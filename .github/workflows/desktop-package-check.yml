@@ -1,16 +1,19 @@
 name: Desktop package check
 
-# Packages the desktop app on Linux, Windows and macOS (Apple silicon and Intel)
-# on every pull request and push to main, checks what shipped, and launches it
-# (ADR-483, ADR-522). Unit tests cannot see what electron-builder actually
-# packs: its file patterns and fuse flips apply silently, and the release
-# lanes' own package checks otherwise ran only when a release was tagged.
+# Packages the desktop app, checks what shipped, and launches it (ADR-483,
+# ADR-522). Unit tests cannot see what electron-builder actually packs: its
+# file patterns and fuse flips apply silently, and the release lanes' own
+# package checks otherwise ran only when a release was tagged.
 #
-# - Linux packages the stable config as an unpacked app.
+# - Linux packages the stable config as an unpacked app, on every pull request
+#   and push to main.
 # - Windows and macOS build the unsigned Preview exactly as the Preview release
 #   lane does, and run that lane's package contract. Windows then installs it,
 #   launches the installed app and uninstalls it; macOS launches the app from
-#   inside its DMG. Both prove a modified app.asar stops the app.
+#   inside its DMG. Both prove a modified app.asar stops the app. The repository
+#   is private, so these runners bill at 2x and 10x Linux minutes: they run when
+#   the release train calls this workflow or on a manual run, not on every pull
+#   request (ADR-522 Amendment 1).
 # - Every launch is the packaged native smoke: launch, SVG import, project
 #   save, on a throwaway profile.
 #
@@ -19,9 +22,29 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
+    inputs:
+      native:
+        description: Also package, install and launch on Windows and macOS
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      native:
+        type: boolean
+        default: true
+      # The release train passes the commit it is about to release, which can
+      # be older than the newest commit on main (ADR-541).
+      ref:
+        type: string
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A fixed prefix: when the release train calls this workflow, github.workflow
+  # names the caller, and sharing its group would deadlock the call. The train's
+  # call is grouped by the commit it checks, so it never waits behind, or is
+  # replaced by, a run for a push to main.
+  group: desktop-package-check-${{ inputs.ref || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 permissions:
@@ -36,6 +59,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up pnpm
@@ -81,13 +106,16 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-${{ github.sha }}
+          name: desktop-package-check-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14
 
   windows-package:
     name: Package, install and launch the Windows desktop app
+    # Only the release train and manual runs set `native`; pull requests and
+    # pushes to main leave the inputs context empty, so this job is skipped.
+    if: ${{ inputs.native == true }}
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -97,6 +125,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up pnpm
@@ -153,11 +183,14 @@ jobs:
       - name: Install, launch, import, save and uninstall
         shell: pwsh
         run: |
+          # The installed app shows the commit it was built from: the checked-out
+          # one, which is not GITHUB_SHA when the release train names a commit.
+          $sourceCommit = (git rev-parse HEAD).Trim()
           & ./scripts/qualify-windows-installer.ps1 `
             -Scenario Launch `
             -Installer "$env:GITHUB_WORKSPACE/release/$env:VERSION/KerfDesk-$env:VERSION-windows-x64-setup.exe" `
             -Version $env:VERSION `
-            -SourceCommit $env:GITHUB_SHA `
+            -SourceCommit $sourceCommit `
             -EvidenceRoot "$env:GITHUB_WORKSPACE/artifacts/installed-launch"
 
       - name: Check that a modified app.asar stops the app
@@ -170,13 +203,14 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-windows-${{ github.sha }}
+          name: desktop-package-check-windows-${{ inputs.ref || github.sha }}
           path: artifacts/installed-launch/
           if-no-files-found: warn
           retention-days: 14
 
   macos-package:
     name: Package and launch the macOS desktop app (${{ matrix.arch }})
+    if: ${{ inputs.native == true }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     strategy:
@@ -194,6 +228,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          # Empty except when the release train calls: then the release commit.
+          ref: ${{ inputs.ref }}
           persist-credentials: false
 
       - name: Set up pnpm
@@ -254,7 +290,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: desktop-package-check-macos-${{ matrix.arch }}-${{ github.sha }}
+          name: desktop-package-check-macos-${{ matrix.arch }}-${{ inputs.ref || github.sha }}
           path: artifacts/native-smoke/
           if-no-files-found: warn
           retention-days: 14

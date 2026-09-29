@@ -63,6 +63,11 @@ export function fileCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> 
     ),
     ...artworkExportCommands(ctx),
     ...gcodeInspectorCommands(ctx),
+    // Desktop app only (ADR-554): closes KerfDesk through the Save question
+    // and the job Abort handoff, as the window's X does.
+    ...(ctx.exitApp === undefined
+      ? []
+      : [enabled('file.exit', 'file', 'Exit', 'Close KerfDesk', ctx.exitApp)]),
   ];
 }
 

@@ -1,7 +1,7 @@
 name: Release Desktop Preview
 
 # Unsigned public Preview lane (ADR-248/249). Preview releases are exact-version
-# GitHub prereleases; they never publish updater metadata or touch stable R2.
+# GitHub archive plus signed public R2 metadata; stable updater paths stay separate.
 on:
   push:
     tags: ['v*-preview.*']
@@ -113,6 +113,7 @@ jobs:
         run: ./scripts/verify-windows-preview-package.ps1 -Version $env:VERSION
 
       - name: Attest Windows binary on its native builder
+        if: github.event.repository.private == false
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
         with:
           subject-path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-windows-x64-setup.exe
@@ -185,6 +186,7 @@ jobs:
         run: bash scripts/verify-macos-preview-package.sh "${VERSION}" x64
 
       - name: Attest macOS x64 binary on its native builder
+        if: github.event.repository.private == false
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
         with:
           subject-path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-macos-x64.dmg
@@ -257,6 +259,7 @@ jobs:
         run: bash scripts/verify-macos-preview-package.sh "${VERSION}" arm64
 
       - name: Attest macOS arm64 binary on its native builder
+        if: github.event.repository.private == false
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
         with:
           subject-path: release/${{ steps.version.outputs.version }}/KerfDesk-${{ steps.version.outputs.version }}-macos-arm64.dmg
@@ -270,11 +273,15 @@ jobs:
           retention-days: 7
 
   publish-preview:
-    name: Publish immutable GitHub prerelease
+    name: Publish immutable Preview archive and signed public downloads
+    concurrency:
+      group: kerfdesk-preview-publication
+      cancel-in-progress: false
     needs: [build-windows, build-macos-x64, build-macos-arm64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
       id-token: write
       attestations: write
       artifact-metadata: write
@@ -341,14 +348,19 @@ jobs:
           VERSION: ${{ steps.release.outputs.version }}
           SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
           SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          node scripts/filter-completed-previews.mjs --fetch "${RUNNER_TEMP}/preview-releases.json"
           cat > release-notes.md <<EOF
           # KerfDesk ${VERSION} Preview
 
           This is a free, unsigned, non-production Preview. Windows may show a
           SmartScreen warning. macOS may require Control-click > Open and the
           Privacy & Security "Open Anyway" path. Updates remain manual: KerfDesk
-          only notifies and opens the public KerfDesk GitHub Releases page.
+          only notifies and opens https://kerfdesk.com/download.html. Public downloads
+          are served from dl.kerfdesk.com with a publisher-signed manifest. For private
+          source, this is publisher provenance, not a GitHub artifact attestation.
 
           - sourceRepository: ${GITHUB_REPOSITORY}
           - sourceSha: ${SOURCE_SHA}
@@ -358,11 +370,13 @@ jobs:
           ## What changed since the last Preview
 
           EOF
-          # CHANGELOG.md's section for this version, or its Unreleased highlights
-          # plus every pull request since the previous Preview tag (ADR-522).
-          node scripts/desktop-release-notes.mjs release-body "${VERSION}" >> release-notes.md
+          # Preserve curated highlights, regenerating changes since the preceding
+          # published immutable Preview. Failed tags never hide unshipped changes.
+          node scripts/desktop-release-notes.mjs release-body "${VERSION}" \
+            --releases="${RUNNER_TEMP}/preview-releases.json" >> release-notes.md
 
       - name: Attest release companions
+        if: github.event.repository.private == false
         uses: actions/attest@36051bcae73b7c2a8a6945a48cbf80953c6baa35 # v4
         with:
           subject-path: |
@@ -371,6 +385,7 @@ jobs:
             release-assets/KerfDesk-*-sbom.cdx.json
 
       - name: Verify exact provenance before creating a release
+        if: github.event.repository.private == false
         env:
           SOURCE_SHA: ${{ steps.release.outputs.source_sha }}
           SIGNER_WORKFLOW: ${{ steps.release.outputs.signer_workflow }}
@@ -507,18 +522,20 @@ jobs:
           )
           test "${target_type}" = commit
           test "${target_sha}" = "${SOURCE_SHA}"
-          release_tag_sha=''
-          for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
-            if release_tag_sha="$(
-              gh release verify "${GITHUB_REF_NAME}" --format json \
-                --jq '.verificationResult.statement.subject[0].digest.sha1'
-            )"; then
-              break
-            fi
-            echo "Release attestation is not available yet; retrying (${attempt}/12)."
-            sleep 10
-          done
-          test "${release_tag_sha}" = "${tag_sha}"
+          if test "${{ github.event.repository.private }}" = false; then
+            release_tag_sha=''
+            for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
+              if release_tag_sha="$(
+                gh release verify "${GITHUB_REF_NAME}" --format json \
+                  --jq '.verificationResult.statement.subject[0].digest.sha1'
+              )"; then
+                break
+              fi
+              echo "Release attestation is not available yet; retrying (${attempt}/12)."
+              sleep 10
+            done
+            test "${release_tag_sha}" = "${tag_sha}"
+          fi
           release_api="repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}"
           api_header='X-GitHub-Api-Version: 2026-03-10'
           test "$(gh api -H "${api_header}" "${release_api}" --jq '.draft')" = false
@@ -547,6 +564,25 @@ jobs:
           test "$(jq -r '.sourceSha' "${manifest}")" = "${SOURCE_SHA}"
           test "$(jq -r '.sourceRef' "${manifest}")" = "${GITHUB_REF}"
           test "$(jq -r '.signerWorkflow' "${manifest}")" = "${SIGNER_WORKFLOW}"
-          for name in "${expected[@]}"; do
-            gh release verify-asset "${GITHUB_REF_NAME}" "published-release-assets/${name}"
-          done
+          if test "${{ github.event.repository.private }}" = false; then
+            for name in "${expected[@]}"; do
+              gh release verify-asset "${GITHUB_REF_NAME}" "published-release-assets/${name}"
+            done
+          fi
+          gh api -H "${api_header}" "${release_api}" > published-preview-release.json
+          gh api -H "${api_header}" "${release_api}" --jq '.body' \
+            > "published-release-assets/KerfDesk-${VERSION}-release-notes.md"
+
+      # Separate signing and upload credentials are only available after native
+      # qualification and archive verification. No token enters a shipped app.
+      - name: Sign and publish verified Preview assets to public R2
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          APPROVED_RELEASE_SHA: ${{ steps.release.outputs.source_sha }}
+          SOURCE_REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+          PREVIEW_PUBLICATION_GROUP: kerfdesk-preview-publication
+          PREVIEW_CLOUDFLARE_ACCOUNT_ID: ${{ vars.PREVIEW_CLOUDFLARE_ACCOUNT_ID }}
+          PREVIEW_R2_API_TOKEN: ${{ secrets.PREVIEW_R2_API_TOKEN }}
+          DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY }}
+          DESKTOP_PREVIEW_MANIFEST_KEY_ID: ${{ vars.DESKTOP_PREVIEW_MANIFEST_KEY_ID }}
+        run: node scripts/publish-preview-release.mjs published-release-assets "${VERSION}" published-preview-release.json

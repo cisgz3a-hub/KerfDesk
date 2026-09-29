@@ -98,6 +98,9 @@ jobs:
       - name: Run the release script tests
         run: pnpm test:release-integrity
 
+      - name: Run the website tests
+        run: pnpm website:test
+
       - name: Build the web app
         run: pnpm build:web
 

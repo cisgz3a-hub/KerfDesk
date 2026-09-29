@@ -7,13 +7,17 @@ export type DesktopCloseNotice = {
 
 export type DesktopCloseReply =
   | { readonly status: 'ready'; readonly dirty: boolean }
-  | { readonly status: 'cancelled' | 'approved' | 'retry' };
+  | { readonly status: 'saved' | 'cancelled' | 'approved' | 'retry' };
 
 export interface DesktopCloseSnapshot {
   readonly active: boolean;
   /** Momentary Fire is latched on. Closing turns it off first, as it aborts a
    *  running job (controller audit electron-native-3). */
   readonly fireLatched?: boolean;
+  /** Identity of non-job motion still owned by the app. A stopped owner may
+   * remain while controller settlement catches up; it is not physical proof. */
+  readonly motionOwner?: object | number | symbol | null;
+  readonly controllerOwner?: object | string | null;
   readonly epoch: number;
   readonly dirty: boolean;
   readonly warning: string | null;
@@ -29,13 +33,16 @@ interface CloseAttempt {
   preparedWarning: string | null;
   preparedDirty: boolean;
   preparedDocument: object | null;
+  preparedMotionOwner: DesktopCloseSnapshot['motionOwner'];
+  preparedControllerOwner: DesktopCloseSnapshot['controllerOwner'];
+  stoppedOwners: DesktopCloseSnapshot;
   approved: boolean;
 }
 
 /** Owns application stop handoff only; a settled write is not a physical stop. */
 export class DesktopCloseController {
   private attempt: CloseAttempt | null = null;
-  private stopFlight: Promise<void> | null = null;
+  private stopFlight: Promise<DesktopCloseSnapshot> | null = null;
   private notice: DesktopCloseNotice | null = null;
   private shownWarning: DesktopCloseSnapshot | null = null;
   private readonly listeners = new Set<() => void>();
@@ -64,13 +71,20 @@ export class DesktopCloseController {
     const snapshot = this.read();
     const attempt: CloseAttempt = {
       id,
-      wasActive: snapshot.active || snapshot.fireLatched === true || this.stopFlight !== null,
+      wasActive:
+        snapshot.active ||
+        snapshot.fireLatched === true ||
+        hasOwnedMotion(snapshot) ||
+        this.stopFlight !== null,
       promise,
       resolve,
       preparedEpoch: null,
       preparedWarning: null,
       preparedDirty: false,
       preparedDocument: null,
+      preparedMotionOwner: null,
+      preparedControllerOwner: null,
+      stoppedOwners: snapshot,
       approved: false,
     };
     this.attempt = attempt;
@@ -107,6 +121,22 @@ export class DesktopCloseController {
     }
   };
 
+  /**
+   * Save before closing (ADR-549), for the prepared attempt only. The save
+   * changes the document, so the approval that follows answers retry and the
+   * close is prepared again with the saved project.
+   */
+  async save(id: number, saveProject: () => Promise<boolean>): Promise<DesktopCloseReply> {
+    if (this.attempt?.id !== id || this.attempt.preparedDocument === null) {
+      return { status: 'cancelled' };
+    }
+    try {
+      return (await saveProject()) ? { status: 'saved' } : { status: 'cancelled' };
+    } catch {
+      return { status: 'cancelled' };
+    }
+  }
+
   approve(id: number): DesktopCloseReply {
     const attempt = this.attempt;
     // A late approval has no authority over the newer attempt that owns unload.
@@ -141,11 +171,12 @@ export class DesktopCloseController {
     }
   }
 
-  private requestStop(): Promise<void> {
+  private requestStop(): Promise<DesktopCloseSnapshot> {
     if (this.stopFlight !== null) return this.stopFlight;
-    let resolve: () => void = () => undefined;
+    const stopping = this.read();
+    let resolve: (snapshot: DesktopCloseSnapshot) => void = () => undefined;
     let reject: (error: unknown) => void = () => undefined;
-    const flight = new Promise<void>((done, fail) => {
+    const flight = new Promise<DesktopCloseSnapshot>((done, fail) => {
       resolve = done;
       reject = fail;
     });
@@ -153,7 +184,7 @@ export class DesktopCloseController {
     // Initiate synchronously: a browser's best-effort beforeunload path cannot
     // defer its first write to a future task on a page already being torn down.
     try {
-      void this.stop().then(resolve, reject);
+      void this.stop().then(() => resolve(stopping), reject);
     } catch (error) {
       reject(error);
     }
@@ -166,22 +197,25 @@ export class DesktopCloseController {
   }
 
   private async stopForAttempt(attempt: CloseAttempt): Promise<void> {
-    const jobActive = this.read().active;
+    const snapshot = this.read();
+    const abortNeeded = snapshot.active || hasOwnedMotion(snapshot);
     this.setNotice({
       kind: 'pending',
       message:
-        (jobActive ? 'Sending Abort before closing. ' : 'Turning Fire off before closing. ') +
+        (abortNeeded ? 'Sending Abort before closing. ' : 'Turning Fire off before closing. ') +
         'Keep this window available while the request finishes. ' +
         'A completed software request does not confirm the machine is physically stopped.',
     });
     try {
-      await this.requestStop();
-      if (this.attempt === attempt) this.prepareResult(attempt);
+      const stopping = await this.requestStop();
+      if (this.attempt !== attempt) return;
+      attempt.stoppedOwners = stopping;
+      this.prepareResult(attempt);
     } catch (error) {
       if (this.attempt !== attempt) return;
-      // Without a job, only Fire was being turned off: its unconfirmed warning
+      // Without a job or motion owner, only Fire was being turned off: its warning
       // can be acknowledged, so a link that refuses M5 cannot trap the window.
-      if (!this.read().active) {
+      if (!this.read().active && !hasOwnedMotion(this.read())) {
         this.prepareResult(attempt);
         return;
       }
@@ -201,6 +235,14 @@ export class DesktopCloseController {
     acknowledged: DesktopCloseSnapshot | null = null,
   ): void {
     const snapshot = this.read();
+    if (hasReplacementMotion(snapshot, attempt.stoppedOwners)) {
+      this.setNotice({
+        kind: 'failed',
+        retry: true,
+        message: 'A new machine operation started while closing. Keep the app open or retry Abort.',
+      });
+      return;
+    }
     if (snapshot.active) {
       this.setNotice({
         kind: 'failed',
@@ -225,6 +267,8 @@ export class DesktopCloseController {
     attempt.preparedWarning = snapshot.warning;
     attempt.preparedDirty = snapshot.dirty;
     attempt.preparedDocument = snapshot.document;
+    attempt.preparedMotionOwner = snapshot.motionOwner ?? null;
+    attempt.preparedControllerOwner = snapshot.controllerOwner ?? null;
     this.setNotice(null);
     attempt.resolve({ status: 'ready', dirty: snapshot.dirty });
   }
@@ -236,7 +280,9 @@ export class DesktopCloseController {
       !snapshot.active &&
       attempt.preparedWarning === snapshot.warning &&
       attempt.preparedDirty === snapshot.dirty &&
-      attempt.preparedDocument === snapshot.document
+      attempt.preparedDocument === snapshot.document &&
+      attempt.preparedMotionOwner === (snapshot.motionOwner ?? null) &&
+      attempt.preparedControllerOwner === (snapshot.controllerOwner ?? null)
     );
   }
 
@@ -245,4 +291,18 @@ export class DesktopCloseController {
     this.notice = notice;
     for (const listener of this.listeners) listener();
   }
+}
+
+function hasOwnedMotion(snapshot: DesktopCloseSnapshot): boolean {
+  return snapshot.motionOwner != null || snapshot.controllerOwner != null;
+}
+
+function hasReplacementMotion(
+  current: DesktopCloseSnapshot,
+  stopped: DesktopCloseSnapshot,
+): boolean {
+  return (
+    (current.motionOwner != null && current.motionOwner !== stopped.motionOwner) ||
+    (current.controllerOwner != null && current.controllerOwner !== stopped.controllerOwner)
+  );
 }

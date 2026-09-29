@@ -12,7 +12,7 @@ type Outcome = {
   readonly args?: ReadonlyArray<string | number>;
   readonly guard?: string;
   readonly url?: string;
-  readonly special?: 'tutorials' | 'unavailable';
+  readonly special?: 'tutorials' | 'unavailable' | 'licence' | 'support-report' | 'check-updates';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -38,6 +38,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'file.export-geojson': { callback: 'exportGeoJson' },
   'file.open-gcode': { callback: 'openGcodePreview' },
   'file.inspect-gcode': { callback: 'inspectCurrentGcode' },
+  'file.exit': { callback: 'exitApp' },
   'edit.undo': { callback: 'undo' },
   'edit.redo': { callback: 'redo' },
   'edit.select-all': { callback: 'selectAll' },
@@ -169,11 +170,15 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'window.project-notes': { callback: 'projectNotes' },
   'window.undo-history': { callback: 'undoHistory' },
   'help.about': { callback: 'showAbout' },
+  'help.licence': { special: 'licence' },
   'help.tutorials': { special: 'tutorials' },
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
-  'help.report-bug': { url: 'https://github.com/cisgz3a-hub/KerfDesk/issues/new/choose' },
-  'help.discussions': { url: 'https://github.com/cisgz3a-hub/KerfDesk/discussions' },
+  'help.report-bug': { url: 'https://kerfdesk.com/support.html#report' },
+  'help.support-report': { special: 'support-report' },
+  'help.check-updates': { special: 'check-updates' },
+  'help.open-data-folder': { callback: 'openDataFolder' },
+  'help.discussions': { url: 'https://kerfdesk.com/support.html' },
 };
 
 let host: HTMLDivElement;
@@ -204,11 +209,14 @@ function availableContext(id: CommandId): AppCommandContext {
   return baseCtx({
     ...eligibility,
     connected: id !== 'laser.connect',
+    licensing: true,
     printAndCutFeatureEnabled: true,
     printAndCutProfileSupported: true,
     printAndCut: vi.fn(),
     createArray: vi.fn(),
     quickNest: vi.fn(),
+    exitApp: vi.fn(),
+    openDataFolder: vi.fn(),
   });
 }
 
@@ -239,6 +247,12 @@ describe('every registered application menu action', () => {
     '$id clicks through the menu to the expected outcome',
     async ({ id, outcome }) => {
       const context = availableContext(id);
+      const licenceEvent = vi.fn();
+      const supportReportEvent = vi.fn();
+      window.addEventListener('kerfdesk:licence-settings', licenceEvent, { once: true });
+      window.addEventListener('kerfdesk:support-report', supportReportEvent, { once: true });
+      const checkUpdatesEvent = vi.fn();
+      window.addEventListener('kerfdesk:check-updates', checkUpdatesEvent, { once: true });
       const opened: Array<{ href: string; target: string; rel: string }> = [];
       vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
         this: HTMLAnchorElement,
@@ -246,6 +260,14 @@ describe('every registered application menu action', () => {
         opened.push({ href: this.href, target: this.target, rel: this.rel });
       });
       const button = await clickCommand(id, context);
+      expect(licenceEvent).toHaveBeenCalledTimes(Number(outcome.special === 'licence'));
+      expect(supportReportEvent).toHaveBeenCalledTimes(
+        Number(outcome.special === 'support-report'),
+      );
+      window.removeEventListener('kerfdesk:licence-settings', licenceEvent);
+      window.removeEventListener('kerfdesk:support-report', supportReportEvent);
+      expect(checkUpdatesEvent).toHaveBeenCalledTimes(Number(outcome.special === 'check-updates'));
+      window.removeEventListener('kerfdesk:check-updates', checkUpdatesEvent);
       if (outcome.special === 'unavailable') {
         expect(button.disabled).toBe(true);
         expect(button.title).toContain('Z-motion generator');

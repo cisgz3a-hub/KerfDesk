@@ -1,7 +1,7 @@
 import type { DesktopUpdateAdapter, DesktopUpdateAvailability } from '../types';
 
 const PREVIEW_UPDATE_PATH = './api/desktop-preview-update';
-const OFFICIAL_RELEASE_BASE = 'https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v';
+const OFFICIAL_RELEASE_BASE = 'https://kerfdesk.com/download.html?version=';
 const PREVIEW_VERSION =
   /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-preview\.(0|[1-9][0-9]*)$/;
 

@@ -29,7 +29,8 @@ now, and its `ubuntu-latest` runners have 4 vCPUs (the Browser smoke log reports
 1. **CI runs the release gate as parallel jobs** (`.github/workflows/ci.yml`):
    - *Typecheck, lint and format*: `typecheck`, `lint`, `lint:electron`, `format:check`.
    - *Policy checks and builds*: ADR numbers, action pins, licences, `test:release-integrity`,
-     `build:web`, `build:electron-main`, and the file-size, soft-size and index-export checks.
+     `website:test`, `build:web`, `build:electron-main`, and the file-size, soft-size and
+     index-export checks.
    - *Unit tests (1/4 to 4/4)*: `pnpm test --shard=i/4`. Vitest assigns each test file to one
      shard by a hash of its path, so every file runs exactly once.
    - *Lint, typecheck, license, test, build*: needs every job above, runs even when one failed or

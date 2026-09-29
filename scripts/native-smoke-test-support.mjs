@@ -65,12 +65,28 @@ export function validResult(userData, overrides = {}) {
     sessionData: userData,
     windowVisible: true,
     failures: [],
+    webPreferences: {
+      available: true,
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      preload: 'not-reported',
+    },
+    devToolsProbe: { method: 'openDevTools', opened: false },
     renderer: {
       readyToShow: true,
       imported: true,
       saved: true,
       savedBytes: 2048,
       url: 'app://app/index.html',
+      nodePrimitives: {
+        require: 'undefined',
+        process: 'undefined',
+        module: 'undefined',
+        Buffer: 'undefined',
+      },
+      fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' },
     },
     ...overrides,
   };

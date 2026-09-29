@@ -2,13 +2,13 @@
 // on main's first-parent history names its pull request; this groups them
 // into what is new, fixed and faster, by area, in the user's words.
 //
-//   node scripts/desktop-release-notes.mjs draft [--from=<ref>] [--to=<ref>]
-//     Prints the notes for the changes since the last Preview tag.
-//   node scripts/desktop-release-notes.mjs refresh [--to=<ref>]
+//   node scripts/desktop-release-notes.mjs draft --releases=<json> [--to=<ref>]
+//     Prints changes since the latest published immutable Preview.
+//   node scripts/desktop-release-notes.mjs refresh --releases=<json> [--to=<ref>]
 //     Rewrites the generated part of CHANGELOG.md's Unreleased section.
-//   node scripts/desktop-release-notes.mjs stamp <version>
+//   node scripts/desktop-release-notes.mjs stamp <version> --releases=<json>
 //     Before tagging: Unreleased becomes <version>'s section.
-//   node scripts/desktop-release-notes.mjs release-body <version>
+//   node scripts/desktop-release-notes.mjs release-body <version> --releases=<json>
 //     What the Preview release lane publishes as the release's notes.
 
 import { execFileSync } from 'node:child_process';
@@ -16,12 +16,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  changelogSection,
   newestReleasedVersion,
   refreshUnreleased,
   releaseBody,
   stampChangelog,
 } from './desktop-changelog.mjs';
+import { compareTags, publishedPreviews, versionParts } from './desktop-preview-releases.mjs';
 
 export const REPOSITORY_URL = 'https://github.com/cisgz3a-hub/KerfDesk';
 const PREVIEW_TAG = 'v*-preview.*';
@@ -172,40 +172,55 @@ export function notesBetween(from, to) {
   );
 }
 
-function tagDate(tag) {
-  return git('log', '-1', '--format=%cs', tag);
-}
-
 function runCli(argv) {
   const [command, version] = argv;
   const option = (name) => argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
   const changelogPath = resolve('CHANGELOG.md');
+  const releasesPath = option('releases');
+  const releases = () => {
+    if (releasesPath === undefined) throw new Error('--releases=<metadata.json> is required');
+    const published = publishedPreviews(JSON.parse(readFileSync(releasesPath, 'utf8')));
+    if (version !== undefined && !version.startsWith('--')) {
+      if (versionParts(`v${version}`) === null) throw new Error('expected a Preview version');
+      return published.filter((release) => compareTags(release.tagName, `v${version}`) < 0);
+    }
+    return published;
+  };
+  const previousTag = (published, to) => {
+    const tag = published[0]?.tagName;
+    if (tag === undefined) throw new Error('no preceding published immutable Preview release');
+    git('merge-base', '--is-ancestor', `${tag}^{commit}`, to);
+    return tag;
+  };
   if (command === 'draft') {
     const to = option('to') ?? 'HEAD';
-    return notesBetween(option('from') ?? previewTagBefore(to), to);
+    return notesBetween(option('from') ?? previousTag(releases(), to), to);
   }
   if (command === 'refresh') {
     const changelog = readFileSync(changelogPath, 'utf8');
     const to = option('to') ?? 'HEAD';
     writeFileSync(
       changelogPath,
-      refreshUnreleased(changelog, notesBetween(previewTagBefore(to), to)),
+      refreshUnreleased(changelog, notesBetween(previousTag(releases(), to), to)),
     );
     return `CHANGELOG.md Unreleased refreshed up to ${to}`;
   }
   if (command === 'stamp' && version !== undefined) {
     const changelog = readFileSync(changelogPath, 'utf8');
-    const latest = previewTagBefore('HEAD');
+    const published = releases();
+    const latest = previousTag(published, 'HEAD');
     const missed = [];
-    // Previews tagged without a stamp still get their own generated section.
-    for (let tag = latest; tag !== null && tag.slice(1) !== newestReleasedVersion(changelog); ) {
-      const previous = previewTagBefore(`${tag}^`);
+    // Only actually published Previews receive a missing historical section.
+    for (let index = 0; index < published.length; index += 1) {
+      const release = published[index];
+      const tag = release.tagName;
+      if (tag.slice(1) === newestReleasedVersion(changelog)) break;
+      const previous = published[index + 1]?.tagName ?? null;
       missed.push({
         version: tag.slice(1),
-        date: tagDate(tag),
+        date: release.publishedAt.slice(0, 10),
         generated: notesBetween(previous, tag),
       });
-      tag = previous;
     }
     const date = new Date().toISOString().slice(0, 10);
     const generated = notesBetween(latest, 'HEAD');
@@ -214,8 +229,10 @@ function runCli(argv) {
   }
   if (command === 'release-body' && version !== undefined) {
     const changelog = readFileSync(changelogPath, 'utf8');
-    if (changelogSection(changelog, version) !== null) return releaseBody(changelog, version, '');
-    return releaseBody(changelog, version, notesBetween(previewTagBefore('HEAD^'), 'HEAD'));
+    const previous = previousTag(releases(), 'HEAD');
+    return releaseBody(changelog, version, notesBetween(previous, 'HEAD'), {
+      regenerateChanges: true,
+    });
   }
   throw new Error(
     'usage: desktop-release-notes.mjs draft|refresh|stamp <version>|release-body <version>',

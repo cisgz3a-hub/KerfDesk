@@ -93,4 +93,9 @@ export const FILE_COMMAND_HELP: Readonly<
     tooltip:
       'Export selected vector artwork, or all of it when nothing is selected, as GeoJSON: polygons with holes for filled artwork and lines for strokes, flattened within 0.01 mm. Coordinates are millimetres with y up from the lower-left corner, not longitude and latitude, so the file is not georeferenced (a deliberate departure from RFC 7946 section 4) and map tools will not place it on a map. Filled shapes follow their fill rule; shapes whose outlines cross are kept as separate, overlapping polygons rather than merged, and the export warns when that happens.',
   },
+  'file.exit': {
+    family: 'file',
+    tooltip:
+      'Close the desktop app. KerfDesk first asks whether to save unsaved changes, and a running job gets the same Abort as closing the window.',
+  },
 };

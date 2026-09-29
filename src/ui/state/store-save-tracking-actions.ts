@@ -1,5 +1,13 @@
+import type { SaveTarget } from '../../platform/types';
 import type { AppState } from './store';
 import { saveTargetsShareDestination } from './project-save-write-coordinator';
+
+/** How a loaded document starts: unsaved, and where Save writes. Open sets the
+ * opened KerfDesk file when the platform can write it back (ADR-550). */
+export type MarkLoadedOptions = {
+  readonly dirty?: boolean;
+  readonly saveTarget?: SaveTarget;
+};
 
 type Setter = (
   update: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -68,7 +76,8 @@ export function saveTrackingActions(
       set({
         dirty: options?.dirty ?? false,
         savedName: filename,
-        lastSaveTarget: null,
+        // Save writes over the KerfDesk project just opened (ADR-550).
+        lastSaveTarget: options?.saveTarget ?? null,
         projectSavedRequestEpoch: null,
       }),
   };

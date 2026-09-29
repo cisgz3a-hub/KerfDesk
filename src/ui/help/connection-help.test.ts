@@ -27,6 +27,11 @@ describe('CONNECTION_HELP_TEXT', () => {
     expect(CONNECTION_HELP_TEXT).toMatch(/USB webcam/i);
   });
 
+  it('covers Windows switching the USB port off and restarting mid-job (ADR-548)', () => {
+    expect(CONNECTION_HELP_TEXT).toContain('USB selective suspend');
+    expect(CONNECTION_HELP_TEXT).toContain('Active hours');
+  });
+
   it('points to the full guide', () => {
     expect(CONNECTION_HELP_TEXT).toContain('docs/connection-troubleshooting.md');
   });

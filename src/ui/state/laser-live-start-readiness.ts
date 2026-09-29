@@ -11,6 +11,7 @@ import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
+import { continueControllerOperation } from './laser-controller-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -54,7 +55,10 @@ export async function refreshLaserLiveStartState(args: {
   args.set((state) => ({
     controllerOperation:
       state.controllerOperation?.kind === 'start-arming'
-        ? { ...state.controllerOperation, phase: 'live-status' }
+        ? continueControllerOperation(state.controllerOperation, {
+            ...state.controllerOperation,
+            phase: 'live-status',
+          })
         : { kind: 'start-arming', phase: 'live-status' },
   }));
   const statusArgs = { ...args, permit: args.permit };

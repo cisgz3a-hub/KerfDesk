@@ -22,6 +22,7 @@ import type { ControllerWakeOutcome } from './laser-store-action-types';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { pushLog } from './laser-store-helpers';
+import { continueControllerOperation } from './laser-controller-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -121,7 +122,11 @@ function afterResetPatch(state: LaserState): Partial<LaserState> {
     framedRun: null,
     frameTrace: null,
     motionOperation: null,
-    controllerOperation: { kind: 'recovery', phase: 'awaiting-idle', idleReports: 0 },
+    controllerOperation: continueControllerOperation(state.controllerOperation, {
+      kind: 'recovery',
+      phase: 'awaiting-idle',
+      idleReports: 0,
+    }),
     homingState: 'unknown',
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
     lastWriteError: null,

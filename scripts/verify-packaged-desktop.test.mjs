@@ -14,6 +14,8 @@ const ENTRIES = [
   'package.json',
   'dist-electron/main.js',
   'dist/web/index.html',
+  'public/desktop-release-manifest.mjs',
+  'public/desktop-release-keys.json',
   'node_modules/electron-updater/package.json',
 ];
 
@@ -75,4 +77,21 @@ test('lists nested asar entries as paths', () => {
     },
   };
   assert.deepEqual(asarEntries(header), ['package.json', 'node_modules/ms/index.js']);
+});
+
+test('requires the packaged verifier and trust anchors in both distribution configs', () => {
+  for (const required of [
+    'public/desktop-release-manifest.mjs',
+    'public/desktop-release-keys.json',
+  ]) {
+    assert.ok(STABLE.includes(`  - ${required}`));
+    assert.ok(PREVIEW.includes(`  - ${required}`));
+    const problems = packagedDesktopProblems({
+      wire: '010011001',
+      fuses: configuredFuses(STABLE),
+      allowed: ['electron-updater'],
+      entries: ENTRIES.filter((entry) => entry !== required),
+    });
+    assert.ok(problems.includes(`app.asar is missing ${required}`));
+  }
 });

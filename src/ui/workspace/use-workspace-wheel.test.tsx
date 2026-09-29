@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { resetStore } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
-import { useWorkspaceWheelZoom } from './use-workspace-wheel';
+import { useWorkspaceWheelZoom, wheelZoomSteps } from './use-workspace-wheel';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -83,6 +83,56 @@ describe('useWorkspaceWheelZoom', () => {
     });
 
     expect(useUiStore.getState()).toMatchObject({ zoomFactor: 2, panX: 7, panY: -3 });
+  });
+
+  // Chromium merges wheel events that queue during a slow frame into one event
+  // with the summed delta. Counting only the sign dropped those notches: ten
+  // notches spun over a large picture zoomed six steps (measured 2026-09-29).
+  it('zooms by every notch a coalesced wheel event carries', async () => {
+    const { canvas } = await renderHarness();
+    await act(async () => {
+      canvas.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaY: -300,
+          clientX: 100,
+          clientY: 100,
+        }),
+      );
+    });
+    expect(useUiStore.getState().zoomFactor).toBeCloseTo(1.1 ** 3, 10);
+  });
+
+  it('still zooms one step for a delta smaller than a notch', async () => {
+    const { canvas } = await renderHarness();
+    await act(async () => {
+      canvas.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          deltaY: 4,
+          clientX: 100,
+          clientY: 100,
+        }),
+      );
+    });
+    expect(useUiStore.getState().zoomFactor).toBeCloseTo(1 / 1.1, 10);
+  });
+});
+
+describe('wheelZoomSteps', () => {
+  it('counts notches in pixel, line and page deltas', () => {
+    expect(wheelZoomSteps({ deltaY: 100, deltaMode: 0 })).toBe(1);
+    expect(wheelZoomSteps({ deltaY: -200, deltaMode: 0 })).toBe(2);
+    expect(wheelZoomSteps({ deltaY: 6, deltaMode: 1 })).toBe(2);
+    expect(wheelZoomSteps({ deltaY: -1, deltaMode: 2 })).toBe(1);
+  });
+
+  it('never drops below one step or runs away on a huge delta', () => {
+    expect(wheelZoomSteps({ deltaY: 0.5, deltaMode: 0 })).toBe(1);
+    expect(wheelZoomSteps({ deltaY: 50_000, deltaMode: 0 })).toBe(10);
+    expect(wheelZoomSteps({ deltaY: Number.NaN, deltaMode: 0 })).toBe(1);
   });
 });
 

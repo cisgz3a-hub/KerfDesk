@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  DISCUSSIONS_URL,
-  REPORT_BUG_URL,
+  REPORT_PROBLEM_URL,
+  SUPPORT_URL,
   discussionsCommand,
   openExternalUrl,
   reportBugCommand,
+  supportReportCommand,
 } from './support-command-family';
 
 afterEach(() => {
@@ -12,12 +13,11 @@ afterEach(() => {
 });
 
 describe('support commands', () => {
-  it('points the bug report at the GitHub issue-template chooser', () => {
-    expect(REPORT_BUG_URL).toBe('https://github.com/cisgz3a-hub/KerfDesk/issues/new/choose');
-  });
-
-  it('points feedback at GitHub Discussions', () => {
-    expect(DISCUSSIONS_URL).toBe('https://github.com/cisgz3a-hub/KerfDesk/discussions');
+  it('sends customers to the kerfdesk.com support page, never the private repository', () => {
+    expect(SUPPORT_URL).toBe('https://kerfdesk.com/support.html');
+    expect(REPORT_PROBLEM_URL).toBe('https://kerfdesk.com/support.html#report');
+    for (const command of [reportBugCommand(), discussionsCommand()])
+      expect(`${command.label} ${command.title}`).not.toMatch(/github/i);
   });
 
   it('registers enabled Help-family commands with stable ids', () => {
@@ -51,7 +51,20 @@ describe('support commands', () => {
 
     reportBugCommand().invoke();
 
-    expect(anchor.href).toBe(REPORT_BUG_URL);
+    expect(anchor.href).toBe(REPORT_PROBLEM_URL);
     expect(clickSpy).toHaveBeenCalledOnce();
+  });
+
+  it('asks the app to save a support report, without leaving it', () => {
+    const command = supportReportCommand();
+    const requested = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click');
+    window.addEventListener('kerfdesk:support-report', requested, { once: true });
+
+    command.invoke();
+
+    expect(command).toMatchObject({ id: 'help.support-report', family: 'help', enabled: true });
+    expect(requested).toHaveBeenCalledOnce();
+    expect(click).not.toHaveBeenCalled();
   });
 });
