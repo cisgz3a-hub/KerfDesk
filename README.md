@@ -288,6 +288,13 @@ preload and no IPC handlers.
 CI publishes the web build to Cloudflare Pages on every green `main` run; the canonical URL is
 <https://kerfdesk.com> (see [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)).
 
+### Product website
+
+The public product site — features, machines, downloads, pricing and help — lives in
+[`website/`](website/README.md). It is static HTML with no JavaScript, built by
+`pnpm website:build` and checked by `pnpm website:test`. It is not part of the app bundle and is
+not deployed automatically (ADR-524).
+
 ---
 
 ## Tests and quality gates

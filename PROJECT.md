@@ -52,6 +52,7 @@ User profile:
 - **Windows desktop preview packaging:** the checked-in Preview workflow builds an unsigned KerfDesk NSIS package for Windows 10/11 x64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
 - **macOS desktop preview packaging:** the checked-in Preview workflow builds separate unsigned and unnotarized KerfDesk DMGs for macOS 13+ x64 and arm64. Publication still requires an authorized exact-version tag and recorded real-OS qualification.
 - **Linux:** web/PWA only. A Linux desktop build remains Phase J.
+- **Product website:** a separate static site in `website/` (ADR-524) that describes, downloads and prices KerfDesk. It ships no JavaScript, analytics or cookies, is never bundled into the app, and shows no price or checkout while sales are closed under ADR-247.
 
 Every current and planned target uses one codebase, sharing every line of pipeline and UI code, separated only by a thin **platform adapter** for file I/O, serial port, and drag-and-drop. See ADR-011 and ADR-248.
 
