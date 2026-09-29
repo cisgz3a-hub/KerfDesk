@@ -11,6 +11,8 @@ import {
   type DeviceProfile,
   type MachineProfileSuggestion,
 } from '../../../core/devices';
+// Deep import: the devices barrel is at its public-export ratchet.
+import { presetCommandSetUpdate } from '../../../core/devices/preset-command-set';
 import { filterMachineProfileSuggestions } from '../../../core/devices/profile-suggestions';
 import { fillRunwayPolicyForDevice } from '../../../core/job/fill-runway-policy';
 import { Button } from '../../kit';
@@ -27,10 +29,14 @@ export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepPro
   });
   const matches = filterMachineProfileSuggestions(suggestions, query);
   const active = matches.find((suggestion) => profilePresetIsActive(state.draft, suggestion));
+  // A saved copy that lacks its preset's command set still leads the preview,
+  // unselected, so re-applying the preset stays one click (ADR-375).
+  const lead =
+    active ?? matches.find((suggestion) => draftLacksPresetCommandSet(state.draft, suggestion));
   const preview =
-    active === undefined
+    lead === undefined
       ? matches.slice(0, 2)
-      : [active, ...matches.filter((item) => item !== active).slice(0, 1)];
+      : [lead, ...matches.filter((item) => item !== lead).slice(0, 1)];
   const visible = showAll || query.trim() !== '' ? matches : preview;
   return (
     <section aria-label="Reviewed machine profiles" className="lf-setup-catalog">
@@ -57,6 +63,7 @@ export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepPro
             key={suggestion.profileId}
             suggestion={suggestion}
             isActive={profilePresetIsActive(state.draft, suggestion)}
+            lacksCommandSet={draftLacksPresetCommandSet(state.draft, suggestion)}
             onUse={() => dispatch({ kind: 'apply-preset', profile: suggestion.profile })}
           />
         ))}
@@ -83,17 +90,33 @@ function profilePresetIsActive(
   suggestion: MachineProfileSuggestion,
 ): boolean {
   if (draft.profileId !== suggestion.profile.profileId) return false;
+  if (draftLacksPresetCommandSet(draft, suggestion)) return false;
   if (suggestion.profile.profileId !== NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId) return true;
   return fillRunwayPolicyForDevice(draft) !== undefined;
+}
+
+// A copy saved before its preset carried a vendor command set connects with the
+// generic driver, whose Frame sends M9 just before Start (ADR-323). It is not
+// the preset, so its card stays unselected and a click re-applies the preset.
+// Job Review names the same copies (ADR-375).
+function draftLacksPresetCommandSet(
+  draft: DeviceProfile,
+  suggestion: MachineProfileSuggestion,
+): boolean {
+  return draft.profileId === suggestion.profile.profileId && presetCommandSetUpdate(draft) !== null;
 }
 
 function PresetCard(props: {
   readonly suggestion: MachineProfileSuggestion;
   readonly isActive: boolean;
+  readonly lacksCommandSet: boolean;
   readonly onUse: () => void;
 }): JSX.Element {
   const { suggestion } = props;
   const profile = suggestion.profile;
+  const notice = props.lacksCommandSet
+    ? 'This saved profile predates the preset’s vendor command set. Choose this card to re-apply the preset; it replaces this draft’s values, so review them before saving.'
+    : suggestion.warnings[0];
   return (
     <article className="lf-setup-profile" data-selected={props.isActive}>
       <label className="lf-setup-profile-choice">
@@ -120,9 +143,7 @@ function PresetCard(props: {
           <span>{suggestionConfidenceLabel(suggestion.confidence)}</span>
           <span>{profileConfidenceLabel(profile)}</span>
         </span>
-        {suggestion.warnings.length > 0 ? (
-          <span className="lf-setup-profile-warning">{suggestion.warnings[0]}</span>
-        ) : null}
+        {notice !== undefined ? <span className="lf-setup-profile-warning">{notice}</span> : null}
       </label>
       <details className="lf-setup-profile-notes">
         <summary title={`Read profile notes for ${profile.name}`}>Profile details</summary>
