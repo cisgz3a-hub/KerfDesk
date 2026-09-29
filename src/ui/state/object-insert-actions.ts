@@ -23,6 +23,8 @@ import {
 } from './box-insert-mutation';
 import { applyCarveSettingsToOperations, applyDesignSketch } from './design-apply-mutation';
 import { reportDependencyRepairs } from './object-delete-actions';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
+import { saveUndoStepName } from './undo-step-names';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
 import { applyLayerDefaultSettings } from '../layers/layer-default-settings';
@@ -51,6 +53,8 @@ import {
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 type Getter = () => AppState;
+
+const DESIGN_FEWER = 'Apply a smaller drawing, or delete some objects first.';
 
 export function objectInsertActions(
   set: Setter,
@@ -221,11 +225,19 @@ function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
   return (sketch: Sketch, ids: ReadonlyArray<string>, previous: DesignApplyRecord | null) => {
     // The record has to reach the Studio, and a zustand setter returns nothing,
     // so it is captured here and returned once the transition has run.
-    let record: DesignApplyRecord | null = null;
+    let record: DesignApplyRecord | 'refused' | null = null;
     set((state) => {
+      const restoreUndoName = saveUndoStepName(state.project);
       const next = applyDesignSketch(state, sketch, ids, previous);
       // A sketch that contributes nothing leaves the project exactly as it was.
       if (next === null) return state;
+      // A project past its limits saves but cannot be opened again (ADR-307
+      // amendment 1): such an Apply is refused whole, and the Studio is told.
+      if (refuseSceneLimitOverrun(state.project.scene, next.project.scene, DESIGN_FEWER)) {
+        restoreUndoName();
+        record = 'refused';
+        return state;
+      }
       record = next.applyRecord;
       const { dependencyRepairs, ...nextState } = next;
       reportDependencyRepairs(dependencyRepairs);

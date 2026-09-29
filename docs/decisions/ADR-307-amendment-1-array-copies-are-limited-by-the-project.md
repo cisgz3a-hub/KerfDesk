@@ -31,7 +31,10 @@ any kind (the 2026-09-28 weakness audit, found while fixing H-5, ADR-498 amendme
   artwork of 12,000 strokes (a stipple, a sheet of parts) into 12,000 objects. Cut Shapes adds a
   piece for every shape it crosses: three shapes cut in a project of 9,999 objects made 10,001.
   Array on board (ADR-125) tiles one design up to 500 times across a placed board: filling a
-  300 mm board with a 10 by 5 mm design in a project of 9,702 objects made 10,166.
+  300 mm board with a 10 by 5 mm design in a project of 9,702 objects made 10,166. Design Studio
+  Apply (ADR-272) makes every entity of the drawing an object and each new design layer an
+  operation: two rectangles applied to a project of 9,999 objects made 10,001, and a drawing
+  applied to a project of 256 operations made 257.
 
 ADR-307 decision 5 says every valid requested placement is materialized. This amendment says what
 valid means: one the project can hold. It is not the policy cap decision 5 removed, because the
@@ -96,14 +99,20 @@ figure is the loader's and not a judgement, and every request that fits is still
      say how many pieces it made.
    - **Array on board:** "... Array fewer copies on the board, or delete some objects first." Its
      own bound of 100 tiles a side and 500 in all is unchanged.
+   - **Design Studio Apply:** "... Apply a smaller drawing, or delete some objects first." The
+     drawing stays unapplied in the Studio and Apply stays on, to apply once there is room. A
+     refused Apply & Close does not close the Studio, so the drawing is there to make smaller. An
+     Apply that replaces what the last one made is counted after the replacement, so editing that
+     artwork in a full project is refused only when the edit adds objects or operations.
 
-   These commands add what the selection or the clipboard makes, and Array on board lays out at
-   most 500 tiles, so the scene each would make is cheap to build and is checked as it is: no
-   room is worked out in advance. No cap below the loader's limits is added, and a project that
-   is already over one stays free to change in ways that add nothing to it. The exact check now
-   holds the fourth count the loader does, operations (256), as well as objects, groups and group
-   members, because a paste from another project brings its operations with it. Array and Copy
-   Along Path add no operations, so nothing changes for them.
+   These commands add what the selection, the clipboard or the drawing makes, and Array on board
+   lays out at most 500 tiles, so the scene each would make is cheap to build and is checked as it
+   is: no room is worked out in advance. No cap below the loader's limits is added, and a project
+   that is already over one stays free to change in ways that add nothing to it. The exact check
+   now holds the fourth count the loader does, operations (256), as well as objects, groups and
+   group members, because a paste from another project brings its operations with it and a Design
+   Studio Apply can add some. Array and Copy Along Path add no operations, so nothing changes for
+   them.
 
 ### Alternatives
 
@@ -129,8 +138,10 @@ figure is the loader's and not a judgement, and every request that fits is still
 - Array never takes a project over the limit it can be reopened with. A project that is already
   over it (Array could make one until now) gets "no room" until objects are deleted.
 - Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
-- Duplicate, Paste, Break Apart, Cut Shapes and Array on board keep to the same limits (item 7).
-  Design Studio Apply does not check them yet.
+- Duplicate, Paste, Break Apart, Cut Shapes, Array on board and Design Studio Apply keep to the
+  same limits (item 7). Commands that add one object or a few at a time, such as drawing a shape
+  or Offset Shapes, do not check them, so at the very limit they can still take a project a few
+  objects past it.
 - No schema change and no change to G-code.
 
 ### Verification
@@ -173,3 +184,9 @@ figure is the loader's and not a judgement, and every request that fits is still
 - `src/ui/state/board-tile-limits.test.ts`: filling a board with 465 tiles in a project of 9,702
   objects is refused (it was made before); a 2 by 2 array one object past the limit refused, and
   one to exactly 10,000 made in one undo step and reopened.
+- `src/ui/design-studio/design-apply-limits.test.tsx`: an Apply one object past the limit, and a
+  new operation past 256, refused (they were applied before); an Apply to exactly 10,000, then an
+  edit of that artwork adding nothing, applied, and a larger edit refused; in the Studio, a refused
+  Apply leaves the drawing unapplied with Apply on, and applies once an object is deleted, and a
+  refused Apply & Close leaves the Studio open; a refused Apply leaves the name of the step
+  waiting to be redone as it was (`saveUndoStepName`, `src/ui/state/undo-step-names.test.ts`).

@@ -17,6 +17,8 @@ import { expect } from 'vitest';
 import { PROJECT_SCENE_LIMITS } from '../../../io/project/project-scene-integrity-validator';
 import { useStore } from '../store';
 import { useToastStore } from '../toast-store';
+import { redoHistoryEntries } from '../undo-history';
+import { withUndoStepName } from '../undo-step-names';
 
 export const OBJECT_LIMIT = PROJECT_SCENE_LIMITS.objects;
 
@@ -88,4 +90,15 @@ export function lastToast(): { readonly message: string; readonly variant: strin
 /** The notice for a command that would take the project past one of its limits. */
 export function pastTheLimit(what: string, limit: number, ask: string): string {
   return `This would take the project past its limit of ${limit} ${what}. ${ask}`;
+}
+
+/** Deletes `filler-0` as a step called `name` and undoes it, to wait in the Redo list. */
+export function undoNamedStep(name: string): void {
+  withUndoStepName(name, () => useStore.getState().removeSceneObjects(['filler-0']));
+  useStore.getState().undo();
+}
+
+/** The names the Redo list shows, the next step first. */
+export function redoNames(): string[] {
+  return redoHistoryEntries(useStore.getState()).map((entry) => entry.name);
 }

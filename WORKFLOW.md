@@ -1294,11 +1294,13 @@ the completed physical Frame is the spatial source of truth.
 - **Duplicate** adds what is selected, **Paste** and **Paste in Place** add what the clipboard
   holds (with its operations, when it came from another project), **Break Apart** makes each
   shape of the selection its own object, **Cut Shapes** makes two pieces of each shape it crosses,
-  and **Array on board** tiles copies of one design across the placed board (F-BC2). Each is
-  refused whole when the result would pass a limit: a warning names the limit and says what to
-  change (duplicate fewer objects, copy fewer objects to paste, break apart fewer objects, cut
-  fewer shapes, array fewer copies on the board, or delete some first), and nothing changes. The
-  clipboard is kept. Everything that fits is made exactly as before; nothing is ever made in part.
+  **Array on board** tiles copies of one design across the placed board (F-BC2), and **Design
+  Studio Apply** adds the drawing (F-DS8). Each is refused whole when the result would pass a
+  limit: a warning names the limit and says what to change (duplicate fewer objects, copy fewer
+  objects to paste, break apart fewer objects, cut fewer shapes, array fewer copies on the board,
+  apply a smaller drawing, or delete some first), and nothing changes. The clipboard, and the
+  Studio's drawing, are kept. Everything that fits is made exactly as before; nothing is ever made
+  in part.
 - A project already over a limit can still be changed in any way that adds nothing to it.
 
 ---
@@ -8536,6 +8538,13 @@ again.
 
 1. An empty sketch, or one containing only construction guides, applies nothing and
    leaves the project untouched. Apply is inert rather than refusing.
+
+#### Error — the project is full
+
+1. An Apply that would take the project past its limit of 10,000 objects or 256 operations
+   (F-A11) is refused with a notice naming the limit, and nothing changes. The drawing stays
+   unapplied and Apply stays on, to apply once there is room. A refused Apply & Close leaves the
+   Studio open on the drawing.
 
 #### Empty — first Apply of a session
 
