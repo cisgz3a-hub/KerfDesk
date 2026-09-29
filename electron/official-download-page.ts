@@ -1,8 +1,10 @@
-export const OFFICIAL_DESKTOP_RELEASE_BASE_URL =
-  'https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v';
+// The Preview update notice opens KerfDesk's own download page for one exact
+// version. The source repository is private, so customers can no longer reach
+// GitHub release pages; downloads come from kerfdesk.com and dl.kerfdesk.com.
+export const OFFICIAL_DESKTOP_RELEASE_BASE_URL = 'https://kerfdesk.com/download.html?version=';
 
 const EXACT_PREVIEW_RELEASE_URL =
-  /^https:\/\/github\.com\/cisgz3a-hub\/KerfDesk\/releases\/tag\/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-preview\.(0|[1-9][0-9]*)$/;
+  /^https:\/\/kerfdesk\.com\/download\.html\?version=(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-preview\.(0|[1-9][0-9]*)$/;
 
 // The only renderer-selected component is a strict Preview version already
 // validated independently by main. API-provided URLs are never accepted.
