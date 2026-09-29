@@ -14,8 +14,8 @@ import {
 } from './licensing-messages';
 
 const SERVICE = new URL('../services/desktop-licensing/', import.meta.url);
-// Codes the licence service is gaining alongside this client (ADR-523 Amendment 2).
-// They may not be in this checkout's service yet; the client must know them anyway.
+// Codes the client must always know, whatever the scan below finds (ADR-523
+// Amendments 2 and 3): the service's checkout and claim routes send them.
 const EXPECTED_FROM_SERVICE = ['checkout_failed', 'payment_rejected'];
 // Answers only Paddle's webhook or the private admin API can receive. The app calls
 // only /v1/trials/start, /v1/licenses/activate, /v1/activations/refresh,
@@ -29,6 +29,8 @@ const NEVER_SENT_TO_DEVICES = new Set([
   'order_already_paid',
   'license_already_exists',
   'order_not_found',
+  // Only the admin API's customer deletion refuses a licence that is still active.
+  'license_not_revoked',
 ]);
 
 /** Every error code in the service source: `requireValue(…, 409, 'code')`, `code: 'code'`. */
