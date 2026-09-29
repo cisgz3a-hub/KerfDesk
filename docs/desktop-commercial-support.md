@@ -55,9 +55,11 @@ crash, a forced close or a power cut.
 
 A job that stopped when Windows restarted, shut down or signed out leaves a `main`
 line starting "Windows asked to end the session" (KerfDesk asked Windows to wait)
-or "Windows is ending the session" (KerfDesk sent Abort), with Windows' reason
-(ADR-548). Point the customer to Windows Update's Active hours and to the
-connection guide's "Disconnects during a job".
+or "Windows is ending the session" (KerfDesk tried to send Abort, which Windows can
+cut off), with Windows' reason (ADR-548). The Abort may never have reached the
+machine, so ask whether the spindle or laser stayed on. Point the customer to
+Windows Update's Active hours and to the connection guide's "Disconnects during a
+job", and tell them to finish or Abort a job before letting Windows restart.
 
 ### An update did not arrive
 

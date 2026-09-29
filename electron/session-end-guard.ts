@@ -4,7 +4,9 @@
 // the machine running its buffered moves, with a spindle or constant-power
 // laser still on. So while the window reports a running job, KerfDesk asks
 // Windows to wait and says why, and when Windows ends the session anyway the
-// window sends the same Abort as closing KerfDesk. Each step goes to the
+// window tries to send the same Abort as closing KerfDesk. Only asking to wait
+// is reliable: once the session is ending, Windows can end the process before
+// the window's Abort leaves (ADR-548 Amendment 1). Each step goes to the
 // support log (ADR-546).
 
 import { trustedAppRequest } from './app-route-guard.js';
@@ -55,6 +57,8 @@ const REASONS = ['shutdown', 'close-app', 'critical', 'logoff'] as const;
 
 const IDLE: DesktopJobReport = { busy: false };
 
+const TRYING_ABORT = 'trying to send Abort, which Windows can cut off.';
+
 export function createDesktopJobActivity(): DesktopJobActivity {
   let report = IDLE;
   const listeners = new Set<(report: DesktopJobReport) => void>();
@@ -87,7 +91,7 @@ export function installSessionEndGuard(
     const reasons = knownReasons(event.reasons);
     // A critical session end cannot be delayed; stop the job straight away.
     if (reasons.includes('critical')) {
-      log(`Windows is ending the session (${describe(reasons)}) during a job; sending Abort.`);
+      log(`Windows is ending the session (${describe(reasons)}) during a job; ${TRYING_ABORT}`);
       notify(window, 'ending', reasons);
       return;
     }
@@ -98,7 +102,7 @@ export function installSessionEndGuard(
   window.on('session-end', (event) => {
     if (!activity.busy()) return;
     const reasons = knownReasons(event.reasons);
-    log(`Windows is ending the session (${describe(reasons)}) during a job; sending Abort.`);
+    log(`Windows is ending the session (${describe(reasons)}) during a job; ${TRYING_ABORT}`);
     notify(window, 'ending', reasons);
   });
 }
