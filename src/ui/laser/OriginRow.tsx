@@ -17,7 +17,7 @@ import { sleepUnavailableReason } from '../state/controller-sleep';
 
 // ADR-053 P4 — releasing motors ($SLP) is hard to undo cleanly (waking needs a
 // soft-reset, which clears G92 on stock GRBL and FluidNC), so confirm and spell out the correct order:
-// release -> hand-move -> Wake (Ctrl-X) -> Set origin LAST.
+// release -> hand-move -> Wake (Ctrl-X) -> Unlock or Home (Wake ends in Alarm) -> Set origin LAST.
 const SET_PERSISTENT_ORIGIN_CONFIRM =
   'Set persistent G54 origin?\n\n' +
   'This selects G54, clears temporary XYZ offsets (G92.1), then saves the current XY position with G10 L20 P1 X0 Y0. ' +
@@ -96,7 +96,7 @@ function ReleaseMotorsButton(props: {
       disabled={props.busy || blockedReason !== null}
       title={
         blockedReason ??
-        'Release the motors ($SLP) so you can move the head by hand, which invalidates the work origin; Wake and Set origin again afterward.'
+        'Release the motors ($SLP) so you can move the head by hand, which invalidates the work origin; afterward Wake, Unlock or Home, and Set origin again.'
       }
     >
       Release motors
@@ -273,7 +273,7 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
         .releaseMotors()
         .then(() =>
           deps.pushToast(
-            'Motors released ($SLP). Move the head by hand, then Wake and Set origin again.',
+            'Motors released ($SLP). Move the head by hand, then Wake, Unlock or Home, and Set origin again.',
             'success',
           ),
         )
