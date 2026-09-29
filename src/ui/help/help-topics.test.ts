@@ -142,7 +142,10 @@ function isMeaningful(value: string): boolean {
 function commandIds(): ReadonlyArray<CommandId> {
   // The machine gate (ADR-101) hides laser-only ids in CNC mode and
   // CNC-only ids in laser mode — help coverage spans BOTH machine kinds.
-  const laser = buildAppCommands(baseCtx({ machineKind: 'laser' })).map((command) => command.id);
+  // Help > Licence exists only in desktop builds with licensing, so cover it too.
+  const laser = buildAppCommands(baseCtx({ machineKind: 'laser', desktopLicensing: true })).map(
+    (command) => command.id,
+  );
   const cnc = buildAppCommands(baseCtx({ machineKind: 'cnc' })).map((command) => command.id);
   return [...new Set([...laser, ...cnc])];
 }
