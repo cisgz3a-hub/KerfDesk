@@ -28,6 +28,8 @@ export type BarcodeLayout = {
   readonly marks: readonly Polyline[];
   /** Inverted 1D codes add a box rectangle around marks and captions. */
   readonly background: boolean;
+  /** Invert: the marks are the light modules and quiet zone, for stock that marks light. */
+  readonly inverted: boolean;
   readonly widthMm: number;
   readonly heightMm: number;
   readonly paddingMm: number;
@@ -71,7 +73,7 @@ export function layoutBarcode(spec: BarcodeShape, data: string): BarcodeLayoutRe
     symbol.kind === 'matrix'
       ? matrixLayout(spec, symbol, moduleMm)
       : linearLayout(spec, symbol, moduleMm);
-  return { ok: true, layout: { ...layout, warnings } };
+  return { ok: true, layout: { ...layout, inverted: spec.invert, warnings } };
 }
 
 /**
@@ -100,7 +102,7 @@ function layoutWarnings(spec: BarcodeShape, moduleMm: number): string[] {
   return warnings;
 }
 
-type PartialLayout = Omit<BarcodeLayout, 'warnings'>;
+type PartialLayout = Omit<BarcodeLayout, 'inverted' | 'warnings'>;
 
 function matrixLayout(
   spec: BarcodeShape,

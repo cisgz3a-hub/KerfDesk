@@ -3090,9 +3090,11 @@ settings and Job Review keep their existing read-only setup references.
 2. Set the error correction (QR Code only), the size by module or by overall width (quiet zones
    included), the bar height and text (1D only), the quiet zone in modules, and **Invert** for
    stock that marks lighter than its surface, such as anodised aluminium or slate.
-3. The preview re-encodes on every change, black on white, with the type, version or module
-   count and the finished size underneath; it can be scanned from the screen. Quiet zones below
-   the standard and modules under 0.2 mm show a warning.
+3. The preview re-encodes on every change and shows the code as it reads on the finished piece:
+   engraving black on white, or with **Invert** white on dark stock, so dark modules always show
+   dark on a light quiet zone. The type, version or module count and the finished size are
+   underneath; it can be scanned from the screen. Quiet zones below the standard and modules
+   under 0.2 mm show a warning.
 4. For serials or CSV data, tick **Variable data** and insert fields as for variable text. The
    preview encodes the value the next output would use; each array copy and each output
    re-encodes its own value. The canvas draws each code, with its text, for the current value

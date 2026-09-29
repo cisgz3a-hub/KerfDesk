@@ -21,6 +21,11 @@ what it engraves or what a scanner reads.
   past the object's bounds: the selection box and click target missed them, arranging and nesting
   could overlap them, and an inverted plate stopped short of them, so part of a digit was
   engraved instead of left as a hole.
+- **The dialog preview of an inverted code was a negative.** The preview drew what is engraved
+  in black on white. With Invert, which engraves the light modules for stock that marks lighter
+  than its surface, it showed dark modules white on a black quiet zone: the reverse of the
+  finished piece, and a code many scanners do not read from the screen. Codes without Invert
+  were already dark on light.
 
 ### Decision
 
@@ -36,8 +41,8 @@ what it engraves or what a scanner reads.
    - A value that cannot be evaluated or encoded leaves the stored code on the canvas; output
      stops on that value with the reason, as before.
    - Preview mode's faint artwork shows the current value too, so it lines up with the route.
-2. **The largest Data Matrix made is 132 x 132.** 144 x 144 is no longer offered, because a code
-   in the reader order could not be checked and a code in the standard's order does not scan.
+2. **The largest Data Matrix made is 132 x 132.** 144 x 144 is no longer offered: a code in the
+   standard's order does not scan in ZXing, and one in the reader order could not be checked.
    Text that needs more than the 1304 codewords of 132 x 132 is refused with "Too much data for a
    Data Matrix: this text needs N codewords and the largest size KerfDesk makes, 132 × 132, holds
    1304. Shorten the text or use a QR Code." The dialog shows it under the preview and disables
@@ -48,6 +53,11 @@ what it engraves or what a scanner reads.
    caption as drawn, with the padding kept under the text also kept beside it. An inverted 1D
    plate fills the same box, so all of its text stays knocked out. Codes whose text stays within
    the quiet zone, as at the standard quiet zones, keep the box they had.
+4. **The dialog preview shows a code as it reads on the finished piece.** Engraving is black on
+   white stock; with Invert it is white on black stock, and the text, a hole in the plate, shows
+   the stock. Dark modules show dark on a light quiet zone either way, so the preview scans from
+   the screen. The canvas is unchanged: like all artwork, it draws what is engraved in the
+   operation's colour.
 
 ### Consequences
 
@@ -67,4 +77,5 @@ what it engraves or what a scanner reads.
   `src/core/barcode/data-matrix-encode.test.ts` (132 x 132 at most, the message);
   `src/ui/barcode/BarcodeDialog.test.tsx` (the message in the dialog, Insert disabled);
   `src/core/barcode/materialize-barcode.test.ts` (the box holds the text, an inverted plate keeps
-  it a hole).
+  it a hole); `src/ui/barcode/BarcodePreviewSvg.test.tsx` (a QR Code and an EAN-13 read from the
+  preview, with and without Invert).
