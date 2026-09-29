@@ -168,8 +168,13 @@ opportunity, without an extra branding delay. It introduces no startup interacti
    image bounds, rotation, unequal scale and mirroring. Bitmap DPI does not change SVG placement.
 2. KerfDesk-exported image clips and holes remain owned by the image, with no extra mask artwork
    or cutting operation. Image clips intersect an independently assigned image mask.
-3. Unsupported image presentation or clipping reports its reason. Decode failure, Esc cancellation
-   and document replacement leave the complete file uninserted and release staged image assets.
+3. An image KerfDesk cannot place faithfully is skipped and the rest of the file imports; a
+   warning toast counts the skipped images for each reason: GIF or SVG image data, opacity, a
+   filter or mask, an unusable position or size, a `slice` that crops, or a skew (ADR-358
+   Amendment 3). `preserveAspectRatio` `meet` fits the bitmap in its box as SVG draws it. An image
+   clip KerfDesk cannot read still rejects the file with its reason. Decode failure, Esc
+   cancellation and document replacement leave the complete file uninserted and release staged
+   image assets.
 
 #### Edge — SVG with a vector clip, mask or filter
 1. Clipped artwork imports as the part its clip keeps (ADR-358 Amendment 2). Filled shapes are
@@ -190,8 +195,8 @@ opportunity, without an extra branding delay. It introduces no startup interacti
    CSS, or a clip transform that cannot be read.
 5. Vector masks and filters no longer reject the file. The artwork imports without them, and a
    warning toast says how many elements were imported without their masks (areas the masks hide
-   are included) or without their filter effects. Masks, filters and opacity on embedded images
-   still reject the file.
+   are included) or without their filter effects. An embedded image with a mask, filter or
+   opacity is skipped with a warning instead (ADR-358 Amendment 3).
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 
@@ -199,9 +204,14 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 1. A path's `A` arcs import as cubic curves of at most a quarter turn each. Each curve's midpoint
    lies on the arc, and nowhere does a curve stray more than 0.027% of the arc's larger radius,
    always outward: 0.027 mm on a 100 mm radius (ADR-159 Amendment 2). `<circle>`, `<ellipse>` and
-   rounded `<rect>` elements import as outlines sampled on the true curve.
+   rounded `<rect>` elements import as their SVG 2 equivalent paths, so their arcs stay curves the
+   same way.
 2. Artwork imported before that amendment keeps its arcs, up to 0.196% of the radius inside the arc
    (0.2 mm on a 100 mm radius), until **Re-import source** replaces them.
+3. A path or `<polyline>` whose last point returns to its first (within 0.0001 mm) imports as a
+   closed shape, as a `Z` or a `<polygon>` would, so kerf, tabs and overcut treat it as closed.
+4. Path data stops at its first error, as SVG 2 and browsers read it: the complete segments before
+   it import and nothing is invented after it.
 
 #### Error — file is not an SVG
 1. On drop, file type is checked by MIME and by content sniff (first 200 bytes).

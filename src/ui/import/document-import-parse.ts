@@ -1,6 +1,7 @@
 import { SaxesParser } from 'saxes';
 import type { DOMParser as WorkerDomParser } from 'linkedom/worker';
 import { parseSvgInWorker } from '../../io/svg/parse-svg-worker';
+import { expandInternalSubset } from '../../io/xml/internal-subset-entities';
 import type {
   DocumentImportWorkerRequest,
   DocumentImportWorkerResponse,
@@ -17,12 +18,15 @@ export async function parseDocumentImportText(
     return { id: request.id, kind: request.kind, result: deserializeProject(text) };
   }
   if (request.kind === 'svg') {
-    assertWellFormedXml(text, 'SVG');
+    // Illustrator declares its namespaces and styles as internal-subset
+    // entities, which this parser cannot read, so they are expanded first.
+    const svgText = expandInternalSubset(text);
+    assertWellFormedXml(svgText, 'SVG');
     return {
       id: request.id,
       kind: request.kind,
       result: parseSvgInWorker({
-        svgText: text,
+        svgText,
         id: request.objectId,
         source: request.source,
       }),

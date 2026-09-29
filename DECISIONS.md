@@ -14053,6 +14053,12 @@ then a `localStorage` write whose ~5 MB cap discards the result.
   of this behaves on a machine. The >100 MB raster/image and `.lf2` paths were not exercised at
   size, and SVG was measured only up to 6 MB.
 
+### Amendments
+
+ADR-268's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-268-amendment-1-use-expansion-has-a-budget.md` (SVG `<use>` expansion has a
+budget, and item 2 reads literal internal-subset entities under an expansion bound).
+
 ## ADR-269 - Production imports are worker-backed, pressure-disclosed, queued, and cancellable (2026-07-30)
 
 **Date:** 2026-07-30

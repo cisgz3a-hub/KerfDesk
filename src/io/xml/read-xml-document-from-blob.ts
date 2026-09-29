@@ -1,5 +1,10 @@
 import { DOMParser as WorkerDomParser } from 'linkedom/worker';
 import { SaxesParser, type SaxesTagPlain } from 'saxes';
+import {
+  EntityExpansionBudget,
+  expandEntityReferences,
+  internalSubsetEntities,
+} from './internal-subset-entities';
 import { RawOpenTagScanner } from './raw-open-tag-scanner';
 
 const ACTIVE_DECLARATION_TAIL = '<!DOCTYPE'.length - 1;
@@ -45,6 +50,12 @@ class XmlDocumentBuilder {
   private declarationTail = '';
   private hasActiveDeclaration = false;
   private sawRoot = false;
+  private entities: ReadonlyMap<string, string> = new Map();
+  // saxes expands references as it parses; the raw-tag replay expands the same
+  // references again, so each gets its own bound.
+  private readonly parsedExpansion = new EntityExpansionBudget();
+  private readonly replayedExpansion = new EntityExpansionBudget();
+  private inputLength = 0;
 
   constructor(private readonly options: XmlDocumentReadOptions) {
     this.document = new WorkerDomParser().parseFromString(
@@ -52,6 +63,7 @@ class XmlDocumentBuilder {
       options.mediaType,
     ) as unknown as Document;
     this.rawOpenTags = new RawOpenTagScanner();
+    this.parser.on('doctype', (doctype) => this.declareEntities(doctype));
     this.parser.on('opentag', (tag) => this.openTag(tag));
     this.parser.on('closetag', () => this.elements.pop());
     this.parser.on('text', (text) => this.appendText(text));
@@ -60,6 +72,7 @@ class XmlDocumentBuilder {
 
   write(text: string): void {
     if (text === '') return;
+    this.inputLength += text.length;
     this.recordActiveDeclarations(text);
     try {
       this.rawOpenTags.write(text);
@@ -90,9 +103,39 @@ class XmlDocumentBuilder {
     }
   }
 
+  // Internal-subset entities (internal-subset-entities.ts), registered where
+  // saxes looks references up; each lookup is charged to the expansion bound.
+  // A document that forbids active declarations keeps refusing them instead.
+  private declareEntities(doctype: string): void {
+    if (this.options.forbidActiveDeclarations === true) return;
+    this.entities = internalSubsetEntities(doctype);
+    for (const [name, value] of this.entities) {
+      Object.defineProperty(this.parser.ENTITIES, name, {
+        enumerable: true,
+        get: () => {
+          this.parsedExpansion.spend(value.length, this.inputLength);
+          return value;
+        },
+      });
+    }
+  }
+
   private openTag(tag: SaxesTagPlain): void {
     const element = this.document.createElement(tag.name);
-    applyAttributes(element, tag, this.rawOpenTags.take(), this.options.mediaType);
+    const rawOpenTag = this.rawOpenTags.take();
+    applyAttributes(
+      element,
+      tag,
+      rawOpenTag === null
+        ? null
+        : expandEntityReferences(
+            rawOpenTag,
+            this.entities,
+            this.replayedExpansion,
+            this.inputLength,
+          ),
+      this.options.mediaType,
+    );
 
     const parent = this.elements.at(-1);
     if (parent !== undefined) {

@@ -75,7 +75,8 @@ export function sanitizeSvg(dirty: string): SanitizeResult {
   const clean = DOMPurify.sanitize(dirty, {
     USE_PROFILES: { svg: true, svgFilters: true },
     ADD_TAGS: ['defs', 'symbol', 'use'],
-    ADD_ATTR: ['href', 'xlink:href'],
+    // <switch> skips a child with requiredExtensions (svg-conditional-processing.ts).
+    ADD_ATTR: ['href', 'xlink:href', 'requiredExtensions'],
     KEEP_CONTENT: false,
   });
 
