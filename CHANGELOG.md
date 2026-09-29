@@ -11,6 +11,10 @@ release before it is tagged.
 
 ### Highlights
 
+- **New licence.** KerfDesk is now all rights reserved. It stays free to use under its License &
+  Safety Notice, except features marked Pro, which need a trial or a paid licence. Versions up to
+  and including the `mit-final` tag remain under the MIT License
+  ([#1022](https://github.com/cisgz3a-hub/KerfDesk/pull/1022)).
 - **Laser tabs and start points.** Tabs by spacing, burned at a lower tab power or placed by hand,
   and a choice of where closed shapes start
   ([#996](https://github.com/cisgz3a-hub/KerfDesk/pull/996)).

@@ -4,7 +4,7 @@
 >
 > Entry format below. New rows are added on PR; existing rows are updated with `Re-verified:` lines when re-checked.
 >
-> **Note on license-history references (2026-05-27, updated 2026-07-07).** Earlier entries describe the project as "MIT-licensed" and reject GPL deps with phrasing like "would taint MIT license." That was true under ADR-008, superseded by ADR-018 (proprietary, private, 2026-05-27), which is in turn superseded by **ADR-120 (2026-07-07): the project is MIT-licensed and open source again**. The dependency policy was identical under all three postures — MIT-compatible only, GPL rejected — so every rejection in this log remains valid.
+> **Note on license-history references (2026-05-27, updated 2026-07-07 and 2026-09-29).** Earlier entries describe the project as "MIT-licensed" and reject GPL deps with phrasing like "would taint MIT license." That was true under ADR-008, superseded by ADR-018 (proprietary, private, 2026-05-27), which is in turn superseded by **ADR-120 (2026-07-07): the project is MIT-licensed and open source again**. **ADR-543 (2026-09-29)** ends MIT licensing for first-party work after the `mit-final` tag; later work is all rights reserved. The dependency policy was identical under every posture — MIT-compatible only, GPL rejected — so every rejection in this log remains valid.
 
 ---
 

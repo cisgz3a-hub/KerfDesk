@@ -109,11 +109,7 @@ function flattenDependencies(tree, rootPackage, packageDir, releaseVersion) {
     }
     const declared = manifest.license;
     const license = typeof declared === 'string' ? declared : declared?.type;
-    const entry = {
-      name,
-      version,
-      license: typeof license === 'string' && license.length > 0 ? license : 'NOASSERTION',
-    };
+    const entry = { name, version, license: spdxDeclaredLicense(license) };
     const key = `${name}@${version}`;
     const previous = byIdentity.get(key);
     if (previous && previous.license !== entry.license) {
@@ -134,6 +130,15 @@ function flattenDependencies(tree, rootPackage, packageDir, releaseVersion) {
   return [...byIdentity.values()].sort(
     (a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version),
   );
+}
+
+// npm's `SEE LICENSE IN <file>` and `UNLICENSED` point at custom terms (KerfDesk's
+// own package has used the first since ADR-543). Neither is an SPDX expression,
+// so SPDX 2.3 gets NOASSERTION rather than the npm wording.
+function spdxDeclaredLicense(license) {
+  if (typeof license !== 'string' || license.length === 0) return 'NOASSERTION';
+  if (license === 'UNLICENSED' || /^SEE LICEN[CS]E IN /u.test(license)) return 'NOASSERTION';
+  return license;
 }
 
 function resolvedPackageVersion(name) {
