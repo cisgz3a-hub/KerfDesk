@@ -62,7 +62,7 @@ export const STEP_COPY = {
       </p>
       <p>
         Prefer a desktop app? <a href="/download/">Desktop Preview builds</a> are available for
-        Windows 10 and 11 (64-bit) and macOS 12 or newer. They are unsigned, you install and update
+        Windows 10 and 11 (64-bit) and macOS 13 or newer. They are unsigned, you install and update
         them yourself, and install testing on real computers is still pending.
       </p>
       <p>

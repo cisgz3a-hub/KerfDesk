@@ -160,14 +160,14 @@ export const page = {
       tone: 'alt',
       eyebrow: 'Operations',
       title: 'Eight cut types',
-      lead: 'Draw or import a shape, pick how it is machined, then set the depth and the bit. Each operation gets one of these cut types.',
+      lead: 'Draw or import a shape, pick how it is machined, then set the depth and the bit. Each operation gets one of these cut types. V-carve is part of Pro.',
       content: html`${statusNote('All eight cut types: code and automated tests only.')}
       ${featureGrid(CUT_TYPES, { columns: 4 })}`,
     })}
     ${section({
       eyebrow: 'Pockets',
       title: 'Clear pockets your way',
-      lead: 'Choose how the bit clears each pocket, and split the work between two bits when you need to.',
+      lead: 'Choose how the bit clears each pocket, and split the work between two bits when you need to. Adaptive clearing is part of Pro.',
       content: html`${statusNote('Pocket clearing has not been run on a machine yet.')}
       ${featureGrid(POCKET_STRATEGIES, { columns: 4 })}`,
     })}
@@ -209,7 +209,7 @@ export const page = {
     })}
     ${ctaBand({
       title: 'Try CNC mode',
-      body: 'KerfDesk is free to use today and needs no account. Design and preview a carve without connecting a machine.',
+      body: 'KerfDesk Free needs no account. Design and preview a carve without connecting a machine.',
       buttons: [
         button(ctx.site.appUrl, 'Open KerfDesk'),
         button('/machines/', 'Check your machine', { variant: 'ghost-dark' }),

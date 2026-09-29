@@ -18,9 +18,9 @@ export const page = {
   nav: 'faq',
   title: 'FAQ',
   description:
-    'Answers about KerfDesk: accounts, browsers, offline use, machine support, LightBurn files, framing, the software Abort, cost, planned paid licenses and privacy.',
-  render: ({ site }) => {
-    const sections = faqSections(site);
+    'Answers about KerfDesk: accounts, browsers, offline use, machine support, LightBurn files, framing, the software Abort, Free and Pro, and privacy.',
+  render: ({ site, commerce }) => {
+    const sections = faqSections(site, commerce);
     return html`${pageHero({
       eyebrow: 'FAQ',
       title: 'Questions and answers',
@@ -38,10 +38,10 @@ export const page = {
     )}
     ${ctaBand({
       title: 'Still have a question?',
-      body: 'Start with the getting-started guide, or report a problem on GitHub.',
+      body: 'Start with the getting-started guide, or go to the KerfDesk support page.',
       buttons: [
         button('/docs/', 'Get started'),
-        button(site.issuesUrl, 'Report a problem', { variant: 'ghost-dark' }),
+        button(site.supportUrl, 'Get support', { variant: 'ghost-dark' }),
       ],
     })}`;
   },

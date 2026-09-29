@@ -7,6 +7,8 @@
 // The docked live 3D pane is NOT mounted (src/ui/app/App.tsx:74); the 3D view
 // is Preview's "3D" button (src/ui/workspace/preview-overlays.tsx:158-167).
 // Frame traces the job's bounding rectangle (core/controllers/grbl/frame-lines).
+// `pro` marks the tools the owner listed as Pro (commerce.config.mjs, ADR-524
+// Amendment 1): V-carve, adaptive clearing and 3D reliefs.
 
 export const CUT_TYPES = [
   {
@@ -37,6 +39,7 @@ export const CUT_TYPES = [
   {
     icon: 'triangle',
     title: 'V-carve',
+    pro: true,
     body: 'An angled bit changes depth as the shape widens and narrows. You can cap the depth for wide areas and clear those flat floors with a second bit first.',
   },
   {
@@ -65,6 +68,7 @@ export const POCKET_STRATEGIES = [
   {
     icon: 'waves',
     title: 'Adaptive clearing',
+    pro: true,
     body: 'Plans a path that keeps the bit’s sideways bite within a radial engagement limit you set. The limit is geometric, not a live load reading. It works on pockets without islands.',
   },
   {
@@ -120,12 +124,14 @@ export const BIG_JOBS = [
   {
     icon: 'mountain',
     title: '3D relief from STL',
+    pro: true,
     body: 'Import an STL model and carve it as a relief. KerfDesk roughs it out level by level, then can finish the surface with a ball-nose bit.',
     status: 'shipped-code-and-tests',
   },
   {
     icon: 'mountain-snow',
     title: 'Reliefs from height maps',
+    pro: true,
     body: 'Start a relief from a grayscale PNG height map. Importing one works today. Editing tools and more controls are planned.',
     status: 'in-progress',
   },

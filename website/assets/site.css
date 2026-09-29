@@ -708,6 +708,16 @@ kbd {
   background: var(--planned-bg);
 }
 
+/* Marks a Pro-edition tool; sits after a heading or an item's name. */
+.pill--pro {
+  color: var(--accent-fg);
+  background: var(--tint-accent);
+}
+
+h3 .pill--pro {
+  vertical-align: middle;
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -1116,6 +1126,22 @@ tbody th {
   margin: 1.25rem 0 0;
   color: var(--muted);
   font-size: 0.92rem;
+}
+
+.plan__fine {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+/* Stands where a buy button will go once checkout opens; deliberately not a button. */
+.plan__soon {
+  margin: auto 0 0;
+  padding: 0.7rem 1rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-weight: 700;
+  text-align: center;
 }
 
 /* ---------- Footer ---------- */

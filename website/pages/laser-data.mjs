@@ -168,12 +168,14 @@ export const EXTRAS = [
   {
     icon: 'camera',
     title: 'Camera overlay',
+    pro: true,
     body: 'Calibrate the lens with a printed checkerboard, align the camera to your bed, then place artwork over the camera’s view of your material. USB webcams work in the web and desktop apps. Network cameras need the desktop app.',
     status: 'shipped-code-and-tests',
   },
   {
     icon: 'focus',
     title: 'Bed alignment',
+    pro: true,
     body: 'Automatic alignment burns a marker target and finds it with the camera. It is an experiment you switch on in Tools > Labs. In the desktop app, you can also align a network camera by hand by clicking the four bed corners.',
     status: 'shipped-code-and-tests',
   },

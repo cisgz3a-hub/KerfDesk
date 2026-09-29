@@ -37,6 +37,12 @@ be read as "this works on my machine", attach a status pill (`statusPill()` in
 `lib/components.mjs`). Keep the software-stop warning wherever Abort is mentioned: Abort is not
 an emergency stop.
 
+Nothing links to GitHub: the source repository is private, so a visitor can't open it (ADR-524
+Amendment 1). Desktop downloads go to the KerfDesk download page (`site.downloadPageUrl`, which
+serves installers from `dl.kerfdesk.com`); help, bug and security reports go to the support page
+(`site.supportUrl`). Don't write a support email address until the support page lists one. Mark a
+tool with `proPill()` (or `pro: true` on a card) only when the owner listed it as Pro.
+
 ## Deploying
 
 Nothing deploys automatically. The site is plain static files and suits a separate Cloudflare Pages
@@ -44,19 +50,25 @@ project (the app's `laserforge` project must stay on `kerfdesk.com`: installed a
 file and serial permissions and the desktop camera bridge's trusted origin are tied to that
 origin). Pick the site's hostname, then build with `--site-url` and upload `website/dist`.
 
-## Opening sales later
+## Editions, prices and opening checkout
 
-Sales are closed and the site shows no prices. KerfDesk is free to use today and paid licenses are
-planned. ADR-247 says a first sale, and any license change for later versions, needs a new,
-lawyer-reviewed commercial ADR. When that exists:
+The owner has settled the offer (ADR-524 Amendment 1), and `commerce.config.mjs` holds it: a Free
+edition with no time limit and a Pro license at US$49.50, one time, with a year of updates, an
+optional US$20 update year, three devices and a 30-day trial. The site shows these prices, but
+checkout is closed (`salesOpen: false`): no plan has a checkout URL, and the pricing page says
+purchase opens soon. `tests/commerce.test.mjs` pins the offer and the closed checkout, so any
+change to either is deliberate. Don't write refund or other sale terms on the site; the terms of
+sale are published before sales open. ADR-247 says a first sale needs a commercial ADR. When
+checkout is ready:
 
 1. Publish terms of sale and a refund policy (as pages here or external https URLs).
 2. Create a hosted checkout for each plan with a merchant-of-record or payment-link provider, so
    no card data touches this site.
-3. Fill in `commerce.config.mjs`: `authorizingAdr`, `termsUrl`, `refundPolicyUrl`, the plans with
-   their `checkoutUrl`s, then set `salesOpen: true`.
-4. Update `tests/commerce.test.mjs`, which pins the closed state, in the same change.
+3. Fill in `commerce.config.mjs`: `authorizingAdr`, `termsUrl`, `refundPolicyUrl` and each plan's
+   `checkoutUrl`, then set `salesOpen: true` in the same change.
+4. Revise the pricing page's "purchase opens soon" copy and FAQ, and update
+   `tests/commerce.test.mjs`, in the same change.
 
-The build refuses an open store that is missing any of these. Versions already released keep the
-terms they were released under (MIT so far); the License page states this and nothing else on the
-site presents KerfDesk as open source.
+The build refuses an open store that is missing any of these, and a closed store that carries a
+checkout URL. Versions already released keep the terms they were released under (MIT so far); the
+License page states this and nothing else on the site presents KerfDesk as open source.

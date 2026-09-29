@@ -1,12 +1,14 @@
 // FAQ questions and answers, grouped by topic. Every answer is grounded in the
-// repo (README.md, PROJECT.md, WORKFLOW.md, DECISIONS.md ADR-247/322,
+// repo (README.md, PROJECT.md, WORKFLOW.md, DECISIONS.md ADR-247/322, ADR-523,
 // SECURITY.md, docs/connection-troubleshooting.md, public/download.html and
-// .github/ISSUE_TEMPLATE). Machine claims follow the 2026-09-19 compatibility
+// public/support.html). Machine claims follow the 2026-09-19 compatibility
 // audit: no machine is described as verified. Pricing answers follow the
-// 2026-09-23 maintainer direction: free to use today, paid licenses planned,
-// no prices, terms or dates, and no open-source selling points.
+// owner's settled Free and Pro offer (commerce.config.mjs, ADR-524 Amendment 1),
+// with no open-source selling points. Help and problem reports go to the
+// support page: the source repository is private.
 
 import { statusPill } from '../lib/components.mjs';
+import { formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 
 function gettingStarted() {
@@ -15,7 +17,7 @@ function gettingStarted() {
       id: 'account',
       question: 'Do I need an account?',
       answer:
-        'No. There’s no account, sign-in, activation, trial or subscription. KerfDesk opens straight to the workspace, so you can start working right away.',
+        'No. There’s no sign-up or sign-in. KerfDesk Free opens straight to the workspace, so you can start working right away, and the Pro trial needs no card.',
     },
     {
       id: 'browsers',
@@ -40,7 +42,7 @@ function gettingStarted() {
         </p>
         <p>
           ${statusPill('in-progress')} Desktop Previews are available for Windows 10 and 11 (64-bit)
-          and for macOS 12 or newer on Intel and Apple Silicon Macs. They are early, unsigned
+          and for macOS 13 or newer on Intel and Apple Silicon Macs. They are early, unsigned
           builds, and Mac Previews aren’t notarized by Apple, so your computer may warn you the
           first time you open one. Testing on real Windows and Mac computers isn’t finished yet. The
           <a href="/download/">download page</a> has the install steps.
@@ -121,8 +123,7 @@ function machinesAndConnection(site) {
         <p>
           Can’t connect? Use a USB cable that carries data, install the CH340 driver on Windows if
           your board needs it, and close any other machine software that’s using the port. In the
-          app, Help → Can’t connect? (Troubleshooting) lists these steps, and the
-          <a href="${site.connectionGuideUrl}">connection guide</a> goes further.
+          app, Help → Can’t connect? (Troubleshooting) lists these steps, including USB drivers.
         </p>`,
     },
     {
@@ -169,8 +170,7 @@ function machinesAndConnection(site) {
           Reports from real machines show what still needs checking. If something goes wrong, file a
           bug report (see <a href="#report-bug">How do I report a bug?</a>) with your machine type,
           controller and firmware. For anything that isn’t a bug, including how a job went on your
-          machine, open <a href="${site.issuesUrl}/new/choose">GitHub’s new-issue page</a> and
-          choose “Questions, ideas &amp; feedback”.
+          machine, use the <a href="${site.supportUrl}">KerfDesk support page</a> too.
         </p>
         <p>
           Test safely. Check the job with Preview and an air run, start on scrap material, and stay
@@ -194,7 +194,7 @@ function filesAndFeatures() {
         </p>
         <p>
           You can also bring in .ttf and .otf fonts, CSV data for variable text, and LightBurn
-          projects and cut libraries. G-code files (.nc, .gcode and .tap) open in the G-code
+          projects and cut libraries. G-code files (.nc, .gcode and .tap) open in the Pro G-code
           Inspector for viewing, but they don’t become editable artwork. .ai, PDF, EPS, .cdr,
           Gerber, OBJ and 3MF files aren’t supported.
         </p>`,
@@ -226,8 +226,8 @@ function filesAndFeatures() {
       answer: html`<p>
           ${statusPill('shipped-code-and-tests')} It has the tools for both, but neither has run on
           a real machine yet. Image mode offers 11 dithering and grayscale options for photos, at 5
-          to 25 lines per mm. CNC mode has profile, pocket, engrave, V-carve, inlay and drill cuts,
-          touch-plate probing and a 3D preview.
+          to 25 lines per mm. CNC mode has profile, pocket, engrave, inlay and drill cuts, V-carve
+          in Pro, touch-plate probing and a 3D preview.
         </p>
         <p>
           Both are covered by code and automated tests, which check structure, not whether a result
@@ -239,25 +239,34 @@ function filesAndFeatures() {
   ];
 }
 
-function pricingAndLicense() {
+function pricingAndLicense(commerce) {
+  const [plan] = commerce.plans;
   return [
     {
       id: 'free',
       question: 'Is KerfDesk free?',
       answer: html`<p>
-        Yes, KerfDesk is free to use today. There’s no account, trial timer, subscription or license
-        key, in the browser or on the desktop. Paid licenses are planned for the future. See
-        <a href="#cost-later">Will KerfDesk cost money later?</a>
+        KerfDesk Free is, with no time limit, in the browser and on the desktop. It covers drawing,
+        text, file import, basic tracing, laser cutting and engraving, 2D CNC cuts and all machine
+        control. See <a href="#pro">What does Pro add?</a>
       </p>`,
     },
-    {
-      id: 'cost-later',
-      question: 'Will KerfDesk cost money later?',
+    plan && {
+      id: 'pro',
+      question: 'What does Pro add, and what does it cost?',
       answer: html`<p>
-        Paid licenses are planned for the future. Prices, terms and timing aren’t set yet, and
-        nothing is for sale today. Versions already released keep the terms they were released
-        under. See <a href="/pricing/">pricing</a> for the latest.
-      </p>`,
+          ${plan.name} adds ${plan.includes.join(', ')}. A license costs
+          ${formatPrice(plan.price, commerce.currency)}, paid once, and includes one year of
+          updates. Every version released during that year keeps working forever. After the year,
+          ${formatPrice(plan.updateYearPrice, commerce.currency)} adds another year of updates if
+          you want it; it never renews automatically.
+        </p>
+        <p>
+          One license is active on up to ${plan.deviceLimit} devices at a time, and each device can
+          try ${plan.name} free for ${plan.trialDays} days with no card. When a trial ends, only the
+          ${plan.name} tools lock, and a license never stops a job from running. Purchase opens
+          soon. See <a href="/pricing/">pricing</a>.
+        </p>`,
     },
     {
       id: 'license-terms',
@@ -268,7 +277,7 @@ function pricingAndLicense() {
         and you’re responsible for running your machine safely.
       </p>`,
     },
-  ];
+  ].filter(Boolean);
 }
 
 function privacyAndData(site) {
@@ -282,9 +291,11 @@ function privacyAndData(site) {
         </p>
         <p>
           It does make a few ordinary connections. The web app contacts kerfdesk.com to load and to
-          check for a newer version of itself. Each time you open a desktop Preview, it asks GitHub
-          once whether a newer Preview exists. That request carries no project, machine or job data,
-          but GitHub sees normal connection details such as your IP address and the time.
+          check for a newer version of itself. Each time you open a desktop Preview, it asks
+          ${site.downloadHost} once whether a newer Preview exists. A Pro trial or license sends
+          ${site.licensingHost} only an installation digest, a device label, the license key and
+          order details. None of these carries project, drawing, toolpath, machine or job data, but
+          each service sees normal connection details such as your IP address and the time.
           <a href="/privacy/">Read the privacy page</a>.
         </p>`,
     },
@@ -298,10 +309,10 @@ function privacyAndData(site) {
       id: 'report-bug',
       question: 'How do I report a bug?',
       answer: html`<p>
-          Open a new issue on <a href="${site.issuesUrl}">KerfDesk’s GitHub issues page</a> and fill
-          in the bug report form. Describe what happened and the steps that cause it, and include
-          the KerfDesk version from Help → About KerfDesk. A project file or exported G-code helps a
-          lot.
+          Use the <a href="${site.reportUrl}">KerfDesk support page</a>. It lists what to include,
+          and a support email address will be listed there once it’s set up. Describe what happened
+          and the steps that cause it, and include the KerfDesk version from Help → About KerfDesk.
+          A project file or exported G-code helps a lot.
         </p>
         <p>
           For machine problems, a copy of your controller settings helps too. With a GRBL-family
@@ -310,15 +321,15 @@ function privacyAndData(site) {
           file on your computer, and it stays there until you choose to share it.
         </p>
         <p>
-          Found a security problem? <a href="${site.securityReportUrl}">Report it privately</a>
-          and keep exploit details out of public issues.
+          Found a security problem? Report it through the support page too, and please don’t post
+          the details anywhere public.
         </p>`,
     },
   ];
 }
 
 // [{ id, title, items: [{ id, question, answer }] }]
-export function faqSections(site) {
+export function faqSections(site, commerce) {
   return [
     { id: 'getting-started', title: 'Getting started', items: gettingStarted() },
     {
@@ -327,7 +338,7 @@ export function faqSections(site) {
       items: machinesAndConnection(site),
     },
     { id: 'files-features', title: 'Files and features', items: filesAndFeatures() },
-    { id: 'pricing-license', title: 'Pricing and license', items: pricingAndLicense() },
+    { id: 'pricing-license', title: 'Pricing and license', items: pricingAndLicense(commerce) },
     { id: 'privacy-data', title: 'Privacy and data', items: privacyAndData(site) },
   ];
 }

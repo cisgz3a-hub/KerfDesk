@@ -1,13 +1,17 @@
 // Copy for the download page that is long enough to crowd download.mjs. Every
-// sentence traces to public/download.html, WORKFLOW.md F-DESK1/F-DESK2,
-// PROJECT.md "Delivery targets", ADR-060, ADR-248, ADR-249 and (for the
-// real-machine answer) ADR-322 and the README status table on origin/main.
+// sentence traces to public/download.html and public/desktop-downloads.mjs (the
+// download page itself), docs/desktop-preview-distribution.md, ADR-523,
+// ADR-483 Amendment 1 (the Mac Preview needs macOS 13), WORKFLOW.md
+// F-DESK1/F-DESK2, PROJECT.md "Delivery targets", ADR-060 and (for the
+// real-machine answer) ADR-322 and the README status table on main. Editions
+// and prices come from commerce.config.mjs (ADR-524 Amendment 1).
 
 import { statusPill } from '../lib/components.mjs';
+import { formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 
-// Asset names come from electron-builder.preview.yml (artifactName) and
-// public/download.html; `<version>` is the prerelease tag without its leading v.
+// Installer names from public/desktop-release-manifest.mjs; `<version>` is the
+// release tag without its leading v.
 export const DESKTOP_FILES = [
   {
     computer: 'Windows PC',
@@ -16,17 +20,17 @@ export const DESKTOP_FILES = [
   },
   {
     computer: 'Mac with Intel',
-    needs: 'macOS 12 or newer, Intel (x64)',
+    needs: 'macOS 13 or newer, Intel (x64)',
     file: 'KerfDesk-<version>-macos-x64.dmg',
   },
   {
     computer: 'Mac with Apple Silicon',
-    needs: 'macOS 12 or newer, Apple Silicon (arm64)',
+    needs: 'macOS 13 or newer, Apple Silicon (arm64)',
     file: 'KerfDesk-<version>-macos-arm64.dmg',
   },
 ];
 
-// Companion files named in WORKFLOW.md F-DESK1 step 2.
+// The companion files each Preview publishes beside its installers.
 export const COMPANION_FILES = [
   {
     file: 'KerfDesk-<version>-SHA256SUMS.txt',
@@ -50,32 +54,44 @@ export const WEB_APP_POINTS = [
 ];
 
 export const SAME_APP_POINTS = [
-  'No account, sign-in or license key',
-  'Opens straight to the workspace',
+  'The same Free and Pro editions',
+  'No account or sign-in',
   'Your projects are saved as files on your own computer',
   'No analytics, error reporting or cloud sync',
 ];
 
-export const UPDATE_ITEMS = [
-  {
-    icon: 'globe',
-    title: 'Web app',
-    body: 'The newest version that passes KerfDesk’s automated checks is published at kerfdesk.com automatically. The app never reloads itself. When an update is ready, an Update button appears in the status bar. The new version loads when you click it, or the next time you open KerfDesk after closing all its tabs and windows. The button stays available during a job, so update while your machine is idle.',
-  },
-  {
-    icon: 'monitor-down',
-    title: 'Desktop Preview',
-    body: 'A new Preview comes out only when a new Preview version is tagged, not with every web app update. When one exists, a small Download update link appears in the status bar. It opens that version’s page on GitHub in your browser. KerfDesk never downloads or installs an update on its own. Finish any machine work, close KerfDesk, then install the new version yourself.',
-  },
-];
+export function updateItems(site) {
+  return [
+    {
+      icon: 'globe',
+      title: 'Web app',
+      body: 'The newest version that passes KerfDesk’s automated checks is published at kerfdesk.com automatically. The app never reloads itself. When an update is ready, an Update button appears in the status bar. The new version loads when you click it, or the next time you open KerfDesk after closing all its tabs and windows. The button stays available during a job, so update while your machine is idle.',
+    },
+    {
+      icon: 'monitor-down',
+      title: 'Desktop Preview',
+      body: html`A new Preview comes out only when a new Preview version is tagged, not with every
+        web app update. When one exists, a small Download update link appears in the status bar. It
+        opens the <a href="${site.downloadPageUrl}">download page</a> for that version in your
+        browser. KerfDesk never downloads or installs a Preview on its own. Finish any machine work,
+        close KerfDesk, then install the new version yourself.`,
+    },
+    {
+      icon: 'refresh-cw',
+      title: 'Signed Windows edition',
+      body: 'Once it’s released, it checks for updates inside the app and installs only versions your license’s updates cover. An update installs after you quit KerfDesk yourself, never during a job, and it never forces a restart.',
+    },
+  ];
+}
 
-export function downloadFaq(site) {
+export function downloadFaq(site, commerce) {
+  const [plan] = commerce.plans;
   return [
     {
       id: 'what-preview-means',
       question: 'What does “Preview” mean?',
       answer:
-        'Previews are early, non-production desktop builds. They are free to download and use, but testing on real Windows and Mac computers isn’t finished yet. Passing builds and automated tests show the package is intact. Installing, file access, USB access and machine behavior still need testing on real computers. There is no signed, stable desktop release yet.',
+        'Previews are early, non-production desktop builds. They are free to download, but testing on real Windows and Mac computers isn’t finished yet. Passing builds and automated tests show the package is intact. Installing, file access, USB access and machine behavior still need testing on real computers. Previews are unsigned, and Mac Previews aren’t notarized by Apple.',
     },
     {
       id: 'browsers',
@@ -97,17 +113,23 @@ export function downloadFaq(site) {
     },
     {
       id: 'account',
-      question: 'Do I need an account or a license key?',
-      answer:
-        'No. There is no account, sign-in, activation or license key. KerfDesk opens straight to the workspace.',
+      question: 'Do I need an account?',
+      answer: html`<p>
+        No. There’s no sign-up or sign-in, and KerfDesk Free needs nothing else.
+        ${plan &&
+        html`${plan.name} is unlocked with a license, and each device can try ${plan.name} free for
+        ${plan.trialDays} days first, with no card needed.`}
+      </p>`,
     },
     {
       id: 'cost',
       question: 'Does it cost anything?',
       answer: html`<p>
-        Not today. KerfDesk is free to use, with no account, trial timer or subscription. Paid
-        licenses are planned for the future, but prices, terms and timing aren’t set, and nothing is
-        for sale today. See <a href="/pricing/">pricing</a>.
+        KerfDesk Free costs nothing and has no time limit.
+        ${plan &&
+        html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)}, paid once, with a
+        year of updates.`}
+        Purchase isn’t open yet. See <a href="/pricing/">pricing</a>.
       </p>`,
     },
     {
@@ -128,9 +150,9 @@ export function downloadFaq(site) {
       id: 'report-problem',
       question: 'Where do I report a problem?',
       answer: html`<p>
-        Open an issue on <a href="${site.issuesUrl}">GitHub</a>. If you find a security problem,
-        <a href="${site.securityReportUrl}">report it privately</a> instead, and please don’t post
-        exploit details in a public issue.
+        On the <a href="${site.reportUrl}">KerfDesk support page</a>. It lists what to include in a
+        report, and a support email address will be listed there once it’s set up. If you find a
+        security problem, please don’t post the details anywhere public.
       </p>`,
     },
   ];

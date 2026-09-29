@@ -137,7 +137,7 @@ function cncSection() {
   });
 }
 
-function troubleshootingSection(site) {
+function troubleshootingSection() {
   return section({
     id: 'troubleshooting',
     narrow: true,
@@ -163,8 +163,7 @@ function troubleshootingSection(site) {
         </ul>
         <p>
           The same steps are in the app under
-          <strong>Help → Can’t connect? (Troubleshooting)</strong>. For driver details and more,
-          read the <a href="${site.connectionGuideUrl}">full connection guide</a>.
+          <strong>Help → Can’t connect? (Troubleshooting)</strong>, including USB drivers.
         </p>
       </div>`,
   });
@@ -192,8 +191,9 @@ function helpSection(site) {
 
       <h3>Report a problem</h3>
       <p>
-        Open an issue on <a href="${site.issuesUrl}">GitHub</a>. Say which machine, controller and
-        firmware you use, and what you tried. Issues are public, so leave out anything private.
+        Use the <a href="${site.reportUrl}">KerfDesk support page</a>. A support email address is
+        being set up and will be listed there. Say which machine, controller and firmware you use,
+        and what you tried. Never include your license key, passwords or payment details.
       </p>
       <p>
         For a connection problem, a diagnostic file helps. Under
@@ -205,8 +205,8 @@ function helpSection(site) {
 
       <h3>Security and safety</h3>
       <p>
-        Found a security problem? <a href="${site.securityReportUrl}">Report it privately</a>
-        instead of opening a public issue. Before you run real jobs, read the
+        Found a security problem? Report it through the support page, and don’t post the details
+        anywhere public. Before you run real jobs, read the
         <a href="/safety/">safety notes</a>. The app has a summary under
         <strong>Help → Safety &amp; liability</strong>.
       </p>
@@ -249,7 +249,7 @@ export const page = {
       lead: 'From here on, the machine moves. Stay with it, keep the work area clear, and keep its physical E-stop or power switch within reach.',
       content: stepBlocks(RUN_STEPS, ctx),
     })}
-    ${runningSection()} ${cncSection()} ${troubleshootingSection(ctx.site)} ${helpSection(ctx.site)}
+    ${runningSection()} ${cncSection()} ${troubleshootingSection()} ${helpSection(ctx.site)}
     ${ctaBand({
       title: 'Ready for your first project?',
       body: 'KerfDesk runs in your browser. There’s nothing to install and no account to create.',

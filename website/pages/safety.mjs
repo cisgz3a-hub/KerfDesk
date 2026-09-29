@@ -1,6 +1,9 @@
-// Safety page. Grounded in docs/safety.md, public/eula.txt, SECURITY.md and the
-// README status table; long copy lives in safety-data.mjs. Abort is always
-// described as a software stop, and nothing here certifies or guarantees safety.
+// Safety page. Grounded in docs/safety.md, public/eula.txt, SECURITY.md,
+// public/support.html and the README status table; long copy lives in
+// safety-data.mjs. Abort is always described as a software stop, and nothing
+// here certifies or guarantees safety. The repository is private, so the page
+// links neither the safety guide's source nor GitHub reporting; reports go to
+// the support page.
 
 import {
   actions,
@@ -86,7 +89,7 @@ function beforeEveryJob(ctx) {
       body: 'Press P to preview the toolpath. Cuts show as solid lines and travel moves as dashed lines, and you can play the route through from start to finish. Preview is a check on screen. It doesn’t take the place of a Frame on the real material.',
       points: [
         'Preview and play back the route before you connect a machine',
-        'Play the program back in 3D in the G-code Inspector',
+        'With Pro, play the program back in 3D in the G-code Inspector',
         'Save the G-code and check it in a separate viewer too',
       ],
       media: shot(ctx, 'preview'),
@@ -224,19 +227,18 @@ function reportSection(site) {
     tone: 'alt',
     narrow: true,
     eyebrow: 'Found a problem?',
-    title: 'Report a safety problem privately',
+    title: 'Report a safety problem',
     content: html`<div class="prose">
         <p>
           If you find a problem that could change what the machine does, get past a safety check,
-          expose files or devices on your computer, or run untrusted code, report it privately
-          through GitHub. Please don’t post the details in a public issue.
+          expose files or devices on your computer, or run untrusted code, report it through the
+          <a href="${site.reportUrl}">KerfDesk support page</a>. A support email address is being
+          set up and will be listed there. Please don’t post the details anywhere public.
         </p>
         <p>
           Include the KerfDesk version, your platform, your controller family and the steps to
           reproduce it, without moving real hardware where you can. Security fixes go into the
-          latest release; older builds aren’t patched separately. If private reporting isn’t
-          available, open a short public issue that asks for a private channel, without describing
-          the problem.
+          latest release; older builds aren’t patched separately.
         </p>
       </div>
       ${callout({
@@ -249,10 +251,7 @@ function reportSection(site) {
           output first.
         </p>`,
       })}
-      ${actions(
-        button(site.securityReportUrl, 'Report a problem privately', { iconName: 'lock' }),
-        button(site.issuesUrl, 'Report other bugs', { variant: 'secondary' }),
-      )}`,
+      ${actions(button(site.reportUrl, 'Go to the support page', { iconName: 'life-buoy' }))}`,
   });
 }
 
@@ -269,18 +268,18 @@ export const page = {
       title: 'Safety and responsible use',
       lead: 'Lasers and CNC routers can start fires, injure your eyes and throw parts. KerfDesk helps you check a job before it runs, but it can’t see your workshop, your material or your machine. Running the machine safely is up to you.',
       extra: actions(
-        button(site.safetyGuideUrl, 'Read the full safety guide', { iconName: 'book-open' }),
+        button('#before', 'Before every job', { iconName: 'book-open' }),
         button('#abort', 'About the Abort button', { variant: 'secondary' }),
       ),
     })}
     ${responsibilities()} ${beforeEveryJob(ctx)} ${whileItRuns()} ${abortSection()}
     ${laserModeSection()} ${checksSection()} ${testedSection()} ${reportSection(site)}
     ${ctaBand({
-      title: 'More detail in the full guide',
-      body: 'The safety guide covers lasers and CNC routers. In the app, Help → Safety & liability has a summary, and the Windows installer shows the License & Safety Notice.',
+      title: 'More safety help in the app',
+      body: 'In the app, Help → Safety & liability has a summary, and the Windows installer shows the License & Safety Notice.',
       buttons: [
-        button(site.safetyGuideUrl, 'Read the safety guide', { iconName: 'book-open' }),
-        button('/machines/', 'Check your machine', { variant: 'ghost-dark' }),
+        button('/machines/', 'Check your machine'),
+        button('/docs/', 'Get started', { variant: 'ghost-dark' }),
       ],
     })}`;
   },

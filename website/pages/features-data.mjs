@@ -17,16 +17,17 @@
 //   - Design Studio / Image Studio stages: PROJECT.md Phase N (DS-3c, DS-6b)
 //     and Phase L (IE-2/IE-3 planned, IE-4 deferred)
 
-import { statusPill } from '../lib/components.mjs';
+import { proPill, statusPill } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 
-// Overview cards; each links to a section id on the features page.
+// Overview cards; each links to a section id on the features page. `pro` marks a
+// tool the owner listed as Pro (commerce.config.mjs, ADR-524 Amendment 1).
 export const OVERVIEW = [
   {
     icon: 'pen-tool',
     title: 'Design and drawing',
     href: '#design',
-    body: 'Shapes, pen and node editing, Weld and the other booleans, offset outlines and Design Studio.',
+    body: 'Shapes, pen and node editing, Weld and the other booleans and offset outlines, plus Design Studio in Pro.',
   },
   {
     icon: 'type',
@@ -38,24 +39,25 @@ export const OVERVIEW = [
     icon: 'scan-eye',
     title: 'Images and tracing',
     href: '#images',
-    body: 'Five trace presets, image masks and crop, and the Image Studio editor.',
+    body: 'Five trace presets, image masks and crop, and the Image Studio editor. Advanced tracing is in Pro.',
   },
   {
     icon: 'package',
     title: 'Generators and layout',
     href: '#generators',
-    body: 'Finger-jointed boxes, arrays, Quick Nest, test grids, material libraries and a Registration Jig.',
+    body: 'Arrays, Quick Nest, test grids, material libraries and a Registration Jig, plus the box generator in Pro.',
   },
   {
     icon: 'circle-play',
     title: 'Preview and G-code Inspector',
     href: '#preview',
-    body: 'Toolpath preview, a job-time estimate and 3D playback of .nc, .gcode and .tap files.',
+    body: 'Toolpath preview and a job-time estimate. In Pro, the G-code Inspector plays back .nc, .gcode and .tap files in 3D.',
   },
   {
     icon: 'camera',
     title: 'Camera alignment',
     href: '#camera',
+    pro: true,
     body: 'Lens calibration and bed alignment, with a USB camera or, in the desktop app, a network camera.',
   },
 ];
@@ -67,7 +69,8 @@ export const DESIGN_POINTS = [
   'Import SVG, DXF, PNG, JPG or STL files with File → Import, the toolbar or drag-and-drop',
   'Measure distance and angle on the workspace',
   html`Design Studio: draw parts to exact size in a full window, with snapping, fillets and
-  chamfers. Typing sizes while you draw, trim and extend are planned. ${statusPill('in-progress')}`,
+  chamfers. Typing sizes while you draw, trim and extend are planned. ${statusPill('in-progress')}
+  ${proPill()}`,
 ];
 
 export const TEXT = [
@@ -135,6 +138,7 @@ export const GENERATORS = [
   {
     icon: 'package',
     title: 'Box generator',
+    pro: true,
     body: 'Make finger-jointed boxes (closed, open-top or slide-lid) with dividers and panel cutouts, as flat panels for a laser or CNC. No generated box has been cut and assembled yet, so check joint clearance on your own material with Box Fit Test strips first.',
     status: 'shipped-code-and-tests',
   },
@@ -253,7 +257,7 @@ export const FILE_ROWS = [
   [
     html`G-code <code>.nc</code>, <code>.gcode</code>, <code>.tap</code>`,
     'View',
-    'Opens in the G-code Inspector for viewing only.',
+    'Opens in the G-code Inspector, part of Pro, for viewing only.',
   ],
   [
     html`G-code <code>.gcode</code>, <code>.nc</code>`,

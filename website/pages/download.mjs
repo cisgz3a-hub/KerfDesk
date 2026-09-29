@@ -1,7 +1,11 @@
-// Download page. The web app is the recommended path; desktop builds are
-// unsigned Previews published only as GitHub prereleases (ADR-248), so every
-// desktop button opens site.releasesUrl and names the exact asset to pick.
-// No version number is hard-coded: each Preview release would make it stale.
+// Download page. The web app is the recommended path. Desktop installers come
+// only from the KerfDesk download page (site.downloadPageUrl, public/download.html
+// in the app), which serves them from dl.kerfdesk.com and checks the publisher
+// signature on the release metadata before it shows a link. This site has no
+// scripts, so it can't run that check or find the newest version itself: every
+// desktop button opens that page, and the file names are given as patterns.
+// No version number is hard-coded, and nothing links to GitHub: the source
+// repository is private (ADR-524 Amendment 1).
 
 import {
   actions,
@@ -23,7 +27,7 @@ import {
   DESKTOP_FILES,
   downloadFaq,
   SAME_APP_POINTS,
-  UPDATE_ITEMS,
+  updateItems,
   WEB_APP_POINTS,
 } from './download-data.mjs';
 
@@ -49,14 +53,15 @@ function platforms(site) {
       ${button(site.appUrl, 'Open the web app', { iconName: 'arrow-right' })}
     </article>
     <article class="platform">
-      <span class="eyebrow">Unsigned Preview</span>
+      <span class="eyebrow">Preview or signed edition</span>
       <h3>${icon('monitor')}Windows</h3>
       <p>
-        Windows 10 or 11, 64-bit (x64). The installer sets up KerfDesk for your user account, in a
-        folder you choose. Testing on real Windows PCs isn’t finished yet.
+        Windows 10 or 11, 64-bit (x64). The download page offers the unsigned Preview and, once it’s
+        released, the signed Windows edition with in-app updates. Testing on real Windows PCs isn’t
+        finished yet.
       </p>
       <p>Look for ${asset(WINDOWS.file)}</p>
-      ${button(site.releasesUrl, 'Browse Windows Previews', {
+      ${button(site.downloadPageUrl, 'Windows downloads', {
         variant: 'secondary',
         iconName: 'download',
       })}
@@ -65,12 +70,12 @@ function platforms(site) {
       <span class="eyebrow">Unsigned, unnotarized Preview</span>
       <h3>${icon('laptop')}macOS</h3>
       <p>
-        macOS 12 or newer, on Intel or Apple Silicon Macs. There is a separate disk image for each
+        macOS 13 or newer, on Intel or Apple Silicon Macs. There is a separate disk image for each
         chip type. Testing on real Macs isn’t finished yet.
       </p>
       <p>Intel (x64): ${asset(MAC_INTEL.file)}</p>
       <p>Apple Silicon (arm64): ${asset(MAC_ARM.file)}</p>
-      ${button(site.releasesUrl, 'Browse Mac Previews', {
+      ${button(site.downloadPageUrl, 'Mac downloads', {
         variant: 'secondary',
         iconName: 'download',
       })}
@@ -83,16 +88,17 @@ function chooseSection(site) {
     id: 'choose',
     eyebrow: 'Web or desktop',
     title: 'Choose how to run KerfDesk',
-    lead: 'The web app is the quickest way to start. The desktop Previews package the same app for Windows and macOS as early, unsigned builds.',
+    lead: 'The web app is the quickest way to start. The desktop app packages the same app for Windows and macOS.',
     content: html`${platforms(site)}
     ${callout({
       iconName: 'package',
-      title: 'Download Previews only from the official releases page',
+      title: 'Download the desktop app only from the KerfDesk download page',
       body: html`<p>
-        Both desktop buttons open the public
-        <a href="${site.releasesUrl}">KerfDesk releases page on GitHub</a>, the only official place
-        to get a Preview. Previews are published as pre-releases, so choose the newest release
-        marked <strong>Pre-release</strong>, then pick the file for your computer.
+        Both desktop buttons open the
+        <a href="${site.downloadPageUrl}">KerfDesk download page</a>, the only official place to get
+        the desktop app. Every installer it offers is served from ${site.downloadHost}. Before it
+        shows a download link, the page checks the publisher’s signature on the release, so it needs
+        JavaScript turned on in your browser.
       </p>`,
     })}
     ${callout({
@@ -101,7 +107,7 @@ function chooseSection(site) {
       body: html`<p>
         There is no Linux desktop app yet, and no date for one. Use the
         <a href="${site.appUrl}">web app</a> in Chrome or Edge. It has the same design and toolpath
-        features as the desktop Previews, and you can install it from the browser.
+        features as the desktop app, and you can install it from the browser.
       </p>`,
     })}`,
   });
@@ -112,7 +118,7 @@ function sameAppSection(ctx) {
     tone: 'alt',
     content: split({
       title: 'One app, wherever you run it',
-      body: 'The desktop Previews are built from the same code as the web app. Packaging doesn’t change any design, toolpath, G-code or machine-control behavior. A few extras exist only on the desktop, such as the network-camera helper and the update link.',
+      body: 'The desktop app is built from the same code as the web app. Packaging doesn’t change any design, toolpath, G-code or machine-control behavior. A few extras exist only on the desktop, such as the network-camera helper and the update link.',
       points: SAME_APP_POINTS,
       media: shot(ctx, 'workspace'),
     }),
@@ -123,9 +129,9 @@ function filesSection() {
   return section({
     id: 'desktop-files',
     narrow: true,
-    eyebrow: 'Desktop Previews',
+    eyebrow: 'Desktop files',
     title: 'Pick the right file',
-    lead: 'Each Preview release lists several files. Download the one that matches your computer.',
+    lead: 'The download page names each file. Download the one that matches your computer.',
     content: html`<div class="prose">
         <p>
           In each name below, <code>&lt;version&gt;</code> is the release tag without its leading
@@ -134,19 +140,20 @@ function filesSection() {
         </p>
       </div>
       ${table({
-        caption: 'Desktop Preview files',
+        caption: 'Desktop installer files',
         head: ['Computer', 'Needs', 'File'],
         rows: DESKTOP_FILES.map((row) => [row.computer, row.needs, asset(row.file)]),
       })}
       <div class="prose">
         <h3>Check what you downloaded</h3>
-        <p>Every Preview release also includes three companion files:</p>
+        <p>Every Preview also publishes three companion files:</p>
         <ul>
           ${COMPANION_FILES.map((item) => html`<li>${asset(item.file)}: ${item.body}</li>`)}
         </ul>
         <p>
-          GitHub provenance records also tie each download to the exact source commit that built it.
-          These files show what was built. They don’t make an unsigned build signed or trusted.
+          Each release also has a signed manifest that ties every file’s name, size and SHA-256
+          checksum to its version. It shows the publisher approved those exact files. It isn’t an
+          operating-system code signature, and it doesn’t make an unsigned build signed.
         </p>
       </div>`,
   });
@@ -164,8 +171,8 @@ function installSection() {
         title: 'Opening an unsigned app is your decision',
         body: html`<p>
           Choose <strong>Run anyway</strong> or <strong>Open Anyway</strong> only for a file you
-          downloaded from the official KerfDesk releases page whose name matches the pattern for
-          your computer. If anything doesn’t match, don’t open it.
+          downloaded from the KerfDesk download page whose name matches the pattern for your
+          computer. If anything doesn’t match, don’t open it.
         </p>`,
       })}
       <div class="prose">
@@ -173,8 +180,8 @@ function installSection() {
         <ol>
           <li>Run the setup file you downloaded.</li>
           <li>
-            Only continue if it came from the official KerfDesk releases page and its name matches
-            the Windows pattern.
+            Only continue if it came from the KerfDesk download page and its name contains
+            <code>-preview.</code> followed by a number.
           </li>
           <li>
             If SmartScreen says <strong>Windows protected your PC</strong>, choose
@@ -184,6 +191,10 @@ function installSection() {
             Check that the publisher is shown as unknown, then choose <strong>Run anyway</strong>.
           </li>
         </ol>
+        <p>
+          The signed Windows edition is different: its installer is code-signed. If Windows reports
+          an unknown publisher for it, don’t run it. Download it again from the download page.
+        </p>
         <h3>macOS</h3>
         <ol>
           <li>Open the disk image and drag <strong>KerfDesk.app</strong> to Applications.</li>
@@ -194,10 +205,7 @@ function installSection() {
           <li>
             If macOS still blocks it, open
             <strong>System Settings &gt; Privacy &amp; Security</strong> and choose
-            <strong>Open Anyway</strong>. On macOS 12 Monterey, use
-            <strong
-              >System Preferences &gt; Security &amp; Privacy &gt; General &gt; Open Anyway</strong
-            >.
+            <strong>Open Anyway</strong>.
           </li>
         </ol>
         <p>KerfDesk never turns off or quietly works around macOS Gatekeeper.</p>
@@ -209,21 +217,22 @@ function installSection() {
   });
 }
 
-function updatesSection() {
+function updatesSection(site) {
   return section({
     id: 'updates',
     narrow: true,
     eyebrow: 'Updates',
     title: 'How updates work',
-    content: html`${featureGrid(UPDATE_ITEMS, { columns: 2 })}
+    content: html`${featureGrid(updateItems(site))}
     ${callout({
       title: 'What the desktop update check sends',
       body: html`<p>
-        To find out whether a newer Preview exists, the desktop app makes one small request to
-        GitHub each time it opens. It sends no project, design, machine or job details, and no
-        device ID. GitHub still sees normal connection details, such as your IP address and the
-        time. If you’re offline or the check fails, nothing happens. Automated tests cover this
-        check, but it hasn’t yet been tried on installed copies on real computers.
+        To find out whether a newer Preview exists, the desktop Preview makes one small request to
+        ${site.downloadHost} each time it opens. It sends no project, design, machine or job
+        details, and no device ID. ${site.downloadHost} still sees normal connection details, such
+        as your IP address and the time. If you’re offline or the check fails, nothing happens.
+        Automated tests cover this check, but it hasn’t yet been tried on installed copies on real
+        computers.
       </p>`,
     })}`,
   });
@@ -234,30 +243,30 @@ export const page = {
   nav: null,
   title: 'Download',
   description:
-    'Use KerfDesk free in your browser today, or download an unsigned desktop Preview for Windows 10/11 or macOS 12+ on Intel and Apple Silicon.',
+    'Use KerfDesk in your browser, or get the desktop app for Windows 10/11 or macOS 13+ from the KerfDesk download page. KerfDesk Free needs no account.',
   render: (ctx) => {
-    const { site } = ctx;
+    const { site, commerce } = ctx;
     return html`${pageHero({
       eyebrow: 'Download',
       title: 'Get KerfDesk',
-      lead: 'Use KerfDesk in your browser, or install a desktop Preview on Windows or macOS. Both are free to use today, and neither needs an account.',
+      lead: 'Use KerfDesk in your browser, or install the desktop app on Windows or macOS. Both come in the same Free and Pro editions, and neither needs an account.',
       extra: actions(
         button(site.appUrl, 'Open KerfDesk in your browser', { iconName: 'arrow-right' }),
-        button('#desktop-files', 'Desktop Preview files', {
+        button(site.downloadPageUrl, 'Desktop downloads', {
           variant: 'secondary',
           iconName: 'download',
         }),
       ),
     })}
     ${chooseSection(site)} ${sameAppSection(ctx)} ${filesSection()} ${installSection()}
-    ${updatesSection()}
+    ${updatesSection(site)}
     ${section({
       id: 'questions',
       tone: 'alt',
       narrow: true,
       eyebrow: 'Questions',
       title: 'Download questions',
-      content: faqList(downloadFaq(site)),
+      content: faqList(downloadFaq(site, commerce)),
     })}
     ${section({
       narrow: true,
@@ -273,7 +282,7 @@ export const page = {
     })}
     ${ctaBand({
       title: 'Ready to start?',
-      body: 'Open KerfDesk in Chrome, Edge, Brave or Arc. It’s free to use today and needs no account.',
+      body: 'Open KerfDesk in Chrome, Edge, Brave or Arc. KerfDesk Free needs no account.',
       buttons: [
         button(site.appUrl, 'Open KerfDesk'),
         button('/docs/', 'Get started', { variant: 'ghost-dark' }),

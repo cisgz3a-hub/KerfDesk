@@ -68,7 +68,7 @@ export const CONNECT_NEEDS = [
   {
     icon: 'monitor-down',
     title: 'Or the desktop Preview',
-    body: 'It has the same browser engine built in, so you click Connect and pick your port the same way. Previews are unsigned early builds for Windows 10/11 and macOS 12 or newer. Installing and serial-port access haven’t been checked on real computers yet.',
+    body: 'It has the same browser engine built in, so you click Connect and pick your port the same way. Previews are unsigned early builds for Windows 10/11 and macOS 13 or newer. Installing and serial-port access haven’t been checked on real computers yet.',
     href: '/download/',
   },
   {

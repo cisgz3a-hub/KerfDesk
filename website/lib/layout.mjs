@@ -98,7 +98,10 @@ function footer() {
           <img src="/favicon.svg" alt="" width="24" height="24" />
           <span>Kerf<span class="brand__accent">Desk</span></span>
         </a>
-        <p>Laser and CNC software for GRBL machines, free to use today. Made by ${site.studio}.</p>
+        <p>
+          Laser and CNC software for GRBL machines, in a Free and a Pro edition. Made by
+          ${site.studio}.
+        </p>
         <p class="site-footer__safety">
           Stay with your machine while it runs. The in-app Abort is a software stop, not an
           emergency stop. <a href="/safety/">Read the safety notes</a>.

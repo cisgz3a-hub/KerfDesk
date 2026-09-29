@@ -1,12 +1,12 @@
 // Card and table copy for the About page. Sources: README.md (status table,
 // naming note), PROJECT.md (product goal, non-negotiables 4, 5 and 8, stack,
-// ADR-322 qualification note), SECURITY.md,
-// .github/ISSUE_TEMPLATE/bug_report.yml, eslint.config.mjs, package.json
+// ADR-322 qualification note), SECURITY.md, public/support.html (the contact
+// route and what a report should include), eslint.config.mjs, package.json
 // release:check and .github/workflows/audit.yml (the vulnerability audit is
 // nightly, not a PR gate), and src/core/controllers/grbl/frame-lines.ts (Frame
 // jogs the job's bounding rectangle, so copy says "rectangle", not "outline").
-// Licensing follows the 2026-09-23 maintainer direction: free to use today,
-// paid licenses planned, and no open-source selling points or repo promotion.
+// Licensing follows the owner's settled Free and Pro offer (ADR-524 Amendment
+// 1), with no open-source selling points or repository links.
 
 export const PRINCIPLES = [
   {
@@ -79,14 +79,14 @@ export function reportLinks(site) {
     {
       icon: 'bug',
       title: 'Report a problem',
-      body: 'The bug form asks what happened, how to reproduce it, your machine type and your KerfDesk version. If a bug caused unsafe machine motion, describe it. Don’t re-run it.',
-      href: site.issuesUrl,
+      body: 'The support page lists what to include: your KerfDesk version, web or desktop, your machine and controller, and what happened. If a bug caused unsafe machine motion, describe it. Don’t re-run it.',
+      href: site.reportUrl,
     },
     {
       icon: 'shield-alert',
       title: 'Report a security issue',
-      body: 'Report it privately through GitHub, not in a public issue. Include the version, platform, controller family and steps to reproduce, without moving real hardware where you can.',
-      href: site.securityReportUrl,
+      body: 'Report it through the support page, and don’t post the details anywhere public. Include the version, platform, controller family and steps to reproduce, without moving real hardware where you can.',
+      href: site.supportUrl,
     },
   ];
 }

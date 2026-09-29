@@ -1,8 +1,9 @@
-// License. Plain facts only (maintainer direction 2026-09-23): KerfDesk is free
-// to use today; the license of the versions released so far is named in one
-// sentence (currentLicenseSection) and nowhere else on the site; paid licenses
-// are planned with nothing set; bundled parts keep their own licenses. No
-// price, no sale, no promise about future terms, and no selling points about
+// License. Plain facts only: KerfDesk comes in a Free and a Pro edition (the
+// owner's settled offer, commerce.config.mjs, ADR-524 Amendment 1); the license
+// of the versions released so far is named in one sentence
+// (currentLicenseSection) and nowhere else on the site, with no link to the
+// private source repository; bundled parts keep their own licenses. No sale, no
+// sale terms (they are published before sales open) and no selling points about
 // source access. The app's License & Safety Notice is public/eula.txt.
 
 import {
@@ -17,14 +18,14 @@ import {
   table,
 } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
-import { NOTICE_PARTS, PAID_LICENSE_FACTS, THIRD_PARTY_ROWS, faqItems } from './license-data.mjs';
+import { NOTICE_PARTS, THIRD_PARTY_ROWS, faqItems, proLicenseFacts } from './license-data.mjs';
 
 function todaySection() {
   return section({
     id: 'today',
-    eyebrow: 'Using KerfDesk today',
-    title: 'Free to use, with a safety notice',
-    lead: 'KerfDesk is free to use today, in the browser and on the desktop. There’s no account, no trial timer and no subscription. The app comes with a short License & Safety Notice about machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
+    eyebrow: 'Using KerfDesk',
+    title: 'The notice that comes with the app',
+    lead: 'KerfDesk comes in a Free and a Pro edition, in the browser and on the desktop. The app comes with a short License & Safety Notice about machine safety and liability. The Windows installer shows it during setup, and Help > About KerfDesk in the app points to it.',
     content: html`${table({
       caption: 'What the five parts of the notice say',
       head: ['Part', 'In plain words'],
@@ -45,7 +46,7 @@ function todaySection() {
 }
 
 // The only place the website names the license of the released versions.
-function currentLicenseSection(site) {
+function currentLicenseSection() {
   return section({
     id: 'current-license',
     tone: 'alt',
@@ -53,10 +54,7 @@ function currentLicenseSection(site) {
     eyebrow: 'Current license',
     title: 'The terms for versions released so far',
     content: html`<div class="prose">
-      <p>
-        The versions of KerfDesk released so far are published under the
-        <a href="${site.licenseUrl}">MIT License</a>.
-      </p>
+      <p>The versions of KerfDesk released so far are published under the MIT License.</p>
       <p>Versions already released keep the terms they were released under.</p>
       <p>
         KerfDesk is © 2026 Johann Stolk. The full license text is also printed at the end of the
@@ -66,13 +64,13 @@ function currentLicenseSection(site) {
   });
 }
 
-function paidLicensesSection() {
+function proLicenseSection(commerce) {
   return section({
-    id: 'paid-licenses',
-    eyebrow: 'Looking ahead',
-    title: 'Paid licenses are planned',
-    lead: 'Paid KerfDesk licenses are planned for the future. Prices, terms and timing aren’t set yet, and nothing is for sale today.',
-    content: html`${featureGrid(PAID_LICENSE_FACTS)}
+    id: 'pro-license',
+    eyebrow: 'Free and Pro',
+    title: 'The Free edition and the Pro license',
+    lead: 'Free has no time limit. Pro adds the Pro tools with a one-time license. Purchase opens soon; nothing can be bought yet.',
+    content: html`${featureGrid(proLicenseFacts(commerce))}
     ${actions(button('/pricing/', 'See pricing', { iconName: 'tag', variant: 'secondary' }))}`,
   });
 }
@@ -95,7 +93,7 @@ function thirdPartySection(site) {
           The full list is generated from every production package KerfDesk depends on, plus the
           bundled fonts and pictures. It ships with the app as
           <code>third-party-notices.txt</code>, together with the license texts those components
-          require. Help &gt; About KerfDesk points to it, and the desktop Previews carry it too.
+          require. Help &gt; About KerfDesk points to it, and the desktop app carries it too.
         </p>
         <h3>About the fonts</h3>
         <p>
@@ -147,18 +145,18 @@ export const page = {
   nav: null,
   title: 'License',
   description:
-    'How KerfDesk is licensed today, what its License & Safety Notice says, the plan for paid licenses and how bundled parts are licensed.',
-  render: ({ site }) =>
+    'How KerfDesk is licensed: the Free and Pro editions, what its License & Safety Notice says, the terms for released versions and how bundled parts are licensed.',
+  render: ({ site, commerce }) =>
     html`${pageHero({
       eyebrow: 'License',
       title: 'Licensing and notices',
-      lead: 'KerfDesk is free to use today, with no account, no trial timer and no subscription. Paid licenses are planned for the future. This page covers the terms that apply now, the notice that comes with the app and how parts made by others are licensed.',
+      lead: 'KerfDesk comes in a Free edition with no time limit and a Pro edition with a one-time license. This page covers the terms that apply now, the notice that comes with the app and how parts made by others are licensed.',
       extra: actions(
-        button('#paid-licenses', 'About paid licenses', { iconName: 'tag' }),
+        button('#pro-license', 'About Free and Pro', { iconName: 'tag' }),
         button(site.noticesUrl, 'Third-party notices', { variant: 'secondary' }),
       ),
     })}
-    ${todaySection()} ${currentLicenseSection(site)} ${paidLicensesSection()}
+    ${todaySection()} ${currentLicenseSection()} ${proLicenseSection(commerce)}
     ${thirdPartySection(site)} ${creditsSection()}
     ${section({
       id: 'questions',
@@ -166,11 +164,11 @@ export const page = {
       narrow: true,
       eyebrow: 'Questions',
       title: 'License questions',
-      content: faqList(faqItems(site)),
+      content: faqList(faqItems(site, commerce)),
     })}
     ${ctaBand({
-      title: 'Free to use today',
-      body: 'Open KerfDesk in your browser or download a desktop Preview. No account, no trial timer, no subscription.',
+      title: 'Start with KerfDesk Free',
+      body: 'Open KerfDesk in your browser or download the desktop app. Free needs no account and has no time limit.',
       buttons: [
         button(site.appUrl, 'Open the app'),
         button('/download/', 'Download', { variant: 'ghost-dark' }),

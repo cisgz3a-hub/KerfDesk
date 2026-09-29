@@ -1,23 +1,16 @@
-// Pricing. KerfDesk is free to use today, and paid licenses are planned
-// (commerce.config.mjs). While sales are closed this page shows the free offer
-// beside a "paid licenses are planned" card, and no price. Once a commercial ADR
-// opens sales, the configured license plans render beside the free card with
-// their hosted checkout links and the planned card goes away. The hero, the
-// description and the FAQ describe the closed store: revise them in the same
-// change that opens sales.
+// Pricing: the Free and Pro editions and the Pro license terms, as the owner
+// settled them on 2026-09-29 (ADR-524 Amendment 1). Every price and term comes
+// from commerce.config.mjs. The prices render while checkout is closed; a buy
+// button renders only once `commerce.salesOpen` is true and the plan has its
+// hosted checkout URL, so until then the Pro card says purchase opens soon.
+// Refund terms are not written here: the terms of sale are published before
+// sales open. The hero lead, the terms line and the FAQ follow `salesOpen`, but
+// reread all of them in the change that opens checkout.
 
-import { button, faqList, pageHero, section } from '../lib/components.mjs';
-import { formatPrice, visiblePlans } from '../lib/commerce.mjs';
+import { button, faqList, featureGrid, pageHero, section } from '../lib/components.mjs';
+import { checkoutUrlFor, formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 import { icon } from '../lib/icons.mjs';
-
-const FREE_INCLUDES = [
-  'The full app in Chrome, Edge and other Chromium browsers',
-  'Early desktop Preview builds for Windows and macOS',
-  'Every laser and CNC feature, with no paywall or license key',
-  'No account, sign-in or activation',
-  'No trial timer and no subscription',
-];
 
 function ticks(items) {
   return html`<ul class="ticks">
@@ -25,80 +18,160 @@ function ticks(items) {
   </ul>`;
 }
 
-function freePlan(site) {
-  return html`<article class="plan plan--free">
-    <h2 class="h3">KerfDesk</h2>
-    <p class="plan__price">Free</p>
-    <p>Everything KerfDesk does today, for everyone.</p>
-    ${ticks(FREE_INCLUDES)} ${button(site.appUrl, 'Open the app')}
+function freePlan(commerce, site) {
+  return html`<article class="plan plan--free" id="plan-free">
+    <h2 class="h3">KerfDesk ${commerce.free.name}</h2>
+    <p class="plan__price">Free <small>no time limit</small></p>
+    <p>In the browser and on the desktop. No account, no card.</p>
+    ${ticks(commerce.free.includes)} ${button(site.appUrl, 'Open the app')}
   </article>`;
 }
 
-// Shown only while sales are closed. No price, date or feature promise.
-function licensesPlanned(site) {
-  return html`<article class="plan" id="paid-licenses">
-    <h2 class="h3">Paid licenses are planned</h2>
-    <p>
-      Paid licenses for KerfDesk are planned for the future. Prices, terms and timing aren’t set
-      yet, and nothing is for sale today.
-    </p>
-    <p>
-      There’s no mailing list to join. To follow news, watch the KerfDesk releases page on GitHub.
-    </p>
-    ${button(site.releasesUrl, 'Watch releases on GitHub', { variant: 'secondary' })}
-  </article>`;
+function planFacts(plan) {
+  return [
+    'Includes one year of updates.',
+    plan.deviceLimit && `Active on up to ${plan.deviceLimit} devices at a time.`,
+    plan.trialDays && `Free ${plan.trialDays}-day trial on each device.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
-function paidPlan(plan, currency) {
+function paidPlan(plan, commerce) {
   const cadence = plan.billing === 'yearly' ? 'per year' : 'one-time';
-  return html`<article class="plan">
-    <h2 class="h3">${plan.name}</h2>
-    <p class="plan__price">${formatPrice(plan.price, currency)} <small>${cadence}</small></p>
+  const checkoutUrl = checkoutUrlFor(commerce, plan);
+  return html`<article class="plan" id="plan-${plan.id}">
+    <h2 class="h3">KerfDesk ${plan.name}</h2>
+    <p class="plan__price">
+      ${formatPrice(plan.price, commerce.currency)} <small>${cadence}</small>
+    </p>
     ${plan.summary && html`<p>${plan.summary}</p>`} ${ticks(plan.includes)}
-    ${button(plan.checkoutUrl, `Buy ${plan.name}`)}
+    <p class="plan__fine">${planFacts(plan)}</p>
+    ${checkoutUrl
+      ? button(checkoutUrl, `Buy ${plan.name}`)
+      : html`<p class="plan__soon">Purchase opens soon</p>`}
   </article>`;
 }
 
-function salesTerms(commerce) {
+function termsLine(commerce) {
+  const tax = html`Prices are in ${commerce.currency === 'USD' ? 'US dollars' : commerce.currency}
+  and exclude any sales tax or VAT the payment provider adds at checkout.`;
+  if (!commerce.salesOpen) {
+    return html`<p class="plans__terms">
+      ${tax} Purchase isn’t open yet: no payment provider is live, so there’s no checkout and
+      nothing can be bought today. The terms of sale will be published before sales open.
+    </p>`;
+  }
   return html`<p class="plans__terms">
-    Checkout opens on our payment provider’s page. See the
+    ${tax} Checkout opens on our payment provider’s page. See the
     <a href="${commerce.termsUrl}">terms of sale</a> and
     <a href="${commerce.refundPolicyUrl}">refund policy</a>.
   </p>`;
 }
 
-function faq(site) {
-  return [
+// How a license works, from the plan's own terms.
+function licenseTerms(plan, currency) {
+  const cards = [
     {
-      id: 'free',
-      question: 'Is KerfDesk really free?',
-      answer:
-        'Yes. Today the web app and the desktop Preview builds cost nothing, need no account and have no trial timer or subscription.',
+      icon: 'receipt',
+      title: 'Pay once',
+      body: `A ${plan.name} license costs ${formatPrice(plan.price, currency)}, one time. It isn’t a subscription.`,
     },
     {
-      id: 'later',
-      question: 'Will KerfDesk cost money later?',
+      icon: 'refresh-cw',
+      title: 'A year of updates, then yours to keep',
+      body: 'Every license includes one year of updates. Every version released during that year keeps working forever.',
+    },
+    plan.updateYearPrice && {
+      icon: 'calendar-plus',
+      title: 'More updates only if you want them',
+      body: `After the year, ${formatPrice(plan.updateYearPrice, currency)} adds another year of updates. It’s optional, it isn’t a subscription and it never renews automatically.`,
+    },
+    plan.deviceLimit && {
+      icon: 'monitor-smartphone',
+      title: `Up to ${plan.deviceLimit} devices at a time`,
+      body: 'Each desktop app installation or browser counts as one device. To move the license, deactivate it on one device, then activate it on another.',
+    },
+    plan.trialDays && {
+      icon: 'hourglass',
+      title: `Try ${plan.name} free for ${plan.trialDays} days`,
+      body: `Each device gets a free ${plan.trialDays}-day ${plan.name} trial. No card needed.`,
+    },
+    {
+      icon: 'shield-check',
+      title: 'Your jobs keep running',
+      body: `A license never stops a job from running. When a trial ends, only the ${plan.name} tools lock, and everything in Free keeps working.`,
+    },
+  ].filter(Boolean);
+  return section({
+    id: 'how-pro-works',
+    tone: 'alt',
+    eyebrow: `${plan.name} license`,
+    title: `How a ${plan.name} license works`,
+    content: featureGrid(cards),
+  });
+}
+
+function faq(commerce, plan) {
+  const devices = plan?.deviceLimit ?? 3;
+  return [
+    !commerce.salesOpen && {
+      id: 'buy-now',
+      question: 'Can I buy Pro today?',
       answer:
-        'Paid licenses are planned for the future. What they include, what they cost and when they arrive aren’t decided yet, so there’s nothing to buy today.',
+        'Not yet. Purchase opens soon. No payment provider is live yet, so there’s no checkout and nothing can be bought today. The terms of sale will be published before sales open.',
+    },
+    {
+      id: 'free-expire',
+      question: 'Does the Free edition expire?',
+      answer:
+        'No. Free has no time limit, in the browser and on the desktop, and it needs no account or card.',
+    },
+    {
+      id: 'trial-ends',
+      question: 'What happens when my trial ends?',
+      answer:
+        'Only the Pro tools lock. Everything in Free keeps working, and a license never stops a job from running.',
+    },
+    {
+      id: 'after-updates',
+      question: 'What happens after my year of updates?',
+      answer: html`<p>
+        Your license keeps working. Every version released during your year of updates keeps working
+        forever.
+        ${plan?.updateYearPrice &&
+        html`If you want newer versions, ${formatPrice(plan.updateYearPrice, commerce.currency)}
+        adds another year of updates. It’s optional, it isn’t a subscription and it never renews
+        automatically.`}
+      </p>`,
+    },
+    {
+      id: 'devices',
+      question: 'How many devices can I use Pro on?',
+      answer: `Up to ${devices} at a time. Each desktop app installation or browser counts as one device. To move the license, deactivate it on one device, then activate it on the other. In the desktop app, that’s under Help > Licence.`,
+    },
+    {
+      id: 'tax',
+      question: 'Do the prices include tax?',
+      answer:
+        'No. Prices are in US dollars and exclude any sales tax or VAT the payment provider adds at checkout.',
+    },
+    {
+      id: 'refunds',
+      question: 'What about refunds?',
+      answer: commerce.salesOpen
+        ? html`<p>See the <a href="${commerce.refundPolicyUrl}">refund policy</a>.</p>`
+        : 'The terms of sale will be published before sales open, so you can read them before you buy.',
     },
     {
       id: 'your-copy',
-      question: 'If licenses go on sale, what happens to the version I have?',
+      question: 'What about the version I have now?',
       answer: html`<p>
         Versions already released keep the terms they were released under.
         <a href="/license/">See the license details</a>.
       </p>`,
     },
-    {
-      id: 'new-versions',
-      question: 'How do I hear about licenses and new versions?',
-      answer: html`<p>
-        There’s no mailing list to join. New desktop Previews are published on the
-        <a href="${site.releasesUrl}">KerfDesk releases page on GitHub</a>, so watch it to follow
-        news. The web app also shows an Update button in its status bar when a new version is ready.
-      </p>`,
-    },
-  ];
+  ].filter(Boolean);
 }
 
 export const page = {
@@ -106,27 +179,30 @@ export const page = {
   nav: 'pricing',
   title: 'Pricing',
   description:
-    'KerfDesk is free to use today, with every feature, no account and no subscription. Paid licenses are planned for later; nothing is for sale yet.',
+    'KerfDesk Free has no time limit. Pro adds advanced tools for US$49.50, paid once, with a year of updates and a 30-day trial. Purchase opens soon.',
   render: ({ site, commerce }) => {
-    const plans = visiblePlans(commerce);
-    return html`${pageHero({
-      eyebrow: 'Pricing',
-      title: 'Free to use today',
-      lead: 'Every feature, in the browser and on the desktop, at no cost. No account, no trial timer, no subscription. Paid licenses are planned for later, and nothing is for sale yet.',
-    })}
+    const [plan] = commerce.plans;
+    const lead = [
+      'KerfDesk comes in two editions, in the browser and on the desktop. Free has no time limit.',
+      plan &&
+        `${plan.name} adds advanced tools for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
+      !commerce.salesOpen && 'Purchase opens soon.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return html`${pageHero({ eyebrow: 'Pricing', title: 'Free and Pro', lead })}
     ${section({
       content: html`<div class="plans">
-          ${freePlan(site)} ${plans.length === 0 && licensesPlanned(site)}
-          ${plans.map((plan) => paidPlan(plan, commerce.currency))}
+          ${freePlan(commerce, site)} ${commerce.plans.map((item) => paidPlan(item, commerce))}
         </div>
-        ${plans.length > 0 && salesTerms(commerce)}`,
+        ${termsLine(commerce)}`,
     })}
+    ${plan && licenseTerms(plan, commerce.currency)}
     ${section({
-      tone: 'alt',
       narrow: true,
       eyebrow: 'Questions',
       title: 'About pricing and licenses',
-      content: faqList(faq(site)),
+      content: faqList(faq(commerce, plan)),
     })}`;
   },
 };

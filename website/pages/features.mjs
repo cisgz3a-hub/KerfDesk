@@ -1,6 +1,8 @@
 // Features: what KerfDesk does, grouped by task, with a file-format table.
 // Copy lives in features-data.mjs with its evidence notes. Machine-dependent
 // results carry a status pill; laser and CNC detail lives on /laser/ and /cnc/.
+// Tools the owner listed as Pro (commerce.config.mjs) carry a Pro pill; nothing
+// else is marked, so the page never guesses which edition an unlisted tool is in.
 
 import {
   actions,
@@ -9,6 +11,7 @@ import {
   ctaBand,
   featureGrid,
   pageHero,
+  proPill,
   section,
   split,
   statusPill,
@@ -41,6 +44,7 @@ function overview() {
           machine
         </li>
         <li>${statusPill('in-progress')} Part of it works today, and more is being built</li>
+        <li>${proPill()} Part of the Pro edition. <a href="/pricing/">Compare Free and Pro</a></li>
       </ul>
       ${featureGrid(OVERVIEW)}`,
   });
@@ -69,9 +73,9 @@ function preview(ctx) {
     title: 'See the program before your machine moves',
     content: html`${split({
       title: 'Preview, then inspect',
-      body: html`Press <kbd>P</kbd> to preview the exact toolpath your machine will run. Then open
-        the G-code Inspector: a 3D viewer with playback that shows which line of the program made
-        each move.`,
+      body: html`Press <kbd>P</kbd> to preview the exact toolpath your machine will run. With Pro,
+        open the G-code Inspector: a 3D viewer with playback that shows which line of the program
+        made each move. ${proPill()}`,
       points: PREVIEW_POINTS,
       media: shot(ctx, 'gcode3d', {
         caption: 'The canvas switched to G-code 3D, with playback controls below the view.',
@@ -166,7 +170,7 @@ export const page = {
       tone: 'alt',
       eyebrow: 'Images and tracing',
       title: 'Turn pictures into paths or engravings',
-      lead: 'Import PNG and JPG images to trace into vectors or, on a laser, to engrave.',
+      lead: 'Import PNG and JPG images to trace into vectors or, on a laser, to engrave. Basic tracing is part of Free, and advanced tracing is part of Pro.',
       content: featureGrid(IMAGES),
     })}
     ${section({
@@ -181,16 +185,16 @@ export const page = {
       id: 'camera',
       eyebrow: 'Camera alignment',
       title: 'Place artwork over your material',
-      lead: 'Use a camera to see your material on the canvas and position your design on it.',
+      lead: 'Use a camera to see your material on the canvas and position your design on it. Camera alignment is part of Pro.',
       content: featureGrid(CAMERA),
     })}
     ${files()} ${machineTypes()}
     ${ctaBand({
       title: 'Try it on your next project',
-      body: 'KerfDesk is free to use today, needs no account and runs in Chrome, Edge and other Chromium browsers.',
+      body: 'KerfDesk Free needs no account and runs in Chrome, Edge and other Chromium browsers.',
       buttons: [
         button(ctx.site.appUrl, 'Open KerfDesk'),
-        button('/download/', 'Desktop Preview', { variant: 'ghost-dark' }),
+        button('/download/', 'Desktop app', { variant: 'ghost-dark' }),
       ],
     })}`,
 };

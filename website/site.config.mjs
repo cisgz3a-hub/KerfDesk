@@ -1,27 +1,37 @@
 // Site-wide facts shared by every page. Keep URLs here, not in page copy, so a
 // move (for example the app leaving the apex domain) is a one-line change.
+//
+// No page links to GitHub. The source repository is private, so a visitor can't
+// open it (ADR-524 Amendment 1). Desktop downloads go through the KerfDesk
+// download page, and help and problem reports go through the support page.
 
-const REPO_URL = 'https://github.com/cisgz3a-hub/KerfDesk';
+const APP_URL = 'https://kerfdesk.com';
+const SUPPORT_URL = `${APP_URL}/support.html`;
 
 export const site = {
   name: 'KerfDesk',
   tagline: 'Laser & CNC software',
   description:
-    'KerfDesk is laser and CNC software for GRBL machines, free to use today. Design, assign operations, preview the toolpath and send the job from your browser or a desktop app.',
+    'KerfDesk is laser and CNC software for GRBL machines, in a Free and a Pro edition. Design, assign operations, preview the toolpath and send the job from your browser or a desktop app.',
   // The KerfDesk web app. It lives at the apex domain today; the website must
   // not take that origin over, because installed PWAs, browser file and serial
   // permissions and the desktop camera bridge's trusted origin are all tied to it.
-  appUrl: 'https://kerfdesk.com',
-  // Functional GitHub links only (downloads, bug and security reports, the
-  // License page). Don't link the source repository as a selling point.
-  repoUrl: REPO_URL,
-  releasesUrl: `${REPO_URL}/releases`,
-  issuesUrl: `${REPO_URL}/issues`,
-  securityReportUrl: `${REPO_URL}/security/advisories/new`,
-  licenseUrl: `${REPO_URL}/blob/main/LICENSE`,
-  noticesUrl: `${REPO_URL}/blob/main/THIRD_PARTY_NOTICES.md`,
-  safetyGuideUrl: `${REPO_URL}/blob/main/docs/safety.md`,
-  connectionGuideUrl: `${REPO_URL}/blob/main/docs/connection-troubleshooting.md`,
+  appUrl: APP_URL,
+  // The app's own download page (public/download.html). It checks the publisher
+  // signature on the release metadata before it shows a link, and every installer
+  // it links is served from downloadHost. This site has no scripts, so it can't
+  // run that check or find the newest version itself: its desktop buttons open
+  // that page instead of naming a version or linking an installer directly.
+  downloadPageUrl: `${APP_URL}/download.html`,
+  downloadHost: 'dl.kerfdesk.com',
+  // Help > Get Help and Help > Report a Problem in the app open this page. It
+  // names the current contact route; a support email address is still being set up.
+  supportUrl: SUPPORT_URL,
+  reportUrl: `${SUPPORT_URL}#report`,
+  // The full third-party notices file that ships with the app.
+  noticesUrl: `${APP_URL}/third-party-notices.txt`,
+  // The licensing service the app uses for Pro trials and activation.
+  licensingHost: 'license.kerfdesk.com',
   studio: 'Ons Houtkombuis',
 };
 
@@ -52,7 +62,7 @@ export const footerNav = [
       { label: 'Get started', href: '/docs/' },
       { label: 'Safety', href: '/safety/' },
       { label: 'FAQ', href: '/faq/' },
-      { label: 'Report a problem', href: `${REPO_URL}/issues` },
+      { label: 'Support', href: SUPPORT_URL },
     ],
   },
   {

@@ -3,9 +3,10 @@
 // "hardware-verified" claim is deliberately absent: PROJECT.md's 2026-09-19
 // qualification note (ADR-322) withdrew it, so the Falcon is named only as a
 // machine jobs were sent to in informal runs. No competitor is named (ADR-120).
-// Licensing follows the 2026-09-23 maintainer direction: KerfDesk is free to use
-// today and paid licenses are planned, so this page doesn't promote the source
-// repository or open-source terms. Only bug and security reporting link to GitHub.
+// Licensing follows the owner's settled Free and Pro offer (commerce.config.mjs,
+// ADR-524 Amendment 1). The page doesn't promote open-source terms, and nothing
+// links to GitHub: the source repository is private, so bug and security reports
+// go to the support page.
 
 import {
   button,
@@ -147,8 +148,8 @@ function maker(site) {
     content: html`<div class="prose">
       <p>The app’s startup screen reads “Created by ${site.studio}”.</p>
       <p>
-        KerfDesk is free to use today. Paid licenses are planned for the future. Prices, terms and
-        timing aren’t set yet, and nothing is for sale today. <a href="/pricing/">See pricing</a>.
+        KerfDesk comes in a Free edition with no time limit and a Pro edition with a one-time
+        license. Purchase opens soon. <a href="/pricing/">See pricing</a>.
       </p>
       <h3>Why the code still says LaserForge</h3>
       <p>
@@ -168,7 +169,7 @@ function reporting(site) {
     id: 'report',
     eyebrow: 'Report a problem',
     title: 'Found a bug or a security issue?',
-    lead: 'Bug reports and private security reports both go through GitHub. Here is where to send each one.',
+    lead: 'Bug reports and security reports both go through the KerfDesk support page. A support email address is being set up and will be listed there.',
     content: html`${featureGrid(reportLinks(site), { columns: 2 })}
     ${callout({
       tone: 'safety',
@@ -192,7 +193,7 @@ export const page = {
     html`${pageHero({
       eyebrow: 'About',
       title: 'Focused software for lasers and CNC routers',
-      lead: 'KerfDesk is software for GRBL lasers and CNC routers. It’s free to use today, with no account, trial timer or subscription. Here is what it’s for, the principles behind it, how it’s built and who makes it.',
+      lead: 'KerfDesk is software for GRBL lasers and CNC routers, in a Free and a Pro edition, with no account or subscription. Here is what it’s for, the principles behind it, how it’s built and who makes it.',
     })}
     ${purpose(ctx)}
     ${section({
@@ -205,7 +206,7 @@ export const page = {
     ${frameFirst()} ${labels()} ${made()} ${maker(ctx.site)} ${reporting(ctx.site)}
     ${ctaBand({
       title: 'Try KerfDesk',
-      body: 'It runs in Chrome, Edge and other Chromium browsers. It’s free to use today and needs no account.',
+      body: 'It runs in Chrome, Edge and other Chromium browsers. KerfDesk Free needs no account.',
       buttons: [
         button(ctx.site.appUrl, 'Open KerfDesk'),
         button('/machines/', 'Check your machine', { variant: 'ghost-dark' }),

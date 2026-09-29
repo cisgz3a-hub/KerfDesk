@@ -88,7 +88,7 @@ function controllersSection() {
   });
 }
 
-function connectSection(site) {
+function connectSection() {
   return section({
     id: 'connect',
     tone: 'alt',
@@ -103,8 +103,9 @@ function connectSection(site) {
           button and names browsers that can.
         </p>
         <p>
-          Stuck on a connection? The <a href="${site.connectionGuideUrl}">connection guide</a>
-          walks through cables, drivers, ports and alarm states.
+          Stuck on a connection? In the app, Help → Can’t connect? (Troubleshooting) walks through
+          cables, drivers and ports, and the
+          <a href="/docs/#troubleshooting">getting-started guide</a> covers the common fixes.
         </p>`,
     })}`,
   });
@@ -188,7 +189,7 @@ function verifySection(site) {
     narrow: true,
     eyebrow: 'Share your results',
     title: 'Tell us how it runs on your machine',
-    lead: 'Reports from real machines help show where KerfDesk works and where it doesn’t. If you try it on yours, open an issue on GitHub.',
+    lead: 'Reports from real machines help show where KerfDesk works and where it doesn’t. If you try it on yours, tell us through the KerfDesk support page.',
     content: html`<div class="prose">
         <p>Helpful things to include:</p>
         <ul>
@@ -200,13 +201,13 @@ function verifySection(site) {
           It stays on your computer until you choose to share it.
         </p>
         <p>
-          GitHub issues are public. Leave out personal details, and look through any file or photo
-          before you attach it. Found a security problem? Please
-          <a href="${site.securityReportUrl}">report it privately</a> instead.
+          A support email address is being set up and will be listed on the support page. Look
+          through any file or photo before you send it, and leave out anything private. Found a
+          security problem? Please don’t post the details anywhere public.
         </p>
       </div>
       ${actions(
-        button(site.issuesUrl, 'Open a GitHub issue', { iconName: 'message-square' }),
+        button(site.reportUrl, 'Go to the support page', { iconName: 'message-square' }),
         button('/safety/', 'Read the safety notes', { variant: 'secondary' }),
       )}
       ${callout({
@@ -233,7 +234,7 @@ export const page = {
       title: 'Machines and compatibility',
       lead: 'KerfDesk connects to GRBL-family controllers over USB and has drivers for a few others. This page shows how far each one has been tested, so you know what to check yourself.',
     })}
-    ${controllersSection()} ${connectSection(ctx.site)} ${ownersSection(ctx)} ${notYetSection()}
+    ${controllersSection()} ${connectSection()} ${ownersSection(ctx)} ${notYetSection()}
     ${camerasSection()} ${checklistSection()} ${verifySection(ctx.site)}
     ${section({
       tone: 'alt',

@@ -97,7 +97,7 @@ function traceSection() {
     tone: 'alt',
     eyebrow: 'Trace',
     title: 'Turn a picture into vectors',
-    lead: 'Trace a logo, sketch or scan into paths you can cut, score or fill. Start from one of five presets.',
+    lead: 'Trace a logo, sketch or scan into paths you can cut, score or fill. Start from one of five presets. Basic tracing is part of Free, and advanced tracing is part of Pro.',
     content: html`${table({
         caption: 'Trace Image presets',
         head: ['Preset', 'Good for'],
@@ -134,7 +134,7 @@ function runSection(ctx) {
         body: 'Preview shows cuts and travel moves on the canvas, and a GRBL-style motion planner estimates how long the job will take. It is an estimate, not a promise: it hasn’t been compared with real run times.',
         points: [
           'Toolpath preview with an estimated run time',
-          'Play the program back in 3D in the G-code Inspector',
+          'With Pro, play the program back in 3D in the G-code Inspector',
           'Automated tests check that the G-code keeps the laser off on every travel move',
         ],
         media: shot(ctx, 'preview', { caption: 'The toolpath preview in KerfDesk.' }),
@@ -182,7 +182,7 @@ function extrasSection() {
     tone: 'alt',
     eyebrow: 'Rotary and camera',
     title: 'Round objects and camera placement',
-    lead: 'Both are built into the software. Rotary output has never run on a physical rotary, and camera alignment accuracy hasn’t been measured on a real machine, so go slowly the first time.',
+    lead: 'Both are built into the software, and camera alignment is part of Pro. Rotary output has never run on a physical rotary, and camera alignment accuracy hasn’t been measured on a real machine, so go slowly the first time.',
     content: featureGrid(EXTRAS),
   });
 }
@@ -280,7 +280,7 @@ export const page = {
     ${runSection(ctx)} ${materialsSection()} ${extrasSection()} ${whoSection()} ${statusSection()}
     ${ctaBand({
       title: 'Try it on your next project',
-      body: 'KerfDesk is free to use today, needs no account and runs in Chromium-based browsers such as Chrome and Edge.',
+      body: 'KerfDesk Free needs no account and runs in Chromium-based browsers such as Chrome and Edge.',
       buttons: [
         button(ctx.site.appUrl, 'Open KerfDesk'),
         button('/docs/', 'Get started', { variant: 'ghost-dark' }),

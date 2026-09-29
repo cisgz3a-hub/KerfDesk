@@ -20,6 +20,12 @@ export function statusPill(status) {
   return html`<span class="pill pill--${entry.tone}">${entry.label}</span>`;
 }
 
+// Marks a tool that belongs to the Pro edition (commerce.config.mjs). Pages mark
+// only the tools the owner listed as Pro and leave everything else unmarked.
+export function proPill() {
+  return html`<span class="pill pill--pro">Pro</span>`;
+}
+
 export function button(href, label, { variant = 'primary', size, iconName } = {}) {
   const classes = ['btn', `btn--${variant}`, size && `btn--${size}`].filter(Boolean).join(' ');
   return html`<a class="${classes}" href="${href}">${iconName && icon(iconName)}${label}</a>`;
@@ -54,14 +60,17 @@ export function section({ id, tone, eyebrow, title, lead, content, narrow }) {
   </section>`;
 }
 
-// items: { icon, title, body, status?, href? }
+// items: { icon, title, body, status?, href?, pro? }
 export function featureGrid(items, { columns = 3 } = {}) {
   return html`<ul class="cards cards--${columns}">
     ${items.map(
       (item) =>
         html`<li class="card">
           ${item.icon && html`<span class="card__icon">${icon(item.icon)}</span>`}
-          <h3>${item.href ? html`<a href="${item.href}">${item.title}</a>` : item.title}</h3>
+          <h3>
+            ${item.href ? html`<a href="${item.href}">${item.title}</a>` : item.title}
+            ${item.pro && proPill()}
+          </h3>
           <p>${item.body}</p>
           ${item.status && statusPill(item.status)}
         </li>`,
