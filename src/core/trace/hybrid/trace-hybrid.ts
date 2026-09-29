@@ -39,6 +39,7 @@ import { clipCurveOutsideRegion } from './clip-stroke-curves';
 import { discUnionSteps } from './disc-union';
 import { HYBRID_FILL_COLOR, HYBRID_STROKE_COLOR } from './hybrid-paths';
 import { isCompactBlob } from './compact-blob';
+import { closeJunctionGaps } from './junction-close';
 import { recentredStroke } from './recentre-stroke';
 import { densePoints, floodEightConnected, pathLength } from './stroke-geometry';
 import { constantStrokeWidthPx, strokeWidthProfile, type StrokeWidthProfile } from './stroke-width';
@@ -92,11 +93,14 @@ export function* traceHybridPathsSteps(
     fillMask === null
       ? []
       : yield* contourPolylinesFromMaskSteps(fillMask, contourFinishOptionsFor(options));
+  // The finisher may smooth off more of the junction bump than the reach
+  // covers; walk those ends on to the outline (junction-close.ts).
+  const closed = closeJunctionGaps(strokes, outlines, mask, gateRadius);
   return [
     ...(outlines.length === 0
       ? []
       : withCanonicalTraceCurves([{ color: HYBRID_FILL_COLOR, polylines: outlines }])),
-    ...strokePaths(strokes, profileOf),
+    ...strokePaths(closed, profileOf),
   ];
 }
 
@@ -210,6 +214,9 @@ type KeptStroke = {
   readonly polyline: Polyline;
   /** A dot mark: concentric circles, never a pen line with a width. */
   readonly mark: boolean;
+  /** The end lies on the wide region's boundary (a stroke/fill junction). */
+  readonly startCut?: boolean;
+  readonly endCut?: boolean;
 };
 
 function clippedStrokes(
@@ -245,6 +252,8 @@ function clippedStrokes(
         curve: reached.curve,
         polyline: { points: reached.points, closed: false },
         mark,
+        startCut: piece.startCut,
+        endCut: piece.endCut,
       });
     }
   });

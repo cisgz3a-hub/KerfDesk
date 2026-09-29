@@ -46,7 +46,11 @@ export function applyLineTabs(
     closed: segment.closed,
   }));
   const sizeMm = Number.isFinite(settings.tabSizeMm) ? Math.max(0, settings.tabSizeMm) : 0;
-  if (sizeMm <= 0) return { segments: polylines.map(cutSegment), tabSpans: [] };
+  if (sizeMm <= 0)
+    return {
+      segments: polylines.map((polyline, index) => cutSegment(polyline, segments[index])),
+      tabSpans: [],
+    };
   const eligible = automaticTabEligibility(polylines, settings);
   const layout = automaticTabLayoutFor(settings);
   const burns: CutSegment[] = [];
@@ -58,11 +62,11 @@ export function applyLineTabs(
         ? null
         : splitClosedPolylineAtTabCenters(polyline, sizeMm, centers);
     if (split === null) {
-      burns.push(cutSegment(polyline));
+      burns.push(cutSegment(polyline, segments[index]));
       return;
     }
-    for (const burn of split.burns) burns.push(cutSegment(burn));
-    for (const tab of split.tabs) tabSpans.push(cutSegment(tab));
+    for (const burn of split.burns) burns.push(cutSegment(burn, segments[index]));
+    for (const tab of split.tabs) tabSpans.push(cutSegment(tab, segments[index]));
   });
   return { segments: burns, tabSpans };
 }
@@ -102,6 +106,7 @@ function tabCentersFor(
     evenTabCenters(tabCountForPerimeter(layout, perimeter))(perimeter, along);
 }
 
-function cutSegment(polyline: Polyline): CutSegment {
-  return { polyline: polyline.points, closed: polyline.closed };
+function cutSegment(polyline: Polyline, source?: CutSegment): CutSegment {
+  const segment = { polyline: polyline.points, closed: polyline.closed };
+  return source?.nesting === undefined ? segment : { ...segment, nesting: source.nesting };
 }

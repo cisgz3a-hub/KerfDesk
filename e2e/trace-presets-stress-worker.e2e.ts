@@ -146,8 +146,10 @@ for (const presetName of ['Centerline', 'Line Art', 'Smooth', 'Sharp', 'Edge Det
     await dialog.getByRole('combobox', { name: 'Trace preset' }).selectOption(presetName);
     if (preset.traceMode !== 'edge') {
       await expect(dialog.getByRole('combobox', { name: 'Trace detection' })).toHaveValue('preset');
+      // Auto (ADR-434 Amendment 1) shows no number; an exact preset value shows itself.
+      const auto = preset.smallMarkPolicy === 'auto' && preset.despeckleMinPixels === undefined;
       await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue(
-        String(preset.despeckleMinPixels ?? 0),
+        auto ? '' : String(preset.despeckleMinPixels ?? 0),
       );
     }
     await page.waitForFunction(

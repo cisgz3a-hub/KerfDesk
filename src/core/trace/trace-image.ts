@@ -25,6 +25,7 @@
 import { finiteOr } from '../util';
 import type { CrackSubPixelField } from './contour-boundary';
 import { cleanupSaddlePolicy } from './saddle-connectivity';
+import { alphaBandField, walkerCrackField } from './walker-crack-field';
 import type { TraceOptions } from './trace-option-types';
 import { fillPinholes } from './fill-pinholes';
 import { hexToRgba } from './hex-to-rgba';
@@ -164,7 +165,8 @@ export function prepareTraceForContour(
       options.cutoffLuma ?? 0,
       options.thresholdLuma ?? 128,
     );
-    return { prepared: cleanBinaryMask(prepared, options, null), crackField: null };
+    const crackField = alphaBandField(image, options);
+    return { prepared: cleanBinaryMask(prepared, options, null), crackField };
   }
   const adjusted = applyImageAdjustments(image, options);
   if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
@@ -214,7 +216,8 @@ export function prepareTraceForContour(
     return { ...recovered, median, prepared: cleaned };
   }
   const cleanedMask = cleanBinaryMask(thresholded.prepared, options, field);
-  return { prepared: cleanedMask, crackField: field, median };
+  const walkerField = walkerCrackField(leveled, options, thresholded, field, lumaBuffer);
+  return { prepared: cleanedMask, crackField: walkerField, median };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle
@@ -246,8 +249,8 @@ export function effectivePixelScale(options: TraceOptions): number {
 // scalar field + its iso value, so the contour walker can interpolate TRUE
 // edge crossings instead of quantizing to crack midpoints — the
 // anti-aliasing ramp holds the sub-pixel edge position that binarization
-// discards. Mirrors preprocessForTrace's branch order; null where no single
-// iso-line exists (alpha masks, brightness bands with a cutoff above 0).
+// discards. Mirrors preprocessForTrace's branch order; alpha masks and
+// Cutoff > 0 bands get a walker-only band crossing (ADR-534).
 export function crackFieldForTrace(
   image: RawImageData,
   options: TraceOptions,

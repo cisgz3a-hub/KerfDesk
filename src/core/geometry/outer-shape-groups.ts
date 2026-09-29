@@ -15,6 +15,11 @@
 // unfilled region at the start of the next shape (count even, or winding 0),
 // so within each shape the even-odd parity or nonzero winding equals the
 // original's. The shapes therefore partition the original burn area.
+//
+// A traced path carries its forest exactly (ADR-531, built on the pixel
+// lattice before smoothing); while it matches the geometry it is used as the
+// tree, and the probe vote of loop-nesting.ts is the fallback for every other
+// path.
 
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
@@ -22,6 +27,7 @@ import {
   type ColoredPath,
   type Vec2,
 } from '../scene';
+import { carriedSubpathParents } from '../scene/subpath-nesting';
 import { nearestContainers, type NestingLoop } from './loop-nesting';
 import { signedAreaMm2 } from './polyline-orientation';
 
@@ -67,27 +73,55 @@ export function groupSubpathsByOuterShape(path: ColoredPath): ReadonlyArray<Read
       loops.push(loop);
     }
   }
-  assignLoopGroups(loops, fillRule, groupOf, groups);
+  const carried = carriedLoopParents(path, loops);
+  const parents = carried ?? nearestContainers(loops);
+  assignLoopGroups(loops, parents, carried !== null, fillRule, groupOf, groups);
   return groups
     .map((members) => [...members].sort((a, b) => a - b))
     .sort((a, b) => (a[0] ?? 0) - (b[0] ?? 0));
 }
 
+// The carried forest as positions in `loops`, or null when the path carries
+// none or it names a subpath that is not a usable loop here.
+function carriedLoopParents(
+  path: ColoredPath,
+  loops: ReadonlyArray<Loop>,
+): ReadonlyArray<number> | null {
+  const carried = carriedSubpathParents(path);
+  if (carried === null) return null;
+  const position = new Map(loops.map((loop, at): [number, number] => [loop.index, at]));
+  const parents: number[] = [];
+  for (const loop of loops) {
+    const parent = carried[loop.index] ?? -1;
+    if (parent < 0) {
+      parents.push(-1);
+      continue;
+    }
+    const at = position.get(parent);
+    if (at === undefined) return null;
+    parents.push(at);
+  }
+  return parents;
+}
+
 function assignLoopGroups(
   loops: ReadonlyArray<Loop>,
+  parents: ReadonlyArray<number>,
+  parentsPrecede: boolean,
   fillRule: ShapeFillRule,
   groupOf: number[],
   groups: number[][],
 ): void {
-  const parents = nearestContainers(loops);
-  // Larger loops first: a container always has a larger area than what it holds.
-  const order = loops
-    .map((_, position) => position)
-    .sort(
-      (a, b) =>
-        (loops[b] as Loop).area - (loops[a] as Loop).area ||
-        (loops[a] as Loop).index - (loops[b] as Loop).index,
-    );
+  // Every parent before its children: a carried forest lists them so; else
+  // larger loops first, as a container has a larger area than what it holds.
+  const positions = loops.map((_, position) => position);
+  const order = parentsPrecede
+    ? positions
+    : positions.sort(
+        (a, b) =>
+          (loops[b] as Loop).area - (loops[a] as Loop).area ||
+          (loops[a] as Loop).index - (loops[b] as Loop).index,
+      );
   const inside = new Map<number, Coverage>();
   for (const position of order) {
     const loop = loops[position] as Loop;

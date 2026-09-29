@@ -83,7 +83,9 @@ function lineFits(start: Vec2, end: Vec2, piece: SourcePiece, toleranceMm: numbe
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const lengthSq = dx * dx + dy * dy;
-  if (!(lengthSq > 0)) return false;
+  // A negative (or NaN) bound means the fixed budget is overspent: squared, it would pass.
+  // A zero bound still admits an exact (collinear) merge, as it did before the guard.
+  if (!(lengthSq > 0) || !(toleranceMm >= 0)) return false;
   const limitSq = toleranceMm * toleranceMm;
   const count = pieceLength(piece);
   for (let index = 0; index < count; index += 1) {

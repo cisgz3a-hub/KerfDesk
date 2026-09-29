@@ -26,6 +26,11 @@
 // kerf grew it and the part holding it was cut first. A vertex of the target
 // that is not on the container's outline is on the same side as the whole
 // target whenever the two outlines do not cross.
+//
+// CARRIED NESTING (ADR-531): a traced path knows its own nesting exactly, and
+// its segments carry it: contours of the same forest are never probed against
+// each other, their carried depth is used instead, and only containers from
+// other paths are probed, with a vertex of the target as above.
 
 import { pointInPolygon } from '../geometry';
 import type { Vec2 } from '../scene';
@@ -34,6 +39,7 @@ import { boundsCenter, boundsContains, polylineBounds, type SegmentBounds } from
 export type ContainmentSegment = {
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
+  readonly nesting?: { readonly forest: string; readonly depth: number };
 };
 
 // A container spanning more cells than this is held in a single always-checked
@@ -53,25 +59,53 @@ export function containmentDepths(
 ): number[] {
   const bounds = segments.map((segment) => polylineBounds(segment.polyline));
   const containers = collectContainers(segments, bounds);
-  if (containers.length === 0) return segments.map(() => 0);
+  if (containers.length === 0) return segments.map((segment) => segment.nesting?.depth ?? 0);
   const grid = buildContainerGrid(containers, bounds);
 
-  return segments.map((target, index) => {
-    const targetBounds = bounds[index] ?? null;
-    const center = boundsCenter(targetBounds);
-    if (center === null || targetBounds === null) return 0;
-    const candidates = grid === null ? containers : candidatesFor(grid, center);
-    let depth = 0;
-    for (const containerIndex of candidates) {
-      if (containerIndex === index) continue;
-      const container = segments[containerIndex];
-      const containerBounds = bounds[containerIndex] ?? null;
-      if (container === undefined || containerBounds === null) continue;
-      if (!boundsMayEnclose(containerBounds, targetBounds, options)) continue;
-      if (targetInside(target.polyline, center, container.polyline)) depth += 1;
-    }
-    return depth;
-  });
+  const context: DepthContext = { segments, bounds, containers, grid, options };
+  return segments.map((_, index) => containmentDepth(context, index));
+}
+
+type DepthContext = {
+  readonly segments: ReadonlyArray<ContainmentSegment>;
+  readonly bounds: ReadonlyArray<SegmentBounds | null>;
+  readonly containers: ReadonlyArray<number>;
+  readonly grid: ContainerGrid | null;
+  readonly options: ContainmentOptions;
+};
+
+function containmentDepth(context: DepthContext, index: number): number {
+  const { segments, bounds, containers, grid } = context;
+  const target = segments[index];
+  const targetBounds = bounds[index] ?? null;
+  const probe = boundsCenter(targetBounds);
+  let depth = target?.nesting?.depth ?? 0;
+  if (probe === null || targetBounds === null || target === undefined) return depth;
+  const candidates = grid === null ? containers : candidatesFor(grid, probe);
+  for (const containerIndex of candidates) {
+    if (containerIndex === index) continue;
+    if (probedContainer(context, containerIndex, target, targetBounds, probe)) depth += 1;
+  }
+  return depth;
+}
+
+function probedContainer(
+  context: DepthContext,
+  containerIndex: number,
+  target: ContainmentSegment,
+  targetBounds: SegmentBounds,
+  probe: Vec2,
+): boolean {
+  const container = context.segments[containerIndex];
+  const containerBounds = context.bounds[containerIndex] ?? null;
+  if (container === undefined || containerBounds === null) return false;
+  if (sameForest(target.nesting, container)) return false;
+  if (!boundsMayEnclose(containerBounds, targetBounds, context.options)) return false;
+  return targetInside(target.polyline, probe, container.polyline);
+}
+
+function sameForest(target: ContainmentSegment['nesting'], container: ContainmentSegment): boolean {
+  return target !== undefined && container.nesting?.forest === target.forest;
 }
 
 // A vertex closer than this to the container's outline touches it, so it

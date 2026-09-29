@@ -26,6 +26,7 @@ import {
   type Vec2,
   withClosingPoint,
 } from '../scene';
+import { segmentNesting } from './cut-segment-nesting';
 import {
   effectiveOperationForObject,
   operationOverrideForObject,
@@ -412,6 +413,7 @@ function appendPathSegments(
     if (!pathUsesOperation(object, path, layer)) continue;
     const closedForKerf: KerfSource[] = [];
     const withArcs = laserArcFitFor(path, object.transform, device);
+    const nesting = segmentNesting(path, `${object.id}#${pathIndex}`);
     const kerfArcSource = kerfArcSourceRings(path, object.transform, layer, device);
     for (const [index, polyline] of compilationPolylines(path, object.transform).entries()) {
       const points: Vec2[] = polyline.points.map((p) =>
@@ -433,7 +435,12 @@ function appendPathSegments(
           polyline: withClosingPoint(points, polyline.closed),
           closed: polyline.closed,
         };
-        pushLineSegment(out, withArcs(index, segment), placed);
+        const known = polyline.closed ? nesting(index) : undefined;
+        pushLineSegment(
+          out,
+          withArcs(index, known === undefined ? segment : { ...segment, nesting: known }),
+          placed,
+        );
       }
     }
     if (closedForKerf.length > 0) {

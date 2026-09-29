@@ -21,6 +21,7 @@
 // converges toward an even-curvature arc; corners stay exact.
 
 import type { Vec2 } from '../../scene';
+import { hypot2 } from '../../geometry/fast-hypot';
 
 // Same shrink-free constants as the raw pass in stroke-chains.ts: lambda
 // smooths, the slightly-larger negative mu re-inflates so a closed loop keeps
@@ -137,8 +138,8 @@ function turnAtIndex(points: ReadonlyArray<Vec2>, i: number, closed: boolean): n
   const at = points[i];
   const next = points[(i + 1) % n];
   if (prev === undefined || at === undefined || next === undefined) return 0;
-  const inLen = Math.hypot(at.x - prev.x, at.y - prev.y);
-  const outLen = Math.hypot(next.x - at.x, next.y - at.y);
+  const inLen = hypot2(at.x - prev.x, at.y - prev.y);
+  const outLen = hypot2(next.x - at.x, next.y - at.y);
   if (inLen < NEAR_POINT_EPS || outLen < NEAR_POINT_EPS) return 0;
   const dot =
     ((at.x - prev.x) / inLen) * ((next.x - at.x) / outLen) +

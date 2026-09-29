@@ -1,0 +1,133 @@
+// FROZEN reference copy of the column-major squared distance field as of
+// 952fb13e3 (ADR-438 amendment, speed wave 2). Test support only: the tuned
+// production field in distance-field.ts must equal it element for element
+// (Object.is). Do not edit or optimise this copy.
+
+import { runTraceSteps, type TraceSteps } from '../trace-steps';
+import type { InkMask } from './distance-field';
+
+const INF = Number.MAX_SAFE_INTEGER;
+
+export function referenceSquaredDistanceField(mask: InkMask): Float64Array {
+  return runTraceSteps(referenceSquaredDistanceFieldSteps(mask));
+}
+
+function* referenceSquaredDistanceFieldSteps(mask: InkMask): TraceSteps<Float64Array> {
+  const cooperate = yield;
+  const { width, height } = mask;
+  const distSq = new Float64Array(width * height);
+  const column = new Float64Array(height);
+  // One scratch envelope serves every 1D transform of both passes.
+  const scratch = envelopeScratch(Math.max(width, height));
+  // Pass 1: per-column 1D transform of the 0/INF indicator.
+  for (let x = 0; x < width; x += 1) {
+    if (cooperate) yield;
+    transformColumn(mask, x, column, distSq, scratch);
+  }
+  // Pass 2: per-row 1D transform of the column result.
+  const row = new Float64Array(width);
+  for (let y = 0; y < height; y += 1) {
+    if (cooperate) yield;
+    for (let x = 0; x < width; x += 1) {
+      row[x] = distSq[y * width + x] ?? 0;
+    }
+    const transformed = distanceTransform1d(row, width, scratch);
+    for (let x = 0; x < width; x += 1) {
+      distSq[y * width + x] = transformed[x] ?? 0;
+    }
+  }
+  clampToVirtualBorder(distSq, width, height);
+  return distSq;
+}
+
+function transformColumn(
+  { width, height, ink }: InkMask,
+  x: number,
+  column: Float64Array,
+  distSq: Float64Array,
+  scratch: EnvelopeScratch,
+): void {
+  for (let y = 0; y < height; y += 1) {
+    column[y] = (ink[y * width + x] ?? 0) === 1 ? INF : 0;
+  }
+  const transformed = distanceTransform1d(column, height, scratch);
+  for (let y = 0; y < height; y += 1) {
+    distSq[y * width + x] = transformed[y] ?? 0;
+  }
+}
+
+// The 1D passes only see in-image background. Treat the first ring of
+// pixels OUTSIDE the image as background too: pixel (x, y) is at most
+// min(x+1, width-x, y+1, height-y) from it.
+function clampToVirtualBorder(distSq: Float64Array, width: number, height: number): void {
+  for (let y = 0; y < height; y += 1) {
+    const yEdge = Math.min(y + 1, height - y);
+    for (let x = 0; x < width; x += 1) {
+      const edge = Math.min(x + 1, width - x, yEdge);
+      const edgeSq = edge * edge;
+      const i = y * width + x;
+      if ((distSq[i] ?? 0) > edgeSq) distSq[i] = edgeSq;
+    }
+  }
+}
+
+// Working arrays for 1D transforms of up to `size` samples.
+type EnvelopeScratch = {
+  readonly v: Int32Array; // parabola roots
+  readonly z: Float64Array; // envelope boundaries
+  readonly d: Float64Array; // sampled result
+};
+
+function envelopeScratch(size: number): EnvelopeScratch {
+  return { v: new Int32Array(size), z: new Float64Array(size + 1), d: new Float64Array(size) };
+}
+
+// 1D squared-distance transform via the lower envelope of parabolas
+// rooted at (i, f[i]). The result lives in the scratch until the next call.
+function distanceTransform1d(f: Float64Array, n: number, scratch: EnvelopeScratch): Float64Array {
+  buildLowerEnvelope(f, n, scratch);
+  return sampleEnvelope(f, n, scratch);
+}
+
+function buildLowerEnvelope(f: Float64Array, n: number, scratch: EnvelopeScratch): void {
+  const { v, z } = scratch;
+  let k = 0;
+  v[0] = 0;
+  z[0] = -Infinity;
+  z[1] = Infinity;
+  for (let q = 1; q < n; q += 1) {
+    const fq = f[q] ?? 0;
+    if (fq === INF && (f[v[k] ?? 0] ?? 0) === INF) {
+      continue; // both at infinity — parabola intersection is undefined; skip
+    }
+    let s = intersection(f, q, v[k] ?? 0);
+    while (k > 0 && s <= (z[k] ?? 0)) {
+      k -= 1;
+      s = intersection(f, q, v[k] ?? 0);
+    }
+    k += 1;
+    v[k] = q;
+    z[k] = s;
+    z[k + 1] = Infinity;
+  }
+}
+
+function sampleEnvelope(f: Float64Array, n: number, scratch: EnvelopeScratch): Float64Array {
+  const { v, z, d } = scratch;
+  let k = 0;
+  for (let q = 0; q < n; q += 1) {
+    while ((z[k + 1] ?? Infinity) < q) k += 1;
+    const root = v[k] ?? 0;
+    const fr = f[root] ?? 0;
+    d[q] = fr === INF ? INF : (q - root) * (q - root) + fr;
+  }
+  return d;
+}
+
+function intersection(f: Float64Array, q: number, p: number): number {
+  const fq = f[q] ?? 0;
+  const fp = f[p] ?? 0;
+  if (fp === INF) return -Infinity; // q's parabola is below everywhere left
+  if (fq === INF) return Infinity; // q never undercuts p
+  return (fq + q * q - (fp + p * p)) / (2 * q - 2 * p);
+}

@@ -8,6 +8,7 @@ import {
   type Polyline,
   type TracedImage,
 } from '../../core/scene';
+import { subsetSubpathNesting } from '../../core/scene/subpath-nesting';
 import { groupSubpathsByOuterShape, subpathCount } from '../../core/geometry/outer-shape-groups';
 import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
 
@@ -74,7 +75,12 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
   });
 }
 
+// Each piece keeps the part of a traced forest (ADR-531) that its subpaths span.
 function pathSubset(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
+  return subsetSubpathNesting(path, indices, subsetGeometry(path, indices));
+}
+
+function subsetGeometry(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
   if (path.curves === undefined) {
     return { ...path, polylines: pick(path.polylines, indices) };
   }
