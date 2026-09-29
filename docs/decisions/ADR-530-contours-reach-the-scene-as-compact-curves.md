@@ -669,5 +669,6 @@ Measured as in Amendment 8, against it, 2 rounds, with another benchmark sharing
 | noise192, Smooth | 2.11 s | 1.64 s |
 | noise192, Sharp | 1.51 s | 1.33 s |
 
-Uniform noise at 1024 px, measured before the retry was skipped, took 69.3 s against main's
-40.5 s (1.71x), with a peak of 3.15 GB against main's 2.32 GB.
+Uniform noise at 1024 px (Line Art, one run each, with another benchmark sharing the machine)
+took 59.6 s against main's 40.6 s (1.47x, against the 1.46x target), with a peak of 3.0 GB
+against main's 2.12 GB (1.42x).
