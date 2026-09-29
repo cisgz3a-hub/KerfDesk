@@ -93,8 +93,18 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      When this session's `$$` shows soft limits on, press-and-hold jog is clamped in machine
      coordinates to the envelope from `$130`/`$131`, `$23` and this session's `[OPT:]` Z, with or
      without a verified bed frame and whatever the profile's homing setting. Each enforced edge
-     stays 0.01 mm inside, because the status report rounds MPos to three decimals
-     ([config.h L142-L143](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/config.h#L142-L143)).
+     keeps a margin on top of any switch inset: 0.01 mm, or where a step is coarser half a step
+     (`$100`, `$101`) plus 0.002 mm, and 0.05 mm when the step size was not read. KerfDesk measures
+     a jog from the reported MPos, which the status report rounds to three decimals
+     ([config.h L142-L143](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/config.h#L142-L143)),
+     while the firmware adds it to its own position, which after a move that ran to its end is
+     that move's unrounded target, up to half a step from the step the motors reached
+     ([gcode.c L863-L864](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L863-L864);
+     only a jog cancel syncs the two,
+     [protocol.c L385-L390](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L385-L390)).
+     The 2026-09-29 re-audit found the first version's margin inside a switch inset rather than on
+     top of it, which left the box on grblHAL's own envelope, already a pull-off inside both
+     edges, so a hold toward an edge was refused from about half of all positions.
    - After Unlock without Home (or Release motors, a failed Home, an origin write that ended
      unknown) KerfDesk hides the reported position, but stock GRBL still checks from its own MPos
      and `$X` leaves that position as it was. On stock GRBL with this session's `$20=1`, the hold
@@ -159,9 +169,11 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      flushes its input buffer ([protocol.c L896-L899](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899)), so a `$J=` it had
      not parsed yet was never answered, Cancel timed out, and Jog, Frame and Disconnect stayed
      locked until ABORT MOTION. The grblHAL driver now declares that its jog-cancel byte drops
-     unparsed lines, and on such a driver Cancel first waits briefly, at most 250 ms, for every
-     owed reply and pending write, then writes `0x85`. Jog and Frame keep at most one line in
-     flight, and an idle main loop parses it within a serial round trip. A reply still owed after
+     unparsed lines, and on such a driver Cancel first waits for the last line to leave the
+     transport (within the 8 s cancel bound), then at most 250 ms for every owed reply, then writes
+     `0x85`; a grace counted from the press could run out before a line still being written
+     arrived (2026-09-29 re-audit). Jog and Frame keep at most one line in flight, and an idle main
+     loop parses it within a serial round trip. A reply still owed after
      the grace belongs to a line already parsed, which the flush cannot drop, so the byte goes
      anyway: stopping motion comes first, grblHAL builds with the kinematics API (CoreXY among
      them) cancel a jog from the byte at once
@@ -242,7 +254,10 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
       complete, at most 2 s later; a hold or door state gets the reset once the hold has settled;
       homing gets the reset at once. In laser mode GRBL and grblHAL turn the laser off by default
       once a hold has stopped ([config.h L583-L587](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/config.h#L583-L587)). A page that is closing and a driver
-      without a feed hold (Smoothieware) keep the immediate reset.
+      without a feed hold (Smoothieware) keep the immediate reset. A machine that needs longer
+      than 2 s to decelerate, such as a heavy CNC gantry at a high feed, gets the reset before its
+      hold completes, which raises `ALARM:3`, and KerfDesk treats the position as lost, as every
+      Abort did before.
     - A door or lid switch wired to the controller's door input puts GRBL in its door state when
       opened while idle, so the popup now names that state until cycle start or Abort. Stock GRBL
       answers no status query while it homes, so a Console `$H` there still shows nothing until
@@ -284,6 +299,47 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
       cache-invalidation paragraph ("Together these match GRBL's actual behaviour") and its note
       that grblHAL confirms vanilla GRBL 1.1 behaviour.
 
+12. **The connection, the serial link, a refused `$HX` and Print and Cut capture** (T-4, T-3, A-7,
+    R-5).
+    - GRBL prints its banner only at the end of its start-up
+      ([main.c L102](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/main.c#L102)), so a board
+      that resets when the port opens and needs more than the 2 s handshake window was reported
+      as "No controller response ... Check baud rate", failed qualification, and Find my machine
+      offered other speeds; the banner then qualified it moments later. After 2 s of silence the
+      log now says KerfDesk is still listening, qualification stays pending while the status poll
+      keeps asking, and it fails only after 10 s in all: the 2 s window plus the 8 s poll wait
+      queued-poll controllers already had, the same 10 s LaserGRBL allows
+      ([GrblCore.cs L2029](https://github.com/arkypita/LaserGRBL/blob/1f9337b3af27133f8b1696e41cc110f2af74d04f/LaserGRBL/Core/GrblCore.cs#L2029)).
+      The baud rate is named only when nothing arrived or nothing that arrived decoded; readable
+      lines point at the device and profile. Any status report counts as an answer, an Alarm or
+      Sleep report included.
+    - Web Serial's break, buffer-overrun, framing and parity errors leave the port open and reading
+      goes on, but the bytes at the error are lost, and GRBL answers every line with exactly one
+      `ok` or `error:N` ([interface.md L9](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md#L9)),
+      so a lost reply leaves its line unacknowledged and the stream waiting. Both transports now
+      report each line error to the store. The Console shows it, at most once every 5 s with a
+      count of the rest; a stream hold in the same job names it in the live bar, the hold log line
+      and the safety notice; and a silent connect that saw only line errors names the baud rate.
+    - Stock GRBL enters its homing state before it checks a `$H` suffix and, built without
+      single-axis homing (the default), answers `$HX` with `error:3` and stays in that state,
+      reporting Home and running nothing until a soft reset
+      ([system.c L179-L194](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L179-L194)).
+      The Falcon command set on the stock driver homes with `$HX`. A Home report from the stock
+      GRBL driver that no Home line still owed a reply accounts for now sets ADR-393's reset latch
+      to a homing-state value: the Alarm banner says the controller is stuck in its homing state
+      and offers Reset (Ctrl-X), and the Live Motion popup names it HOMING STATE with ABORT MOTION.
+      A real cycle answers no status query until just before its `$H` reply, while that reply is
+      still owed, so it never qualifies. Unlike the critical-event latch this one holds nothing.
+    - GRBL reports MPos or WPos as `$10` selects, never both
+      ([report.c L522-L527](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/report.c#L522-L527)),
+      so with WPos reports Print and Cut's **Capture head** stayed off with no reason. It now takes
+      the position the status panel shows, MPos or WPos plus the work offset, converted to
+      millimetres once. While the controller is connected and Idle without a known position, the
+      dialog says why: no work offset reported yet, a position KerfDesk withholds after Unlock,
+      Release motors or an unfinished Home, or report units unconfirmed after a `$13` write. A
+      withheld position is never captured.
+    - No new refusal.
+
 ### Consequences
 
 - The GRBL simulator models more stock GRBL behaviour: `G10 L20` with an active G92, a failed
@@ -291,7 +347,9 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
   (`homingInitLock`) and the `error:15` check of a `$J=` target once `$20=1`. An opt-in
   `jogCancelFlushesInput` mode plays grblHAL's `0x85`, which discards lines not parsed yet, and
   `storedOffsets` loads the G54 and, on grblHAL with `$384` not 1, the G92 an earlier session
-  stored.
+  stored. It also plays stock GRBL's stuck homing state after a refused `$HX`, answers a status
+  query asked during a homing cycle once at the end of the cycle, and raises `ALARM:6` for a
+  reset in the homing state.
 - Still open for work offsets: transient Frames (the camera calibration target, the recovery
   area, the second pass) get no burst; a controller whose reports never carry WCO waits 3 s at
   every Frame while no offset is known, and with a real offset it cannot earn a permit (the
@@ -309,3 +367,8 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
   an origin restored then reads as re-learned; the recovery review's work-origin match does not
   know about a power-up restore without Home; after Reset origin, a restored G54 that remains
   reads "reported by controller".
+- Still open for the connection and capture work: a head-mounted camera (ADR-449) still reads
+  only MPos, so with WPos reports it has no head position; after the reset out of the stuck
+  homing state the log line names Sleep or a critical alarm, not the homing state; with the
+  Falcon command set on the stock GRBL driver, Home sends `$HX` again after that reset and gets
+  stuck again, so Unlock is the way out; the simulator does not model `$10` WPos reports.

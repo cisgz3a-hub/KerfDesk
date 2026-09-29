@@ -1663,8 +1663,8 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — cancel mid-frame
 1. **Cancel** records permanent cancel intent and writes real-time jog-cancel (`0x85`); pending Frame
    lines are dropped immediately. On grblHAL, whose `0x85` also discards any line it has not parsed
-   yet without answering it, Cancel first waits briefly (at most 250 ms) for the replies owed to
-   lines already sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
+   yet without answering it, Cancel first waits for the last line to leave the transport, then at
+   most 250 ms for the replies owed to lines already sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
@@ -1684,7 +1684,10 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 1. Holding an arrow sends one jog toward the travel edge and cancels it (`0x85`) on release.
 2. With a verified bed frame, or with soft limits on in this session's `$$` (`$20=1`), the jog
    stops inside the travel the controller accepts, so GRBL does not refuse it with `error:15`. The
-   homing-side edge stays the homing pull-off (`$27`, 1 mm if unread) clear of the switch.
+   homing-side edge stays the homing pull-off (`$27`, 1 mm if unread) clear of the switch. With
+   soft limits on, every edge keeps a further margin of at least 0.01 mm (half a step on a coarse
+   axis), since the reported position is rounded and can sit up to half a step from the
+   controller's own (ADR-375).
 3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
    app still treats the position as unknown (ADR-375).
 4. Otherwise the jog asks for full travel and relies on the release.
@@ -2492,6 +2495,10 @@ authorization, Frame proof, controller command, or safety boundary.
   unacknowledged-lines notice count only time the page was running. After a poll gap of two
   seconds or more the wait restarts from the resumed tick, so a page stall is not reported
   as the controller holding the program (ADR-356).
+- When the serial link reports a line error (break, buffer overrun, framing or parity), the
+  Console says that bytes from the controller were lost, at most once every 5 s with a count of
+  the rest. If it happened during the job, the "controller holding program" state, its log line
+  and the notice add that an acknowledgement lost with it never arrives (ADR-375).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -2873,8 +2880,9 @@ saving an ordinary software profile disconnects the controller.
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
    and reads the controller's identity and settings; nothing moves and no controller setting is
    written. Its heading follows the connection: **Find your machine**, **Connecting…**,
-   **Reading your controller…**, **Found your <firmware> controller**, **Your machine didn’t
-   answer**, **Couldn’t connect**, or **No answer at any common speed**. When found it lists the
+   **Reading your controller…**, **Waiting for the controller…**, **Found your <firmware>
+   controller**, **Your machine didn’t answer**, **Couldn’t connect**, or **No answer at any
+   common speed**. When found it lists the
    reported travel, max speed, power range, laser mode and Z travel.
    - For a machine not set up before in this browser, or after the operator presses **Find my
      machine**, the reported values are filled into the draft by themselves: the firmware the
@@ -2885,7 +2893,9 @@ saving an ordinary software profile disconnects the controller.
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
      connected with, Find reconnects once with it.
-   - **Your machine didn’t answer** offers **Try other speeds**, which reconnects at 115200,
+   - **Your machine didn’t answer** appears when nothing came back within 10 s of connecting (a
+     board that restarts when the port opens can take several seconds to answer, ADR-375). It
+     offers **Try other speeds**, which reconnects at 115200,
      230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn and stops at the first that
      answers; **Stop** ends it. **Use a different port…** always shows the picker.
    - **Set up without connecting** keeps the whole stage usable offline; a browser without
@@ -3548,7 +3558,10 @@ command). A Z-only offset reads "custom" (ADR-375).
 The profile's **Recorded home** corner documents the setup. It does not write controller
 homing direction or change work zero. Home uses the selected controller's command contract
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
-the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
+the physical direction. Stock GRBL built without single-axis homing refuses `$HX` with `error:3`
+and then stays in its homing state, reporting Home, until a soft reset; the Alarm banner says so
+and offers **Reset (Ctrl-X)**, after which the controller is in Alarm and can be unlocked or homed
+with `$H` (ADR-375). **Go to work zero** is a separate movement to the workpiece reference.
 
 **Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
 **Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
@@ -7595,6 +7608,10 @@ as the pane's design record.
   registration** registers the design on the sheet. The head never moves.
 - **Success / mixed.** **Capture head** still works on either target, so a camera point can be
   replaced by jogging onto that mark. Head captures report the same spacing, print scale and turn.
+- **Edge / work-position reports.** A controller set to report its work position (`$10`) is
+  captured at WPos plus the reported work offset (WCO), the position the status panel shows.
+  Until a WCO arrives, or while KerfDesk hides the position after Unlock, Release motors or an
+  unfinished Home, **Capture head** is disabled and the dialog says why (ADR-375).
 - **Edge / unusual registration.** When the targets or the captures are closer than 10 mm, the
   print scale is more than 2 % off, or the turn is near 180°, the dialog says why and applies it
   only once **Use this registration anyway** is ticked. Job Review repeats the note at Start and
