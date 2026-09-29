@@ -27,6 +27,10 @@ type PathTables = {
   readonly vertices: ReadonlyMap<number, ReadonlyArray<LbrnVertex>>;
   readonly primitives: ReadonlyMap<number, PrimitiveList>;
 };
+/** How many shapes of each type were left out: a type KerfDesk does not open, or no geometry. */
+type LeftOut = { readonly unsupported: Map<string, number>; readonly empty: Map<string, number> };
+
+const TEXT_WITHOUT_OUTLINE = 'Text without BackupPath';
 
 /** `frame` places LightBurn project coordinates on the scene (lightBurnSceneFrame). */
 export function importLbrnGeometry(
@@ -35,13 +39,41 @@ export function importLbrnGeometry(
   frame: LbrnMatrix,
 ): LbrnGeometryResult {
   const objects: ImportedSvg[] = [];
-  const unsupported = new Set<string>();
-  const warnings: string[] = [];
+  const leftOut: LeftOut = { unsupported: new Map(), empty: new Map() };
   const pathTables = buildPathTables(root);
   const topShapes = [...root.children].filter((element) => normalized(element.tagName) === 'shape');
-  for (const shape of topShapes)
-    visitShape(shape, frame, sourceName, objects, unsupported, warnings, pathTables);
-  return { objects, unsupportedShapeTypes: [...unsupported].sort(), warnings };
+  for (const shape of topShapes) visitShape(shape, frame, sourceName, objects, leftOut, pathTables);
+  return {
+    objects,
+    unsupportedShapeTypes: [...leftOut.unsupported.keys()].sort(),
+    warnings: leftOutWarnings(leftOut),
+  };
+}
+
+// Every shape left out is named in the import report, with how many (ADR-388).
+function leftOutWarnings(leftOut: LeftOut): string[] {
+  const unsupported = sortedCounts(leftOut.unsupported).map(([type, count]) =>
+    type === TEXT_WITHOUT_OUTLINE
+      ? `${shapeCount(count, 'Text')} not imported: the file holds no outline (BackupPath) for ${count === 1 ? 'it' : 'them'}, and KerfDesk does not lay out LightBurn text. Convert the text to paths in LightBurn to bring ${count === 1 ? 'it' : 'them'} across.`
+      : `${shapeCount(count, type)} not imported: KerfDesk opens only the Rect, Ellipse, Path, Text and Group shapes of a LightBurn project.`,
+  );
+  const empty = sortedCounts(leftOut.empty).map(
+    ([type, count]) =>
+      `${count} ${type} shape${count === 1 ? '' : 's'} had no geometry KerfDesk could read and ${count === 1 ? 'was' : 'were'} not imported.`,
+  );
+  return [...unsupported, ...empty];
+}
+
+function shapeCount(count: number, type: string): string {
+  return count === 1 ? `1 ${type} shape was` : `${count} ${type} shapes were`;
+}
+
+function sortedCounts(counts: ReadonlyMap<string, number>): Array<[string, number]> {
+  return [...counts].sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+}
+
+function tally(counts: Map<string, number>, type: string): void {
+  counts.set(type, (counts.get(type) ?? 0) + 1);
 }
 
 function visitShape(
@@ -49,8 +81,7 @@ function visitShape(
   parent: LbrnMatrix,
   sourceName: string,
   objects: ImportedSvg[],
-  unsupported: Set<string>,
-  warnings: string[],
+  leftOut: LeftOut,
   pathTables: PathTables,
 ): void {
   const type = shape.getAttribute('Type') ?? shape.getAttribute('type') ?? '';
@@ -59,24 +90,24 @@ function visitShape(
     const children = directChild(shape, 'children');
     for (const child of children === null ? [] : [...children.children]) {
       if (normalized(child.tagName) === 'shape')
-        visitShape(child, matrix, sourceName, objects, unsupported, warnings, pathTables);
+        visitShape(child, matrix, sourceName, objects, leftOut, pathTables);
     }
     return;
   }
   if (normalized(type) === 'text') {
     const backup = [...shape.children].find((child) => normalized(child.tagName) === 'backuppath');
     if (backup === undefined) {
-      unsupported.add('Text without BackupPath');
+      tally(leftOut.unsupported, TEXT_WITHOUT_OUTLINE);
       return;
     }
-    visitVectorShape(backup, parent, sourceName, shape, objects, warnings, pathTables);
+    visitVectorShape(backup, parent, sourceName, shape, objects, leftOut, pathTables);
     return;
   }
   if (['rect', 'ellipse', 'path'].includes(normalized(type))) {
-    visitVectorShape(shape, parent, sourceName, shape, objects, warnings, pathTables);
+    visitVectorShape(shape, parent, sourceName, shape, objects, leftOut, pathTables);
     return;
   }
-  unsupported.add(type || shape.tagName);
+  tally(leftOut.unsupported, type || 'untyped');
 }
 
 function visitVectorShape(
@@ -85,7 +116,7 @@ function visitVectorShape(
   sourceName: string,
   layerSource: Element,
   objects: ImportedSvg[],
-  warnings: string[],
+  leftOut: LeftOut,
   pathTables: PathTables,
 ): void {
   const matrix = multiplyMatrix(parent, parseXForm(shape));
@@ -97,7 +128,10 @@ function visitVectorShape(
         ? ellipseCurves(shape)
         : pathCurves(shape, pathTables);
   if (curves.length === 0) {
-    warnings.push(`${type || 'shape'} contained no supported geometry.`);
+    tally(
+      leftOut.empty,
+      layerSource.getAttribute('Type') ?? layerSource.getAttribute('type') ?? 'Path',
+    );
     return;
   }
   const transformed = curves.map((curve) => transformCurve(curve, matrix));

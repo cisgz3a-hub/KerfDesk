@@ -86,6 +86,12 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
     it holds anything but 0, off or nothing, and a nested block of settings (a sub-layer, say) is
     named as a whole. The same rules hold for every layer mode, so a Fill no longer lists fields
     LightBurn writes at rest: a Fill with the fields of the corpus layers reported six before.
+11. **Every shape left out is named.** The report has a line for each kind of shape a project
+    opens without, with how many: a type KerfDesk does not open (a `Bitmap`, say), a `Text` saved
+    without its outline (`BackupPath`), with the advice to convert it to paths in LightBurn, and a
+    shape with no geometry to read (a `Rect` of zero width, an empty `Path`). Before, a left-out
+    type was listed apart from the warnings, and opening the project counted it without naming
+    it. The open toast now counts each line once and shows the first three.
 
 ### Limits
 
@@ -147,6 +153,8 @@ compiled job; out-of-range, unreadable and Scan kerfs are named); `lbrn-layer-mo
 (each type name, Fill+Line as a fill then a line on the same artwork, an unknown mode named, a
 Scan priority not reported, `runBlower` on every operation, `doOutput` 0 keeps every operation of
 the layer out of the job); `lbrn-setting-report.test.ts` (each setting a Cut layer uses is named,
-none of a LightBurn 0.9 Cut layer or a 2.0.05 Fill at rest, Fill settings on a Fill only, one line
-for a Fill+Line layer, unknown fields and nested blocks); `clb-import.test.ts` (`runBlower` in a
-library).
+none for a LightBurn 0.9 Cut layer at rest or a Fill with the corpus layers' fields, Fill settings
+on a Fill only, one line for a Fill+Line layer, unknown fields and nested blocks); `clb-import.test.ts` (`runBlower` in a
+library); `lbrn-shape-report.test.ts` (each kind of shape left out is named with how many,
+shapes with no geometry are counted); `project-open-completion-lightburn.test.ts` (a left-out
+shape is named when the project opens, and counted once).
