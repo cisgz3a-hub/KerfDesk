@@ -1664,6 +1664,15 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 #### Edge — jog target exceeds travel
 1. Controller replies `error:15`. UI logs the rejected line.
 
+#### Edge — press-and-hold
+1. Holding an arrow sends one jog toward the travel edge and cancels it (`0x85`) on release.
+2. With a verified bed frame, or with soft limits on in this session's `$$` (`$20=1`), the jog
+   stops inside the travel the controller accepts, so GRBL does not refuse it with `error:15`. The
+   homing-side edge stays the homing pull-off (`$27`, 1 mm if unread) clear of the switch.
+3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
+   app still treats the position as unknown (ADR-375).
+4. Otherwise the jog asks for full travel and relies on the release.
+
 ### F-B6. Start job
 
 #### Success
@@ -7411,8 +7420,11 @@ as the pane's design record.
 
 - **Success / head under the click.** The operator selects **Move laser here**
   and clicks a point on the workspace. The click maps through the same origin
-  transform used by emitted G-code, clamps inside the machine bed, and sends
-  one absolute beam-off jog through the normal jog safety gates.
+  transform used by emitted G-code and clamps inside the machine bed. When this
+  session read the controller's settings, it also clamps inside the travel the
+  firmware accepts, keeping the homing-side edge the homing pull-off (`$27`,
+  1 mm if unread) clear of the switch (ADR-375). It then sends one absolute
+  beam-off jog through the normal jog safety gates.
 - **Error / machine not ready.** If the machine is disconnected, busy, alarmed,
   or otherwise blocked for jogging, no command is sent and the operator sees
   the same block reason as the Jog Pad.
