@@ -628,3 +628,33 @@ traced more than once.
 The audit measured noise1024 at 116.6 s before and 94.4 s after, against main's 40.4 s. Noise is
 still about 1.9x main, above the 1.46x target. The rest of the back-off is the whole-ring retry
 without rebuilt corners, plus the refits of the few large rings that meet many others.
+
+### Amendment 9 - a ring that meets many others skips the weaker refits (2026-09-29)
+
+After Amendment 8, most of the back-off on uniform noise is a few large rings that meet many
+others. On noise512 Line Art, 5 rings of 15k to 40k samples each met 11 to 39 other rings in the
+first round. Every one of them was refitted at 1/2 and at 1/4 and still ended at its source.
+Rings that met 2 to 7 others often cleared: of 13 on noise512, 7 cleared at the retry without
+rebuilt corners and 1 at 1/2.
+
+Change: each repair round counts, for every conflicting ring, the other rings it meets in the
+sample crossing test, the curve guard (ADR-531) or the nesting check. A ring that meets 8 or more
+(`CROWDED_PARTNERS`, `contour-topology.ts`) passes over the weaker refinements and takes its
+baseline next. It still gets its retry without rebuilt corners first. A weaker refinement would
+have to clear every one of those contacts at once, and it costs a whole fit of what is usually a
+large ring. The laser commit guard's steps are all the source, so it is unaffected.
+
+Output: the whole-trace hash is unchanged on the astronaut (Line Art and Sharp), the 1254 px
+stress-test drawing, the arch house (Line Art) and text-sans-96. In the first three, no ring met
+more than one other in the first round. On noise, the crowded ring reaches its baseline sooner, so fewer of its neighbours back
+off. Against Amendment 8, 63 of 3,271 rings change on noise512 Line Art, 8 of 455 on noise192
+Line Art and 7 of 931 on noise192 Sharp. No ring goes from a curve to a polyline, and 31, 3 and 3
+rings go from a polyline to a curve. Of noise512's rings, 3,227 are curves instead of 3,196.
+
+Measured as in Amendment 8, against it, 2 rounds, with another benchmark sharing the machine:
+
+| Case | Amendment 8 | After |
+|---|---|---|
+| noise512, Line Art | 18.2 s, 932 MB | 14.9 s, 916 MB |
+| noise192, Line Art | 2.26 s | 1.87 s |
+| noise192, Sharp | 1.56 s | 1.39 s |

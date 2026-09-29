@@ -37,7 +37,10 @@ export class ContourContactCache {
     return this.geometries.get(points);
   }
 
-  *findSteps(polylines: ReadonlyArray<Polyline>): TraceSteps<Set<number> | undefined> {
+  *findSteps(
+    polylines: ReadonlyArray<Polyline>,
+    onPair?: (a: number, b: number) => void,
+  ): TraceSteps<Set<number> | undefined> {
     const cooperate = yield;
     const loops: Loop[] = [];
     for (const [loop, polyline] of polylines.entries()) {
@@ -58,6 +61,9 @@ export class ContourContactCache {
     for (const event of events) {
       conflicts.add(event.first.owner);
       conflicts.add(event.second.owner);
+      if (event.first.owner !== event.second.owner) {
+        onPair?.(event.first.owner, event.second.owner);
+      }
     }
     return conflicts;
   }

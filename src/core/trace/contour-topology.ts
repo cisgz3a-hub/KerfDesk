@@ -1,6 +1,6 @@
 import type { Polyline, Vec2 } from '../scene';
 import { closeRingEndpoints } from './centerline/loop-closure';
-import { intersectingContourLoopsSteps } from './contour-intersections';
+import { intersectingContourLoopsSteps, type ContourPairListener } from './contour-intersections';
 import { ContourMembership } from './contour-membership';
 import { ContourContactCache } from './contour-contact-cache';
 import { unionContourBoxes } from './contour-bounds';
@@ -28,6 +28,12 @@ export type FinishedContour = ContourRefinement & {
 // curve, yet each one costs a full check of the drawing.
 const REFINEMENT_ATTEMPTS = 4;
 const REFINEMENT_REDUCTION = 0.5;
+// A ring that meets at least this many other rings in a round takes its
+// baseline without the weaker refinements (ADR-530, Amendment 9). A weaker
+// refinement would have to clear every one of those contacts at once, and it
+// costs a whole fit of what is usually a large ring. On uniform noise every
+// such ring ended at its source anyway.
+const CROWDED_PARTNERS = 8;
 
 /** Keep a final curve candidate together with the geometry it refines. */
 export function contourRefinement(
@@ -59,26 +65,29 @@ export function* preserveContourTopologySteps(
   const nestingPairs = new ContourPairCache();
   const curves = new CurveContactCache();
   for (;;) {
-    const conflicts = yield* intersectingContourLoopsSteps(current, contacts);
+    const partners = new RoundPartners();
+    const conflicts = yield* intersectingContourLoopsSteps(current, contacts, partners.add);
     // The fitted curves themselves, which can meet between their samples
     // (ADR-531). Rings without a fitted curve are exact in their samples.
-    for (const index of yield* curves.conflictsSteps(current)) conflicts.add(index);
-    yield* addNestingConflictsSteps(contours, current, conflicts, {
-      membership,
-      measurements,
-      relations,
-      nestingPairs,
-    });
+    for (const index of yield* curves.conflictsSteps(current, partners.add)) conflicts.add(index);
+    yield* addNestingConflictsSteps(
+      contours,
+      current,
+      conflicts,
+      { membership, measurements, relations, nestingPairs },
+      partners.add,
+    );
     let changed = false;
     for (const index of conflicts) {
       if (cooperate) yield;
       const contour = contours[index];
-      if (contour !== undefined && backOffContour(contour, index, repair)) changed = true;
+      const crowded = partners.count(index) >= CROWDED_PARTNERS;
+      if (contour !== undefined && backOffContour(contour, index, repair, crowded)) changed = true;
     }
     // Each conflicting contour moves only toward its source boundary: the
-    // finish without rebuilt corners, weaker refinements, the smoothed
-    // baseline, then the source. Once source boundaries are reached, any
-    // inherited source contact is kept.
+    // finish without rebuilt corners, weaker refinements (skipped by a ring
+    // that meets many others), the smoothed baseline, then the source. Once
+    // source boundaries are reached, any inherited source contact is kept.
     if (!changed) return current;
   }
 }
@@ -95,8 +104,14 @@ type TopologyRepair = {
  *  it is already there. A step that returns the geometry the contour already
  *  has is passed over: it cannot resolve the conflict, and each round costs a
  *  check of the whole drawing. The tracer's refinements are always new, so
- *  this only shortens callers with fixed steps, like the laser commit guard. */
-function backOffContour(contour: FinishedContour, index: number, repair: TopologyRepair): boolean {
+ *  this only shortens callers with fixed steps, like the laser commit guard.
+ *  A crowded contour passes over the weaker refinements too. */
+function backOffContour(
+  contour: FinishedContour,
+  index: number,
+  repair: TopologyRepair,
+  crowded: boolean,
+): boolean {
   const finish = repair.finishes[index] ?? contour;
   const attempt = repair.attempts[index] ?? 0;
   if (attempt > REFINEMENT_ATTEMPTS + 1) return false;
@@ -110,7 +125,8 @@ function backOffContour(contour: FinishedContour, index: number, repair: Topolog
     return true;
   }
   const current = repair.current[index];
-  for (let next = attempt + 1; next <= REFINEMENT_ATTEMPTS + 2; next += 1) {
+  const first = crowded ? Math.max(attempt, REFINEMENT_ATTEMPTS) + 1 : attempt + 1;
+  for (let next = first; next <= REFINEMENT_ATTEMPTS + 2; next += 1) {
     repair.attempts[index] = next;
     const step = backOffStep(contour, finish, next);
     if (step !== current) {
@@ -127,6 +143,30 @@ function backOffStep(contour: FinishedContour, finish: ContourRefinement, step: 
   return step === REFINEMENT_ATTEMPTS + 1 ? finish.baseline : contour.source;
 }
 
+/** The other rings each ring met in one round, by position. */
+class RoundPartners {
+  private readonly partners = new Map<number, Set<number>>();
+
+  readonly add: ContourPairListener = (a, b) => {
+    if (a === b) return;
+    this.of(a).add(b);
+    this.of(b).add(a);
+  };
+
+  count(ring: number): number {
+    return this.partners.get(ring)?.size ?? 0;
+  }
+
+  private of(ring: number): Set<number> {
+    let partners = this.partners.get(ring);
+    if (partners === undefined) {
+      partners = new Set();
+      this.partners.set(ring, partners);
+    }
+    return partners;
+  }
+}
+
 /** What one topology repair keeps between its rounds. */
 type NestingCaches = {
   readonly membership: ContourMembership;
@@ -140,6 +180,7 @@ function* addNestingConflictsSteps(
   current: ReadonlyArray<Polyline>,
   conflicts: Set<number>,
   { membership, measurements, relations, nestingPairs }: NestingCaches,
+  onPair: ContourPairListener,
 ): TraceSteps<void> {
   const cooperate = yield;
   const boxes = contours.map((contour, index) => {
@@ -170,6 +211,7 @@ function* addNestingConflictsSteps(
     if (changed) {
       conflicts.add(a.index);
       conflicts.add(b.index);
+      onPair(a.index, b.index);
     }
   }
 }

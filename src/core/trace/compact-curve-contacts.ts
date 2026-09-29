@@ -45,7 +45,11 @@ export class CurveContactCache {
   private indexedIds: number[] = [];
   private meetings: Meeting[] = [];
 
-  *conflictsSteps(rings: ReadonlyArray<Polyline>): TraceSteps<Set<number>> {
+  /** `onPair` hears the two rings of each meeting between different rings. */
+  *conflictsSteps(
+    rings: ReadonlyArray<Polyline>,
+    onPair?: (a: number, b: number) => void,
+  ): TraceSteps<Set<number>> {
     const cooperate = yield;
     const conflicts = new Set<number>();
     // Nothing fitted (the laser commit guard, source boundaries): the sample
@@ -70,6 +74,7 @@ export class CurveContactCache {
     for (const meeting of this.meetings) {
       conflicts.add(meeting.a);
       conflicts.add(meeting.b);
+      onPair?.(meeting.a, meeting.b);
     }
     return conflicts;
   }

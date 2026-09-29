@@ -85,3 +85,48 @@ describe('topology work during repeated repairs', () => {
     },
   );
 });
+
+describe('a ring that meets many others', () => {
+  const box = (x0: number, y0: number, x1: number, y1: number): Polyline => ({
+    closed: true,
+    points: [
+      { x: x0, y: y0 },
+      { x: x1, y: y0 },
+      { x: x1, y: y1 },
+      { x: x0, y: y1 },
+    ],
+  });
+
+  // A long bar whose top edge crosses `count` small squares that cannot move.
+  // Its retry and weaker refinements keep the crossing; its baseline clears it.
+  function repairBar(count: number) {
+    const baseline = box(0, 0, 400, 5);
+    const refine = vi.fn((_amount: number) => box(0, 0, 400, 10.25));
+    const bar: FinishedContour = {
+      source: baseline,
+      baseline,
+      polyline: box(0, 0, 400, 10),
+      refine: () => box(0, 0, 400, 10),
+      withoutRebuiltCorners: () => ({ polyline: box(0, 0, 400, 10.5), baseline, refine }),
+    };
+    const squares = Array.from({ length: count }, (_, index) => {
+      const square = box(10 + 20 * index, 8, 14 + 20 * index, 12);
+      return { source: square, baseline: square, polyline: square, refine: () => square };
+    });
+    const result = runTraceSteps(preserveContourTopologySteps([bar, ...squares]));
+    return { result, baseline, refine, squares };
+  }
+
+  it('takes its baseline after the retry without the weaker refinements', () => {
+    const { result, baseline, refine, squares } = repairBar(8);
+    expect(result[0]).toBe(baseline);
+    expect(refine).not.toHaveBeenCalled();
+    squares.forEach((square, index) => expect(result[index + 1]).toBe(square.polyline));
+  });
+
+  it('still tries the weaker refinements when it meets fewer', () => {
+    const { result, baseline, refine } = repairBar(7);
+    expect(result[0]).toBe(baseline);
+    expect(refine.mock.calls.map(([amount]) => amount)).toEqual([0.5, 0.25, 0.125, 0.0625]);
+  });
+});
