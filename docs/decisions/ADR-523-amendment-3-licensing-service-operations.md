@@ -88,7 +88,9 @@ support once it is switched on:
    - `GET /v1/public/health` makes one Durable Object round trip with one
      database read. It answers 200 `{ok:true}`, or 503 `{ok:false}`. Like the
      public configuration, it skips the rate limit and answers while licensing is
-     switched off. It is not cached, so each call is one Durable Object request.
+     switched off. Each Worker isolate reuses its last answer for ten seconds, so a
+     client polling it in a loop cannot queue ahead of licence calls in the one
+     Durable Object (added after the pre-merge re-audit, before any deploy).
 5. **Administration is audited, and its token can rotate.**
    - Every admin change writes `audit:<time>:<sequence>` in its own transaction:
      the route, the target, the outcome, which token was used and the time. The
