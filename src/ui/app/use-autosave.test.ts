@@ -115,6 +115,8 @@ function savedProject(): Project {
 
 afterEach(() => {
   clearAutosave();
+  // A test can leave work in an inherited slot on purpose (D-1); clear it too.
+  localStorage.clear();
   useStore.getState().newProject();
   useStore.setState({ dirty: false });
 });

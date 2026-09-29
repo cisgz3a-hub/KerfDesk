@@ -41,6 +41,8 @@ export function loadLastMachine(storage: StorageLike): DeviceProfile | null {
     return null;
   }
   if (raw === null) return null;
-  const result = deserializeMachineProfileDocument(raw);
+  // A restore, not a file import: the machine was saved here from Machine Setup,
+  // so its scan offsets keep the calibration status they were saved with.
+  const result = deserializeMachineProfileDocument(raw, 'restore');
   return result.kind === 'ok' ? result.document.profile : null;
 }
