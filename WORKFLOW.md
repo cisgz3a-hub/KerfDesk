@@ -530,7 +530,8 @@ destination and cannot overwrite the template source.
 2. Set **Offset distance (mm)**, then **Direction** (**Outward**, **Inward**, **Both**) and
    **Corner style** (**Round**, **Bevel**, **Corner**). **Outer shapes only** ignores holes and
    shapes inside other shapes. **Delete original objects** removes the selection once the offset
-   is added.
+   is added. Round corners and end caps are chorded within the 0.025 mm machine curve tolerance
+   at any distance (ADR-410 amendment 1); so are the round corners of the properties-panel offset.
 3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
    result in green, and lists each result's size. The selection is offset as one design.
 4. Open lines offset outward into a closed outline around the line, with caps that follow the
