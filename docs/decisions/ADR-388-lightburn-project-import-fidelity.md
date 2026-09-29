@@ -44,6 +44,13 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    on the main thread and in the import worker. No machine-change banner appears, and the bed,
    S range, homing and start placement stay the machine's own. Opening still replaces the job, so
    a Frame completed before it does not carry over: the opened project is framed afresh.
+5. **Other ways LightBurn writes a shape.** A `Rect`'s `Cr` is its corner radius: each corner
+   opens as a quarter circle, drawn as KerfDesk's own Rectangle draws one, and a radius past half
+   the shorter side is drawn as half that side. A `<PrimList>` of `LineClosed` joins every vertex
+   in order with lines and closes the path; `LineOpen` joins them without closing. A legacy
+   `.lbrn` path writes each vertex as `<V vx vy c0x c0y c1x c1y/>` and each primitive as
+   `<P T="L|B" p0 p1/>`; its handles mean what they do in a `<VertList>` (decision 1), and a
+   handle coordinate left out reads as zero.
 
 ### Limits
 
@@ -58,6 +65,10 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
   offers the choice.
 - Code and test evidence only. The corpus is five LightBurn 2.0.05 projects from one machine
   (rear-right origin); the front-left rule is the same mapping with no flags set.
+- No corpus file has a rounded `Rect`, a `LineClosed` or `LineOpen` list, or a legacy `.lbrn`
+  path. Decision 5 follows the audit's repro files and LightBurn files published with
+  third-party converters (a LightBurn 1.7 text outline written as `LineClosed`, `Cr` written on
+  every `Rect`); `LineOpen` is named only by a converter's notes. Nothing of theirs is copied.
 
 ### Consequences
 
@@ -73,5 +84,8 @@ arcs along their whole length); `lbrn-frame.test.ts` (each MirrorX/MirrorY corne
 and text through the same frame, the backplane fixture laid out as its thumbnail shows);
 `lbrn-run-order.test.ts` (engrave before cut whatever the drawing order, interleaved shapes run
 once per layer, priority over index, the Cut Planner warning); `lbrn-open-machine.test.ts`,
-`open-project-command.test.ts`, `shortcuts.test.ts` and `document-import-lightburn-stream.test.ts`
-(the open machine is kept, and places the project, through every open route).
+`shortcuts-open-lightburn.test.ts`, `open-project-command.test.ts` and
+`document-import-lightburn-stream.test.ts` (the open machine is kept, and places the project,
+through every open route); `lbrn-shapes.test.ts` (rounded and over-rounded Rects are true arcs,
+`LineClosed` / `LineOpen` lists, shared by `PrimID` too, and legacy `<V>` / `<P>` circles and
+lines).

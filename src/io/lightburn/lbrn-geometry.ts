@@ -5,8 +5,10 @@ import {
   type CurveSubpath,
   type ImportedSvg,
   type PathSegment,
+  type Vec2,
 } from '../../core/scene';
 import { parametricEllipseCurve } from '../../core/geometry';
+import { rectangleToCurve } from '../../core/shapes/primitives';
 import { multiplyMatrix, parseXFormText, transformCurve, type LbrnMatrix } from './lbrn-frame';
 import { parseLbrnVertexList, type LbrnVertex } from './lbrn-vertex-list';
 
@@ -17,10 +19,13 @@ export type LbrnGeometryResult = {
 };
 
 type Primitive = { readonly kind: 'L' | 'B'; readonly from: number; readonly to: number };
+/** A PrimList: its primitives, or LightBurn's `LineClosed` / `LineOpen`, which
+ * join every vertex in order with lines (ADR-388). */
+type PrimitiveList = ReadonlyArray<Primitive> | { readonly joinAll: 'closed' | 'open' };
 type BuildingPath = { startIndex: number; endIndex: number; segments: PathSegment[] };
 type PathTables = {
   readonly vertices: ReadonlyMap<number, ReadonlyArray<LbrnVertex>>;
-  readonly primitives: ReadonlyMap<number, ReadonlyArray<Primitive>>;
+  readonly primitives: ReadonlyMap<number, PrimitiveList>;
 };
 
 /** `frame` places LightBurn project coordinates on the scene (lightBurnSceneFrame). */
@@ -125,22 +130,11 @@ function rectangleCurves(shape: Element): CurveSubpath[] {
   const width = numberAttribute(shape, 'W');
   const height = numberAttribute(shape, 'H');
   if (width === null || height === null || width <= 0 || height <= 0) return [];
-  const left = -width / 2;
-  const right = width / 2;
-  const top = -height / 2;
-  const bottom = height / 2;
-  return [
-    {
-      start: { x: left, y: top },
-      closed: true,
-      segments: [
-        { kind: 'line', to: { x: right, y: top } },
-        { kind: 'line', to: { x: right, y: bottom } },
-        { kind: 'line', to: { x: left, y: bottom } },
-        { kind: 'line', to: { x: left, y: top } },
-      ],
-    },
-  ];
+  // A Rect is centred on its origin. `Cr` is its corner radius: each corner a
+  // quarter circle, as KerfDesk's own Rectangle draws it (ADR-388).
+  const cornerRadiusMm = numberAttribute(shape, 'Cr') ?? 0;
+  const outline = rectangleToCurve({ widthMm: width, heightMm: height, cornerRadiusMm });
+  return [transformCurve(outline, { a: 1, b: 0, c: 0, d: 1, e: -width / 2, f: -height / 2 })];
 }
 
 function ellipseCurves(shape: Element): CurveSubpath[] {
@@ -161,7 +155,7 @@ function ellipseCurves(shape: Element): CurveSubpath[] {
 
 function pathCurves(shape: Element, pathTables: PathTables): CurveSubpath[] {
   const vertices = pathVertices(shape, pathTables);
-  const primitives = pathPrimitives(shape, pathTables);
+  const primitives = expandedPrimitives(pathPrimitives(shape, pathTables), vertices.length);
   const curves: CurveSubpath[] = [];
   let current: BuildingPath | null = null;
   for (const primitive of primitives) {
@@ -174,21 +168,52 @@ function pathCurves(shape: Element, pathTables: PathTables): CurveSubpath[] {
   return curves;
 }
 
+// A legacy .lbrn path writes each vertex as <V vx vy c0x c0y c1x c1y/> and
+// each primitive as <P T="L|B" p0 p1/>, with the handles meaning what they do
+// in a LightBurn 2 VertList (ADR-388).
 function pathVertices(shape: Element, pathTables: PathTables): ReadonlyArray<LbrnVertex> {
   const list = directChild(shape, 'vertlist');
   if (list !== null) return parseLbrnVertexList(list.textContent ?? '');
+  const legacy = childrenNamed(shape, 'v');
+  if (legacy.length > 0) return legacy.map(legacyVertex);
   return pathTables.vertices.get(integerAttribute(shape, 'VertID') ?? -1) ?? [];
 }
 
-function pathPrimitives(shape: Element, pathTables: PathTables): ReadonlyArray<Primitive> {
+function pathPrimitives(shape: Element, pathTables: PathTables): PrimitiveList {
   const list = directChild(shape, 'primlist');
   if (list !== null) return parsePrimitives(list.textContent ?? '');
+  const legacy = childrenNamed(shape, 'p');
+  if (legacy.length > 0) return legacy.flatMap(legacyPrimitive);
   return pathTables.primitives.get(integerAttribute(shape, 'PrimID') ?? -1) ?? [];
+}
+
+function legacyVertex(element: Element): LbrnVertex {
+  const outgoing = legacyHandle(element, 'c0');
+  const incoming = legacyHandle(element, 'c1');
+  return {
+    point: { x: numberAttribute(element, 'vx') ?? 0, y: numberAttribute(element, 'vy') ?? 0 },
+    ...(outgoing === null ? {} : { outgoing }),
+    ...(incoming === null ? {} : { incoming }),
+  };
+}
+
+function legacyHandle(element: Element, handle: 'c0' | 'c1'): Vec2 | null {
+  const x = numberAttribute(element, `${handle}x`);
+  const y = numberAttribute(element, `${handle}y`);
+  return x === null && y === null ? null : { x: x ?? 0, y: y ?? 0 };
+}
+
+function legacyPrimitive(element: Element): Primitive[] {
+  const kind = (element.getAttribute('T') ?? '').toUpperCase();
+  const from = integerAttribute(element, 'p0');
+  const to = integerAttribute(element, 'p1');
+  if ((kind !== 'L' && kind !== 'B') || from === null || to === null) return [];
+  return [{ kind, from, to }];
 }
 
 function buildPathTables(root: Element): PathTables {
   const vertices = new Map<number, ReadonlyArray<LbrnVertex>>();
-  const primitives = new Map<number, ReadonlyArray<Primitive>>();
+  const primitives = new Map<number, PrimitiveList>();
   for (const element of [...root.querySelectorAll('*')]) {
     const vertexId = integerAttribute(element, 'VertID');
     const vertexList = directChild(element, 'vertlist');
@@ -247,12 +272,26 @@ function finishPath(
   };
 }
 
-function parsePrimitives(text: string): Primitive[] {
+function parsePrimitives(text: string): PrimitiveList {
+  const joinAll = /^\s*Line(Closed|Open)\s*$/i.exec(text)?.[1]?.toLowerCase();
+  if (joinAll === 'closed' || joinAll === 'open') return { joinAll };
   return [...text.matchAll(/([LB])(\d+)\s+(\d+)/g)].map((match) => ({
     kind: match[1] as 'L' | 'B',
     from: Number(match[2]),
     to: Number(match[3]),
   }));
+}
+
+function expandedPrimitives(list: PrimitiveList, vertexCount: number): ReadonlyArray<Primitive> {
+  if (!('joinAll' in list)) return list;
+  const lines: Primitive[] = [];
+  for (let index = 1; index < vertexCount; index += 1) {
+    lines.push({ kind: 'L', from: index - 1, to: index });
+  }
+  if (list.joinAll === 'closed' && vertexCount > 2) {
+    lines.push({ kind: 'L', from: vertexCount - 1, to: 0 });
+  }
+  return lines;
 }
 
 function parseXForm(shape: Element): LbrnMatrix {
@@ -270,11 +309,17 @@ function combinedBounds(curves: ReadonlyArray<CurveSubpath>) {
 }
 
 function directChild(element: Element, name: string): Element | null {
-  const target = normalized(name);
-  return [...element.children].find((child) => normalized(child.tagName) === target) ?? null;
+  return childrenNamed(element, name)[0] ?? null;
 }
+function childrenNamed(element: Element, name: string): Element[] {
+  const target = normalized(name);
+  return [...element.children].filter((child) => normalized(child.tagName) === target);
+}
+/** Null when the attribute is missing or blank, never a silent 0. */
 function numberAttribute(element: Element, name: string): number | null {
-  const value = Number(element.getAttribute(name) ?? element.getAttribute(name.toLowerCase()));
+  const text = element.getAttribute(name) ?? element.getAttribute(name.toLowerCase());
+  if (text === null || text.trim() === '') return null;
+  const value = Number(text);
   return Number.isFinite(value) ? value : null;
 }
 function integerAttribute(element: Element, name: string): number | null {
