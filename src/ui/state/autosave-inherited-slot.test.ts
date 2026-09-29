@@ -59,6 +59,36 @@ describe('autosave after a reload of the same tab', () => {
     });
   });
 
+  it('offers the earlier page work to both recovery reads that StrictMode starts', async () => {
+    // Development runs the recovery effect twice. The second read probes the
+    // earlier page's session while the first read still holds its lock.
+    const { page, oldSessionId } = await reloadAfterUnsavedWork();
+    const firstProbing = deferred();
+    const firstDone = deferred();
+    const probe = locks.runIfAbandoned.bind(locks);
+    vi.spyOn(locks, 'runIfAbandoned').mockImplementationOnce(
+      async <T>(sessionId: string, reconcile: () => Promise<T>) =>
+        probe(sessionId, async () => {
+          firstProbing.resolve();
+          await firstDone.promise;
+          return reconcile();
+        }),
+    );
+    const reads = vi.spyOn(IndexedDbAutosaveRepository.prototype, 'readAllSlots');
+
+    const first = page.readLatest();
+    await firstProbing.promise;
+    const second = page.readLatest();
+    await vi.waitFor(() => expect(reads).toHaveBeenCalledTimes(2));
+    await reads.mock.results[1]?.value;
+    await new Promise((resolve) => setTimeout(resolve, 0)); // the second read reaches its probe
+    firstDone.resolve();
+
+    for (const read of await Promise.all([first, second])) {
+      expect(read.snapshot).toMatchObject({ sessionId: oldSessionId, ownership: 'abandoned' });
+    }
+  });
+
   it('keeps the earlier page work through edits and a manual save', async () => {
     const { page } = await reloadAfterUnsavedWork();
     await page.readLatest();
