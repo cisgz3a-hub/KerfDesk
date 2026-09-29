@@ -97,7 +97,7 @@ describe('trace controls describe the options the engine actually receives', () 
     fill(image, 20, 20, 30, 10, [220, 180, 80]);
     await withControls('Line Art', async (controls) => {
       expect(controls.host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
-      expect(controls.host.textContent).toContain('Automatic (preserve pale details)');
+      expect(controls.host.textContent).toContain('Automatic (band + pale colour detail)');
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(300);
       await controls.detect('manual');
       expect(ink(preprocessForTrace(image, controls.options()))).toBe(0);

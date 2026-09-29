@@ -199,6 +199,9 @@
   font-weight: 650;
   padding: 0 8px 0 0;
 }
+.lf-trace-preview-grid {
+  margin: 0 0 12px;
+}
 .lf-trace-settings-group {
   display: grid;
   gap: 12px;

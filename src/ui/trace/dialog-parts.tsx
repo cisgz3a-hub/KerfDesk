@@ -33,7 +33,7 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
   'Photo shading':
     'For portraits and real photographs. Fine filled lines vary in width to keep highlights, midtones and shadows.',
   'Line Art':
-    'A balanced start for logos, lettering and drawings. Automatic detection keeps pale details.',
+    'A balanced start for logos, lettering and drawings. Traces brightness 0–128 as ink and, in colour artwork, adds pale details.',
   Smooth: 'Clean curves and quieter outlines for rough or noisy artwork. Very fine gaps may close.',
   Sharp:
     'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',

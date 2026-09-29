@@ -20,7 +20,9 @@ export function traceNumberTitle(label: string): string {
     case 'Max stroke width':
       return 'Ink up to this wide is traced once down its centre line; wider ink stays a filled outline.';
     case 'Minimum line':
-      return 'Discard closed edge outlines whose perimeter is shorter than this many source-image pixels.';
+      return 'Discard closed edge outlines whose perimeter is shorter than this many pixels.';
+    case 'Join gaps':
+      return 'Join line ends closer than this many pixels that face each other, unless the pieces are as short as dashes. 0 leaves every gap open.';
     default:
       return `Trace ${label.toLowerCase()} setting.`;
   }

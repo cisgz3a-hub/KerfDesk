@@ -70,6 +70,7 @@ export const TRACE_CLI_OVERRIDE_FLAGS: Readonly<
   edgeDetail: { flag: 'edge-detail', help: 'Edge Detection detail' },
   edgeMinimumLinePx: { flag: 'edge-min-line', help: 'Edge Detection shortest line in px' },
   hybridMaxStrokeWidthMm: { flag: 'max-stroke-width', help: 'Line + fill max stroke in mm' },
+  centerlineJoinGapPx: { flag: 'join-gaps', help: 'Centerline and Line + fill join gap in px' },
   photoDetail: { flag: 'photo-detail', help: 'Photo shading detail' },
   photoBrightness: { flag: 'photo-brightness', help: 'Photo shading brightness' },
   photoContrast: { flag: 'photo-contrast', help: 'Photo shading contrast' },

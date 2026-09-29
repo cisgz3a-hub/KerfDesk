@@ -38,7 +38,7 @@ import {
 } from './trace-commit-ownership';
 import { commitTraceOutput } from './trace-output-commit';
 import { useTracePreview } from './use-trace-preview';
-import { tracePreviewFacts } from './trace-preview-facts';
+import { useTracePreviewFacts } from './trace-preview-facts';
 import { useTraceCommitLifetime } from './use-trace-commit-lifetime';
 import {
   preparedTraceEntry,
@@ -125,6 +125,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   const options = useDialogTraceOptions(presetOptions, choices.traceSettings, seed);
   const effectiveTraceOutput = effectiveOutput(machineKind, options, choices.traceOutput);
   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
+  const facts = useTracePreviewFacts(preview, file, options, boundarySelection);
 
   const onSubmit = (): void =>
     submitTraceDialog({
@@ -160,7 +161,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
       settings={{
         preset: presetOptions,
         overrides: choices.traceSettings,
-        ...tracePreviewFacts(preview),
+        ...facts,
         onChange: choices.setTraceSettings,
       }}
       output={{
