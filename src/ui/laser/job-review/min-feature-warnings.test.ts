@@ -5,6 +5,8 @@ import { checkProjectMinimumFeatures } from '../../../core/min-feature';
 import {
   createLayer,
   createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  DEFAULT_CNC_MACHINE_CONFIG,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
   type Layer,
@@ -81,6 +83,38 @@ describe('minFeatureWarnings', () => {
     expect(warning).toContain('(twice its Kerf Offset)');
     expect(warning).toContain('narrowest 0.1 mm at X ');
     expect(warning).toContain('; also at ');
+  });
+
+  // Second CNC audit P2-toolpath-4: a V-bit's threshold is what it cuts at depth.
+  it('names the width a V-bit cuts at its depth, not its stored diameter', () => {
+    const slot: SceneObject = {
+      kind: 'imported-svg',
+      id: 'slot',
+      source: 'slot.svg',
+      bounds: { minX: 20, minY: 20, maxX: 23, maxY: 40 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [{ color: '#ff0000', polylines: [rectangle(20, 20, 3, 20)] }],
+    };
+    const cnc: Project = {
+      ...project(slot, {
+        name: 'Pocket',
+        cnc: {
+          ...DEFAULT_CNC_LAYER_SETTINGS,
+          cutType: 'pocket',
+          toolId: 'vb-90',
+          depthMm: 2,
+          depthPerPassMm: 1,
+        },
+      }),
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+    };
+
+    expect(minFeatureWarnings(checkProjectMinimumFeatures(cnc))).toEqual([
+      expect.stringContaining(
+        'Layer "Pocket": 1 area narrower than the 4 mm the bit (90° V-bit — 12.7 mm (1/2") cut) ' +
+          'cuts at 2 mm deep — the bit cannot enter it, so it stays uncut; narrowest 3 mm',
+      ),
+    ]);
   });
 
   it('gives a plain Line operation one optional line, without positions or a setting to change', () => {

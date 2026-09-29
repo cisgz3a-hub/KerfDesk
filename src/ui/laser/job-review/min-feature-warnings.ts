@@ -68,7 +68,8 @@ function cutterText(report: MinFeatureReport): string {
     return `the ${mm} mm kerf${WIDTH_SOURCE_NOTES[report.widthSource]}`;
   const name =
     report.toolName === undefined || report.toolName === '' ? 'bit' : `bit (${report.toolName})`;
-  return `the ${mm} mm ${name}`;
+  if (report.cutDepthMm === undefined) return `the ${mm} mm ${name}`;
+  return `the ${mm} mm the ${name} cuts at ${formatFeatureMm(report.cutDepthMm)} mm deep`;
 }
 
 type Grammar = { readonly it: string; readonly verb: (one: string, many: string) => string };

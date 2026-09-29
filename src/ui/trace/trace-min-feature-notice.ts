@@ -25,10 +25,13 @@ function reportNotice(report: MinFeatureReport): string {
     ...(widths.count > 0 ? [plural(widths.count, 'part', 'parts')] : []),
     ...(gaps.count > 0 ? [plural(gaps.count, 'gap', 'gaps')] : []),
   ].join(' and ');
+  const mm = formatFeatureMm(report.request.thresholdMm);
   const cutter =
     report.machine === 'laser'
-      ? `the ${formatFeatureMm(report.request.thresholdMm)} mm kerf`
-      : `the ${formatFeatureMm(report.request.thresholdMm)} mm bit`;
+      ? `the ${mm} mm kerf`
+      : report.cutDepthMm === undefined
+        ? `the ${mm} mm bit`
+        : `the ${mm} mm the bit cuts at ${formatFeatureMm(report.cutDepthMm)} mm deep`;
   const pronoun = widths.count + gaps.count === 1 ? 'it' : 'they';
   const effect =
     report.machine === 'laser'

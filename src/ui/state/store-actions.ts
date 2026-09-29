@@ -1,3 +1,4 @@
+import type { DeviceProfile } from '../../core/devices';
 import { deviceProfileWithInteractivePatch } from '../../core/devices/device-profile-patch';
 import {
   moveLayer as moveSceneLayer,
@@ -11,7 +12,12 @@ import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import type { AppState } from './store';
-import { projectAfterDeviceProfileChange } from './cnc-machine-setup-scene';
+import {
+  cncMachineForProfile,
+  projectAfterDeviceProfileChange,
+  projectAfterDeviceProfileReplacement,
+} from './cnc-machine-setup-scene';
+import { projectWithParkedCnc } from './parked-cnc-machine';
 import { captureSetupHistoryContext, setupHistoryContextFor } from './setup-history-context';
 import { machineSetupActions } from './machine-setup-actions';
 import { synchronizeCncTabCount } from './cnc-tab-count-sync';
@@ -86,25 +92,30 @@ export function sceneActions(
           dirty: true,
         };
       }),
-    replaceDeviceProfile: (profile) =>
-      set((s) => {
-        captureSetupHistoryContext(s.project, s);
-        return {
-          ...nextProbeSetupState(
-            projectAfterDeviceProfileChange(s.project, profile, s.cncLiveCaps),
-            s.probeSetupEpoch,
-          ),
-          jobPlacement: jobPlacementAfterProfileSelection(
-            s.jobPlacement,
-            s.project.device,
-            profile,
-          ),
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+    replaceDeviceProfile: (profile) => set((s) => deviceProfileReplacementState(s, profile)),
     ...machineSetupActions(set),
+  };
+}
+
+// The picked machine's saved router values replace the CNC params, cached and
+// parked copies included, in the same undo step as the profile (ADR-500).
+function deviceProfileReplacementState(s: AppState, profile: DeviceProfile): Partial<AppState> {
+  captureSetupHistoryContext(s.project, s);
+  const cachedCncMachine =
+    s.cachedCncMachine === null ? null : cncMachineForProfile(s.cachedCncMachine, profile);
+  const replaced = projectAfterDeviceProfileReplacement(s.project, profile, s.cncLiveCaps);
+  return {
+    ...nextProbeSetupState(
+      cachedCncMachine === s.cachedCncMachine
+        ? replaced
+        : projectWithParkedCnc(replaced, cachedCncMachine),
+      s.probeSetupEpoch,
+    ),
+    cachedCncMachine,
+    jobPlacement: jobPlacementAfterProfileSelection(s.jobPlacement, s.project.device, profile),
+    undoStack: pushUndo(s.project, s.undoStack),
+    redoStack: [],
+    dirty: true,
   };
 }
 

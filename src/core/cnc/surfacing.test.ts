@@ -72,6 +72,19 @@ describe('buildSurfacingProgram', () => {
     expect(program.lines).toContain('G1 Y0.025 F2500.000');
   });
 
+  it('refuses a stepover above 100% instead of leaving uncut strips between rows', () => {
+    expect(buildSurfacingProgram({ ...PARAMS, stepoverPct: 150 })).toEqual({
+      ok: false,
+      reason:
+        'Surfacing stepover 150% puts the rows farther apart than the bit is wide and leaves uncut strips between them. Use 100% or less.',
+    });
+
+    const program = expectSurfacingProgram(buildSurfacingProgram({ ...PARAMS, stepoverPct: 100 }));
+    // 50 mm faced with a 25.4 mm bit: rows at Y 0, 25.4 and 50, one bit width apart.
+    expect(program.rowsPerPass).toBe(3);
+    expect(program.lines).toContain('G1 Y25.400 F2500.000');
+  });
+
   it('clears the touched surface before spin-up, brackets cutting with M5, and parks', () => {
     const program = expectSurfacingProgram(buildSurfacingProgram(PARAMS));
     const lines = program.lines;
