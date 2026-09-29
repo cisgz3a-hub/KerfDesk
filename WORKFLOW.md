@@ -3650,8 +3650,10 @@ homing direction or change work zero. Home uses the selected controller's comman
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
 the physical direction. Stock GRBL built without single-axis homing refuses `$HX` with `error:3`
 and then stays in its homing state, reporting Home, until a soft reset; the Alarm banner says so
-and offers **Reset (Ctrl-X)**, after which the controller is in Alarm and can be unlocked or homed
-with `$H` (ADR-375). **Go to work zero** is a separate movement to the workpiece reference.
+and offers **Reset (Ctrl-X)**, after which the controller is in Alarm (`ALARM:6`) and can be
+unlocked or homed with `$H` (ADR-375). When the profile's Home sends `$HX`, the Console log says to
+unlock it instead, since that Home would leave it stuck again (ADR-375 Amendment 1). **Go to work
+zero** is a separate movement to the workpiece reference.
 
 **Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
 **Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
@@ -7774,6 +7776,10 @@ as the pane's design record.
 - **Edge / out of reach.** When the head cannot travel far enough for the camera to see an edge
   of the area, the picture stops short of that edge and the panel says why.
 - **Edge / back to live.** **Live** clears the joined picture and shows the live camera again.
+- **Edge / work-position reports.** A controller set to report its work position (`$10`) places
+  the head at WPos plus the reported work offset (WCO), the position the status panel shows. Until
+  a WCO arrives, or while KerfDesk hides the position after Unlock, Release motors or an unfinished
+  Home, the camera has no head position, as when not homed (ADR-375 Amendment 1).
 - **Error / head position unknown.** Not connected or not homed: the Camera panel says the camera
   rides on the head and asks to connect and home; the photo step and the captures say the same.
 - **Error / machine busy.** A capture that needs moves while the machine cannot jog shows the
