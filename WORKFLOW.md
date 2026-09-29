@@ -1293,11 +1293,12 @@ the completed physical Frame is the spatial source of truth.
   F-A6f).
 - **Duplicate** adds what is selected, **Paste** and **Paste in Place** add what the clipboard
   holds (with its operations, when it came from another project), **Break Apart** makes each
-  shape of the selection its own object, and **Cut Shapes** makes two pieces of each shape it
-  crosses. Each is refused whole when the result would pass a limit: a warning names the limit and
-  says what to change (duplicate fewer objects, copy fewer objects to paste, break apart fewer
-  objects, cut fewer shapes, or delete some first), and nothing changes. The clipboard is kept.
-  Everything that fits is made exactly as before; nothing is ever made in part.
+  shape of the selection its own object, **Cut Shapes** makes two pieces of each shape it crosses,
+  and **Array on board** tiles copies of one design across the placed board (F-BC2). Each is
+  refused whole when the result would pass a limit: a warning names the limit and says what to
+  change (duplicate fewer objects, copy fewer objects to paste, break apart fewer objects, cut
+  fewer shapes, array fewer copies on the board, or delete some first), and nothing changes. The
+  clipboard is kept. Everything that fits is made exactly as before; nothing is ever made in part.
 - A project already over a limit can still be changed in any way that adds nothing to it.
 
 ---
@@ -3903,7 +3904,9 @@ selected.
 **Edge / empty / error.** No board, or zero/several designs selected → both
 controls are disabled ("Select exactly one design…"). A design larger than the
 board tiles as a single centered copy. A runaway count (huge rows, or a tiny
-design under "fit as many as fit") is capped per axis.
+design under "fit as many as fit") is capped per axis. An array that would take
+the project past its limit of 10,000 objects is refused with a notice, and
+nothing changes (F-A11).
 
 ---
 

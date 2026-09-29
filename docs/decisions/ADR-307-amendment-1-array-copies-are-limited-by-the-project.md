@@ -30,6 +30,8 @@ any kind (the 2026-09-28 weakness audit, found while fixing H-5, ADR-498 amendme
   100 made 300, past the loader's 256 ("invalid `scene.layers`"). Break Apart made one imported
   artwork of 12,000 strokes (a stipple, a sheet of parts) into 12,000 objects. Cut Shapes adds a
   piece for every shape it crosses: three shapes cut in a project of 9,999 objects made 10,001.
+  Array on board (ADR-125) tiles one design up to 500 times across a placed board: filling a
+  300 mm board with a 10 by 5 mm design in a project of 9,702 objects made 10,166.
 
 ADR-307 decision 5 says every valid requested placement is materialized. This amendment says what
 valid means: one the project can hold. It is not the policy cap decision 5 removed, because the
@@ -92,14 +94,16 @@ figure is the loader's and not a judgement, and every request that fits is still
      limit too. A refused Break Apart lets go of no image mask, so it says nothing about masks.
    - **Cut Shapes:** "... Cut fewer shapes, or delete some objects first." A refused cut does not
      say how many pieces it made.
+   - **Array on board:** "... Array fewer copies on the board, or delete some objects first." Its
+     own bound of 100 tiles a side and 500 in all is unchanged.
 
-   These commands add what the selection or the clipboard holds, not a number the operator typed,
-   so no room is worked out in advance and there is nothing to lay out first. No cap below the
-   loader's limits is added, and a project that is already over one stays free to change in ways
-   that add nothing to it. The exact check now holds the fourth count the loader does, operations
-   (256), as well as objects, groups and group members, because a paste from another project
-   brings its operations with it. Array and Copy Along Path add no operations, so nothing changes
-   for them.
+   These commands add what the selection or the clipboard makes, and Array on board lays out at
+   most 500 tiles, so the scene each would make is cheap to build and is checked as it is: no
+   room is worked out in advance. No cap below the loader's limits is added, and a project that
+   is already over one stays free to change in ways that add nothing to it. The exact check now
+   holds the fourth count the loader does, operations (256), as well as objects, groups and group
+   members, because a paste from another project brings its operations with it. Array and Copy
+   Along Path add no operations, so nothing changes for them.
 
 ### Alternatives
 
@@ -125,8 +129,8 @@ figure is the loader's and not a judgement, and every request that fits is still
 - Array never takes a project over the limit it can be reopened with. A project that is already
   over it (Array could make one until now) gets "no room" until objects are deleted.
 - Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
-- Duplicate, Paste, Break Apart and Cut Shapes keep to the same limits (item 7). Design Studio
-  Apply and tiling into a board do not check them yet.
+- Duplicate, Paste, Break Apart, Cut Shapes and Array on board keep to the same limits (item 7).
+  Design Studio Apply does not check them yet.
 - No schema change and no change to G-code.
 
 ### Verification
@@ -166,3 +170,6 @@ figure is the loader's and not a judgement, and every request that fits is still
 - `src/ui/state/cut-shapes-limits.test.ts`: a cut that would make 10,001 objects is refused with
   the refusal alone for a notice (it was made before); one that makes exactly 10,000 is made in
   one undo step, says so, and reopens.
+- `src/ui/state/board-tile-limits.test.ts`: filling a board with 465 tiles in a project of 9,702
+  objects is refused (it was made before); a 2 by 2 array one object past the limit refused, and
+  one to exactly 10,000 made in one undo step and reopened.

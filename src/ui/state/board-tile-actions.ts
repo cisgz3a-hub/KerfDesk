@@ -2,7 +2,8 @@
 // single selected design across the placed board (the registration box). The
 // pure geometry lives in core (tileIntoRegion); this action resolves the board
 // region and the selected design, moves the original into the first grid slot,
-// and adds a fresh copy for every remaining slot as one undoable edit.
+// and adds a fresh copy for every remaining slot as one undoable edit. An array
+// the project cannot hold (ADR-307 amendment 1) is refused with a notice.
 
 import {
   boardFitRegion,
@@ -14,6 +15,7 @@ import {
   tileIntoRegion,
   transformedBBox,
 } from '../../core/scene';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 
@@ -22,6 +24,8 @@ export type BoardTileActions = {
 };
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+
+const ARRAY_ON_BOARD_FEWER = 'Array fewer copies on the board, or delete some objects first.';
 
 export function boardTileActions(set: Setter): BoardTileActions {
   return {
@@ -57,9 +61,13 @@ function applyTileSelectionIntoBoard(
   const objects = scene.objects
     .map((object) => (object.id === target.id ? movedOriginal : object))
     .concat(copies);
+  const next = { ...scene, objects };
+  // A project past its limits saves but cannot be opened again (ADR-307
+  // amendment 1): such an array is refused whole, never made in part.
+  if (refuseSceneLimitOverrun(scene, next, ARRAY_ON_BOARD_FEWER)) return state;
 
   return {
-    project: { ...state.project, scene: { ...scene, objects } },
+    project: { ...state.project, scene: next },
     // Select the whole array (original + copies), like Duplicate. This also
     // disables "Array on board" (it needs exactly one selected design), so
     // re-clicking can't silently stack a second overlapping grid (double-burn) —
