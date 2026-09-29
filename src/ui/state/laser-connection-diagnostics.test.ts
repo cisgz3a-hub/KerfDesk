@@ -13,6 +13,19 @@ function silentConnection(): SerialConnection {
   };
 }
 
+// Silent too, but its UART reports line errors, as one does at the wrong baud rate.
+function erroringConnection() {
+  const handlers = new Set<(name: string) => void>();
+  const connection: SerialConnection = {
+    ...silentConnection(),
+    onLineError: (handler) => {
+      handlers.add(handler);
+      return () => handlers.delete(handler);
+    },
+  };
+  return { connection, raise: (name: string) => handlers.forEach((handler) => handler(name)) };
+}
+
 // A GRBL board that answers nothing while `state` is null (still starting),
 // then answers every `?` with that state. Lines it prints by itself are emitted
 // by the test.
@@ -176,6 +189,38 @@ describe('connection diagnostics', () => {
     await vi.advanceTimersByTimeAsync(7_100);
 
     expect(useLaserStore.getState().log).toContain(
+      '[lf2] Only undecodable data from the controller within 10 s. Check baud rate (9600) and that the device is GRBL v1.1.',
+    );
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
+  });
+
+  // The UART's framing and parity errors are the wrong baud rate's other
+  // symptom; the bytes they lost never reach the transcript (controller audit
+  // T-3, ADR-375).
+  it('names the baud rate when the port reports only line errors', async () => {
+    vi.useFakeTimers();
+    const board = erroringConnection();
+    await useLaserStore
+      .getState()
+      .connect(adapterFor(board.connection), { controllerKind: 'grbl-v1.1', baudRate: 9600 });
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    board.raise('FramingError');
+    board.raise('ParityError');
+    await vi.advanceTimersByTimeAsync(7_100);
+
+    const log = useLaserStore.getState().log;
+    expect(log.filter((line) => line.includes('Serial line error (FramingError)'))).toHaveLength(1);
+    // Shown in the Console, which renders the transcript.
+    expect(
+      useLaserStore
+        .getState()
+        .transcript.some(
+          (entry) =>
+            entry.direction === 'system' && entry.raw.includes('Serial line error (FramingError)'),
+        ),
+    ).toBe(true);
+    expect(log).toContain(
       '[lf2] Only undecodable data from the controller within 10 s. Check baud rate (9600) and that the device is GRBL v1.1.',
     );
     expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');

@@ -159,6 +159,11 @@ export type SerialConnection = {
   // Subscribe to the close event (port physically disconnected, OS revoked,
   // or close() called).
   readonly onClose: (handler: () => void) => () => void;
+  // Subscribe to UART line errors the transport survived (Web Serial's
+  // BreakError, BufferOverrunError, FramingError, ParityError): bytes at the
+  // error were lost, the port stayed open and reading goes on. The handler
+  // gets the error's name. Absent on a transport that cannot see them.
+  readonly onLineError?: (handler: (name: string) => void) => () => void;
   readonly close: () => Promise<void>;
   // Explicit permission revocation. Normal Disconnect must retain the pairing.
   readonly forget?: () => Promise<void>;

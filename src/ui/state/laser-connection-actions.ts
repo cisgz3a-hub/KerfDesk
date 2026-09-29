@@ -44,6 +44,7 @@ import {
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
 import { observeStreamHoldTick } from './laser-stream-hold';
+import { observeSerialLineErrors } from './laser-serial-line-errors';
 import {
   canSendQueuedStatusQuery,
   controllerOperationOwnsPolling,
@@ -145,6 +146,7 @@ function attachConnectedController(
     if (refs.connection !== connection) return;
     containActiveStreamWriteFailure(set, refs, safeWrite, 'stream', streamWriteOwner(get()));
   });
+  observeSerialLineErrors(set, get, refs, connection);
   refs.unsubscribeClose = connection.onClose(() => {
     if (refs.connection !== connection) return;
     teardownConnectionRefs(refs);

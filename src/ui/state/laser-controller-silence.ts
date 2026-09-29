@@ -8,6 +8,7 @@ import {
 } from './laser-controller-qualification';
 import type { SetFn, GetFn } from './laser-line-shared';
 import type { LaserState, LiveRefs } from './laser-store';
+import { sessionSawLineError } from './laser-serial-line-errors';
 import { appendSystemNotice } from './laser-system-notice';
 
 type SilentSession = { readonly baudRate: number; readonly epoch: number };
@@ -65,7 +66,7 @@ function reportMissingControllerResponse(
   waitedMs: number,
 ): void {
   const { baudRate, epoch } = session;
-  const evidence = inboundEvidence(get());
+  const evidence = inboundEvidence(get(), refs);
   const [notice, failure] = silenceMessages(evidence, waitedMs / 1000, baudRate, refs.driver.label);
   set(appendSystemNotice(get(), refs, notice));
   set((state) => failedControllerQualificationPatch(state, epoch, failure));
@@ -99,14 +100,16 @@ function silenceMessages(
 
 // GRBL-family replies are lines of ASCII text
 // (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md#L492).
-// At the wrong baud rate the UART delivers other bytes, which the transport's
+// At the wrong baud rate the UART reports framing or parity errors
+// (laser-serial-line-errors.ts) or delivers other bytes, which the transport's
 // non-fatal UTF-8 decoder turns into U+FFFD. Any recognised reply proves the
 // speed; unrecognised lines prove it only when nothing in them failed to decode.
-function inboundEvidence(state: LaserState): InboundEvidence {
+function inboundEvidence(state: LaserState, refs: LiveRefs): InboundEvidence {
   const inbound = state.transcript.filter(
     (entry) => entry.direction === 'in' && entry.raw.trim() !== '',
   );
-  if (inbound.length === 0) return 'none';
   if (inbound.some((entry) => entry.kind !== 'unknown')) return 'readable';
+  if (sessionSawLineError(refs, state)) return 'undecodable';
+  if (inbound.length === 0) return 'none';
   return inbound.some((entry) => entry.raw.includes('\uFFFD')) ? 'undecodable' : 'readable';
 }

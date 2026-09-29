@@ -184,6 +184,11 @@ async function openWithRetry(port: SerialPort, baudRate: number): Promise<void> 
 
 type Subscribers<T> = Set<(value: T) => void>;
 
+function subscribe<T>(subscribers: Subscribers<T>, handler: (value: T) => void): () => void {
+  subscribers.add(handler);
+  return () => subscribers.delete(handler);
+}
+
 type ConnectionContext = SerialReadTarget & {
   closed: boolean;
   streamsClosed: boolean;
@@ -205,6 +210,7 @@ function openConnectionContext(port: SerialPort): ConnectionContext {
 function makeConnection(port: SerialPort): SerialConnection {
   const lineSubs: Subscribers<string> = new Set();
   const closeSubs: Subscribers<void> = new Set();
+  const lineErrorSubs: Subscribers<string> = new Set();
   const ctx = openConnectionContext(port);
 
   const closeStreamsOnce = async (): Promise<void> => {
@@ -237,7 +243,7 @@ function makeConnection(port: SerialPort): SerialConnection {
   };
   port.addEventListener('disconnect', handleDroppedConnection);
 
-  void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection);
+  void runSerialReadLoop(ctx, lineSubs, handleDroppedConnection, lineErrorSubs);
 
   const closeConnection = async (): Promise<void> => {
     if (ctx.closed) return;
@@ -292,6 +298,7 @@ function makeConnection(port: SerialPort): SerialConnection {
       closeSubs.add(handler);
       return () => closeSubs.delete(handler);
     },
+    onLineError: (handler) => subscribe(lineErrorSubs, handler),
     close: closeConnection,
     forget: async () => {
       // A2 audit finding: revoke the in-page permission for this port on
