@@ -67,9 +67,10 @@ now, and its `ubuntu-latest` runners have 4 vCPUs (the Browser smoke log reports
 
 - What is verified before a commit merges or publishes is unchanged: every `release:check`
   command runs once on that exact commit before its deploy, and nothing is skipped or sampled.
-- Expected times: about 10 minutes for CI and 15 for Browser smoke, down from 77 and 49; a merge
-  reaches production about 15 minutes after it lands, down from about 2 hours 15 minutes. The
-  measured times from this change's own runs are under Verification.
+- On this change's pull request CI took 14 minutes and Browser smoke 15, down from 77 and 49
+  (under Verification). A merge should reach production about 20 minutes after it lands, CI plus
+  a build-only deploy, down from about 2 hours 15 minutes. `main`'s runs still never cancel, so a
+  merge that lands while another merge's CI runs waits for it, now for up to about 14 minutes.
 - A push starts up to 12 jobs at once instead of 3 to 6. GitHub Free runs 20 jobs at a time per
   account, so two pushes in the same minute queue for a few minutes.
 - If the repository goes private again, Vitest drops to 1 worker per shard and runs take longer.
@@ -117,3 +118,8 @@ now, and its `ubuntu-latest` runners have 4 vCPUs (the Browser smoke log reports
   `cancelled` and `skipped` results and for unreadable input.
 - Measured locally on 4 cores, one 202-file shard: 422 s with 1 worker, 226 s with 2, 159 s
   with 3, all tests passing each time.
+- Measured on GitHub, the pull request's run for `bf1e8bd50` (2026-09-29), all jobs passing: CI
+  took 13 minutes 47 seconds from its first job to its gate (unit test shards 10.5 to 11.4
+  minutes, *Typecheck, lint and format* 6.0, *Policy checks and builds* 2.4, the gate 0.5; one
+  shard waited 2 minutes for a runner). Browser smoke took 15 minutes 10 seconds (shards 10.4 to
+  14.5 minutes, the checks job 4.3, the gate 0.6).
