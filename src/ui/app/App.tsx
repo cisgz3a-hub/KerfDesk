@@ -47,6 +47,7 @@ import { ProjectBedReconciliationBanner } from './ProjectBedReconciliationBanner
 import { MachineSetupBanner } from './MachineSetupBanner';
 import { ExternalGcodePreviewBanner } from './ExternalGcodePreviewBanner';
 import { DesktopCloseNotice } from './DesktopCloseNotice';
+import { DesktopSessionEndNotice } from './DesktopSessionEndNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
 import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
 import { SupportReportHost } from '../support/SupportReportHost';
@@ -56,6 +57,7 @@ export function App(): JSX.Element {
     <div className="lf-app-shell" style={shellStyle}>
       <CommandShell />
       <DesktopCloseNotice />
+      <DesktopSessionEndNotice />
       <AutosaveRecoveryBanner />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />

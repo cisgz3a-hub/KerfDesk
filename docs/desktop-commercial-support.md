@@ -49,6 +49,12 @@ main process, `window` for the app window). A startup line without a `KerfDesk
 quit.` line before it usually means the previous session ended abnormally: a
 crash, a forced close or a power cut.
 
+A job that stopped when Windows restarted, shut down or signed out leaves a `main`
+line starting "Windows asked to end the session" (KerfDesk asked Windows to wait)
+or "Windows is ending the session" (KerfDesk sent Abort), with Windows' reason
+(ADR-548). Point the customer to Windows Update's Active hours and to the
+connection guide's "Disconnects during a job".
+
 ### An update did not arrive
 
 Ask what **Help > Check for Updates** says (ADR-547).

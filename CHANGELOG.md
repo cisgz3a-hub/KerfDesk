@@ -74,6 +74,10 @@ release before it is tagged.
 - **Drop a project to open it.** Dragging a KerfDesk or LightBurn project onto the window opens it,
   after the usual question about unsaved changes
   ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Windows restarts wait for the job.** In the desktop app, a Windows restart, shutdown or
+  sign-out during a job is asked to wait, and one that goes ahead anyway gets Abort first. Help's
+  connection guide explains USB power saving and Windows Update's Active hours
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

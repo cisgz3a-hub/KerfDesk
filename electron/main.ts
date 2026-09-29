@@ -101,6 +101,7 @@ import { createDesktopLicensing } from './desktop-licensing.js';
 import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
 import { startDesktopSupportLog } from './support-log.js';
+import { installSessionEndGuard, withDesktopActivityRoute } from './session-end-guard.js';
 import { withSupportRoutes } from './support-routes.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -411,6 +412,8 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
+  // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548).
+  installSessionEndGuard(window);
   installRendererCrashRecovery(window, {
     isClosing: () => closeGuard.isClosing(),
     askToReload: async (prompt) => {
@@ -534,9 +537,11 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       // every build opens, and Pro tools unlock only in the renderer (ADR-540).
       protocol.handle(
         'app',
-        withSupportRoutes(
-          licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
-          SUPPORT_LOG,
+        withDesktopActivityRoute(
+          withSupportRoutes(
+            licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+            SUPPORT_LOG,
+          ),
         ),
       );
       // A Session survives macOS window closure; install its listeners once,

@@ -89,6 +89,24 @@ If KerfDesk connects but position never updates or commands do nothing:
 
 ---
 
+## Disconnects during a job
+
+- **Windows switches the USB port off to save power.** In **Control Panel >
+  Power Options > Change plan settings > Change advanced power settings**, set
+  **USB settings > USB selective suspend setting** to **Disabled**. In
+  **Device Manager**, open each **USB Root Hub** under **Universal Serial Bus
+  controllers** and, on its **Power Management** tab, untick **Allow the
+  computer to turn off this device to save power**.
+- **Windows restarts for updates.** Set **Active hours** in Windows Update's
+  settings to cover the times you run long jobs. While a job runs, the desktop
+  app asks Windows to wait before it restarts, shuts down or signs out, and says
+  so in the app. A forced restart still ends the job, and KerfDesk sends Abort
+  first.
+- **Electrical noise.** Use a short, shielded USB cable, plugged straight into
+  the computer, routed away from spindle, stepper and laser power leads.
+
+---
+
 ## Camera not working?
 
 - **USB webcams** work directly — no extra software needed.

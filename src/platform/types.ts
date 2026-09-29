@@ -444,4 +444,8 @@ export type PlatformAdapter = {
   // The desktop app's local support log (ADR-546): its newest part, for Help >
   // Save Support Report. Absent in the web app, which keeps no log.
   readonly readSupportLog?: () => Promise<string>;
+
+  // Tells the desktop app's main process whether a job runs, so a Windows
+  // restart, shutdown or sign-out waits for it (ADR-548). Absent in the web app.
+  readonly reportJobActivity?: (busy: boolean) => Promise<void>;
 };

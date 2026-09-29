@@ -7682,6 +7682,18 @@ behavior or create a second product implementation.
    Keeping the app open invalidates late close replies. Close approval is tied to
    the reviewed document identity and the displayed stop warning.
 
+#### Edge — Windows restarts, shuts down or signs out during a job (ADR-548)
+1. The window tells the main process whenever a job starts or ends, or Fire is latched or
+   released. A page that reloads or crashes counts as no job.
+2. When Windows asks to end the session while a job runs, KerfDesk asks it to wait. Windows shows
+   that KerfDesk is preventing the restart, shutdown or sign-out, and the app shows a notice: let
+   the job finish or Abort it first; if Windows goes ahead anyway, KerfDesk sends Abort first.
+3. When the session ends anyway, or Windows marks the request critical, the window sends the
+   close handoff's Abort (Fire off first; recovery records the app closing). The notice says a
+   sent Abort does not confirm the machine stopped and names the physical E-stop.
+4. Without a job, KerfDesk never delays Windows. Each request and what KerfDesk did goes to the
+   support log (ADR-546).
+
 ### F-DESK-LIC. Commercial admission, payment and updates (ADR-523)
 
 1. An explicitly prepared commercial package checks its signed saved licence before

@@ -1,3 +1,4 @@
+import { trustedAppRequest } from './app-route-guard.js';
 import type { LicensingRuntime } from './licensing-runtime.js';
 import { record } from './licensing-verification.js';
 import type { EarlyUpdates } from './update-ring-store.js';
@@ -16,7 +17,7 @@ export function withLicensingRoutes(
   return async (request) => {
     const url = new URL(request.url);
     if (!url.pathname.startsWith(PREFIX)) return fallback(request);
-    if (!exactUrl(url) || !sameOriginHeaders(request)) return missing();
+    if (!trustedAppRequest(request, url, 'X-KerfDesk-Licensing')) return missing();
     const action = url.pathname.slice(PREFIX.length);
     if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
     if (action === 'update-status' || action === 'check-updates')
@@ -75,22 +76,6 @@ async function updateRoute(
   return response(updates.check());
 }
 
-function exactUrl(url: URL): boolean {
-  return (
-    url.protocol === 'app:' &&
-    url.hostname === 'app' &&
-    [url.port, url.username, url.password, url.search, url.hash].every((part) => part === '')
-  );
-}
-function sameOriginHeaders(request: Request): boolean {
-  const origin = request.headers.get('Origin');
-  const site = request.headers.get('Sec-Fetch-Site');
-  return (
-    request.headers.get('X-KerfDesk-Licensing') === '1' &&
-    (origin === null || origin === 'app://app') &&
-    (site === null || site === 'same-origin' || site === 'none')
-  );
-}
 async function dispatch(
   action: string,
   body: Record<string, unknown>,
