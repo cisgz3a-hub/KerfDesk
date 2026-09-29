@@ -10,7 +10,17 @@
 //     the work zero is `G10 L20 P0 <axis><-dir·radius>`. The cycle stays in
 //     relative motion until every contact succeeds, then commits X, Y, and Z
 //     together with one G10 L20, so a failed contact cannot leave only part
-//     of the work coordinate system changed.
+//     of the work coordinate system changed. A `G92.1` just before that commit
+//     drops any temporary G92 origin (Set origin here): G10 L20 stores
+//     G54 = MPos - G92 - WPos, so with a G92 still active the stored corner
+//     would move by that offset as soon as the G92 goes, at every reset on
+//     stock GRBL and FluidNC (controller audit 2, ADR-375):
+//     https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L550-L553
+//     The Z cycle keeps any G92. G10 L20 works per axis and Set origin here
+//     writes only G92 X Y, so the Z commit meets a G92 Z only after Zero Z
+//     here or a pause-and-lift restore; a G92.1 there would drop the
+//     operator's XY origin, and every reset or G92.1 that later drops a G92 Z
+//     also voids work-Z evidence, forcing a new touch-off.
 //
 // Geometry model (PROVISIONAL, ADR-103): a rectangular corner plate whose
 // outer faces sit flush with the stock faces, wide enough that the plate
@@ -175,9 +185,11 @@ export function buildCornerProbeLines(params: CornerProbeParams): ReadonlyArray<
     `G0 X${fmt(sx * (params.plateCenterOffsetXmm + radius + SIDE_RETREAT_MM))}`,
     ...sideLegLines('Y', sy, params, zTop, geometry.flankHeightMm),
     'G90',
-    // This is the only coordinate mutation in the corner cycle. At this
+    // These are the only coordinate mutations in the corner cycle. At this
     // point all six probe contacts have succeeded and the current XYZ values
-    // are derivable from their deterministic relative retreats/lifts.
+    // are derivable from their deterministic relative retreats/lifts. G92.1
+    // first, so the stored G54 is the probed corner itself (header comment).
+    'G92.1',
     `G10 L20 P0 X${fmt(xAfterCentering)} Y${fmt(yAfterRetreat)} Z${fmt(zTop)}`,
     `G0 X${fmt(-sx * geometry.finalParkMm)} Y${fmt(-sy * geometry.finalParkMm)}`,
   ];

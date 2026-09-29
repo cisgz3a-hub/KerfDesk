@@ -317,21 +317,24 @@ function applyG92(state: GrblSimState, line: string): GrblSimState {
 }
 
 function applyG10(state: GrblSimState, line: string): GrblSimState {
-  // G10 L20 P1 X<v>: set G54 so the current position reads <v>; G10 L2 P1
-  // X<v>: set the G54 offset to <v> directly. Only P1 (G54) is modeled.
+  // G10 L20 P1 X<v>: set G54 so the current position reads <v> with any G92
+  // still applied, G54 = MPos - G92 - v (gcode.c:550-553); G10 L2 P1 X<v>: set
+  // the G54 offset to <v> directly. Only G54 is modeled, so P0 (the active
+  // system) writes it too.
   const words = parseMotionWords(line);
   const isL20 = /[Ll]20/.test(line);
   const prior = state.g54 ?? SIM_ZERO_VEC3;
-  const axis = (mpos: number, prev: number, word: number | null): number => {
+  const g92 = state.g92 ?? SIM_ZERO_VEC3;
+  const axis = (mpos: number, g92Offset: number, prev: number, word: number | null): number => {
     if (word === null) return prev;
-    return isL20 ? mpos - word : word;
+    return isL20 ? mpos - g92Offset - word : word;
   };
   return {
     ...state,
     g54: {
-      x: axis(state.mpos.x, prior.x, words.x),
-      y: axis(state.mpos.y, prior.y, words.y),
-      z: axis(state.mpos.z, prior.z, words.z),
+      x: axis(state.mpos.x, g92.x, prior.x, words.x),
+      y: axis(state.mpos.y, g92.y, prior.y, words.y),
+      z: axis(state.mpos.z, g92.z, prior.z, words.z),
     },
   };
 }
