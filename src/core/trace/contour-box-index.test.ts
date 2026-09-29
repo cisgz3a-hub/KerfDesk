@@ -67,3 +67,69 @@ describe('ContourBoxIndex.overlapPairsSteps', () => {
     expect(pairsByTrees(some, empty, false)).toEqual([]);
   });
 });
+
+describe('ContourBoxIndex.overlapIdsSteps with a margin', () => {
+  // Every pair whose boxes come within `margin` (inclusive), marked with
+  // whether the boxes themselves overlap, found by brute force. Coordinates
+  // and margins are multiples of 1/2, so the sums are exact.
+  function pairsWithin(a: Box[], b: Box[], margin: number): string[] {
+    const within = (p: Box, q: Box, m: number): boolean =>
+      p.maxX + m >= q.minX && q.maxX + m >= p.minX && p.maxY + m >= q.minY && q.maxY + m >= p.minY;
+    return a
+      .flatMap((p) =>
+        b.filter((q) => within(p, q, margin)).map((q) => `${p.id}:${q.id}:${within(p, q, 0)}`),
+      )
+      .sort();
+  }
+
+  function pairsByIds(
+    a: ContourBoxIndex<Box>,
+    b: ContourBoxIndex<Box>,
+    cooperate: boolean,
+    margin?: number,
+  ): string[] {
+    const pairs: string[] = [];
+    runTraceSteps(
+      (function* () {
+        yield* a.overlapIdsSteps(
+          b,
+          (i, j, overlapping) => pairs.push(`${i}:${j}:${overlapping}`),
+          cooperate,
+          margin,
+        );
+      })(),
+    );
+    return pairs;
+  }
+
+  it('visits exactly the pairs whose boxes come within the margin, saying which overlap', () => {
+    for (const margin of [0.5, 1, 2.5]) {
+      for (const [countA, countB, size] of [
+        [9, 300, 2],
+        [400, 350, 1],
+        [120, 120, 6],
+      ] as const) {
+        const a = boxes(countA, countA * 31 + countB, size);
+        const b = boxes(countB, countB * 17 + countA, size);
+        const expected = pairsWithin(a, b, margin);
+        // Some pairs are visited only for the margin.
+        expect(expected.some((pair) => pair.endsWith(':false'))).toBe(true);
+        const indexA = ContourBoxIndex.create(a);
+        const indexB = ContourBoxIndex.create(b);
+        expect(pairsByIds(indexA, indexB, false, margin).sort()).toEqual(expected);
+        expect(pairsByIds(indexA, indexB, true, margin).sort()).toEqual(expected);
+      }
+    }
+  });
+
+  it('with no margin visits the overlapping pairs, all marked as overlapping, in one order', () => {
+    const a = boxes(300, 5, 2);
+    const b = boxes(280, 6, 3);
+    const indexA = ContourBoxIndex.create(a);
+    const indexB = ContourBoxIndex.create(b);
+    const plain = pairsByIds(indexA, indexB, false);
+    expect(pairsByIds(indexA, indexB, false, 0)).toEqual(plain);
+    expect([...plain].sort()).toEqual(pairsWithin(a, b, 0));
+    expect(plain.every((pair) => pair.endsWith(':true'))).toBe(true);
+  });
+});

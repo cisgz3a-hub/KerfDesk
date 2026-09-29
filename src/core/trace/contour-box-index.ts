@@ -156,12 +156,17 @@ export class ContourBoxIndex<T extends ContourBox> {
     yield* this.overlapIdsSteps(other, (a, b) => visit(mine(a), theirs(b)), cooperate);
   }
 
-  /** overlapPairsSteps by item number: `visit(i, j)` for item `i` here and
-   *  item `j` of `other`, without making either item. */
+  /** overlapPairsSteps by item number: `visit(i, j, overlapping)` for item
+   *  `i` here and item `j` of `other`, without making either item. With a
+   *  `margin`, pairs whose boxes come within it of each other are visited
+   *  too, and `overlapping` says whether the boxes themselves overlap
+   *  (inclusive). A margin of 0 is the plain test: `x + 0` and `x - 0` are
+   *  `x` in every comparison, so the same pairs come in the same order. */
   *overlapIdsSteps<U extends ContourBox>(
     other: ContourBoxIndex<U>,
-    visit: (item: number, otherItem: number) => void,
+    visit: (item: number, otherItem: number, overlapping: boolean) => void,
     cooperate: boolean,
+    margin = 0,
   ): TraceSteps<void> {
     if (this.root < 0 || other.root < 0) return;
     const { bounds: mineBounds, first: mineFirst, second: mineSecond } = this.nodes;
@@ -172,14 +177,13 @@ export class ContourBoxIndex<T extends ContourBox> {
     while (mine.length > 0) {
       const a = mine.pop() as number;
       const b = theirs.pop() as number;
-      if (!nodesOverlap(mineBounds, a, theirBounds, b)) continue;
+      if (!boxesWithin(mineBounds, a, theirBounds, b, margin)) continue;
       if (cooperate && ++visited % PAIR_CHECKPOINT_INTERVAL === 0) yield;
       const aFirst = mineFirst[a] as number;
       const bFirst = theirFirst[b] as number;
       if (aFirst < 0 && bFirst < 0) {
-        this.visitLeafPairs(~aFirst, mineSecond[a] as number, other, b, visit);
-      } else if (bFirst < 0 || (aFirst >= 0 && wider(mineBounds, a, theirBounds, b))) {
-        // Descend this tree: its node is the wider, or the other's is a leaf.
+        this.visitLeafPairs(~aFirst, mineSecond[a] as number, other, b, visit, margin);
+      } else if (descendsMine(mineBounds, a, aFirst, theirBounds, b, bFirst)) {
         mine.push(aFirst);
         theirs.push(b);
         mine.push(mineSecond[a] as number);
@@ -193,12 +197,16 @@ export class ContourBoxIndex<T extends ContourBox> {
     }
   }
 
+  // This index's items are widened by the margin and the other's are not, as
+  // boxesWithin widens this index's nodes. Rounding is monotone, so a node
+  // pair is never dismissed while two of its items would pass.
   private visitLeafPairs<U extends ContourBox>(
     start: number,
     end: number,
     other: ContourBoxIndex<U>,
     otherLeaf: number,
-    visit: (item: number, otherItem: number) => void,
+    visit: (item: number, otherItem: number, overlapping: boolean) => void,
+    margin: number,
   ): void {
     const { bounds, order } = this;
     const { bounds: otherBounds, order: otherOrder, nodes } = other;
@@ -212,23 +220,23 @@ export class ContourBoxIndex<T extends ContourBox> {
     for (let i = start; i < end; i += 1) {
       const item = order[i] as number;
       const at = 4 * item;
-      const minX = bounds[at] as number,
-        minY = bounds[at + 1] as number,
-        maxX = bounds[at + 2] as number,
-        maxY = bounds[at + 3] as number;
-      if (!(maxX >= leafMinX && leafMaxX >= minX && maxY >= leafMinY && leafMaxY >= minY)) {
+      const lowX = (bounds[at] as number) - margin,
+        lowY = (bounds[at + 1] as number) - margin,
+        highX = (bounds[at + 2] as number) + margin,
+        highY = (bounds[at + 3] as number) + margin;
+      if (!(highX >= leafMinX && leafMaxX >= lowX && highY >= leafMinY && leafMaxY >= lowY)) {
         continue;
       }
       for (let j = otherStart; j < otherEnd; j += 1) {
         const otherItem = otherOrder[j] as number;
         const to = 4 * otherItem;
         if (
-          maxX >= (otherBounds[to] as number) &&
-          (otherBounds[to + 2] as number) >= minX &&
-          maxY >= (otherBounds[to + 1] as number) &&
-          (otherBounds[to + 3] as number) >= minY
+          highX >= (otherBounds[to] as number) &&
+          (otherBounds[to + 2] as number) >= lowX &&
+          highY >= (otherBounds[to + 1] as number) &&
+          (otherBounds[to + 3] as number) >= lowY
         ) {
-          visit(item, otherItem);
+          visit(item, otherItem, boxesWithin(bounds, item, otherBounds, otherItem, 0));
         }
       }
     }
@@ -237,14 +245,34 @@ export class ContourBoxIndex<T extends ContourBox> {
 
 const PAIR_CHECKPOINT_INTERVAL = 256;
 
-function nodesOverlap(aBounds: Float64Array, a: number, bBounds: Float64Array, b: number): boolean {
+// Descend this tree: its node is the wider, or the other's is a leaf.
+function descendsMine(
+  mineBounds: Float64Array,
+  a: number,
+  aFirst: number,
+  theirBounds: Float64Array,
+  b: number,
+  bFirst: number,
+): boolean {
+  return bFirst < 0 || (aFirst >= 0 && wider(mineBounds, a, theirBounds, b));
+}
+
+// Whether box `a` of `aBounds` (4 per box), widened by `margin`, overlaps box
+// `b` of `bBounds` (inclusive). Nodes and items are laid out alike.
+function boxesWithin(
+  aBounds: Float64Array,
+  a: number,
+  bBounds: Float64Array,
+  b: number,
+  margin: number,
+): boolean {
   const at = 4 * a,
     bt = 4 * b;
   return (
-    (aBounds[at + 2] as number) >= (bBounds[bt] as number) &&
-    (bBounds[bt + 2] as number) >= (aBounds[at] as number) &&
-    (aBounds[at + 3] as number) >= (bBounds[bt + 1] as number) &&
-    (bBounds[bt + 3] as number) >= (aBounds[at + 1] as number)
+    (aBounds[at + 2] as number) + margin >= (bBounds[bt] as number) &&
+    (bBounds[bt + 2] as number) >= (aBounds[at] as number) - margin &&
+    (aBounds[at + 3] as number) + margin >= (bBounds[bt + 1] as number) &&
+    (bBounds[bt + 3] as number) >= (aBounds[at + 1] as number) - margin
   );
 }
 

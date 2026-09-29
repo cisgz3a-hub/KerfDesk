@@ -57,7 +57,12 @@ export function* preserveContourTopologySteps(
   const measurements = new ContourMeasurements();
   const relations = new ContourNestingRelations();
   const nestingPairs = new ContourPairCache();
-  const curves = new CurveContactCache();
+  // The curve guard skips rings whose samples the sample test just found
+  // apart, which proves their curves apart too (compact-curve-contacts.ts).
+  const curves = new CurveContactCache({
+    near: (a, b) => contacts.samplesNear(a, b),
+    nearItself: (points) => contacts.samplesNearItself(points),
+  });
   for (;;) {
     const conflicts = yield* intersectingContourLoopsSteps(current, contacts);
     // The fitted curves themselves, which can meet between their samples

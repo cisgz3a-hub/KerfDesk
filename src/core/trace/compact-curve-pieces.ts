@@ -32,6 +32,10 @@ export type RingPieces = ContourBox & {
   readonly straights: ReadonlyArray<number>;
   readonly count: number;
   readonly closed: boolean;
+  /** Whether the ring had too few pieces and they were halved (atLeastPieces):
+   *  a halved line piece is half a sample edge, so ringMeetsNeighbours does
+   *  not apply. */
+  readonly halved: boolean;
   cubicIndex?: ContourBoxIndex<Piece>;
   straightIndex?: ContourBoxIndex<Piece>;
   /** Whether the ring meets itself, once tested. */
@@ -76,7 +80,8 @@ export function* ringPiecesSteps(polyline: Polyline, id: number): TraceSteps<Rin
       cubics.push({ p0, p1, p2, p3, minX, minY, maxX, maxY, index });
     }
   }
-  return { ...bounds, id, cubics, straights, count: raw.length, closed: polyline.closed };
+  const halved = raw !== cut;
+  return { ...bounds, id, cubics, straights, count: raw.length, closed: polyline.closed, halved };
 }
 
 /** Whether the ring's curves cross or touch themselves. */
@@ -92,6 +97,50 @@ export function ringMeetsItself(ring: RingPieces): boolean {
     }
   }
   return false;
+}
+
+/** ringMeetsItself for a ring whose sample edges stay apart except where
+ *  they are neighbours: each cubic piece is tested against itself and the
+ *  pieces one and two places from it along the ring, by the same rules. The
+ *  pieces further apart cannot meet then (compact-curve-contacts.ts). Not for
+ *  a ring whose pieces were halved. */
+export function ringMeetsNeighbours(ring: RingPieces): boolean {
+  const count = ring.count;
+  // With fewer pieces, every two are within two places of each other.
+  if (count < 6) return ringMeetsItself(ring);
+  const slots = pieceSlots(ring);
+  for (const piece of ring.cubics) {
+    if (pieceMeetsItself(piece)) return true;
+    for (const step of NEIGHBOUR_STEPS) {
+      const index = (piece.index + step + count) % count;
+      const slot = slots[index] as number;
+      // Two cubics are tested once, from the lower index, as in
+      // ringMeetsItself; a straight piece is tested from the cubic.
+      if (slot >= 0 && index < piece.index) continue;
+      const other =
+        slot >= 0 ? (ring.cubics[slot] as Piece) : straightPiece(ring.straights, ~slot * STRIDE);
+      const meets =
+        index < piece.index ? sameRingMeet(other, piece, ring) : sameRingMeet(piece, other, ring);
+      if (meets) return true;
+    }
+  }
+  return false;
+}
+
+// The pieces one and two places along the ring, either way.
+const NEIGHBOUR_STEPS = [1, 2, -1, -2];
+
+// Each piece's place by its index along the ring: its position in `cubics`,
+// or the bitwise complement of its position among the straight pieces.
+function pieceSlots(ring: RingPieces): Int32Array {
+  const slots = new Int32Array(ring.count);
+  ring.cubics.forEach((piece, slot) => {
+    slots[piece.index] = slot;
+  });
+  for (let slot = 0; slot * STRIDE < ring.straights.length; slot += 1) {
+    slots[ring.straights[slot * STRIDE + 4] as number] = ~slot;
+  }
+  return slots;
 }
 
 /** Whether a curved piece of either ring meets any piece of the other. */
