@@ -293,13 +293,16 @@ function importedCommonLayerFields(setting: Element): Partial<Layer> {
   const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
   const power = numericField(setting, ['maxpower', 'power']);
   const passes = numericField(setting, ['numpasses', 'passes']);
-  // LightBurn writes a layer's Air Assist as `runBlower`.
+  // LightBurn writes a layer's Air Assist as `runBlower`, and its Output
+  // switch, which keeps the layer out of the job when off, as `doOutput`.
   const airAssist = booleanField(setting, ['runblower']);
+  const output = booleanField(setting, ['dooutput']);
   return {
     ...(speedMmSec === null ? {} : { speed: Math.max(1, speedMmSec * 60) }),
     ...(power === null ? {} : { power: Math.max(0, Math.min(100, power)) }),
     ...(passes === null ? {} : { passes: Math.max(1, Math.round(passes)) }),
     ...(airAssist === null ? {} : { airAssist }),
+    ...(output === null ? {} : { output }),
   };
 }
 
@@ -331,6 +334,7 @@ function unsupportedScanSettingWarnings(
     'mode',
     'priority',
     'runblower',
+    'dooutput',
     'speed',
     'speedmmsec',
     'maxpower',

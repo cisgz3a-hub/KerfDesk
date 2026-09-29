@@ -85,4 +85,19 @@ describe('LightBurn layer modes', () => {
   it('does not report a Scan layer priority, which sets the run order', () => {
     expect(opened(cutSetting('Scan', '<priority Value="3"/>')).report.warnings).toEqual([]);
   });
+
+  it('keeps a layer LightBurn does not output (doOutput 0) out of the job', () => {
+    const output = (type: string, value: string) => {
+      const { project, report } = opened(cutSetting(type, `<doOutput Value="${value}"/>`));
+      expect(report.warnings).toEqual([]);
+      return project.scene.layers.map((layer) => layer.output);
+    };
+    expect(output('Cut', '0')).toEqual([false]);
+    expect(output('Scan', '0')).toEqual([false]);
+    expect(output('Scan+Cut', '0')).toEqual([false, false]);
+    expect(output('Cut', '1')).toEqual([true]);
+    expect(output('Scan', '1')).toEqual([true]);
+    const { project } = opened(cutSetting('Cut', '<doOutput Value="0"/>'));
+    expect(compileJob(project.scene, project.device).groups).toEqual([]);
+  });
 });

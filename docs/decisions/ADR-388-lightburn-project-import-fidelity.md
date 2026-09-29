@@ -70,6 +70,10 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    in projects and in `.clb` libraries alike. It opens as the operation's Air Assist, on both
    operations of a Fill+Line layer, and as a library preset's air assist. The `.clb` names the
    importer read before (`AirAssist`, `AirAssistEnable`) are kept; no LightBurn file shows them.
+9. **Output.** `doOutput` is the layer's Output switch in LightBurn's Cuts / Layers list; `0`
+   keeps the layer out of the job. It opens as the operation's Output, on both operations of a
+   Fill+Line layer, so a layer LightBurn would not run does not run here either. A setting without
+   it keeps the default, on.
 
 ### Limits
 
@@ -94,6 +98,9 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
 - `runBlower` comes from LightBurn 0.9 projects published with third-party tools; the repo's
   `.clb` fixtures leave it out, as current LightBurn leaves out values at their default. A setting
   without it keeps KerfDesk's default, off; LightBurn's own default is not known here.
+- `doOutput` is written as `0` or `1` in the same LightBurn 0.9 projects, and a third-party
+  converter's notes call it LightBurn's output toggle, separate from the layer's `hide`. The
+  corpus leaves it out, at its default.
 - No corpus file has a rounded `Rect`, a `LineClosed` or `LineOpen` list, or a legacy `.lbrn`
   path. Decision 5 follows the audit's repro files and LightBurn files published with
   third-party converters (a LightBurn 1.7 text outline written as `LineClosed`, `Cr` written on
@@ -120,5 +127,5 @@ through every open route); `lbrn-shapes.test.ts` (rounded and over-rounded Rects
 lines); `lbrn-kerf.test.ts` (a Cut layer's kerf grows the plate and shrinks its hole in the
 compiled job; out-of-range, unreadable and Scan kerfs are named); `lbrn-layer-modes.test.ts`
 (each type name, Fill+Line as a fill then a line on the same artwork, an unknown mode named, a
-Scan priority not reported, `runBlower` on every operation); `clb-import.test.ts` (`runBlower`
-in a library).
+Scan priority not reported, `runBlower` on every operation, `doOutput` 0 keeps every operation of
+the layer out of the job); `clb-import.test.ts` (`runBlower` in a library).
