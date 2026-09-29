@@ -161,6 +161,12 @@ jobs:
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        # pnpm installs the dependencies before it runs a script in a checkout
+        # without them, so the readiness report below would install uncached.
+        run: pnpm install --frozen-lockfile
 
       - name: Release verification gate
         id: release_check
