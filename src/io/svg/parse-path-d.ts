@@ -3,10 +3,20 @@
 // support: M/m, L/l, H/h, V/v, C/c, S/s, Q/q, T/t, A/a, Z/z (each in both
 // absolute and relative forms). Curves and arcs are flattened to polylines
 // via De Casteljau subdivision (cubic + quadratic) and W3C arc-to-cubic
-// conversion. Default flatness 0.25 mm — see flatten-curves.ts.
+// conversion. Default flatness 0.25 mm — see flatten-curves.ts. The data is
+// read by path-data-tokens.ts, which stops at the first error (SVG 2).
 
 import type { CurveSubpath, PathSegment, Vec2 } from '../../core/scene';
-import { DEFAULT_FLATNESS_MM, flattenArc, flattenCubic, flattenQuadratic } from './flatten-curves';
+import { DEFAULT_FLATNESS_MM } from './flatten-curves';
+import {
+  coordinateLimitUserUnits,
+  flattenArcWithin,
+  flattenCubicWithin,
+  flattenQuadraticWithin,
+  type FlattenBounds,
+} from './flatten-within-limit';
+import { tokenizePathData, type PathToken } from './path-data-tokens';
+import { closureToleranceUserUnits, endsMeet } from './subpath-closure';
 
 export type SubPath = {
   readonly points: ReadonlyArray<Vec2>;
@@ -36,58 +46,20 @@ type State = {
   // Last quadratic control point (for T/t reflection). Reset when the previous
   // command isn't Q/q or T/t.
   lastQuadraticCtrl: Vec2 | null;
-  flatness: number;
+  bounds: FlattenBounds;
   pointCount: number;
 };
 
-type Token = { readonly cmd: string; readonly args: ReadonlyArray<number> };
-
-const COMMAND_LETTERS = new Set([
-  'M',
-  'm',
-  'L',
-  'l',
-  'H',
-  'h',
-  'V',
-  'v',
-  'C',
-  'c',
-  'S',
-  's',
-  'Q',
-  'q',
-  'T',
-  't',
-  'A',
-  'a',
-  'Z',
-  'z',
-]);
-
-const NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
-
-// A path coordinate must be finite. NUMBER_RE permits an unbounded exponent, so
-// `Number("1e999")` is Infinity; a non-finite coordinate would flow to the
-// G-code emitter as a literal `XInfinity`/`XNaN` word and slip past the
-// out-of-bounds preflight, which cannot parse a non-numeric coordinate (S04-001).
-// Reject at the import boundary, mirroring io/project's `requireCoordinate`
-// finiteness guard on `.lf2` load. This is an INTEGRITY refusal, not a policy
-// cap: it survived ADR-268, which removed the point/polyline/color-group
-// ceilings this parser used to throw on alongside it.
-function finiteNumber(raw: string): number {
-  const value = Number(raw);
-  if (!Number.isFinite(value)) {
-    throw new Error(`SVG path contains a non-finite coordinate: "${raw}"`);
-  }
-  return value;
-}
-
+// `flatness` is in the caller's user units. `scale` is the element's largest
+// user-to-mm stretch, which puts the millimetre closure tolerance (E-2) and
+// the importer's coordinate limit (A-07) into user units. Like the flatness,
+// it defaults to one user unit per millimetre.
 export function parsePathD(
   d: string,
   flatness: number = DEFAULT_FLATNESS_MM,
+  scale = 1,
 ): ReadonlyArray<SubPath> {
-  const tokens = tokenize(d);
+  const tokens = tokenizePathData(d);
   const state: State = {
     subpaths: [],
     cur: null,
@@ -95,74 +67,31 @@ export function parsePathD(
     cursor: { x: 0, y: 0 },
     lastCubicCtrl: null,
     lastQuadraticCtrl: null,
-    flatness,
+    bounds: { flatness, limit: coordinateLimitUserUnits(scale) },
     pointCount: 0,
   };
   for (const tok of tokens) dispatch(state, tok);
-  return state.subpaths.map((sp) => ({
-    points: sp.points,
-    closed: sp.closed,
-    curve: { start: sp.start, segments: sp.segments, closed: sp.closed },
-  }));
+  const closureTolerance = closureToleranceUserUnits(scale);
+  return state.subpaths.map((sp) => {
+    closeIfEndsMeet(sp, closureTolerance);
+    return {
+      points: sp.points,
+      closed: sp.closed,
+      curve: { start: sp.start, segments: sp.segments, closed: sp.closed },
+    };
+  });
 }
 
-function tokenize(d: string): ReadonlyArray<Token> {
-  const out: Token[] = [];
-  let i = 0;
-  while (i < d.length) {
-    const ch = d[i];
-    if (ch === undefined) break;
-    if (COMMAND_LETTERS.has(ch)) {
-      let j = i + 1;
-      while (j < d.length && !COMMAND_LETTERS.has(d[j] ?? '')) j += 1;
-      const slice = d.slice(i + 1, j);
-      // H8: arc args need a grammar-aware scan — the two flag productions are
-      // single digits that may be fused with each other and the next number
-      // (`a4 4 0 011 7` is valid SVG and standard SVGO output). A greedy
-      // number match would read `011` as one number and drop the whole arc.
-      const args =
-        ch === 'A' || ch === 'a'
-          ? parseArcArgs(slice)
-          : (slice.match(NUMBER_RE) ?? []).map(finiteNumber);
-      out.push({ cmd: ch, args });
-      i = j;
-    } else {
-      i += 1;
-    }
-  }
-  return out;
-}
-
-// Scans `rx ry rot flag flag x y` tuples: positions 3 and 4 (mod 7) consume
-// exactly one '0'/'1' character; every other position consumes a full number.
-// Stops at the first malformed token, leaving any complete tuples parsed.
-function parseArcArgs(slice: string): number[] {
-  // Local (not module-level) because sticky regexes carry mutable lastIndex.
-  const numberAt = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/y;
-  const out: number[] = [];
-  let i = 0;
-  for (;;) {
-    while (i < slice.length && isArcSeparator(slice[i] ?? '')) i += 1;
-    if (i >= slice.length) break;
-    const argIndex = out.length % 7;
-    if (argIndex === 3 || argIndex === 4) {
-      const ch = slice[i];
-      if (ch !== '0' && ch !== '1') break;
-      out.push(ch === '1' ? 1 : 0);
-      i += 1;
-      continue;
-    }
-    numberAt.lastIndex = i;
-    const match = numberAt.exec(slice);
-    if (match === null) break;
-    out.push(finiteNumber(match[0]));
-    i = numberAt.lastIndex;
-  }
-  return out;
-}
-
-function isArcSeparator(ch: string): boolean {
-  return ch === ' ' || ch === ',' || ch === '\t' || ch === '\n' || ch === '\r' || ch === '\f';
+// A subpath that returns to its start without Z (ended by M or the end of the
+// data) is stored exactly as Z would have closed it (E-2): its end lands on
+// the start, with no duplicate closing point, and both channels are closed.
+// The last point is always the last segment's end, so the two move together.
+function closeIfEndsMeet(sub: MutableSubPath, tolerance: number): void {
+  if (sub.closed || !endsMeet(sub.points, tolerance)) return;
+  sub.points[sub.points.length - 1] = sub.start;
+  const last = sub.segments.at(-1);
+  if (last !== undefined) sub.segments[sub.segments.length - 1] = { ...last, to: sub.start };
+  sub.closed = true;
 }
 
 type Handler = (state: State, args: ReadonlyArray<number>, cmd: string) => void;
@@ -192,7 +121,7 @@ const HANDLERS: Readonly<Record<string, Handler>> = {
   z: (s) => handleClose(s),
 };
 
-function dispatch(state: State, tok: Token): void {
+function dispatch(state: State, tok: PathToken): void {
   HANDLERS[tok.cmd]?.(state, tok.args, tok.cmd);
   state.sawCommand = true;
 }
@@ -222,9 +151,11 @@ function appendPoint(state: State, sub: MutableSubPath, point: Vec2): void {
   sub.segments.push({ kind: 'line', to: point });
 }
 
+// A loop, not a spread push: a spread passes every point as an argument and
+// overflows the call stack on a very long flattening (A-07).
 function appendPoints(state: State, sub: MutableSubPath, points: ReadonlyArray<Vec2>): void {
   reservePathPoints(state, points.length);
-  sub.points.push(...points);
+  for (const point of points) sub.points.push(point);
 }
 
 // The point ceiling was a policy cap and no longer refuses (rule 7 / ADR-268);
@@ -256,30 +187,37 @@ function handleMove(state: State, args: ReadonlyArray<number>, rel: boolean): vo
   resetSmoothControls(state);
 }
 
+// Each line handler opens its subpath BEFORE moving the cursor: after Z the new
+// subpath starts at the closed subpath's start (SVG 2 closepath rule), so a
+// line drawn straight after Z runs from there instead of collapsing onto its
+// own end point.
 function handleLine(state: State, args: ReadonlyArray<number>, rel: boolean): void {
   for (let k = 0; k + 1 < args.length; k += 2) {
+    const sub = ensureSub(state);
     const x = (args[k] ?? 0) + (rel ? state.cursor.x : 0);
     const y = (args[k + 1] ?? 0) + (rel ? state.cursor.y : 0);
     state.cursor = { x, y };
-    appendPoint(state, ensureSub(state), state.cursor);
+    appendPoint(state, sub, state.cursor);
   }
   resetSmoothControls(state);
 }
 
 function handleHorizontal(state: State, args: ReadonlyArray<number>, rel: boolean): void {
   for (const arg of args) {
+    const sub = ensureSub(state);
     const x = arg + (rel ? state.cursor.x : 0);
     state.cursor = { x, y: state.cursor.y };
-    appendPoint(state, ensureSub(state), state.cursor);
+    appendPoint(state, sub, state.cursor);
   }
   resetSmoothControls(state);
 }
 
 function handleVertical(state: State, args: ReadonlyArray<number>, rel: boolean): void {
   for (const arg of args) {
+    const sub = ensureSub(state);
     const y = arg + (rel ? state.cursor.y : 0);
     state.cursor = { x: state.cursor.x, y };
-    appendPoint(state, ensureSub(state), state.cursor);
+    appendPoint(state, sub, state.cursor);
   }
   resetSmoothControls(state);
 }
@@ -294,7 +232,7 @@ function handleCubic(state: State, args: ReadonlyArray<number>, rel: boolean): v
     const c2 = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const end = offset(args[k + 4] ?? 0, args[k + 5] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
-    flattenCubic(state.cursor, c1, c2, end, state.flatness, out);
+    flattenCubicWithin(state.cursor, c1, c2, end, state.bounds, out);
     const sub = ensureSub(state);
     appendPoints(state, sub, out);
     sub.segments.push({ kind: 'cubic', control1: c1, control2: c2, to: end });
@@ -311,7 +249,7 @@ function handleSmoothCubic(state: State, args: ReadonlyArray<number>, rel: boole
     const c2 = offset(args[k] ?? 0, args[k + 1] ?? 0, rel, state.cursor);
     const end = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
-    flattenCubic(state.cursor, c1, c2, end, state.flatness, out);
+    flattenCubicWithin(state.cursor, c1, c2, end, state.bounds, out);
     const sub = ensureSub(state);
     appendPoints(state, sub, out);
     sub.segments.push({ kind: 'cubic', control1: c1, control2: c2, to: end });
@@ -326,7 +264,7 @@ function handleQuadratic(state: State, args: ReadonlyArray<number>, rel: boolean
     const c1 = offset(args[k] ?? 0, args[k + 1] ?? 0, rel, state.cursor);
     const end = offset(args[k + 2] ?? 0, args[k + 3] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
-    flattenQuadratic(state.cursor, c1, end, state.flatness, out);
+    flattenQuadraticWithin(state.cursor, c1, end, state.bounds, out);
     const sub = ensureSub(state);
     appendPoints(state, sub, out);
     sub.segments.push(quadraticAsCubic(state.cursor, c1, end));
@@ -344,7 +282,7 @@ function handleSmoothQuadratic(state: State, args: ReadonlyArray<number>, rel: b
         : reflect(state.cursor, state.lastQuadraticCtrl);
     const end = offset(args[k] ?? 0, args[k + 1] ?? 0, rel, state.cursor);
     const out: Vec2[] = [];
-    flattenQuadratic(state.cursor, c1, end, state.flatness, out);
+    flattenQuadraticWithin(state.cursor, c1, end, state.bounds, out);
     const sub = ensureSub(state);
     appendPoints(state, sub, out);
     sub.segments.push(quadraticAsCubic(state.cursor, c1, end));
@@ -374,11 +312,11 @@ function handleArc(state: State, args: ReadonlyArray<number>, rel: boolean): voi
     // of the curve channel (it previously survived only by NaN accident).
     if (isSamePoint(end, state.cursor)) continue;
     const out: Vec2[] = [];
-    flattenArc(
+    flattenArcWithin(
       state.cursor,
       end,
       { rx, ry, xAxisRotationDeg, largeArc, sweep },
-      state.flatness,
+      state.bounds,
       out,
     );
     const sub = ensureSub(state);
