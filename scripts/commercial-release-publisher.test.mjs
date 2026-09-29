@@ -5,6 +5,7 @@ import {
   commercialReleaseFiles,
 } from './commercial-release-publisher.mjs';
 import {
+  COMMERCIAL_BETA_CATALOG_KEY,
   COMMERCIAL_CATALOG_KEY,
   readCommercialCatalog,
   catalogBytes,
@@ -32,12 +33,14 @@ test('publishes complete immutable assets and verified update manifest before th
   assert.deepEqual(verified, ['local', 'remote']);
   assert.equal(f.writes[0].key, 'desktop/commercial/releases/1.2.3/publication-reservation.json');
   assert.equal(f.writes.at(-2).key, 'desktop/commercial/releases/1.2.3/update-manifest.json');
-  assert.equal(f.writes.at(-1).key, COMMERCIAL_CATALOG_KEY);
+  assert.equal(f.writes.at(-1).key, COMMERCIAL_BETA_CATALOG_KEY);
   assert.equal(f.writes.at(-1).metadata.cacheControl, 'no-store');
+  // Customers on the stable ring see it only once it is promoted.
+  assert.equal(f.objects.has(COMMERCIAL_CATALOG_KEY), false);
   assert.ok(f.writes.every((write) => write.key.startsWith('desktop/commercial/')));
   assert.equal(f.objects.get('desktop/latest.yml').toString(), 'legacy');
   assert.equal(f.objects.get('desktop/previews/latest.json').toString(), 'preview');
-  const entry = readCommercialCatalog(f.objects.get(COMMERCIAL_CATALOG_KEY), keySet)[0];
+  const entry = readCommercialCatalog(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY), keySet)[0];
   assert.equal(entry.payload.publishedAt, '2026-01-01T00:00:00.000Z');
   assert.equal(entry.payload.artifacts.length, 3);
 });
@@ -46,7 +49,7 @@ test('keeps every older eligible release and refuses rollback or immutable confl
   await publish(fixture('1.0.0'), f.store);
   await publish(fixture(), f.store);
   assert.deepEqual(
-    readCommercialCatalog(f.objects.get(COMMERCIAL_CATALOG_KEY), keySet).map(
+    readCommercialCatalog(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY), keySet).map(
       (item) => item.payload.version,
     ),
     ['1.2.3', '1.0.0'],
@@ -79,7 +82,7 @@ test('interrupted publication resumes matching reserved bytes without promoting 
     await put(key, bytes, metadata);
   };
   await assert.rejects(publish(fixture(), f.store), /interrupted/u);
-  assert.equal(f.objects.has(COMMERCIAL_CATALOG_KEY), false);
+  assert.equal(f.objects.has(COMMERCIAL_BETA_CATALOG_KEY), false);
   assert.equal(f.objects.has('desktop/commercial/releases/1.2.3/update-manifest.json'), false);
   const reserved = f.objects.get('desktop/commercial/releases/1.2.3/publication-reservation.json');
   fail = false;
@@ -94,10 +97,12 @@ test('all immutable conflicts, invalid catalogs and signature failures fail clos
   f.objects.set('desktop/commercial/releases/1.2.3/latest.yml', Buffer.from('conflict'));
   await assert.rejects(publish(fixture(), f.store), /conflict/u);
   assert.equal(f.writes.length, 0);
-  f.objects.clear();
-  f.objects.set(COMMERCIAL_CATALOG_KEY, Buffer.from('{}'));
-  await assert.rejects(publish(fixture(), f.store));
-  assert.equal(f.writes.length, 0);
+  for (const key of [COMMERCIAL_BETA_CATALOG_KEY, COMMERCIAL_CATALOG_KEY]) {
+    f.objects.clear();
+    f.objects.set(key, Buffer.from('{}'));
+    await assert.rejects(publish(fixture(), f.store));
+    assert.equal(f.writes.length, 0);
+  }
   f.objects.clear();
   await assert.rejects(
     publish(fixture(), f.store, async () => {
@@ -120,7 +125,7 @@ test('remote corruption, remote signer rejection and moving catalog never promot
       if (key.endsWith('-setup.exe') && mode === 'corrupt')
         f.objects.set(key, Buffer.from('wrong'));
       if (key.endsWith('.blockmap') && mode === 'race')
-        f.objects.set(COMMERCIAL_CATALOG_KEY, Buffer.from('changed'));
+        f.objects.set(COMMERCIAL_BETA_CATALOG_KEY, Buffer.from('changed'));
     };
     await assert.rejects(
       publish(fixture(), f.store, async (_bytes, source) => {
@@ -128,7 +133,7 @@ test('remote corruption, remote signer rejection and moving catalog never promot
       }),
     );
     assert.equal(
-      f.writes.some((item) => item.key === COMMERCIAL_CATALOG_KEY),
+      f.writes.some((item) => item.key.endsWith('catalog.json')),
       false,
     );
   }
@@ -139,7 +144,7 @@ test('catalogue promotion is not reported successful without exact readback', as
   const put = f.store.put;
   f.store.put = async (key, bytes, metadata) => {
     await put(key, bytes, metadata);
-    if (key === COMMERCIAL_CATALOG_KEY) f.objects.set(key, Buffer.from('truncated'));
+    if (key === COMMERCIAL_BETA_CATALOG_KEY) f.objects.set(key, Buffer.from('truncated'));
   };
   await assert.rejects(publish(fixture(), f.store), /catalogue readback/u);
   assert.ok(f.objects.has('desktop/commercial/releases/1.2.3/update-manifest.json'));
@@ -171,5 +176,57 @@ test('signed identity cannot be replaced or backdated and malformed artifacts ne
   const traversal = fixture('1.2.4');
   traversal.files[0].name = '../evil.exe';
   await assert.rejects(publish(traversal, f.store), /artifact/u);
+  assert.equal(f.writes.length, 0);
+});
+
+// Releases published before the rings existed were written straight to stable.
+async function legacyStable(...versions) {
+  const f = memoryStore();
+  for (const version of versions) await publish(fixture(version), f.store);
+  f.objects.set(COMMERCIAL_CATALOG_KEY, f.objects.get(COMMERCIAL_BETA_CATALOG_KEY));
+  f.objects.delete(COMMERCIAL_BETA_CATALOG_KEY);
+  f.writes.length = 0;
+  return f;
+}
+const versions = (bytes) =>
+  readCommercialCatalog(bytes, keySet).map((item) => item.payload.version);
+
+test('a new release reaches only the beta ring, which also lists every stable release', async () => {
+  const f = await legacyStable('1.0.0');
+  const stable = f.objects.get(COMMERCIAL_CATALOG_KEY);
+  const train = fixture('2026.6.0', {
+    sourceRef: 'refs/heads/main',
+    publishedAt: '2026-02-03T07:17:00.000Z',
+  });
+  assert.equal((await publish(train, f.store)).status, 'published');
+  assert.deepEqual(versions(f.objects.get(COMMERCIAL_BETA_CATALOG_KEY)), ['2026.6.0', '1.0.0']);
+  assert.deepEqual(f.objects.get(COMMERCIAL_CATALOG_KEY), stable);
+  assert.equal(
+    f.writes.some((write) => write.key === COMMERCIAL_CATALOG_KEY),
+    false,
+  );
+});
+
+test('the stable ring bounds a new release too: no rollback, no second meaning of a version', async () => {
+  const f = await legacyStable('1.2.3');
+  await assert.rejects(publish(fixture('1.1.0'), f.store), /rollback/u);
+  const rebuilt = fixture();
+  rebuilt.files[1].bytes = Buffer.from('changed blockmap');
+  await assert.rejects(publish(rebuilt, f.store), /conflicts/u);
+  assert.equal(f.writes.length, 0);
+  // Retrying the exact stable release heals a missing beta ring without re-signing.
+  assert.equal((await publish(fixture(), f.store)).status, 'already-published');
+  assert.deepEqual(
+    f.objects.get(COMMERCIAL_BETA_CATALOG_KEY),
+    f.objects.get(COMMERCIAL_CATALOG_KEY),
+  );
+});
+
+test('rings that disagree about one version stop every publication', async () => {
+  const f = await legacyStable('1.0.0');
+  const other = memoryStore();
+  await publish(fixture('1.0.0', { publishedAt: '2026-01-02T00:00:00.000Z' }), other.store);
+  f.objects.set(COMMERCIAL_BETA_CATALOG_KEY, other.objects.get(COMMERCIAL_BETA_CATALOG_KEY));
+  await assert.rejects(publish(fixture('1.2.3'), f.store), /disagree about 1\.0\.0/u);
   assert.equal(f.writes.length, 0);
 });

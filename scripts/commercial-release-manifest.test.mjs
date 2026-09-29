@@ -98,7 +98,10 @@ test('signed malformed/traversing/duplicate assets, dates and versions are rejec
       value.version = '01.2.3';
     },
     (value) => {
-      value.sourceRef = 'refs/heads/main';
+      value.sourceRef = 'refs/heads/feature';
+    },
+    (value) => {
+      value.sourceRef = 'refs/tags/v1.2.4';
     },
     (value) => {
       value.channel = 'preview';
@@ -109,6 +112,16 @@ test('signed malformed/traversing/duplicate assets, dates and versions are rejec
     mutate(value);
     assert.throws(() => verifyCommercialEnvelope(signed(value), keySet));
   }
+});
+
+test('the release train names main as its source, since it never tags (ADR-541)', () => {
+  const value = { ...manifest(), sourceRef: 'refs/heads/main' };
+  assert.deepEqual(verifyCommercialEnvelope(signed(value), keySet), value);
+  const train = fixture('2026.40.0', { sourceRef: 'refs/heads/main' });
+  assert.equal(
+    verifyCommercialEnvelope(train.identity, keySet, 'release-identity').sourceRef,
+    'refs/heads/main',
+  );
 });
 
 test('signature tampering, wrong-purpose keys, unknown keys and noncanonical base64 fail before storage', async () => {

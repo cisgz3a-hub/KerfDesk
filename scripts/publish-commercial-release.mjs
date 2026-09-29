@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { stableArtifactNames } from './stable-release-artifacts.mjs';
 import { createStableReleaseStore } from './stable-release-store.mjs';
-import { verifyCommercialEnvelope } from './commercial-release-manifest.mjs';
+import { commercialSourceRef, verifyCommercialEnvelope } from './commercial-release-manifest.mjs';
 import {
   readCommercialPackage,
   createCommercialInstallerVerifier,
@@ -26,7 +26,8 @@ export function requireCommercialPublishContext(env, identity, platform = proces
     );
   if (!/^[a-f0-9]{32}$/u.test(env.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID))
     throw new Error('Invalid commercial R2 account ID.');
-  if (platform !== 'win32' || identity.sourceRef !== `refs/tags/v${identity.version}`)
+  // A maintainer's release names its vX.Y.Z tag; the release train names main.
+  if (platform !== 'win32' || !commercialSourceRef(identity.version, identity.sourceRef))
     throw new Error(
       'Commercial publication requires Windows and a versioned signed source identity.',
     );
@@ -102,7 +103,7 @@ async function main() {
     keyId: process.env.DESKTOP_STABLE_MANIFEST_KEY_ID,
     verifyInstaller,
   });
-  console.log(`Commercial release ${result.version}: ${result.status}.`);
+  console.log(`Commercial release ${result.version}: ${result.status} to the beta ring.`);
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
   main().catch(() => {
