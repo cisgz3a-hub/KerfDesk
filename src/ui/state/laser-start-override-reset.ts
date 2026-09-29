@@ -117,6 +117,30 @@ export function laserStartOverrideResetPrefix(
     : '';
 }
 
+/** Low-power Fire lights the beam with one `M3 S<n>` capped at an absolute
+ * share of full power, but the controller scales S by its power (spindle)
+ * override (GRBL
+ * https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/spindle_control.c#L195;
+ * grblHAL
+ * https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/spindle_control.c#L867-L868),
+ * so a 200% left over from a job doubled the 5% ceiling (controller audit
+ * P-2, ADR-375). Start's rule applies to that one override: unknown or not
+ * 100% is reset first. Fire does not move, so feed and rapid do not matter.
+ * Returns the realtime byte to write ahead of Fire-on, or ''. */
+export function firePowerOverrideReset(
+  controllerHasOverrides: boolean,
+  overrides: OverrideValues | null,
+): string {
+  if (!controllerHasOverrides) return '';
+  return overrides?.spindle === BASELINE_PERCENT ? '' : RT_SPINDLE_OV_RESET;
+}
+
+export function firePowerOverrideResetLogLine(before: OverrideValues | null): string {
+  return before === null
+    ? '[lf2] Reset the power override to 100% before Fire.'
+    : `[lf2] Reset the power override to 100% before Fire (was ${before.spindle}%).`;
+}
+
 export function laserStartOverrideResetLogLine(before: OverrideValues | null): string {
   return before === null
     ? '[lf2] Reset feed, rapid and power overrides to 100% as the job started.'
