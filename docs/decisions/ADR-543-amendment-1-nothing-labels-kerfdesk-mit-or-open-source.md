@@ -24,9 +24,11 @@ already explains what happens to earlier versions.
 
 ### Decision
 
-1. The MIT text moves unchanged from `LICENSE-MIT` to `docs/legal/mit-final-terms.txt`. Outside
-   the root, and with no "license" in its name, GitHub no longer reports it as a repository
-   licence. `LICENSE` points to the new path and still says versions up to `mit-final` stay MIT.
+1. The MIT text moves unchanged from `LICENSE-MIT` to `docs/licensing/mit-final-terms.txt`.
+   Outside the root, and with no "license" in its name, GitHub no longer reports it as a
+   repository licence. It also stays out of `docs/legal/`, which holds the customer documents the
+   website's policy pages are built from. `LICENSE` points to the new path and still says versions
+   up to `mit-final` stay MIT.
 2. KerfDesk's own design-library artwork no longer carries MIT. Its entries show "License: Free to
    use in your designs" (id `LicenseRef-KerfDesk-Designs`, which the label doesn't repeat), credit
    "KerfDesk", and carry the grant as their notice: "Made for KerfDesk. You may use it in your own

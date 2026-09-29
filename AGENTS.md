@@ -47,7 +47,7 @@ Keep this file small. It defines durable repository rules; task-specific details
 
 ## Licence
 
-- KerfDesk is proprietary, all rights reserved (`LICENSE`, ADR-543). Only versions up to the `mit-final` tag stay MIT (`docs/legal/mit-final-terms.txt`). Never describe KerfDesk as open source or MIT-licensed, and change `LICENSE`, `docs/legal/mit-final-terms.txt` or `public/eula.txt` only when the user asks. Keep MIT text out of the repository root: GitHub labels the repository with every licence file it finds there.
+- KerfDesk is proprietary, all rights reserved (`LICENSE`, ADR-543). Only versions up to the `mit-final` tag stay MIT (`docs/licensing/mit-final-terms.txt`). Never describe KerfDesk as open source or MIT-licensed, and change `LICENSE`, `docs/licensing/mit-final-terms.txt` or `public/eula.txt` only when the user asks. Keep MIT text out of the repository root: GitHub labels the repository with every licence file it finds there.
 - Before pushing a branch, check that `LICENSE` says "All rights reserved". If it still holds the MIT License, merge `origin/main` and check again; do not push until it passes. While the repository is public, a push under the MIT `LICENSE` releases that work under MIT for good.
 - Add outside code, fonts or assets only under a licence that allows a paid, closed-source app, and list them in `THIRD_PARTY_NOTICES.md`. New dependencies must pass `pnpm license-check`, which rejects GPL-family licences.
 
