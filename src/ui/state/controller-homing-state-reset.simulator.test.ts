@@ -56,6 +56,14 @@ function outcomeOf(pending: Promise<unknown>): { value: string } {
   return outcome;
 }
 
+/** The last KerfDesk note in the log, skipping the controller's own lines. */
+function lastLogLine(): string | undefined {
+  return useLaserStore
+    .getState()
+    .log.filter((line) => line.startsWith('[lf2]'))
+    .at(-1);
+}
+
 function writesAfter(sim: GrblSimulator, count: number): string[] {
   return sim
     .outbound()
@@ -93,6 +101,10 @@ describe('stock GRBL left in its homing state by a refused single-axis Home', ()
     expect(sim.state().machine).toBe('Alarm');
     expect(useLaserStore.getState()).toMatchObject({ resetRequired: false, alarmCode: 6 });
     expect(useLaserStore.getState().statusReport?.state).toBe('Alarm');
+    // Home with this profile would send `$HX` again, so the log says Unlock.
+    expect(lastLogLine()).toBe(
+      '[lf2] Controller reset out of its homing state and came back locked in Alarm (ALARM:6). Unlock it: Home with this device profile sends $HX, which leaves stock GRBL built without single-axis homing stuck again.',
+    );
 
     const unlock = outcomeOf(useLaserStore.getState().unlockAlarm());
     await vi.advanceTimersByTimeAsync(2_000);
@@ -109,6 +121,15 @@ describe('stock GRBL left in its homing state by a refused single-axis Home', ()
     expect(sim.state().homingStuck).toBe(true);
     expect(useLaserStore.getState().statusReport?.state).toBe('Home');
     expect(useLaserStore.getState().resetRequired).toBe('homing-state');
+
+    // This profile's Home sends a plain `$H`, which stock GRBL takes.
+    const reset = outcomeOf(useLaserStore.getState().wakeController());
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(reset.value).toBe('resolved');
+    expect(useLaserStore.getState().alarmCode).toBe(6);
+    expect(lastLogLine()).toBe(
+      '[lf2] Controller reset out of its homing state and came back locked in Alarm (ALARM:6). Unlock or Home it.',
+    );
   });
 
   it.each([
