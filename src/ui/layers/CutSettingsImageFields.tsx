@@ -4,8 +4,6 @@ import {
   lineIntervalMmToLinesPerMm,
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
-  MAX_RASTER_LINES_PER_MM,
-  MIN_RASTER_LINES_PER_MM,
 } from '../../core/raster';
 import {
   accelerationDistanceMm,
@@ -14,6 +12,7 @@ import {
 } from '../../core/job/operation-cut-extras';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { imageDensityBounds } from '../raster/image-density-bounds';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
 import { AutoOverscanSwitch, automaticOverscanNote } from './CutSettingsAutoOverscan';
@@ -63,6 +62,7 @@ export function CutSettingsImageFields(props: {
       ) : null}
       <ImageDensityFields
         linesPerMm={props.imageLinesPerMm}
+        storedLinesPerMm={props.layer.linesPerMm}
         onChange={props.onImageLinesPerMmChange}
       />
       <p className="lf-laser-help">
@@ -220,8 +220,10 @@ function MinPowerInput(props: {
 
 function ImageDensityFields(props: {
   readonly linesPerMm: number;
+  readonly storedLinesPerMm: number;
   readonly onChange: (linesPerMm: number) => void;
 }): JSX.Element {
+  const bounds = imageDensityBounds(props.storedLinesPerMm);
   return (
     <>
       <input
@@ -235,8 +237,8 @@ function ImageDensityFields(props: {
         <input
           name="lineIntervalMm"
           type="number"
-          min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
-          max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
+          min={bounds.intervalMm.min}
+          max={bounds.intervalMm.max}
           step="any"
           className="lf-input"
           value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
@@ -257,8 +259,8 @@ function ImageDensityFields(props: {
         <input
           name="imageDpi"
           type="number"
-          min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
-          max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
+          min={bounds.dpi.min}
+          max={bounds.dpi.max}
           step="any"
           className="lf-input"
           value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}

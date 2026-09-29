@@ -13,7 +13,8 @@ export function RasterPreviewDisplayBanner(props: {
       emitted sampling grid: {advisory.largestSourceWidth.toLocaleString()} ×{' '}
       {advisory.largestSourceHeight.toLocaleString()}; displayed at{' '}
       {advisory.largestDisplayWidth.toLocaleString()} ×{' '}
-      {advisory.largestDisplayHeight.toLocaleString()}. Emitted S-values and G-code are unchanged.
+      {advisory.largestDisplayHeight.toLocaleString()}. Each displayed pixel shows the average power
+      of the emitted pixels it covers. Emitted S-values and G-code are unchanged.
     </div>
   );
 }

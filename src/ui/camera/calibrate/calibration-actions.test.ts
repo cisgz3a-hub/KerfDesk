@@ -24,6 +24,7 @@ import {
   targetAreaForBed,
 } from './calibration-actions';
 import { DEFAULT_CALIBRATION_SETTINGS } from './camera-calibration-store';
+import { rememberedEngravedTarget } from './engraved-target-memory';
 
 vi.mock('../frame-source', async (original) => ({
   ...(await original<typeof FrameSource>()),
@@ -166,6 +167,22 @@ describe('engraveCalibrationTarget', () => {
       expect.objectContaining({ id: 'camera-bed-target', power: 35, speed: 3000 }),
     ]);
     expect(scene?.objects.length).toBeGreaterThan(0);
+  });
+
+  it('remembers where the target went once its job starts, and not before', async () => {
+    localStorage.clear();
+    const { device } = useStore.getState().project;
+    const settings = { ...SETTINGS, marginMm: 20 };
+    await engraveCalibrationTarget(settings, async () => false);
+    expect(rememberedEngravedTarget(device, false)).toBeNull();
+    await engraveCalibrationTarget(settings, async () => true);
+    expect(rememberedEngravedTarget(device, false)).toMatchObject({
+      area: targetAreaForBed(device.bedWidth, device.bedHeight, 20),
+      bedWidthMm: device.bedWidth,
+      bedHeightMm: device.bedHeight,
+      layoutMm: 20,
+    });
+    expect(rememberedEngravedTarget(device, true)).toBeNull();
   });
 
   it('engraves the target with the laser while the canvas is in CNC mode', async () => {

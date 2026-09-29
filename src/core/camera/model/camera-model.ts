@@ -10,7 +10,12 @@
 // is no separate "rectified basis", homography, or height fudge to keep in
 // step, which is where the old camera stack kept going wrong.
 
-import { distortFisheye, undistortPixel, type CameraIntrinsics } from '../fisheye';
+import {
+  distortFisheye,
+  fisheyeAngleLimit,
+  undistortPixel,
+  type CameraIntrinsics,
+} from '../fisheye';
 import type { FisheyeDistortion } from '../fisheye';
 import type { Mat3 } from '../homography';
 import { rodriguesToMatrix, type Rvec } from '../rodrigues';
@@ -81,7 +86,8 @@ export function cameraCentre(pose: CameraPose): Vec3 {
 /**
  * The bed (x, y) the camera sees at `pixel` on the surface `heightMm` above the
  * bed: back-project the pixel to a ray and intersect it with that plane. Null
- * when the ray runs parallel to or away from the plane.
+ * when the lens gives the pixel no ray (see undistortPixel) or the ray runs
+ * parallel to or away from the plane.
  */
 export function pixelToBed(
   lens: LensModel,
@@ -99,8 +105,10 @@ export function bedMapper(
 ): (pixel: Vec2, heightMm?: number) => Vec2 | null {
   const r = rodriguesToMatrix(pose.rvec);
   const centre = cameraCentre(pose);
+  const angleLimit = fisheyeAngleLimit(lens.distortion);
   return (pixel, heightMm = 0) => {
-    const ray = undistortPixel(pixel.x, pixel.y, lens.intrinsics, lens.distortion);
+    const ray = undistortPixel(pixel.x, pixel.y, lens.intrinsics, lens.distortion, angleLimit);
+    if (ray === null) return null;
     // Ray direction in world = Rᵀ·(a, b, 1); origin = camera centre.
     const dx = r[0] * ray.x + r[3] * ray.y + r[6];
     const dy = r[1] * ray.x + r[4] * ray.y + r[7];

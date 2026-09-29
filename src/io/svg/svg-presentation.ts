@@ -2,7 +2,16 @@ import type { ColoredPath } from '../../core/scene';
 import type { SvgMatrix } from './svg-curve-transform';
 import { multiplySvgMatrix, parseSvgTransform } from './svg-transform-attribute';
 import { inheritedSvgFillRule } from './svg-fill-rule';
+import {
+  BLACK_PAINT,
+  parseSvgPaint,
+  resolveSvgColorProperty,
+  type SvgColorValue,
+  type SvgPaint,
+} from './svg-paint';
+import { NO_MARKERS, svgMarkerReferences, type SvgMarkerReferences } from './svg-markers';
 import type { SvgStyleCascade } from './svg-stylesheet';
+import type { SvgViewportSize } from './svg-viewport';
 
 // `element` carries the clip-path property; objectBoundingBox clips measure it.
 export type SvgClipReference = {
@@ -11,80 +20,31 @@ export type SvgClipReference = {
   readonly element: Element;
 };
 
-const COLOR_FALLBACK = '#000000';
-
-// CSS named colors. Phase A covers the 16 HTML basic colors plus a handful of
-// common extended names. Anything else falls back to black.
-const NAMED_COLORS: Readonly<Record<string, string>> = {
-  black: '#000000',
-  silver: '#c0c0c0',
-  gray: '#808080',
-  grey: '#808080',
-  white: '#ffffff',
-  maroon: '#800000',
-  red: '#ff0000',
-  purple: '#800080',
-  fuchsia: '#ff00ff',
-  magenta: '#ff00ff',
-  green: '#008000',
-  lime: '#00ff00',
-  olive: '#808000',
-  yellow: '#ffff00',
-  navy: '#000080',
-  blue: '#0000ff',
-  teal: '#008080',
-  aqua: '#00ffff',
-  cyan: '#00ffff',
-  orange: '#ffa500',
-};
-
-function clampByte(n: number): number {
-  return Math.min(255, Math.max(0, n));
-}
-
-function byteToHex(n: number): string {
-  return clampByte(n).toString(16).padStart(2, '0');
-}
-
-function expandShortHex(s: string): string {
-  const r = s[1] ?? '0';
-  const g = s[2] ?? '0';
-  const b = s[3] ?? '0';
-  return `#${r}${r}${g}${g}${b}${b}`;
-}
-
-function tryParseRgb(s: string): string | null {
-  const m = /^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(s);
-  if (m === null) return null;
-  const r = byteToHex(Number.parseInt(m[1] ?? '0', 10));
-  const g = byteToHex(Number.parseInt(m[2] ?? '0', 10));
-  const b = byteToHex(Number.parseInt(m[3] ?? '0', 10));
-  return `#${r}${g}${b}`;
-}
-
-// Returns '' for "no stroke" (none / absent without default) — caller skips.
-export function normalizeColor(input: string | null): string {
-  if (input === null) return '';
-  const s = input.trim().toLowerCase();
-  if (s === 'none' || s === '') return '';
-  if (s in NAMED_COLORS) return NAMED_COLORS[s] ?? COLOR_FALLBACK;
-  if (/^#[0-9a-f]{6}$/.test(s)) return s;
-  if (/^#[0-9a-f]{3}$/.test(s)) return expandShortHex(s);
-  return tryParseRgb(s) ?? COLOR_FALLBACK;
-}
-
 export type PresentationState = {
-  readonly stroke: string | null;
-  readonly fill: string | null;
+  /** null while unset: SVG's initial stroke is none. */
+  readonly stroke: SvgPaint | null;
+  /** null while unset: SVG's initial fill is black, and a line has no interior. */
+  readonly fill: SvgPaint | null;
+  /** The computed `color` property, which currentColor paints with. */
+  readonly color: SvgColorValue;
   readonly fillRule: ColoredPath['fillRule'];
   readonly transform: SvgMatrix;
   readonly unsupportedEffects: readonly string[];
   readonly clips: readonly SvgClipReference[];
+  /** display:none or zero opacity: nothing inside renders, whatever it says. */
+  readonly hiddenSubtree: boolean;
+  /** This element paints nothing: its subtree is hidden, or its visibility is. */
   readonly hidden: boolean;
   readonly opacity: number;
   readonly strokeOpacity: number;
   readonly fillOpacity: number;
+  /** The computed visibility keyword; null until something sets it (visible). */
   readonly visibility: string | null;
+  /** A zero stroke-width paints no stroke (SVG 2 painting.html#StrokeWidth). */
+  readonly strokeWidthZero: boolean;
+  readonly markers: SvgMarkerReferences;
+  /** The viewport that percentage lengths resolve against. */
+  readonly viewport: SvgViewportSize;
 };
 
 const IDENTITY_MATRIX: SvgMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -92,15 +52,20 @@ const IDENTITY_MATRIX: SvgMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 export const INITIAL_PRESENTATION_STATE: PresentationState = {
   stroke: null,
   fill: null,
+  color: BLACK_PAINT,
   fillRule: undefined,
   transform: IDENTITY_MATRIX,
   clips: [],
   unsupportedEffects: [],
+  hiddenSubtree: false,
   hidden: false,
   opacity: 1,
   strokeOpacity: 1,
   fillOpacity: 1,
   visibility: null,
+  strokeWidthZero: false,
+  markers: NO_MARKERS,
+  viewport: { width: 100, height: 100 },
 };
 
 export function presentationStateFor(
@@ -113,10 +78,9 @@ export function presentationStateFor(
   // <style> rules merge in here, so paint, opacity, clips and effects all see
   // the winning declaration while retaining the fragment's ownership state.
   const styles = svgPresentationStyles(el, cascadeStyles);
-  const stroke = presentationValue(el, styles, 'stroke') ?? parent.stroke;
-  const fill = presentationValue(el, styles, 'fill') ?? parent.fill;
-  const visibility = presentationValue(el, styles, 'visibility') ?? parent.visibility;
-  const display = presentationValue(el, styles, 'display');
+  const color = resolveSvgColorProperty(specifiedValues(el, styles, 'color'), parent.color);
+  const stroke = specifiedPaint(specifiedValues(el, styles, 'stroke'), parent.stroke);
+  const fill = specifiedPaint(specifiedValues(el, styles, 'fill'), parent.fill);
   const opacity = parent.opacity * parseOpacity(presentationValue(el, styles, 'opacity'));
   const strokeOpacity =
     parent.strokeOpacity * parseOpacity(presentationValue(el, styles, 'stroke-opacity'));
@@ -126,17 +90,12 @@ export function presentationStateFor(
     parent.transform,
     parseSvgTransform(presentationValue(el, styles, 'transform')),
   );
-  const normalizedVisibility = visibility?.trim().toLowerCase();
-  const hidden =
-    parent.hidden ||
-    display?.trim().toLowerCase() === 'none' ||
-    normalizedVisibility === 'hidden' ||
-    normalizedVisibility === 'collapse' ||
-    opacity <= 0;
+  const property = (name: string) => presentationValue(el, styles, name);
 
   return {
     stroke,
     fill,
+    color,
     fillRule: inheritedSvgFillRule(presentationValue(el, styles, 'fill-rule'), parent.fillRule),
     transform,
     unsupportedEffects: [
@@ -147,12 +106,56 @@ export function presentationStateFor(
       }),
     ],
     clips: clipReferences(el, presentationValue(el, styles, 'clip-path'), parent.clips, transform),
-    hidden,
+    ...visibilityState(property, parent, opacity),
     opacity,
     strokeOpacity,
     fillOpacity,
+    strokeWidthZero: strokeWidthZero(property('stroke-width'), parent.strokeWidthZero),
+    markers: svgMarkerReferences(property, parent.markers),
+    viewport: parent.viewport,
+  };
+}
+
+const VISIBILITY = new Set(['visible', 'hidden', 'collapse']);
+
+// display:none and zero opacity hide the whole subtree. Visibility is only
+// inherited, so a descendant that sets it back to visible still renders
+// (SVG 2 render.html#VisibilityControl).
+function visibilityState(
+  property: (name: string) => string | null,
+  parent: PresentationState,
+  opacity: number,
+): Pick<PresentationState, 'hiddenSubtree' | 'hidden' | 'visibility'> {
+  const specified = keyword(property('visibility'));
+  const visibility =
+    specified !== null && VISIBILITY.has(specified) ? specified : parent.visibility;
+  const hiddenSubtree =
+    parent.hiddenSubtree || keyword(property('display')) === 'none' || opacity <= 0;
+  return {
+    hiddenSubtree,
+    hidden: hiddenSubtree || visibility === 'hidden' || visibility === 'collapse',
     visibility,
   };
+}
+
+// A negative or unreadable stroke-width is invalid, so the inherited one applies.
+function strokeWidthZero(value: string | null, inherited: boolean): boolean {
+  const match = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(?:[a-z]+|%)?$/i.exec(
+    keyword(value) ?? '',
+  );
+  if (match === null) return inherited;
+  const width = Number(match[1]);
+  return width < 0 ? inherited : width === 0;
+}
+
+function keyword(value: string | null): string | null {
+  return (
+    value
+      ?.trim()
+      .replace(/\s*!important$/i, '')
+      .trim()
+      .toLowerCase() ?? null
+  );
 }
 
 export function numAttr(el: Element, name: string, fallback = 0): number {
@@ -167,6 +170,31 @@ export function svgPresentationStyles(
   cascadeStyles: SvgStyleCascade,
 ): ReadonlyMap<string, string> {
   return cascadeStyles(el, styleMap(el.getAttribute('style')));
+}
+
+// The style declaration outranks the presentation attribute. Each is tried in
+// turn because CSS ignores an invalid declaration rather than applying it.
+function specifiedValues(
+  el: Element,
+  styles: ReadonlyMap<string, string>,
+  name: string,
+): readonly (string | null)[] {
+  return [styles.get(name) ?? null, el.getAttribute(name)];
+}
+
+// fill and stroke inherit: an unset, `inherit` or invalid value keeps the
+// parent's paint.
+function specifiedPaint(
+  values: readonly (string | null)[],
+  inherited: SvgPaint | null,
+): SvgPaint | null {
+  for (const value of values) {
+    if (value === null) continue;
+    const paint = parseSvgPaint(value);
+    if (paint === 'inherit') return inherited;
+    if (paint !== null) return paint;
+  }
+  return inherited;
 }
 
 function presentationValue(

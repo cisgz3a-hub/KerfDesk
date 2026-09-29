@@ -207,6 +207,25 @@ describe('cut settings draft helpers', () => {
     ).toBe(5);
   });
 
+  it('keeps an unchanged stored image density outside the recommended range', () => {
+    // A LightBurn recipe at a 0.5 mm interval stores 2 lines/mm; compile burns it as stored.
+    for (const stored of [2, 40, 1 / 0.3]) {
+      const layer = imageLayer({ linesPerMm: stored });
+      expect(
+        readCutSettingsPatch(formData({ mode: 'image', linesPerMm: String(stored) }), layer)
+          .linesPerMm,
+      ).toBe(stored);
+    }
+    // A new entry is still held to the recommended 5-25 lines/mm.
+    const layer = imageLayer({ linesPerMm: 2 });
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image', linesPerMm: '3' }), layer).linesPerMm,
+    ).toBe(5);
+    expect(
+      readCutSettingsPatch(formData({ mode: 'image', linesPerMm: '30' }), layer).linesPerMm,
+    ).toBe(25);
+  });
+
   it('clamps dot width correction to one raster line interval', () => {
     const layer = imageLayer({ linesPerMm: 10, dotWidthCorrectionMm: 0 });
     const patch = readCutSettingsPatch(

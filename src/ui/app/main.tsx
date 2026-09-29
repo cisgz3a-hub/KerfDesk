@@ -23,6 +23,7 @@ import '../theme/tokens.css';
 import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
+import { watchPreloadErrors } from './preload-error-toast';
 
 const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
@@ -35,6 +36,9 @@ initAppTheme();
 
 startPagedAssetReconciliation();
 watchPagedRasterOwnership();
+// Before anything lazy loads: a chunk gone after an update in another window
+// gets one advisory toast, and nothing reloads by itself (ADR-060).
+watchPreloadErrors();
 
 // Reuse every web-adapter method; override `id` so the UI can hide the
 // browser-only PWA install + desktop-download affordances inside the app. The

@@ -71,7 +71,22 @@ function readHeader(bytes: Uint8Array): PnmHeader {
   }
   if (maxval < 1 || maxval > 65535) throw new Error('This Netpbm image has an unusable maxval.');
   // Exactly one whitespace byte separates a binary header from its raster.
-  return { ...format, width, height, maxval, dataStart: cursor.at + 1 };
+  return { ...format, width, height, maxval, dataStart: pnmRasterDelimiter(bytes, cursor.at) + 1 };
+}
+
+/**
+ * Where the one whitespace byte that delimits the raster sits, given the offset
+ * just past the last header number. pbm(5), which pgm(5) and ppm(5) follow:
+ * "Before the whitespace character that delimits the raster, any characters
+ * from a "#" to but not including the next carriage return or newline
+ * character, or end of file, is a comment and is ignored." So in `255# note\n`
+ * the newline that ends the comment is the delimiter, not raster data.
+ */
+export function pnmRasterDelimiter(bytes: Uint8Array, afterHeader: number): number {
+  let at = afterHeader;
+  if (bytes[at] !== 0x23) return at;
+  while (at < bytes.length && bytes[at] !== 0x0a && bytes[at] !== 0x0d) at += 1;
+  return at;
 }
 
 // The fewest raster bytes a well-formed file can carry. Plain samples need a

@@ -44,7 +44,7 @@ export function prepareStartJobFromPrepared(
     motionOffset: input.motionOffset,
     inspected,
     canvasPlanKey: canvasPlanRetentionKey(project, outputScope, input.effectivePlacement),
-    printCutRegistrationActive: false,
+    printCutRegistration: undefined,
     sourceGeometryChecks: 'compiled-evidence-only',
   });
 }

@@ -196,7 +196,10 @@ async function importCsv(name: string, contents: Promise<string>): Promise<void>
   if (!(input instanceof HTMLInputElement)) throw new Error('CSV picker missing');
   Object.defineProperty(input, 'files', {
     configurable: true,
-    value: [{ name, text: () => contents }],
+    // The importer reads bytes so it can tell UTF-8 from an Excel Windows-1252 file.
+    value: [
+      { name, arrayBuffer: () => contents.then((text) => new TextEncoder().encode(text).buffer) },
+    ],
   });
   await act(async () => {
     input.dispatchEvent(new Event('change', { bubbles: true }));

@@ -1367,6 +1367,12 @@ bitmap.
 - **Verification (per CLAUDE.md #2):** core math is property-tested (`preview-data.test.ts`) and the dither↔preview agreement is content-checked against the compile call. On-canvas registration (the sim overlaying the bitmap pixel-for-pixel, including rotation) is **maintainer-eyeball only** — not asserted by the suite, and not driven from the live file `<input>` per CLAUDE.md #4.
 - Gated by ADR-027 (divergence fix) and ADR-025 (perceptual harness is the fidelity gate for raster output).
 
+### Amendments
+
+ADR-028's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-028-amendment-1-reduced-preview-keeps-the-burn-tone.md` (item 1's reduced
+preview averages each block instead of max-pooling it).
+
 ---
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)
@@ -4031,7 +4037,15 @@ direct Web Serial control is a genuine gap.
    Update button (`PwaUpdateWatcher` publishes to `pwa-update-store`,
    `PwaUpdateButton` renders it), the "Later" dismissal persistence and its
    `updatefound` re-arm are removed, and the click path through
-   `pwa-prompted-reload.ts` is unchanged.)
+   `pwa-prompted-reload.ts` is unchanged.) (Corrected 2026-09-29: the service
+   worker is shared by every tab and window, so one window's Update click
+   activates the new worker under all of them, and vite-plugin-pwa's prompt
+   mode then reloads every window that had seen the update unless
+   `onNeedReload` is given. A window streaming a job reloaded with no click in
+   it and its unload stop aborted the burn. `PwaUpdateWatcher` now passes
+   `onNeedReload`, reloads only the window whose operator clicked, and tells
+   any other window that it was updated elsewhere; that window keeps its build
+   and its Update button.)
 3. **`injectRegister: false`; register via the `virtual:pwa-register/react`
    hook.** A bundled hook is same-origin, satisfying the strict CSP
    (`script-src 'self'`, `public/_headers`) where the inline registration form is
@@ -14038,6 +14052,12 @@ then a `localStorage` write whose ~5 MB cap discards the result.
 - NOT verified: no hardware run — nothing was cut or engraved, so no claim is made about how any
   of this behaves on a machine. The >100 MB raster/image and `.lf2` paths were not exercised at
   size, and SVG was measured only up to 6 MB.
+
+### Amendments
+
+ADR-268's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-268-amendment-1-use-expansion-has-a-budget.md` (SVG `<use>` expansion has a
+budget, and item 2 reads literal internal-subset entities under an expansion bound).
 
 ## ADR-269 - Production imports are worker-backed, pressure-disclosed, queued, and cancellable (2026-07-30)
 

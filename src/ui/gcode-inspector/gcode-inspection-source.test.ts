@@ -87,6 +87,8 @@ describe('Inspector timing context (ADR-425)', () => {
     const expected = {
       limits: { accelMmPerSec2: 2500, junctionDeviationMm: 0.02, maxFeedMmPerMin: 12000 },
       cutTimeScale: 1.1,
+      // The default profile's GRBL 1.1 planner (ADR-525).
+      plannerBlocks: 15,
       deviceName: 'Shop laser',
     };
     expect(contextWithTiming({ ...project, device }).timing).toEqual(expected);
