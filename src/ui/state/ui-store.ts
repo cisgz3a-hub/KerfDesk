@@ -154,6 +154,8 @@ export type UiState = ArtworkRunOrderUiState &
     readonly resetView: () => void;
     readonly panBy: (dx: number, dy: number) => void;
     readonly setPan: (panX: number, panY: number) => void;
+    // Zoom and pan in one store update, as a zoom about the cursor needs.
+    readonly setView: (zoomFactor: number, panX: number, panY: number) => void;
     // Zoom + pan the viewport so `bounds` (scene-mm) lands centered in
     // the canvas filling ~70% of either dimension. Used by auto-zoom-
     // on-import (so a tiny SVG doesn't disappear on a big bed) and by
@@ -332,7 +334,10 @@ export const useUiStore = create<UiState>((set) => ({
   setSelectionMarquee: (next) => set({ selectionMarquee: next }),
   workspaceContextBar: null,
   openWorkspaceContextBar: (next) => set({ workspaceContextBar: next }),
-  closeWorkspaceContextBar: () => set({ workspaceContextBar: null }),
+  // Every wheel event closes the bar; returning the same state when it is
+  // already closed skips notifying every subscriber on each notch.
+  closeWorkspaceContextBar: () =>
+    set((state) => (state.workspaceContextBar === null ? state : { workspaceContextBar: null })),
   activeLayerColor: null,
   setActiveLayerColor: (next) => set({ activeLayerColor: normalizeLayerColor(next) }),
   zoomFactor: 1,
@@ -343,6 +348,7 @@ export const useUiStore = create<UiState>((set) => ({
   resetView: () => set({ zoomFactor: 1, panX: 0, panY: 0 }),
   panBy: (dx, dy) => set((s) => ({ panX: s.panX + dx, panY: s.panY + dy })),
   setPan: (panX, panY) => set({ panX, panY }),
+  setView: (zoomFactor, panX, panY) => set({ zoomFactor: clampZoom(zoomFactor), panX, panY }),
   zoomToBounds: (bounds, bedWidth, bedHeight) => {
     const next = computeZoomToBounds(bounds, bedWidth, bedHeight);
     if (next === null) return;

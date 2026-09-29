@@ -54,7 +54,7 @@ describe('Windows ending the session during a job (ADR-548)', () => {
     expect(log).not.toHaveBeenCalled();
   });
 
-  it('sends Abort at once when Windows cannot be asked to wait', () => {
+  it('tries Abort at once when Windows cannot be asked to wait', () => {
     const { window } = guarded(true);
     const event = sessionEvent('critical', 'shutdown');
     window.emit('query-session-end', event);
@@ -65,7 +65,9 @@ describe('Windows ending the session during a job (ADR-548)', () => {
     );
   });
 
-  it('sends Abort when Windows ends the session anyway', () => {
+  // Windows can end the process before the window's Abort leaves (Amendment 1),
+  // so the log says it was tried, never that it was sent.
+  it('tries Abort when Windows ends the session anyway', () => {
     const { window, log } = guarded(true);
     window.emit('session-end', sessionEvent('logoff'));
 
@@ -73,7 +75,7 @@ describe('Windows ending the session during a job (ADR-548)', () => {
       sessionEndScript('ending', ['logoff']),
     );
     expect(log).toHaveBeenCalledWith(
-      'Windows is ending the session (logoff) during a job; sending Abort.',
+      'Windows is ending the session (logoff) during a job; trying to send Abort, which Windows can cut off.',
     );
   });
 

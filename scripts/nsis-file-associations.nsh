@@ -7,12 +7,24 @@
   !insertmacro UPDATEFILEASSOC
 !macroend
 
-; KerfDesk installs for the current user only (ADR-545). The assisted installer
+; KerfDesk installs for the current user (ADR-545). The assisted installer
 ; otherwise offers "Anyone who uses this computer", an untested mode whose
 ; updates would need administrator approval that shop accounts often lack.
 ; electron-builder calls this before its install-mode page and skips the page.
+; Earlier installers did offer that mode, so a copy installed for everyone and
+; not for this user is updated where it is, as a silent update already does;
+; forcing this user's own copy would leave the old one behind, sharing the same
+; data folder (ADR-545 Amendment 1). The uninstaller keeps electron-builder's
+; own choice: the one copy there is, or a question when there are both.
 !macro customInstallMode
-  StrCpy $isForceCurrentInstall "1"
+  !ifndef BUILD_UNINSTALLER
+    ${If} $hasPerMachineInstallation == "1"
+    ${AndIf} $hasPerUserInstallation == "0"
+      StrCpy $isForceMachineInstall "1"
+    ${Else}
+      StrCpy $isForceCurrentInstall "1"
+    ${EndIf}
+  !endif
 !macroend
 
 ; A running KerfDesk may be streaming a job to a laser or router, so the

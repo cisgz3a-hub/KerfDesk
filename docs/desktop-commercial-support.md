@@ -55,9 +55,11 @@ crash, a forced close or a power cut.
 
 A job that stopped when Windows restarted, shut down or signed out leaves a `main`
 line starting "Windows asked to end the session" (KerfDesk asked Windows to wait)
-or "Windows is ending the session" (KerfDesk sent Abort), with Windows' reason
-(ADR-548). Point the customer to Windows Update's Active hours and to the
-connection guide's "Disconnects during a job".
+or "Windows is ending the session" (KerfDesk tried to send Abort, which Windows can
+cut off), with Windows' reason (ADR-548). The Abort may never have reached the
+machine, so ask whether the spindle or laser stayed on. Point the customer to
+Windows Update's Active hours and to the connection guide's "Disconnects during a
+job", and tell them to finish or Abort a job before letting Windows restart.
 
 ### An update did not arrive
 
@@ -88,7 +90,9 @@ shared connection (an office, a school, a mobile carrier) can meet it sooner.
 
 Check the service first: `https://license.kerfdesk.com/v1/public/health` answers
 `{"ok":true}` when the service and its database are up, and `{"ok":false}` with
-status 503 when they are not. It answers even while licensing is switched off.
+status 503 when they are not. It answers even while licensing is switched off, but
+only after the Worker is redeployed with ADR-523 Amendment 3: the Worker deployed
+from 27855387e predates the route and answers 503 `service_unavailable`.
 
 ### The trial was already used on this computer
 
@@ -308,7 +312,8 @@ Deleting a trial frees that Windows installation to start a new 30-day trial.
   secret `ADMIN_TOKEN_NEXT`; both tokens then work. Move your tools to the new one,
   set it as `ADMIN_TOKEN`, then delete `ADMIN_TOKEN_NEXT`: the old token stops
   working. Rotate after anyone who knew the token leaves, or if it may have leaked.
-- **Health monitor.** Point an uptime monitor at
+- **Health monitor.** Once the Worker is redeployed with the health route (the
+  one deployed from 27855387e predates it), point an uptime monitor at
   `https://license.kerfdesk.com/v1/public/health`, expecting status 200 and
   `{"ok":true}`. Each check is one Durable Object request, so a check every minute
   or two stays well inside Cloudflare's free allowance.

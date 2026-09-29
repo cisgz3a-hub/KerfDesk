@@ -1,10 +1,12 @@
 // The owner's settled Free and Pro offer is shown (ADR-524 Amendment 1), while
-// checkout ships closed and can only open fully configured (ADR-247).
+// checkout ships closed and can only open fully configured (ADR-247). Purchases
+// start in the desktop app, so the site never links a checkout, and the trial
+// is promised for when the desktop app is released (ADR-524 Amendment 2).
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { commerce } from '../commerce.config.mjs';
-import { checkoutUrlFor, commerceErrors, formatPrice } from '../lib/commerce.mjs';
+import { commerceErrors, formatPrice } from '../lib/commerce.mjs';
 import { page as pricing } from '../pages/pricing.mjs';
 import { site } from '../site.config.mjs';
 import { attrValues, buildToTemp, builtPages, textContent } from './helpers.mjs';
@@ -13,16 +15,21 @@ const PRO = commerce.plans.find((plan) => plan.id === 'pro');
 // Every price the site may show, as formatPrice writes it.
 const SETTLED_PRICES = ['US$49.50', 'US$20'];
 
-const EARLY_CHECKOUT_PLAN = { ...PRO, checkoutUrl: 'https://checkout.example.com/buy/pro' };
+const CHECKOUT_PLAN = { ...PRO, checkoutUrl: 'https://checkout.example.com/buy/pro' };
+
+const TRIAL_STORE = { ...commerce, trialOpen: true };
 
 const OPEN_STORE = {
-  ...commerce,
+  ...TRIAL_STORE,
   salesOpen: true,
   authorizingAdr: 'ADR-999',
   termsUrl: '/terms/',
   refundPolicyUrl: '/refunds/',
-  plans: [EARLY_CHECKOUT_PLAN],
 };
+
+function checkoutLinks(html) {
+  return attrValues(html, 'a', 'href').filter((href) => /checkout|paddle|\/buy/i.test(href));
+}
 
 function renderPricing(store) {
   return String(pricing.render({ site, commerce: store, siteUrl: null, asset: (p) => `/${p}` }));
@@ -65,7 +72,12 @@ describe('commerce configuration', () => {
     ]);
   });
 
-  it('ships with checkout closed and no checkout URL until a payment provider is live', () => {
+  it('ships with the trial and checkout closed until the desktop app and a payment provider are live', () => {
+    assert.equal(
+      commerce.trialOpen,
+      false,
+      'The trial opens once the licensed Windows app is on the download page and the licence service is on; update this test in that same change.',
+    );
     assert.equal(
       commerce.salesOpen,
       false,
@@ -74,14 +86,20 @@ describe('commerce configuration', () => {
     assert.equal(commerce.authorizingAdr, null);
     assert.equal(commerce.termsUrl, null);
     assert.equal(commerce.refundPolicyUrl, null);
-    for (const plan of commerce.plans) assert.equal(plan.checkoutUrl, null, plan.id);
+    for (const plan of commerce.plans) assert.ok(!('checkoutUrl' in plan), plan.id);
     assert.deepEqual(commerceErrors(commerce), []);
   });
 
-  it('refuses a checkout URL while sales are closed', () => {
-    const early = { ...commerce, plans: [EARLY_CHECKOUT_PLAN] };
-    assert.ok(commerceErrors(early).some((e) => e.includes('checkoutUrl must stay empty')));
-    assert.equal(checkoutUrlFor(early, EARLY_CHECKOUT_PLAN), null);
+  // The licence service fulfils only the Paddle checkouts it creates for the
+  // desktop app (ADR-523): a payment link would take money without a license.
+  it('refuses a checkout URL whether sales are open or closed', () => {
+    for (const store of [commerce, OPEN_STORE]) {
+      const errors = commerceErrors({ ...store, plans: [CHECKOUT_PLAN] });
+      assert.ok(
+        errors.some((e) => e.includes('purchases start in the desktop app')),
+        errors.join('; '),
+      );
+    }
   });
 
   it('refuses an incomplete offer', () => {
@@ -98,14 +116,16 @@ describe('commerce configuration', () => {
     );
   });
 
-  it('refuses to open a store without an ADR, policies, plans and https checkout', () => {
+  it('refuses to open a store without an ADR, policies, plans and the desktop app out', () => {
     const errors = commerceErrors({ ...OPEN_STORE, authorizingAdr: null, termsUrl: null });
     assert.ok(errors.some((e) => e.includes('authorizingAdr')));
     assert.ok(errors.some((e) => e.includes('termsUrl')));
     assert.ok(commerceErrors({ ...OPEN_STORE, plans: [] }).some((e) => e.includes('plan')));
-    const insecure = { ...PRO, checkoutUrl: 'http://checkout.example.com/x' };
     assert.ok(
-      commerceErrors({ ...OPEN_STORE, plans: [insecure] }).some((e) => e.includes('https')),
+      commerceErrors({ ...OPEN_STORE, trialOpen: false }).some((e) => e.includes('trialOpen')),
+    );
+    assert.ok(
+      commerceErrors({ ...commerce, trialOpen: undefined }).some((e) => e.includes('trialOpen')),
     );
     assert.deepEqual(commerceErrors(OPEN_STORE), []);
   });
@@ -127,31 +147,54 @@ describe('commerce configuration', () => {
     );
     assert.match(text, /Can I use Pro in the browser\? No\. Pro works in the Windows desktop app/);
     assert.doesNotMatch(text, /browser counts as (?:one|a) device/);
-    assert.match(text, /free 30-day Pro trial\. No card needed/);
+    assert.match(
+      text,
+      /Once the desktop app is released, each device gets a free 30-day Pro trial\. No card needed/,
+    );
+    assert.match(text, /Free 30-day trial on each device once the desktop app is released\./);
+    assert.match(
+      text,
+      /Can I try Pro today\? Not yet\. Pro comes with the Windows desktop app, which isn’t released yet\./,
+    );
+    assert.match(
+      text,
+      /The desktop app with Pro isn’t released yet; the download page will have it/,
+    );
     assert.match(text, /only the Pro tools lock, and everything in Free keeps working/);
     assert.match(text, /A license never stops a job from running/);
     assert.match(text, /terms of sale will be published before sales open/);
     assert.doesNotMatch(html, /<form\b/i);
     assert.doesNotMatch(text, /\bBuy Pro\b/);
-    const checkoutLinks = attrValues(html, 'a', 'href').filter((href) =>
-      /checkout|paddle|\/buy/i.test(href),
-    );
-    assert.deepEqual(checkoutLinks, []);
+    assert.doesNotMatch(text, /Get the desktop app/);
+    assert.deepEqual(checkoutLinks(html), []);
   });
 
-  it('never renders a checkout link while closed, even if one was pasted in early', () => {
-    const html = renderPricing({ ...commerce, plans: [EARLY_CHECKOUT_PLAN] });
-    assert.doesNotMatch(html, /checkout\.example\.com/);
-    assert.match(textContent(html), /Purchase opens soon/);
+  it('never renders a checkout link, even if one was pasted in', () => {
+    for (const store of [commerce, OPEN_STORE]) {
+      const html = renderPricing({ ...store, plans: [CHECKOUT_PLAN] });
+      assert.doesNotMatch(html, /checkout\.example\.com/);
+    }
   });
 
-  it('renders each plan with its price and checkout link once open', () => {
+  it('links the desktop app for the trial once it is out, with purchase still closed', () => {
+    const html = renderPricing(TRIAL_STORE);
+    const text = textContent(html);
+    assert.match(text, /Get the desktop app Purchase opens soon\./);
+    assert.match(text, /Each device gets a free 30-day Pro trial\. No card needed/);
+    assert.doesNotMatch(text, /once the desktop app is released|Can I try Pro today/);
+    assert.doesNotMatch(text, /\bBuy Pro\b/);
+  });
+
+  it('sends buyers to the desktop app once sales open, never to a checkout', () => {
     const html = renderPricing(OPEN_STORE);
-    assert.match(textContent(html), /US\$49\.50/);
-    assert.match(html, /href="https:\/\/checkout\.example\.com\/buy\/pro"/);
+    const text = textContent(html);
+    assert.match(text, /US\$49\.50/);
+    assert.match(html, /href="\/download\/"/);
+    assert.match(text, /Buy Pro inside the app, from Help &gt; Licence\./);
+    assert.deepEqual(checkoutLinks(html), []);
     assert.match(html, /href="\/terms\/"/);
     assert.match(html, /href="\/refunds\/"/);
-    assert.doesNotMatch(textContent(html), /Purchase opens soon/);
+    assert.doesNotMatch(text, /Purchase opens soon/);
   });
 
   it('formats whole and fractional prices as unambiguous US dollars', () => {

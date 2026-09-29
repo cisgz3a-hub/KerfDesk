@@ -10,7 +10,7 @@ Set these protected environment inputs without putting their values in command h
 - `DESKTOP_STABLE_MANIFEST_KEY_ID`: that stable key's ID.
 - `DESKTOP_WINDOWS_PUBLISHER_NAME`: the Windows certificate publisher, also pinned in `app-update.yml`.
 - `COMMERCIAL_CLOUDFLARE_ACCOUNT_ID`: the explicitly verified account hosting `kerfdesk-downloads` and `dl.kerfdesk.com`.
-- `COMMERCIAL_R2_API_TOKEN`: restricted R2 access to that account and bucket.
+- `COMMERCIAL_R2_API_TOKEN`: the Token value of an R2 API token with Admin Read & Write for that account. The publisher uses Cloudflare's REST API, which does not accept Object Read & Write tokens, and never the S3 key pair.
 
 ```text
 node scripts/publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>

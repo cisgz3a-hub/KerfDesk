@@ -1,14 +1,16 @@
 // Pricing: the Free and Pro editions and the Pro license terms, as the owner
 // settled them on 2026-09-29 (ADR-524 Amendment 1). Every price and term comes
-// from commerce.config.mjs. The prices render while checkout is closed; a buy
-// button renders only once `commerce.salesOpen` is true and the plan has its
-// hosted checkout URL, so until then the Pro card says purchase opens soon.
-// Refund terms are not written here: the terms of sale are published before
-// sales open. The hero lead, the terms line and the FAQ follow `salesOpen`, but
-// reread all of them in the change that opens checkout.
+// from commerce.config.mjs. The prices render while checkout is closed. Purchases
+// start in the desktop app, so the site never links a checkout (ADR-524
+// Amendment 2): until `commerce.trialOpen` the Pro card says purchase opens soon
+// and the trial is promised for when the desktop app is released; after it, the
+// card links the desktop app. Refund terms are not written here: the terms of
+// sale are published before sales open. The hero lead, the terms line and the
+// FAQ follow `salesOpen` and `trialOpen`, but reread all of them in the change
+// that opens sales.
 
 import { button, callout, faqList, featureGrid, pageHero, section } from '../lib/components.mjs';
-import { checkoutUrlFor, formatPrice } from '../lib/commerce.mjs';
+import { formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 import { icon } from '../lib/icons.mjs';
 
@@ -27,19 +29,32 @@ function freePlan(commerce, site) {
   </article>`;
 }
 
-function planFacts(plan) {
+function planFacts(plan, commerce) {
+  const trial =
+    plan.trialDays &&
+    `Free ${plan.trialDays}-day trial on each device${commerce.trialOpen ? '' : ' once the desktop app is released'}.`;
   return [
     'Includes one year of updates.',
     plan.deviceLimit && `Active on up to ${plan.deviceLimit} devices at a time.`,
-    plan.trialDays && `Free ${plan.trialDays}-day trial on each device.`,
+    trial,
   ]
     .filter(Boolean)
     .join(' ');
 }
 
+// The desktop app runs the trial and sells the license (Help > Licence), so the
+// card links the app once it is out and never a checkout.
+function planAction(plan, commerce) {
+  if (!commerce.trialOpen) return html`<p class="plan__soon">Purchase opens soon</p>`;
+  const note = commerce.salesOpen
+    ? html`Buy ${plan.name} inside the app, from Help &gt; Licence.`
+    : 'Purchase opens soon.';
+  return html`${button('/download/', 'Get the desktop app')}
+    <p class="plan__fine">${note}</p>`;
+}
+
 function paidPlan(plan, commerce) {
   const cadence = plan.billing === 'yearly' ? 'per year' : 'one-time';
-  const checkoutUrl = checkoutUrlFor(commerce, plan);
   return html`<article class="plan" id="plan-${plan.id}">
     <h2 class="h3">KerfDesk ${plan.name}</h2>
     <p class="plan__price">
@@ -47,16 +62,14 @@ function paidPlan(plan, commerce) {
     </p>
     ${plan.where && html`<p>In ${plan.where}.</p>`} ${plan.summary && html`<p>${plan.summary}</p>`}
     ${ticks(plan.includes)}
-    <p class="plan__fine">${planFacts(plan)}</p>
-    ${checkoutUrl
-      ? button(checkoutUrl, `Buy ${plan.name}`)
-      : html`<p class="plan__soon">Purchase opens soon</p>`}
+    <p class="plan__fine">${planFacts(plan, commerce)}</p>
+    ${planAction(plan, commerce)}
   </article>`;
 }
 
 // The owner's choice of 2026-09-29: every Pro feature is in the desktop app,
 // and KerfDesk in the browser is Free (ADR-540 item 7).
-function proInDesktopNotice(plan) {
+function proInDesktopNotice(plan, commerce) {
   if (!plan?.where) return null;
   const tools = `${plan.includes.slice(0, -1).join(', ')} and ${plan.includes.at(-1)}`;
   return callout({
@@ -64,7 +77,11 @@ function proInDesktopNotice(plan) {
     title: `All ${plan.name} features are in the desktop app`,
     body: html`<p>
       ${tools} are in KerfDesk ${plan.name}, which comes with ${plan.where}. KerfDesk in the browser
-      is the Free edition, with no time limit. <a href="/download/">Get the desktop app</a>.
+      is the Free edition, with no time limit.
+      ${commerce.trialOpen
+        ? html`<a href="/download/">Get the desktop app</a>.`
+        : html`The desktop app with ${plan.name} isn’t released yet; the
+            <a href="/download/">download page</a> will have it.`}
     </p>`,
   });
 }
@@ -86,7 +103,8 @@ function termsLine(commerce) {
 }
 
 // How a license works, from the plan's own terms.
-function licenseTerms(plan, currency) {
+function licenseTerms(plan, commerce) {
+  const { currency } = commerce;
   const cards = [
     {
       icon: 'receipt',
@@ -111,7 +129,7 @@ function licenseTerms(plan, currency) {
     plan.trialDays && {
       icon: 'hourglass',
       title: `Try ${plan.name} free for ${plan.trialDays} days`,
-      body: `Each device gets a free ${plan.trialDays}-day ${plan.name} trial. No card needed.`,
+      body: `${commerce.trialOpen ? 'Each' : 'Once the desktop app is released, each'} device gets a free ${plan.trialDays}-day ${plan.name} trial. No card needed.`,
     },
     {
       icon: 'shield-check',
@@ -131,6 +149,12 @@ function licenseTerms(plan, currency) {
 function faq(commerce, plan) {
   const devices = plan?.deviceLimit ?? 3;
   return [
+    !commerce.trialOpen &&
+      plan?.trialDays && {
+        id: 'try-now',
+        question: `Can I try ${plan.name} today?`,
+        answer: `Not yet. ${plan.name} comes with ${plan.where ?? 'the desktop app'}, which isn’t released yet. When it is, each device gets a free ${plan.trialDays}-day trial with no card needed.`,
+      },
     !commerce.salesOpen && {
       id: 'buy-now',
       question: 'Can I buy Pro today?',
@@ -216,9 +240,9 @@ export const page = {
       content: html`<div class="plans">
           ${freePlan(commerce, site)} ${commerce.plans.map((item) => paidPlan(item, commerce))}
         </div>
-        ${proInDesktopNotice(plan)} ${termsLine(commerce)}`,
+        ${proInDesktopNotice(plan, commerce)} ${termsLine(commerce)}`,
     })}
-    ${plan && licenseTerms(plan, commerce.currency)}
+    ${plan && licenseTerms(plan, commerce)}
     ${section({
       narrow: true,
       eyebrow: 'Questions',
