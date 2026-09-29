@@ -331,7 +331,7 @@ function classifyRegions(regions: Regions, paper: Paper, scale: number): void {
  *  brightness threshold leaves open too. Light pixels are paper-toned pixels
  *  and candidate solids. */
 function rejectCutOuts(ctx: Context, regions: Regions, paperLike: number): void {
-  const { plane, smooth, labels, queue, scale } = ctx;
+  const { plane, smooth, labels, scale } = ctx;
   const { width, height } = plane;
   const isCandidate = (id: number): boolean => id >= 0 && regions.status[id] === CANDIDATE;
   const light = new Uint8Array(labels.length);
@@ -340,7 +340,7 @@ function rejectCutOuts(ctx: Context, regions: Regions, paperLike: number): void 
   }
   const halfWidth = Math.round(OUTLINE_HALF_WIDTH_PX * scale);
   const span = { halfWidth, reach: halfWidth + Math.ceil(2 * scale) };
-  const near = nearThickMaterial(light, width, height, span, queue);
+  const near = nearThickMaterial(light, width, height, span);
   const edge = new Array<number>(regions.count.length).fill(0);
   const grounded = new Array<number>(regions.count.length).fill(0);
   const around = new Int32Array(4);

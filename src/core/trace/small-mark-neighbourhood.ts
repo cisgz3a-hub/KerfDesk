@@ -140,32 +140,39 @@ function labelInk(input: InkNeighbourhoodInput): {
   readonly small: number[][];
 } {
   const labels = new Int32Array(input.width * input.height);
+  const stack = new Int32Array(input.width * input.height);
   const areas: number[] = [0];
   const small: number[][] = [];
   for (let start = 0; start < input.ink.length; start += 1) {
     if (input.ink[start] !== 1 || labels[start] !== 0) continue;
-    const pixels = floodLabel(input, labels, start, areas.length);
-    areas.push(pixels.length);
-    if (pixels.length < input.isolatedMinArea) small.push(pixels);
+    const component = floodLabel(input, { labels, stack }, start, areas.length);
+    areas.push(component.area);
+    if (component.pixels !== null) small.push(component.pixels);
   }
   return { labels, areas, small };
 }
 
-// Label the eight-connected ink component at `start`; returns its pixels.
-// Inlined neighbour loops: this is the one full-image pass.
+// Label the eight-connected ink component at `start`: its area, and its
+// pixels in flood order while it stays under the lone-mark floor (null for a
+// larger one). Inlined neighbour loops: this is the one full-image pass.
 function floodLabel(
   input: InkNeighbourhoodInput,
-  labels: Int32Array,
+  scratch: { readonly labels: Int32Array; readonly stack: Int32Array },
   start: number,
   label: number,
-): number[] {
+): { readonly area: number; readonly pixels: number[] | null } {
   const { width, height, ink } = input;
+  const { labels, stack } = scratch;
   const pixels: number[] = [];
-  const stack = [start];
+  let area = 0;
+  let top = 1;
+  stack[0] = start;
   labels[start] = label;
-  while (stack.length > 0) {
-    const p = stack.pop() ?? 0;
-    pixels.push(p);
+  while (top > 0) {
+    top -= 1;
+    const p = stack[top] as number;
+    area += 1;
+    if (area < input.isolatedMinArea) pixels.push(p);
     const x = p % width;
     const y = (p - x) / width;
     const x0 = x > 0 ? x - 1 : x;
@@ -175,11 +182,12 @@ function floodLabel(
       for (let q = ny * width + x0; q <= ny * width + x1; q += 1) {
         if (ink[q] !== 1 || labels[q] !== 0) continue;
         labels[q] = label;
-        stack.push(q);
+        stack[top] = q;
+        top += 1;
       }
     }
   }
-  return pixels;
+  return { area, pixels: area < input.isolatedMinArea ? pixels : null };
 }
 
 function forEachNeighbour(p: number, width: number, height: number, visit: (q: number) => void) {
