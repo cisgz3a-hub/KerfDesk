@@ -162,9 +162,14 @@ Once on, it works like this:
      (ADR-142 Amendment 1).
    - `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY`: the Ed25519 PKCS8 PEM of the pinned
      stable release key.
-   - `COMMERCIAL_R2_API_TOKEN`: a Cloudflare API token scoped to `kerfdesk-downloads`,
-     with object read and write and bucket read access, like the Preview's token
-     (`desktop-preview-distribution.md`).
+   - `COMMERCIAL_R2_API_TOKEN`: the Token value of an R2 API token with the Admin
+     Read & Write permission (R2 > Manage API tokens), not the Access Key ID or
+     Secret Access Key shown with it. The publisher sends it as a bearer token to
+     Cloudflare's REST API, which reads the bucket first and does not accept
+     Object Read & Write tokens (cloudflare/workers-sdk#9235). An Admin token
+     reaches every bucket in the account, which holds only `kerfdesk-downloads`.
+     The Preview's `PREVIEW_R2_API_TOKEN` is not needed here; it serves only
+     `v*-preview.*` tags.
    - `COMMERCIAL_CLOUDFLARE_ACCOUNT_ID`: the 32-character ID of the account that
      owns that bucket and `dl.kerfdesk.com`.
 3. Add these variables, to the environment or the repository:
