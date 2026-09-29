@@ -158,6 +158,37 @@ describe('trace worker heartbeat', () => {
     expect(beats).toBe(Math.floor(checkpoints / checkpointsPerBeat));
   });
 
+  it('sends what the trace reported with its result', async () => {
+    const posted: TraceWorkerResponse[] = [];
+    const scope: WorkerScope = {
+      onmessage: null,
+      postMessage: (response) => posted.push(response),
+    };
+    mocks.trace.mockImplementation(
+      async (_image: unknown, _options: unknown, run: (steps: TraceSteps<string[]>) => string[]) =>
+        run(
+          (function* reporting(): TraceSteps<string[]> {
+            yield;
+            yield { automaticThresholdLuma: 141 };
+            yield { localDetailAdded: false };
+            return [];
+          })(),
+        ),
+    );
+    vi.stubGlobal('self', scope);
+    vi.resetModules();
+    await import('./trace-worker');
+    scope.onmessage?.({ data: request(9) } as MessageEvent<TraceWorkerRequest>);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(posted.at(-1)).toMatchObject({
+      id: 9,
+      kind: 'ok',
+      report: { automaticThresholdLuma: 141, localDetailAdded: false },
+    });
+  });
+
   it('reports the failure instead of heartbeating forever when the trace throws', async () => {
     const posted: TraceWorkerResponse[] = [];
     const scope: WorkerScope = {

@@ -41,6 +41,7 @@ import { shouldTraceAlphaMask } from './trace-alpha';
 import { traceImageToPhotoPathsSteps } from './photo-trace';
 import { coloredPathsToSvg } from './paths-to-svg';
 import { runTraceSteps } from './trace-steps';
+import { brightnessReport, LOCAL_DETAIL_REPORT, type ReportedDetection } from './trace-report';
 
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
@@ -142,7 +143,7 @@ export type ContourMedianStage = {
   readonly adjusted: RawImageData;
   readonly cleaned: RawImageData;
 };
-type ContourPreparation = {
+type ContourPreparation = ReportedDetection & {
   readonly prepared: RawImageData;
   readonly crackField: CrackSubPixelField | null;
   readonly median?: ContourMedianStage;
@@ -178,7 +179,7 @@ export function prepareTraceForContour(
         options,
       );
       const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
-      return { ...recovered, prepared: cleaned };
+      return { ...recovered, prepared: cleaned, report: LOCAL_DETAIL_REPORT };
     }
     const prepared = sketchTraceToMonochrome(
       adjusted,
@@ -198,13 +199,13 @@ export function prepareTraceForContour(
   // explicit Cutoff/Threshold values, and a region carrying the whole
   // source's frozen cut (ADR-435) get `prepared` itself back.
   const frozenCut = options.sourceOtsuThreshold !== undefined;
-  const level = frozenCut
+  const { source: leveled, threshold: automaticCut } = frozenCut
     ? { source: prepared, threshold: null }
     : levelForAutomaticThreshold(prepared, options);
-  const leveled = level.source;
-  const thresholded = applyThresholdWithIso(leveled, options, level.threshold);
+  const thresholded = applyThresholdWithIso(leveled, options, automaticCut);
   const field =
     thresholded.thresholdLuma === null ? null : lumaCrackField(leveled, thresholded.thresholdLuma);
+  const reported = brightnessReport(options, thresholded.thresholdLuma, leveled !== prepared);
   if (options.faintLineRecovery === true) {
     const recovered = prepareFaintLineMask(
       thresholded.prepared,
@@ -213,11 +214,11 @@ export function prepareTraceForContour(
       effectivePixelScale(options),
     );
     const cleaned = cleanBinaryMask(recovered.prepared, options, recovered.crackField);
-    return { ...recovered, median, prepared: cleaned };
+    return { ...recovered, median, prepared: cleaned, ...reported };
   }
   const cleanedMask = cleanBinaryMask(thresholded.prepared, options, field);
   const walkerField = walkerCrackField(leveled, options, thresholded, field, lumaBuffer);
-  return { prepared: cleanedMask, crackField: walkerField, median };
+  return { prepared: cleanedMask, crackField: walkerField, median, ...reported };
 }
 
 // Mask cleanup is the shared tail of every preprocessing branch: despeckle

@@ -10,7 +10,7 @@ import type { ColoredPath, Polyline } from '../../scene';
 import { withCanonicalTraceCurves } from '../trace-curves';
 import {
   effectivePixelScale,
-  preprocessForTrace,
+  prepareTraceForContour,
   type RawImageData,
   type TraceOptions,
 } from '../trace-image';
@@ -41,7 +41,11 @@ export function* traceCenterlineStrokePathsSteps(
   options: TraceOptions,
 ): TraceSteps<ColoredPath[]> {
   const cooperate = yield;
-  const prepared = preprocessForTrace(image, { ...options, traceMode: 'centerline' });
+  const { prepared, report } = prepareTraceForContour(image, {
+    ...options,
+    traceMode: 'centerline',
+  });
+  if (report !== undefined) yield report;
   if (cooperate) yield;
   const mask = inkMaskFromPrepared(prepared);
   if (!hasInk(mask)) return [];
