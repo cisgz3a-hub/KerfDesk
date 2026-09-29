@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
 import type { ArraySpec } from '../../core/scene/array-layout-types';
 import { combinedBBox } from '../../core/scene/hit-test';
+import type { Scene } from '../../core/scene/scene';
 import type { Bounds, SceneObject } from '../../core/scene/scene-object';
+import { arrayCopiedIds, arraySpecRoomProblem } from '../state/array-room';
+import { sceneCopyRoom } from '../state/scene-copy-room';
 import { Button, Dialog, DialogActions } from '../kit';
 import {
   centreObjectOptions,
@@ -26,6 +29,8 @@ const NO_OBJECTS: ReadonlyArray<SceneObject> = [];
 
 export function ArrayDialog(props: {
   readonly selectionBounds: Bounds;
+  /** The project's scene: how many copies it has room for (ADR-307 amendment 1). */
+  readonly scene: Scene;
   /** The selection in stacking order; lets a circular array centre on one of its objects. */
   readonly selected?: ReadonlyArray<SceneObject>;
   /** Settings to open with, such as the ones last applied; the defaults when absent. */
@@ -47,6 +52,7 @@ export function ArrayDialog(props: {
   const [form, setForm] = useState(() => props.initial ?? defaultArrayForm(props.selectionBounds));
   const [advanceVariables, setAdvanceVariables] = useState(false);
   const spec = arraySpecFromForm(form, context);
+  const problem = useRoomProblem(props.scene, selected, spec);
   const onChange = (patch: Partial<ArrayForm>): void =>
     setForm((current) => ({ ...current, ...patch }));
   return (
@@ -57,34 +63,19 @@ export function ArrayDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
+        if (problem !== null) return;
         props.onSubmitForm?.(form);
         return advanceVariables ? props.onApply(spec, true) : props.onApply(spec);
       }}
     >
       <ArrayModes mode={form.mode} onChange={(mode) => onChange({ mode })} />
-      {form.mode === 'grid' ? (
-        <GridArrayFields
-          form={form}
-          onChange={onChange}
-          onSpaceBy={(spaceBy) =>
-            setForm((current) => withSpaceBy(current, spaceBy, context.bounds))
-          }
-        />
-      ) : form.mode === 'point-rotation' ? (
-        <PointRotationArrayFields form={form} onChange={onChange} />
-      ) : (
-        <CircularArrayFields
-          form={form}
-          shownCentre={displayedCentre(form, context)}
-          centreObjects={centreObjects}
-          onChange={onChange}
-          onCentre={(centre) => setForm((current) => withCentre(current, centre, context))}
-          onCenterField={(axis, text) =>
-            setForm((current) => withCenterField(current, axis, text, context))
-          }
-          onSpread={(spread) => setForm((current) => withSpread(current, spread, context))}
-        />
-      )}
+      <ArrayFields
+        form={form}
+        context={context}
+        centreObjects={centreObjects}
+        setForm={setForm}
+        onChange={onChange}
+      />
       <VariableArrayOption
         visible={props.hasVariableText === true}
         hint={variableArrayHint(form)}
@@ -92,16 +83,71 @@ export function ArrayDialog(props: {
         onChange={setAdvanceVariables}
       />
       <p role="status" aria-live="polite" style={statusStyle}>
-        {props.preparing === true ? 'Preparing variable copies…' : summaryFor(spec, context)}
+        {props.preparing === true
+          ? 'Preparing variable copies…'
+          : (problem ?? summaryFor(spec, context))}
       </p>
       {props.errorMessage === undefined ? null : <p role="alert">{props.errorMessage}</p>}
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary">
+        <Button type="submit" variant="primary" disabled={problem !== null}>
           Create array
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+// Why the request as typed does not fit the project, or null when it does
+// (ADR-307 amendment 1). It is counted from the numbers alone, without laying
+// any copy out, so whatever is typed costs the same. A circle centred on a
+// selected object copies the rest of the selection.
+function useRoomProblem(
+  scene: Scene,
+  selected: ReadonlyArray<SceneObject>,
+  spec: ArraySpec,
+): string | null {
+  const centreId = spec.kind === 'circular' ? spec.centerObjectId : undefined;
+  const room = useMemo(
+    () =>
+      sceneCopyRoom(scene, arrayCopiedIds(new Set(selected.map((object) => object.id)), centreId)),
+    [scene, selected, centreId],
+  );
+  return arraySpecRoomProblem(room, spec);
+}
+
+function ArrayFields(props: {
+  readonly form: ArrayForm;
+  readonly context: ArrayDialogContext;
+  readonly centreObjects: ReturnType<typeof centreObjectOptions>;
+  readonly setForm: (update: (current: ArrayForm) => ArrayForm) => void;
+  readonly onChange: (patch: Partial<ArrayForm>) => void;
+}): JSX.Element {
+  const { form, context, setForm, onChange } = props;
+  if (form.mode === 'grid') {
+    return (
+      <GridArrayFields
+        form={form}
+        onChange={onChange}
+        onSpaceBy={(spaceBy) => setForm((current) => withSpaceBy(current, spaceBy, context.bounds))}
+      />
+    );
+  }
+  if (form.mode === 'point-rotation') {
+    return <PointRotationArrayFields form={form} onChange={onChange} />;
+  }
+  return (
+    <CircularArrayFields
+      form={form}
+      shownCentre={displayedCentre(form, context)}
+      centreObjects={props.centreObjects}
+      onChange={onChange}
+      onCentre={(centre) => setForm((current) => withCentre(current, centre, context))}
+      onCenterField={(axis, text) =>
+        setForm((current) => withCenterField(current, axis, text, context))
+      }
+      onSpread={(spread) => setForm((current) => withSpread(current, spread, context))}
+    />
   );
 }
 

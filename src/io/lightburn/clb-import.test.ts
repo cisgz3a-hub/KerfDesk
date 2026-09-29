@@ -100,6 +100,23 @@ describe('LightBurn CLB import', () => {
     },
   );
 
+  it('reads air assist from the runBlower field LightBurn writes', () => {
+    // LightBurn writes a cut setting's Air Assist as <runBlower Value="0|1"/>, in
+    // libraries as in projects.
+    for (const [value, airAssist] of [
+      ['1', true],
+      ['0', false],
+    ] as const) {
+      const result = importLightBurnClb(
+        `<LightBurnLibrary><Material name="Birch"><Entry Thickness="3.0000" Desc="Cut"><CutSetting type="Cut"><maxPower Value="75"/><speed Value="8"/><runBlower Value="${value}"/></CutSetting></Entry></Material></LightBurnLibrary>`,
+        'birch.clb',
+      );
+      if (!result.ok) throw new Error(result.reason);
+      expect(result.library.entries[0]?.recipe.airAssist).toBe(airAssist);
+      expect(result.report.unknownFields).not.toContain('runBlower');
+    }
+  });
+
   it('reports skipped unsupported entries instead of silently inventing settings', () => {
     const result = importLightBurnClb(
       `<Library><Material Name="Mixed"><Entry Desc="Missing"><CutSetting Speed="10" /></Entry><Entry Desc="Good"><CutSetting Speed="10" MaxPower="20" /></Entry></Material></Library>`,

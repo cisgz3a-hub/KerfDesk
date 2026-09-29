@@ -506,7 +506,8 @@ destination and cannot overwrite the template source.
 
 1. Select one or more visible, unlocked artwork objects and choose **Arrange → Array...**.
 2. Choose **Grid**, **Point Rotation**, or **Circular**. Grid and Circular retain their existing
-   placement fields; every valid requested placement is materialized without a policy count cap.
+   placement fields; every requested placement the project can hold is materialized, without a
+   policy count cap (item 10).
 3. For **Point Rotation**, enter **Copies (includes original)** and **Total angle (deg)**. The original
    selection is the zero-degree instance. Instance `i` rotates by `i * total angle / copies`, so a
    360-degree array stops before a duplicate endpoint.
@@ -530,6 +531,18 @@ destination and cannot overwrite the template source.
    more objects selected, one of them, which stays put and is not copied. **Spread copies** evenly
    all the way round, from a start to an end angle (both ends included), or by a step angle. 0° is
    to the right and angles run clockwise. The status line says what Apply will do.
+10. **The project's room (ADR-307 amendment 1).** A project holds at most 10,000 objects and cannot
+    be opened again above that, so that is the one limit on how many copies an array makes. A copy
+    is the selection and everything it carries (an image's mask, a path text's guide); a circle's
+    centre object is not copied. A request that fits is placed whole, in one undo step. One that
+    does not is not applied and nothing changes: the status line says how many more copies fit ("This
+    project has room for at most 18 more copies of this selection (project limit 10000 objects). Use
+    fewer rows or columns."), and **Create array** stays off, and Enter does nothing, until it fits.
+    A project with no room says to delete some objects. The check is made from the numbers alone,
+    so typing a huge count is as quick as typing a small one, and it comes before the first render
+    of Advance variables. Place selection on each piece (ADR-442) is held to the same room and says
+    "Nothing was placed" when it is refused. A saved file whose groups nest can reach the group or
+    group member limits first; that is refused too, naming the limit.
 
 ---
 
@@ -555,7 +568,8 @@ destination and cannot overwrite the template source.
 2. Set **Offset distance (mm)**, then **Direction** (**Outward**, **Inward**, **Both**) and
    **Corner style** (**Round**, **Bevel**, **Corner**). **Outer shapes only** ignores holes and
    shapes inside other shapes. **Delete original objects** removes the selection once the offset
-   is added.
+   is added. Round corners and end caps are chorded within the 0.025 mm machine curve tolerance
+   at any distance (ADR-410 amendment 1); so are the round corners of the properties-panel offset.
 3. The dialog draws the selection in grey, the outward result in the accent colour and the inward
    result in green, and lists each result's size. The selection is offset as one design.
 4. Open lines offset outward into a closed outline around the line, with caps that follow the
@@ -586,13 +600,15 @@ destination and cannot overwrite the template source.
    closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
    to convert them to paths first.
 3. **Tools → Vector → Reverse Direction** reverses the same kinds of paths. Open paths swap ends;
-   closed paths keep their start point and run the other way round. CNC tabs stay where they were
-   on the shape. When Cut Planner may cut open paths from either end, the notice says to set Path
-   direction to Preserve direction to keep the new direction.
+   closed paths keep their start point and run the other way round. Tabs placed by hand, CNC and
+   laser, stay where they were on the shape (ADR-494 Amendment 1). When Cut Planner may cut open
+   paths from either end, the notice says to set Path direction to Preserve direction to keep the
+   new direction.
 4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
    place on the same operation: moved-back copies, and closed shapes starting at another corner or
-   drawn the other way, count. Copies on another operation, or with another power scale or
-   override, are kept. Locked artwork, image masks and path-text guides are never deleted.
+   drawn the other way, count. Copies on another operation, or with another power scale,
+   override or tabs placed by hand (CNC or laser), are kept. Locked artwork, image masks and
+   path-text guides are never deleted.
 5. **Tools → Image → Flatten Image Mask** bakes the mask into the selected image and crops it, as
    **Crop Image** does, then deletes the mask shape. The shape stays when it is locked or another
    image or path text uses it; the notice says which.
@@ -608,7 +624,8 @@ destination and cannot overwrite the template source.
 2. **Tools → Vector → Cut Shapes** splits every selected shape along the top-most selected closed
    shape into an inside piece and an outside piece, removes that cutter and selects the pieces.
    Pieces keep their operations. Shapes the cutter does not cross are left as they were, and the
-   notice counts them.
+   notice counts them. A cut that would take the project past its limit of 10,000 objects is
+   refused with a notice, and nothing changes (F-A11).
 3. **Tools → Vector → Warp** (four corner handles) and **Deform** (a grid of 16 handles) bend the
    selected vector artwork. The artwork previews live while the handles are dragged; Enter or Apply
    applies it as one undo step, Esc or Cancel leaves it as it was, and Reset handles starts again.
@@ -618,7 +635,11 @@ destination and cannot overwrite the template source.
    single path (or the path picked under Guide path): by number of copies, spacing between centres
    or gap between copies, from the start offset to the end offset, turned to follow the path unless
    that box is cleared. A closed guide gets copies all the way round with none doubled at the seam.
-   The status line says what Apply will do. The guide stays and the copies are selected.
+   The status line says what Apply will do, and is worked out without laying the copies out, so a
+   large count stays quick to type. The guide stays and the copies are selected. Apply places every
+   copy asked for, in one undo step, up to the project's own limit of 10,000 objects (a copy counts
+   everything it carries, such as an image's mask); a count, spacing or gap that would place more
+   is refused with how many fit, and nothing changes. Nothing else caps the number of copies.
 5. When a selection gives a tool nothing to do, a notice says what to select, and nothing changes.
    None of these tools operates a machine or changes how other artwork compiles.
 
@@ -919,8 +940,13 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
-   move, rotate and scale with the artwork and survive copy and paste and break apart. **Clear
-   placed tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Reverse
+   Direction** and the Edit nodes **Start** keep them where they were on the shape, and **Delete
+   Duplicates** keeps a copy whose placed tabs differ. A shape opened with **Break** holds them
+   until a straight line closes it again (**Close Path**), which puts each one back where it was,
+   except a tab on a curve that led into the break node: Break removes that curve, and its tab
+   moves to the same share of the straight line (ADR-494 Amendment 1). **Clear placed tabs** (in
+   Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
@@ -1289,6 +1315,23 @@ the completed physical Frame is the spatial source of truth.
 - Only the latest request for the current document may publish the remembered target/name, clear
   dirty/autosave state, or show ordinary success/failure feedback. A stale selected write still runs.
 
+#### Edge — a project the file limits cannot hold (ADR-307 amendment 1)
+- A project file holds at most 10,000 objects, 10,000 groups, 50,000 group members and 256
+  operations; a larger one cannot be opened again (F-A12). The commands that can add many objects
+  in one step keep to these limits. Array and Copy Along Path say how many copies fit (F-A6a,
+  F-A6f).
+- **Duplicate** adds what is selected, **Paste** and **Paste in Place** add what the clipboard
+  holds (with its operations, when it came from another project), **Break Apart** makes each
+  shape of the selection its own object, **Cut Shapes** makes two pieces of each shape it crosses,
+  **Array on board** tiles copies of one design across the placed board (F-BC2), and **Design
+  Studio Apply** adds the drawing (F-DS8). Each is refused whole when the result would pass a
+  limit: a warning names the limit and says what to change (duplicate fewer objects, copy fewer
+  objects to paste, break apart fewer objects, cut fewer shapes, array fewer copies on the board,
+  apply a smaller drawing, or delete some first), and nothing changes. The clipboard, and the
+  Studio's drawing, are kept. Everything that fits is made exactly as before; nothing is ever made
+  in part.
+- A project already over a limit can still be changed in any way that adds nothing to it.
+
 ---
 
 ### F-A12. Open Project (.lf2)
@@ -1345,6 +1388,13 @@ the completed physical Frame is the spatial source of truth.
 3. A browser that cannot keep file handles remembers names only. Reopening one shows
    `<name> can't be reopened directly in this browser. Choose it in the file picker.` and opens
    the picker.
+
+#### Edge — this computer's storage refuses the list (ADR-378 Amendment 1)
+1. The next Recent Projects action tries storage again. Meanwhile the list stays shown, and
+   projects opened or saved are listed and stored once storage works again.
+2. After 3 refusals in a row the list is kept until KerfDesk closes, and one warning says
+   `Recent Projects could not be saved for next session (browser storage is full or blocked).
+   The list is kept until KerfDesk closes.`
 
 #### Success — open from the operating system
 - Desktop: F-DESK4. Installed web app on a Chromium desktop browser: opening a `.lf2` with
@@ -3097,6 +3147,8 @@ settings and Job Review keep their existing read-only setup references.
 
 - Missing data or failed text materialization identifies the affected copy and leaves the project
   and cursor unchanged. Creation cancelled or made stale by an intervening edit consumes nothing.
+- A request the project has no room for (10,000 objects, F-A6a item 10) is refused before any copy
+  is rendered, with how many more copies fit, and the project and cursor are unchanged.
 - Failed writes, a cancelled save, partial tile saves, stale source identity and a mismatched
   advancement policy leave the cursor unchanged. Re-prepare the current source before retrying.
 - Distinct serial and date/time fields can be used without CSV; CSV fields require their addressed
@@ -3113,12 +3165,15 @@ settings and Job Review keep their existing read-only setup references.
 2. Set the error correction (QR Code only), the size by module or by overall width (quiet zones
    included), the bar height and text (1D only), the quiet zone in modules, and **Invert** for
    stock that marks lighter than its surface, such as anodised aluminium or slate.
-3. The preview re-encodes on every change, black on white, with the type, version or module
-   count and the finished size underneath; it can be scanned from the screen. Quiet zones below
-   the standard and modules under 0.2 mm show a warning.
+3. The preview re-encodes on every change and shows the code as it reads on the finished piece:
+   engraving black on white, or with **Invert** white on dark stock, so dark modules always show
+   dark on a light quiet zone. The type, version or module count and the finished size are
+   underneath; it can be scanned from the screen. Quiet zones below the standard and modules
+   under 0.2 mm show a warning.
 4. For serials or CSV data, tick **Variable data** and insert fields as for variable text. The
    preview encodes the value the next output would use; each array copy and each output
-   re-encodes its own value.
+   re-encodes its own value. The canvas draws each code, with its text, for the current value
+   and redraws it when the serial, record or data changes (ADR-386 Amendment 2).
 5. **Insert** places the code centred on the bed on its own Fill operation, selected, as one undo
    step. Double-click a barcode, or use **Edit barcode...** in the artwork panel, to change it;
    **Apply** re-encodes it in place and keeps its position, rotation and operation.
@@ -3131,6 +3186,11 @@ settings and Job Review keep their existing read-only setup references.
   much data) shows the reason under the preview and disables **Insert** or **Apply**.
 - A variable value that cannot be encoded fails Save G-code, Start or SVG export with the barcode
   and the value named; nothing is engraved in its place.
+- The dialog makes a Data Matrix up to 132 × 132: longer text is refused under the preview. A
+  variable value that grows past it by output is still engraved, as a 144 × 144 code, and Job
+  Review and Save G-code's warnings name the barcode: 144 × 144 Data Matrix codes may not scan in
+  common readers, so test-scan one before a run. Only a value longer than 144 × 144 holds fails
+  the output (ADR-386 Amendment 2).
 - If the text under a 1D code cannot be drawn, the dialog stays open with the reason.
 
 ## Phase E flows
@@ -3883,7 +3943,9 @@ selected.
 **Edge / empty / error.** No board, or zero/several designs selected → both
 controls are disabled ("Select exactly one design…"). A design larger than the
 board tiles as a single centered copy. A runaway count (huge rows, or a tiny
-design under "fit as many as fit") is capped per axis.
+design under "fit as many as fit") is capped per axis. An array that would take
+the project past its limit of 10,000 objects is refused with a notice, and
+nothing changes (F-A11).
 
 ---
 
@@ -7521,7 +7583,10 @@ as the pane's design record.
 - **Edge / piece partly out of view.** It is listed and outlined but starts unticked, with the
   reason; ticking it includes it.
 - **Edge / different piece.** A piece of another shape, or more than 3 mm longer or wider than the
-  design's own piece, is flagged and stays ticked. Place is never refused.
+  design's own piece, is flagged and stays ticked. Place is never refused because of it.
+- **Edge / project full.** Place is refused only when the project cannot hold the copies (10,000
+  objects, ADR-307 amendment 1): nothing is placed, the panel says "Nothing was placed" and a
+  notice says how many more copies fit and to untick some pieces.
 - **Edge / raised pieces.** Pieces on a box are found at the box's height when a height area
   covers it (F-CAM3).
 - **Edge / Frame.** Frame traces the rectangle around all the copies, not each piece; the panel
@@ -8588,6 +8653,13 @@ again.
 
 1. An empty sketch, or one containing only construction guides, applies nothing and
    leaves the project untouched. Apply is inert rather than refusing.
+
+#### Error — the project is full
+
+1. An Apply that would take the project past its limit of 10,000 objects or 256 operations
+   (F-A11) is refused with a notice naming the limit, and nothing changes. The drawing stays
+   unapplied and Apply stays on, to apply once there is room. A refused Apply & Close leaves the
+   Studio open on the drawing.
 
 #### Empty — first Apply of a session
 

@@ -6,6 +6,7 @@ import { pushUndo } from './scene-mutations';
 import {
   namedUndoAction,
   recordUndoStepName,
+  saveUndoStepName,
   undoStepName,
   withUndoStepName,
 } from './undo-step-names';
@@ -61,6 +62,26 @@ describe('undo step names', () => {
     pushUndo(before, []);
     const after = withObjects(before, [rect('a')]);
     expect(undoStepName(before, after)).toBe('Add rectangle');
+  });
+
+  it('puts back the names a step took from its snapshot when the step is refused', () => {
+    // A command that builds its step and then refuses it (ADR-307 amendment 1)
+    // has already pushed undo from the snapshot, naming it.
+    const named = createProject();
+    const unnamed = createProject();
+    recordUndoStepName(named, 'Warp');
+    const restoreNamed = saveUndoStepName(named);
+    const restoreUnnamed = saveUndoStepName(unnamed);
+    withUndoStepName('Duplicate', () => {
+      pushUndo(named, []);
+      pushUndo(unnamed, []);
+    });
+
+    restoreNamed();
+    restoreUnnamed();
+
+    expect(undoStepName(named, withObjects(named, [rect('a')]))).toBe('Warp');
+    expect(undoStepName(unnamed, withObjects(unnamed, [rect('a')]))).toBe('Add rectangle');
   });
 
   it('ignores a blank name and leaves nothing pending afterwards', () => {

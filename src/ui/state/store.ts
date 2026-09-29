@@ -292,11 +292,12 @@ export type AppState = ObjectPropertiesActions &
     // core may not generate identity. `previous` names the artwork an earlier
     // Apply from the same session created, which this one REPLACES rather than
     // duplicating; the returned record is what the next Apply passes back.
+    // 'refused': the project could not hold it (ADR-307 amendment 1).
     readonly applyDesignSketch: (
       sketch: Sketch,
       ids: ReadonlyArray<string>,
       previous: DesignApplyRecord | null,
-    ) => DesignApplyRecord | null;
+    ) => DesignApplyRecord | 'refused' | null;
     // ADR-057: add (or replace) the registration jig box on the reserved
     // registration layer. Width/height in mm; a new box centers on the bed, a
     // replace keeps the existing box's position and lock state.

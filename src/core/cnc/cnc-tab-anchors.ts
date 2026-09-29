@@ -1,9 +1,12 @@
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   applyTransform,
+  breakCurveAtNode,
   flattenColoredPathCurves,
+  flattenCurveSubpath,
   type ColoredPath,
   type CncTabAnchor,
+  type CurveSubpath,
   type Polyline,
   type SceneObject,
   type Vec2,
@@ -107,6 +110,108 @@ export function redistributeCncTabAnchors(
   if (replaced.size === 0) return original;
   const next = [...original.filter((anchor) => !replaced.has(anchor)), ...seeded];
   return JSON.stringify(next) === JSON.stringify(original) ? original : next;
+}
+
+/** How far along closed `curve` its node `nodeIndex` lies, as the fraction of
+ * the contour's length that a tab anchor's `pathT` measures. Null for an open
+ * curve, a missing node or a contour without length. */
+export function closedCurveNodeFraction(curve: CurveSubpath, nodeIndex: number): number | null {
+  if (!curve.closed || !Number.isInteger(nodeIndex) || nodeIndex < 0) return null;
+  if (nodeIndex > curve.segments.length) return null;
+  const whole = flattenAsTabsResolve(curve);
+  const measure = whole === null ? null : measurePolyline(whole);
+  // Flattening works segment by segment, so the lead-in to the node flattens
+  // to the same points as the start of the whole contour, and its length is
+  // the same running sum pointAtFraction walks.
+  const lead = flattenAsTabsResolve({
+    start: curve.start,
+    segments: curve.segments.slice(0, nodeIndex),
+    closed: false,
+  });
+  if (measure === null || lead === null) return null;
+  return Math.min(1, openLength(lead.points) / measure.total);
+}
+
+/** Anchors after one closed contour is redrawn from the point `startFraction`
+ * of its length along it (the node tool's Start): each tab of that contour
+ * keeps its place, and anchors on other contours are unchanged. */
+export function restartedTabAnchors<A extends CncTabAnchor>(
+  anchors: ReadonlyArray<A>,
+  pathIndex: number,
+  polylineIndex: number,
+  startFraction: number,
+): ReadonlyArray<A> {
+  return anchors.map((anchor) => {
+    if (anchor.pathIndex !== pathIndex || anchor.polylineIndex !== polylineIndex) return anchor;
+    return { ...anchor, pathT: aroundOnce(Math.max(0, Math.min(1, anchor.pathT)) - startFraction) };
+  });
+}
+
+/** How the node tool's Break opens a closed contour, as shares of its closed
+ * length, which a tab anchor's `pathT` measures: where the break node lies,
+ * how much of the outline the open contour keeps (all but the segment that
+ * arrived at the node), and how long the straight line is that closes it again
+ * (Close Path and Join add it from its end back to its start). */
+export type ContourBreak = {
+  readonly start: number;
+  readonly kept: number;
+  readonly closing: number;
+};
+
+/** Break at node `nodeIndex` of closed `curve`, measured on the same flattened
+ * outline that places the tabs. Null when Break would not open it, or would
+ * leave nothing with length to close again. */
+export function closedCurveBreak(curve: CurveSubpath, nodeIndex: number): ContourBreak | null {
+  const start = closedCurveNodeFraction(curve, nodeIndex);
+  const whole = flattenAsTabsResolve(curve);
+  const measure = whole === null ? null : measurePolyline(whole);
+  const broken = breakCurveAtNode(curve, nodeIndex);
+  const open = broken === null ? null : flattenAsTabsResolve(broken);
+  if (start === null || measure === null || open === null) return null;
+  // Flattening works segment by segment, so the open contour flattens to the
+  // points the closed one had from the break node on.
+  const kept = openLength(open.points);
+  const closing = closingGap(open.points);
+  if (kept + closing <= EPS) return null;
+  return { start, kept: Math.min(1, kept / measure.total), closing: closing / measure.total };
+}
+
+/** Anchors after Break opens one closed contour (`cut`, from closedCurveBreak).
+ * Each tab of that contour is measured from the break node along the open
+ * contour plus the straight line that closes it again, so closing it puts
+ * every tab on the kept outline back where it was. A tab on the dropped
+ * segment has no place left on the open contour: it takes the same share of
+ * that closing line, which is its old place only if the segment was straight.
+ * Anchors on other contours are unchanged. */
+export function brokenTabAnchors<A extends CncTabAnchor>(
+  anchors: ReadonlyArray<A>,
+  pathIndex: number,
+  polylineIndex: number,
+  cut: ContourBreak,
+): ReadonlyArray<A> {
+  const dropped = 1 - cut.kept;
+  const closedAgain = cut.kept + cut.closing;
+  return anchors.map((anchor) => {
+    if (anchor.pathIndex !== pathIndex || anchor.polylineIndex !== polylineIndex) return anchor;
+    const along = aroundOnce(Math.max(0, Math.min(1, anchor.pathT)) - cut.start);
+    const reach =
+      along <= cut.kept ? along : cut.kept + ((along - cut.kept) / dropped) * cut.closing;
+    return { ...anchor, pathT: aroundOnce(reach / closedAgain) };
+  });
+}
+
+/** How much of an open contour's length, once closed, the straight line from
+ * its end back to its start takes: Close Path and Join close it that way, and
+ * its tabs placed by hand wait for that. 0 for a closed contour; null for a
+ * missing contour or one without length. */
+export function closingLineFraction(path: ColoredPath, polylineIndex: number): number | null {
+  const polyline = resolvedPolylines(path)[polylineIndex];
+  if (polyline === undefined) return null;
+  if (polyline.closed) return 0;
+  if (polyline.points.length === 0) return null;
+  const closing = closingGap(polyline.points);
+  const total = openLength(polyline.points) + closing;
+  return total <= EPS ? null : closing / total;
 }
 
 export function projectCncTabAnchor(
@@ -220,6 +325,45 @@ function projectPointToEdge(point: Vec2, start: Vec2, end: Vec2): EdgeProjection
 
 function interpolate(start: Vec2, end: Vec2, t: number): Vec2 {
   return { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t };
+}
+
+// A curve flattened as resolvedPolylines flattens a path's curves.
+function flattenAsTabsResolve(curve: CurveSubpath): Polyline | null {
+  const flattened = flattenCurveSubpath(curve, {
+    toleranceMm: DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
+    segmentBudget: Number.MAX_SAFE_INTEGER,
+  });
+  return flattened.kind === 'ok' ? flattened.polyline : null;
+}
+
+// The edges measurePolyline counts, without closing the run.
+function openLength(points: ReadonlyArray<Vec2>): number {
+  let total = 0;
+  for (let index = 1; index < points.length; index += 1) {
+    const start = points[index - 1];
+    const end = points[index];
+    if (start === undefined || end === undefined) continue;
+    const length = Math.hypot(end.x - start.x, end.y - start.y);
+    if (length > EPS) total += length;
+  }
+  return total;
+}
+
+// The straight line from an open run's end back to its start, as measurePolyline
+// counts the closing edge once the run is closed.
+function closingGap(points: ReadonlyArray<Vec2>): number {
+  const first = points[0];
+  const last = points.at(-1);
+  if (first === undefined || last === undefined) return 0;
+  const gap = Math.hypot(first.x - last.x, first.y - last.y);
+  return gap > EPS ? gap : 0;
+}
+
+// A fraction of a closed contour taken round into 0 to 1. A place a rounding
+// step short of a whole turn is the start, not 1.
+function aroundOnce(fraction: number): number {
+  const wrapped = fraction - Math.floor(fraction);
+  return wrapped >= 1 ? 0 : wrapped;
 }
 
 function resolvedPolylines(path: ColoredPath): ReadonlyArray<Polyline> {

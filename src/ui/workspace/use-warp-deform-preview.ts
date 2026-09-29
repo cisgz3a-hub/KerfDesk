@@ -9,6 +9,7 @@ import type { Project } from '../../core/scene/project';
 import { useUiStore } from '../state/ui-store';
 import { planWarpDeform } from '../state/warp-deform-plan';
 import { useWarpDeformSession, type WarpDeformRequest } from '../state/warp-deform-session';
+import { useVariableBarcodeDisplay } from './variable-barcode-display';
 import { activeWarpDeformSession } from './warp-deform-tool';
 import { canvasTextSelection, useCanvasTextDisplayProject } from './workspace-text-interaction';
 
@@ -19,10 +20,11 @@ export function useActiveWarpDeformSession(): WarpDeformRequest | null {
 }
 
 /**
- * What the canvas draws: the project with any canvas text draft and any
- * bent Warp or Deform artwork in place, and the selection to outline. While
- * Warp or Deform is on, its handles are drawn instead of the selection box.
- * Preview mode shows the real project.
+ * What the canvas draws: the project with each variable barcode showing its
+ * current value, any canvas text draft and any bent Warp or Deform artwork in
+ * place, and the selection to outline. While Warp or Deform is on, its handles
+ * are drawn instead of the selection box. Preview mode shows the real project,
+ * with variable barcodes at their current value as output encodes them.
  */
 export function useCanvasDisplay(
   project: Project,
@@ -35,7 +37,8 @@ export function useCanvasDisplay(
   readonly additionalSelectedIds: ReadonlySet<string>;
   readonly warpDeformEditor?: WarpDeformRequest;
 } {
-  const { displayProject, textEditing } = useCanvasTextDisplayProject(project, previewMode);
+  const current = useVariableBarcodeDisplay(project);
+  const { displayProject, textEditing } = useCanvasTextDisplayProject(current, previewMode);
   const session = useActiveWarpDeformSession();
   const editor = previewMode ? null : session;
   const display = useMemo(

@@ -3,16 +3,20 @@
 // the part outside it, and is removed. The pieces take their source's place
 // in the stacking and run order, burn with its operations, and end up
 // selected so they can be moved apart. One undo step. A selection it cannot
-// cut gets a notice saying why, and nothing changes.
+// cut, or a cut the project cannot hold (ADR-307 amendment 1), gets a notice
+// saying why, and nothing changes.
 
 import { planCutShapes, type CutShapesPlan } from '../../core/geometry/cut-shapes';
 import { isUnlockedVectorArtwork } from '../../core/geometry/trim-contours';
 import type { Scene, SceneObject } from '../../core/scene';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { removeObjectIdsFromGroups, selectedObjectIds } from './scene-group-actions';
 import { pruneOrphanLayers, pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';
+
+const CUT_FEWER = 'Cut fewer shapes, or delete some objects first.';
 
 export type CutShapesActions = {
   /** Cut the selection with its top-most closed shape; true when anything was cut. */
@@ -49,10 +53,14 @@ function cutShapesMutation(state: AppState): AppState | Partial<AppState> {
   }
   const pieces = plan.value.cuts.flatMap((cut) => cut.pieces.map((piece) => piece.id));
   const repaired = repairDanglingObjectDependencies(applyCut(scene, plan.value));
+  const next = pruneOrphanLayers(repaired.scene);
+  // A project past its limits saves but cannot be opened again (ADR-307
+  // amendment 1): such a cut is refused whole, never made in part.
+  if (refuseSceneLimitOverrun(scene, next, CUT_FEWER)) return state;
   reportDependencyRepairs(repaired);
   useToastStore.getState().pushToast(cutMessage(plan.value, selected.length), 'success');
   return {
-    project: { ...state.project, scene: pruneOrphanLayers(repaired.scene) },
+    project: { ...state.project, scene: next },
     selectedObjectId: pieces[0] ?? null,
     additionalSelectedIds: new Set(pieces.slice(1)),
     selectedPathNode: null,

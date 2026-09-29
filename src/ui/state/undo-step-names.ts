@@ -51,6 +51,17 @@ export function recordUndoStepName(before: Project, name?: string): void {
   else explicitNames.set(before, resolved);
 }
 
+/** For a step from `before` that its command may still refuse once it is built
+ * (ADR-307 amendment 1): returns what puts back the name `before` has now, so
+ * the refused step's undo push leaves the Undo and Redo lists as they were. */
+export function saveUndoStepName(before: Project): () => void {
+  const name = explicitNames.get(before);
+  return () => {
+    if (name === undefined) explicitNames.delete(before);
+    else explicitNames.set(before, name);
+  };
+}
+
 /** The name of the step that turned `before` into `after`. */
 export function undoStepName(before: Project, after: Project): string {
   const explicit = explicitNames.get(before);

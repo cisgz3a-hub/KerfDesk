@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { cncTabAnchorPosition } from '../cnc/cnc-tab-anchors';
 import { compileCncJob } from '../cnc/compile-cnc-job';
 import { DEFAULT_DEVICE_PROFILE } from '../devices';
+import { compileJob } from '../job/compile-job';
+import { laserTabAnchorPosition } from '../job/laser-tab-anchors';
 import {
   createLayer,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -13,6 +15,7 @@ import {
   type RasterImage,
   type Vec2,
 } from '../scene';
+import type { LaserTabAnchor } from '../scene/scene-object';
 import { duplicateObjectIds, duplicateSignature } from './duplicate-shapes';
 
 const LAYERS: ReadonlyArray<Layer> = [
@@ -233,6 +236,102 @@ describe('delete duplicates', () => {
     expect(duplicateObjectIds([image, { ...image, id: 'copy' }], LAYERS, new Set())).toEqual([]);
   });
 });
+
+describe('delete duplicates with laser tabs placed by hand (ADR-494)', () => {
+  const anchor: LaserTabAnchor = {
+    layerColor: '#ff0000',
+    pathIndex: 0,
+    polylineIndex: 0,
+    pathT: 0.1,
+  };
+
+  it('keeps the copy that carries laser tabs, whichever copy comes first', () => {
+    const plain = art('plain', [closed(SQUARE)]);
+    const tabbed = { ...art('tabbed', [closed(SQUARE)]), laserTabAnchors: [anchor] };
+
+    // The two burn different outlines, so neither is a copy of the other.
+    expect(laserLineOutput(tabbed)).not.toEqual(laserLineOutput(plain));
+    expect(duplicateSignature(tabbed, TABBED_LASER_LAYERS)).not.toBe(
+      duplicateSignature(plain, TABBED_LASER_LAYERS),
+    );
+    expect(duplicateObjectIds([plain, tabbed], TABBED_LASER_LAYERS, new Set())).toEqual([]);
+    expect(duplicateObjectIds([tabbed, plain], TABBED_LASER_LAYERS, new Set())).toEqual([]);
+  });
+
+  it('keeps copies whose start point or authored scale puts the same tab fraction elsewhere', () => {
+    const tabbed = { ...art('tabbed', [closed(SQUARE)]), laserTabAnchors: [anchor] };
+    const movedStart = {
+      ...tabbed,
+      id: 'moved-start',
+      paths: [{ color: '#ff0000', polylines: [closed([...SQUARE.slice(1), SQUARE[0]!])] }],
+    };
+    const scaled = {
+      ...tabbed,
+      id: 'scaled',
+      bounds: { minX: 0, minY: 0, maxX: 5, maxY: 10 },
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 2 },
+      paths: [{ color: '#ff0000', polylines: [closed([p(0, 0), p(5, 0), p(5, 10), p(0, 10)])] }],
+    };
+    const trueCopy = { ...tabbed, id: 'true-copy' };
+
+    expect(laserTabAnchorPosition(tabbed, anchor)).toEqual(p(4, 0));
+    expect(laserTabAnchorPosition(movedStart, anchor)).toEqual(p(10, 4));
+    expect(laserTabAnchorPosition(scaled, anchor)).toEqual(p(6, 0));
+    expect(laserLineOutput(movedStart)).not.toEqual(laserLineOutput(tabbed));
+    expect(laserLineOutput(scaled)).not.toEqual(laserLineOutput(tabbed));
+    // The copy that is deleted cut exactly what the kept one cuts, tabs included.
+    expect(laserLineOutput(trueCopy)).toEqual(laserLineOutput(tabbed));
+    expect(
+      duplicateObjectIds([tabbed, movedStart, scaled, trueCopy], TABBED_LASER_LAYERS, new Set()),
+    ).toEqual(['true-copy']);
+  });
+
+  it('keeps laser tabs apart from CNC tabs at the same fraction', () => {
+    const laser = { ...art('laser', [closed(SQUARE)]), laserTabAnchors: [anchor] };
+    const cnc = { ...art('cnc', [closed(SQUARE)]), cncTabAnchors: [anchor] };
+
+    expect(duplicateObjectIds([laser, cnc], LAYERS, new Set())).toEqual([]);
+  });
+
+  it('deletes a copy whose tab list is empty or whose tabs no longer cut', () => {
+    const plain = art('plain', [closed(SQUARE)]);
+    // Break Apart, Join and Trim write an empty list; it cuts no tab.
+    const emptyLaser = { ...art('empty-laser', [closed(SQUARE)]), laserTabAnchors: [] };
+    const emptyCnc = { ...art('empty-cnc', [closed(SQUARE)]), cncTabAnchors: [] };
+    // An anchor kept from before the path changed colour cuts no tab either.
+    const stale = {
+      ...art('stale', [closed(SQUARE)]),
+      laserTabAnchors: [{ ...anchor, layerColor: '#0000ff' }],
+    };
+
+    expect(laserLineOutput(emptyLaser)).toEqual(laserLineOutput(plain));
+    expect(laserLineOutput(stale)).toEqual(laserLineOutput(plain));
+    expect(
+      duplicateObjectIds([plain, emptyLaser, emptyCnc, stale], TABBED_LASER_LAYERS, new Set()),
+    ).toEqual(['empty-laser', 'empty-cnc', 'stale']);
+  });
+});
+
+const TABBED_LASER_LAYERS: ReadonlyArray<Layer> = [
+  {
+    ...createLayer({ id: 'cut', name: 'Cut', color: '#ff0000', mode: 'line' }),
+    tabsEnabled: true,
+    tabSizeMm: 1,
+    tabsPerShape: 2,
+  },
+];
+
+function laserLineOutput(object: ImportedSvg) {
+  const job = compileJob(
+    { objects: [object], layers: TABBED_LASER_LAYERS },
+    DEFAULT_DEVICE_PROFILE,
+  );
+  const segments = job.groups.flatMap((group) =>
+    group.kind === 'cut' ? group.segments.map((segment) => segment.polyline) : [],
+  );
+  expect(segments.length).toBeGreaterThan(0);
+  return segments;
+}
 
 const TABBED_CNC_LAYERS: ReadonlyArray<Layer> = [
   {

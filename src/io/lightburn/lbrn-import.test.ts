@@ -82,7 +82,7 @@ describe('importLightBurnProject', () => {
       fillOverscanMm: 0.3,
     });
     expect(result.report.warnings).toEqual([
-      expect.stringContaining('minimum power'),
+      expect.stringContaining('Min Power was not imported (minPower 12)'),
       expect.stringContaining('converted to 0.3 mm at 15 mm/s'),
     ]);
 

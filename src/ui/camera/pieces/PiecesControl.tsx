@@ -116,10 +116,8 @@ function FoundPieces(props: {
       design: current,
       sample: pieceUnder(scan.pieces, current.centre),
     });
-    state.placeSelectionCopies(placements, state.project);
-    props.onPlaced(
-      `Placed on ${included.length} ${included.length === 1 ? 'piece' : 'pieces'}. One Undo takes them all back. Frame traces the rectangle around all of them, not each piece.`,
-    );
+    const placed = state.placeSelectionCopies(placements, state.project);
+    props.onPlaced(placed ? placedMessage(included.length) : NOTHING_PLACED);
   };
 
   if (scan.pieces.length === 0) {
@@ -162,6 +160,15 @@ function FoundPieces(props: {
     </>
   );
 }
+
+function placedMessage(pieces: number): string {
+  return `Placed on ${pieces} ${pieces === 1 ? 'piece' : 'pieces'}. One Undo takes them all back. Frame traces the rectangle around all of them, not each piece.`;
+}
+
+// The project refuses copies it has no room for, and says why in a notice; a
+// locked or hidden design is not repeated at all.
+const NOTHING_PLACED =
+  'Nothing was placed. Unlock or show the design, or untick some pieces if the project has no room.';
 
 function PieceRow(props: {
   readonly index: number;

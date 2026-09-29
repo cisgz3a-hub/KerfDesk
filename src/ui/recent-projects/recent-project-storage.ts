@@ -40,37 +40,98 @@ export function createMemoryRecentProjectStorage(initial: Entries = []): RecentP
 
 export function createIndexedDbRecentProjectStorage(factory: IDBFactory): RecentProjectStorage {
   let database: Promise<IDBDatabase> | null = null;
+  const forget = (connection: Promise<IDBDatabase>): void => {
+    if (database === connection) database = null;
+  };
   const open = (): Promise<IDBDatabase> => {
-    database ??= openDatabase(factory).catch((error: unknown) => {
-      database = null;
-      throw error;
-    });
-    return database;
+    const connection = openDatabase(factory, () => forget(connection));
+    database = connection;
+    connection.catch(() => forget(connection));
+    return connection;
   };
-  return {
-    load: async () => readList(await open()),
-    update: async (change) => changeList(await open(), change),
-  };
-}
-
-/** IndexedDB when the browser offers it. Where it is missing or refuses (a
- * locked-down profile), the list lasts for this session only. */
-export function defaultRecentProjectStorage(): RecentProjectStorage {
-  const factory = indexedDbFactory();
-  const memory = createMemoryRecentProjectStorage();
-  if (factory === null) return memory;
-  const primary = createIndexedDbRecentProjectStorage(factory);
-  let failed = false;
-  const run = async (action: (storage: RecentProjectStorage) => Promise<Entries>) => {
-    if (failed) return action(memory);
+  // A failed operation drops its connection, so the next one opens a new one:
+  // a connection the browser closed (a version change, lost storage) never
+  // works again.
+  const run = async (action: (database: IDBDatabase) => Promise<Entries>): Promise<Entries> => {
+    const connection = database ?? open();
     try {
-      return await action(primary);
-    } catch {
-      failed = true;
-      return action(memory);
+      return await action(await connection);
+    } catch (error) {
+      forget(connection);
+      void connection.then((opened) => opened.close()).catch(() => undefined);
+      throw error;
     }
   };
-  return { load: () => run((s) => s.load()), update: (change) => run((s) => s.update(change)) };
+  return { load: () => run(readList), update: (change) => run((db) => changeList(db, change)) };
+}
+
+/** Consecutive refusals after which IndexedDB is left alone for this session. */
+export const RECENT_PROJECT_STORAGE_ATTEMPTS = 3;
+
+export type RecentProjectStorageOptions = {
+  /** Called once, when IndexedDB has refused so often that the list will last
+   * for this session only. */
+  readonly onUnavailable?: () => void;
+};
+
+/** IndexedDB when the browser offers it; where it is missing, the list lasts
+ * for this session only. */
+export function defaultRecentProjectStorage(
+  options: RecentProjectStorageOptions = {},
+): RecentProjectStorage {
+  const factory = indexedDbFactory();
+  if (factory === null) return createMemoryRecentProjectStorage();
+  return createFallbackRecentProjectStorage(createIndexedDbRecentProjectStorage(factory), options);
+}
+
+/** A refusal is often transient (a dropped connection, a busy profile), so it
+ * never turns persistence off by itself. While `primary` refuses, the list
+ * this window last saw keeps being shown and changed, and those changes are
+ * replayed onto the stored list, inside the next transaction that succeeds, so
+ * another window's changes are kept too. After
+ * `RECENT_PROJECT_STORAGE_ATTEMPTS` refusals in a row the list lasts for this
+ * session only, and `onUnavailable` says so once. */
+export function createFallbackRecentProjectStorage(
+  primary: RecentProjectStorage,
+  options: RecentProjectStorageOptions = {},
+): RecentProjectStorage {
+  let known: Entries = [];
+  let unstored: ReadonlyArray<(entries: Entries) => Entries> = [];
+  let refusals = 0;
+  const available = (): boolean => refusals < RECENT_PROJECT_STORAGE_ATTEMPTS;
+  const attempt = async (
+    action: (replay: (entries: Entries) => Entries) => Promise<Entries>,
+  ): Promise<boolean> => {
+    const replaying = unstored;
+    try {
+      known = await action((entries) => replaying.reduce((list, change) => change(list), entries));
+      unstored = unstored.slice(replaying.length);
+      refusals = 0;
+      return true;
+    } catch {
+      refusals += 1;
+      if (refusals === RECENT_PROJECT_STORAGE_ATTEMPTS) options.onUnavailable?.();
+      return false;
+    }
+  };
+  return {
+    load: async () => {
+      if (available()) {
+        await attempt((replay) =>
+          unstored.length === 0 ? primary.load() : primary.update(replay),
+        );
+      }
+      return known;
+    },
+    update: async (change) => {
+      if (available() && (await attempt((replay) => primary.update((e) => change(replay(e)))))) {
+        return known;
+      }
+      known = change(known);
+      if (available()) unstored = [...unstored, change];
+      return known;
+    },
+  };
 }
 
 export function loadRecentProjectLimit(): number {
@@ -100,7 +161,9 @@ function indexedDbFactory(): IDBFactory | null {
   }
 }
 
-function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
+/** `onClosed` runs when the browser closes the connection, or asks for it to be
+ * closed for another window's version change. */
+function openDatabase(factory: IDBFactory, onClosed: () => void): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = factory.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {
@@ -110,7 +173,11 @@ function openDatabase(factory: IDBFactory): Promise<IDBDatabase> {
     };
     request.onsuccess = () => {
       const database = request.result;
-      database.onversionchange = () => database.close();
+      database.onversionchange = () => {
+        database.close();
+        onClosed();
+      };
+      database.onclose = onClosed;
       resolve(database);
     };
     request.onerror = () => reject(request.error ?? new Error('Recent Projects storage failed.'));

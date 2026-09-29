@@ -39,10 +39,25 @@ export type CopyAlongPathLayout =
       /** Centre-to-centre distance when every copy is the same distance apart. */
       readonly stepMm: number | null;
     }
+  | CopyAlongPathShortfall;
+
+/** How many copies a layout has and how far apart, without the copies themselves. */
+export type CopyAlongPathCount =
+  | {
+      readonly kind: 'counted';
+      readonly count: number;
+      /** Centre-to-centre distance when every copy is the same distance apart. */
+      readonly stepMm: number | null;
+    }
+  | CopyAlongPathShortfall;
+
+export type CopyAlongPathShortfall =
   /** The offsets leave no room on an open guide. */
   | { readonly kind: 'no-room' }
   /** The spacing or gap would pile every copy on one point. */
-  | { readonly kind: 'no-step' };
+  | { readonly kind: 'no-step' }
+  /** More copies than the caller said it can take. */
+  | { readonly kind: 'too-many' };
 
 // Rounding slack for "fits exactly": a 100 mm guide takes a copy every 25 mm
 // at 0, 25, 50, 75 and 100.
@@ -50,26 +65,65 @@ const FIT_EPS_MM = 1e-6;
 // Copies closer than this along the guide are one pile, not a row.
 const MIN_STEP_MM = 1e-3;
 
+// The copies as a count and the distance of each along the guide: the count
+// modes work each distance out on request, so a count costs nothing to hold.
 type Distances =
-  | { readonly kind: 'ok'; readonly distances: ReadonlyArray<number> }
-  | { readonly kind: 'no-room' | 'no-step' };
+  | {
+      readonly kind: 'ok';
+      readonly count: number;
+      readonly at: (index: number) => number;
+    }
+  | CopyAlongPathShortfall;
 
+type Resolved = Extract<Distances, { kind: 'ok' }> & { readonly along: AlongPath };
+
+/**
+ * Lay out the copies. `maxCopies` is the most the caller can take: a layout
+ * that needs more comes back as 'too-many' before anything is laid out, and a
+ * spacing or gap stops stepping there however long the guide is.
+ */
 export function copyAlongPathLayout(
   guide: CopyAlongPathGuidePath,
   source: Bounds,
   spec: CopyAlongPathSpec,
+  maxCopies: number = Number.POSITIVE_INFINITY,
 ): CopyAlongPathLayout {
-  const along = alongPath(guide, source, spec);
-  const result = guide.closed ? closedDistances(along) : openDistances(along);
-  if (result.kind !== 'ok') return result;
+  const resolved = resolveCopies(guide, source, spec, maxCopies);
+  if (resolved.kind !== 'ok') return resolved;
   const centre = { x: (source.minX + source.maxX) / 2, y: (source.minY + source.maxY) / 2 };
   return {
     kind: 'placed',
-    placements: result.distances.map((distance) =>
-      placementAt(guide, along.wrap(distance), centre, spec.rotateCopies),
+    placements: Array.from({ length: resolved.count }, (_, index) =>
+      placementAt(guide, resolved.along.wrap(resolved.at(index)), centre, spec.rotateCopies),
     ),
-    stepMm: uniformStep(result.distances, spec),
+    stepMm: uniformStep(resolved, spec),
   };
+}
+
+/**
+ * How many copies `copyAlongPathLayout` would place, and how far apart, without
+ * laying any of them out: the same answer for the cost of finding the count.
+ */
+export function copyAlongPathCount(
+  guide: CopyAlongPathGuidePath,
+  source: Bounds,
+  spec: CopyAlongPathSpec,
+  maxCopies: number = Number.POSITIVE_INFINITY,
+): CopyAlongPathCount {
+  const resolved = resolveCopies(guide, source, spec, maxCopies);
+  if (resolved.kind !== 'ok') return resolved;
+  return { kind: 'counted', count: resolved.count, stepMm: uniformStep(resolved, spec) };
+}
+
+function resolveCopies(
+  guide: CopyAlongPathGuidePath,
+  source: Bounds,
+  spec: CopyAlongPathSpec,
+  maxCopies: number,
+): Resolved | CopyAlongPathShortfall {
+  const along = alongPath(guide, source, spec);
+  const result = guide.closed ? closedDistances(along, maxCopies) : openDistances(along, maxCopies);
+  return result.kind === 'ok' ? { ...result, along } : result;
 }
 
 /** The direction of travel at a distance along the walk: the edge leaving that point, or the last edge at the very end. */
@@ -134,46 +188,58 @@ function extentAlongPath(source: Bounds, tangent: Vec2, rotateCopies: boolean): 
   return rotateCopies ? width : Math.abs(width * tangent.x) + Math.abs(height * tangent.y);
 }
 
-function openDistances(along: AlongPath): Distances {
+function openDistances(along: AlongPath, maxCopies: number): Distances {
   const start = along.startMm;
   const end = along.lengthMm - Math.max(0, finite(along.spec.endOffsetMm));
   const span = end - start;
   if (span < -FIT_EPS_MM) return { kind: 'no-room' };
   if (along.spec.mode === 'count') {
     const count = positiveCount(along.spec.count);
-    if (count === 1) return { kind: 'ok', distances: [start] };
+    if (count > maxCopies) return { kind: 'too-many' };
+    if (count === 1) return { kind: 'ok', count, at: () => start };
     if (span < MIN_STEP_MM) return { kind: 'no-room' };
-    return {
-      kind: 'ok',
-      distances: Array.from({ length: count }, (_, index) => start + (span * index) / (count - 1)),
-    };
+    return { kind: 'ok', count, at: (index) => start + (span * index) / (count - 1) };
   }
-  return stepAlong(along, start, (next) => next <= end + FIT_EPS_MM);
+  return stepAlong(along, start, (next) => next <= end + FIT_EPS_MM, maxCopies);
 }
 
-function closedDistances(along: AlongPath): Distances {
+function closedDistances(along: AlongPath, maxCopies: number): Distances {
   const start = along.startMm;
   const length = along.lengthMm;
   if (along.spec.mode === 'count') {
     const count = positiveCount(along.spec.count);
-    return {
-      kind: 'ok',
-      distances: Array.from({ length: count }, (_, index) => start + (length * index) / count),
-    };
+    if (count > maxCopies) return { kind: 'too-many' };
+    return { kind: 'ok', count, at: (index) => start + (length * index) / count };
   }
   // The last copy keeps at least the asked-for distance from the first one
   // round the seam; whatever is left over goes into that last space.
   const seam = start + length;
-  return stepAlong(along, start, (next) => seam - next >= along.minStep(next, seam) - FIT_EPS_MM);
+  return stepAlong(
+    along,
+    start,
+    (next) => seam - next >= along.minStep(next, seam) - FIT_EPS_MM,
+    maxCopies,
+  );
 }
 
-function stepAlong(along: AlongPath, start: number, fits: (next: number) => boolean): Distances {
+// Steps until the next copy no longer fits, or until there would be more
+// copies than the caller can take, so a tiny spacing on a long guide costs as
+// much as the copies it may have and no more.
+function stepAlong(
+  along: AlongPath,
+  start: number,
+  fits: (next: number) => boolean,
+  maxCopies: number,
+): Distances {
+  if (maxCopies < 1) return { kind: 'too-many' };
   const distances = [start];
   let current = start;
   for (;;) {
     const next = nextDistance(along, current);
     if (next - current < MIN_STEP_MM) return { kind: 'no-step' };
-    if (!fits(next)) return { kind: 'ok', distances };
+    if (!fits(next))
+      return { kind: 'ok', count: distances.length, at: (index) => distances[index] ?? 0 };
+    if (distances.length >= maxCopies) return { kind: 'too-many' };
     distances.push(next);
     current = next;
   }
@@ -206,11 +272,10 @@ function placementAt(
 
 // Upright copies kept a gap apart reach further along a diagonal than along a
 // straight run, so only then does the centre distance vary.
-function uniformStep(distances: ReadonlyArray<number>, spec: CopyAlongPathSpec): number | null {
-  const [first, second] = distances;
-  if (first === undefined || second === undefined) return null;
+function uniformStep(distances: Resolved, spec: CopyAlongPathSpec): number | null {
+  if (distances.count < 2) return null;
   if (spec.mode === 'gap' && !spec.rotateCopies) return null;
-  return second - first;
+  return distances.at(1) - distances.at(0);
 }
 
 function normalizeDegrees(value: number): number {
