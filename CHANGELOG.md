@@ -71,6 +71,9 @@ release before it is tagged.
   one is downloading or ready, checks now, and offers new versions early; the status bar says
   Update ready when one will install as KerfDesk closes
   ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Drop a project to open it.** Dragging a KerfDesk or LightBurn project onto the window opens it,
+  after the usual question about unsaved changes
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

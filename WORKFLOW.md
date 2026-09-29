@@ -140,7 +140,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 
 #### Success — single valid SVG
 1. User drags an SVG file from desktop / Finder / Explorer into the app window.
-2. On `dragenter`, viewport shows a dashed-blue overlay with text "Drop to import" centered.
+2. On `dragenter`, viewport shows a dashed-blue overlay with text "Drop to open or import" centered.
 3. On `drop`:
    1. Overlay disappears.
    2. A normal file-backed SVG is UTF-8-decoded incrementally in the import Worker, validated while
@@ -164,6 +164,15 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 3. Each is offset 10mm right + 10mm down from the previous to avoid full overlap.
 4. After import, all imported objects are multi-selected.
 5. Toast: `Imported 3 designs · 3 artwork operations`.
+
+#### Success — a project file dropped on the window (ADR-378 Amendment 1)
+1. User drops a KerfDesk project (`.lf2`) or a LightBurn project (`.lbrn`, `.lbrn2`).
+2. It opens exactly like a project double-clicked in Explorer (ADR-378): the Save / Don't Save /
+   Cancel question comes first when the current project has unsaved changes, and during a job or
+   with a dialog open the file waits in the banner instead.
+3. Only the first project in a drop opens. The drop's other files are not imported; toast
+   (warning): `Opening <filename>. Ignored <n> other dropped file(s); drop artwork again once the
+   project opens.`
 
 #### Success — SVG with embedded raster image
 1. Embedded PNG, JPEG, BMP and WebP pixels are decoded into raster artwork, preserving the SVG
