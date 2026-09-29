@@ -16,6 +16,7 @@ Keep this file small. It defines durable repository rules; task-specific details
 - Before asking a blocking question, complete the authorized read-only or reversible preparation that makes the decision concrete and reviewable.
 - Ask a focused question only when a missing choice would materially change the result, an action is destructive or irreversible, or external authorization is required.
 - Inspect the current checkout and `git status` before editing. Preserve unrelated tracked and untracked work; do not reset, discard, or silently rewrite it.
+- Start from GitHub. Claude cloud sessions, Claude Code on the maintainer's PC and Codex all push to `origin`, so begin each task with `git fetch origin` and work from the latest `origin/main`: branch from it for new work, or merge it into a branch you continue.
 - Keep each change scoped to the requested outcome. Avoid unrelated cleanup.
 - Verify uncertain facts in the current source or a primary upstream source. Never invent controller settings, G-code behavior, safety behavior, version constraints, API details, or test results.
 - Treat current code as evidence of behaviour, not proof of correctness. Challenge its algorithms, maths, configuration model, and assumptions with independent reasoning, reproductions, tests, and primary sources. Revise confirmed in-scope flaws without repeatedly asking permission, while preserving unrelated work and the machine, output, Frame, hardware, and publication boundaries below.
@@ -42,6 +43,12 @@ Keep this file small. It defines durable repository rules; task-specific details
 - Run the narrowest meaningful checks first. Broaden to `pnpm test`, `pnpm lint`, `pnpm typecheck`, and `pnpm format:check` when the change warrants them; use `pnpm release:check` for release readiness.
 - Do not repeat passing checks without a new change or unresolved reason.
 - Do not merge, deploy, publish, or change provider or hardware state unless the user requests it.
+
+## Licence
+
+- KerfDesk is proprietary, all rights reserved (`LICENSE`, ADR-543). Only versions up to the `mit-final` tag stay MIT (`LICENSE-MIT`). Never describe KerfDesk as open source or MIT-licensed, and change `LICENSE`, `LICENSE-MIT` or `public/eula.txt` only when the user asks.
+- Before pushing a branch, check that `LICENSE` says "All rights reserved". If it still holds the MIT License, merge `origin/main` and check again; do not push until it passes. While the repository is public, a push under the MIT `LICENSE` releases that work under MIT for good.
+- Add outside code, fonts or assets only under a licence that allows a paid, closed-source app, and list them in `THIRD_PARTY_NOTICES.md`. New dependencies must pass `pnpm license-check`, which rejects GPL-family licences.
 
 ## Delegation and communication
 
