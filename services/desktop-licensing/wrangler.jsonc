@@ -1,0 +1,26 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "kerfdesk-desktop-licensing",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-28",
+  "workers_dev": false,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": {
+    "LICENSING_ENABLED": "false",
+    "PAYMENTS_ENABLED": "false",
+    "PAYMENT_PROVIDER": "paddle",
+    "PADDLE_CHECKOUT_URL": "https://kerfdesk.com/buy.html",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "LICENSE_AUTHORITY", "class_name": "LicenseAuthority" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LicenseAuthority"] }],
+  "ratelimits": [
+    {
+      "name": "REQUEST_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 30, "period": 60 },
+    },
+  ],
+}

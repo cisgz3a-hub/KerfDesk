@@ -14,6 +14,8 @@ files:
   - '!dist-electron/**/*.map'
   - dist/web/**/*
   - package.json
+  - public/desktop-release-manifest.mjs
+  - public/desktop-release-keys.json
   # The renderer is bundled into dist/web, so the main process needs only
   # electron-updater at runtime. Ship its dependency closure and no other
   # node_modules (ADR-483): the renderer-only packages were 88.6 MB of the

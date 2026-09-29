@@ -7561,13 +7561,11 @@ behavior or create a second product implementation.
 ### F-DESK1. Download and install an unsigned Preview (ADR-248)
 
 1. In the web app, the operator opens the Camera panel and clicks **Download
-   desktop app** to open the public KerfDesk GitHub Releases page directly. The
-   explanatory `https://kerfdesk.com/download` page remains available manually.
-2. The download page is static, scriptless, and opens the public
-   **cisgz3a-hub/KerfDesk** Releases list for each platform. It names the exact
-   asset pattern the operator must choose from the newest immutable prerelease.
-   It does not send Preview users through a `latest` alias, a dynamic resolver,
-   or the stable R2 update feed:
+   desktop app** to open `https://kerfdesk.com/download.html`.
+2. The download page verifies a bounded, publisher-signed public manifest against
+   the website's public key anchor before exposing exact-version R2 links (ADR-523).
+   Missing, invalid or unreachable metadata leaves download links unavailable.
+   A requested `?version=` never silently changes to another version. Assets are:
    - **Windows 10/11, x64:** `KerfDesk-<version>-windows-x64-setup.exe`
      (NSIS, per-user, `oneClick:false`, user-selectable install directory).
    - **macOS 13+, Intel x64:** `KerfDesk-<version>-macos-x64.dmg`.
@@ -7611,39 +7609,29 @@ behavior or create a second product implementation.
    installed desktop app does not download or PWA-install itself.
 
 #### Edge — Preview is free to launch without an account or gate
-1. Preview shows no account, sign-in, activation, license-key, trial-renewal,
-   subscription, or paywall flow. Launch continues directly to F-A1. Any future
-   commercial entitlement flow is not authorized by this workflow. It first
-   requires the maintainer's explicit prior permission and coordinated
-   supersession of the no-new-guard governance where applicable; only then may a
-   new ADR, workflow, and implementation be proposed.
+1. Preview launches directly into F-A1 without activation. Help → Licence explains
+   that this is the free edition. The separately requested commercial channel is
+   governed by ADR-523 and F-DESK-LIC below; ordinary free/Preview updates cannot
+   migrate the user into paid access.
 
 ### F-DESK2. Desktop updates and ordinary shutdown
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
-   metadata request to the fixed public `cisgz3a-hub/KerfDesk` GitHub Actions
-   endpoint for successful runs of
-   `.github/workflows/release-desktop-preview.yml` (ADR-249). Main accepts only a
-   completed successful push run with a strict newer `vX.Y.Z-preview.N` tag and
-   exact workflow path. A green run means the workflow's final job verified the
-   immutable prerelease, canonical six-asset set, checksums, source manifest, and
-   attestations. Dev, web, stable-version, unsupported-platform, malformed,
-   failed/cancelled/in-progress, downgrade, offline, rate-limited, and failed
-   requests produce no visible control and never block startup.
+   metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
+   Main verifies the signed envelope against its packaged Preview public keys and
+   accepts only a newer strict Preview version. The publisher exposes this pointer
+   only after every versioned artifact has passed readback verification. Malformed,
+   tampered, oversized, stale, offline or failed responses never block startup.
 2. When a newer Preview exists, a passive **Download update** control appears at
    the right edge of the status bar and a polite live region announces its exact
    version. There is no popup and the control receives no automatic focus. It
    remains available during a job because it cannot reload, download, execute,
    install, restart, or change machine state.
-3. Clicking **Download update** opens only the fixed public
-   `https://github.com/cisgz3a-hub/KerfDesk/releases/tag/v<version>` page for the
-   exact announced version in the system browser. This bypasses any legacy
-   service-worker copy of the first-party landing page and cannot drift to a
-   newer-by-date but lower semantic version.
-   The Electron child window is denied. API-provided URLs are ignored, Preview
-   updater trust stays false, and the app never consumes
-   `latest.yml`, a `latest` redirect, R2 update metadata, or installer bytes.
-   The operator selects an exact GitHub prerelease asset and installs it manually.
+3. Clicking **Download update** opens only the fixed first-party download page
+   with the exact announced version in the system browser. The page verifies that
+   version's manifest before exposing its immutable artifact links. The Electron
+   child window is denied. API-provided destinations are ignored; Preview never
+   consumes an automatic-install feed or installer bytes inside the app.
 4. The signed stable Windows path remains governed by ADR-024, ADR-135, and
    ADR-142. Once production signing is enabled and verified, each signed stable
    packaged launch checks the R2 feed's `latest.yml` (`electron/auto-update.ts`).
@@ -7654,7 +7642,7 @@ behavior or create a second product implementation.
    notarized macOS stable updater remains out of scope.
 
 #### Error — offline or feed unreachable
-1. Preview GitHub metadata failures are silent and non-fatal; the status control
+1. Preview signed-metadata failures are silent and non-fatal; the status control
    remains absent and the installed version continues normally. Signed stable R2
    failures are also logged only through `onError` and never block startup.
 
@@ -7675,6 +7663,35 @@ behavior or create a second product implementation.
    unreachable window, with a warning that Abort and saving are unconfirmed.
    Keeping the app open invalidates late close replies. Close approval is tied to
    the reviewed document identity and the displayed stop warning.
+
+### F-DESK-LIC. Commercial admission, payment and updates (ADR-523)
+
+1. An explicitly prepared commercial package checks its signed saved licence before
+   mounting the workspace. A fresh install offers a full 30-day trial or activation
+   with a licence key. It must not expose project routes, camera or serial permission
+   before admission. Closing this initial screen needs no workspace stop handoff;
+   admission racing with close causes the normal handoff to run instead.
+2. Help → Licence manages activation, trial, refresh, deactivation, purchase and
+   optional update renewal. Paid versions remain usable after update coverage ends.
+   Admission stays latched until this app session closes; licence changes never
+   interrupt the workspace or an ongoing job. The panel is nonmodal and dismissible.
+3. Purchase and renewal create a fixed-price server transaction. The main process
+   saves its pending claim securely before opening the approved checkout URL.
+   After payment the operator returns to the app and selects **Check payment**.
+   A browser success event cannot issue a licence. Pending/ambiguous payments stay
+   recoverable and must not encourage a duplicate purchase.
+4. Deactivation removes the local grant before contacting the server. If offline,
+   the app truthfully shows that freeing the seat is pending and retries later.
+   Developer grants for Johann and Father are separate private keys with normal
+   computer-transfer behaviour and unlimited update coverage.
+5. Trusted signed Windows commercial builds use only the separate commercial
+   catalog. The newest eligible signed release is selected by immutable release
+   date and version; an ineligible newer release cannot replace an older eligible
+   one. Manifest hashes, native publisher validation and actual updater availability
+   must all pass before download. Eligibility is rechecked at download completion
+   and natural quit. No forced quit is issued and the ordinary close handoff remains.
+6. Live payment, hosted service and genuine signed upgrade qualification remain
+   pending. Follow `docs/desktop-commercial-launch.md` before customer publication.
 
 ### F-DESK3. Release + manual verification checklist (load-bearing)
 

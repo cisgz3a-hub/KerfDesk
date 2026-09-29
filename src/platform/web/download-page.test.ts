@@ -2,19 +2,19 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const RELEASES_URL = 'https://github.com/cisgz3a-hub/KerfDesk/releases';
-
 function downloadPage(): string {
   return readFileSync(join(process.cwd(), 'public', 'download.html'), 'utf8');
 }
 
 describe('desktop Preview download page', () => {
-  it('routes every desktop choice to the public KerfDesk release list', () => {
-    const releaseLinks = downloadPage().split(`class="download" href="${RELEASES_URL}"`).length - 1;
-
-    expect(releaseLinks).toBe(3);
+  it('enables versioned downloads only after signature verification', () => {
+    const page = downloadPage();
+    expect(page).toContain('src="/desktop-downloads.mjs"');
+    expect(page).toContain('dl.kerfdesk.com');
+    expect(page).toContain('id="release-status" role="status"');
+    expect(page.match(/class="download" data-preview-suffix="[^"]+" hidden/g)).toHaveLength(3);
+    expect(page).not.toContain('github.com/cisgz3a-hub/KerfDesk/releases');
   });
-
   it('names each exact-version Preview asset pattern', () => {
     const page = downloadPage();
 
@@ -37,14 +37,14 @@ describe('desktop Preview download page', () => {
     expect(page).toContain('Open Anyway');
   });
 
-  it('uses no mutable update alias or executable page script', () => {
+  it('uses no executable update alias and isolates download-page network access', () => {
     const page = downloadPage();
 
-    expect(page).not.toContain('dl.kerfdesk.com');
+    expect(page).toContain("connect-src 'self' https://dl.kerfdesk.com");
     expect(page).not.toContain('kerfdesk-latest');
     expect(page).not.toContain('/releases/latest');
     expect(page).not.toContain('latest.yml');
-    expect(page).not.toMatch(/<script\b/i);
+    expect(page).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   });
 
   it('keeps Linux users on the web app', () => {

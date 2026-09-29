@@ -97,6 +97,9 @@ import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-p
 import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
+import { createDesktopLicensing } from './desktop-licensing.js';
+import { withLicensingRoutes } from './licensing-routes.js';
+import type { LicensingRuntime } from './licensing-runtime.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -113,6 +116,8 @@ if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_I
 
 let desktopWindowReady = false;
 let quitRequested = false;
+let desktopLicensing: LicensingRuntime | null = null;
+let prepareLicenceQuit: (() => void) | null = null;
 const reopenDesktopWindow = createDesktopWindowReopener({
   isReady: () => desktopWindowReady,
   isQuitting: () => quitRequested,
@@ -180,6 +185,7 @@ const CSP_POLICY = [
 ].join('; ');
 let cameraBridge: RtspCameraBridgeHandle | null = null;
 app.on('before-quit', () => {
+  prepareLicenceQuit?.();
   quitRequested = true;
 });
 const installSessionPermissions = sessionPermissionsOnce(installPermissionHandlers);
@@ -259,6 +265,7 @@ function installContentSecurityPolicy(ses: Session): void {
 
 function installPermissionHandlers(ses: Session): void {
   ses.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+    if (desktopLicensing !== null && !desktopLicensing.sessionAuthorized()) return false;
     const baseInput = {
       permission: String(permission),
       requestingOrigin,
@@ -286,6 +293,10 @@ function installPermissionHandlers(ses: Session): void {
   // an identical twin, and Forget revokes it. Only the trusted origin reaches
   // the picker: requestPort is gated by the permission check handler above.
   ses.setPermissionRequestHandler((wc, permission, cb, details) => {
+    if (desktopLicensing !== null && !desktopLicensing.sessionAuthorized()) {
+      cb(false);
+      return;
+    }
     const mediaTypes =
       'mediaTypes' in details && details.mediaTypes !== undefined ? details.mediaTypes : undefined;
     cb(
@@ -307,6 +318,11 @@ function installPermissionHandlers(ses: Session): void {
     webContents: WebContents,
     callback: (portId: string) => void,
   ): void => {
+    if (desktopLicensing !== null && !desktopLicensing.sessionAuthorized()) {
+      event.preventDefault();
+      callback('');
+      return;
+    }
     handleSelectSerialPort(event, portList, webContents, callback);
   };
   (ses.on as unknown as (e: 'select-serial-port', l: typeof onSelectSerialPort) => void)(
@@ -378,6 +394,7 @@ async function createWindow(): Promise<void> {
   installDesktopContextMenu(window);
   const closeGuard = installDesktopWindowClose(window, {
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
+    isWorkspaceAdmitted: () => desktopLicensing?.sessionAuthorized() ?? true,
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
       quitRequested = false;
@@ -493,18 +510,42 @@ if (HAS_SINGLE_INSTANCE_LOCK)
       // window. createWindow() will call loadURL('app://app/index.html'),
       // which fails fast if this handler isn't installed yet.
       const distRoot = path.join(__dirname, '..', 'dist', 'web');
-      protocol.handle('app', DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)));
+      autoUpdater.on('error', () => console.warn('Desktop updater reported an error.'));
+      const licence = createDesktopLicensing({
+        appPath: app.getAppPath(),
+        userDataPath: DESKTOP_DATA_PATH,
+        version: app.getVersion(),
+        packaged: app.isPackaged,
+        trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
+        updater: autoUpdater,
+        onAuthorized: () => {
+          if (NATIVE_SMOKE_CONFIG === null) void startCameraBridgeSafely();
+        },
+      });
+      desktopLicensing = licence.runtime;
+      prepareLicenceQuit = licence.prepareQuit;
+      const staticRoutes = makeAppProtocolHandler(distRoot);
+      const projectRoutes = DESKTOP_PROJECT_OPENS.routes(staticRoutes);
+      protocol.handle(
+        'app',
+        withLicensingRoutes(
+          (request) =>
+            licence.runtime.sessionAuthorized() ? projectRoutes(request) : staticRoutes(request),
+          licence.runtime,
+        ),
+      );
       // A Session survives macOS window closure; install its listeners once,
       // before the first renderer, rather than adding another picker on reopen.
       installSessionPermissions(session.defaultSession);
-      if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
+      if (NATIVE_SMOKE_CONFIG === null && licence.config.channel === 'free')
+        await startCameraBridgeSafely();
       // Background auto-update against our self-hosted feed (ADR-024/135). This is
       // inert until production artifacts are code-signed; once trusted, updates
       // install on quit after the application close handoff. This does not prove
       // the machine physically stopped. Check errors are never fatal to startup.
       configureAutoUpdater(autoUpdater, {
         isPackaged: app.isPackaged,
-        isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
+        isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED && licence.config.channel === 'free',
         onError: (error: unknown) => console.warn('Desktop update check failed:', error),
       });
       await createWindow();

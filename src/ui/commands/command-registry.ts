@@ -10,7 +10,7 @@ import {
   toolsCommands,
   windowCommands,
 } from './command-families';
-import { discussionsCommand, reportBugCommand } from './support-command-family';
+import { discussionsCommand, reportBugCommand, licenceCommand } from './support-command-family';
 import { tutorialsCommand } from './help-command-family';
 import { editCommands } from './edit-command-family';
 import { arrangeCommands } from './arrange-command-family';
@@ -40,6 +40,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       connectionHelpCommand(ctx),
       reportBugCommand(),
       discussionsCommand(),
+      ...(ctx.desktopLicensing === true ? [licenceCommand()] : []),
     ],
     ctx.machineKind,
   );

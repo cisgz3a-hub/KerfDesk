@@ -12,7 +12,7 @@ type Outcome = {
   readonly args?: ReadonlyArray<string | number>;
   readonly guard?: string;
   readonly url?: string;
-  readonly special?: 'tutorials' | 'unavailable';
+  readonly special?: 'tutorials' | 'unavailable' | 'licence';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -169,6 +169,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'window.project-notes': { callback: 'projectNotes' },
   'window.undo-history': { callback: 'undoHistory' },
   'help.about': { callback: 'showAbout' },
+  'help.licence': { special: 'licence' },
   'help.tutorials': { special: 'tutorials' },
   'help.connection': { callback: 'showConnectionHelp' },
   'help.safety': { callback: 'showSafety' },
@@ -204,6 +205,7 @@ function availableContext(id: CommandId): AppCommandContext {
   return baseCtx({
     ...eligibility,
     connected: id !== 'laser.connect',
+    desktopLicensing: true,
     printAndCutFeatureEnabled: true,
     printAndCutProfileSupported: true,
     printAndCut: vi.fn(),
@@ -239,6 +241,8 @@ describe('every registered application menu action', () => {
     '$id clicks through the menu to the expected outcome',
     async ({ id, outcome }) => {
       const context = availableContext(id);
+      const licenceEvent = vi.fn();
+      window.addEventListener('kerfdesk:licence-settings', licenceEvent, { once: true });
       const opened: Array<{ href: string; target: string; rel: string }> = [];
       vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
         this: HTMLAnchorElement,
@@ -246,6 +250,8 @@ describe('every registered application menu action', () => {
         opened.push({ href: this.href, target: this.target, rel: this.rel });
       });
       const button = await clickCommand(id, context);
+      expect(licenceEvent).toHaveBeenCalledTimes(Number(outcome.special === 'licence'));
+      window.removeEventListener('kerfdesk:licence-settings', licenceEvent);
       if (outcome.special === 'unavailable') {
         expect(button.disabled).toBe(true);
         expect(button.title).toContain('Z-motion generator');

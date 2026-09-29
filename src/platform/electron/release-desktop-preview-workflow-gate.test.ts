@@ -191,13 +191,12 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     );
     expect(cadence).toContain('--releases="${RUNNER_TEMP}/preview-releases.json"');
     for (const source of [workflow, cadence]) {
-      const metadataCommands = source
-        .replace(/\\\r?\n/g, ' ')
-        .split('\n')
-        .filter((line) => line.includes('gh api') && line.includes('--slurp'));
-      expect(metadataCommands).toHaveLength(1);
-      expect(metadataCommands[0]).not.toMatch(/--jq|--template/);
+      expect(source).toContain('node scripts/filter-completed-previews.mjs --fetch');
     }
+    const metadataFetcher = repoFile('scripts/filter-completed-previews.mjs');
+    expect(metadataFetcher).toContain("'--paginate', '--slurp'");
+    expect(metadataFetcher).not.toMatch(/--jq|--template/);
+    expect(workflow).toContain('actions: read');
     expect(workflow.indexOf('release-body')).toBeLessThan(workflow.indexOf('gh release create'));
     expect(repoFile('CHANGELOG.md')).toMatch(/^## Unreleased$/m);
     // The v* tag ruleset keeps release tags with the maintainer; the cadence only drafts.
@@ -214,7 +213,7 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(cadence).toContain('for extra in "${open_issues[@]:1}"; do');
   });
 
-  it('cannot publish Preview updater metadata, R2 objects, or secret-backed output', () => {
+  it('publishes signed Preview metadata and keeps executable updater trust disabled', () => {
     const windowsBuild = workflow.indexOf('Build unsigned Windows Preview');
     const windowsCleanup = workflow.indexOf(
       'Remove local Windows Preview updater metadata before verification',
@@ -230,9 +229,15 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
     expect(`${windowsVerifier}\n${macVerifier}`).toContain("-name 'latest*.yml'");
     expect(`${workflow}\n${macVerifier}`).toContain("-name '*.blockmap'");
     expect(workflow).not.toContain('wrangler r2');
-    expect(workflow).not.toContain('dl.kerfdesk.com');
-    expect(workflow).not.toContain('${{ secrets.');
-    expect(workflow).not.toContain('environment:');
+    expect(workflow).toContain('dl.kerfdesk.com');
+    expect(workflow).toContain('DESKTOP_PREVIEW_MANIFEST_PRIVATE_KEY:');
+    expect(workflow).toContain('group: kerfdesk-preview-publication');
+    expect(workflow).toContain('node scripts/publish-preview-release.mjs');
+    expect(workflow).toContain('SOURCE_REPOSITORY_PRIVATE:');
+    expect(workflow.match(/if: github.event.repository.private == false/g)).toHaveLength(5);
+    expect(workflow.indexOf('Sign and publish verified Preview')).toBeGreaterThan(
+      workflow.indexOf('Verify the published immutable release'),
+    );
   });
 
   it('generates all integrity companions from the three built binaries', () => {

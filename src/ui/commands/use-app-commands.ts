@@ -121,7 +121,7 @@ function appCommandContext(
     ...editingToolsCommandContext(app, callbacks, selectedIds, dialogs.wireframeActive),
     ...arrangeCommandContext(app, callbacks),
     ...laserCommandContext(platform, laser),
-    ...windowHelpCommandContext(callbacks, app),
+    ...windowHelpCommandContext(callbacks, app, platform.id === 'electron'),
     ...connectionCommandContext(app, laser, platform, activeStreamer),
     hasSelection: selectedIds.length > 0,
     registrationPanelOpen: dialogs.registrationPanelOpen,
@@ -304,6 +304,7 @@ function laserCommandContext(
 function windowHelpCommandContext(
   callbacks: CommandShellCallbacks,
   app: ReturnType<typeof useStore.getState>,
+  desktopLicensing: boolean,
 ): Pick<
   AppCommandContext,
   | 'togglePreview'
@@ -313,8 +314,10 @@ function windowHelpCommandContext(
   | 'showAbout'
   | 'showConnectionHelp'
   | 'showSafety'
+  | 'desktopLicensing'
 > {
   return {
+    desktopLicensing,
     togglePreview: app.togglePreview,
     resetView: useUiStore.getState().resetView,
     projectNotes: callbacks.requestProjectNotes,

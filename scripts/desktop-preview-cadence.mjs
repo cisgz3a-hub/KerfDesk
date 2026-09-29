@@ -67,14 +67,14 @@ export function cadenceIssue({
     ...(unpublishedTags.length === 0
       ? []
       : [
-          `These newer tags exist without a published immutable Preview: ${unpublishedTags.map((tag) => `\`${tag}\``).join(', ')}. They are reserved and do not reset the release date or remove changes from these notes.`,
+          `These newer tags exist without a completed public Preview release: ${unpublishedTags.map((tag) => `\`${tag}\``).join(', ')}. They are reserved and do not reset the release date or remove changes from these notes.`,
           '',
           'Check their release workflow runs first. Wait for an active run, or investigate a failed run and decide whether to retry that release before creating another. The commands below use the next unused tag; never move or recreate an existing release tag.',
           '',
         ]),
     'To publish it:',
     '',
-    `1. Optional: fetch release metadata with \`gh api --paginate --slurp repos/cisgz3a-hub/KerfDesk/releases > preview-releases.json\`, then stamp the changelog with \`node scripts/desktop-release-notes.mjs stamp ${version} --releases=preview-releases.json\` and merge it. Tag that merge commit once its checks pass. Without a stamp the Preview still gets these notes.`,
+    `1. Optional: fetch completed release metadata with \`node scripts/filter-completed-previews.mjs --fetch preview-releases.json\`, then stamp the changelog with \`node scripts/desktop-release-notes.mjs stamp ${version} --releases=preview-releases.json\` and merge it. Tag that merge commit once its checks pass. Without a stamp the Preview still gets these notes.`,
     '2. From a clone of main:',
     '',
     '```sh',
@@ -83,7 +83,7 @@ export function cadenceIssue({
     `git push origin ${nextTag}`,
     '```',
     '',
-    '3. The Preview release lane builds, checks and publishes the Windows and macOS downloads with these notes. This issue closes itself only after a newer immutable Preview is published.',
+    '3. The Preview release lane builds, checks and publishes the Windows and macOS downloads with these notes. This issue closes itself only after a newer immutable Preview completes the full release workflow, including public download publication.',
     '',
     '<details><summary>Release notes draft</summary>',
     '',

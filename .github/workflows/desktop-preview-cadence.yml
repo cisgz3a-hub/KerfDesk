@@ -61,8 +61,7 @@ jobs:
       - name: Read published release metadata
         run: |
           set -euo pipefail
-          gh api --paginate --slurp "repos/${GH_REPO}/releases?per_page=100" \
-            > "${RUNNER_TEMP}/preview-releases.json"
+          node scripts/filter-completed-previews.mjs --fetch "${RUNNER_TEMP}/preview-releases.json"
 
       - name: Draft the next Preview
         id: cadence

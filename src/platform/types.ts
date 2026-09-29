@@ -3,6 +3,41 @@
 // fs). Injected at React root per ADR-011. Phase A scope: file-pick (open) +
 // file-pick (save). Phase B adds serial-port connection methods.
 
+/** Commercial desktop launch admission; never a machine-operation policy. */
+export type DesktopLicenceStatus = {
+  readonly channel: 'free' | 'commercial';
+  readonly state:
+    | 'ready'
+    | 'activation-required'
+    | 'trial-expired'
+    | 'updates-expired'
+    | 'invalid-licence'
+    | 'unavailable'
+    | 'clock-error';
+  readonly sessionAuthorized: boolean;
+  readonly tier: 'trial' | 'paid' | 'developer' | null;
+  readonly accessExpiresAt: number | null;
+  readonly updatesUntil: number | null;
+  readonly perpetualUpdates: boolean;
+  readonly deactivationPending: boolean;
+  readonly paymentPending: boolean;
+  readonly message: string | null;
+};
+
+export type DesktopLicenceAdapter = {
+  readonly status: () => Promise<DesktopLicenceStatus>;
+  readonly activate: (licenseKey: string) => Promise<DesktopLicenceStatus>;
+  readonly startTrial: () => Promise<DesktopLicenceStatus>;
+  readonly refresh: () => Promise<DesktopLicenceStatus>;
+  readonly deactivate: () => Promise<DesktopLicenceStatus>;
+  readonly launch: () => Promise<DesktopLicenceStatus>;
+  readonly checkout: (
+    operation: 'purchase' | 'renewal',
+    licenseKey?: string,
+  ) => Promise<DesktopLicenceStatus>;
+  readonly claimPayment: () => Promise<DesktopLicenceStatus>;
+};
+
 export type FileHandle = {
   readonly name: string;
   // Byte size when the adapter can supply it cheaply (web File.size, Electron

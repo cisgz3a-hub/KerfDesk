@@ -22,7 +22,13 @@ const FUSE_ORDER = [
   'loadBrowserProcessSpecificV8Snapshot',
   'grantFileProtocolExtraPrivileges',
 ];
-const REQUIRED_ENTRIES = ['package.json', 'dist-electron/main.js', 'dist/web/index.html'];
+const REQUIRED_ENTRIES = [
+  'package.json',
+  'dist-electron/main.js',
+  'dist/web/index.html',
+  'public/desktop-release-manifest.mjs',
+  'public/desktop-release-keys.json',
+];
 
 export function readFuseWire(executable) {
   const binary = readFileSync(executable);

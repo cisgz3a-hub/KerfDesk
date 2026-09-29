@@ -133,6 +133,7 @@ export type CommandId =
   | 'help.connection'
   | 'help.safety'
   | 'help.report-bug'
+  | 'help.licence'
   | 'help.discussions';
 
 export type AppCommand = {
@@ -155,6 +156,7 @@ type CommandContextSlices = EditingToolsCommandContext &
   SettingsCommandContext;
 
 export type AppCommandContext = CommandContextSlices & {
+  readonly desktopLicensing?: boolean;
   // ADR-101 gate-and-hide: laser-only commands are filtered out of the
   // registry's output when the project machine is CNC.
   readonly machineKind: MachineKind;

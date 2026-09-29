@@ -17,6 +17,7 @@ interface CloseTarget {
 
 interface CloseOptions {
   request(operation: RendererCloseOperation, requestId: number): Promise<unknown>;
+  isApprovalCurrent?(requestId: number): boolean;
   decideUnsaved(): WindowUnloadDecision;
   decideUnavailable(): WindowUnloadDecision;
   forceClose(): void;
@@ -58,6 +59,13 @@ export class WindowCloseGuard {
   private onClose(event: CloseEvent): void {
     if (this.allowNextClose) {
       this.allowNextClose = false;
+      // A main-process admission can settle after async approval, including
+      // during app.quit listeners. Recheck in the final synchronous close event.
+      if (this.options.isApprovalCurrent?.(this.requestId) === false) {
+        event.preventDefault();
+        this.begin();
+        return;
+      }
       this.awaitingUnload = true;
       return;
     }

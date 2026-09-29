@@ -7,6 +7,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   createDesktopPreviewUpdateAdapter,
+  createDesktopLicenceAdapter,
   createDesktopProjectFiles,
   isElectronRenderer,
 } from '../../platform/electron';
@@ -23,6 +24,7 @@ import '../theme/tokens.css';
 import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
+import { CommercialLicenceGate } from '../licensing/CommercialLicenceGate';
 
 const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
@@ -47,6 +49,10 @@ const adapter: PlatformAdapter = isElectronRenderer()
       ...createDesktopProjectFiles(webAdapter.recentFiles),
     }
   : webAdapter;
+const desktopLicenceClient =
+  adapter.id === 'electron' && window.location.protocol === 'app:'
+    ? createDesktopLicenceAdapter()
+    : undefined;
 
 // If a render crash unmounts the App (and its Abort button + Ctrl+. listener),
 // the crash screen still needs a way to request a controller abort (F60/F65). Both
@@ -73,7 +79,11 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <App />
+        <CommercialLicenceGate
+          {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
+        >
+          <App />
+        </CommercialLicenceGate>
       </PlatformProvider>
     </ErrorBoundary>
   </StrictMode>,
@@ -106,8 +116,9 @@ function dismissWhenBoardReady(): void {
   const boardPainted =
     document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
+  const licenceReady = document.querySelector('[data-licence-gate]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
-  if (boardPainted || startupCrashed || timedOut) {
+  if (boardPainted || startupCrashed || licenceReady || timedOut) {
     requestAnimationFrame(fadeOutSplash);
     return;
   }

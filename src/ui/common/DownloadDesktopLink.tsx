@@ -1,10 +1,9 @@
-// Cross-platform desktop Preview affordance (ADR-248/249). Go straight to the
-// public source repository so a legacy cached service worker cannot substitute
-// an old mutable download page. Hidden inside the desktop app.
+// The download page verifies publisher metadata before enabling versioned links.
+// It remains accessible when the source repository is private.
 
 import { usePlatformOptional } from '../app/platform-context';
 
-const DOWNLOAD_PAGE_URL = 'https://github.com/cisgz3a-hub/KerfDesk/releases';
+const DOWNLOAD_PAGE_URL = 'https://kerfdesk.com/download.html';
 
 const linkStyle: React.CSSProperties = { textDecoration: 'none' };
 

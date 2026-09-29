@@ -1,0 +1,28 @@
+# Opt-in commercial Windows packaging. Generate the external configuration using
+# scripts/prepare-commercial-desktop.mjs, then pass its path with --config.
+extends: ./electron-builder.yml
+forceCodeSigning: true
+afterPack: scripts/prepare-commercial-desktop.mjs
+
+directories:
+  output: release/commercial/${version}
+
+# Direct use of this template must never silently produce a free application.
+# The generated config replaces this marker with the signed commercial metadata.
+extraMetadata:
+  kerfdeskUpdateChannelTrusted: true
+  kerfdeskDesktopReleaseChannel: stable
+  kerfdeskCommercialLicense:
+    schema: 0
+
+nsis:
+  # Seller terms are not yet approved. Preparation requires an explicit external
+  # terms file and overrides this sentinel; never inherit the free MIT EULA.
+  license: COMMERCIAL-TERMS-MUST-BE-PROVIDED.txt
+
+win:
+  verifyUpdateCodeSignature: true
+
+publish:
+  provider: generic
+  url: https://dl.kerfdesk.com/desktop/commercial

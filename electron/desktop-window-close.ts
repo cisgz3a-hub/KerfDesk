@@ -5,6 +5,7 @@ import type { WindowUnloadDecision } from './window-unload-decision.js';
 
 interface DesktopCloseOptions {
   isTrustedRenderer(url: string): boolean;
+  isWorkspaceAdmitted?(): boolean;
   isQuitRequested(): boolean;
   cancelQuit(): void;
   quit(): void;
@@ -14,12 +15,29 @@ export function installDesktopWindowClose(
   window: BrowserWindow,
   options: DesktopCloseOptions,
 ): WindowCloseGuard {
+  let gatePreparedId: number | null = null;
+  let gateApprovalId: number | null = null;
   return new WindowCloseGuard(window, {
     ...options,
+    isApprovalCurrent: (requestId) =>
+      gateApprovalId !== requestId ||
+      (options.isWorkspaceAdmitted?.() === false &&
+        options.isTrustedRenderer(window.webContents.getURL())),
     request: async (operation, requestId) => {
       if (!options.isTrustedRenderer(window.webContents.getURL())) {
         return { status: 'unavailable' };
       }
+      if (options.isWorkspaceAdmitted?.() === false) {
+        if (operation === 'prepare') {
+          gatePreparedId = requestId;
+          return { status: 'ready', dirty: false };
+        }
+        if (operation === 'approve') gateApprovalId = requestId;
+        return { status: operation === 'approve' ? 'approved' : 'cancelled' };
+      }
+      // Admission may settle between prepare and approve. The new workspace
+      // must receive its own complete handoff, even before its receiver mounts.
+      if (operation === 'approve' && gatePreparedId === requestId) return { status: 'retry' };
       return window.webContents.executeJavaScript(rendererCloseRequestScript(operation, requestId));
     },
     decideUnsaved: () => decideUnsaved(window),
