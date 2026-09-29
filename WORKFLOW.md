@@ -7646,6 +7646,14 @@ behavior or create a second product implementation.
 1. The download page links Linux users to the web app. Linux desktop packaging
    remains out of scope for ADR-248.
 
+#### Edge — KerfDesk is open while an installer or uninstaller runs (ADR-555)
+1. The installer and uninstaller never close KerfDesk: it may be streaming a job. A hand-run one
+   asks the operator to close KerfDesk themselves (closing stops a running job and asks about
+   unsaved work), then **Retry**; **Cancel** stops. A silent or managed install stops with an
+   error instead.
+2. An update installing at quit waits up to a minute for KerfDesk to finish closing; if it is
+   still open, the update waits for the next close.
+
 #### Edge — inside the desktop app the download/install affordances vanish
 1. When running under Electron (`adapter.id === 'electron'`), the Camera panel's
    `DownloadDesktopLink` returns `null`. The Toolbar's PWA **Install app** button
