@@ -2414,7 +2414,8 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Placement and work origin** in the review shows the saved placement, the work origin the
   job ran with and the controller's current one (in mm from machine zero). When they differ by
   more than 0.05 mm it warns that the rest of the job would land that far from the finished part
-  (a controller reset clears a temporary origin; home first where the machine homes). **Frame
+  (stock GRBL and FluidNC clear a Set origin here origin at a reset or power loss; grblHAL keeps
+  it, through a power loss too unless `$384=1`; home first where the machine homes). **Frame
   remaining area** traces everything still to engrave from the chosen line, from the current
   origin, through the ordinary Frame preparation; it issues no Start permit. Both inform only.
 - When the origin differs, is not reported, or (for a User or Verified Origin job) is no longer
@@ -3529,7 +3530,7 @@ streaming controls. Two buttons:
   acknowledgement (not merely USB write completion); the status
   bar's `Origin:` row flips from "machine 0,0" (muted; "not reported yet"
   until the controller's first WCO report) to
-  "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
+  "X… Y… (G92, set this session)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
   next WCO-bearing status frame arrives. Set Origin upgrades an Absolute
   Coordinates placement to User Origin after that `ok` and its bounded
   work-offset wait finish; an explicit User, Verified, or Current Position
@@ -3538,6 +3539,11 @@ streaming controls. Two buttons:
   G92 offsets, including temporary Z zero. Any stored G54 offset remains, so work
   coordinates do not necessarily return to machine zero. Disabled when no custom
   origin is active; a persistent or unknown origin uses the explicit persistent controls.
+
+The `Origin:` row names which origin is active: "G92, set this session", "persistent G54",
+"restored by controller" (it was already on the controller when KerfDesk connected) or
+"reported by controller" (KerfDesk cannot attribute it, for example after a reset or a Console
+command). A Z-only offset reads "custom" (ADR-375).
 
 The profile's **Recorded home** corner documents the setup. It does not write controller
 homing direction or change work zero. Home uses the selected controller's command contract
@@ -3621,7 +3627,7 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 
 1. **Success.** Connected, idle, head jogged to a workpiece corner.
    Click Set origin here → toast "Origin set to current head position
-   (G92)." → status row updates to "Origin: X… Y… (custom)". Click
+   (G92)." → status row updates to "Origin: X… Y… (G92, set this session)". Click
    Frame → head traces the job's front-left anchored bounding box
    around the workpiece corner. Click Start → job runs at the
    workpiece corner.
@@ -3642,7 +3648,8 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    (`laser-alarm-line.ts`, and the reset branch in `laser-line-handler.ts`)
    clears `wcoCache`; the status row reads "Origin: not reported yet" until
    the next WCO-bearing report shows what remains ("machine 0,0" unless a
-   G54 offset is stored or grblHAL kept the G92). A failed probe
+   G54 offset is stored or grblHAL kept the G92, which then reads "reported
+   by controller"). A failed probe
    (ALARM:4 or 5) keeps the origin (ADR-375). User re-jogs and re-sets if
    they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
@@ -3655,14 +3662,23 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    unresolved placement remains a factual compile input and cannot
    produce the exact candidate.
 
+**Origin found at connect.** grblHAL keeps Set origin here through a power cycle unless
+`$384=1`, and a saved G54 survives everywhere, while machine position restarts at zero. When a
+User or Verified Origin job would run from an origin the first report of the connection showed,
+with no origin action since and the machine not homed in this session, Job Review's unverified
+bed-mapping warning adds that the origin was already on the controller when KerfDesk connected,
+what this firmware keeps (from `$384` when the `$$` read reported it), and to check the Frame or
+Set origin here again. It is a warning; Frame and Start are not refused (ADR-375).
+
 **Hardware verification checklist (Falcon A1 Pro — user-driven).**
 
 1. Connect and wait for fresh controller position and WCO. Record any existing G54 offset;
    reconnecting does not erase persistent coordinates or prove that work zero equals machine zero.
 2. Jog the head to a workpiece corner. If positioning by hand instead, use the documented
-   Release → move → Wake → Set origin order; stale MPos is not physical position evidence.
+   Release → move → Wake → Unlock (or Home) → Set origin order; Wake leaves the controller
+   locked in Alarm, and stale MPos is not physical position evidence.
 3. Click **Set origin here**. Within ~5 s the readout flips to
-   `Origin: X… Y… (custom)` (red/bold), values matching the previous
+   `Origin: X… Y… (G92, set this session)` (red/bold), values matching the previous
    MPos. Toast confirms.
 4. Click **Frame**. Head sweeps the job's front-left anchored bounding
    box *around the workpiece corner*, not around machine origin or the
@@ -3676,8 +3692,10 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    authorization are invalidated. A real alarm or `$X` acknowledgement alone does not prove
    that stored offsets were erased or that the physical machine reference is still valid.
 8. **Abort-clear path.** Set origin, start a job, press **ABORT**
-   (the GRBL path requests Ctrl-X plus accessory-off cleanup). Temporary G92 is cleared by
-   reset; persistent G54 remains. Check the fresh controller readback rather than assuming zero.
+   (the GRBL path requests Ctrl-X plus accessory-off cleanup). Stock GRBL and FluidNC clear a
+   temporary G92 at that reset and grblHAL keeps it (the row then reads "reported by
+   controller"); persistent G54 remains. Check the fresh controller readback rather than assuming
+   zero.
 9. **Reconnect path.** Disconnect and reconnect invalidate cached origin/Frame evidence.
    Verify fresh controller data; local cache clearing does not erase persistent controller offsets.
 10. **Status-format fixtures.** For stock GRBL, test both `$10=1` (MPos) and `$10=0`
@@ -3756,8 +3774,8 @@ on the rail, below the job actions, as the hand-placement fallback):
    removed as redundant with the Start from dropdown — ADR-225.)
 2. **Move head by hand.** The operator selects **Release motors to move by hand**,
    confirms Release motors, and physically moves the head. The guide then exposes
-   **Use this position**, which sends Wake and waits for controller recovery.
-   If GRBL reports Alarm, the guide names the state and requires the operator
+   **Use this position**, which sends Wake. GRBL, grblHAL and FluidNC come back from it
+   locked in Alarm, so the guide names the state and requires the operator
    to press **Unlock and continue** after confirming the head is safe. Only
    after fresh Idle does the app send Set origin, select Verified Origin, and
    report that the hand position is ready. Frame is mandatory before Start.
@@ -3782,8 +3800,10 @@ completed job guarantees, so the Origin row carries **Release motors** whenever
 the card is not showing it (either homing is enabled, or an origin is settled).
 Release is refused until the controller reports Idle, so it stays blocked
 through the "Machine finishing" window while the postamble park rapid is still
-running. `$SLP` clears the work origin and invalidates any Verified Frame; the
-top-level **Controller is asleep** banner offers Wake (Ctrl-X), and on a
+running. Release motors drops KerfDesk's work origin (moving the head by hand invalidates it;
+the Wake reset also clears G92 on stock GRBL and FluidNC, while grblHAL keeps it) and
+invalidates any Verified Frame; the top-level **Controller is asleep** banner offers Wake
+(Ctrl-X), after which the controller is locked in Alarm until Unlock or Home, and on a
 no-homing profile the Position job card returns to guide the re-set.
 grblHAL refuses `$SLP` unless its `$62` Sleep enable is on: when a `$$` read reported
 `$62=0`, Release motors is disabled with that reason, and a controller that refuses `$SLP`
@@ -3834,7 +3854,7 @@ jog controls.
 
 1. **Success.** Connected, Idle, board on the bed. Jog to the bottom-left
    corner → Capture (sends `G92 X0 Y0`; the `Origin:` row flips to
-   custom). Jog to the remaining three corners — **in any order/direction** —
+   `(G92, set this session)`). Jog to the remaining three corners — **in any order/direction** —
    → Capture each (width/height come from the bounding box, so the outline's
    size and orientation don't depend on which way you go around). Create board
    outline → a dashed rectangle appears centered on the canvas at the
@@ -3867,7 +3887,7 @@ fails, the panel shows an inline error instead of leaving the operator on
 
 1. Connect → Idle. Click the **Place Board** toolbar button to open the panel.
 2. Jog to the board's bottom-left corner; Capture. The `Origin:` row flips
-   to `X… Y… (custom)` within a few seconds; the step advances to corner 2.
+   to `X… Y… (G92, set this session)` within a few seconds; the step advances to corner 2.
 3. Capture the other three corners in any order. The measured size should
    match the board (both dimensions and orientation) within eyeball
    tolerance (±~1 mm).

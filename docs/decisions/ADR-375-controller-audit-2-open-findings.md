@@ -249,12 +249,45 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
       homing ends.
     - No new refusal.
 
+11. **Origins the controller restored, and which origin is active** (M-4/A-6, M-8, A-3).
+    - grblHAL at its default compatibility level keeps a Set origin here (G92) origin through a
+      reset and, unless `$384=1`, restores it at power-up
+      ([grblHAL gcode.c L833-L838](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L833-L838)); every GRBL-family controller loads a
+      saved G54 at power-up; and machine position restarts at zero wherever the head stands
+      ([grblHAL grbllib.c L358](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/grbllib.c#L358), [main.c L47](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/main.c#L47)). So an origin
+      can already be on the controller when KerfDesk connects, and without Home it need not be
+      where it was set. KerfDesk records what the first work-offset report of each connection
+      showed. When a User or Verified Origin job would run from that same origin (no origin action
+      since, and the controller still reporting the same XY offset) on a machine not homed in this
+      session, Job Review's unverified bed-mapping warning adds that the origin was already on the
+      controller when KerfDesk connected, what this firmware keeps, read from `$384` in this
+      session's `$$` read (never written), and to check the Frame or Set origin here again. No new
+      refusal.
+    - The copy that said a reset, Wake or power loss clears Set origin here now says stock GRBL
+      and FluidNC clear it ([gcode.c L42-L49](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L42-L49)) and grblHAL keeps it, through a
+      power loss too unless `$384=1`.
+    - The status panel's Origin row names the origin after its offset: "G92, set this session",
+      "persistent G54", "restored by controller" or "reported by controller" (one KerfDesk cannot
+      attribute, for example after a reset or a Console command); a Z-only offset still reads
+      "custom". The G92 label avoids "temporary", since grblHAL keeps G92.
+    - Since #923, Wake ends when the controller comes back locked in Alarm, as GRBL and grblHAL do
+      after Sleep ([protocol.c L52-L54](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L52-L54)); the Sleep banner and the Release
+      motors copy now say Unlock or Home comes next.
+    - Correction to ADR-021: G92 is "cleared by GRBL on alarm, soft reset, power-cycle, or
+      `$RST=#`", and "each session starts with a clean origin", only on stock GRBL and FluidNC, and
+      a failed probe's `ALARM:4`/`5` resets nothing (decision 1). grblHAL keeps G92 through a soft
+      reset and, unless `$384=1`, through a power cycle. The same holds for ADR-021's
+      cache-invalidation paragraph ("Together these match GRBL's actual behaviour") and its note
+      that grblHAL confirms vanilla GRBL 1.1 behaviour.
+
 ### Consequences
 
 - The GRBL simulator models more stock GRBL behaviour: `G10 L20` with an active G92, a failed
   `G38.2` (`probeFailure`), and, both off by default, the power-up lock into Alarm with homing on
   (`homingInitLock`) and the `error:15` check of a `$J=` target once `$20=1`. An opt-in
-  `jogCancelFlushesInput` mode plays grblHAL's `0x85`, which discards lines not parsed yet.
+  `jogCancelFlushesInput` mode plays grblHAL's `0x85`, which discards lines not parsed yet, and
+  `storedOffsets` loads the G54 and, on grblHAL with `$384` not 1, the G92 an earlier session
+  stored.
 - Still open for work offsets: transient Frames (the camera calibration target, the recovery
   area, the second pass) get no burst; a controller whose reports never carry WCO waits 3 s at
   every Frame while no offset is known, and with a real offset it cannot earn a permit (the
@@ -268,3 +301,7 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
   command-set warnings; the automatic fill for a new machine (ADR-420) names only the controller
   it sets, not the RX window, command set or calibration the same choice changes (its Undo covers
   them); the settings reference still labels `$21` and `$22` "0/1".
+- Still open for restored origins: a power loss inside one connection looks like any reset, so
+  an origin restored then reads as re-learned; the recovery review's work-origin match does not
+  know about a power-up restore without Home; after Reset origin, a restored G54 that remains
+  reads "reported by controller".
