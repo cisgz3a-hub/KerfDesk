@@ -45,6 +45,13 @@ describe('statsRows', () => {
     expect(byLabel.get('Segments')).toBe('4');
   });
 
+  // ADR-255 amendment 2: the rapid in from the assumed 0,0 is drawn but not
+  // measured, so X spans the 10 to 30 mm the program cuts, not 0 to 30.
+  it('measures Size from where the program goes, not from the assumed start', () => {
+    const size = statsRows(model(PROGRAM)).find((row) => row.label === 'Size')?.value;
+    expect(size).toBe('20 × 0 × 7 mm');
+  });
+
   it('says whose limits the estimated time assumes (ADR-425)', () => {
     const parsed = model(PROGRAM);
     const time = inspectorProgramTime(

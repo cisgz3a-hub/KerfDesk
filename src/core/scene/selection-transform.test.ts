@@ -90,6 +90,85 @@ describe('buildSelectionTransformEdit', () => {
     expect(result).toEqual({ kind: 'error', reason: 'non-uniform-rotated-selection' });
   });
 
+  // Weakness audit H-7: a shape turned 90 degrees is still square to the bed,
+  // so typing a new W with the aspect unlocked is a plain one-axis stretch.
+  it.each([
+    { rotationDeg: 90, mirrorX: false },
+    { rotationDeg: 270, mirrorX: false },
+    { rotationDeg: -90, mirrorX: true },
+  ])(
+    'stretches a shape turned $rotationDeg degrees along the bed (mirrorX $mirrorX)',
+    ({ rotationDeg, mirrorX }) => {
+      const object = objectWithTransform('shape', {
+        ...IDENTITY_TRANSFORM,
+        x: 40,
+        y: 25,
+        rotationDeg,
+        mirrorX,
+      });
+      const before = selectionMetrics([object]);
+      if (before === null) throw new Error('expected metrics');
+      expect(before.width).toBeCloseTo(10, 9);
+      expect(before.height).toBeCloseTo(20, 9);
+
+      const result = buildSelectionTransformEdit([object], {
+        kind: 'resize',
+        anchor: 'nw',
+        width: 30,
+        preserveAspect: false,
+      });
+
+      expect(result.kind).toBe('ok');
+      if (result.kind !== 'ok') return;
+      const next = { ...object, transform: result.transforms[0]?.transform ?? object.transform };
+      const after = selectionMetrics([next]);
+      expect(after?.width).toBeCloseTo(30, 9);
+      expect(after?.height).toBeCloseTo(20, 9);
+      expect(after?.bbox.minX).toBeCloseTo(before.bbox.minX, 9);
+      expect(after?.bbox.minY).toBeCloseTo(before.bbox.minY, 9);
+      // The object's own height lies along the bed's X, so it takes the stretch.
+      expect(next.transform.scaleX).toBeCloseTo(1, 9);
+      expect(next.transform.scaleY).toBeCloseTo(3, 9);
+      expect(next.transform.rotationDeg).toBe(rotationDeg);
+    },
+  );
+
+  it('stretches a selection of upright and quarter-turned shapes along the bed', () => {
+    const upright = objectWithTransform('upright', { ...IDENTITY_TRANSFORM, x: 0, y: 0 });
+    const turned = objectWithTransform('turned', {
+      ...IDENTITY_TRANSFORM,
+      x: 50,
+      y: 0,
+      rotationDeg: 90,
+    });
+    const before = selectionMetrics([upright, turned]);
+    if (before === null) throw new Error('expected metrics');
+
+    const result = buildSelectionTransformEdit([upright, turned], {
+      kind: 'resize',
+      anchor: 'nw',
+      height: before.height * 2,
+      preserveAspect: false,
+    });
+
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    const byId = new Map(result.transforms.map((entry) => [entry.id, entry.transform]));
+    const moved = (object: SceneObject): SceneObject => ({
+      ...object,
+      transform: byId.get(object.id) ?? object.transform,
+    });
+    const after = selectionMetrics([moved(upright), moved(turned)]);
+    expect(after?.width).toBeCloseTo(before.width, 9);
+    expect(after?.height).toBeCloseTo(before.height * 2, 9);
+    for (const object of [upright, turned]) {
+      const was = selectionMetrics([object]);
+      const now = selectionMetrics([moved(object)]);
+      expect(now?.width).toBeCloseTo(was?.width ?? 0, 9);
+      expect(now?.height).toBeCloseTo((was?.height ?? 0) * 2, 9);
+    }
+  });
+
   // Rotation ignores the 9-dot anchor by construction (it carries none), so the
   // centre stays pinned even when that anchor is the default 'nw'.
   it('rotates one object about its centre without moving it', () => {
