@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   SURFACING_DEFAULT_STEPOVER_PCT,
   SURFACING_DEFAULT_TOTAL_DEPTH_MM,
+  SURFACING_MAX_STEPOVER_PCT,
 } from '../../core/cnc/surfacing';
 import type { CncMachineConfig, Project } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
@@ -120,7 +121,8 @@ function surfacingFields(v: Values): ReadonlyArray<NumProps> {
       label: 'Stepover %',
       value: v.inputs.stepoverPct,
       onCommit: v.setStepoverPct,
-      title: "Row spacing as a percentage of the active bit's diameter.",
+      title: `Row spacing as a percentage of the active bit's diameter, at most ${String(SURFACING_MAX_STEPOVER_PCT)}%. Wider rows leave uncut strips.`,
+      range: { min: 1, max: SURFACING_MAX_STEPOVER_PCT },
     },
     {
       label: 'Total depth',
@@ -159,6 +161,8 @@ type NumProps = {
   readonly value: number;
   readonly title: string;
   readonly onCommit: (value: number) => void;
+  /** Clamp to this range; without one the field only has to be positive. */
+  readonly range?: { readonly min: number; readonly max: number };
 };
 function Num(props: NumProps): JSX.Element {
   return (
@@ -168,7 +172,9 @@ function Num(props: NumProps): JSX.Element {
         ariaLabel={`Surfacing ${props.label.toLowerCase()}`}
         title={props.title}
         value={props.value}
-        positiveOnly
+        {...(props.range === undefined
+          ? { positiveOnly: true as const }
+          : { min: props.range.min, max: props.range.max })}
         step={0.1}
         onCommit={props.onCommit}
         style={{ width: 76 }}
