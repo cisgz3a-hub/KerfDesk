@@ -24,7 +24,7 @@ Windows publisher name (Authenticode):
 Installer N:   bytes / SHA-256
 Installer N+1: bytes / SHA-256
 Licensing service: environment, deployment ID, compatibility date
-Download host: bucket, custom domain, catalogue SHA-256 after each publication
+Download host: bucket, custom domain, both catalogue SHA-256s after each change
 Test machine: Windows edition/build, x64, disposable account or VM name
 Result: passed / failed at step __ (link the failing evidence)
 ```
@@ -86,13 +86,18 @@ For each version, from a clean checkout at the tagged source:
 ## 3. Publish version N
 
 - [ ] `node scripts/publish-commercial-release.mjs <release-dir> <identity.json> <resources-dir>`
-      prints `published` for N. Only one publisher runs at a time.
+      prints `published` for N. Only one publisher runs at a time, and never while a
+      release train run is in progress.
+- [ ] N is listed in `desktop/commercial/beta/catalog.json` only, and the download
+      page does not show it yet (ADR-541).
+- [ ] `node scripts/promote-commercial-release.mjs N` reports `promoted`, and
+      `desktop/commercial/catalog.json` now lists N with the same entry as beta.
 - [ ] From an ordinary browser without GitHub access, `https://kerfdesk.com/download.html`
       shows `KerfDesk N · Released <date> · Publisher signature verified.` and the
       SHA-256 printed there equals the local installer.
 - [ ] The installer downloaded from that page is byte-identical to the local one.
-- [ ] `catalog.json` is served with `Cache-Control: no-store`; versioned objects
-      are immutable. Record the catalogue SHA-256.
+- [ ] Both catalogues are served with `Cache-Control: no-store`; versioned objects
+      are immutable. Record both catalogue SHA-256s.
 
 ## 4. Fresh install and trial
 
@@ -134,8 +139,12 @@ For each version, from a clean checkout at the tagged source:
 
 ## 7. Updates from N to N+1
 
-- [ ] Publish N+1 (section 3 steps). The catalogue lists both versions and the
-      download page shows N+1 with N under Earlier versions.
+- [ ] Publish N+1 (section 3's publish step) without promoting it. A device running
+      N with "Get new versions early (beta)" ticked in Help > Licence downloads N+1;
+      a device with it unticked does not.
+- [ ] Untick it on the device that took N+1 early: it stays on N+1.
+- [ ] Promote N+1. The stable catalogue lists both versions and the download page
+      shows N+1 with N under Earlier versions.
 - [ ] With a covered licence running N, the app downloads N+1 in the background.
       Nothing restarts or interrupts the open workspace.
 - [ ] Quit KerfDesk normally. N+1 installs, and on relaunch Help > About shows
