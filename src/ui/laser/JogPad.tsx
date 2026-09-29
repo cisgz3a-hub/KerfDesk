@@ -20,7 +20,8 @@ import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import { useLaserStore } from '../state/laser-store';
-import { resolveManualMotionLimits } from '../state/manual-motion-limits';
+import { withheldControllerMPos } from '../state/laser-status-position';
+import { firmwareJogCheckPosition, resolveManualMotionLimits } from '../state/manual-motion-limits';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
 import { FocusJogControls, focusJogReady } from './FocusJogControls';
 import { JogArrowGrid } from './JogArrowGrid';
@@ -134,9 +135,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 // jog-home-origin-3). With soft limits on, the controller checks the target in
 // MPos with or without a verified frame and refuses the whole line
 // (error:15), so this session's `$$` bounds the hold as well, and the homing
-// edge stays the pull-off clear of its switch (ADR-375). With neither, the
-// hold asks for full travel and relies on release plus the jog-cancel byte,
-// as it does with no position.
+// edge stays the pull-off clear of its switch (ADR-375). Stock GRBL checks from
+// its own MPos even after an Unlock without Home, when KerfDesk hides the
+// position, so that clamp alone aims from the controller's number then. With
+// neither a frame nor soft limits, the hold asks for full travel and relies on
+// release plus the jog-cancel byte, as it does with no position.
 function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
   const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
   const wcoCache = useLaserStore((s) => s.wcoCache);
@@ -148,7 +151,14 @@ function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>):
     nativeEvidence,
   );
   const position =
-    limits === null ? null : inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
+    limits === null
+      ? null
+      : (inferCurrentMachinePosition(statusReport, wcoCache, reportInches) ??
+        firmwareJogCheckPosition(
+          nativeEvidence,
+          withheldControllerMPos(statusReport),
+          reportInches,
+        ));
   const bounds = limits === null ? props.bounds : nativeTravel(limits);
   return <JogArrowGrid {...props} bounds={bounds} position={position} />;
 }

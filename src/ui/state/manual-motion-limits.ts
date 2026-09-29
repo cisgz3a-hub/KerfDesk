@@ -8,13 +8,15 @@
 // frame, yet GRBL still refuses a whole hold jog whose target leaves its
 // envelope (error:15).
 
-import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
+import type { ControllerSettingsSnapshot, StatusReport } from '../../core/controllers/grbl';
 import {
   jogTravelLimits,
   type JogTravelFirmware,
   type JogTravelSettings,
 } from '../../core/controllers/grbl/jog-travel-limits';
+import { normalizeReportedMPosToMm } from '../../core/controllers/grbl/machine-envelope';
 import type { NativeBedFrame, NativeXyBounds } from '../../core/devices/native-bed-frame';
+import type { Vec2 } from '../../core/scene';
 import type { NativeBedEvidence } from './native-bed-frame';
 
 /**
@@ -39,6 +41,29 @@ export function resolveManualMotionLimits(
       : intersectWithFrame(frame.nativeBounds, firmware);
   }
   return settings?.softLimitsEnforced === true ? firmware : null;
+}
+
+/**
+ * Where stock GRBL measures a hold's target from while KerfDesk hides the
+ * reported position (Unlock without Home, a failed Home, released motors).
+ * With `$20=1` GRBL checks every jog target against its own machine position
+ * whatever KerfDesk trusts, and `$X` leaves that position as it was, so a hold
+ * aimed from an unknown position asked for the full travel, which GRBL refuses
+ * whole (error:15) from almost anywhere. Pass only the controller MPos
+ * KerfDesk withheld; nothing but this clamp may use it. grblHAL has no
+ * envelope before this session's Home, and a WPos-only report ($10=0) carries
+ * no MPos: both keep the full request.
+ */
+export function firmwareJogCheckPosition(
+  evidence: NativeBedEvidence,
+  hiddenMPos: StatusReport['mPos'] | undefined,
+  reportInches: boolean,
+): Vec2 | null {
+  if (hiddenMPos == null || travelFirmware(evidence) !== 'grbl') return null;
+  if (currentSessionSettings(evidence)?.softLimitsEnabled !== true) return null;
+  const { x, y, z } = hiddenMPos;
+  const [xMm, yMm] = normalizeReportedMPosToMm([x, y, z], reportInches);
+  return { x: xMm, y: yMm };
 }
 
 function jogTravelSettings(evidence: NativeBedEvidence): JogTravelSettings | null {

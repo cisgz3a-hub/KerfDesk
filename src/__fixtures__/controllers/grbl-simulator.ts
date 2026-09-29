@@ -20,6 +20,7 @@ import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { createBackpressureFeeder } from './grbl-sim-backpressure';
 import {
   DEFAULT_GRBL_SIM_OPTIONS,
+  UNLOCK_MESSAGE,
   grblSimParsesLines,
   initialGrblSimState,
   reduceGrblSim,
@@ -51,6 +52,13 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   readonly settings?: ReadonlyArray<readonly [number, string]>;
   /** Emit the welcome banner when the port opens (default true). */
   readonly emitBannerOnOpen?: boolean;
+  /**
+   * Boot as stock GRBL 1.1h does with homing on ($22=1): HOMING_INIT_LOCK is
+   * defined by default and puts the power-up state into Alarm (config.h:88,
+   * main.c:65-67), and the main loop then reports the lock after the banner
+   * (protocol.c:49-54). Unset keeps the unlocked, vendor-typical boot.
+   */
+  readonly homingInitLock?: boolean;
   /**
    * Model GRBL's bounded planner with this many motion blocks (stock grbl 1.1
    * has 15 usable, GRBL_PLANNER_BLOCKS). Unset means acks stay immediate — the
@@ -155,6 +163,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   const {
     settings: settingOverrides,
     emitBannerOnOpen,
+    homingInitLock,
     plannerBlocks,
     blockRetireMs,
     rxBufferBytes,
@@ -165,7 +174,7 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
 
   const port = createFakeSerialPort();
-  let state = initialGrblSimState(settings);
+  let state = powerUpState(settings, homingInitLock === true);
 
   const runEffect = (effect: GrblSimEffect): void => {
     if (effect.kind === 'emit') {
@@ -227,6 +236,9 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     feeder.reset();
     if (emitBannerOnOpen !== false) {
       setTimeout(() => port.emitLine(opts.firmwareBanner), opts.responseDelayMs);
+      if (homingInitLock === true && state.machine === 'Alarm') {
+        setTimeout(() => port.emitLine(UNLOCK_MESSAGE), opts.responseDelayMs);
+      }
     }
   });
 
@@ -251,4 +263,14 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     rxWindow: () => backpressure?.rxWindow() ?? inertRxWindow,
     planner: () => backpressure?.planner() ?? inertPlanner,
   };
+}
+
+function powerUpState(
+  settings: ReadonlyMap<number, string>,
+  homingInitLock: boolean,
+): GrblSimState {
+  const booted = initialGrblSimState(settings);
+  return homingInitLock && settings.get(22) === '1'
+    ? { ...booted, machine: 'Alarm', locked: true }
+    : booted;
 }

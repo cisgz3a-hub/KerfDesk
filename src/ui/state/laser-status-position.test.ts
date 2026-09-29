@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { StatusReport } from '../../core/controllers/grbl';
-import { statusPositionPatch } from './laser-status-position';
+import { statusPositionPatch, withheldControllerMPos } from './laser-status-position';
 import { useLaserStore } from './laser-store';
 
 const idleReport: StatusReport = {
@@ -127,5 +127,42 @@ describe('statusPositionPatch — cache identity', () => {
     });
     expect(patch.accessoryCache).not.toBe(state.accessoryCache);
     expect(patch.accessoryCache?.toolChangePending).toBe(true);
+  });
+});
+
+// After Unlock without Home KerfDesk hides the reported position, yet stock
+// GRBL with $20=1 still checks a jog target against its own MPos, which $X
+// leaves as it was (ADR-375):
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L160-L168
+// The hold clamp alone reads that MPos, beside the stored report.
+describe('statusPositionPatch — the controller MPos behind hidden position evidence', () => {
+  const at = { ...idleReport, mPos: { x: -50, y: -40, z: -1 } };
+  const suppressed = { ...useLaserStore.getState(), positionEvidenceSuppressed: true };
+
+  it('keeps the MPos it strips while position evidence is suppressed', () => {
+    const report = statusPositionPatch(suppressed, at).statusReport;
+    expect(report?.mPos).toBeNull();
+    expect(withheldControllerMPos(report)).toEqual({ x: -50, y: -40, z: -1 });
+  });
+
+  it('keeps none with unconfirmed report units or a WPos-only report ($10=0)', () => {
+    const unitsUnknown = { ...suppressed, reportUnitsUnconfirmed: true };
+    expect(withheldControllerMPos(statusPositionPatch(unitsUnknown, at).statusReport)).toBeNull();
+    const workOnly = { ...at, mPos: null, wPos: { x: -50, y: -40, z: -1 } };
+    expect(
+      withheldControllerMPos(statusPositionPatch(suppressed, workOnly).statusReport),
+    ).toBeNull();
+  });
+
+  it('withholds nothing from a report whose position is shown', () => {
+    const shown = {
+      ...suppressed,
+      positionEvidenceSuppressed: false,
+      reportUnitsUnconfirmed: false,
+    };
+    const report = statusPositionPatch(shown, at).statusReport;
+    expect(report?.mPos).toEqual({ x: -50, y: -40, z: -1 });
+    expect(withheldControllerMPos(report)).toBeNull();
+    expect(withheldControllerMPos(null)).toBeNull();
   });
 });

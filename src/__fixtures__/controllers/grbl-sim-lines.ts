@@ -9,6 +9,7 @@ import {
   parseMotionWords,
   resolveTarget,
   SIM_ZERO_VEC3,
+  type SimVec3,
 } from './grbl-sim-gcode';
 import {
   emit,
@@ -22,6 +23,7 @@ import {
 } from './grbl-sim-state';
 
 const STATUS_SYSTEM_GC_LOCK = 9;
+const STATUS_TRAVEL_EXCEEDED = 15;
 const STATUS_CRITICAL_EVENT = 79;
 const PROGRAM_PAUSE_RE = /(?:^|\s)[Mm]0*0(?![\d.])/;
 const DWELL_SECONDS_RE = /[Pp](\d*\.?\d+)/;
@@ -198,6 +200,9 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
   if (!words.hasMotion || words.feed === null) return { state, effects: [emit('error:22', opts)] };
   const isAbsolute = words.setsAbsolute ?? false;
   const target = resolveTarget(state.mpos, totalWco(state), words, isAbsolute);
+  if (jogLeavesStockTravel(state, target, opts)) {
+    return { state, effects: [emit(`error:${STATUS_TRAVEL_EXCEEDED}`, opts)] };
+  }
   const next: GrblSimState = {
     ...state,
     machine: 'Jog',
@@ -209,6 +214,17 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
     state: next,
     effects: [emit('ok', opts), schedule({ kind: 'motion-finished' }, opts.motionMs, next)],
   };
+}
+
+// With soft limits on ($20=1) stock GRBL refuses a whole `$J=` line whose
+// machine target leaves [-$13x, 0] on any axis, homed or not (jog.c:35-37,
+// system.c:346-349; this build reports no HOMING_FORCE_SET_ORIGIN in $I).
+function jogLeavesStockTravel(state: GrblSimState, target: SimVec3, opts: GrblSimOptions): boolean {
+  if (opts.firmware !== 'grbl' || state.settings.get(20) !== '1') return false;
+  return (['x', 'y', 'z'] as const).some((axis, index) => {
+    const travel = Number(state.settings.get(130 + index));
+    return target[axis] > 0 || target[axis] < -travel;
+  });
 }
 
 function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {

@@ -46,7 +46,11 @@
 //  * `$$`, `$I`, `$#` and `$G` are answered immediately in every state.
 //  * Motion position is applied at command time; state stays Run/Jog until the
 //    scheduled motion-finished event, then reports Idle.
-//  * Boot is unlocked by default (vendor-typical).
+//  * Boot is unlocked by default (vendor-typical); `homingInitLock` boots
+//    locked as stock GRBL does with homing on (grbl-simulator.ts).
+//  * Soft limits ($20=1) are checked only for a stock-GRBL `$J=` line
+//    (grbl-sim-lines.ts): G0/G1 past the travel raises no ALARM:2, and the
+//    grblHAL mode checks no soft limits.
 
 import { formatVec3, SIM_ZERO_VEC3 } from './grbl-sim-gcode';
 import { reduceGrblSimLine } from './grbl-sim-lines';
@@ -91,7 +95,7 @@ export const DEFAULT_GRBL_SIM_OPTIONS: GrblSimOptions = {
   firmware: 'grbl',
 };
 
-const UNLOCK_MESSAGE = "[MSG:'$H'|'$X' to unlock]";
+export const UNLOCK_MESSAGE = "[MSG:'$H'|'$X' to unlock]";
 const LINE_BLOCKING_STATES: ReadonlySet<GrblSimMachineLabel> = new Set([
   'Hold',
   'Door',

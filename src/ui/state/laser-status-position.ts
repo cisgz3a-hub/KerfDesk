@@ -4,6 +4,22 @@ import type { LaserState } from './laser-store';
 import { hostRecordedWorkOffset } from './host-recorded-origin';
 import { hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
 
+// The controller's own MPos from a report whose position KerfDesk withholds
+// (after Unlock, Release motors, a failed Home or an origin write that ended
+// unknown). With $20=1 stock GRBL checks a jog target against it whatever
+// KerfDesk trusts, and $X leaves it as it was (ADR-375), so the hold-to-jog
+// clamp alone aims from it. Kept beside the stored report rather than in a
+// store field, it goes when that report is replaced or cleared. A WPos-only
+// report ($10=0) carries none, and unconfirmed report units make the number
+// meaningless, so neither keeps one.
+const withheldMPos = new WeakMap<StatusReport, NonNullable<StatusReport['mPos']>>();
+
+/** The MPos, in report units, that KerfDesk withheld from this report, or
+ *  null. Only the hold-to-jog clamp may use it. */
+export function withheldControllerMPos(report: StatusReport | null): StatusReport['mPos'] {
+  return report === null ? null : (withheldMPos.get(report) ?? null);
+}
+
 export function statusPositionPatch(
   state: LaserState,
   report: StatusReport,
@@ -42,7 +58,7 @@ export function statusPositionPatch(
   const airPatch = manualAirPatch(report);
   if (state.positionEvidenceSuppressed === true || state.reportUnitsUnconfirmed === true) {
     return {
-      statusReport: { ...report, mPos: null, wPos: null, wco: null },
+      statusReport: withholdPosition(state, report),
       ...ovPatch,
       ...accessoryPatch,
       ...airPatch,
@@ -70,6 +86,14 @@ export function statusPositionPatch(
     workOriginActive: active,
     workOriginSource: active ? knownOrUnknownOriginSource(state.workOriginSource) : 'none',
   };
+}
+
+function withholdPosition(state: LaserState, report: StatusReport): StatusReport {
+  const shown = { ...report, mPos: null, wPos: null, wco: null };
+  if (state.reportUnitsUnconfirmed !== true && report.mPos !== null) {
+    withheldMPos.set(shown, report.mPos);
+  }
+  return shown;
 }
 
 // The work offset this report proves: its own WCO: field, the difference of

@@ -190,6 +190,49 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     await pump(250);
     expect(oks(lines)).toBe(3);
   });
+
+  it('boots locked in Alarm with homing on and reports the lock after the banner (main.c:65-67, protocol.c:49-54)', async () => {
+    const sim = createGrblSimulator({ homingInitLock: true });
+    const portRef = await sim.adapter.serial.requestPort();
+    if (portRef === null) throw new Error('requestPort returned null');
+    const conn = await portRef.open({ baudRate: 115200 });
+    const lines: string[] = [];
+    conn.onLine((line) => lines.push(line));
+    await pump(5);
+    await conn.write('$J=G91 G21 X-1.000 F600\n');
+    await pump(5);
+    await conn.write('$X\n');
+    await pump(5);
+    expect(lines).toEqual([
+      "Grbl 1.1f ['$' for help]",
+      "[MSG:'$H'|'$X' to unlock]",
+      'error:9',
+      '[MSG:Caution: Unlocked]',
+      'ok',
+    ]);
+    expect(sim.state().machine).toBe('Idle');
+  });
+
+  it('boots unlocked with homing off even with the homing lock modelled (main.c:65-67)', async () => {
+    const { sim } = await openSim({ homingInitLock: true, settings: [[22, '0']] });
+    expect(sim.state().machine).toBe('Idle');
+  });
+
+  it('refuses a whole $J= line whose target leaves [-$13x, 0] with $20=1, homed or not (jog.c:35-37, system.c:346-349)', async () => {
+    const { sim, conn, lines } = await openSim({ settings: [[20, '1']] });
+    await conn.write('$J=G91 G21 X-10.000 F600\n');
+    await pump(5);
+    await conn.write('$J=G91 G21 X-390.001 Y-5.000 F600\n');
+    await conn.write('$J=G91 G21 X10.001 F600\n');
+    await pump(5);
+    expect(lines).toEqual(['ok', 'error:15', 'error:15']);
+    expect(sim.state().mpos).toEqual({ x: -10, y: 0, z: 0 });
+    // A target on the edge itself is inside.
+    await conn.write('$J=G91 G21 X-390.000 F600\n');
+    await pump(5);
+    expect(lines.at(-1)).toBe('ok');
+    expect(sim.state().mpos.x).toBe(-400);
+  });
 });
 
 describe('GRBL simulator grblHAL differences', () => {

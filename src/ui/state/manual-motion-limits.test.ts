@@ -7,7 +7,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { resolveManualMotionLimits } from './manual-motion-limits';
+import { firmwareJogCheckPosition, resolveManualMotionLimits } from './manual-motion-limits';
 import { resolveNativeBedFrame, type NativeBedEvidence } from './native-bed-frame';
 import { stockNativeEvidence } from './native-bed-frame.test-support';
 
@@ -174,5 +174,43 @@ describe('manual-motion limits with a verified bed frame', () => {
       nativeToBedOffsetMm: { x: 0, y: 0 },
     };
     expect(resolveManualMotionLimits(frame, softLimitedGrbl())).toEqual(frame.nativeBounds);
+  });
+});
+
+// After an Unlock without Home KerfDesk hides the reported position, yet $X
+// leaves GRBL's own position as it was
+// (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L160-L168)
+// and every jog target is still checked against it once $20=1.
+describe('the hidden controller MPos a hold is aimed from', () => {
+  const hidden = { x: -50, y: -40, z: 0 };
+
+  it('is the firmware position in mm on stock GRBL enforcing soft limits this session', () => {
+    expect(
+      firmwareJogCheckPosition(softLimitedGrbl({ homingState: 'unknown' }), hidden, false),
+    ).toEqual({ x: -50, y: -40 });
+    expect(firmwareJogCheckPosition(softLimitedGrbl(), { x: -2, y: -1, z: 0 }, true)).toEqual({
+      x: -50.8,
+      y: -25.4,
+    });
+  });
+
+  it.each<[string, Partial<NativeBedEvidence>]>([
+    [
+      'soft limits off',
+      { controllerSettings: { ...softLimitedGrbl().controllerSettings, softLimitsEnabled: false } },
+    ],
+    [
+      '$$ from an earlier session',
+      { controllerSettingsObservation: { sessionEpoch: 6, observedAt: 1 } },
+    ],
+    ['grblHAL', { activeControllerKind: 'grblhal', detectedControllerKind: 'grblhal' }],
+    ['a vendor command set', { activeControllerCommandSet: 'creality-falcon-a1-pro' }],
+  ])('is not used with %s', (_name, patch) => {
+    expect(firmwareJogCheckPosition(softLimitedGrbl(patch), hidden, false)).toBeNull();
+  });
+
+  it('is absent when the report carried no MPos ($10=0 or unconfirmed units)', () => {
+    expect(firmwareJogCheckPosition(softLimitedGrbl(), null, false)).toBeNull();
+    expect(firmwareJogCheckPosition(softLimitedGrbl(), undefined, false)).toBeNull();
   });
 });
