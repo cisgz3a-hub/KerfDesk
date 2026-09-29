@@ -63,6 +63,11 @@ async function runWake(
   }
   const softReset = driver().realtime.softReset;
   if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
+  // Read before the reset: the reboot banner ends the homing-state latch.
+  const alarmNotice = wokeIntoAlarmNotice(
+    get().resetRequired === 'homing-state',
+    driver().commands.home,
+  );
   clearCncLiveCaps();
   cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
   const resetWriteEpoch = refs.writeEpoch ?? 0;
@@ -94,7 +99,7 @@ async function runWake(
     return 'idle';
   } catch (err) {
     if (resetSent && controllerReportsAlarm(get())) {
-      set(wokeIntoAlarmPatch);
+      set(wokeIntoAlarmPatch(alarmNotice));
       return 'alarm';
     }
     const message = err instanceof Error ? err.message : String(err);
@@ -137,15 +142,33 @@ function afterResetPatch(state: LaserState): Partial<LaserState> {
   };
 }
 
-function wokeIntoAlarmPatch(state: LaserState): Partial<LaserState> {
-  return {
+function wokeIntoAlarmPatch(notice: string): (state: LaserState) => Partial<LaserState> {
+  return (state) => ({
     controllerOperation: releaseRecoveryOperation(state),
     lastWriteError: null,
-    log: pushLog(
-      state,
-      '[lf2] Controller reset and came back locked in Alarm, as it does after Sleep or a critical alarm. Unlock or Home it.',
-    ),
-  };
+    log: pushLog(state, notice),
+  });
+}
+
+// A reset out of stock GRBL's homing state raises ALARM:6 and the controller
+// comes back locked in Alarm
+// (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/motion_control.c#L380-L384).
+// A single-axis Home, such as the Falcon command set's `$HX`, is what left it
+// stuck and would again, so the note says Unlock for it (controller audit A-7,
+// ADR-375 Amendment 1).
+function wokeIntoAlarmNotice(fromHomingState: boolean, home: string | null): string {
+  if (!fromHomingState) {
+    return '[lf2] Controller reset and came back locked in Alarm, as it does after Sleep or a critical alarm. Unlock or Home it.';
+  }
+  const singleAxisHome = home
+    ?.split('\n')
+    .map((line) => line.trim())
+    .find((line) => /^\$H[A-Z]/i.test(line));
+  const stuck =
+    '[lf2] Controller reset out of its homing state and came back locked in Alarm (ALARM:6).';
+  return singleAxisHome === undefined
+    ? `${stuck} Unlock or Home it.`
+    : `${stuck} Unlock it: Home with this device profile sends ${singleAxisHome}, which leaves stock GRBL built without single-axis homing stuck again.`;
 }
 
 function releaseRecoveryOperation(state: LaserState): LaserState['controllerOperation'] {
