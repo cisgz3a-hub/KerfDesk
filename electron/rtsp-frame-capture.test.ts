@@ -3,8 +3,13 @@ import { EventEmitter } from 'node:events';
 import type { ServerResponse } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
+const { spawnMock, installedFfmpeg } = vi.hoisted(() => ({
+  spawnMock: vi.fn(),
+  installedFfmpeg: vi.fn((): string | null => '/opt/ffmpeg/bin/ffmpeg'),
+}));
 vi.mock('node:child_process', () => ({ default: { spawn: spawnMock }, spawn: spawnMock }));
+// FFmpeg is started only by its full path from PATH (ADR-551); the test machine may have none.
+vi.mock('./ffmpeg-path.js', () => ({ FFMPEG_MISSING_REASON: 'No FFmpeg.', installedFfmpeg }));
 
 import { captureRtspFrameJpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream';
 
