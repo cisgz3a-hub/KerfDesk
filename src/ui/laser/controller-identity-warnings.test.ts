@@ -40,11 +40,19 @@ describe('controller identity warnings', () => {
     expect(warnings[0]).toContain('Reconnect using the selected profile');
   });
 
-  it('warns when the banner differs from an otherwise matching connection', () => {
+  // A banner never selects the driver: Connect binds it from the profile, so a
+  // reconnect with the same profile hears the same banner. The advice names the
+  // profile change that can clear it (ADR-375).
+  it('points a banner that differs from a matching connection at the profile', () => {
     const warnings = controllerIdentityWarnings('grbl-v1.1', 'grbl-v1.1', 'marlin');
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain(CONTROLLER_IDENTITY_WARNING_PREFIX);
     expect(warnings[0]).toContain('firmware banner identifies Marlin');
+    expect(warnings[0]).toContain('reconnecting with this profile hears the same banner');
+    expect(warnings[0]).toContain(
+      'If this machine runs Marlin, choose Marlin as its controller in Machine Setup, then reconnect.',
+    );
+    expect(warnings[0]).not.toContain('Reconnect using the selected profile');
   });
 
   // Audit HF-8: "Grbl 1.1f" is also grblHAL's banner at COMPATIBILITY_LEVEL >= 1
@@ -57,6 +65,10 @@ describe('controller identity warnings', () => {
     const warnings = controllerIdentityWarnings('grblhal', 'grblhal', stock);
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('firmware banner identifies GRBL');
+    expect(warnings[0]).toContain(
+      'If this machine runs GRBL v1.1, choose GRBL v1.1 as its controller in Machine Setup',
+    );
+    expect(warnings[0]).not.toContain('Reconnect using the selected profile');
   });
 
   it('discloses a GRBL-family variant instead of silently treating it as identical', () => {

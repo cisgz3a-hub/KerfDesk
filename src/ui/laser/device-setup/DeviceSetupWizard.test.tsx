@@ -136,8 +136,15 @@ describe('DeviceSetupWizard', () => {
     try {
       await openSetupDisclosure(view.host, 'Connection options');
       expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
-      expect(view.host.textContent).toContain('The connection does not match this setup');
+      // The active driver matches the draft and only the banner differs, which
+      // a reconnect cannot change (ADR-375).
+      expect(view.host.textContent).toContain('The firmware banner differs from this setup');
       await act(async () => button(view.host, 'Use detected grblHAL in draft').click());
+      // grblHAL lifts the inherited 120-byte window to 1024 (ADR-331), so the
+      // draft changes only when the operator applies the listed changes.
+      expect(view.host.textContent).toContain('RX window: 120 bytes → 1024 bytes');
+      expect(select(view.host, 'Controller firmware').value).toBe('grbl-v1.1');
+      await act(async () => button(view.host, 'Apply to draft').click());
       expect(select(view.host, 'Controller firmware').value).toBe('grblhal');
     } finally {
       await view.unmount();

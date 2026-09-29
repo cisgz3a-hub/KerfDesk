@@ -58,11 +58,17 @@ export function controllerIdentityWarnings(
         'controller-specific behavior.',
     ];
   }
+  // Connect binds the driver from the profile and a banner never switches it,
+  // so a reconnect with this profile hears the same banner. The advice names
+  // the profile change that can clear it (ADR-375).
   if (detected !== null && detected !== configured) {
+    const detectedLabel = controllerLabel(detected);
     return [
       `${CONTROLLER_IDENTITY_WARNING_PREFIX} the selected profile and active connection use ` +
-        `${configuredLabel}, but the firmware banner identifies ${controllerLabel(detected)}. ` +
-        'Reconnect using the selected profile before relying on controller-specific behavior.',
+        `${configuredLabel}, but the firmware banner identifies ${detectedLabel}. The banner is ` +
+        'identity evidence and does not choose the driver, so reconnecting with this profile ' +
+        `hears the same banner. If this machine runs ${detectedLabel}, choose ${detectedLabel} ` +
+        'as its controller in Machine Setup, then reconnect.',
     ];
   }
   if (detected === null) {
