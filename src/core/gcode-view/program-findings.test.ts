@@ -66,6 +66,19 @@ describe('findProgramIssues', () => {
     expect(never).toContain('cut-before-spindle');
   });
 
+  // Weakness audit WA-5: a G0, or a feed that stops above the work, is not a cut.
+  it('does not count rapids or moves above the work as cutting before the spindle', () => {
+    const approach = ['G21 G90', 'G0 Z10', 'G0 Z5', 'G1 Z1 F300', 'M3 S600'];
+    expect(idsOf([...approach, 'G1 Z-1 F300', 'G1 X10 F800', 'M5', 'M2'].join('\n'))).not.toContain(
+      'cut-before-spindle',
+    );
+
+    const early = findProgramIssues(
+      model(['G21 G90', 'G0 Z5', 'G1 Z-1 F300', 'M3 S600', 'G1 X10 F800', 'M2'].join('\n')),
+    ).find((entry) => entry.id === 'cut-before-spindle');
+    expect(early?.detail).toContain('line 3');
+  });
+
   it('flags cutting moves with no feed rate', () => {
     const finding = findProgramIssues(
       model(['G21 G90', 'M3 S600', 'G1 X10', 'G1 X20', 'M2'].join('\n')),
