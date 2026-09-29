@@ -61,6 +61,56 @@ function validateEntry(view: DataView, little: boolean, entry: number, visited: 
   }
 }
 
+const BITS_PER_SAMPLE_TAG = 258;
+const SHORT_TYPE = 3;
+const ENTRY_BYTES = 12;
+
+/**
+ * TIFF 6.0 gives BitsPerSample a default of 1 and lets bilevel files omit it
+ * (Pillow's uncompressed 1-bit writer does), but the decoder has no default and
+ * reads such a page as having no bit depth. Return a copy whose selected page
+ * states the default, or the bytes themselves when the page already has it.
+ */
+export function withDefaultBitsPerSample(bytes: Uint8Array, pageNumber: number): Uint8Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const little = view.getUint16(0) === 0x4949;
+  const pointer = directoryPointer(view, little, pageNumber);
+  const entries = view.getUint32(pointer, little) + 2;
+  const count = view.getUint16(entries - 2, little);
+  const tags = Array.from({ length: count }, (_, i) =>
+    view.getUint16(entries + i * ENTRY_BYTES, little),
+  );
+  if (tags.includes(BITS_PER_SAMPLE_TAG)) return bytes;
+  // Append the directory again with the entry in tag order and point the chain
+  // at the copy. Values stored elsewhere keep their absolute offsets.
+  const start = bytes.length + (bytes.length % 2); // directories start on a word boundary
+  const out = new Uint8Array(start + 2 + (count + 1) * ENTRY_BYTES + 4);
+  out.set(bytes);
+  const outView = new DataView(out.buffer);
+  const before = tags.filter((tag) => tag < BITS_PER_SAMPLE_TAG).length * ENTRY_BYTES;
+  const added = start + 2 + before;
+  outView.setUint16(start, count + 1, little);
+  out.set(bytes.subarray(entries, entries + before), start + 2);
+  outView.setUint16(added, BITS_PER_SAMPLE_TAG, little);
+  outView.setUint16(added + 2, SHORT_TYPE, little);
+  outView.setUint32(added + 4, 1, little);
+  outView.setUint16(added + 8, 1, little);
+  // The rest of the entries, then the next-directory pointer that follows them.
+  out.set(bytes.subarray(entries + before, entries + count * ENTRY_BYTES + 4), added + ENTRY_BYTES);
+  outView.setUint32(pointer, start, little);
+  return out;
+}
+
+/** The byte offset of the pointer to page `pageNumber`'s directory. */
+function directoryPointer(view: DataView, little: boolean, pageNumber: number): number {
+  let pointer = 4;
+  for (let page = 1; page < pageNumber; page += 1) {
+    const directory = view.getUint32(pointer, little);
+    pointer = directory + 2 + view.getUint16(directory, little) * ENTRY_BYTES;
+  }
+  return pointer;
+}
+
 /** The decoder accepts top-left samples only; orient our decoded pixels once. */
 export function topLeftTiffBytes(bytes: Uint8Array, pageNumber: number): Uint8Array {
   const copy = bytes.slice();

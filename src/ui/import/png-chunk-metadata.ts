@@ -29,6 +29,31 @@ export async function grayscaleTransparencyFromChunk(
   return sample;
 }
 
+/** The samples of the one colour tRNS makes transparent: [grey] or [red, green, blue]. */
+export type PngTransparentKey = readonly number[];
+
+/**
+ * Validate a truecolour tRNS chunk and return its colour at the source's own
+ * bit depth, with the same integrity checks as the grayscale key above.
+ */
+export function truecolourTransparencyFromChunk(
+  chunk: ChunkHeader,
+  format: PngFormat,
+  afterImageData: boolean,
+  bytes: Uint8Array,
+  current: PngTransparentKey | undefined,
+): PngTransparentKey | undefined {
+  if (chunk.type !== 'tRNS' || format.colorType !== 2) return current;
+  if (afterImageData) throw new Error('PNG tRNS chunk must precede IDAT image data.');
+  if (current !== undefined) throw new Error('PNG may contain only one tRNS chunk.');
+  if (chunk.length !== 6 || bytes.byteLength !== 6) {
+    throw new Error('PNG truecolour tRNS chunk must contain exactly 6 bytes.');
+  }
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const usedBits = 2 ** format.bitDepth - 1;
+  return [0, 2, 4].map((offset) => view.getUint16(offset) & usedBits);
+}
+
 /** Reject PLTE only for grayscale types where the PNG specification forbids it. */
 export function validatePaletteForColorType(type: string, colorType: number): void {
   if (type !== 'PLTE' || (colorType !== 0 && colorType !== 4)) return;

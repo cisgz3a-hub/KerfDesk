@@ -280,8 +280,14 @@ function readFillLineIntervalMm(data: FormData, layer: Layer): number {
   return layer.hatchSpacingMm;
 }
 
+// A stored density outside the recommended range (a LightBurn recipe at a
+// 0.5 mm interval stores 2 lines/mm) is what compiles, so submitting it
+// unchanged keeps it; only a new entry is held to the recommended range. The
+// hidden linesPerMm field carries the exact stored number beside the rounded
+// visible fields, so it alone can tell an unchanged density from a new one.
 function readImageLinesPerMm(data: FormData, layer: Layer): number {
   if (data.has('linesPerMm')) {
+    if (submittedNumber(data, 'linesPerMm') === layer.linesPerMm) return layer.linesPerMm;
     return numberField(
       data,
       'linesPerMm',
@@ -322,9 +328,13 @@ function numberField(
   min: number,
   max: number,
 ): number {
-  const parsed = Number.parseFloat(String(data.get(name) ?? ''));
+  const parsed = submittedNumber(data, name);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function submittedNumber(data: FormData, name: string): number {
+  return Number.parseFloat(String(data.get(name) ?? ''));
 }
 
 function positiveFiniteLimit(value: number | undefined): number | null {

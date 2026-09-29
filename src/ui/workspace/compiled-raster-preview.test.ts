@@ -60,6 +60,38 @@ describe('compiledRasterPreview', () => {
     expect(streamedPreview.rgba).toEqual(materializedPreview.rgba);
   });
 
+  it('reduces a large dithered grid to the tone it burns (ADR-028 Amendment 1)', () => {
+    // 50% grey through Floyd-Steinberg burns about half its dots at full power.
+    const group = compileRaster(
+      {
+        ...asymmetricRaster(),
+        pixelWidth: 1,
+        pixelHeight: 1,
+        bounds: { minX: 0, minY: 0, maxX: 300, maxY: 200 },
+        lumaBase64: encodeLuma([128]),
+      },
+      imageLayer({ ditherAlgorithm: 'floyd-steinberg', linesPerMm: 1, power: 100 }),
+    );
+    const preview = compiledRasterPreview(group, DEFAULT_DEVICE_PROFILE, 128);
+
+    expect(preview.displayDecimated).toBe(true);
+    const burned = meanPowerFraction(group);
+    expect(burned).toBeGreaterThan(0.4);
+    expect(burned).toBeLessThan(0.6);
+    expect(Math.abs(meanDarkness(preview.rgba) - burned)).toBeLessThan(0.02);
+  });
+
+  it('shows a one-pixel line as the share of its display block it burns', () => {
+    const sMax = DEFAULT_DEVICE_PROFILE.maxPowerS;
+    // A burned first column in a 4x2 grid shown 2x1: it fills half of the left block.
+    const group = powerGrid(4, 2, (x) => (x === 0 ? sMax : 0));
+
+    const preview = compiledRasterPreview(group, DEFAULT_DEVICE_PROFILE, 2);
+
+    expect(Array.from(preview.sValues)).toEqual([sMax / 2, 0]);
+    expect([preview.rgba[0], preview.rgba[4]]).toEqual([127, 255]);
+  });
+
   it('renders compiled power against the device maximum instead of normalizing the group', () => {
     const group = compileRaster(asymmetricRaster(), imageLayer({ power: 25 }));
     const preview = compiledRasterPreview(group, DEFAULT_DEVICE_PROFILE);
@@ -109,4 +141,32 @@ function asymmetricRaster(): RasterImage {
 
 function encodeLuma(bytes: ReadonlyArray<number>): string {
   return btoa(String.fromCharCode(...bytes));
+}
+
+function powerGrid(
+  width: number,
+  height: number,
+  power: (x: number, y: number) => number,
+): RasterGroup {
+  const sValues = new Uint16Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) sValues[y * width + x] = power(x, y);
+  }
+  const base = compileRaster(asymmetricRaster(), imageLayer());
+  return { ...base, pixelWidth: width, pixelHeight: height, sValues };
+}
+
+// Mean emitted power as a fraction of the machine maximum.
+function meanPowerFraction(group: RasterGroup): number {
+  let sum = 0;
+  for (let y = 0; y < group.pixelHeight; y += 1) {
+    for (const value of rasterRow(group, y)) sum += value;
+  }
+  return sum / (group.pixelWidth * group.pixelHeight * DEFAULT_DEVICE_PROFILE.maxPowerS);
+}
+
+function meanDarkness(rgba: Uint8ClampedArray): number {
+  let dark = 0;
+  for (let index = 0; index < rgba.length; index += 4) dark += 1 - (rgba[index] ?? 255) / 255;
+  return dark / (rgba.length / 4);
 }

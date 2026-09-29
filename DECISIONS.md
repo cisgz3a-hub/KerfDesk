@@ -1367,6 +1367,12 @@ bitmap.
 - **Verification (per CLAUDE.md #2):** core math is property-tested (`preview-data.test.ts`) and the dither↔preview agreement is content-checked against the compile call. On-canvas registration (the sim overlaying the bitmap pixel-for-pixel, including rotation) is **maintainer-eyeball only** — not asserted by the suite, and not driven from the live file `<input>` per CLAUDE.md #4.
 - Gated by ADR-027 (divergence fix) and ADR-025 (perceptual harness is the fidelity gate for raster output).
 
+### Amendments
+
+ADR-028's amendments are separate decision files (ADR-344):
+`docs/decisions/ADR-028-amendment-1-reduced-preview-keeps-the-burn-tone.md` (item 1's reduced
+preview averages each block instead of max-pooling it).
+
 ---
 
 ## ADR-029 — Convert to Bitmap (vector → raster engrave source)

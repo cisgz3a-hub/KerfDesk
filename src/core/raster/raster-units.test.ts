@@ -4,6 +4,7 @@ import {
   lineIntervalMmToLinesPerMm,
   linesPerMmToDpi,
   linesPerMmToLineIntervalMm,
+  MM_PER_INCH,
 } from './raster-units';
 
 describe('raster unit conversions', () => {
@@ -29,6 +30,19 @@ describe('raster unit conversions', () => {
 
   it('reports the interval the compiler will burn above the recommended maximum', () => {
     expect(linesPerMmToLineIntervalMm(1000)).toBeCloseTo(0.001);
+  });
+
+  // The DPI field sits beside the interval and must describe the same density:
+  // a .clb recipe at 0.5 mm burns 50.8 DPI, and one at 0.025 mm burns 1016 DPI.
+  it.each([
+    { linesPerMm: 2, dpi: 50.8 },
+    { linesPerMm: 40, dpi: 1016 },
+    { linesPerMm: 0, dpi: 25.4 },
+  ])('reports the DPI the compiler will burn for $linesPerMm lines/mm', ({ linesPerMm, dpi }) => {
+    expect(linesPerMmToDpi(linesPerMm)).toBeCloseTo(dpi);
+    expect(linesPerMmToDpi(linesPerMm)).toBeCloseTo(
+      MM_PER_INCH / linesPerMmToLineIntervalMm(linesPerMm),
+    );
   });
 
   it('floors density where the compiler floors it, so the interval never exceeds 1 mm', () => {

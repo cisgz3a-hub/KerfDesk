@@ -63,6 +63,7 @@ export function CutSettingsImageFields(props: {
       ) : null}
       <ImageDensityFields
         linesPerMm={props.imageLinesPerMm}
+        storedLinesPerMm={props.layer.linesPerMm}
         onChange={props.onImageLinesPerMmChange}
       />
       <p className="lf-laser-help">
@@ -220,8 +221,10 @@ function MinPowerInput(props: {
 
 function ImageDensityFields(props: {
   readonly linesPerMm: number;
+  readonly storedLinesPerMm: number;
   readonly onChange: (linesPerMm: number) => void;
 }): JSX.Element {
+  const bounds = imageDensityBounds(props.storedLinesPerMm);
   return (
     <>
       <input
@@ -235,8 +238,8 @@ function ImageDensityFields(props: {
         <input
           name="lineIntervalMm"
           type="number"
-          min={linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM)}
-          max={linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM)}
+          min={bounds.intervalMm.min}
+          max={bounds.intervalMm.max}
           step="any"
           className="lf-input"
           value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
@@ -257,8 +260,8 @@ function ImageDensityFields(props: {
         <input
           name="imageDpi"
           type="number"
-          min={linesPerMmToDpi(MIN_RASTER_LINES_PER_MM)}
-          max={linesPerMmToDpi(MAX_RASTER_LINES_PER_MM)}
+          min={bounds.dpi.min}
+          max={bounds.dpi.max}
           step="any"
           className="lf-input"
           value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
@@ -275,6 +278,30 @@ function ImageDensityFields(props: {
       </Field>
     </>
   );
+}
+
+type NumberBounds = { readonly min: number; readonly max: number };
+
+// New entries keep the recommended range: the change handlers clamp into it. A
+// stored density outside that range (a LightBurn recipe at a 0.5 mm interval
+// stores 2 lines/mm) still burns as stored, so the bounds also admit its shown
+// value, or the browser's range check would block Apply for an unrelated edit.
+function imageDensityBounds(storedLinesPerMm: number): {
+  readonly intervalMm: NumberBounds;
+  readonly dpi: NumberBounds;
+} {
+  const storedIntervalMm = displayNumber(linesPerMmToLineIntervalMm(storedLinesPerMm), 4);
+  const storedDpi = displayNumber(linesPerMmToDpi(storedLinesPerMm), 2);
+  return {
+    intervalMm: {
+      min: Math.min(linesPerMmToLineIntervalMm(MAX_RASTER_LINES_PER_MM), storedIntervalMm),
+      max: Math.max(linesPerMmToLineIntervalMm(MIN_RASTER_LINES_PER_MM), storedIntervalMm),
+    },
+    dpi: {
+      min: Math.min(linesPerMmToDpi(MIN_RASTER_LINES_PER_MM), storedDpi),
+      max: Math.max(linesPerMmToDpi(MAX_RASTER_LINES_PER_MM), storedDpi),
+    },
+  };
 }
 
 function NumberInput(props: {

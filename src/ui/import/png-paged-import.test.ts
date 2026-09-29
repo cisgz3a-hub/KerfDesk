@@ -3,6 +3,7 @@ import { Blob as NodeBlob } from 'node:buffer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { encodeRgbPng } from '../../__fixtures__/perceptual/png';
 import { IndexedDbPagedAssetRepository } from './paged-asset-indexeddb';
+import { makePng } from './png-incremental-decoder.test-support';
 import { importPngStreamToPagedAssets, importPngToPagedAssets } from './png-paged-import';
 
 describe('importPngToPagedAssets', () => {
@@ -59,6 +60,37 @@ describe('importPngToPagedAssets', () => {
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'persisting-source' }));
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'decoding' }));
     expect(progress).toHaveBeenCalledWith(expect.objectContaining({ phase: 'persisting-luma' }));
+  });
+
+  it('stores and previews the tRNS key colour of an RGB PNG as paper', async () => {
+    const repository = new IndexedDbPagedAssetRepository(new FakeIDBFactory(), FakeIDBKeyRange);
+    // A black key around grey art, as PNG optimisers write a hard-edged transparent background.
+    const png = makePng({
+      width: 2,
+      height: 1,
+      colorType: 2,
+      rows: [[0, 0, 0, 200, 200, 200]],
+      transparency: new Uint8Array(6),
+    });
+
+    const result = await importPngToPagedAssets(
+      new NodeBlob([png], { type: 'image/png' }) as Blob,
+      {
+        assetId: 'keyed-source',
+        lumaAssetId: 'keyed-luma',
+        sourceName: 'keyed.png',
+        createdAtEpochMs: 1,
+        maxEdge: 8,
+        maxPixels: 64,
+      },
+      repository,
+    );
+
+    if (result.kind !== 'ok') throw new Error('expected qualified PNG');
+    const page = await repository.readPage('keyed-luma', 0);
+    expect([...new Uint8Array(await page!.arrayBuffer())]).toEqual([255, 200]);
+    // 24-bit BMP pixels start after the 54-byte header, blue first.
+    expect([...result.thumbnail.bytes.subarray(54, 60)]).toEqual([255, 255, 255, 200, 200, 200]);
   });
 
   it('stages a readable source with backpressure before decoding its durable pages', async () => {
