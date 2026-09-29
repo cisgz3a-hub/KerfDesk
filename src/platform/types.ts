@@ -3,6 +3,90 @@
 // fs). Injected at React root per ADR-011. Phase A scope: file-pick (open) +
 // file-pick (save). Phase B adds serial-port connection methods.
 
+/**
+ * A device's licence as the app sees it (ADR-540). The app always opens;
+ * `edition` says whether the Pro tools are unlocked for this session. It is
+ * never a machine-operation policy: no licence state stops a running job.
+ */
+export type LicenceStatus = {
+  /** 'free' is a Preview or source build with every feature and no licensing. */
+  readonly channel: 'free' | 'commercial';
+  readonly edition: 'pro' | 'free';
+  readonly state:
+    | 'ready'
+    | 'activation-required'
+    | 'trial-expired'
+    | 'updates-expired'
+    | 'invalid-licence'
+    | 'unavailable'
+    | 'clock-error';
+  readonly tier: 'trial' | 'paid' | 'developer' | null;
+  readonly accessExpiresAt: number | null;
+  readonly updatesUntil: number | null;
+  readonly perpetualUpdates: boolean;
+  /** The saved licence key, shown so a buyer can activate their other devices. */
+  readonly licenseKey: string | null;
+  readonly deactivationPending: boolean;
+  readonly paymentPending: boolean;
+  readonly paymentOrderId: string | null;
+  readonly storeUnreadable: boolean;
+  readonly message: string | null;
+};
+
+export type LicenceAdapter = {
+  readonly status: () => Promise<LicenceStatus>;
+  readonly activate: (licenseKey: string) => Promise<LicenceStatus>;
+  readonly startTrial: () => Promise<LicenceStatus>;
+  readonly refresh: () => Promise<LicenceStatus>;
+  readonly deactivate: () => Promise<LicenceStatus>;
+  readonly resetStore: () => Promise<LicenceStatus>;
+  readonly checkout: (
+    operation: 'purchase' | 'renewal',
+    licenseKey?: string,
+  ) => Promise<LicenceStatus>;
+  readonly claimPayment: () => Promise<LicenceStatus>;
+  readonly discardPayment: () => Promise<LicenceStatus>;
+  readonly earlyUpdates: () => Promise<EarlyUpdates>;
+  readonly setEarlyUpdates: (enabled: boolean) => Promise<EarlyUpdates>;
+  /** Where this device's own updates stand (ADR-547). */
+  readonly updateStatus: () => Promise<CommercialUpdateStatus>;
+  /** Starts an update check and answers at once; `updateStatus` gives the result. */
+  readonly checkForUpdates: () => Promise<CommercialUpdateStatus>;
+};
+
+/**
+ * Where the desktop app's own updates stand (ADR-547). `unavailable` is a
+ * build that does not update itself; `ready` is a downloaded version that
+ * installs when KerfDesk closes; `not-covered` is a newer version this
+ * licence's updates do not cover.
+ */
+export type CommercialUpdateStatus = {
+  readonly state:
+    | 'unavailable'
+    | 'idle'
+    | 'checking'
+    | 'downloading'
+    | 'up-to-date'
+    | 'ready'
+    | 'not-covered'
+    | 'failed';
+  readonly currentVersion: string;
+  /** The newer version being downloaded, ready, not covered or not installed. */
+  readonly version: string | null;
+  /** When the last check finished, in milliseconds since 1970. */
+  readonly checkedAt: number | null;
+};
+
+/**
+ * Whether this device takes new versions early, from the beta ring, a few
+ * quiet days before everyone else (ADR-541). Stable unless the owner opts in.
+ */
+export type EarlyUpdates = {
+  /** False in builds that do not take commercial updates. */
+  readonly available: boolean;
+  readonly enabled: boolean;
+};
+
 export type FileHandle = {
   readonly name: string;
   // Byte size when the adapter can supply it cheaply (web File.size, Electron
@@ -197,6 +281,10 @@ export type SerialAdapter = {
   // A picked port was plugged in or unplugged. The handler re-reads
   // grantedPorts(); it never opens a port by itself.
   readonly onGrantedPortsChange?: (handler: () => void) => () => void;
+  // True where a pick lasts only until the app closes, so every start begins
+  // with no granted port: the desktop app on macOS and Linux (ADR-366). Chrome
+  // and the Windows desktop app remember picks (ADR-420, ADR-552).
+  readonly picksEndOnRestart?: boolean;
 };
 
 // --- Camera (Camera Mode, ADR-107) ---
@@ -356,4 +444,42 @@ export type PlatformAdapter = {
   // Project files handed over by the operating system: the desktop file
   // association, or an installed web app's file handler.
   readonly externalFileOpens?: ExternalFileOpenSource;
+
+  // Where Save writes a KerfDesk project opened from `ref`, so the first Save
+  // after Open replaces that file (ADR-550). Null when this platform cannot
+  // write it back; Save then asks where to save, as for a new project.
+  readonly openedProjectSaveTarget?: (ref: RecentFileRef) => SaveTarget | null;
+
+  // The desktop app's local support log (ADR-546): its newest part, for Help >
+  // Save Support Report. Absent in the web app, which keeps no log.
+  readonly readSupportLog?: () => Promise<string>;
+
+  // Tells the desktop app's main process whether a job runs, so a Windows
+  // restart, shutdown or sign-out waits for it (ADR-548), and how far a
+  // streamed job is, for the taskbar button (ADR-553). Absent in the web app.
+  readonly reportJobActivity?: (report: DesktopJobReport) => Promise<void>;
+
+  // File > Exit and Help > Open Data Folder in the desktop app (ADR-554).
+  // Absent in the web app, where the browser closes its own tab.
+  readonly desktopWindow?: DesktopWindowAdapter;
+};
+
+export type DesktopWindowAdapter = {
+  // Closes KerfDesk as its window's X does: the unsaved-changes question and
+  // the job Abort handoff run first, and Cancel keeps it open.
+  readonly exit: () => Promise<void>;
+  // Opens the folder with settings, the licence record and the support log.
+  // Rejects with a message that names the folder when it could not.
+  readonly openDataFolder: () => Promise<void>;
+};
+
+// A job or a latched Fire that ending the session would cut off, and for a
+// streamed job the share of its lines acknowledged (0 to 1) and whether it
+// runs, is held (paused or at a tool change) or stopped on an error.
+export type DesktopJobReport = {
+  readonly busy: boolean;
+  readonly job?: {
+    readonly progress: number;
+    readonly state: 'running' | 'paused' | 'error';
+  };
 };

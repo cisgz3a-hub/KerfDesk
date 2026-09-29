@@ -5,14 +5,19 @@
 //   GET /api/desktop-project-opens                    drain the open queue
 //   GET /api/desktop-project-status?path=&token=      exists? size, mtime
 //   GET /api/desktop-project-file?path=&token=        the file's bytes
+//   PUT /api/desktop-project-file?path=&token=        Save over a .lf2 (ADR-550)
 //
 // Any other method, host, port, credentials, fragment, extra or repeated query
 // parameter gets 404. A path needs main's token for exactly that path, and it
-// is checked again as a regular project file before every answer.
+// is checked again as a regular project file before every answer. A save also
+// needs the X-KerfDesk-Project header from the app's own page, and replaces
+// only KerfDesk's own .lf2 projects, never a LightBurn file.
 
+import { sameOriginRequest } from './app-route-guard.js';
 import type { DesktopProjectFile, DesktopProjectFileCheck } from './desktop-project-file-check.js';
 import type { DesktopProjectOpenRequest } from './desktop-project-open-queue.js';
 import { MAX_DESKTOP_PROJECT_PATH_LENGTH } from './desktop-project-paths.js';
+import type { DesktopProjectSaveResult } from './desktop-project-save.js';
 import type { DesktopProjectTokens } from './desktop-project-token.js';
 
 export const DESKTOP_PROJECT_FILE_PATH = '/api/desktop-project-file';
@@ -27,6 +32,10 @@ export type DesktopProjectRouteDeps = {
   readonly check: (file: string) => Promise<DesktopProjectFileCheck>;
   readonly read: (file: DesktopProjectFile) => Response;
   readonly drainOpens: () => Promise<ReadonlyArray<DesktopProjectOpenRequest>>;
+  readonly save: (
+    file: DesktopProjectFile,
+    body: ReadableStream<Uint8Array> | null,
+  ) => Promise<DesktopProjectSaveResult>;
 };
 
 type PathQuery = { readonly path: string; readonly token: string };
@@ -57,6 +66,9 @@ async function answerDesktopProjectRoute(
   url: URL,
   deps: DesktopProjectRouteDeps,
 ): Promise<Response> {
+  if (request.method === 'PUT' && url.pathname === DESKTOP_PROJECT_FILE_PATH) {
+    return answerSaveRoute(request, url, deps);
+  }
   if (!isExactAppRequest(request, url)) return notFound();
   switch (url.pathname) {
     case DESKTOP_PROJECT_OPENS_PATH:
@@ -90,6 +102,41 @@ async function answerPathRoute(
   }
   if (wantsBytes) return deps.read(checked);
   return jsonResponse(200, { kind: 'present', size: checked.size, modifiedMs: checked.modifiedMs });
+}
+
+async function answerSaveRoute(
+  request: Request,
+  url: URL,
+  deps: DesktopProjectRouteDeps,
+): Promise<Response> {
+  const query = pathQuery(url);
+  if (query === null || !isExactSaveRequest(request, url)) return notFound();
+  if (!(await deps.tokens()).verify(query.path, query.token)) {
+    return jsonResponse(403, { kind: 'denied' });
+  }
+  if (!isKerfDeskProject(query.path)) return jsonResponse(415, { kind: 'invalid' });
+  const checked = await deps.check(query.path);
+  if (checked.kind !== 'file') return jsonResponse(failureStatus(checked.kind), checked);
+  if (!isKerfDeskProject(checked.realPath)) return jsonResponse(415, { kind: 'invalid' });
+  const saved = await deps.save(checked, request.body);
+  if (saved === 'saved') return new Response(null, { status: 204, headers: NO_STORE_HEADERS });
+  return jsonResponse(saved === 'too-large' ? 413 : 500, { kind: saved });
+}
+
+function isExactSaveRequest(request: Request, url: URL): boolean {
+  return (
+    url.username === '' &&
+    url.password === '' &&
+    url.port === '' &&
+    url.hash === '' &&
+    request.headers.get('Content-Type') === 'application/octet-stream' &&
+    sameOriginRequest(request, 'X-KerfDesk-Project')
+  );
+}
+
+/** Save replaces only KerfDesk's own projects; LightBurn files open as imports. */
+function isKerfDeskProject(file: string): boolean {
+  return /\.lf2$/i.test(file);
 }
 
 function appUrl(value: string): URL | null {

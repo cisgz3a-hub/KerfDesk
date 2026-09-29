@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { parseDocumentImportText } from './document-import-parse';
 import { parseDocumentImportSource } from './document-import-source';
 
@@ -85,6 +86,28 @@ describe('parseDocumentImportSource LightBurn streaming', () => {
       await parseDocumentImportText(request, xml),
     );
     expect(text).not.toHaveBeenCalled();
+  });
+
+  it('opens the project on the machine the request names, streamed or as text', async () => {
+    const device = { ...DEFAULT_DEVICE_PROFILE, name: 'My 300x200 diode', bedWidth: 300 };
+    const request = {
+      id: 30,
+      kind: 'lightburn-project' as const,
+      blob: streamedBlob(LBRN_TEXT).blob,
+      source: 'machine.lbrn2',
+      device,
+    };
+    const responses = [
+      await parseDocumentImportSource(request, vi.fn()),
+      await parseDocumentImportText(request, LBRN_TEXT),
+    ];
+    expect(
+      responses.map((response) =>
+        response.kind === 'lightburn-project' && response.result.ok
+          ? response.result.project.device
+          : null,
+      ),
+    ).toEqual([device, device]);
   });
 
   it('preserves the text parser when Blob.stream is unavailable', async () => {

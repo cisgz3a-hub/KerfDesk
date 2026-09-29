@@ -88,8 +88,10 @@ function BridgeLine(props: { readonly health: CameraBridgeHealth | null }): JSX.
   if (health.kind === 'unavailable') return <p style={errStyle}>Bridge: {health.reason}</p>;
   return (
     <p style={noteStyle}>
-      Bridge: running · frame proxy {health.frameProxy ? 'yes' : 'NO (update LaserForge Desktop)'} ·
-      ffmpeg {health.ffmpegAvailable ? 'yes' : 'no (RTSP cameras disabled)'}
+      Bridge: running · frame proxy {health.frameProxy ? 'yes' : 'NO (update KerfDesk)'} · FFmpeg{' '}
+      {health.ffmpegAvailable
+        ? 'yes'
+        : 'no (network cameras need FFmpeg on PATH; install it, then restart KerfDesk)'}
     </p>
   );
 }

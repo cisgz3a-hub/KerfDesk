@@ -20,9 +20,15 @@ concurrency:
 permissions:
   contents: read
 
+# The release gate runs as parallel jobs rather than one `pnpm release:check`
+# chain (ADR-557). Every command in release:check runs in one of the first
+# three jobs, and the unit tests are split into shards. The last job keeps the
+# gate's check name and passes only when every other job passed, so a required
+# check of that name, and deploy.yml's trigger on a successful CI run, still
+# mean the whole gate passed. scripts/ci-parallel-gate.test.mjs pins both.
 jobs:
-  ci:
-    name: Lint, typecheck, license, test, build
+  static-checks:
+    name: Typecheck, lint and format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -49,9 +55,134 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Lint the Electron main process
+        run: pnpm lint:electron
+
+      - name: Check formatting
+        run: pnpm format:check
+
+  policy-and-build:
+    name: Policy checks and builds
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check ADR numbers
+        run: pnpm check:adr-numbers
+
+      - name: Check GitHub Actions pins
+        run: pnpm check:action-pins
+
+      - name: Check dependency licences
+        run: pnpm license-check
+
+      - name: Run the release script tests
+        run: pnpm test:release-integrity
+
+      - name: Run the website tests
+        run: pnpm website:test
+
+      - name: Build the web app
+        run: pnpm build:web
+
+      - name: Build the Electron main process
+        run: pnpm build:electron-main
+
+      - name: Check file sizes
+        run: pnpm check:file-size
+
+      - name: Report files over the soft line limit
+        run: pnpm check:soft-size
+
+      - name: Check index exports
+        run: pnpm check:index-exports
+
+  unit-tests:
+    name: Unit tests (${{ matrix.shard }}/${{ strategy.job-total }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Every shard reports, so one failure does not hide another shard's.
+      fail-fast: false
+      matrix:
+        # Vitest splits the test files evenly by a hash of their paths. Keep
+        # the list 1..N: the job total is the shard count.
+        shard: [1, 2, 3, 4]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run this shard of the unit tests
+        run: pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+
+  ci:
+    name: Lint, typecheck, license, test, build
+    needs: [static-checks, policy-and-build, unit-tests]
+    # Runs whatever the jobs above did, so a failed or cancelled job fails
+    # this check instead of skipping it: GitHub counts a skipped required
+    # check as passed.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        # pnpm installs the dependencies before it runs a script in a checkout
+        # without them, so the readiness report below would install uncached.
+        run: pnpm install --frozen-lockfile
+
       - name: Release verification gate
         id: release_check
-        run: pnpm release:check
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          not_passed="$(jq -r 'to_entries[] | select(.value.result != "success") | "\(.key): \(.value.result)"' <<< "${NEEDS}")"
+          if [ -n "${not_passed}" ]; then
+            echo "The release gate passes only when every CI job passed. Not passed:"
+            echo "${not_passed}"
+            exit 1
+          fi
+          echo "Every CI job passed."
 
       - name: Record SHA-correlated readiness lanes
         if: always()
@@ -66,7 +197,7 @@ jobs:
           --state=packaged-runtime=not-run
           --state=perceptual-reference-cam=not-run
           --state=hardware=not-run
-          "--evidence=ci=1 release:check gate; result=${CI_STATE}; run=${WORKFLOW_RUN_URL}"
+          "--evidence=ci=1 release:check gate in parallel jobs; result=${CI_STATE}; run=${WORKFLOW_RUN_URL}"
 
       - name: Upload readiness report
         if: always()

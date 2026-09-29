@@ -28,6 +28,19 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
     expect(workflow).toContain('environment: desktop-production');
   });
 
+  // ADR-556: commercial releases own vX.Y.Z tags, and this free build shares their
+  // version and app ID, so a tag starts nothing here unless the owner opts in.
+  it('skips the whole lane for every tag until the owner turns it back on', () => {
+    const jobs = workflow.slice(workflow.indexOf('\njobs:\n'));
+    expect(jobs.match(/^ {2}[a-z-]+:$/gmu)).toEqual(['  validate-stable-tag:', '  build-windows:']);
+    const validationJob = jobs.slice(jobs.indexOf('validate-stable-tag:'), jobs.indexOf('steps:'));
+    expect(validationJob).toContain("if: vars.KERFDESK_LEGACY_STABLE_LANE == 'on'");
+    const buildJob = jobs.slice(jobs.indexOf('build-windows:'));
+    expect(buildJob.slice(0, buildJob.indexOf('steps:'))).toContain('needs: validate-stable-tag');
+    expect(buildJob.slice(0, buildJob.indexOf('steps:'))).not.toContain('if:');
+    expect(workflow).not.toContain('always()');
+  });
+
   it('puts manual packaging in a credential-free dispatch-only workflow', () => {
     expect(dryRunWorkflow).toMatch(/^\s{2}workflow_dispatch:/m);
     expect(dryRunWorkflow).not.toContain('tags:');

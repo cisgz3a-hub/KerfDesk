@@ -11,8 +11,11 @@ import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { pushUndo, type StateSlice } from './scene-mutations';
 import { selectedObjectIds } from './scene-group-actions';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { canBreakApartTrace, curvePolyline, splitTracedImage } from './trace-break-apart';
 import { useToastStore } from './toast-store';
+
+const BREAK_APART_FEWER = 'Break apart fewer objects, or delete some objects first.';
 
 export type BreakApartActions = {
   readonly breakApartSelection: () => void;
@@ -61,6 +64,9 @@ function breakApartSelectionMutation(state: BreakApartState): BreakApartMutation
       })) ?? [],
     artworkOrder: canonicalArtworkOrder(state.project.scene).flatMap(expand),
   });
+  // A project past its limits saves but cannot be opened again (ADR-307
+  // amendment 1): such a Break Apart is refused whole, never made in part.
+  if (refuseSceneLimitOverrun(state.project.scene, repaired.scene, BREAK_APART_FEWER)) return state;
   reportDependencyRepairs(repaired);
   return {
     project: {

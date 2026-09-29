@@ -47,7 +47,12 @@ export async function parseDocumentImportText(
     return {
       id: request.id,
       kind: request.kind,
-      result: importLightBurnProject(text, request.source, (xml) => parseXml(xml, DOMParser)),
+      result: importLightBurnProject(
+        text,
+        request.source,
+        (xml) => parseXml(xml, DOMParser),
+        request.device,
+      ),
     };
   }
   if (request.kind === 'material-library') {

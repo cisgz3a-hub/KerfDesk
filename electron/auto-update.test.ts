@@ -7,6 +7,7 @@ function makeFakeUpdater(check: () => Promise<unknown> = () => Promise.resolve(n
   return {
     autoDownload: false,
     autoInstallOnAppQuit: false,
+    disableWebInstaller: false,
     checkForUpdatesAndNotify: vi.fn(check),
     quitAndInstall: vi.fn(),
   };
@@ -19,6 +20,7 @@ describe('configureAutoUpdater', () => {
     expect(updater.checkForUpdatesAndNotify).not.toHaveBeenCalled();
     expect(updater.autoDownload).toBe(false);
     expect(updater.autoInstallOnAppQuit).toBe(false);
+    expect(updater.disableWebInstaller).toBe(false);
   });
 
   it('does nothing while the update channel is unsigned', () => {
@@ -27,6 +29,7 @@ describe('configureAutoUpdater', () => {
     expect(updater.checkForUpdatesAndNotify).not.toHaveBeenCalled();
     expect(updater.autoDownload).toBe(false);
     expect(updater.autoInstallOnAppQuit).toBe(false);
+    expect(updater.disableWebInstaller).toBe(false);
   });
 
   it('enables background download + install-on-quit only for a trusted packaged channel', () => {
@@ -35,6 +38,16 @@ describe('configureAutoUpdater', () => {
     expect(updater.autoDownload).toBe(true);
     expect(updater.autoInstallOnAppQuit).toBe(true);
     expect(updater.checkForUpdatesAndNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects web installers before the first trusted update check can download a payload', () => {
+    const observedWebInstallerPolicy: boolean[] = [];
+    const updater = makeFakeUpdater(() => {
+      observedWebInstallerPolicy.push(updater.disableWebInstaller);
+      return Promise.resolve(null);
+    });
+    configureAutoUpdater(updater, { isPackaged: true, isChannelTrusted: true });
+    expect(observedWebInstallerPolicy).toEqual([true]);
   });
 
   it('never force-installs — quitAndInstall is not called (burn-safety, non-negotiable #9)', () => {

@@ -97,7 +97,12 @@ function SourceNote(props: {
     );
   }
   if (sourceState.kind === 'denied') {
-    return <p style={errStyle}>Permission denied. Allow camera access and press Start again.</p>;
+    return (
+      <p style={errStyle}>
+        Camera access was blocked. Allow it and press Start again. On Windows, also open Settings,
+        Privacy &amp; security, Camera, and let desktop apps use the camera.
+      </p>
+    );
   }
   if (sourceState.kind === 'error' && sourceState.sourceKind === 'usb') {
     return <p style={errStyle}>{sourceState.message}</p>;

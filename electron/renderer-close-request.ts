@@ -1,4 +1,4 @@
-export type RendererCloseOperation = 'prepare' | 'approve' | 'cancel';
+export type RendererCloseOperation = 'prepare' | 'save' | 'approve' | 'cancel';
 
 /** Fixed renderer-only operation; no renderer-to-main IPC or privileged API. */
 export function rendererCloseRequestScript(
@@ -16,7 +16,7 @@ export function rendererCloseRequestScript(
 }
 
 export function rendererCloseReply(value: unknown): {
-  readonly status: 'ready' | 'approved' | 'cancelled' | 'retry' | 'unavailable';
+  readonly status: 'ready' | 'saved' | 'approved' | 'cancelled' | 'retry' | 'unavailable';
   readonly dirty: boolean;
 } {
   if (typeof value !== 'object' || value === null || !('status' in value)) {
@@ -25,7 +25,12 @@ export function rendererCloseReply(value: unknown): {
   if (value.status === 'ready' && 'dirty' in value && typeof value.dirty === 'boolean') {
     return { status: 'ready', dirty: value.dirty };
   }
-  if (value.status === 'approved' || value.status === 'cancelled' || value.status === 'retry') {
+  if (
+    value.status === 'saved' ||
+    value.status === 'approved' ||
+    value.status === 'cancelled' ||
+    value.status === 'retry'
+  ) {
     return { status: value.status, dirty: false };
   }
   return { status: 'unavailable', dirty: false };

@@ -4,6 +4,7 @@ import type { SceneObject, Transform, Vec2 } from './scene-object';
 
 const MIN_DIMENSION_MM = 0.000001;
 const ROTATION_EPSILON_DEG = 0.000001;
+const QUARTER_TURN_DEG = 90;
 const HALF_TURN_DEG = 180;
 const FULL_TURN_DEG = 360;
 
@@ -221,7 +222,7 @@ function rejectsWorldAxisResize(
     edit.frameRotationDeg === undefined &&
     !edit.preserveAspect &&
     !isUniformScale(factors) &&
-    hasRotatedObject(objects)
+    hasObliqueObject(objects)
   );
 }
 
@@ -293,12 +294,15 @@ function scaleTransformAboutPoint(
   factorX: number,
   factorY: number,
 ): Transform {
+  // A quarter turn lays the object's own X axis along the world's Y, so each
+  // world factor scales the object's other axis.
+  const turned = isQuarterTurn(transform.rotationDeg);
   return {
     ...transform,
     x: anchor.x + (transform.x - anchor.x) * factorX,
     y: anchor.y + (transform.y - anchor.y) * factorY,
-    scaleX: transform.scaleX * factorX,
-    scaleY: transform.scaleY * factorY,
+    scaleX: transform.scaleX * (turned ? factorY : factorX),
+    scaleY: transform.scaleY * (turned ? factorX : factorY),
   };
 }
 
@@ -399,13 +403,21 @@ function objectLocalCenter(object: SceneObject): Vec2 {
   };
 }
 
-function hasRotatedObject(objects: ReadonlyArray<SceneObject>): boolean {
-  return objects.some((object) => !isAxisAlignedRotation(object.transform.rotationDeg));
+// Stretching along the world axes needs shear only for an object turned by
+// something other than a whole number of quarter turns.
+function hasObliqueObject(objects: ReadonlyArray<SceneObject>): boolean {
+  return objects.some((object) => !isRightAngleRotation(object.transform.rotationDeg));
 }
 
-function isAxisAlignedRotation(rotationDeg: number): boolean {
-  const folded = Math.abs(normalizeDeg(rotationDeg) % HALF_TURN_DEG);
-  return folded <= ROTATION_EPSILON_DEG || Math.abs(folded - HALF_TURN_DEG) <= ROTATION_EPSILON_DEG;
+function isRightAngleRotation(rotationDeg: number): boolean {
+  const folded = normalizeDeg(rotationDeg) % QUARTER_TURN_DEG;
+  return folded <= ROTATION_EPSILON_DEG || QUARTER_TURN_DEG - folded <= ROTATION_EPSILON_DEG;
+}
+
+// 90 or 270 degrees.
+function isQuarterTurn(rotationDeg: number): boolean {
+  const folded = normalizeDeg(rotationDeg) % HALF_TURN_DEG;
+  return Math.abs(folded - QUARTER_TURN_DEG) <= ROTATION_EPSILON_DEG;
 }
 
 function isUniformScale(factors: { readonly x: number; readonly y: number }): boolean {

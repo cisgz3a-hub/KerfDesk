@@ -204,6 +204,7 @@ describe('individual editing dialog actions', () => {
     await mount(
       <ArrayDialog
         selectionBounds={{ minX: 10, minY: 20, maxX: 30, maxY: 40 }}
+        scene={createProject().scene}
         onCancel={vi.fn()}
         onApply={apply}
       />,

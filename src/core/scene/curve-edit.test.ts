@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { CurveSubpath } from './scene-object';
+import { polylineToCurveSubpath } from './curve-path';
+import type { CurveSubpath, Vec2 } from './scene-object';
 import {
   breakCurveAtNode,
   cornerCurveNode,
@@ -98,4 +99,30 @@ describe('curve editing', () => {
     expect(broken?.start).toEqual({ x: 10, y: 0 });
     expect(broken?.segments).toHaveLength(1);
   });
+
+  it('keeps the implied closing line of a closed path that does not repeat its start', () => {
+    // Closed DXF splines and closed polylines without a repeated end arrive this way.
+    const [a, b, c, d] = [p(0, 0), p(40, 0), p(40, 20), p(0, 20)];
+    const implied = polylineToCurveSubpath({ closed: true, points: [a!, b!, c!, d!] });
+    expect(curveNodeCount(implied)).toBe(4);
+
+    const restarted = setCurveStartNode(implied, 2);
+    expect(restarted?.closed).toBe(true);
+    expect(nodes(restarted)).toEqual([c, d, a, b, c]);
+    expect(nodes(setCurveStartNode(implied, 3))).toEqual([d, a, b, c, d]);
+
+    const openedAtStart = breakCurveAtNode(implied, 0);
+    expect(openedAtStart?.closed).toBe(false);
+    expect(nodes(openedAtStart)).toEqual([a, b, c, d]);
+    expect(nodes(breakCurveAtNode(implied, 2))).toEqual([c, d, a, b]);
+  });
 });
+
+function p(x: number, y: number): Vec2 {
+  return { x, y };
+}
+
+function nodes(curve: CurveSubpath | null): ReadonlyArray<Vec2> {
+  if (curve === null) throw new Error('the edit was refused');
+  return [curve.start, ...curve.segments.map((segment) => segment.to)];
+}

@@ -58,9 +58,10 @@ export const webSerial: SerialAdapter = {
   },
   // getPorts() lists only ports this origin was granted that are attached
   // now: Chrome keeps a grant across restarts when it can tell the adapter
-  // again (on Windows by device instance ID), and the desktop app for the run
-  // (ADR-366). A port still flagged open from an earlier session is closed
-  // and reopened by openWithRetry, as a picked one is.
+  // again (on Windows by device instance ID), the Windows desktop app the same
+  // way (ADR-552), and the desktop app elsewhere for the run (ADR-366). A port
+  // still flagged open from an earlier session is closed and reopened by
+  // openWithRetry, as a picked one is.
   grantedPorts: async () => {
     try {
       const ports = await navigator.serial.getPorts();

@@ -1,5 +1,8 @@
 export type WindowUnloadDecision = 'leave' | 'stay';
 
+/** Closing KerfDesk with unsaved changes: Save, Don't Save or Cancel (ADR-549). */
+export type UnsavedCloseDecision = 'save' | WindowUnloadDecision;
+
 interface WindowUnloadEvent {
   preventDefault(): void;
 }

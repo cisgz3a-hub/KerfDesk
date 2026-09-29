@@ -35,3 +35,31 @@
 # one tiny conditional request per load.
 /sw.js
   Cache-Control: no-cache
+
+# This dedicated download page supplies its restrictive CSP in a meta element.
+# Detach only this page's app-wide policy to permit its one public manifest host.
+# Pages clean-URL redirects .html to /download, so both forms are covered.
+/download
+  ! Content-Security-Policy
+  Cache-Control: no-store
+/download.html
+  ! Content-Security-Policy
+  Cache-Control: no-store
+/desktop-release-keys.json
+  Cache-Control: no-cache
+/desktop-release-manifest.mjs
+  Cache-Control: no-cache
+/desktop-downloads.mjs
+  Cache-Control: no-cache
+/desktop-commercial-catalog.mjs
+  Cache-Control: no-cache
+
+# Payment pages alone permit Paddle; the workspace keeps its original CSP.
+/buy
+  ! Content-Security-Policy
+  Cache-Control: no-store
+/buy.html
+  ! Content-Security-Policy
+  Cache-Control: no-store
+/desktop-checkout.mjs
+  Cache-Control: no-cache

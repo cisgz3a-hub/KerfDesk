@@ -17,8 +17,9 @@
     />
     <title>KerfDesk</title>
     <!-- The wordmark, credit and activity indicator paint before JS or artwork.
-         main.tsx dismisses the screen when the workspace is ready (F-A1).
-         Activity is indeterminate: no simulated percentage or branding hold.
+         main.tsx dismisses the screen when the workspace is ready (F-A1); the
+         desktop app holds it briefly first (ADR-049 Amendment 1).
+         Activity is indeterminate: no simulated percentage.
          Inline CSS is allowed by the CSP; startup code stays in the bundle. -->
     <style>
       #app-splash {

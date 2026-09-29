@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
   CHANGES_END,
@@ -169,4 +174,77 @@ test('gives a Preview tagged without a stamp its own generated section', () => {
     order,
   );
   assert.equal(changelogSection(stamped, '0.2.0-preview.14'), '13 to 14');
+});
+
+test('release publication regenerates a stamped list while retaining its curated highlights', () => {
+  const stamped = stampChangelog(CHANGELOG, {
+    version: '0.2.0-preview.15',
+    date: '2026-09-28',
+    generated: 'incomplete list made after a failed tag',
+  });
+  const body = releaseBody(stamped, '0.2.0-preview.15', 'all unshipped changes', {
+    regenerateChanges: true,
+  });
+  assert.match(body, /CNC pauses lift the bit/);
+  assert.match(body, /all unshipped changes/);
+  assert.doesNotMatch(body, /incomplete list/);
+});
+
+test('the release-body and stamp CLIs retain failed-tag changes without inventing a published release', (context) => {
+  const root = mkdtempSync(join(tmpdir(), 'kerfdesk-release-notes-'));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '--initial-branch=main');
+  git('config', 'user.name', 'Release notes test');
+  git('config', 'user.email', 'notes@example.invalid');
+  let count = 0;
+  const commit = (title) => {
+    writeFileSync(join(root, 'fixture.txt'), String(count++));
+    git('add', 'fixture.txt');
+    git('commit', '-m', title);
+  };
+  commit('feat: previously published (#1)');
+  git('tag', '-a', 'v0.2.0-preview.13', '-m', 'Published 13');
+  commit('fix: unshipped failed-tag change (#2)');
+  git('tag', '-a', 'v0.2.0-preview.14', '-m', 'Failed 14');
+  commit('feat: newest change (#3)');
+  git('tag', '-a', 'v0.2.0-preview.15', '-m', 'Current release');
+  const release = {
+    tag_name: 'v0.2.0-preview.13',
+    published_at: '2026-07-23T09:37:17Z',
+    draft: false,
+    prerelease: true,
+    immutable: true,
+  };
+  const metadata = join(root, 'releases.json');
+  // A published current version on a retry must not become its own baseline.
+  writeFileSync(
+    metadata,
+    JSON.stringify([[release], [{ ...release, tag_name: 'v0.2.0-preview.15' }]]),
+  );
+  const changelog = join(root, 'CHANGELOG.md');
+  writeFileSync(changelog, CHANGELOG);
+  const script = fileURLToPath(new URL('./desktop-release-notes.mjs', import.meta.url));
+  const run = (command) =>
+    spawnSync(process.execPath, [script, command, '0.2.0-preview.15', `--releases=${metadata}`], {
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+  const body = run('release-body');
+  assert.ifError(body.error);
+  assert.equal(body.status, 0, body.stderr);
+  assert.match(body.stdout, /Unshipped failed-tag change/);
+  assert.match(body.stdout, /Newest change/);
+  assert.doesNotMatch(body.stdout, /Previously published/);
+  const stamped = run('stamp');
+  assert.equal(stamped.status, 0, stamped.stderr);
+  const text = readFileSync(changelog, 'utf8');
+  assert.match(changelogSection(text, '0.2.0-preview.15'), /Unshipped failed-tag change/);
+  assert.equal(changelogSection(text, '0.2.0-preview.14'), null);
+  writeFileSync(metadata, '[]');
+  const noBaseline = run('release-body');
+  assert.equal(noBaseline.status, 1);
+  assert.match(noBaseline.stderr, /no preceding published immutable Preview release/);
 });

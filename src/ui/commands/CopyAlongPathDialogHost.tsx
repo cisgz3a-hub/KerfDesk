@@ -30,6 +30,7 @@ function OpenCopyAlongPathDialog(): JSX.Element {
   return (
     <CopyAlongPathDialog
       selected={selected}
+      scene={project.scene}
       initial={initial}
       onCancel={close}
       onApply={(request, form) => {

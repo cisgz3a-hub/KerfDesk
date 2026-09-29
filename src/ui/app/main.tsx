@@ -7,7 +7,12 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
   createDesktopPreviewUpdateAdapter,
+  createDesktopLicenceAdapter,
   createDesktopProjectFiles,
+  createDesktopJobActivityReporter,
+  createDesktopSerialAdapter,
+  createDesktopSupportLogReader,
+  createDesktopWindowCommands,
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
@@ -23,6 +28,7 @@ import '../theme/tokens.css';
 import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
+import { EditionProvider } from '../licensing/EditionProvider';
 import { watchPreloadErrors } from './preload-error-toast';
 
 const rootElement = document.getElementById('app-root');
@@ -47,10 +53,26 @@ const adapter: PlatformAdapter = isElectronRenderer()
   ? {
       ...webAdapter,
       id: 'electron',
+      serial: createDesktopSerialAdapter(webAdapter.serial),
       desktopUpdates: createDesktopPreviewUpdateAdapter(),
-      ...createDesktopProjectFiles(webAdapter.recentFiles),
+      ...createDesktopProjectFiles(webAdapter.recentFiles, {
+        handleSaveTarget: webAdapter.openedProjectSaveTarget,
+      }),
+      // The main process serves its support log (ADR-546), takes job reports
+      // (ADR-548) and runs File > Exit (ADR-554) only on app://.
+      ...(window.location.protocol === 'app:'
+        ? {
+            readSupportLog: createDesktopSupportLogReader(),
+            reportJobActivity: createDesktopJobActivityReporter(),
+            desktopWindow: createDesktopWindowCommands(),
+          }
+        : {}),
     }
   : webAdapter;
+const desktopLicenceClient =
+  adapter.id === 'electron' && window.location.protocol === 'app:'
+    ? createDesktopLicenceAdapter()
+    : undefined;
 
 // If a render crash unmounts the App (and its Abort button + Ctrl+. listener),
 // the crash screen still needs a way to request a controller abort (F60/F65). Both
@@ -77,17 +99,26 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <App />
+        <EditionProvider
+          {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
+        >
+          <App />
+        </EditionProvider>
       </PlatformProvider>
     </ErrorBoundary>
   </StrictMode>,
 );
 
 // Static HTML supplies the wordmark and indeterminate loader before JS arrives.
-// Give the successfully drawn workspace one paint opportunity, then reveal it
-// without an artificial hold. Keep the fallback for startup render failures.
-// The fade duration matches index.html; reduced motion removes it immediately.
-const SPLASH_FADE_MS = 180;
+// Give the successfully drawn workspace one paint opportunity, then reveal it.
+// The web app reveals at once. The desktop app, which loads from disk in a
+// fraction of a second, holds the screen for a short minimum from launch and
+// fades it slowly so it reads as a loading screen, not a flash (ADR-049
+// Amendment 1). A startup crash is always revealed immediately, and reduced
+// motion removes the fade.
+const DESKTOP_STARTUP = adapter.id === 'electron';
+const SPLASH_MIN_VISIBLE_MS = DESKTOP_STARTUP ? 2000 : 0;
+const SPLASH_FADE_MS = DESKTOP_STARTUP ? 500 : 180;
 const SPLASH_MAX_WAIT_MS = 5000;
 const SPLASH_HIDDEN_CLASS = 'app-splash--hidden';
 const splashStartedAt = performance.now();
@@ -99,11 +130,13 @@ function fadeOutSplash(): void {
     splash.remove();
     return;
   }
+  // index.html's rule carries the web duration; the desktop fade is longer.
+  splash.style.transitionDuration = `${SPLASH_FADE_MS}ms`;
   splash.classList.add(SPLASH_HIDDEN_CLASS);
   const remove = (): void => splash.remove();
   splash.addEventListener('transitionend', remove, { once: true });
   // Fallback: reduced-motion (no transition) or a missed transitionend.
-  window.setTimeout(remove, SPLASH_FADE_MS);
+  window.setTimeout(remove, SPLASH_FADE_MS + 50);
 }
 
 function dismissWhenBoardReady(): void {
@@ -111,7 +144,9 @@ function dismissWhenBoardReady(): void {
     document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
-  if (boardPainted || startupCrashed || timedOut) {
+  // performance.now() counts from navigation, when the static splash first paints.
+  const heldLongEnough = performance.now() >= SPLASH_MIN_VISIBLE_MS;
+  if (startupCrashed || ((boardPainted || timedOut) && heldLongEnough)) {
     requestAnimationFrame(fadeOutSplash);
     return;
   }

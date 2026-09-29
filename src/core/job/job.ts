@@ -378,6 +378,15 @@ export type JobDiagnostic =
   // closed contour on the layer was dropped from the cut. Same silent-loss
   // shape as the offset fill, on the path that cuts the part itself.
   | { readonly kind: 'kerf-offset-failed'; readonly layerName: string }
+  // ADR-486 amendment 1: the kerf offset succeeded but closed up `count` holes
+  // or slots narrower than twice the offset (parts, when the offset is
+  // negative), so they are missing from the cut.
+  | {
+      readonly kind: 'kerf-offset-closed-up';
+      readonly layerName: string;
+      readonly count: number;
+      readonly kerfOffsetMm: number;
+    }
   // Hatch geometry existed, but every sweep rounded to a stationary point at
   // emitted G-code precision. Keep this advisory so microscopic fill loss is
   // visible without turning it into a Start, Frame, or export refusal.

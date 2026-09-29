@@ -159,7 +159,7 @@ async function parseLightBurnDocumentSource(
     return {
       id: request.id,
       kind: request.kind,
-      result: importLightBurnProjectDocument(document, request.source),
+      result: importLightBurnProjectDocument(document, request.source, request.device),
     };
   }
   const { importLightBurnClbDocument } = await import('../../io/lightburn/clb-import');

@@ -97,6 +97,10 @@ export type AxisBounds = {
 export type ProgramStats = {
   /** Bounds over every emitted segment (travel included); null when no motion. */
   readonly motionBounds: AxisBounds | null;
+  /** The program's own extent: motionBounds without the start the viewer
+   * assumes or a G28 position, per axis the program sets (ADR-255 amendment
+   * 2). What the Size readouts show. Null when no motion. */
+  readonly programBounds: AxisBounds | null;
   /** Bounds over cut/plunge segments only; null when the program never cuts. */
   readonly cutBounds: AxisBounds | null;
   readonly travelMm: number;

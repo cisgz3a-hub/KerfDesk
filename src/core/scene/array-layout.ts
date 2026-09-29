@@ -28,6 +28,24 @@ export function arrayPlacements(bounds: Bounds, spec: ArraySpec): ReadonlyArray<
   }
 }
 
+/**
+ * How many placements `arrayPlacements` makes for a spec, the original included,
+ * without laying any of them out. It rounds exactly as the layouts do, so a count
+ * no project could hold (1e12, 1e300) can be refused before anything is
+ * allocated for it. A grid too large for a number to hold is Infinity.
+ */
+export function arrayPlacementCount(spec: ArraySpec): number {
+  switch (spec.kind) {
+    case 'grid':
+      return positiveCount(spec.rows) * positiveCount(spec.columns);
+    case 'circular':
+    case 'point-rotation':
+      return positiveCount(spec.count);
+    default:
+      return assertNever(spec, 'ArraySpec');
+  }
+}
+
 function pointRotationPlacements(
   bounds: Bounds,
   spec: PointRotationArraySpec,

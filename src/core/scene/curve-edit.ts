@@ -165,18 +165,32 @@ export function setCurveStartNode(path: CurveSubpath, nodeIndex: number): CurveS
   if (!path.closed || nodeIndex <= 0 || nodeIndex >= curveNodeCount(path)) return null;
   const start = curveNodePoint(path, nodeIndex);
   if (start === null) return null;
+  const segments = explicitClosingSegments(path);
   return {
     ...path,
     start,
-    segments: [...path.segments.slice(nodeIndex), ...path.segments.slice(0, nodeIndex)],
+    segments: [...segments.slice(nodeIndex), ...segments.slice(0, nodeIndex)],
   };
 }
 
 export function breakCurveAtNode(path: CurveSubpath, nodeIndex: number): CurveSubpath | null {
   if (!path.closed) return null;
-  const rotated = nodeIndex === 0 ? path : setCurveStartNode(path, nodeIndex);
+  const rotated =
+    nodeIndex === 0
+      ? { ...path, segments: explicitClosingSegments(path) }
+      : setCurveStartNode(path, nodeIndex);
   if (rotated === null || rotated.segments.length === 0) return null;
   return { ...rotated, segments: rotated.segments.slice(0, -1), closed: false };
+}
+
+// A closed curve may stop short of its start and close with an implied
+// straight line, as a closed DXF spline or a closed polyline without its start
+// repeated does. Restarting or breaking it must keep that line as a segment.
+function explicitClosingSegments(path: CurveSubpath): ReadonlyArray<PathSegment> {
+  const end = path.segments.at(-1)?.to;
+  return end === undefined || samePoint(end, path.start)
+    ? path.segments
+    : [...path.segments, { kind: 'line', to: path.start }];
 }
 
 function incomingSegmentIndex(path: CurveSubpath, nodeIndex: number): number | null {

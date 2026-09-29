@@ -1,13 +1,35 @@
-import { createLayer, type Layer, type Project } from '../../core/scene';
+import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../../core/devices';
+import {
+  createLayer,
+  nextOperationColor,
+  type ImportedSvg,
+  type Layer,
+  type Project,
+} from '../../core/scene';
 import { createProject } from '../../core/scene/project';
+import { lightBurnSceneFrame } from './lbrn-frame';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
+import { lightBurnNotesWarnings, lightBurnProjectNotes } from './lbrn-notes';
 import { resolveLightBurnOverscan } from './lbrn-overscan';
+import { lightBurnSettingsNotImported, type LayerKind } from './lbrn-setting-report';
 
 // MAX_XML_DEPTH is an integrity bound, not a policy cap: unbounded nesting
 // overflows the recursive walker. It stays. The former 20 MB byte ceiling and
 // 50 000 shape ceiling were policy caps and are gone (rule 7 / ADR-228) — the
 // UI advises on size at the picker instead.
 const MAX_XML_DEPTH = 64;
+// The range the Kerf Offset field takes (CutSettingsCommonFields).
+const KERF_OFFSET_LIMIT_MM = 10;
+
+// A CutSetting's `type` is LightBurn's layer mode: Line is "Cut", Fill is
+// "Scan" and Fill+Line is "Scan+Cut" (ADR-388).
+const LIGHTBURN_LAYER_KINDS: ReadonlyMap<string, LayerKind> = new Map([
+  ['cut', 'line'],
+  ['scan', 'fill'],
+  ['scan+cut', 'fill+line'],
+]);
+// LightBurn's tool layers, T1 and T2, hold guides it never cuts (ADR-388).
+const TOOL_LAYER_INDEXES: ReadonlySet<number> = new Set([30, 31]);
 
 export type LbrnImportReport = {
   readonly sourceName: string;
@@ -23,22 +45,27 @@ export type LbrnImportResult =
   | { readonly ok: true; readonly project: Project; readonly report: LbrnImportReport }
   | { readonly ok: false; readonly reason: string };
 
+// A LightBurn project carries no KerfDesk machine, so it opens on `device`:
+// the machine already open in KerfDesk, as when opening any artwork (ADR-388).
+// Its bed also places the project (lightBurnSceneFrame).
 export function importLightBurnProject(
   xmlText: string,
   sourceName: string,
   parseXml: (text: string) => Document = defaultParseXml,
+  device: DeviceProfile = DEFAULT_DEVICE_PROFILE,
 ): LbrnImportResult {
   if (!/\.lbrn2?$/i.test(sourceName))
     return { ok: false, reason: 'Expected a .lbrn or .lbrn2 project.' };
   if (/<!DOCTYPE|<!ENTITY/i.test(xmlText)) {
     return { ok: false, reason: 'Active XML declarations are not allowed.' };
   }
-  return importLightBurnProjectDocument(parseXml(xmlText), sourceName);
+  return importLightBurnProjectDocument(parseXml(xmlText), sourceName, device);
 }
 
 export function importLightBurnProjectDocument(
   document: Document,
   sourceName: string,
+  device: DeviceProfile = DEFAULT_DEVICE_PROFILE,
 ): LbrnImportResult {
   if (!/\.lbrn2?$/i.test(sourceName))
     return { ok: false, reason: 'Expected a .lbrn or .lbrn2 project.' };
@@ -52,7 +79,12 @@ export function importLightBurnProjectDocument(
   }
   if (xmlDepth(root) > MAX_XML_DEPTH)
     return { ok: false, reason: 'LightBurn XML nesting is too deep.' };
-  const geometry = importLbrnGeometry(root, sourceName);
+  const base = createProject(device);
+  const frame = lightBurnSceneFrame(root, {
+    width: base.device.bedWidth,
+    height: base.device.bedHeight,
+  });
+  const geometry = importLbrnGeometry(root, sourceName, frame);
   if (geometry.objects.length === 0) {
     return { ok: false, reason: 'LightBurn project contains no supported vector geometry.' };
   }
@@ -61,18 +93,28 @@ export function importLightBurnProjectDocument(
     geometry.objects.flatMap((object) => object.paths.map((path) => path.color)),
   );
   const layers = layerImport.layers;
-  const operationIdByColor = new Map(layers.map((operation) => [operation.color, operation.id]));
   const objects = geometry.objects.map((object) => ({
     ...object,
     paths: object.paths.map((path) => {
-      const operationId = operationIdByColor.get(path.color);
-      return operationId === undefined ? path : { ...path, operationIds: [operationId] };
+      const operationIds = layerImport.operationIdsByColor.get(path.color);
+      return operationIds === undefined ? path : { ...path, operationIds };
     }),
   }));
-  const base = createProject();
+  const warnings = [
+    ...lightBurnNotesWarnings(root),
+    ...geometry.warnings,
+    ...layerImport.warnings,
+    ...cutPlannerWarnings(root),
+  ];
   const project: Project = {
     ...base,
-    scene: { ...base.scene, objects, layers },
+    notes: lightBurnProjectNotes(root, sourceName, warnings),
+    scene: {
+      ...base.scene,
+      objects,
+      layers,
+      artworkOrder: layerByLayerArtworkOrder(objects, layers),
+    },
   };
   return {
     ok: true,
@@ -84,7 +126,7 @@ export function importLightBurnProjectDocument(
       importedObjects: geometry.objects.length,
       importedLayers: layers.length,
       unsupportedShapeTypes: geometry.unsupportedShapeTypes,
-      warnings: [...geometry.warnings, ...layerImport.warnings],
+      warnings,
     },
   };
 }
@@ -92,40 +134,170 @@ export function importLightBurnProjectDocument(
 function importedLayers(
   root: Element,
   usedColors: ReadonlyArray<string>,
-): { readonly layers: Layer[]; readonly warnings: ReadonlyArray<string> } {
+): {
+  readonly layers: Layer[];
+  readonly operationIdsByColor: ReadonlyMap<string, ReadonlyArray<string>>;
+  readonly warnings: ReadonlyArray<string>;
+} {
   const settings = new Map<number, Element>();
   for (const element of [...root.children]) {
     if (normalized(element.tagName) !== 'cutsetting') continue;
     const index = numericField(element, ['index']);
     if (index !== null) settings.set(Math.trunc(index), element);
   }
-  const colors = [...new Set(usedColors)];
+  const colors = [...new Set(usedColors)]
+    .map((color) => ({ color, rank: lightBurnLayerRank(color, settings) }))
+    .sort((left, right) => left.rank[0] - right.rank[0] || left.rank[1] - right.rank[1])
+    .map((entry) => entry.color);
   const warnings: string[] = [];
-  const layers = colors.map((color) => importedLayer(color, settings, warnings));
-  return { layers, warnings: [...new Set(warnings)].sort() };
+  const imported = colors.map((color) => importedLayer(color, settings, warnings));
+  const layers: Layer[] = [];
+  const operationIdsByColor = new Map<string, ReadonlyArray<string>>();
+  for (const { layer, outline } of imported) {
+    layers.push(layer);
+    if (outline === null) {
+      operationIdsByColor.set(layer.color, [layer.id]);
+      continue;
+    }
+    // Fill+Line fills the shapes, then cuts their outlines: a Line operation
+    // on the same artwork, listed right after the fill so it runs second.
+    const color = nextOperationColor([...imported.map((entry) => entry.layer), ...layers]);
+    const line = {
+      ...createLayer({ id: `${layer.id}-line`, name: `${layer.name} (Line)`, color }),
+      ...outline,
+    };
+    layers.push(line);
+    operationIdsByColor.set(layer.color, [layer.id, line.id]);
+  }
+  return { layers, operationIdsByColor, warnings: [...new Set(warnings)].sort() };
 }
 
+// LightBurn runs a project layer by layer in its Cuts / Layers list order,
+// which each CutSetting records as `priority`, then by index. A layer written
+// without a priority keeps its index's place (ADR-388).
+function lightBurnLayerRank(
+  color: string,
+  settings: ReadonlyMap<number, Element>,
+): readonly [number, number] {
+  const index = findColorIndex(color);
+  const setting = settings.get(index);
+  const priority = setting === undefined ? null : numericField(setting, ['priority']);
+  return [priority ?? index, index];
+}
+
+// The Cut Planner in LightBurn's Optimization Settings ranks its orderings,
+// 0 first; KerfDesk always runs a LightBurn project layer by layer.
+function cutPlannerWarnings(root: Element): ReadonlyArray<string> {
+  const prefs = [...root.children].find((child) => normalized(child.tagName) === 'uiprefs');
+  const byLayer = prefs === undefined ? '' : textField(prefs, ['optimizebylayer']).trim();
+  if (byLayer === '' || byLayer === '0') return [];
+  return [
+    `LightBurn's Cut Planner for this project does not run layers first (Optimize_ByLayer ${byLayer}); KerfDesk runs it layer by layer in the Cuts / Layers order. Check the Run order view.`,
+  ];
+}
+
+// Artwork priority decides which operation runs first (ADR-211), so artwork
+// is ordered by its layer's place in the list, drawing order within a layer.
+// The canvas stacking (`objects`) keeps LightBurn's drawing order.
+function layerByLayerArtworkOrder(
+  objects: ReadonlyArray<ImportedSvg>,
+  layers: ReadonlyArray<Layer>,
+): string[] {
+  const position = new Map(layers.map((layer, index) => [layer.id, index]));
+  return objects
+    .map((object, drawn) => ({
+      id: object.id,
+      drawn,
+      layer: position.get(object.paths[0]?.operationIds?.[0] ?? '') ?? layers.length,
+    }))
+    .sort((left, right) => left.layer - right.layer || left.drawn - right.drawn)
+    .map((entry) => entry.id);
+}
+
+/** A layer, and for Fill+Line the settings of the Line operation that follows it. */
 function importedLayer(
   color: string,
   settings: ReadonlyMap<number, Element>,
   warnings: string[],
-): Layer {
+): { readonly layer: Layer; readonly outline: Partial<Layer> | null } {
   const index = findColorIndex(color);
   const setting = settings.get(index);
   const importedName = setting === undefined ? '' : textField(setting, ['name', 'label']).trim();
-  const name =
-    importedName ||
-    (index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`);
+  const name = importedName || defaultLayerName(index, color);
   const base = createLayer({ id: color, name, color });
-  if (setting === undefined) return base;
-  const mode = textField(setting, ['type', 'mode']).toLowerCase();
-  const isScan = mode.includes('scan') || mode.includes('fill');
+  if (isToolLayer(index, setting)) {
+    warnings.push(
+      `${name}: a LightBurn tool layer, which LightBurn never cuts, so it opened with Output off.`,
+    );
+    return { layer: { ...base, output: false }, outline: null };
+  }
+  if (setting === undefined) return { layer: base, outline: null };
+  const kind = lightBurnLayerKind(setting, name, warnings);
+  warnings.push(...lightBurnSettingsNotImported(setting, name, kind));
+  if (isHiddenLayer(setting))
+    warnings.push(
+      `${name}: hidden in LightBurn, which does not cut a hidden layer, so it opened with Output off. Switch Output on to cut it.`,
+    );
+  const common = importedCommonLayerFields(setting);
+  const line = (): Partial<Layer> => ({
+    mode: 'line',
+    ...common,
+    ...importedKerf(setting, name, warnings),
+  });
+  if (kind === 'line') return { layer: { ...base, ...line() }, outline: null };
+  const fill: Layer = { ...base, mode: 'fill', ...common };
   return {
-    ...base,
-    mode: isScan ? 'fill' : 'line',
-    ...importedCommonLayerFields(setting),
-    ...(isScan ? importedScanSettings(setting, name, warnings) : {}),
+    layer: { ...fill, ...importedScanSettings(setting, name, warnings) },
+    outline: kind === 'fill+line' ? line() : null,
   };
+}
+
+function defaultLayerName(index: number, color: string): string {
+  if (TOOL_LAYER_INDEXES.has(index)) return `LightBurn T${index - 29}`;
+  return index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`;
+}
+
+// T1 and T2 are CutIndex 30 and 31, and their cut settings are of type "Tool".
+function isToolLayer(index: number, setting: Element | undefined): boolean {
+  if (TOOL_LAYER_INDEXES.has(index)) return true;
+  return (
+    setting !== undefined && textField(setting, ['type', 'mode']).trim().toLowerCase() === 'tool'
+  );
+}
+
+// A setting without a type keeps LightBurn's default mode, Line. A type
+// KerfDesk has no operation for is named, and opens as Line to be reviewed.
+function lightBurnLayerKind(setting: Element, name: string, warnings: string[]): LayerKind {
+  const type = textField(setting, ['type', 'mode']).trim();
+  const kind = LIGHTBURN_LAYER_KINDS.get(type.toLowerCase());
+  if (kind !== undefined) return kind;
+  if (type !== '') {
+    warnings.push(
+      `${name}: LightBurn layer mode “${type}” has no KerfDesk equivalent, so it opened as a Line operation. Check its settings before cutting.`,
+    );
+  }
+  return 'line';
+}
+
+// LightBurn's Kerf Offset moves a Cut layer's closed shapes out by the offset
+// and the holes inside them in, as KerfDesk's Kerf Offset does (ADR-486), so it
+// opens as the layer's own. One the field cannot hold is named, never dropped
+// (ADR-388).
+function importedKerf(setting: Element, name: string, warnings: string[]): Partial<Layer> {
+  const text = textField(setting, ['kerf']).trim();
+  const kerf = finiteNumber(text);
+  if (kerf !== null && Math.abs(kerf) <= KERF_OFFSET_LIMIT_MM)
+    return kerf === 0 ? {} : { kerfOffsetMm: kerf };
+  if (text !== '') {
+    const problem =
+      kerf === null
+        ? 'is not a number'
+        : `is outside KerfDesk's Kerf Offset range (-${KERF_OFFSET_LIMIT_MM} to ${KERF_OFFSET_LIMIT_MM} mm)`;
+    warnings.push(
+      `${name}: LightBurn kerf offset “${text}” ${problem} and was not imported. Set this layer's Kerf Offset before cutting.`,
+    );
+  }
+  return {};
 }
 
 function importedScanSettings(setting: Element, name: string, warnings: string[]): Partial<Layer> {
@@ -135,7 +307,7 @@ function importedScanSettings(setting: Element, name: string, warnings: string[]
     numericField(setting, ['speed', 'speedmmsec']),
     name,
   );
-  warnings.push(...unsupportedScanSettingWarnings(setting, name), ...overscan.warnings);
+  warnings.push(...overscan.warnings);
   return {
     ...importedScanLayerFields(setting),
     ...(overscan.distanceMm === null ? {} : { fillOverscanMm: overscan.distanceMm }),
@@ -146,11 +318,22 @@ function importedCommonLayerFields(setting: Element): Partial<Layer> {
   const speedMmSec = numericField(setting, ['speed', 'speedmmsec']);
   const power = numericField(setting, ['maxpower', 'power']);
   const passes = numericField(setting, ['numpasses', 'passes']);
+  // LightBurn writes a layer's Air Assist as `runBlower`, and its Output
+  // switch, which keeps the layer out of the job when off, as `doOutput`. A
+  // layer it hides (`hide`) is not cut either, so it opens with Output off.
+  const airAssist = booleanField(setting, ['runblower']);
+  const output = isHiddenLayer(setting) ? false : booleanField(setting, ['dooutput']);
   return {
     ...(speedMmSec === null ? {} : { speed: Math.max(1, speedMmSec * 60) }),
     ...(power === null ? {} : { power: Math.max(0, Math.min(100, power)) }),
     ...(passes === null ? {} : { passes: Math.max(1, Math.round(passes)) }),
+    ...(airAssist === null ? {} : { airAssist }),
+    ...(output === null ? {} : { output }),
   };
+}
+
+function isHiddenLayer(setting: Element): boolean {
+  return booleanField(setting, ['hide']) === true;
 }
 
 function importedScanLayerFields(setting: Element): Partial<Layer> {
@@ -164,73 +347,6 @@ function importedScanLayerFields(setting: Element): Partial<Layer> {
     ...(crossHatch === null ? {} : { fillCrossHatch: crossHatch }),
     ...(bidirectional === null ? {} : { fillBidirectional: bidirectional }),
   };
-}
-
-function unsupportedScanSettingWarnings(
-  setting: Element,
-  layerName: string,
-): ReadonlyArray<string> {
-  const warnings: string[] = [];
-  const supported = new Set([
-    'index',
-    'name',
-    'label',
-    'type',
-    'mode',
-    'speed',
-    'speedmmsec',
-    'maxpower',
-    'minpower',
-    'minpower2',
-    'power',
-    'numpasses',
-    'passes',
-    'interval',
-    'lineinterval',
-    'scanangle',
-    'angle',
-    'crosshatch',
-    'bidirectional',
-    'bidir',
-    'overscan',
-    'overscanpercent',
-  ]);
-  for (const field of directFields(setting)) {
-    if (supported.has(field.name) || !meaningfulLightBurnValue(field.value)) continue;
-    warnings.push(
-      `${layerName}: unsupported LightBurn Scan field “${field.name}” was not imported.`,
-    );
-  }
-  const minPower = numericField(setting, ['minpower', 'minpower2']);
-  if (minPower !== null && minPower !== 0) {
-    warnings.push(
-      `${layerName}: LightBurn Scan minimum power is not equivalent to LaserForge image grayscale minimum power and was not imported.`,
-    );
-  }
-  return warnings;
-}
-
-function directFields(
-  element: Element,
-): ReadonlyArray<{ readonly name: string; readonly value: string }> {
-  return [
-    ...[...element.attributes].map((attribute) => ({
-      name: normalized(attribute.name),
-      value: attribute.value,
-    })),
-    ...[...element.children].map((child) => ({
-      name: normalized(child.tagName),
-      value: child.getAttribute('Value') ?? child.textContent ?? '',
-    })),
-  ];
-}
-
-function meaningfulLightBurnValue(value: string): boolean {
-  const trimmed = value.trim().toLowerCase();
-  if (trimmed === '' || trimmed === 'false' || trimmed === 'off' || trimmed === 'none')
-    return false;
-  const numeric = Number(trimmed);
-  return !Number.isFinite(numeric) || numeric !== 0;
 }
 
 function booleanField(element: Element, names: ReadonlyArray<string>): boolean | null {

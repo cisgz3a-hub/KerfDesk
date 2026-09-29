@@ -35,8 +35,12 @@ export function computeProgramStats(segments: FinishedSegments): ProgramStats {
 }
 
 function finishStats(acc: StatsAccumulator): ProgramStats {
+  const motionBounds = acc.motionBounds.result();
   return {
-    motionBounds: acc.motionBounds.result(),
+    motionBounds,
+    // Segments alone cannot tell an assumed start from a programmed one; the
+    // render-model builder replaces this with what the program set.
+    programBounds: motionBounds,
     cutBounds: acc.cutBounds.result(),
     ...kindTotals(acc.totals),
     ...rangeFields(acc.feed, acc.power),

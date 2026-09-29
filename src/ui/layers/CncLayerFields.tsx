@@ -22,6 +22,8 @@ import {
 } from '../../core/scene';
 import { useStore } from '../state';
 import { withManualCncFeedPatch } from '../state/cnc-feed-provenance';
+import { useEdition } from '../licensing/edition';
+import { proChoiceLabel } from '../licensing/pro-features';
 import {
   CncFeedFields,
   CncLayerAdvancedGroup,
@@ -138,19 +140,28 @@ function CncCutTypeField(props: {
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
 }): JSX.Element {
   const { layer, settings, onCommit: commit } = props;
+  const edition = useEdition();
+  // V-carve is a Pro tool (ADR-540): only choosing it anew asks for Pro, so a
+  // layer that already carves stays editable in Free.
+  const choose = (cutType: CncCutType): void => {
+    const apply = (): void => commit(cutTypePatch(settings, cutType));
+    if (cutType === 'v-carve' && settings.cutType !== 'v-carve')
+      edition.requestPro('vcarve', apply);
+    else apply();
+  };
   return (
     <section className="lf-cnc-settings-card" aria-label="Cut type">
       <Row label="Cut type" stacked>
         <select
           value={settings.cutType}
-          onChange={(e) => commit(cutTypePatch(settings, e.target.value as CncCutType))}
+          onChange={(e) => choose(e.target.value as CncCutType)}
           aria-label={`Cut type for ${layer.color}`}
           title={`${cutTypeLabel(settings.cutType)}: ${cutTypeHint(settings.cutType)}`}
           style={selectStyle}
         >
           {CNC_CUT_TYPES.map((cutType) => (
             <option key={cutType} value={cutType} title={cutTypeHint(cutType)}>
-              {cutTypeLabel(cutType)}
+              {proChoiceLabel(cutTypeLabel(cutType), cutType === 'v-carve' && !edition.pro)}
             </option>
           ))}
         </select>

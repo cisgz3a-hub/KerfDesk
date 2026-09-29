@@ -3,6 +3,7 @@ import type { MachineKind } from '../../core/scene';
 import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
+import { continueControllerOperation } from './laser-controller-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -42,7 +43,10 @@ export async function refreshCncLiveStartState(
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
     controllerOperation:
       state.controllerOperation?.kind === 'start-arming'
-        ? { ...state.controllerOperation, phase: 'live-status' }
+        ? continueControllerOperation(state.controllerOperation, {
+            ...state.controllerOperation,
+            phase: 'live-status',
+          })
         : { kind: 'start-arming', phase: 'live-status' },
   }));
   const deadline = Date.now() + LIVE_STATUS_TIMEOUT_MS;

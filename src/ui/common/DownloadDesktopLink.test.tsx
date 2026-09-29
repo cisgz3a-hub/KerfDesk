@@ -36,10 +36,10 @@ afterEach(() => {
 });
 
 describe('DownloadDesktopLink', () => {
-  it('links directly to the public release repository in a new tab', async () => {
+  it('links to the verified public download page in a new tab', async () => {
     const host = await renderInProvider('web');
     const link = host.querySelector('a');
-    expect(link?.getAttribute('href')).toBe('https://github.com/cisgz3a-hub/KerfDesk/releases');
+    expect(link?.getAttribute('href')).toBe('https://kerfdesk.com/download.html');
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.getAttribute('rel')).toContain('noopener');
     expect(link?.textContent).toBe('Download desktop app');

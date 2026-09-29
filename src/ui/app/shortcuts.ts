@@ -57,7 +57,7 @@ export type FileCtx = {
   readonly lastSaveTarget: SaveTarget | null;
   readonly markSaved: AppState['markSaved'];
   readonly markProjectSaveUncertain: AppState['markProjectSaveUncertain'];
-  readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
+  readonly markLoaded: AppState['markLoaded'];
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly advanceVariablesAfter?: (
     expectedProject: Project,
@@ -141,6 +141,7 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
         claimProjectOpenRequest: useStore.getState().claimProjectOpenRequest,
         getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+        currentDevice: () => useStore.getState().project.device,
       });
     });
   },
