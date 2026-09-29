@@ -204,6 +204,51 @@ therefore sent moves the firmware refuses, or trusted values the controller had 
      be a new refusal outside NN21, so none was added. Each `$x=` is stored at once with no
      firmware undo ([settings.c L301](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/settings.c#L301)), so the copy still asks for an export.
 
+9. **Console commands that only read, write settings, or wait their turn** (C-6, C-4, C-5).
+   - GRBL's `$` (help) and `$N` (startup lines) only print
+     ([system.c L237-L246](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L237-L246)), and so do grblHAL's enumeration, help, pin,
+     limit, homing-switch, spindle, port and extended build-info reports
+     ([grblHAL system.c L1013-L1047](https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L1013-L1047)), but the Console took them for
+     G-code with an unknown effect and voided the completed Frame and the position evidence. They
+     are now read-only report queries, by exact match only: `$HELP <topic>`, `$N0` and anything
+     with `=` stay cautious. grblHAL's `$DWNGRD`, which rewrites the settings in non-volatile
+     storage, joins the blocked persistent commands.
+   - Stock GRBL stores a non-axis setting as an 8-bit integer and still answers `ok`
+     ([settings.c L229](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/settings.c#L229)), so a Console `$22=0.5` turned homing and soft limits
+     off while KerfDesk reported the write as done. On the stock GRBL driver the Console now
+     refuses, before its confirmation prompt, a value the firmware would store as something else,
+     with the check the Machine Settings dialog already applies (#923). grblHAL refuses such
+     values itself. Every acknowledged Console setting write is read back with `$$`, not only a
+     `$13` write, so the settings table shows what the controller stored.
+   - GRBL answers lines strictly in order ([protocol.c L88-L104](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L88-L104)), and an
+     owned Console exchange takes the next reply as its own, so a `$$` sent while a `$H` still owed
+     its `ok` ended on the homing reply with an empty dump. An owned Console `$$` or `$n=` now
+     waits, as the M115 identity read already did, until every earlier line is acknowledged; `$X`
+     stays exempt as recovery.
+   - No refusal of Frame, Start, Save G-code or output.
+
+10. **Abort for motion nothing in KerfDesk started** (C-2).
+    - A Console move, `$J=` or `$H` has no owner in KerfDesk, so the Live Motion popup, Ctrl+. and
+      the crash screen's software abort offered no stop for it: Disconnect was the only one. While
+      the controller reports Run, Jog, Home, Hold or Door and nothing here owns it (no job,
+      controller operation, jog, Frame, Fire or grblHAL pendant), the popup now shows it with
+      **ABORT MOTION** and still no Resume, and Ctrl+. and the crash screen offer the same Abort.
+    - A reset sent into a cycle, jog or homing kills the steppers and raises `ALARM:3`
+      ([motion_control.c L380-L386](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/motion_control.c#L380-L386)), while a completed feed hold
+      keeps position until cycle start or a reset
+      ([protocol.c L377-L381](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L377-L381)). So Abort gives such motion the stop that
+      keeps position: a jog gets jog cancel `0x85` and no reset (feed hold `!` where the driver has
+      no jog cancel); a run gets feed hold `!`, then the reset once a fresh report shows the hold
+      complete, at most 2 s later; a hold or door state gets the reset once the hold has settled;
+      homing gets the reset at once. In laser mode GRBL and grblHAL turn the laser off by default
+      once a hold has stopped ([config.h L583-L587](https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/config.h#L583-L587)). A page that is closing and a driver
+      without a feed hold (Smoothieware) keep the immediate reset.
+    - A door or lid switch wired to the controller's door input puts GRBL in its door state when
+      opened while idle, so the popup now names that state until cycle start or Abort. Stock GRBL
+      answers no status query while it homes, so a Console `$H` there still shows nothing until
+      homing ends.
+    - No new refusal.
+
 ### Consequences
 
 - The GRBL simulator models more stock GRBL behaviour: `G10 L20` with an active G92, a failed

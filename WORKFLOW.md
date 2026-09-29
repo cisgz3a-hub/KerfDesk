@@ -105,7 +105,7 @@ opportunity, without an extra branding delay. It introduces no startup interacti
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the Machine panel groups the existing placement and output settings in a disclosure. Mouse, Space, and Enter open it without activating canvas or job shortcuts.
 - **Job actions dock**: **Frame job** and the primary **Start** action (greyed out until a clean Frame of the exact job completes) sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
-- **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
+- **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation, and while the controller reports motion or a hold that nothing in KerfDesk started (a Console move, `$J=` or `$H`: Run, Jog, Home, Hold or Door; ADR-375), it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs; a hold KerfDesk did not request never gets a Resume. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
@@ -1430,8 +1430,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 #### Phase B+ shortcuts
 - `Cmd/Ctrl+Return` — Start job (Phase B)
 - `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B). With no job running
-  it aborts a running Home, Probe or Auto-focus the same way, and turns a latched Fire off
-  (ADR-362).
+  it aborts a running Home, Probe or Auto-focus the same way, turns a latched Fire off
+  (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
+  as **ABORT MOTION** does (ADR-375).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
@@ -1960,8 +1961,14 @@ minimum target size.
 #### Success
 1. User clicks the single **ABORT JOB** or **ABORT MOTION** action in the Live Motion bar. The control explicitly says it is a controller reset request, not a safety-rated E-stop, and directs the operator to the machine's physical E-stop or power isolation for danger.
 2. The app sends the active driver's controller-specific abort/reset path: GRBL-family drivers may use realtime `\x18`; drivers without realtime reset use their queued best-effort de-energize commands.
+   For motion the controller reports that nothing in KerfDesk started (a Console move, `$J=` or
+   `$H`), Abort first takes the stop that keeps position: a jog gets jog cancel (`0x85`; feed hold
+   `!` where the driver has none) and no reset; a run gets feed hold `!`, then `\x18` once a fresh
+   report shows `Hold:0` (at most 2 s later); Hold and Door get `\x18` once the hold has settled;
+   Home gets `\x18` at once (ADR-375).
 3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
-4. A GRBL controller enters `Alarm` after reset; the user clears with `$X` (F-B9).
+4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
+   `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
 
 ### F-B9. Alarm
 
@@ -2118,6 +2125,11 @@ authorization, Frame proof, controller command, or safety boundary.
    and Frame evidence are discarded until fresh position arrives in the verified units.
    During an owned `$13` write and verification, status and accessories remain visible,
    but coordinate numbers cannot be reused under an unconfirmed unit interpretation.
+   `$` (help) and `$N` (startup lines), and on grblHAL its enumeration, help, pin, limit,
+   homing-switch, spindle, port and extended build-info reports, are read-only queries too:
+   they keep the completed Frame and the position evidence (ADR-375).
+5. `$$`, a `$n=` write and the M115 identity read wait until every earlier Console line has
+   been acknowledged, because the controller answers lines in order (ADR-375).
 
 #### Success — unlock alarm
 1. When the controller is in `Alarm`, user can send `$X` from the console or the alarm banner after confirming the head is safe.
@@ -2133,8 +2145,12 @@ authorization, Frame proof, controller command, or safety boundary.
 3. Blocked commands are recorded as local diagnostics and no bytes are sent.
 
 #### Error — unsafe persistent command
-1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, and `$I=...` are blocked in Lane 2.
-2. `$number=value` settings writes require connected, idle controller state and explicit confirmation.
+1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2.
+2. `$number=value` settings writes require connected, idle controller state and explicit
+   confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
+   for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
+   refused before the prompt. Every acknowledged write is read back with `$$`, so the settings
+   table shows what the controller stored (ADR-375).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
