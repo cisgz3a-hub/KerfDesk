@@ -54,7 +54,7 @@ export function detectMachineJobWarnings(
           ...detectCncDefaultFeedWarnings(project),
           ...detectCncAngledToolFeedWarnings(project),
           ...detectCncUnmodeledBitLayoutWarnings(project),
-          ...detectCncMachineLimitWarnings(project, controllerSettings),
+          ...detectCncMachineLimitWarnings(project, controllerSettings, job),
           ...detectCncMissingPrimaryToolWarnings(project),
           ...(prepared === undefined
             ? []
