@@ -1,0 +1,51 @@
+## ADR-388 - LightBurn projects open where, and as, LightBurn showed them (2026-09-29)
+
+**Status:** Accepted. | **Date:** 2026-09-29
+
+Applies ADR-027 (LightBurn is the source of truth) to opening `.lbrn2` and legacy `.lbrn`
+projects (`src/io/lightburn/lbrn-*.ts`). Laser only.
+
+### Context
+
+The 2026-09-28 weakness audit of main `2f6f84dec` opened real LightBurn 2.0.05 projects (the
+`src/__fixtures__/lightburn/external/lbrn` corpus) and found the geometry wrong. Circles came in as
+pinched stars, fillets as chamfers, and every project upside down. The format is not published, so
+each rule below was settled from the fixtures themselves: the circles and fillets they contain,
+and the thumbnail LightBurn embeds in each file, which is its own drawing of the project.
+
+### Decision
+
+1. **Bezier handles.** In a `<VertList>`, `c0x`/`c0y` is the handle a curve leaves the vertex
+   along and `c1x`/`c1y` the handle it arrives along, so `B i j` is the cubic V[i], V[i].c0, V[j].c1,
+   V[j]. LightBurn leaves out a handle coordinate that is zero (`c0x-2.2385712` alone is the handle
+   (-2.2385712, 0)), and writes a bare `x1` (`c0x1`, `c1x1`) where a vertex has no handle. Read this
+   way, every circle and fillet in the corpus is a true arc to within 0.003 mm along its whole
+   length.
+2. **Where a project lands.** LightBurn saves coordinates in the saving machine's own frame:
+   millimetres from its origin corner, +X along the width away from that corner, +Y along the depth
+   away from it. The root's `MirrorX` puts that origin on the right and `MirrorY` at the rear; no
+   flags is a front-left origin with Y pointing to the rear. LightBurn draws its workspace from
+   above with the rear at the top, as KerfDesk does, so the importer maps a project point to the
+   scene as `x = MirrorX ? bedWidth - X : X` and `y = MirrorY ? Y : bedHeight - Y`, using the bed of
+   the machine the project opens on, after every group and shape `<XForm>`. The project keeps its
+   distance from that corner, and text and asymmetric parts read the same way round as in
+   LightBurn. The corpus files (`MirrorX="True" MirrorY="True"`) come out matching their embedded
+   thumbnails: the backplane's notch along the top edge, its tall slot on the right.
+
+### Limits
+
+- The saving machine's bed size is not in the file. A project saved on a larger bed can land
+  partly off a smaller one, as it would on that machine in LightBurn. It is not moved or scaled.
+- Code and test evidence only. The corpus is five LightBurn 2.0.05 projects from one machine
+  (rear-right origin); the front-left rule is the same mapping with no flags set.
+
+### Consequences
+
+- LightBurn projects open right way up, at LightBurn's position, with curves intact.
+- Existing `.lf2` files are unaffected; only opening a LightBurn file changes.
+
+### Tests
+
+`lbrn-vertex-list.test.ts` (handle forms; the keypad fixture's circles and eight fillets are
+arcs along their whole length); `lbrn-frame.test.ts` (each MirrorX/MirrorY corner, rotated groups
+and text through the same frame, the backplane fixture laid out as its thumbnail shows).

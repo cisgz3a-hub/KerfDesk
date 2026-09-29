@@ -1,5 +1,6 @@
 import { createLayer, type Layer, type Project } from '../../core/scene';
 import { createProject } from '../../core/scene/project';
+import { lightBurnSceneFrame } from './lbrn-frame';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
 import { resolveLightBurnOverscan } from './lbrn-overscan';
 
@@ -52,7 +53,12 @@ export function importLightBurnProjectDocument(
   }
   if (xmlDepth(root) > MAX_XML_DEPTH)
     return { ok: false, reason: 'LightBurn XML nesting is too deep.' };
-  const geometry = importLbrnGeometry(root, sourceName);
+  const base = createProject();
+  const frame = lightBurnSceneFrame(root, {
+    width: base.device.bedWidth,
+    height: base.device.bedHeight,
+  });
+  const geometry = importLbrnGeometry(root, sourceName, frame);
   if (geometry.objects.length === 0) {
     return { ok: false, reason: 'LightBurn project contains no supported vector geometry.' };
   }
@@ -69,7 +75,6 @@ export function importLightBurnProjectDocument(
       return operationId === undefined ? path : { ...path, operationIds: [operationId] };
     }),
   }));
-  const base = createProject();
   const project: Project = {
     ...base,
     scene: { ...base.scene, objects, layers },

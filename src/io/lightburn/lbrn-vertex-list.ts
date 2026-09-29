@@ -10,7 +10,7 @@ import type { Vec2 } from '../../core/scene';
 // bare `x1` (`c0x1`, `c1x1`) is LightBurn's "no handle here" marker. The real
 // LightBurn 2.0.05 fixtures in src/__fixtures__/lightburn/external/lbrn show
 // all three forms: their circles and fillets only come out as true arcs this
-// way.
+// way (ADR-388).
 
 export type LbrnVertex = {
   readonly point: Vec2;

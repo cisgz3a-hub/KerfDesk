@@ -5,9 +5,9 @@ import {
   type CurveSubpath,
   type ImportedSvg,
   type PathSegment,
-  type Vec2,
 } from '../../core/scene';
 import { parametricEllipseCurve } from '../../core/geometry';
+import { multiplyMatrix, parseXFormText, transformCurve, type LbrnMatrix } from './lbrn-frame';
 import { parseLbrnVertexList, type LbrnVertex } from './lbrn-vertex-list';
 
 export type LbrnGeometryResult = {
@@ -16,36 +16,32 @@ export type LbrnGeometryResult = {
   readonly warnings: ReadonlyArray<string>;
 };
 
-type Matrix = {
-  readonly a: number;
-  readonly b: number;
-  readonly c: number;
-  readonly d: number;
-  readonly e: number;
-  readonly f: number;
-};
 type Primitive = { readonly kind: 'L' | 'B'; readonly from: number; readonly to: number };
 type BuildingPath = { startIndex: number; endIndex: number; segments: PathSegment[] };
 type PathTables = {
   readonly vertices: ReadonlyMap<number, ReadonlyArray<LbrnVertex>>;
   readonly primitives: ReadonlyMap<number, ReadonlyArray<Primitive>>;
 };
-const IDENTITY: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
 
-export function importLbrnGeometry(root: Element, sourceName: string): LbrnGeometryResult {
+/** `frame` places LightBurn project coordinates on the scene (lightBurnSceneFrame). */
+export function importLbrnGeometry(
+  root: Element,
+  sourceName: string,
+  frame: LbrnMatrix,
+): LbrnGeometryResult {
   const objects: ImportedSvg[] = [];
   const unsupported = new Set<string>();
   const warnings: string[] = [];
   const pathTables = buildPathTables(root);
   const topShapes = [...root.children].filter((element) => normalized(element.tagName) === 'shape');
   for (const shape of topShapes)
-    visitShape(shape, IDENTITY, sourceName, objects, unsupported, warnings, pathTables);
+    visitShape(shape, frame, sourceName, objects, unsupported, warnings, pathTables);
   return { objects, unsupportedShapeTypes: [...unsupported].sort(), warnings };
 }
 
 function visitShape(
   shape: Element,
-  parent: Matrix,
+  parent: LbrnMatrix,
   sourceName: string,
   objects: ImportedSvg[],
   unsupported: Set<string>,
@@ -54,7 +50,7 @@ function visitShape(
 ): void {
   const type = shape.getAttribute('Type') ?? shape.getAttribute('type') ?? '';
   if (normalized(type) === 'group') {
-    const matrix = multiply(parent, parseXForm(shape));
+    const matrix = multiplyMatrix(parent, parseXForm(shape));
     const children = directChild(shape, 'children');
     for (const child of children === null ? [] : [...children.children]) {
       if (normalized(child.tagName) === 'shape')
@@ -80,14 +76,14 @@ function visitShape(
 
 function visitVectorShape(
   shape: Element,
-  parent: Matrix,
+  parent: LbrnMatrix,
   sourceName: string,
   layerSource: Element,
   objects: ImportedSvg[],
   warnings: string[],
   pathTables: PathTables,
 ): void {
-  const matrix = multiply(parent, parseXForm(shape));
+  const matrix = multiplyMatrix(parent, parseXForm(shape));
   const type = normalized(shape.getAttribute('Type') ?? shape.getAttribute('type') ?? 'path');
   const curves =
     type === 'rect'
@@ -259,52 +255,8 @@ function parsePrimitives(text: string): Primitive[] {
   }));
 }
 
-function parseXForm(shape: Element): Matrix {
-  const values = (directChild(shape, 'xform')?.textContent ?? '').trim().split(/\s+/).map(Number);
-  return values.length === 6 && values.every(Number.isFinite)
-    ? {
-        a: values[0] as number,
-        b: values[1] as number,
-        c: values[2] as number,
-        d: values[3] as number,
-        e: values[4] as number,
-        f: values[5] as number,
-      }
-    : IDENTITY;
-}
-
-function multiply(left: Matrix, right: Matrix): Matrix {
-  return {
-    a: left.a * right.a + left.c * right.b,
-    b: left.b * right.a + left.d * right.b,
-    c: left.a * right.c + left.c * right.d,
-    d: left.b * right.c + left.d * right.d,
-    e: left.a * right.e + left.c * right.f + left.e,
-    f: left.b * right.e + left.d * right.f + left.f,
-  };
-}
-
-function transformCurve(curve: CurveSubpath, matrix: Matrix): CurveSubpath {
-  const point = (value: Vec2): Vec2 => ({
-    x: matrix.a * value.x + matrix.c * value.y + matrix.e,
-    y: matrix.b * value.x + matrix.d * value.y + matrix.f,
-  });
-  return {
-    ...curve,
-    start: point(curve.start),
-    segments: curve.segments.map((segment) =>
-      segment.kind === 'line'
-        ? { ...segment, to: point(segment.to) }
-        : segment.kind === 'cubic'
-          ? {
-              ...segment,
-              control1: point(segment.control1),
-              control2: point(segment.control2),
-              to: point(segment.to),
-            }
-          : { ...segment, to: point(segment.to) },
-    ),
-  };
+function parseXForm(shape: Element): LbrnMatrix {
+  return parseXFormText(directChild(shape, 'xform')?.textContent);
 }
 
 function combinedBounds(curves: ReadonlyArray<CurveSubpath>) {
