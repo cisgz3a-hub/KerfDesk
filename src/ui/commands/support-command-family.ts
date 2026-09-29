@@ -46,6 +46,7 @@ export function discussionsCommand(): AppCommand {
 }
 
 export function licenceCommand(): AppCommand {
-  return enabled('help.licence', 'help', 'Licence', 'Manage your desktop licence and updates',
-    () => window.dispatchEvent(new Event('kerfdesk:licence-settings')));
+  return enabled('help.licence', 'help', 'Licence', 'Manage your desktop licence and updates', () =>
+    window.dispatchEvent(new Event('kerfdesk:licence-settings')),
+  );
 }
