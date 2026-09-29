@@ -4,8 +4,7 @@ KerfDesk (repo: LaserForge 2.0) bundles third-party software and fonts under
 their respective licenses and notices. KerfDesk's own first-party software and
 associated documentation, in source and compiled/bundled form, are proprietary,
 all rights reserved — see `LICENSE`. Versions up to and including the
-`mit-final` tag were released under the MIT License (`LICENSE-MIT`), and
-recipients keep those rights.
+`mit-final` tag keep the licence they were released under (see `LICENSE`).
 
 The tables below are a readable summary of selected libraries and bundled
 fonts. The generated `public/third-party-notices.txt` is the release input: it

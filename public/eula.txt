@@ -42,6 +42,6 @@ Copyright (c) 2026 Johann Stolk. All rights reserved.
    MACHINES OR MATERIALS, OR LOST PROFITS — ARISING FROM, OUT OF, OR IN
    CONNECTION WITH THE SOFTWARE OR ITS USE.
 
-5. THIRD-PARTY COMPONENTS. The Software bundles open-source components
+5. THIRD-PARTY COMPONENTS. The Software bundles third-party components
    under their own licenses; see the accompanying
    third-party-notices.txt for the required notices and license texts.

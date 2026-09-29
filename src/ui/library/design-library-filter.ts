@@ -58,17 +58,13 @@ export function filterDesignLibrary(
 
 function haystack(entry: LibraryEntry): string {
   const provenance = entry.provenance;
+  // Originals' licence names KerfDesk and uses everyday words, so like their
+  // credit it stays out of the substring search.
   const credit =
-    provenance.sourceKind === 'owned' ? [] : [provenance.creator, provenance.sourceName];
-  return searchText([
-    entry.title,
-    entry.category,
-    entry.subcategory,
-    ...entry.tags,
-    ...credit,
-    provenance.license,
-    provenance.licenseId,
-  ]);
+    provenance.sourceKind === 'owned'
+      ? []
+      : [provenance.creator, provenance.sourceName, provenance.license, provenance.licenseId];
+  return searchText([entry.title, entry.category, entry.subcategory, ...entry.tags, ...credit]);
 }
 
 // Originals credit KerfDesk itself, and "kerf" is a laser term: a substring
