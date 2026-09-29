@@ -1,12 +1,15 @@
 // Builds the pricing and legal pages that ship with the web app on kerfdesk.com
 // (ADR-524 Amendment 3) from the customer documents in docs/legal/, which the
 // sourced legal review of 29 September 2026 checked (ADR-247 Amendment 2), and
-// the machines and safety pages those documents link. The pages are committed,
-// so a review shows the exact published text, and generate-site-pages.test.mjs
-// fails when one is out of date.
+// the machines and safety pages those documents link. It also writes the terms
+// the app shows when it asks for agreement on first use (ADR-564). Everything
+// it writes is committed, so a review shows the exact published text, and
+// generate-site-pages.test.mjs and app-terms-module.test.mjs fail when a file is
+// out of date.
 //
 //   node scripts/generate-site-pages.mjs          writes public/<page>/index.html
-//   node scripts/generate-site-pages.mjs --check  lists out-of-date pages, exits 1
+//                                                 and src/ui/legal/terms-text.generated.ts
+//   node scripts/generate-site-pages.mjs --check  lists out-of-date files, exits 1
 
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -14,6 +17,7 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as prettier from 'prettier';
 
+import { APP_TERMS_MODULE, TERMS_SOURCE, appTermsModule } from './app-terms-module.mjs';
 import { sitePage } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
 
@@ -114,10 +118,17 @@ export async function buildSitePages() {
   return built;
 }
 
+// The terms the app shows on first use (ADR-564), from the terms page's source.
+export async function buildAppTerms() {
+  const source = await readFile(path.join(REPO_ROOT, TERMS_SOURCE), 'utf8');
+  return new Map([[APP_TERMS_MODULE, await formatted(appTermsModule(source), APP_TERMS_MODULE)]]);
+}
+
 async function main(args) {
   const check = args.includes('--check');
   const stale = [];
-  for (const [file, content] of await buildSitePages()) {
+  const outputs = new Map([...(await buildSitePages()), ...(await buildAppTerms())]);
+  for (const [file, content] of outputs) {
     const target = path.join(REPO_ROOT, file);
     if (check) {
       const current = await readFile(target, 'utf8').catch(() => null);

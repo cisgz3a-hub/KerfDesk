@@ -19,8 +19,10 @@ is kept with the owner's project files, not in this repository.
 | `kerfdesk-pricing.md` | https://kerfdesk.com/pricing/ |
 | `kerfdesk-paia-manual.md` | https://kerfdesk.com/paia-manual/ |
 
-The documents are copied unchanged from the review. Change one only with the same care: check the
-change against the law, keep the five consistent, and run `pnpm generate:site-pages`.
+The documents are copied unchanged from the review, except that the privacy notice's working data
+(s3.2) also names the agreement the app keeps (ADR-564). Change one only with the same care: check
+the change against the law, keep the five consistent, and run `pnpm generate:site-pages`, which
+also updates the terms the app shows (`src/ui/legal/terms-text.generated.ts`).
 
 ## Blanks the owner fills before the pages go live
 
@@ -61,6 +63,10 @@ done.
    the terms version and the time of acceptance. Without them the safety acknowledgement,
    disclaimers and liability limits probably fail. This is a terms acceptance, not a machine or
    paywall gate: record in an ADR how it squares with ADR-228 and ADR-247 s3.
+   Status: the first-open step (both apps, terms and machine safety, version and time kept on the
+   device, s24.3's later offer) ships with the pages and starts once the publication date is
+   filled (ADR-564); the checkout step is on buy.html. The installer's "I agree" page still shows
+   public/eula.txt until the owner approves replacing it.
 2. **The deletion the privacy notice promises (s7).** Deactivated computers after 90 days, trials
    3 years after they end, unpaid orders after 90 days, administrative records after 5 years,
    backups after 90 days, and licences cancelled after a refund or chargeback 2 years after

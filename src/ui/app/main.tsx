@@ -30,6 +30,7 @@ import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 import { EditionProvider } from '../licensing/EditionProvider';
+import { TermsAgreementGate } from '../legal/TermsAgreementGate';
 import { watchPreloadErrors } from './preload-error-toast';
 
 const rootElement = document.getElementById('app-root');
@@ -101,11 +102,15 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <EditionProvider
-          {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
-        >
-          <App />
-        </EditionProvider>
+        {/* First use asks for agreement to the terms and machine safety before
+            anything else starts (ADR-564). */}
+        <TermsAgreementGate>
+          <EditionProvider
+            {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
+          >
+            <App />
+          </EditionProvider>
+        </TermsAgreementGate>
       </PlatformProvider>
     </ErrorBoundary>
   </StrictMode>,
@@ -142,8 +147,10 @@ function fadeOutSplash(): void {
 }
 
 function dismissWhenBoardReady(): void {
+  // The first-use agreement (ADR-564) stands in for the board until it is answered.
   const boardPainted =
-    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
+    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null ||
+    document.querySelector('#app-root [data-terms-agreement="first"]') !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
   // performance.now() counts from navigation, when the static splash first paints.
