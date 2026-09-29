@@ -244,7 +244,12 @@ describe('Cloudflare production deploy gate', () => {
     expect(workflow).toContain(
       "github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha",
     );
-    expect(workflow).toContain('CI_STATE: ${{ steps.release_check.outcome }}');
+    // ADR-557: a workflow_run candidate reports the CI run that passed its
+    // release gate; only a manual dispatch runs the gate in this job.
+    expect(workflow).toContain(
+      "CI_STATE: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.conclusion || steps.release_check.outcome }}",
+    );
+    expect(workflow).toContain('gate-ran-in=${GATE_RAN_IN}');
     expect(workflow).toContain('validated-run=${TRIGGER_RUN_URL}');
     expect(workflow).not.toContain(
       "CI_STATE: ${{ github.event_name == 'workflow_run' && 'passed' || steps.release_check.outcome }}",
@@ -287,6 +292,39 @@ describe('Cloudflare production deploy gate', () => {
     expect(packageJson.scripts['deploy:web']).toMatch(/^pnpm guard:repo && pnpm release:check && /);
     expect(packageJson.scripts['deploy:web:preview']).toMatch(
       /^pnpm guard:repo && pnpm release:check && /,
+    );
+  });
+
+  // ADR-557: CI's push run on main already passed the whole release gate on the
+  // exact commit a workflow_run deploy checks out, and the job runs only after
+  // that run succeeded. Running the gate again doubled the time to production.
+  it('builds a CI-verified candidate without re-running its release gate', () => {
+    const workflow = repoFile('.github/workflows/deploy.yml');
+    const gateStep = stepBody(workflow, 'Release verification gate');
+    const buildStep = stepBody(workflow, 'Build the web bundle CI verified');
+    const publishIndex = workflow.indexOf('uses: cloudflare/wrangler-action@');
+
+    expect(gateStep).toContain(
+      "if: ${{ steps.deployment_identity.outputs.eligible == 'true' && github.event_name == 'workflow_dispatch' }}",
+    );
+    expect(gateStep).toContain('run: pnpm release:check');
+    expect(buildStep).toContain(
+      "if: ${{ steps.deployment_identity.outputs.eligible == 'true' && github.event_name == 'workflow_run' }}",
+    );
+    expect(buildStep).toContain('run: pnpm build:web');
+    expect(workflow.indexOf('- name: Build the web bundle CI verified')).toBeLessThan(publishIndex);
+    // The build-only path is sound only for a candidate whose own push CI
+    // succeeded, at the commit this job checks out.
+    expect(workflow).toContain(
+      "(github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')",
+    );
+    expect(workflow).toContain(
+      "ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}",
+    );
+    // A failed build skips the publish step, so it must still read as a failed
+    // deploy in the readiness report.
+    expect(workflow).toContain(
+      "DEPLOY_STATE: ${{ steps.build_web.outcome == 'failure' && 'failure' || steps.publish.outcome }}",
     );
   });
 
