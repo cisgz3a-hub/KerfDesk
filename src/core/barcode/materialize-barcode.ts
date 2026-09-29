@@ -20,6 +20,7 @@ import {
 import type { BarcodeShape } from '../scene/scene-object';
 import { DEFAULT_FONT_KEY } from '../text';
 import { layoutBarcode, layoutPolylines, type BarcodeLayout } from './barcode-layout';
+import type { BarcodeUse } from './data-matrix-encode';
 
 /** Captions use the bundled sans font; its digits are tabular like OCR-B's. */
 export const BARCODE_CAPTION_FONT_KEY = DEFAULT_FONT_KEY;
@@ -46,13 +47,15 @@ export type MaterializeBarcodeResult =
   | { readonly ok: true; readonly barcode: MaterializedBarcode }
   | { readonly ok: false; readonly message: string };
 
+/** Insert and Edit build for 'edit'; output passes 'output' (see data-matrix-encode). */
 export async function materializeBarcode(
   spec: BarcodeShape,
   value: string,
   color: string,
   renderCaption: BarcodeCaptionRenderer,
+  use: BarcodeUse = 'edit',
 ): Promise<MaterializeBarcodeResult> {
-  const laid = layoutBarcode(spec, value);
+  const laid = layoutBarcode(spec, value, use);
   if (!laid.ok) return laid;
   const layout = laid.layout;
   const glyphs: { polylines: Polyline[]; curves: CurveSubpath[] } = { polylines: [], curves: [] };

@@ -206,4 +206,23 @@ describe('createBarcodeObject', () => {
     expect(created.object.paths[0]?.color).toBe('#112233');
     expect(created.object.bounds.maxX).toBeGreaterThan(0);
   });
+
+  // Insert and Apply build through here: they stop at 132 x 132 (ADR-386
+  // Amendment 2), while output builds 144 x 144 with a Job Review warning.
+  it('refuses a Data Matrix value that needs 144 x 144, as Insert and Edit do', async () => {
+    const spec = { ...defaultBarcodeSpec('data-matrix'), data: 'Z'.repeat(1305) };
+    const created = await createBarcodeObject({
+      id: 'b1',
+      color: '#000000',
+      spec,
+      value: spec.data,
+      renderCaption: boxCaptions,
+    });
+    expect(created).toEqual({
+      ok: false,
+      message:
+        'Too much data for a Data Matrix: this text needs 1305 codewords and the largest size ' +
+        'KerfDesk makes, 132 × 132, holds 1304. Shorten the text or use a QR Code.',
+    });
+  });
 });

@@ -3154,6 +3154,11 @@ settings and Job Review keep their existing read-only setup references.
   much data) shows the reason under the preview and disables **Insert** or **Apply**.
 - A variable value that cannot be encoded fails Save G-code, Start or SVG export with the barcode
   and the value named; nothing is engraved in its place.
+- The dialog makes a Data Matrix up to 132 × 132: longer text is refused under the preview. A
+  variable value that grows past it by output is still engraved, as a 144 × 144 code, and Job
+  Review and Save G-code's warnings name the barcode: 144 × 144 Data Matrix codes may not scan in
+  common readers, so test-scan one before a run. Only a value longer than 144 × 144 holds fails
+  the output (ADR-386 Amendment 2).
 - If the text under a 1D code cannot be drawn, the dialog stays open with the reason.
 
 ## Phase E flows

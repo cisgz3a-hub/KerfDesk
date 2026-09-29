@@ -162,6 +162,49 @@ describe('variable barcodes at output', () => {
     expect(message).toContain('Barcode B1 cannot encode "041"');
   });
 
+  // ADR-386 Amendment 2: Insert and Edit stop at 132 x 132, but a value that
+  // needs 144 x 144 at output is a code KerfDesk can build. Refusing it would
+  // be policy (PROJECT.md non-negotiable 21), so output builds it as the
+  // standard gives it and Job Review warns; only a longer value stops output.
+  it('builds a value that needs 144 x 144 instead of stopping the output', async () => {
+    const dataMatrix = { ...defaultBarcodeSpec('data-matrix'), moduleMm: 0.25 };
+    // 1302 letters and three digit pairs: 1305 codewords, one more than 132 x 132 holds.
+    const project = await barcodeProject(
+      variableSpec(dataMatrix, `${'A'.repeat(1302)}{{serial:6}}`),
+    );
+    const result = await prepareOutputSnapshot(project, {
+      clock: () => NOW,
+      renderVariableText: renderer,
+    });
+    expect(result.ok ? 'prepared' : result.preflight.issues[0]?.message).toBe('prepared');
+    const object = await materialized(project);
+    expect(object.kind === 'shape' && object.spec.kind === 'barcode' && object.spec.data).toBe(
+      `${'A'.repeat(1302)}000041`,
+    );
+    // 144 modules and the standard two-module quiet zone on each side.
+    expect(object.bounds).toEqual({ minX: 0, minY: 0, maxX: 148 * 0.25, maxY: 148 * 0.25 });
+  });
+
+  it('stops the output on a value longer than 144 x 144 holds', async () => {
+    const dataMatrix = { ...defaultBarcodeSpec('data-matrix'), moduleMm: 0.25 };
+    const project = await barcodeProject(
+      variableSpec(dataMatrix, `${'A'.repeat(1556)}{{serial:6}}`),
+    );
+    const result = await prepareOutputSnapshot(project, {
+      clock: () => NOW,
+      renderVariableText: renderer,
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      preflight: { issues: [{ code: 'variable-evaluation-failed' }] },
+    });
+    const message = result.ok ? '' : (result.preflight.issues[0]?.message ?? '');
+    expect(message).toContain('Barcode B1 cannot encode');
+    expect(message).toContain(
+      'this text needs 1559 codewords and the largest size KerfDesk makes, 144 × 144, holds 1558.',
+    );
+  });
+
   it('prepares a job from a variable barcode on a fill operation', async () => {
     const project = await barcodeProject(variableSpec(defaultBarcodeSpec('qr'), '{{serial:4}}'));
     const result = await prepareOutputSnapshot(project, {

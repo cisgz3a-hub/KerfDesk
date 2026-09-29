@@ -149,6 +149,32 @@ describe('BarcodeDialog', () => {
     }
   });
 
+  it('inserts a variable Data Matrix whose current value fits 132 x 132', async () => {
+    const onSubmit = vi.fn<BarcodeSubmit>(async () => null);
+    const view = await renderDialog(onSubmit, defaultBarcodeSpec('data-matrix'));
+    // At serial 41: 1301 letters and three digit pairs, the 1304 codewords 132 x 132 holds.
+    const source = `${'A'.repeat(1301)}{{serial:6}}`;
+    try {
+      await change(control(view.host, 'textarea[aria-label="Barcode data"]'), source);
+      const toggle = control<HTMLInputElement>(
+        view.host,
+        'section[aria-label="Variable data"] input[type="checkbox"]',
+      );
+      await act(async () => toggle.click());
+      expect(previewLabel(view.host)).toBe(
+        'Barcode preview: Data Matrix ECC 200 (132 × 132 modules)',
+      );
+      expect(insertButton(view.host).disabled).toBe(false);
+      await act(async () => insertButton(view.host).click());
+      expect(onSubmit).toHaveBeenCalledWith(
+        expect.objectContaining({ data: source, variableTemplate: expect.anything() }),
+        `${'A'.repeat(1301)}000041`,
+      );
+    } finally {
+      await unmount(view);
+    }
+  });
+
   it('shows only the settings the chosen type uses', async () => {
     const view = await renderDialog(vi.fn<BarcodeSubmit>(async () => null));
     const labels = (): string[] =>

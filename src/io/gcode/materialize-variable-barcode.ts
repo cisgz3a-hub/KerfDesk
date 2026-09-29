@@ -2,7 +2,10 @@
 // (ADR-386): the template is evaluated for this copy exactly like variable
 // text, the symbol is re-encoded, and any human-readable text is drawn
 // through the same text renderer seam. A value the symbology cannot encode
-// fails the output instead of engraving the previous copy's code.
+// fails the output instead of engraving the previous copy's code. A value
+// that needs a 144 x 144 Data Matrix, which Insert and Edit do not make, is
+// still built here: Job Review warns that it may not scan (ADR-386
+// Amendment 2), because only factual inability may refuse output.
 
 import {
   BARCODE_CAPTION_FONT_KEY,
@@ -40,6 +43,7 @@ export async function materializeVariableBarcode(
     evaluated.value,
     object.color,
     barcodeCaptionRenderer(renderer, object.color, project),
+    'output',
   );
   if (!result.ok) {
     return {

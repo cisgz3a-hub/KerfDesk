@@ -16,6 +16,10 @@ what it engraves or what a scanner reads.
   144 x 144 symbol, built to the letter of ISO/IEC 16022. ZXing could not read it: readers expect
   the ten check blocks of that one size in another order than the standard's text gives. No test
   vector or reader in the repository pins that order, so it cannot be verified offline.
+  A first fix stopped making 144 x 144 anywhere. A second audit of that fix found it broke
+  PROJECT.md non-negotiable 21: a variable value that needs 144 x 144 then stopped Frame, Start
+  and output, although the code can still be built. That it may not scan is a quality finding,
+  which Job Review states; only factual inability may refuse output.
 - **Text could sit outside the code's box.** EAN-13 and UPC-A set their outer digits in the quiet
   zone. With a quiet zone below the standard, which draws with a warning, those digits reached
   past the object's bounds: the selection box and click target missed them, arranging and nesting
@@ -41,14 +45,30 @@ what it engraves or what a scanner reads.
    - A value that cannot be evaluated or encoded leaves the stored code on the canvas; output
      stops on that value with the reason, as before.
    - Preview mode's faint artwork shows the current value too, so it lines up with the route.
-2. **The largest Data Matrix made is 132 x 132.** 144 x 144 is no longer offered: a code in the
-   standard's order does not scan in ZXing, and one in the reader order could not be checked.
-   Text that needs more than the 1304 codewords of 132 x 132 is refused with "Too much data for a
-   Data Matrix: this text needs N codewords and the largest size KerfDesk makes, 132 × 132, holds
-   1304. Shorten the text or use a QR Code." The dialog shows it under the preview and disables
-   Insert or Apply; a variable value that long stops output with the barcode and value named, as
-   any value that cannot be encoded does. The size table still lists 144 x 144 so its placement
-   stays tested; offering it again needs a verified reference for the reader order.
+2. **Insert and Edit make Data Matrix codes up to 132 x 132; output still builds 144 x 144 and
+   warns.** A code in the standard's order does not scan in ZXing, and one in the reader order
+   could not be checked, so KerfDesk does not offer 144 x 144 where the operator types the data.
+   - In the dialog, text that needs more than the 1304 codewords of 132 x 132 is refused under
+     the preview with "Too much data for a Data Matrix: this text needs N codewords and the
+     largest size KerfDesk makes, 132 × 132, holds 1304. Shorten the text or use a QR Code.",
+     and Insert or Apply is disabled. For variable data this is the value the preview evaluates;
+     a template whose current value fits is inserted as before.
+   - At output (Save G-code, Start, Frame, previews and estimates through the output snapshot,
+     SVG and DXF export) and on the canvas, a variable value that needs 144 x 144 is built at
+     144 x 144, exactly as before this amendment: the standard's block order, which the
+     repository's test reader reads back. The block order readers expect is not built, because
+     nothing in the repository pins it. Job Review and Save G-code's warnings name each such code on an
+     output operation, and a code saved at that size by an earlier build: "Barcode ID is a
+     144 × 144 Data Matrix. 144 × 144 Data Matrix codes may not scan in common readers, so
+     test-scan one before a run." Several codes share one warning ("Barcodes A, B and C are
+     144 × 144 Data Matrix codes. ..."), naming four and counting the rest. The warning never
+     refuses Frame, Start or Save. SVG and DXF export have no warning list and write the code as
+     before.
+   - Only a value longer than 144 x 144 holds (1558 codewords) stops output, with the barcode
+     and value named, because no Data Matrix can carry it: "... the largest size KerfDesk makes,
+     144 × 144, holds 1558. ..."
+   - Offering 144 x 144 in the dialog again, or building it in the reader order, needs a verified
+     reference for that order.
 3. **A barcode's box holds its text.** The bounds are the quiet-zone box grown to hold every
    caption as drawn, with the padding kept under the text also kept beside it. An inverted 1D
    plate fills the same box, so all of its text stays knocked out. Codes whose text stays within
@@ -68,14 +88,25 @@ what it engraves or what a scanner reads.
   box follows the drawn code but a click on the added part does not select it until the code is
   edited. Convert to Path still converts the stored code.
 - A 144 x 144 code saved by an earlier build keeps its stored outlines until it is edited; Edit
-  barcode then shows the message. Text that long needs a QR Code or shorter text.
+  barcode then shows the message. Text that long needs a QR Code or shorter text. Until then it
+  engraves as before, with the Job Review warning.
+- A variable code whose current value needs 144 x 144 draws at that size on the canvas, but Edit
+  barcode shows the message until the data is shortened, since the dialog makes 132 x 132 at
+  most.
 - An EAN or UPC code with a narrow quiet zone is as wide as its digits, and the selected code's
   size shows that. A code saved by an earlier build keeps its stored box until it is edited.
 - Tests: `src/ui/workspace/use-canvas-display-barcode.test.tsx` (the canvas after Next, QR Code
   and Code 128 with its text, project untouched) and `variable-barcode-display.test.ts`
   (bindings, the last value while encoding, values that cannot be encoded or evaluated);
-  `src/core/barcode/data-matrix-encode.test.ts` (132 x 132 at most, the message);
-  `src/ui/barcode/BarcodeDialog.test.tsx` (the message in the dialog, Insert disabled);
+  `src/core/barcode/data-matrix-encode.test.ts` (132 x 132 at most for Insert and Edit, the
+  message; 144 x 144 for output, read back by the repository's reader, and the longer-value
+  message); `src/ui/barcode/BarcodeDialog.test.tsx` and `barcode-form.test.ts` (the message in
+  the dialog, Insert disabled; a variable template whose value fits is inserted);
   `src/core/barcode/materialize-barcode.test.ts` (the box holds the text, an inverted plate keeps
-  it a hole); `src/ui/barcode/BarcodePreviewSvg.test.tsx` (a QR Code and an EAN-13 read from the
-  preview, with and without Invert).
+  it a hole, Insert and Edit refuse 144 x 144); `src/io/gcode/materialize-variable-barcode.test.ts`
+  and `src/ui/laser/start-job-data-matrix.test.ts` (output and Start build 144 x 144 with the
+  Job Review warning, and stop only beyond it); `src/ui/laser/data-matrix-scan-warnings.test.ts`
+  (the warning, grouped, not for unused operations or unevaluated templates, and in Save
+  G-code's warnings); `variable-barcode-display.test.ts` (the canvas draws 144 x 144);
+  `src/ui/barcode/BarcodePreviewSvg.test.tsx` (a QR Code and an EAN-13 read from the preview,
+  with and without Invert).

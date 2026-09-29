@@ -13,6 +13,7 @@ import {
   type MatrixBarcodeSymbol,
 } from './barcode-symbol';
 import { MIN_QUIET_ZONE } from './barcode-spec';
+import type { BarcodeUse } from './data-matrix-encode';
 import { moduleContours } from './module-contours';
 
 export type BarcodeCaption = {
@@ -54,8 +55,13 @@ const DIGIT_INK = 0.75;
 const TEXT_INK = 1;
 const APPROX_ADVANCE = 0.6;
 
-export function layoutBarcode(spec: BarcodeShape, data: string): BarcodeLayoutResult {
-  const encoded = encodeBarcodeSymbol(spec.symbology, data, spec.errorCorrection);
+/** `use` 'output' also lays out a 144x144 Data Matrix, which editing refuses. */
+export function layoutBarcode(
+  spec: BarcodeShape,
+  data: string,
+  use: BarcodeUse = 'edit',
+): BarcodeLayoutResult {
+  const encoded = encodeBarcodeSymbol(spec.symbology, data, spec.errorCorrection, use);
   if (!encoded.ok) return encoded;
   const symbol = encoded.symbol;
   const across =

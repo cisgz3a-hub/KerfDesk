@@ -144,6 +144,15 @@ describe('variable barcodes on the canvas', () => {
     expect(scanQr(await settled(next))).toBe('LOT-008');
   });
 
+  it('draws a value that needs 144 x 144 as output builds it (ADR-386 Amendment 2)', async () => {
+    // 1302 letters and three digit pairs: 1305 codewords, one more than 132 x 132 holds.
+    const long = await projectWith('data-matrix', `${'A'.repeat(1302)}{{serial:6}}`, 41);
+    const shown = (await settled(long)).scene.objects[0];
+    expect(shown).not.toBe(long.scene.objects[0]);
+    // 144 modules and the standard two-module quiet zone on each side, at 0.6 mm.
+    expect(shown?.bounds.maxX).toBeCloseTo(148 * 0.6, 9);
+  });
+
   it('keeps the stored code when the value cannot be encoded or evaluated', async () => {
     const ean = await projectWith('ean8', '{{serial:7}}', 1);
     expect((await settled(ean)).scene.objects[0]).not.toBe(ean.scene.objects[0]);

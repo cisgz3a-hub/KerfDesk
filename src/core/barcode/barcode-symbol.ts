@@ -6,7 +6,7 @@
 import type { BarcodeSymbology } from '../scene/scene-object';
 import { encodeCode128 } from './code128';
 import { encodeCode39 } from './code39';
-import { encodeDataMatrix } from './data-matrix-encode';
+import { encodeDataMatrix, type BarcodeUse } from './data-matrix-encode';
 import { encodeEanUpc } from './ean-upc';
 import type { LinearEncodeResult, LinearSymbol } from './linear-symbol';
 import { encodeQr } from './qr-encode';
@@ -47,13 +47,14 @@ export function encodeBarcodeSymbol(
   symbology: BarcodeSymbology,
   data: string,
   errorCorrection: QrErrorCorrection,
+  use: BarcodeUse = 'edit',
 ): BarcodeSymbolResult {
   if (data.length === 0) return { ok: false, message: 'Enter the data to encode.' };
   switch (symbology) {
     case 'qr':
       return qrSymbol(data, errorCorrection);
     case 'data-matrix':
-      return dataMatrixSymbol(data);
+      return dataMatrixSymbol(data, use);
     case 'code128':
       return linear(encodeCode128(data), 'Code 128');
     case 'code39':
@@ -81,8 +82,8 @@ function qrSymbol(data: string, errorCorrection: QrErrorCorrection): BarcodeSymb
   };
 }
 
-function dataMatrixSymbol(data: string): BarcodeSymbolResult {
-  const encoded = encodeDataMatrix(data);
+function dataMatrixSymbol(data: string, use: BarcodeUse): BarcodeSymbolResult {
+  const encoded = encodeDataMatrix(data, use);
   if (!encoded.ok) return encoded;
   const { size, modules } = encoded.symbol;
   return {
