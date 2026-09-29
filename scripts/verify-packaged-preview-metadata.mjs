@@ -18,7 +18,7 @@ const RENDERER_ASSET_PATTERN = /^dist\/web\/assets\/[^/]+\.js$/;
 // Smoothieware firmware banner (`Build version:`), which the core chunk and
 // every job worker carry.
 const RENDERER_SURFACES = [
-  { label: 'About', marker: 'Free to use under the License & Safety Notice' },
+  { label: 'About', marker: 'Terms of use: License & Safety Notice' },
   { label: 'Build badge', marker: 'lf-menu-build' },
 ];
 const SURFACE_VERSION_RADIUS = 512;

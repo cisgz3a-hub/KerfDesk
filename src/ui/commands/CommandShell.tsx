@@ -358,7 +358,7 @@ function aboutText(): string {
     `Built ${__BUILD_TIME__}`,
     '',
     'Copyright © 2026 Johann Stolk. All rights reserved.',
-    'Free to use under the License & Safety Notice (/eula.txt).',
+    'Terms of use: License & Safety Notice (/eula.txt).',
     'Bundled open-source components: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',
