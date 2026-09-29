@@ -57,7 +57,8 @@ export function completeLightBurnProjectOpen(
   ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
   clearAutosaveAfterFileHandoff(ctx.pushToast);
   // The report's warnings name every shape and setting left behind, the
-  // unsupported shape types among them (ADR-388).
+  // unsupported shape types among them, and the project's notes keep the
+  // whole report (ADR-388).
   const warnings = result.report.warnings.length;
   ctx.pushToast(
     `Imported ${fileName}: ${result.report.importedObjects} objects, ${result.report.importedLayers} layers${warnings === 0 ? '' : `, ${warnings} warning(s)`}. Save as .lf2 to keep changes.`,
@@ -67,7 +68,7 @@ export function completeLightBurnProjectOpen(
     const visible = result.report.warnings.slice(0, 3);
     const remainder = warnings - visible.length;
     ctx.pushToast(
-      `LightBurn import review: ${visible.join(' ')}${remainder > 0 ? ` ${remainder} more warning(s) are in the import report.` : ''}`,
+      `LightBurn import review: ${visible.join(' ')}${remainder > 0 ? ` ${remainder} more warning(s) are in the import report in Window > Project Notes.` : ''}`,
       'warning',
     );
   }

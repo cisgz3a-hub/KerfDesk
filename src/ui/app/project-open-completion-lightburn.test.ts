@@ -33,6 +33,18 @@ describe('opening a LightBurn project', () => {
     ]);
   });
 
+  it('says where the rest of a long report is kept', () => {
+    const shapes = ['Barcode', 'Bitmap', 'Image', 'Polygon']
+      .map((type) => `<Shape Type="${type}" CutIndex="0"/>`)
+      .join('');
+    const review = openedToasts(shapes).find(([message]) =>
+      String(message).startsWith('LightBurn import review:'),
+    );
+    expect(review?.[0]).toMatch(
+      /Image shape was not imported: .* 1 more warning\(s\) are in the import report in Window > Project Notes\.$/,
+    );
+  });
+
   it('reports nothing to review when everything came across', () => {
     expect(openedToasts('')).toEqual([
       ['Imported sign.lbrn2: 1 objects, 1 layers. Save as .lf2 to keep changes.', 'success'],

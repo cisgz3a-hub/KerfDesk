@@ -92,6 +92,14 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
     shape with no geometry to read (a `Rect` of zero width, an empty `Path`). Before, a left-out
     type was listed apart from the warnings, and opening the project counted it without naming
     it. The open toast now counts each line once and shows the first three.
+12. **The notes and the report stay with the project.** LightBurn's project notes
+    (`<Notes Notes="…">`) open as the project's notes (Window > Project Notes). When the import
+    report has lines, they follow the notes under "LightBurn import report for <file>:", one per
+    line, so the whole report is saved with the project and can be read after the toasts have
+    gone; the review toast says where the rest of a long report is. A project whose notes
+    LightBurn shows on opening (`ShowOnLoad="1"`) adds a report line saying where to read them.
+    Before, the notes were dropped and the toast sent the rest of a long report to an "import
+    report" nothing showed.
 
 ### Limits
 
@@ -136,6 +144,8 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
   layer by layer in LightBurn's order. The Run order view shows one run per layer.
 - Existing `.lf2` files are unaffected; only opening a LightBurn file changes. A `.lf2` still
   brings its own machine and the banner that goes with it.
+- An opened project whose report has lines carries them in its notes; deleting them there
+  changes nothing else.
 
 ### Tests
 
@@ -157,4 +167,6 @@ none for a LightBurn 0.9 Cut layer at rest or a Fill with the corpus layers' fie
 on a Fill only, one line for a Fill+Line layer, unknown fields and nested blocks); `clb-import.test.ts` (`runBlower` in a
 library); `lbrn-shape-report.test.ts` (each kind of shape left out is named with how many,
 shapes with no geometry are counted); `project-open-completion-lightburn.test.ts` (a left-out
-shape is named when the project opens, and counted once).
+shape is named when the project opens and counted once, and the toast says where the rest of a
+long report is); `lbrn-notes.test.ts` (LightBurn's notes, the report beneath them, and the line for
+notes LightBurn shows on opening).

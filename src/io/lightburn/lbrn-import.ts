@@ -9,6 +9,7 @@ import {
 import { createProject } from '../../core/scene/project';
 import { lightBurnSceneFrame } from './lbrn-frame';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
+import { lightBurnNotesWarnings, lightBurnProjectNotes } from './lbrn-notes';
 import { resolveLightBurnOverscan } from './lbrn-overscan';
 import { lightBurnSettingsNotImported, type LayerKind } from './lbrn-setting-report';
 
@@ -97,8 +98,15 @@ export function importLightBurnProjectDocument(
       return operationIds === undefined ? path : { ...path, operationIds };
     }),
   }));
+  const warnings = [
+    ...lightBurnNotesWarnings(root),
+    ...geometry.warnings,
+    ...layerImport.warnings,
+    ...cutPlannerWarnings(root),
+  ];
   const project: Project = {
     ...base,
+    notes: lightBurnProjectNotes(root, sourceName, warnings),
     scene: {
       ...base.scene,
       objects,
@@ -116,7 +124,7 @@ export function importLightBurnProjectDocument(
       importedObjects: geometry.objects.length,
       importedLayers: layers.length,
       unsupportedShapeTypes: geometry.unsupportedShapeTypes,
-      warnings: [...geometry.warnings, ...layerImport.warnings, ...cutPlannerWarnings(root)],
+      warnings,
     },
   };
 }
