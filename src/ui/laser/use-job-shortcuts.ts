@@ -13,6 +13,7 @@ import { useEffect } from 'react';
 import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
+import { unownedControllerMotion } from '../state/unowned-controller-motion';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { runStartJobFlow } from './start-job-flow';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
@@ -71,5 +72,10 @@ function stopShortcutAction(
       : { label: 'Abort motion', run: () => laser.stopJob() };
   }
   if (laser.fireActive) return { label: 'Laser off', run: () => laser.setFireActive(false) };
+  // Motion the controller reports and nothing here owns (a Console G1, $J= or
+  // $H): the bar's ABORT MOTION, which picks the stop for its state (ADR-375 C-2).
+  if (unownedControllerMotion(laser) !== null) {
+    return { label: 'Abort motion', run: () => laser.stopJob() };
+  }
   return null;
 }

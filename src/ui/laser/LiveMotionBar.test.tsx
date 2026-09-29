@@ -75,6 +75,7 @@ function buttonByText(host: HTMLElement, text: string): HTMLButtonElement | unde
 afterEach(() => {
   useStore.getState().newProject();
   useLaserStore.setState({
+    connection: { kind: 'disconnected' },
     streamer: null,
     statusReport: null,
     controllerOperation: null,
@@ -423,11 +424,18 @@ describe('LiveMotionBar controller-owned hold', () => {
     }
   });
 
-  it('says nothing about a hold once the job is over', async () => {
-    useLaserStore.setState({ streamer: null, statusReport: holdReport('Hold') });
+  // The controller still holds motion it can resume once the job is over: GRBL
+  // stays in Hold until cycle start or a reset, so the bar names it with ABORT
+  // MOTION and still no Resume. It used to say nothing, which left Disconnect
+  // as the only software stop (ADR-375 C-2).
+  // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L377-L381
+  it('names a hold the controller keeps once the job is over', async () => {
+    useLaserStore.setState({ connection: { kind: 'connected' }, statusReport: holdReport('Hold') });
     const { host, root } = await render(<LiveMotionBar />);
     try {
-      expect(host.textContent ?? '').not.toContain('CONTROLLER HOLD');
+      expect(host.textContent).toContain('CONTROLLER HOLD');
+      expect(buttonByText(host, 'ABORT MOTION')).toBeInstanceOf(HTMLButtonElement);
+      expect(buttonByText(host, 'Resume')).toBeUndefined();
     } finally {
       await act(async () => root.unmount());
     }
