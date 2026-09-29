@@ -141,7 +141,9 @@ export type CommandId =
   | 'help.discussions'
   | 'help.pricing'
   | 'help.terms'
-  | 'help.privacy';
+  | 'help.privacy'
+  | 'help.refunds'
+  | 'help.paia-manual';
 
 export type AppCommand = {
   readonly id: CommandId;

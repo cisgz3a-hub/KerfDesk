@@ -28,16 +28,16 @@ import {
   WHILE_IT_RUNS,
 } from './safety-data.mjs';
 
-function responsibilities() {
+function responsibilities(site) {
   return section({
     narrow: true,
     title: 'Your responsibilities',
     content: html`<div class="prose">
         <p>
-          KerfDesk prepares toolpaths and sends commands to your laser or router. It is provided “as
-          is”, with no warranty. You use it, and run your machine, at your own risk.
+          KerfDesk prepares toolpaths and sends commands to your laser or router. It is not a safety
+          device, and it can’t guarantee a safe result.
         </p>
-        <p>That makes you responsible for:</p>
+        <p>You are responsible for:</p>
         <ul>
           <li>never leaving a running machine unattended;</li>
           <li>checking every job before it cuts real material;</li>
@@ -56,8 +56,9 @@ function responsibilities() {
         <p>
           KerfDesk’s previews, simulations and pre-run checks help you spot problems. They are aids,
           not guarantees of safe output. When you’re unsure about a material, read its safety data
-          sheet (SDS) and your machine maker’s guidance. The
-          <a href="/license/">license page</a> sums up the warranty and liability terms.
+          sheet (SDS) and your machine maker’s guidance. Section 2 of the
+          <a href="${site.termsUrl}">Terms of Service</a> sets out what you must do. Sections 14 to
+          16 cover warranties, the limits on our liability and your legal rights where you live.
         </p>
       </div>
       ${callout({
@@ -272,11 +273,11 @@ export const page = {
         button('#abort', 'About the Abort button', { variant: 'secondary' }),
       ),
     })}
-    ${responsibilities()} ${beforeEveryJob(ctx)} ${whileItRuns()} ${abortSection()}
+    ${responsibilities(site)} ${beforeEveryJob(ctx)} ${whileItRuns()} ${abortSection()}
     ${laserModeSection()} ${checksSection()} ${testedSection()} ${reportSection(site)}
     ${ctaBand({
       title: 'More safety help in the app',
-      body: 'In the app, Help → Safety & liability has a summary, and the Windows installer shows the License & Safety Notice.',
+      body: 'In the app, Help → Safety & liability has a summary.',
       buttons: [
         button('/machines/', 'Check your machine'),
         button('/docs/', 'Get started', { variant: 'ghost-dark' }),

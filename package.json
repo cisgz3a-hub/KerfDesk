@@ -4,7 +4,7 @@
   "private": true,
   "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.",
   "author": {
-    "name": "Johann Stolk"
+    "name": "Johannes Stephanus Stolk"
   },
   "license": "SEE LICENSE IN LICENSE",
   "engines": {

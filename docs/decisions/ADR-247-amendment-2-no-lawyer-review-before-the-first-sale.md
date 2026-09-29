@@ -26,9 +26,14 @@ review: "Im not getting a lawyer to check. you make sure its correct by law" (14
    Africa, the United States, the European Union and the United Kingdom) and against Paddle's
    rules, cites the provisions it relied on, and says plainly what stays uncertain. The owner
    decides each uncertain point.
-3. **The review notes stay as the list of open questions.** `docs/legal/lawyer-review-notes.md`
-   keeps the legal questions the drafts raised; each check answers them or lists them as uncertain
-   for the owner.
+3. **The sourced review replaces the review notes.** On 29 and 30 September 2026 the drafts from
+   PR #1021 were checked against South African law (CPA, ECTA, POPIA, PAIA), EU and UK law (GDPR,
+   consumer and digital-content law), US law (warranties, CalOPPA, the FTC Act) and Paddle's
+   seller, buyer and domain rules, with sources, an adversarial fact-check of each document and a
+   cross-document consistency check. Its corrected texts are the customer documents in
+   `docs/legal/`, copied unchanged; `docs/legal/publishing-notes.md` lists the blanks the owner
+   fills, what ships with the pages and what must exist before Pro trials or sales open.
+   `docs/legal/lawyer-review-notes.md` is kept for its history only.
 
 ### Consequences
 
@@ -37,3 +42,5 @@ review: "Im not getting a lawyer to check. you make sure its correct by law" (14
 - Hiring a lawyer later needs no new ADR. Their findings go into the texts like any correction.
 - ADR-114, ADR-524, ADR-543 and the notes in `docs/legal/` still mention a lawyer's review before
   the first sale; this amendment governs those passages.
+- The review's evidence (its sourced requirements, findings and verdicts, and a ranked list of
+  residual risks) stays with the owner's project files rather than in this public repository.

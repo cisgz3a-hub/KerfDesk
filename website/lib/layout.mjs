@@ -99,8 +99,8 @@ function footer() {
           <span>Kerf<span class="brand__accent">Desk</span></span>
         </a>
         <p>
-          Laser and CNC software for GRBL machines, in a Free and a Pro edition. Made by
-          ${site.studio}.
+          Laser and CNC software for GRBL machines, in a Free and a Pro edition. Made and licensed
+          by ${site.owner}, trading as KerfDesk.
         </p>
         <p class="site-footer__safety">
           Stay with your machine while it runs. The in-app Abort is a software stop, not an
@@ -118,7 +118,7 @@ function footer() {
       )}
     </div>
     <div class="wrap site-footer__legal">
-      <p>© 2026 Johann Stolk. <a href="/license/">License and notices</a></p>
+      <p>© 2026 ${site.owner}. <a href="${site.licenseUrl}">Licence and notices</a></p>
     </div>
   </footer>`;
 }

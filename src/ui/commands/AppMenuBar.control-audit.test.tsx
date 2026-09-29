@@ -182,6 +182,8 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.pricing': { url: 'https://kerfdesk.com/pricing/' },
   'help.terms': { url: 'https://kerfdesk.com/terms/' },
   'help.privacy': { url: 'https://kerfdesk.com/privacy/' },
+  'help.refunds': { url: 'https://kerfdesk.com/refunds/' },
+  'help.paia-manual': { url: 'https://kerfdesk.com/paia-manual/' },
 };
 
 let host: HTMLDivElement;

@@ -20,7 +20,7 @@ function answeredByAppShell(pathAndQuery: string): boolean {
   );
 }
 
-describe('standalone checkout, download, support, pricing and policy pages under the service worker', () => {
+describe('standalone checkout, download, support, pricing, legal, machines and safety pages under the service worker', () => {
   it.each([
     '/buy.html?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
     '/buy?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
@@ -36,6 +36,11 @@ describe('standalone checkout, download, support, pricing and policy pages under
     '/terms/index.html',
     '/privacy/#who-we-are',
     '/refunds/',
+    '/paia-manual/',
+    '/license/',
+    '/license',
+    '/machines/',
+    '/safety/index.html',
   ])('never answers %s with the workspace', (page) => {
     expect(answeredByAppShell(page)).toBe(false);
   });
@@ -49,6 +54,8 @@ describe('standalone checkout, download, support, pricing and policy pages under
     '/supported-machines',
     '/pricing-guide',
     '/terms-of-trade/',
+    '/licenses-help',
+    '/safety-first/',
   ])('keeps the offline app shell for %s', (page) => {
     expect(answeredByAppShell(page)).toBe(true);
   });
@@ -60,7 +67,7 @@ describe('standalone checkout, download, support, pricing and policy pages under
         'download.html',
         'support.html',
         'desktop-*.{mjs,json,css}',
-        '{pricing,privacy,refunds,terms}/**',
+        '{pricing,privacy,refunds,terms,paia-manual,license,machines,safety}/**',
       ]),
     );
   });

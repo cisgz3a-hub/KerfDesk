@@ -8,6 +8,8 @@ import { escapeText } from './site-pages-markdown.mjs';
 
 export const SITE_MENU = [
   { href: '/pricing/', label: 'Pricing' },
+  { href: '/machines/', label: 'Machines' },
+  { href: '/safety/', label: 'Safety' },
   { href: '/download.html', label: 'Download' },
   { href: '/support.html', label: 'Support' },
   { href: '/', label: 'Open the web app' },
@@ -15,8 +17,10 @@ export const SITE_MENU = [
 
 export const POLICY_LINKS = [
   { href: '/terms/', label: 'Terms of Service' },
-  { href: '/privacy/', label: 'Privacy Policy' },
+  { href: '/privacy/', label: 'Privacy Notice' },
   { href: '/refunds/', label: 'Refund Policy' },
+  { href: '/paia-manual/', label: 'PAIA Manual' },
+  { href: '/license/', label: 'Licence and notices' },
 ];
 
 const STYLES = `
@@ -33,16 +37,14 @@ h1 { margin: 0 0 0.75rem; font-size: clamp(1.8rem, 5vw, 2.4rem); line-height: 1.
 h2 { margin: 2.25rem 0 0.75rem; font-size: 1.35rem; line-height: 1.25; }
 h3 { margin: 1.75rem 0 0.5rem; font-size: 1.1rem; }
 p, li { line-height: 1.6; }
-.lead { color: #4b5563; font-size: 1.1rem; }
 mark.blank { padding: 0 0.2rem; background: #fef08a; border: 1px dashed #a16207; border-radius: 3px; color: #713f12; }
-.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 1rem; margin-top: 1.5rem; }
-.plan { display: flex; flex-direction: column; padding: 1.25rem; background: #ffffff; border: 1px solid #dbe3ec; border-radius: 12px; }
-.plan h2 { margin-top: 0; }
-.price { margin: 0; font-size: 2rem; font-weight: 700; }
-.price small { color: #4b5563; font-size: 1rem; font-weight: 500; }
-.fine { color: #4b5563; font-size: 0.95rem; }
-.action { align-self: flex-start; margin-top: auto; padding: 0.65rem 1rem; color: #ffffff; background: #1976d2; border-radius: 8px; font-weight: 650; text-decoration: none; }
-.soon { align-self: flex-start; margin: auto 0 0; padding: 0.55rem 0.9rem; border: 1px dashed #94a3b8; border-radius: 8px; color: #4b5563; font-weight: 600; }
+li > ul { margin: 0.25rem 0; }
+.note { margin: 1.25rem 0; padding: 0.25rem 1.1rem; background: #eff6ff; border-left: 4px solid #1976d2; border-radius: 0 8px 8px 0; }
+.table-scroll { margin: 1rem 0; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; background: #ffffff; font-size: 0.95rem; }
+th, td { padding: 0.5rem 0.65rem; border: 1px solid #dbe3ec; text-align: left; vertical-align: top; line-height: 1.5; }
+th { background: #f1f5f9; }
+hr { margin: 2rem 0; border: 0; border-top: 1px solid #dbe3ec; }
 .site-footer { padding-top: 1.25rem; padding-bottom: 2.5rem; border-top: 1px solid #dbe3ec; color: #4b5563; }
 `;
 
@@ -84,7 +86,7 @@ ${body}
 </main>
 <footer class="site-footer">
 <nav aria-label="Policies">${menu(POLICY_LINKS, path)}</nav>
-<p>Questions? Email <a href="mailto:support@kerfdesk.com">support@kerfdesk.com</a>.</p>
+<p>KerfDesk is made and licensed by Johannes Stephanus Stolk, trading as KerfDesk. Questions? Email <a href="mailto:support@kerfdesk.com">support@kerfdesk.com</a>.</p>
 </footer>
 </body>
 </html>

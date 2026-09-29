@@ -8,33 +8,35 @@
 // Licensing follows the owner's settled Free and Pro offer (ADR-524 Amendment
 // 1), with no open-source selling points or repository links.
 
-export const PRINCIPLES = [
-  {
-    icon: 'scan',
-    title: 'Frame-first starts',
-    body: 'Before a normal start, the machine traces a rectangle around the exact job with the laser or spindle off. That finished trace unlocks Start. Job Review findings are warnings for you to weigh.',
-    href: '#frame-first',
-    status: 'shipped-code-and-tests',
-  },
-  {
-    icon: 'tags',
-    title: 'Honest status labels',
-    body: 'When something could read as “works on your machine”, we label how it was actually checked. The app labels its built-in machine profiles too.',
-    href: '#labels',
-  },
-  {
-    icon: 'wifi-off',
-    title: 'Offline and private',
-    body: 'No account, no analytics, no error reporting and no cloud sync. Your projects, machine details and jobs stay on your computer, and the installed web app keeps working offline.',
-    href: '/privacy/',
-  },
-  {
-    icon: 'file-check',
-    title: 'Predictable output',
-    body: 'The same design and settings give byte-identical G-code, and automated tests check it. If a job can’t be built, KerfDesk writes no file and sends nothing to the machine.',
-    href: '#how-it-is-made',
-  },
-];
+export function principles(site) {
+  return [
+    {
+      icon: 'scan',
+      title: 'Frame-first starts',
+      body: 'Before a normal start, the machine traces a rectangle around the exact job with the laser or spindle off. That finished trace unlocks Start. Job Review findings are warnings for you to weigh.',
+      href: '#frame-first',
+      status: 'shipped-code-and-tests',
+    },
+    {
+      icon: 'tags',
+      title: 'Honest status labels',
+      body: 'When something could read as “works on your machine”, we label how it was actually checked. The app labels its built-in machine profiles too.',
+      href: '#labels',
+    },
+    {
+      icon: 'wifi-off',
+      title: 'Offline and private',
+      body: 'No account, no analytics, no error reporting and no cloud sync. Your projects, machine details and jobs stay on your computer, and the installed web app keeps working offline.',
+      href: site.privacyUrl,
+    },
+    {
+      icon: 'file-check',
+      title: 'Predictable output',
+      body: 'The same design and settings give byte-identical G-code, and automated tests check it. If a job can’t be built, KerfDesk writes no file and sends nothing to the machine.',
+      href: '#how-it-is-made',
+    },
+  ];
+}
 
 // [status key, meaning] — keys are lib/components.mjs STATUS entries.
 export const LABELS = [

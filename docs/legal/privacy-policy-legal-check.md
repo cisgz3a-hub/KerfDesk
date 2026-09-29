@@ -1,5 +1,13 @@
 # Legal check: KerfDesk Privacy Policy, general part
 
+> **Superseded.** The page this checked, `kerfdesk-privacy-policy.md`, was replaced on 29
+> September 2026 by the reviewed Privacy Notice (`kerfdesk-privacy-notice.md`), which is now the
+> whole of https://kerfdesk.com/privacy/. That notice meets the four points in section 5 below:
+> it lists restriction and portability, names the transfer safeguards and offers a copy, carries
+> one set of identity, rights and complaint details, and gives the Information Regulator's full
+> contact details. Section 4's facts still apply to it: the Data Privacy Framework list entries and
+> the Cloudflare dashboard's contents are unchecked.
+
 > **Internal working notes. Not legal advice. Do not publish.** Claude (an AI assistant) checked
 > this at the owner's request instead of a lawyer (ADR-247 Amendment 2). Claude is not a lawyer.
 

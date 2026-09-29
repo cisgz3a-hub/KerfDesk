@@ -1,480 +1,462 @@
-# KerfDesk Licence Agreement
+# KerfDesk Terms of Service and Licence Agreement
 
-> **Final form, pending legal checks. Not yet in force.** This agreement takes effect only when
-> KerfDesk Pro goes on sale. Before then, a South African lawyer and a US lawyer should check the
-> clauses listed in `lawyer-review-notes.md`, and the owner must fill in every `[PLACEHOLDER]`.
-> This text is not legal advice. The published version is supplied to the installer as an external
-> terms file (see `scripts/commercial-release-README.md`) and published at
-> https://kerfdesk.com/terms/. Keep it consistent with `kerfdesk-refund-policy.md`,
-> `kerfdesk-privacy-notice.md` and `docs/desktop-commercial-business-decisions.md`.
+Version 1.0. Last updated: [PLACEHOLDER: publication date]
 
-Version 1.0. Last updated: 29 September 2026. In force from: [PLACEHOLDER: the date sales open].
+These terms are an agreement between you and Johannes Stephanus Stolk, trading as KerfDesk. They cover the KerfDesk website, the free KerfDesk apps, and the Pro trial and Pro licences. Please read them before you use KerfDesk. You can download, save and print them (section 25).
+
+> **What is available today**
+>
+> The website, the web app and the free KerfDesk Preview desktop builds are available now.
+>
+> **KerfDesk Pro is not on sale yet, and the Pro trial is not open yet.** The KerfDesk desktop app for Windows, which will carry Pro, has not been released. No checkout is live, and nothing can be bought today. Sections 6 to 11 explain how the trial, Pro licences, buying and refunds will work once they are available.
+>
+> Until Pro goes on sale, the web app and the Preview builds include every tool free of charge, including the tools that will become Pro (section 5.3).
 
 ## The short version
 
-This summary helps you find your way. The numbered sections below are the agreement.
+This summary helps you find your way. The numbered sections below are the terms.
 
-- **Free** has no time limit and no device limit, for personal or business work. It includes all
-  machine control.
-- **Pro** comes with the KerfDesk desktop app for Windows and costs US$49.50 once, plus any tax.
-  You may use every version released during your update period for as long as you like. The web
-  app is Free.
-- Your purchase includes **one year of updates**. Another year costs US$20. Nothing renews
-  automatically.
-- Use Pro on **3 devices at a time**. Deactivate one to move to another.
-- **Try every Pro feature free for 30 days** on each device. You can get a **refund within 14
-  days** of buying.
-- Your licence never blocks machine control and never stops a running job.
-- **Lasers and CNC machines can cause fire and serious injury.** You are responsible for using your
-  machine safely (section 10).
-- KerfDesk comes **without warranty**, and **our liability is limited**, as far as the law allows
-  (sections 11 and 12).
+- **Free** has no time limit and no device limit, for personal or business work. It includes all machine control.
+- **Pro**, once on sale, comes with the KerfDesk desktop app for Windows. It costs US$49.50 once, plus any tax, and includes one year of updates. You may keep using Pro, with no time limit, in every version released during your update period. Another year of updates costs US$20. Nothing renews automatically.
+- You can use Pro on **3 devices at a time**, and move it between devices up to 6 times in any 30 days.
+- You can **try every Pro tool free for 30 days** on each Windows installation, with no card. You can get a **full refund within 14 days** of buying, even after you have used Pro.
+- Paddle.com sells Pro to you as our reseller and merchant of record.
+- A licence never blocks machine control and never stops a running job.
+- **Lasers and CNC machines can start fires and cause blindness, burns, cuts and death. KerfDesk is not a safety device, and its stop buttons are not emergency stops. You must operate your machine safely (section 2).**
+- **What we promise about KerfDesk, and our liability, are limited (sections 14 and 15).** These limits never apply to death or personal injury caused by our negligence or by a defect in KerfDesk, to fraud or gross negligence, or to rights that the law does not let a contract remove. **If you are a consumer, section 16 explains the rights you keep where you live.**
+- **If you use KerfDesk in a business and are not a consumer, you must cover certain claims made against us because of how you use it (section 17).**
+- **You confirm some facts, for example that you are allowed to accept for an organisation (section 1.4) and that export and sanctions rules allow you to use KerfDesk (section 22).**
+- South African law governs these terms. **If you are a consumer, you keep the protection of the laws where you live, and in the EU, the UK and wherever else the law allows, you can use your own courts (section 23).**
 
-## 1. About this agreement
+## 1. About these terms
 
-**1.1** This agreement is between Johannes Stephanus Stolk, of [PLACEHOLDER: physical address],
-South Africa ("we", "us", "our"), and you, the person or organisation that installs, opens or uses
-KerfDesk ("you").
+**1.1 Who we are.** KerfDesk is made and licensed by Johannes Stephanus Stolk, a sole proprietor (an individual, not a company) trading as KerfDesk, of [PLACEHOLDER: street address], South Africa (“we”, “us”, “our”). Section 27 gives all our contact details.
 
-**1.2** You accept this agreement when you tick the box or click to accept it, or when you install,
-activate or use KerfDesk. If you do not accept it, do not install or use KerfDesk.
+**1.2 What these terms cover.** These terms apply to:
 
-**1.3** If you accept this agreement for an organisation, you confirm that you have authority to
-bind it. "You" then means that organisation.
+- the KerfDesk website at https://kerfdesk.com, with its guides, download and support pages (“the website”);
+- the KerfDesk web app at https://kerfdesk.com (“the web app”);
+- the KerfDesk desktop apps: the free KerfDesk Preview builds for Windows and Mac, and the KerfDesk desktop app for Windows (“the desktop app”), with its Free edition, the Pro trial and Pro licences; and
+- their updates, documentation and bundled content.
 
-**1.4** You must be at least 18 to accept this agreement. If you are younger, a parent or guardian
-must accept it for you and supervise your use of any machine.
+In these terms, “KerfDesk” means all of these. Third-party components and earlier versions released under the MIT License have their own licences (section 19).
 
-**1.5** These documents also apply:
+**1.3 How you accept these terms.** You accept these terms when you tick the box or click “I agree” to accept them, for example in the desktop installer, when you first open the web app, or before you buy. We also ask you to confirm separately that you have read the machine-safety section (section 2). If you do not agree, do not install or use KerfDesk. Section 4 applies whenever you use the website.
 
-- our Privacy Notice at https://kerfdesk.com/privacy/, which explains how licensing handles your
-  information (section 15);
-- our Refund Policy at https://kerfdesk.com/refunds/ (section 8); and
-- when you buy, Paddle's buyer terms (section 7).
+**1.4 Organisations.** If you accept these terms for an organisation, you confirm that you have authority to bind it. “You” then means that organisation.
 
-Paddle's buyer terms govern the payment. This agreement governs your use of KerfDesk.
+**1.5 Age.** You must be 18 or older to accept these terms. If you are younger, a parent or guardian must accept them for you and supervise any use of a machine.
 
-## 2. Words we use
+**1.6 Other documents.** These documents also apply:
 
-- **KerfDesk** means the KerfDesk desktop app, the KerfDesk web app at kerfdesk.com, and their
-  updates, documentation and bundled content. It does not include third-party components, which
-  have their own licences (section 16).
-- A **device** is one installation of the desktop app.
-- A version's **release date** is the date we publish for it when we release it. Downloading or
-  installing a version later does not change its release date.
-- Your **update end date** is the last day of your update period. The app's licence screen shows
-  it as "Updates through" a date.
+- our Privacy Notice at https://kerfdesk.com/privacy/, which explains how we handle personal information (section 18);
+- our Refund Policy at https://kerfdesk.com/refunds/ (section 11); and
+- when you buy, Paddle’s Buyer Terms (https://www.paddle.com/legal/buyer-terms), Paddle’s Refund Policy (https://www.paddle.com/legal/refund-policy) and Paddle’s Privacy Policy (https://www.paddle.com/legal/privacy).
+
+Paddle’s terms govern your purchase from Paddle. These terms govern your use of KerfDesk. If these terms and our Refund Policy differ, the one that is better for you applies.
+
+**1.7 Earlier versions.** Versions released before these terms were published came with the KerfDesk License & Safety Notice or with the MIT License (section 19.2). Those versions keep those terms. However, section 15.1 (what we never limit) and section 16 (your legal rights) apply to every version of KerfDesk that we released, whatever terms came with it, but not to copies that someone else has changed. For versions released after these terms were published, these terms replace the License & Safety Notice.
+
+## 2. MACHINE SAFETY: PLEASE READ THIS CAREFULLY
+
+**KerfDesk prepares and sends instructions to lasers, CNC routers and similar machines. These machines can start fires and cause serious injury or death, including permanent eye damage, burns and cuts. They can also damage property. A laser beam, even a reflection, can blind in an instant. Cutting some materials gives off toxic or corrosive fumes. A CNC tool can break or throw material. A mistake in a design, a setting, the software, the connection or the machine can make a machine move or fire when you do not expect it.**
+
+**2.1 What you must do.** You are responsible for operating your machine safely and for the safety of everyone near it. In particular:
+
+- Never leave a running machine unattended.
+- Check every job before you cut real material: review the preview, run Frame, and do an air run when in doubt.
+- Set up and maintain your machine correctly, including its configuration, work holding, enclosure, interlocks, fire safety, ventilation, and fume and dust extraction.
+- Wear eye protection rated for your laser’s wavelength and power, and protect anyone nearby. With a CNC router, wear safety glasses, hearing protection and a dust mask, keep loose clothing, gloves, hair and jewellery away from the tool, keep your hands clear while the spindle runs, and clamp the work securely.
+- Know what you are cutting. Do not cut materials that give off toxic or corrosive fumes, such as PVC or vinyl.
+- Keep a suitable fire extinguisher, and your machine’s own emergency stop, within reach.
+- Follow your machine maker’s instructions and the safety laws and rules that apply where you work.
+
+**2.2 KerfDesk’s stop controls are not emergency stops.** Abort and the other stop controls in KerfDesk are software stops. They depend on your computer, the connection and the machine’s controller, and they may not stop the machine at once. Closing KerfDesk, or reloading the web app (clicking Update in the web app reloads it), stops a running job part-way. Finish or stop a job before you do either. If your computer restarts, shuts down, goes to sleep or loses its connection to the machine during a job, the job stops part-way, and the machine may keep moving, or the laser or spindle may stay on, until you stop it at the machine. Finish or stop a job before you let Windows restart.
+
+**2.3 KerfDesk’s aids are not guarantees.** Material settings, previews, simulations, time estimates, preflight checks and suggestions are aids. They do not guarantee that a job is correct, safe or suited to your machine and material. KerfDesk is not a safety device. Do not rely on it to prevent harm.
+
+**2.4 How far KerfDesk has been tested.** We have not tested KerfDesk with every machine, controller, material or file, and how far each controller and feature has been tested varies a lot. When we wrote these terms, no machine, machine profile or controller had been formally qualified. KerfDesk had been used only for informal jobs on real machines, and most controllers had been tested only against simulators. Photo and image engraving, Ruida file export, rotary output and generated boxes had not had a recorded test on real hardware, and the CNC tools (including V-carve, 3D relief, adaptive clearing and touch-plate probing) had been tested only in software, not on a real router. The Machines page at https://kerfdesk.com/machines/ shows the current status. Treat every new machine, controller, feature and version as untested. Start with an air run and a small test piece.
+
+**2.5 Your confirmation.** Before you first use KerfDesk, and before you buy Pro, we ask you to confirm separately that you have read this section, understand these risks and will operate your machine safely. Your confirmation does not reduce our own legal responsibility for KerfDesk (sections 15.1 and 16).
+
+## 3. Words we use
+
+- A **consumer** is anyone the consumer-protection law of the country, state or province where you live treats as a consumer. For example:
+  - in the EU and the UK, an individual acting mainly for purposes outside their trade, business, craft or profession;
+  - in South Africa, any individual, even one buying for a business, and any company, close corporation, trust or partnership whose asset value and yearly turnover are both below R2 million; and
+  - in the United States, a person who buys or uses KerfDesk mainly for personal, family or household purposes, or anyone else your state’s law treats as a consumer.
+- A **business user** is anyone who uses KerfDesk for a trade, business, craft or profession and is not a consumer.
+- A **device** is one Windows installation on which the desktop app is activated. KerfDesk recognises it by a one-way code made on your computer from Windows’ own installation ID. Reinstalling KerfDesk, or using it from another Windows account on the same Windows installation, does not make a new device. Reinstalling Windows does.
+- A version’s **release date** is the date and time we publish for it in its signed release information when we release it. Downloading or installing the version later does not change its release date.
+- Your **update period** starts when Paddle confirms your payment for Pro and ends exactly one year later, plus any extensions (section 9). The moment it ends is your **update end date**. Help > Licence shows it as “Updates through” a date, in your computer’s local time. A version released later on that last day is not covered.
 - A **covered version** is a version whose release date is on or before your update end date.
-- A **consumer** is a person who buys or uses KerfDesk mainly for personal purposes, or anyone else
-  the law of their country treats as a consumer.
 
-## 3. Editions
+## 4. Using the website
 
-**3.1 Free.** Free includes drawing, text, import, basic tracing, laser cutting and engraving, 2D
-CNC cuts and all machine control. Free needs no licence key, has no time limit and no device limit,
-and may be used for personal or business work. These Free features stay Free in future versions.
+**4.1** You may read, download and print pages of the website for your own personal or business use, and you may link to it.
 
-**3.2 Pro trial.** The trial gives you every Pro feature, free, for 30 days on one device. No
-payment card is needed. The trial starts when you start it in the app and the device registers it
-with our licensing service, which needs an internet connection. It then runs for 30 days in a row,
-whether or not you use KerfDesk. You get one trial per device.
+**4.2** The guides, lessons, material settings, machine information and examples on the website and in KerfDesk are general information. They may not suit your machine, material or situation. Check them against your machine maker’s instructions, and test before you rely on them.
 
-**3.3 Pro licence.** A Pro licence unlocks the Pro features: V-carve, 3D relief, adaptive clearing,
-advanced tracing, camera alignment, the box generator, Design Studio and the G-code Inspector, and
-any other features we mark as Pro. Pro works in the KerfDesk desktop app for Windows. The web app
-includes the Free features only. Section 4 explains how long a licence lasts.
+**4.3** The website links to other sites, such as Paddle’s. We do not control those sites and are not responsible for what they contain.
 
-**3.4 Developer licence.** A developer licence is a free Pro licence that we issue privately to
-named people. It is not sold.
+**4.4** Do not misuse our services. Do not attack, overload, probe or disrupt the website, the web app, the download service (dl.kerfdesk.com) or the licensing service (license.kerfdesk.com), and do not send them automated requests beyond what KerfDesk itself sends. To protect these services, we limit how many requests one internet address can make.
 
-**3.5** The current split between Free and Pro is published at https://kerfdesk.com/pricing/, and
-the app marks Pro tools. Section 17.2 explains how the split may change.
+**4.5** The website’s text, pictures and design belong to us or our licensors. Section 19.3 covers the KerfDesk name and logo.
 
-## 4. Your licence
+**4.6** We may change or stop any part of the website. Section 12.5 covers the availability of our services.
 
-**4.1** If you keep to this agreement, we give you a worldwide (subject to section 20),
-non-exclusive licence to install and use KerfDesk for your own personal or business purposes. You
-may transfer it only as section 6.5 allows. The licence covers:
+## 5. The Free edition
 
-- **Free:** any number of devices;
-- **Pro trial:** the device that registered it, for 30 days;
-- **Pro licence:** up to 3 active devices at the same time (section 6); and
-- **developer licence:** the devices and period for which we issued it.
+**5.1 What Free includes.** Drawing and text, file import, basic tracing, laser cutting and engraving, 2D CNC cuts, and all machine control. Free has no time limit and no device limit, needs no licence key or account, and may be used for personal or business work. These Free features stay free in future versions.
 
-**4.2 Covered versions are yours to use for as long as you like.** A Pro licence does not expire.
-You may keep using every covered version, with all its Pro features, and you may reinstall it.
+**5.2 Your Free licence.** If you keep to these terms, we give you a free, non-exclusive licence to install and use KerfDesk without a Pro licence, anywhere except where section 22 forbids it, on any number of devices, for your own personal or business work. This covers the Free edition and every other tool that a free version of KerfDesk includes (section 5.3).
 
-**4.3 Updates.** Your purchase includes one year of updates. Your update end date is one year after
-the date you buy. You can extend it (section 5).
+**5.3 Before and after Pro goes on sale.**
 
-**4.4 Versions released after your update end date** still run their Free features. Their Pro
-features stay locked until you extend your updates. Your covered versions keep working.
+- **Today**, before Pro goes on sale, the web app and the Preview builds include every tool free of charge, including the tools that will become Pro.
+- **When Pro goes on sale**, new versions of the web app and of the free desktop builds will include the Free features only. The Pro tools will then work only in the desktop app for Windows, with a trial or a licence. We will announce the date on the website at least 14 days before it happens.
+- Free desktop builds you have already installed keep the tools they came with. The web app changes when it updates (section 12.1).
+- Projects you made with Pro tools keep opening, previewing, framing and running in Free. You need Pro only to open a Pro tool or to choose a Pro option again.
 
-**4.5 Desktop downloads.** We keep covered desktop versions available for you to download for as
-long as we run the KerfDesk download service. Keep a copy of any installer you rely on.
+**5.4 The desktop app without a licence.** The desktop app for Windows runs the Free edition whenever it has no active trial or licence.
 
-**4.6 The web app.** The web app includes the Free features only, and we host only its current
-version. Pro works in your covered desktop versions.
+## 6. The Pro trial
 
-**4.7 When a trial or update period ends,** only Pro tools lock, and only for new work. Free keeps
-working. Your licence status never blocks machine control and never stops a running job. We never
-delete your files.
+*Not open yet. The trial starts working when the desktop app for Windows is released.*
 
-**4.8 Ownership.** We and our licensors own KerfDesk and all rights in it. You receive a licence,
-not ownership. We claim no rights in the designs, files and G-code you make with KerfDesk.
+**6.1 What you get.** Every Pro tool, free, for 30 days, in the desktop app for Windows, on one device. No payment card or payment details are needed. We offer the trial ourselves.
 
-## 5. Extending updates
+**6.2 How it starts.** In the desktop app, choose Help > Licence, then Start free 30-day Pro trial. Starting needs an internet connection, because the device registers the trial with our licensing service, and your computer’s clock must be correct to within a few minutes. The trial then runs for 30 days in a row, whether or not you use KerfDesk.
 
-**5.1** You can extend your updates by one year for US$20, plus any tax. We add the year to your
-current update end date. If that date has already passed, the new year starts on the day you pay.
+**6.3 One trial per device.** Reinstalling KerfDesk, resetting its saved licence, or using another Windows account on the same Windows installation brings back the same trial with its original end date. Do not change, reset or fake a device’s identity, clock or stored data to get another trial or to make one last longer. If your computer’s clock is set back during a trial, the Pro tools lock, from the next time KerfDesk starts, until the clock is right.
 
-**5.2** An extension applies to your existing licence key, so you do not get a new key. The app sees
-the new date the next time it connects to our licensing service.
+**6.4 When it ends.** The Pro tools lock. If KerfDesk is open when the trial ends, they stay available until you close it. Free keeps working, and so do your projects (section 5.3).
 
-**5.3** Once you extend, versions released while your updates had lapsed become covered, as long as
-their release date is on or before your new update end date.
+## 7. The Pro licence
 
-**5.4** An extension is optional. It is not a subscription, and it never renews automatically. You
-are never charged unless you choose to buy.
+*Not on sale yet.*
 
-## 6. Activation, devices and transfers
+**7.1 What Pro unlocks.** V-carve, 3D relief, adaptive clearing, advanced tracing, camera alignment, the box generator, Design Studio and the G-code Inspector, and any new tools we mark as Pro in future versions. The current split between Free and Pro is at https://kerfdesk.com/pricing/, and the app marks Pro tools.
 
-**6.1** To use a Pro licence on a device, activate it in the app with your licence key. Activation
-needs an internet connection once. After that, the device keeps working offline. When the device is
-online, the app may check your licence with our licensing service, for example to pick up an update
-extension.
+**7.2 Where Pro works.** Only in the desktop app for Windows (Windows 10 or 11, 64-bit). Pro is not available in the web app or in the Preview builds once Pro goes on sale (section 5.3).
 
-**6.2** Up to 3 devices can be active on one licence at the same time. Each installation of the
-desktop app counts as one device.
+**7.3 Your licence.** If you keep to these terms, we give you a non-exclusive licence to install and use KerfDesk with Pro, anywhere except where section 22 forbids it, for your own personal or business purposes, on up to 3 devices at a time (section 8). You get a licence to use the software, not ownership of it. Your licence can end only in the ways these terms describe: a refund (section 11.4), a reversed payment (section 11.5), a transfer to someone else (section 8.8), your ending it under your legal rights (section 16), or termination for a serious breach (section 21).
 
-**6.3** To move your licence, deactivate a device in the app (in the desktop app: Help > Licence,
-then **Deactivate this device**), then activate the new device. If a device is lost, stolen or
-broken and you cannot deactivate it, contact us (section 24). We will deactivate it once we are
-reasonably satisfied that the request is genuine. We may refuse requests that look like abuse.
+**7.4 No time limit on covered versions.** A Pro licence does not expire. You may keep using Pro in every covered version, and reinstall covered versions, for as long as you like. Three practical limits apply: activating a new device needs our licensing service (section 12.6 says what we will do if it ever closes); if you ask us to delete your licence records, the licence can no longer activate any device, and a device that checks in while we carry out your request loses Pro (our Privacy Notice explains this); and we cannot promise that future versions of Windows will run older versions of KerfDesk.
 
-**6.4** A licence belongs to the person or organisation that bought it. If an organisation owns it,
-its employees and contractors may use it for the organisation, within the device limit.
+**7.5 One year of updates.** Your purchase includes one year of updates: every new version released during your update period is a covered version. You can extend your updates (section 9).
 
-**6.5** You may not sell, give or transfer a licence to anyone else without our written consent. If
-you want to transfer a whole licence, for example because you are selling your business or your
-machine, contact us. If we agree, you must deactivate all your devices before the transfer.
+**7.6 Versions released after your update end date** still run their Free features, but their Pro tools stay locked unless you extend your updates. On a paid licence, the desktop app does not install these versions automatically, so an automatic update never takes your Pro tools away. Your covered versions keep Pro. Section 12.4 explains how we fix faults free of charge.
 
-**6.6** You may use one Pro trial per device. Do not restart or extend a trial by changing,
-resetting or faking a device's identity, clock or stored data.
+**7.7 Downloading covered versions.** We keep covered desktop versions available to download, under “Earlier versions” on the download page, for as long as we run the KerfDesk download service. Keep a copy of any installer you rely on.
 
-## 7. Price, payment and taxes
+**7.8 Your work.** When a trial ends, or when you run a version released after your update end date, only the Pro tools lock. This never deletes or locks your files or projects, never blocks machine control and never stops a running job. We claim no rights in the designs, files and G-code you make with KerfDesk.
 
-**7.1 Paddle is our reseller.** Our order process is run by our online reseller, Paddle (Paddle.com
-Market Limited, or the Paddle company named on your receipt). Paddle is the merchant of record for
-all our orders. Paddle takes your payment, issues your receipt or invoice, charges and pays any
-sales tax or VAT, and processes refunds. Paddle's buyer terms at
-https://www.paddle.com/legal/checkout-buyer-terms apply to your purchase. Paddle handles questions
-about payments, receipts and refunds. We grant your licence and handle questions about KerfDesk.
+**7.9 Developer licences.** A developer licence is a free Pro licence that we issue privately to named people. It is not sold. It covers the devices and period for which we issued it.
 
-**7.2 Prices.** A Pro licence costs US$49.50, paid once. An update extension costs US$20. Prices are
-in US dollars and do not include sales tax or VAT. Paddle adds any tax that applies where you live
-and shows the total before you pay. Your bank may charge its own fees, for example for currency
-conversion.
+**7.10 Ownership.** We and our licensors own KerfDesk and all rights in it, apart from the rights these terms give you.
 
-**7.3 Delivery.** Once Paddle confirms your payment, our licensing service issues your licence key
-and the app can activate it. This usually takes a few minutes. Keep your licence key safe: you need
-it to activate other devices.
+## 8. Devices: activating and moving your licence
 
-**7.4 If checkout seems to fail, do not pay again.** Contact us and we will match your original
-order.
+**8.1 Activation.** To use a Pro licence on a device, enter your licence key in Help > Licence. Activation needs an internet connection once, and your computer’s clock must be correct to within a few minutes. After that, the device keeps working offline.
 
-**7.5 Price changes.** We may change prices for future purchases. A change never affects a purchase
-you have already made.
+**8.2 Licence checks.** While KerfDesk is open and the device is online, the app checks your licence with our licensing service about once a week, and whenever you choose Refresh licence. A check picks up changes such as an update extension. If a check finds that your licence has been cancelled (sections 11 and 21), or that this device was removed from the licence, the Pro tools lock on this device from the next time KerfDesk starts. If our service cannot be reached, your saved licence keeps working.
 
-## 8. Refunds
+**8.3 Three devices at a time.** Up to 3 devices can be active on one licence at the same time. A device that could not reach us when you deactivated it still counts until its place is freed. Help > Licence lets you retry, or you can contact us.
 
-**8.1** You can ask for a full refund within 14 days of buying a Pro licence or an update extension.
-You do not need to give a reason.
+**8.4 Moving your licence.** On the device you are leaving, choose Help > Licence, then Deactivate this device. Then activate the new device with your key. You can free a device in this way up to 6 times in any 30 days. After that, a deactivation is refused and the device stays active until 30 days have passed since the earliest of those 6. Contact us if you need help. Trials and developer licences have no such limit.
 
-**8.2** After 14 days, we do not refund because you changed your mind. You can try every Pro feature
-free for 30 days before you buy, so please use the trial to check that KerfDesk suits your machine
-and your work. After 14 days we still refund:
+**8.5 Lost, stolen or broken devices.** KerfDesk does not yet let you free another device’s place from the app. Contact us (section 27). Once we are reasonably satisfied that the request is genuine, we will free it. We may refuse requests that look like abuse.
 
-- where the law requires it;
+**8.6 Keep your key safe.** Help > Licence shows your licence key on every device activated with it. You need the key to activate other devices. If you lose it, we can send it again to the buyer.
+
+**8.7 Organisations.** A licence belongs to the person or organisation that bought it. An organisation’s employees and contractors may use its licence for its work, within the device limit.
+
+**8.8 Transferring a licence.** You may transfer your whole licence, with any remaining update period, to another person or organisation. First deactivate all your devices, stop using the Pro tools and give the new owner the licence key. You may not split a licence between people.
+
+- **If you live in the EU,** tell us about the transfer by email. You do not need our consent.
+- **Everyone else** must ask us first. We will not refuse without a good reason.
+
+The new owner then takes your place under these terms.
+
+## 9. Extending updates
+
+**9.1** You can extend your updates by one year for US$20, plus any tax. Buy the extension in Help > Licence (Renew updates) on a device activated with your licence.
+
+**9.2** We add the year to your current update end date. If that date has already passed, the new year starts when Paddle confirms your payment.
+
+**9.3** You keep the same licence key. The device you bought on shows the new date when you choose Check payment. Your other devices pick it up when you choose Refresh licence, or at their next weekly check.
+
+**9.4** Once you extend, versions released while your updates had lapsed become covered, as long as their release date is on or before your new update end date.
+
+**9.5** An extension is optional. It is not a subscription, it never renews automatically, and there is no minimum period. You are never charged unless you choose to buy.
+
+## 10. Buying Pro
+
+*Not open yet. No checkout is live, and nothing can be bought today.*
+
+**10.1 Paddle is our reseller.** Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant of Record for all our orders. Paddle provides all customer service inquiries and handles returns.
+
+In practice, Paddle handles questions about orders, payments, receipts, invoices, tax and refunds (https://paddle.net), and we handle questions about using KerfDesk and getting your licence to work (section 20). You buy from the Paddle company named on your receipt: Paddle.com Inc. if you are in the United States, Paddle.com (Canada) Ltd if you are in Canada, and Paddle.com Market Limited everywhere else. We license KerfDesk to you under these terms.
+
+**10.2 How to buy.** In the desktop app, choose Help > Licence, then Buy Pro (or Renew updates). Your browser opens our checkout page at https://kerfdesk.com/buy.html, where Paddle’s secure checkout shows what you are buying. You pay by card or another method Paddle offers in your country. Before you pay, Paddle’s checkout shows the total, including tax. You can correct your details there, or close the checkout without paying. After you pay, return to KerfDesk and choose Check payment.
+
+**10.3 Prices and tax.** A Pro licence costs US$49.50, paid once. An update extension costs US$20. Prices are in US dollars and do not include sales tax or VAT. Paddle adds the tax that applies where you live (for example, 15% VAT in South Africa) and shows the full price, including tax, before you pay. We charge no other fees. Your bank may charge its own fees, for example for currency conversion.
+
+**10.4 Payment security.** You enter your payment details only in Paddle’s checkout. We never see or store them. Our licensing service does not store your licence key itself, only a keyed one-way code made from it.
+
+**10.5 Delivery.** Your licence is issued as soon as Paddle confirms your payment, usually within minutes. Choose Check payment in Help > Licence on the computer where you started checkout, then copy your licence key and keep it safe. If you started checkout on a computer you no longer have, or anything else goes wrong, contact us with your order number or Paddle receipt. If we fail to deliver a working licence, you are entitled to a working licence or a full refund. If you still do not have a working licence 30 days after paying, you may also cancel the purchase by giving us 7 days’ notice by email, and we will ask Paddle to refund you in full.
+
+**10.6 If checkout seems to fail, do not pay again.** Contact us, and we will find your original order.
+
+**10.7 Your record of the purchase.** Paddle emails you a receipt for every purchase. It is your full record of the purchase, so keep it for as long as you need it. You can also find your purchases at https://paddle.net. Help > Licence shows your licence key and your “Updates through” date.
+
+**10.8 Price changes.** We may change prices for future purchases. A change never affects a purchase you have already made.
+
+## 11. Refunds
+
+**11.1 14 days, no reason needed.** You can get a full refund of a Pro licence or an update extension if you ask within 14 days of buying it, that is, by the end of the 14th day after the day you buy. You do not need to give a reason. This applies even if you have already activated or used Pro.
+
+**11.2 How to ask.** Email support@kerfdesk.com with your order number or Paddle receipt, or use the link in your Paddle receipt or https://paddle.net. We cannot pay refunds ourselves: Paddle, as the seller, pays every refund. When you ask us, we ask Paddle to refund you. Paddle normally returns the money to the payment method you used, within 14 days of approving the refund. How long it then takes to reach you depends on your bank. If Paddle turns down a refund that this section promises, tell us, and we will ask Paddle again. Paddle may also give refunds under its own Refund Policy.
+
+**11.3 After 14 days.** We do not refund because you changed your mind after 14 days. You can try every Pro tool free for 30 days before you buy, so please use the trial to check that KerfDesk suits your machine and your work. After 14 days we still refund:
+
+- where the law gives you a right to a refund, for example if Pro has a fault that is not fixed (section 16);
 - if you were charged twice or charged the wrong amount; or
-- if your licence will not work and we cannot fix the problem within a reasonable time.
+- if we fail to deliver a working licence (for example, it cannot be activated because of a problem on our side) and cannot put this right within a reasonable time.
 
-**8.3** To ask for a refund, use the link in your Paddle receipt, or contact us (section 24). Paddle
-refunds the full amount, including any tax you paid, to your original payment method.
+**11.4 After a refund.** A refund of a Pro licence ends that licence, and we also refund any update extension you bought for it. We then cancel the licence in our licensing service: its key can no longer activate a device, and each device loses Pro after its next online licence check (about once a week while KerfDesk is open), from the next time KerfDesk starts. A device kept offline keeps its saved licence until it next connects, so you must deactivate the licence on every device yourself and stop using the Pro tools. A refund of an update extension ends that extra year: your licence then covers only versions released on or before your earlier update end date, and you must not use Pro in later versions. Free keeps working.
 
-**8.4** A refund ends the licence. A refund of an update extension removes that extra year. After a
-refund you must deactivate the licence on every device and stop using the Pro features it unlocked.
-Activated licences also work offline, so we rely on you to do this. We may block a refunded licence
-key so that it can no longer be activated or refreshed.
+**11.5 Payment disputes.** If something is wrong with a payment, please contact us or Paddle before you dispute it with your bank or card issuer. It is usually faster. If Paddle reasonably believes a dispute is fraud or an abuse, for example a claim that you never received a licence you are using, we may suspend your licence while Paddle reviews it, which locks Pro on each device after its next online check, from the next time KerfDesk starts. If the payment stands, we restore the licence; you may then need to enter your licence key again on each device, and we will send it to you if you no longer have it. If the payment is reversed, the licence ends as if it had been refunded.
 
-**8.5** If you have a problem with a payment, please contact us before you dispute it with your bank
-or card issuer. While a dispute is open, we may suspend the licence. If the payment is reversed, the
-licence ends as if it had been refunded.
+**11.6 Fair use.** We may refuse a refund under section 11.1 where there is clear evidence of abuse, such as repeatedly buying and refunding licences. This never limits a refund that the law requires.
 
-**8.6** We may refuse a refund where there is clear evidence of abuse, such as repeatedly buying and
-refunding licences, unless the law requires the refund.
+**11.7 Your legal rights.** This section adds to the rights the law gives you. It does not reduce them.
 
-**8.7** This section does not reduce any refund or cancellation right you have under the law where
-you live.
+- **Consumers in the EU and the UK** have a legal right to cancel within 14 days. You can use it by telling us or Paddle (https://paddle.net, also linked from your receipt); in the EU, Paddle’s customer portal also has a withdrawal button. Under the law, that right can end once you start using Pro, if you agreed to this at checkout. Our refund in section 11.1 still applies.
+- **Consumers in South Africa** may cancel an online purchase within 7 days after receiving it under section 44 of the Electronic Communications and Transactions Act, where that section applies. Our 14-day refund covers that right; if your licence reaches you late, you still have the full 7 days after you receive it. Section 16.2 explains your rights if Pro has a defect.
 
-## 9. What you may not do
+## 12. Updates, changes and availability
+
+**12.1 How updates arrive.**
+
+- The desktop app for Windows checks for new versions and downloads them in the background. A new version installs only when you close KerfDesk. Nothing restarts KerfDesk or installs an update during a job. You cannot currently turn automatic downloads off.
+- On a paid licence, the desktop app installs only covered versions automatically. Without a licence, or after a trial ends, it installs every new version, which runs as Free.
+- You can choose “Get new versions early (beta)” in the app to receive new versions a few days before everyone else. Beta versions have had less testing.
+- The Preview builds never update themselves. You install new ones by hand from the download page.
+- The web app waits to update until you click Update or close every KerfDesk tab. Clicking Update reloads the web app, which stops a running job (section 2.2).
+
+**12.2 Changes to Free and Pro.** Future versions may add or improve features. We may move a feature from Pro to Free at any time. We will never move a feature from Free to Pro, or remove it, in a version already released, and the Free features in section 5.1 stay free. (The change in section 5.3 is not a move from Free to Pro: those are Pro tools that are free only until Pro goes on sale.) In a new version released during your update period, we will not remove a Pro feature or make it significantly worse unless we must for safety, security or legal reasons. If we must, we will tell you in advance. You can also keep using an earlier covered version that still has it (section 7.7). If such a change means Pro no longer does what we described when you bought it, you have the rights in section 16. A change never reduces what your licence covers in the versions it already covers.
+
+**12.3 Changes to these terms.** Section 24 explains how we may change these terms.
+
+**12.4 Fixes for faults.** If a covered version has a fault, including a security flaw, and the law where you live gives you a right to have it fixed (section 16), we will fix it free of charge within a reasonable time. If the fix is only in a version released after your update end date, we will extend your update period free of charge so that your licence covers that version. For consumers in the EU, this applies to faults that show up within at least two years after we supplied the version, or longer where your country’s law says so. To benefit from a fix, you need to install the version that contains it.
+
+**12.5 Availability.** We aim to keep the website, the web app, downloads and the licensing service available, but we do not promise that they will always be available or free of errors. The desktop app needs none of our servers to use Free, or to use Pro on a device that is already activated.
+
+**12.6 If we stop licensing.** If we ever stop running the licensing service, we will make reasonable efforts to give licence holders a way to keep using their covered versions on new devices, for example an update that no longer needs online activation.
+
+**12.7 Preview and beta versions** are more likely to contain errors. Use them with extra care, and never unattended.
+
+## 13. What you may not do
 
 You may not, and may not help anyone else to:
 
-- share, publish, sell or give away a licence key, or use one on more devices than section 6
-  allows;
-- remove, bypass, disable or tamper with licensing, activation, trial or update checks, or
-  interfere with our licensing service;
-- restart or extend a trial by changing a device's identity, clock or stored data;
-- rent, lease, lend, sell, resell or sublicense KerfDesk, or offer it to others as a hosted
-  service;
-- copy KerfDesk, except to install and use it under this agreement and to keep backup copies of
-  installers;
-- distribute copies of KerfDesk, changed or unchanged (you are welcome to send people to
-  kerfdesk.com instead);
-- modify, decompile, disassemble or reverse engineer KerfDesk, except as the law or an open-source
-  licence allows (section 16);
+- share, publish, sell or give away a licence key, or use one on more devices than section 8 allows;
+- remove, bypass, disable or tamper with licensing, activation, trial or update checks, or interfere with our licensing service;
+- rent, lease, lend, sell, resell or sublicense KerfDesk, or offer it to others as a hosted service, except for a transfer under section 8.8;
+- copy KerfDesk, except to install and use it under these terms and to keep backup copies of installers;
+- distribute copies of KerfDesk, changed or unchanged (you are welcome to send people to kerfdesk.com instead);
+- modify, decompile, disassemble or reverse engineer KerfDesk, except as the law or an open-source licence allows (section 19);
 - remove or change copyright, licence or safety notices; or
-- use KerfDesk in breach of any law, including export control and sanctions laws (section 20).
-
-Nothing in this section limits what the law or an open-source licence allows you to do.
-
-## 10. Machine safety: please read this carefully
-
-**KerfDesk prepares and sends instructions to lasers, CNC routers and similar machines. These
-machines can start fires, cause serious injury, including permanent eye damage, burns and cuts, and
-damage property. A laser beam, even a reflection, can blind in an instant. Cutting some materials
-gives off toxic or corrosive fumes. A CNC tool can break or throw material. A mistake in a design,
-a setting, the software, the connection or the machine can make a machine move or fire when you do
-not expect it.**
-
-You are solely responsible for operating your machine safely, and for the safety of everyone near
-it. In particular:
-
-- Never leave a running machine unattended.
-- Check every job before you cut real material: review the preview, run the Frame check, and do an
-  air run when in doubt.
-- Set up and maintain your machine correctly, including its configuration, work holding,
-  enclosure, interlocks, fire safety, ventilation and fume extraction.
-- Wear eye protection rated for your laser's wavelength and power, and protect anyone nearby.
-- Know what you are cutting. Do not cut materials that give off toxic or corrosive fumes.
-- Keep a suitable fire extinguisher and the machine's own emergency stop within reach.
-- **The stop controls in KerfDesk, such as Abort, are software stops, not emergency stops.** They
-  depend on your computer, the connection and the machine's controller, and they may not stop the
-  machine at once.
-- Follow your machine manufacturer's instructions and the safety laws and rules that apply where
-  you work.
-- Material settings, previews, simulations, estimates, preflight checks and suggestions are aids,
-  not guarantees that a job is correct, safe or suited to your machine and material.
-- KerfDesk is not a safety device. Do not rely on it to prevent harm.
-
-**When you accept this agreement, you confirm that you have read this section, that you understand
-these risks, and that you accept responsibility for operating your machine safely.**
-
-## 11. No warranty
-
-**TO THE FULLEST EXTENT THE LAW ALLOWS, KERFDESK IS PROVIDED "AS IS", "AS AVAILABLE" AND WITH ALL
-FAULTS, WITHOUT WARRANTY OF ANY KIND. WE DISCLAIM ALL WARRANTIES, GUARANTEES AND CONDITIONS, WHETHER
-EXPRESS, IMPLIED OR STATUTORY, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY, SATISFACTORY
-QUALITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE OR NON-INFRINGEMENT.**
-
-In plain words: we do not promise that KerfDesk is free of errors or will run without interruption.
-We do not promise that its output, including designs, toolpaths, G-code, previews, estimates and
-settings, is correct, safe or suited to your machine or material, or that KerfDesk works with every
-machine, controller or file. This is why every Pro feature has a free 30-day trial: please check
-that KerfDesk suits your machine and your work before you buy.
-
-Some laws give consumers guarantees or warranties that a contract cannot exclude. This section does
-not take those away (section 14).
-
-## 12. Limitation of liability
-
-**TO THE FULLEST EXTENT THE LAW ALLOWS:**
+- use KerfDesk in breach of any law, including export control and sanctions laws (section 22).
 
-**(a) WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE
-DAMAGES, OR FOR ANY LOSS OF PROFIT, REVENUE, BUSINESS, GOODWILL OR DATA, WASTED MATERIAL, DAMAGE TO
-MACHINES, TOOLS OR OTHER PROPERTY, OR BUSINESS INTERRUPTION, ARISING FROM OR RELATED TO KERFDESK OR
-THIS AGREEMENT, EVEN IF WE WERE TOLD SUCH LOSS WAS POSSIBLE; AND**
+Nothing in this section limits what the law or an open-source licence allows you to do. For example, in the EU and the UK, a lawful user may make a backup copy they need, observe, study and test how KerfDesk works while using it, and decompile it where the law allows this to make another program work with it.
 
-**(b) OUR TOTAL LIABILITY FOR ALL CLAIMS ARISING FROM OR RELATED TO KERFDESK OR THIS AGREEMENT IS
-LIMITED TO THE GREATER OF (i) THE AMOUNT YOU PAID FOR KERFDESK IN THE 12 MONTHS BEFORE THE EVENT
-THAT GAVE RISE TO THE CLAIM, AND (ii) US$50.**
+## 14. NO WARRANTY
 
-These limits apply whatever the legal basis of the claim, including contract, delict, tort
-(including negligence) and strict liability.
+**14.1 Who this section applies to. If you are a consumer in the EU, the UK, South Africa or Australia, sections 14.2 and 14.3 do not apply to you. Section 16 explains what we promise you instead.** For everyone else, this section applies as far as the law where you live allows (section 16).
 
-These limits do not apply to liability that the law does not allow us to limit or exclude, such as
-liability for fraud, for gross negligence or wilful misconduct, or, where the law requires, for
-death or personal injury caused by our negligence. In those cases our liability is limited only as
-far as the law allows.
+**14.2 KERFDESK IS PROVIDED “AS IS”, “AS AVAILABLE” AND WITH ALL FAULTS. EXCEPT FOR THE PROMISES WE MAKE IN THESE TERMS, WE GIVE NO WARRANTIES, GUARANTEES OR CONDITIONS, WHETHER EXPRESS, IMPLIED OR STATUTORY, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY, QUALITY, SATISFACTORY QUALITY, FITNESS FOR A PARTICULAR PURPOSE, ACCURACY, TITLE, QUIET ENJOYMENT, SYSTEM INTEGRATION OR NON-INFRINGEMENT. THERE IS NO WARRANTY THAT KERFDESK, OUR EFFORTS OR THE SYSTEM WILL FULFIL ANY OF YOUR PARTICULAR PURPOSES OR NEEDS. THERE IS NO WARRANTY AGAINST INTERFERENCE WITH YOUR ENJOYMENT OF KERFDESK OR AGAINST INFRINGEMENT. THE ENTIRE RISK AS TO THE QUALITY, PERFORMANCE, ACCURACY AND EFFORT OF KERFDESK IS WITH YOU. IF KERFDESK PROVES DEFECTIVE, YOU, AND NOT WE, ASSUME THE ENTIRE COST OF ANY NECESSARY SERVICING, REPAIR OR CORRECTION.**
 
-The price of Pro, and the fact that Free costs nothing, reflect these limits.
+**14.3 In plain words:** we do not promise that KerfDesk is free of errors or will run without interruption. We do not promise that its output (designs, toolpaths, G-code, previews, estimates and settings) is correct, safe or suited to your machine or material. We do not promise that KerfDesk works with every machine, controller, file or computer, or that it meets your particular needs. If KerfDesk has a fault, we do not have to fix it or pay for it, unless these terms or the law say otherwise. This is why Pro has a free 30-day trial: please check that KerfDesk suits your machine and your work before you buy.
 
-## 13. If you use KerfDesk in a business: your indemnity
+## 15. LIMITS ON OUR LIABILITY
 
-**If you use KerfDesk for a business, you will compensate us for any loss, damage and reasonable
-legal costs we suffer from a claim by someone else, such as your staff or your customers, that
-arises from how you operate your machine, from things you make with KerfDesk, or from your breach
-of this agreement.** This does not apply to the extent the claim was caused by our fraud, gross
-negligence or wilful misconduct. This section does not apply to consumers.
+**15.1 What we never limit. Nothing in these terms, or in any terms that came with an earlier version we released, excludes or limits our liability for:**
 
-## 14. Your legal rights
+- **death or personal injury caused by our negligence or by a defect in KerfDesk;**
+- **fraud or fraudulent misrepresentation;**
+- **gross negligence, wilful misconduct, or harm we cause on purpose; or**
+- **anything else the law does not allow us to exclude or limit, including liability under product-liability laws (such as section 61 of South Africa’s Consumer Protection Act and the EU rules on defective products) and under the consumer laws described in section 16.**
 
-Nothing in this agreement removes or limits a right that the law does not allow a contract to
-remove or limit. This includes consumer rights under the law of the country where you live, such as
-guarantees of quality, cooling-off and cancellation rights, and rights to claim for harm caused by
-defective goods. Where the law lets us limit such a right, our liability is limited to repairing or
-replacing KerfDesk, or refunding what you paid for it.
+**15.2 Who sections 15.3 and 15.4 apply to.** They apply to business users. For consumers, they do not apply in the EU, the UK or Australia; in South Africa and the United States they apply only as far as section 16 allows; and elsewhere they apply only as far as the law where you live allows. They never apply to anything listed in section 15.1.
 
-## 15. Privacy
+**15.3 WE ARE NOT LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFIT, REVENUE, BUSINESS, GOODWILL OR DATA, WASTED MATERIAL, DAMAGE TO MACHINES, TOOLS OR OTHER PROPERTY, OR BUSINESS INTERRUPTION, ARISING FROM OR RELATED TO KERFDESK OR THESE TERMS, EVEN IF WE WERE TOLD SUCH LOSS WAS POSSIBLE.**
 
-KerfDesk does not upload your projects, drawings, toolpaths, or machine or job data, and it has no
-analytics or telemetry. To register a trial, or to activate, check or deactivate a licence, the app
-sends our licensing service at https://license.kerfdesk.com only:
+**15.4 OUR TOTAL LIABILITY FOR ALL CLAIMS ARISING FROM OR RELATED TO KERFDESK OR THESE TERMS IS LIMITED TO THE GREATER OF (A) THE AMOUNT YOU PAID FOR KERFDESK IN THE 12 MONTHS BEFORE THE EVENT THAT GAVE RISE TO THE CLAIM, AND (B) US$50.**
 
-- your licence and activation credentials;
-- order details from your purchase;
-- an installation digest: a one-way hash of your device's installation identity, made on your
-  device; and
-- a generic device label, not your computer's name.
+**15.5** Sections 15.3 and 15.4 apply whatever the legal basis of the claim: a contract, or a claim for harm that is not based on a contract (called “delict” in South Africa and “tort” in many other countries), including negligence and strict liability.
 
-KerfDesk works offline. A trial starts when the device first registers it online. Paddle handles
-your payment details under its own privacy notice. Our Privacy Notice at
-https://kerfdesk.com/privacy/ explains what we keep, for how long, and your rights.
+**15.6 In plain words:** where sections 15.3 and 15.4 apply to you, we do not pay for losses that follow indirectly from a problem, such as lost profits, spoiled material, or damage to your machine, tools or other property. The most we pay for all claims together is what you paid us in the last 12 months, or US$50 if that is more. But we always remain responsible for death or personal injury caused by our negligence or by a defect in KerfDesk, for fraud, gross negligence and harm we cause on purpose, and for anything else the law does not let us limit.
 
-## 16. Third-party components, open source and earlier MIT versions
+**15.7** The price of Pro, and the fact that Free costs nothing, reflect these limits.
 
-**16.1** KerfDesk includes third-party components, such as open-source libraries and fonts, under
-their own licences. The third-party notices shipped with KerfDesk list them. Those licences govern
-those components, and nothing in this agreement limits your rights under them.
+## 16. YOUR LEGAL RIGHTS WHERE YOU LIVE
 
-**16.2** KerfDesk versions released up to and including the version tagged "mit-final" in the
-KerfDesk source repository, the last version before KerfDesk's licence changed on 29 September 2026,
-were released under the MIT License. Your rights in those versions come from the MIT License, not from this
-agreement, and this agreement does not reduce them. This agreement covers KerfDesk versions released
-after that version.
+**16.1 Everyone.** Nothing in these terms removes or limits a right that the law where you live does not allow a contract to remove or limit. Where this section gives you more than sections 14 and 15, this section applies.
 
-**16.3** The KerfDesk name and logo are ours. Neither this agreement nor the MIT License gives you
-any right to use them, except to refer accurately to KerfDesk.
+**16.2 If you are a consumer in South Africa:**
 
-## 17. Updates, changes and availability
+- **Quality.** Under the Consumer Protection Act, Pro must be reasonably suitable for its usual purposes, of good quality, in good working order and free of defects (section 55). If Pro has a defect, you may, within six months after you receive it, tell us, stop using it and choose whether we fix it, replace it or refund what you paid (section 56). If the defect is still there within three months after a fix, or a new defect appears, we must replace Pro or refund what you paid. These rights are in addition to our 14-day refund.
+- **Harm caused by KerfDesk.** Nothing in these terms limits a claim under section 61 of the Consumer Protection Act for harm, including death, injury, illness and loss of or damage to property, caused by unsafe goods, a defect or hazard, or inadequate instructions or warnings.
+- **Our limits.** Sections 15.3 and 15.4 apply to you only as far as the Consumer Protection Act allows, and never to a claim under section 61, to loss caused by our gross negligence, or to death or personal injury caused by any act or omission of ours.
+- **Cooling-off.** Section 11.7 explains your cooling-off right. The consumer protections of the Electronic Communications and Transactions Act apply whatever law governs these terms.
+- **Indemnity.** Section 17 does not apply to you.
+- **Complaints.** You may complain to the Consumer Goods and Services Ombud (which first asks you to give us 15 business days to resolve your complaint), and at any time to the National Consumer Commission or a provincial consumer court, to the National Consumer Tribunal where the Act allows you to go to it directly, or, about personal information, to the Information Regulator (section 23.5).
 
-**17.1 Updates.** The desktop app installs an update only when you choose to quit it. An update
-never interrupts a running job. The web app waits to update until you click Update or close every
-KerfDesk tab.
+**16.3 If you are a consumer in the EU or the UK,** sections 14.2, 14.3, 15.3 and 15.4 do not apply to you. Instead:
 
-**17.2 Changes to Free and Pro.** Future versions may add, change or remove features. We may move a
-feature from Pro to Free at any time. We will never move a feature from Free to Pro, or remove it,
-in a version already released, and the Free features listed in section 3.1 stay Free in future
-versions. A change never reduces what your licence covers in the versions it already covers.
+- **What we promise.** If you paid for Pro, it must match its description and the information we gave you before you bought it, be fit for its purpose, and be of satisfactory quality (UK) or conform to the contract as EU law requires. In the EU, you are also entitled to the updates, including security updates, needed to keep it that way for as long as you can reasonably expect (section 12.4).
+- **If Pro has a fault,** you are entitled to have it fixed or replaced free of charge within a reasonable time. If that is impossible, or fails, or takes too long, you are entitled to a price reduction or, where the law allows, to end the contract and get your money back. In the EU, we are responsible for faults that existed when we supplied the version and show up within two years, or longer where your country’s law says so. In the UK, you can usually bring a claim up to six years after we supplied it (five years in Scotland).
+- **Damage to your device or files.** If KerfDesk, Free or Pro, damages your device or other digital content because we did not use reasonable care and skill, you are entitled to have us repair the damage or to compensation (in the UK, under section 46 of the Consumer Rights Act 2015).
+- **Loss or damage.** If we break these terms or fail to use reasonable care and skill, we are responsible for loss or damage you suffer that was a foreseeable result. Loss is foreseeable if it was obvious that it would happen, or if both of us knew it might happen when you accepted these terms. We are not responsible for loss that was not foreseeable. If you use KerfDesk for business purposes, we are not responsible to you for loss of profit, loss of business, business interruption or loss of business opportunity.
+- **Product liability.** Nothing in these terms limits a claim under the product liability laws of your country, including the EU rules on defective products.
+- **Cancellation, law and courts.** Section 11.7 explains your right to cancel. Section 23 explains that you keep the protection of your own country’s mandatory laws and can use its courts.
 
-**17.3 Availability.** We aim to keep the web app, downloads and licensing service available, but we
-do not promise that they will always be available or free of errors. The desktop app needs none of
-our servers to use Free features, or to use Pro on a device that is already activated.
+**16.4 If you live in the United States:**
 
-**17.4 If we stop licensing.** If we ever stop running the licensing service, we will make
-reasonable efforts to give licence holders a way to keep using their covered versions on new
-devices, for example an update that no longer needs online activation.
+- Your state’s law may give you rights that these terms cannot remove.
+- If you are a consumer in Massachusetts, Maryland or Kansas, the implied warranties that your state’s law gives you in consumer sales apply despite section 14, and sections 15.3 and 15.4 do not limit your remedies for a breach of them.
+- If you live in New Jersey, sections 14, 15.3 and 15.4 do not limit any right you have under New Jersey law that a contract cannot limit, and section 17 does not apply to you if you are a consumer.
 
-**17.5 Changes to this agreement.** We may update this agreement. A new version applies to KerfDesk
-versions released after it takes effect, and you accept it when you install or use such a version.
-For the web app, we will give notice in the app or on our website at least 14 days before a change
-that materially reduces your rights takes effect. No change takes away rights you already have in
-covered versions or changes the price of a purchase you have already made.
+**16.5 If you are a consumer in Australia:** Our goods come with guarantees that cannot be excluded under the Australian Consumer Law. You are entitled to a replacement or refund for a major failure and compensation for any other reasonably foreseeable loss or damage. You are also entitled to have the goods repaired or replaced if the goods fail to be of acceptable quality and the failure does not amount to a major failure. Sections 14 and 15 do not limit these rights.
 
-**17.6 Preview versions.** We may offer early preview versions. They are more likely to contain
-errors, so use them with extra care and never unattended.
+**16.6 Everywhere else.** If you are a consumer in another country, you keep every right the consumer law of your country gives you that a contract cannot remove.
 
-## 18. Support
+## 17. BUSINESS USERS: COVERING CERTAIN CLAIMS AGAINST US (INDEMNITY)
 
-We provide support through https://kerfdesk.com/support.html. We will do our best to help, but we
-do not promise a response time or that we can solve every problem.
+**If you are a business user, you will compensate us for any loss, damage and reasonable legal costs we suffer because someone else, such as your staff or your customers, makes a claim against us that arises from how you operate your machine, from things you make with KerfDesk, or from your breach of these terms.** This does not apply to the extent the claim was caused by our fraud, gross negligence or wilful misconduct. **This section never applies to consumers, including, in South Africa, any individual and any business whose asset value and yearly turnover are both below R2 million.**
 
-## 19. Ending this agreement
+In plain words: if you use KerfDesk in a business that is not a consumer, and someone makes a claim against us because of how you ran your machine or what you made, you pay the costs this causes us, unless we caused the problem through fraud, gross negligence or wilful misconduct.
 
-**19.1** You may stop using KerfDesk at any time. Please deactivate your devices first.
+## 18. Privacy
 
-**19.2** We may end this agreement, or your licence, by notice to you if you seriously breach it. If
-the breach can be put right, we will first give you 14 days to put it right. We may end it at once
-if you share or sell licence keys, bypass licensing or trial checks, or commit fraud.
+- KerfDesk does not upload your projects, drawings, toolpaths, or machine or job data, and it has no analytics, telemetry or automatic crash reporting.
+- Our hosting provider, Cloudflare, delivers the website, the web app, downloads and the licensing service. Like any web host, it receives your IP address and standard connection details.
+- The desktop apps contact our download service (dl.kerfdesk.com) to check for new versions. The desktop app for Windows also downloads them from there.
+- To start a trial, to activate, check or deactivate a licence, or to complete a purchase, the desktop app sends our licensing service (license.kerfdesk.com) only: your licence key and activation credentials; one-time codes that link a purchase to your app; a one-way code made on your computer from Windows’ installation ID, which we use only for licensing, to count your devices and to allow one trial per device; and a generic device label, not your computer’s name.
+- Our checkout page (kerfdesk.com/buy.html) loads Paddle’s code, which Paddle uses to take your payment and prevent fraud. Paddle collects your payment and contact details under its own privacy notice, and shares order details with us so that we can provide your licence, support and refunds.
+- If you email us or send us a support report, we receive what you send. A support report can include your machine settings, recent machine messages and logs, so read it before you send it.
+- We do not sell your personal information, and we do not send you marketing emails unless you ask for them.
 
-**19.3** When this agreement ends, you must stop using the Pro features and deactivate all your
-devices. If we ended it because of your breach, you must also stop using the KerfDesk versions this
-agreement covers, and we do not refund anything unless the law requires it. Your rights under the
-MIT License in earlier versions are not affected.
+Our Privacy Notice at https://kerfdesk.com/privacy/ explains what we keep, why, for how long, where it is processed, and your rights.
 
-**19.4** Sections 8.4, 9 to 14, 16, 19, 21 and 23 continue after this agreement ends.
+## 19. Third-party components, earlier MIT versions and our name
 
-## 20. Export controls and sanctions
+**19.1** KerfDesk includes third-party components, such as open-source libraries and fonts, under their own licences. The third-party notices shipped with KerfDesk, also at https://kerfdesk.com/third-party-notices.txt, list them. Those licences govern those components, and nothing in these terms limits your rights under them.
 
-You must follow the export control and sanctions laws that apply to you and to KerfDesk, including
-those of South Africa, the United States, the United Kingdom and the European Union. You confirm
-that you are not located in, or ordinarily resident in, a country or region under comprehensive
-sanctions, and that you are not named on a government list of sanctioned or restricted persons.
-You must not use KerfDesk for weapons of mass destruction or for any other use those laws prohibit.
-Paddle may refuse orders it cannot lawfully accept.
+**19.2** KerfDesk versions released up to and including the version tagged “mit-final” in our source code, the last version before KerfDesk’s licence changed on 29 September 2026, were released under the MIT License. Your rights in those versions come from the MIT License, not from these terms, and these terms do not reduce them. These terms cover versions released after that version.
 
-## 21. Governing law and disputes
+**19.3** The KerfDesk name and logo are ours. Neither these terms nor the MIT License gives you any right to use them, except to refer accurately to KerfDesk.
 
-**21.1** The law of the Republic of South Africa governs this agreement and any dispute about it or
-about KerfDesk, including disputes that are not about the contract itself.
+## 20. Support and complaints
 
-**21.2** Before either of us starts a court case, we will each first try to settle the dispute by
-contacting the other and allowing 30 days to resolve it. This does not stop either of us asking a
-court for urgent relief. If a time limit for your claim would expire during those 30 days, you may
-start your claim sooner.
+**20.1 Support.** We provide support through https://kerfdesk.com/support.html and at support@kerfdesk.com. We will do our best to help, but we cannot promise to solve every problem. Questions about payments, receipts, invoices and tax go to Paddle (https://paddle.net).
 
-**21.3** Subject to section 21.4, the South African courts that have jurisdiction will decide any
-dispute, and no other courts.
+**20.2 Complaints.** To make a complaint, email support@kerfdesk.com with “Complaint” in the subject line. Tell us what went wrong and what you would like us to do. We will confirm that we received it and aim to resolve it within 15 business days. If we cannot, we will tell you where else you can take it (section 23.5).
 
-**21.4** If you are a consumer, you keep the protection of the mandatory laws of the country where
-you live, and you may bring a claim in the courts where you live if those laws allow it.
+## 21. Ending these terms
 
-**21.5** The United Nations Convention on Contracts for the International Sale of Goods does not
-apply.
+**21.1** You may stop using KerfDesk at any time. If you have a Pro licence, please deactivate your devices first.
 
-## 22. Electronic agreement
+**21.2** We may end your Pro licence, or these terms, by notice to you if you seriously breach these terms. If the breach can be put right, we will first give you 14 days to put it right. We may end them at once if you share or sell licence keys, bypass licensing or trial checks, or commit fraud.
 
-This agreement is made electronically. Ticking a box or clicking to accept it, or installing or
-using KerfDesk, has the same effect as signing it. The desktop installer shows this agreement, and
-you can read, download, save and print it at any time at https://kerfdesk.com/terms/. Paddle emails
-you a receipt for every purchase.
+**21.3** We give notice by email to the address you gave Paddle, or in the app.
 
-## 23. General
+**21.4** When your Pro licence ends (other than by a transfer under section 8.8), you must stop using the Pro tools and deactivate all your devices. We cancel the licence: its key can no longer activate a device, and each device loses Pro after its next online check, from the next time KerfDesk starts. If we ended these terms because you seriously breached them, you must also stop using KerfDesk, including the Free edition, and we do not refund anything unless the law requires it. Your rights under the MIT License in earlier versions are not affected.
 
-**23.1 Whole agreement.** This agreement and the documents in section 1.5 are the whole agreement
-between you and us about KerfDesk. They replace any earlier agreement or statement about the same
-subject, except where the law says otherwise.
+**21.5** Sections 11.4, 13 to 17, 19, 21, 23 and 26 continue after these terms end.
 
-**23.2 If part is invalid.** If a court finds part of this agreement unenforceable, that part is
-changed as little as needed to make it enforceable, or removed, and the rest stays in force.
+## 22. Export controls and sanctions
 
-**23.3 No waiver.** If we do not enforce a right straight away, we can still enforce it later.
+**22.1** You must follow the export control and sanctions laws that apply to you and to KerfDesk, including those of South Africa, the United States, the United Kingdom, the European Union and the United Nations.
 
-**23.4 Transfer.** You may not transfer this agreement except as section 6.5 allows. We may transfer
-it to a company we control, or to anyone who takes over the KerfDesk business, if your rights under
-it are not reduced. We will tell you if we do.
+**22.2** You may not download, use, export or re-export KerfDesk in or to Cuba, Iran, North Korea, Russia or Belarus, or Crimea, the so-called Donetsk People’s Republic or Luhansk People’s Republic, or any other part of the Donetsk, Luhansk, Kherson or Zaporizhzhia regions of Ukraine that Ukraine’s government does not control, or any other place under a comprehensive embargo by those governments. This list can change.
 
-**23.5 Notices.** We may send you notices by email to the address you gave Paddle, or show them in
-the app or on our website. Send notices to us as section 24 describes.
+**22.3** You confirm that you are not located in, or ordinarily resident in, any of those places, and that you are not named on, or owned or controlled by anyone named on, a list of sanctioned or restricted persons, such as the US Treasury’s Specially Designated Nationals List, the US Commerce Department’s Entity List or Denied Persons List, or the UK, EU or UN sanctions lists.
 
-**23.6 Language.** This agreement is written in English. If we provide a translation, the English
-text prevails unless the law where you live says otherwise.
+**22.4** You must not use KerfDesk for weapons of mass destruction or for any other use those laws prohibit.
 
-**23.7 Events beyond our control.** We are not responsible for delays or failures caused by events
-we cannot reasonably control, such as power or internet failures, or failures of hosting or payment
-providers.
+**22.5** Paddle may refuse orders it cannot lawfully accept. We may block access to KerfDesk and our services from places where the law requires it.
 
-**23.8 No one else.** Only you and we have rights under this agreement.
+## 23. Governing law and disputes
 
-**23.9 Headings.** Headings and the short version at the top are for convenience only.
+**23.1 The law that applies.** The law of the Republic of South Africa governs these terms. For business users, it also governs any dispute about KerfDesk that is not about these terms, such as a claim in delict or tort.
 
-## 24. Contact details
+**23.2 Consumers keep their own law.** If you are a consumer, you also keep the protection of the mandatory laws of the country, state or province where you live, including EU and UK consumer law. The consumer protections of South Africa’s Electronic Communications and Transactions Act apply whatever law governs these terms.
 
-- **Seller:** Johannes Stephanus Stolk, an individual
-- **Physical address, and address for legal documents:** [PLACEHOLDER: street address, South
-  Africa]
+**23.3 Try to settle first.** Before either of us starts a court case, we will each try to settle the dispute by contacting the other and allowing 30 days to resolve it. This does not stop either of us asking a court for urgent relief. If a time limit for your claim would run out during those 30 days, you may start your claim sooner. This step never stops you complaining at any time to a regulator, an ombud or an out-of-court dispute scheme.
+
+**23.4 Courts.**
+
+- **Business users:** the South African courts that have jurisdiction decide any dispute.
+- **Consumers:** you may bring a claim in the South African courts, or in the courts where you live if the law there allows it. If you live in the EU or the UK, you can always bring a claim in the courts of the country where you live, and we can bring a claim against you only in those courts.
+
+**23.5 Where else you can complain.**
+
+- **South Africa:** the Consumer Goods and Services Ombud (https://www.cgso.org.za, 0860 000 272, info@cgso.org.za); the National Consumer Commission (https://thencc.org.za); a provincial consumer court; the National Consumer Tribunal (where the Act allows you to go to it directly); and, about personal information, the Information Regulator (https://inforegulator.org.za).
+- **EU and UK:** your national consumer authority or consumer advice service, and, about personal information, your data protection authority (in the UK, the Information Commission’s Office, known as the ICO).
+- **Payments:** Paddle, at https://paddle.net.
+
+**23.6 No arbitration.** These terms do not require arbitration and contain no class-action waiver.
+
+**23.7 International sales treaty.** The United Nations Convention on Contracts for the International Sale of Goods (a treaty with default rules for international sales between businesses) does not apply to these terms.
+
+## 24. Changes to these terms
+
+**24.1 Why we may change them.** We may change these terms for a valid reason: to reflect changes in the law or in Paddle’s or payment-card rules; to protect security or prevent abuse; to cover new features, versions or services; to reflect changes in how we run KerfDesk; or to make them clearer.
+
+**24.2 What a change can never do.** A change never takes away rights you already have in covered versions, never changes the price of a purchase you have already made, and never reduces a refund you are already owed.
+
+**24.3 How changes take effect.** We publish every new version at https://kerfdesk.com/terms/ with a new date. A change that does not reduce your rights applies from the date we publish it. A change that reduces your rights applies to you only once you agree to it. We will tell you about such a change at least 14 days before it takes effect, on the website and in KerfDesk, and by email if you have bought Pro, and KerfDesk will ask you to agree. If you do not agree, the terms you agreed to before keep applying to you.
+
+## 25. Electronic agreement and your copy
+
+**25.1** These terms are made electronically. Ticking a box or clicking “I agree” has the same effect as signing them on paper.
+
+**25.2** Our desktop installers show these terms, or a notice that points to them. You can read, download, save and print these terms at any time at https://kerfdesk.com/terms/. Every earlier version stays available from that page, so you can always find the version you accepted.
+
+**25.3** Paddle emails you a receipt for every purchase (section 10.7).
+
+## 26. General
+
+**26.1 Whole agreement.** These terms and the documents in section 1.6 are the whole agreement between you and us about KerfDesk. They replace any earlier agreement about the same subject. They do not cancel anything we have told you about KerfDesk on our website, on the pricing page or in the app, and they do not limit liability for fraudulent misrepresentation.
+
+**26.2 If part is invalid,** that part is changed as little as needed to make it valid, or removed, and the rest stays in force.
+
+**26.3 No waiver.** If we do not enforce a right straight away, we can still enforce it later.
+
+**26.4 Transfer by us.** We may transfer these terms to a company controlled by Johannes Stephanus Stolk, or to anyone who takes over the KerfDesk business, if your rights under them are not reduced. We will tell you if we do.
+
+**26.5 Notices.** We may send you notices by email to the address you gave Paddle, or show them in the app or on our website. Send notices to us as section 27 describes.
+
+**26.6 Language.** These terms are written in English. If we provide a translation, the English text prevails unless the law where you live says otherwise.
+
+**26.7 Events beyond our control.** We are not responsible for delays or failures caused by events we cannot reasonably control, such as power or internet failures, or failures of hosting or payment providers. This does not affect your right to a refund or your rights under section 16.
+
+**26.8 No one else.** Only you and we have rights under these terms.
+
+**26.9 The short version and headings** help you find your way. The numbered sections are the terms.
+
+## 27. Who we are and how to contact us
+
+- **Maker and licensor of KerfDesk:** Johannes Stephanus Stolk, a sole proprietor (an individual, not a company), trading as KerfDesk.
+- [PLACEHOLDER: if the name “Ons Houtkombuis” stays on the website, say what it is, for example “Ons Houtkombuis is the studio name Johannes Stephanus Stolk uses; it is not a separate business”, or delete this line]
+- **Physical address, also our address for legal documents:** [PLACEHOLDER: street address in South Africa, not a post box]
 - **Telephone:** [PLACEHOLDER: telephone number]
-- **Support and general contact:** https://kerfdesk.com/support.html
 - **Email:** support@kerfdesk.com
-- **Website:** https://kerfdesk.com
+- **Website:** https://kerfdesk.com (support: https://kerfdesk.com/support.html)
+- **VAT:** [PLACEHOLDER: “Not registered for VAT”, or the VAT registration number]
+- **Codes of conduct and ombud:** We follow the Consumer Goods and Services Industry Code of Conduct, available at https://www.cgso.org.za, and you may refer complaints to the Consumer Goods and Services Ombud (section 23.5).
+- **Seller of every order (our reseller and merchant of record):** Paddle: Paddle.com Inc. (United States), Paddle.com (Canada) Ltd (Canada) or Paddle.com Market Limited (everywhere else). Contact Paddle about orders and payments at https://paddle.net.

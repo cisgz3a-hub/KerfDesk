@@ -3,6 +3,7 @@ import { EDITING_TOOLS_COMMAND_HELP } from './editing-tools-command-help';
 import { FILE_COMMAND_HELP } from './file-command-help';
 import { MACHINE_MOVE_COMMAND_HELP } from './machine-move-command-help';
 import { SETTINGS_COMMAND_HELP } from './settings-command-help';
+import { SITE_PAGE_COMMAND_HELP } from './site-page-command-help';
 
 export type CommandHelpTopic = {
   readonly family: CommandFamily;
@@ -14,6 +15,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   ...EDITING_TOOLS_COMMAND_HELP,
   ...MACHINE_MOVE_COMMAND_HELP,
   ...SETTINGS_COMMAND_HELP,
+  ...SITE_PAGE_COMMAND_HELP,
   'edit.undo': {
     family: 'edit',
     tooltip:
@@ -386,19 +388,5 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'help.discussions': {
     family: 'help',
     tooltip: 'Open KerfDesk support in your browser for questions, ideas and feedback.',
-  },
-  'help.pricing': {
-    family: 'help',
-    tooltip:
-      'Open the KerfDesk pricing page in your browser: what Free and Pro include, what Pro costs and how a licence works.',
-  },
-  'help.terms': {
-    family: 'help',
-    tooltip: 'Open the KerfDesk Terms of Service in your browser. It links the Refund Policy.',
-  },
-  'help.privacy': {
-    family: 'help',
-    tooltip:
-      'Open the KerfDesk Privacy Policy in your browser: what the app sends over the network, what stays on your computer, and your rights.',
   },
 };

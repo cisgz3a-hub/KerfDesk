@@ -31,7 +31,7 @@ export function ProInDesktopDialog({
         ))}
       </ul>
       <p style={bodyStyle}>
-        Try every Pro tool free for 30 days there, or buy Pro for {PRO_PRICE_LABEL} once.
+        Try every Pro tool free for 30 days there, or buy Pro once for {PRO_PRICE_LABEL}.
       </p>
       <DialogActions>
         <a

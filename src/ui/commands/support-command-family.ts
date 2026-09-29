@@ -6,7 +6,13 @@
 // no AppCommandContext. The command ids keep their original names so saved
 // shortcuts still resolve.
 
-import { PRICING_URL, PRIVACY_URL, TERMS_URL } from '../common/site-page-urls';
+import {
+  PAIA_MANUAL_URL,
+  PRICING_URL,
+  PRIVACY_URL,
+  REFUNDS_URL,
+  TERMS_URL,
+} from '../common/site-page-urls';
 import { CHECK_UPDATES_EVENT } from '../licensing/update-status-text';
 import { SUPPORT_REPORT_EVENT } from '../support/support-report-event';
 import { enabled, type AppCommand } from './command-types';
@@ -93,9 +99,30 @@ export function privacyCommand(): AppCommand {
   return enabled(
     'help.privacy',
     'help',
-    'Privacy Policy',
-    'Open the KerfDesk Privacy Policy: what KerfDesk sends over the network, and your rights',
+    'Privacy Notice',
+    'Open the KerfDesk Privacy Notice: what KerfDesk sends over the network, and your rights',
     () => openExternalUrl(PRIVACY_URL),
+  );
+}
+
+export function refundsCommand(): AppCommand {
+  return enabled(
+    'help.refunds',
+    'help',
+    'Refund Policy',
+    'Open the KerfDesk Refund Policy for Pro licences and update extensions',
+    () => openExternalUrl(REFUNDS_URL),
+  );
+}
+
+// South Africa's access-to-information law asks for the manual on the website.
+export function paiaManualCommand(): AppCommand {
+  return enabled(
+    'help.paia-manual',
+    'help',
+    'PAIA Manual',
+    'Open the KerfDesk PAIA Manual: how to ask for records under South African law',
+    () => openExternalUrl(PAIA_MANUAL_URL),
   );
 }
 

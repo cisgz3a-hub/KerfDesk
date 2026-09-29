@@ -19,6 +19,7 @@ import {
 } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 import { shot } from '../lib/screens.mjs';
+import { site } from '../site.config.mjs';
 import {
   CAMERA,
   DESIGN_POINTS,
@@ -44,7 +45,10 @@ function overview() {
           machine
         </li>
         <li>${statusPill('in-progress')} Part of it works today, and more is being built</li>
-        <li>${proPill()} Part of the Pro edition. <a href="/pricing/">Compare Free and Pro</a></li>
+        <li>
+          ${proPill()} Part of the Pro edition.
+          <a href="${site.pricingUrl}">Compare Free and Pro</a>
+        </li>
       </ul>
       ${featureGrid(OVERVIEW)}`,
   });

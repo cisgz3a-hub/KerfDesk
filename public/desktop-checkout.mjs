@@ -84,10 +84,33 @@ async function paddleScript(document) {
   });
 }
 
+async function initializedPaddle(window, config, status) {
+  await paddleScript(window.document);
+  const paddle = window.Paddle;
+  if (!paddle?.Initialize || !paddle?.Checkout?.open) throw new Error('Checkout unavailable');
+  if (config.environment === 'sandbox') paddle.Environment.set('sandbox');
+  paddle.Initialize({
+    token: config.token,
+    eventCallback: (event) => {
+      if (event.name === 'checkout.completed')
+        status.textContent =
+          'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
+    },
+  });
+  return paddle;
+}
+
+const UNAVAILABLE =
+  'Checkout is temporarily unavailable. Return to KerfDesk to check an existing payment before trying again.';
+
+// The buyer agrees to the terms and confirms the machine-safety section before
+// Paddle's checkout opens (terms s1.3 and s2.5), and Paddle's code loads only
+// then, so the page sets no Paddle cookie for a visitor who does not go ahead.
 export async function startCheckoutPage(window, fetcher = fetch) {
   const status = window.document.getElementById('checkout-status');
   const button = window.document.getElementById('checkout-open');
-  if (!status || !button) return;
+  const agreement = window.document.getElementById('checkout-agreement');
+  if (!status || !button || !agreement) return;
   const transaction = checkoutTransaction(window.location.search);
   if (transaction === null) {
     status.textContent =
@@ -101,32 +124,38 @@ export async function startCheckoutPage(window, fetcher = fetch) {
         'Checkout is not available yet. Return to KerfDesk to check an existing payment.';
       return;
     }
-    await paddleScript(window.document);
-    const paddle = window.Paddle;
-    if (!paddle?.Initialize || !paddle?.Checkout?.open) throw new Error('Checkout unavailable');
-    if (config.environment === 'sandbox') paddle.Environment.set('sandbox');
-    paddle.Initialize({
-      token: config.token,
-      eventCallback: (event) => {
-        if (event.name === 'checkout.completed')
-          status.textContent =
-            'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
-      },
-    });
+    const boxes = [...agreement.querySelectorAll('input[data-checkout-agreement]')];
+    const agreed = () => boxes.length > 0 && boxes.every((box) => box.checked);
+    const refresh = () => {
+      button.disabled = !agreed();
+    };
+    for (const box of boxes) box.addEventListener('change', refresh);
+    let paddle = null;
     // No discount field: the licence service refuses a discounted payment, so a code
     // entered here would take money without issuing a licence (ADR-523 Amendment 3).
-    const open = () =>
-      paddle.Checkout.open({ transactionId: transaction, settings: { showAddDiscounts: false } });
-    button.addEventListener('click', open);
+    button.addEventListener('click', () => {
+      if (!agreed()) return;
+      void (async () => {
+        try {
+          paddle ??= await initializedPaddle(window, config, status);
+          paddle.Checkout.open({
+            transactionId: transaction,
+            settings: { showAddDiscounts: false },
+          });
+        } catch {
+          status.textContent = UNAVAILABLE;
+        }
+      })();
+    });
+    refresh();
+    agreement.hidden = false;
     button.hidden = false;
     status.textContent =
       config.environment === 'sandbox'
-        ? 'Test checkout. No real payment will be taken.'
-        : 'Your secure checkout is ready.';
-    open();
+        ? 'Test checkout. No real payment will be taken. Tick both boxes to open the checkout.'
+        : 'Tick both boxes to open the secure checkout.';
   } catch {
-    status.textContent =
-      'Checkout is temporarily unavailable. Return to KerfDesk to check an existing payment before trying again.';
+    status.textContent = UNAVAILABLE;
   }
 }
 

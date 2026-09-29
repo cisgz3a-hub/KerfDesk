@@ -34,6 +34,17 @@ export const site = {
   noticesUrl: `${APP_URL}/third-party-notices.txt`,
   // The licensing service the app uses for Pro trials and activation.
   licensingHost: 'license.kerfdesk.com',
+  // The pricing, legal and licence pages. The app publishes them from the
+  // checked texts in docs/legal (scripts/generate-site-pages.mjs), so this site
+  // links them instead of keeping its own copies (ADR-247 Amendment 2).
+  pricingUrl: `${APP_URL}/pricing/`,
+  termsUrl: `${APP_URL}/terms/`,
+  privacyUrl: `${APP_URL}/privacy/`,
+  refundsUrl: `${APP_URL}/refunds/`,
+  paiaManualUrl: `${APP_URL}/paia-manual/`,
+  licenseUrl: `${APP_URL}/license/`,
+  // The seller named in the terms: an individual trading as KerfDesk.
+  owner: 'Johannes Stephanus Stolk',
   studio: 'Ons Houtkombuis',
 };
 
@@ -42,7 +53,7 @@ export const primaryNav = [
   { key: 'features', label: 'Features', href: '/features/' },
   { key: 'machines', label: 'Machines', href: '/machines/' },
   { key: 'docs', label: 'Get started', href: '/docs/' },
-  { key: 'pricing', label: 'Pricing', href: '/pricing/' },
+  { key: 'pricing', label: 'Pricing', href: site.pricingUrl },
   { key: 'faq', label: 'FAQ', href: '/faq/' },
 ];
 
@@ -55,7 +66,7 @@ export const footerNav = [
       { label: 'CNC', href: '/cnc/' },
       { label: 'Machines', href: '/machines/' },
       { label: 'Download', href: '/download/' },
-      { label: 'Pricing', href: '/pricing/' },
+      { label: 'Pricing', href: site.pricingUrl },
     ],
   },
   {
@@ -71,8 +82,11 @@ export const footerNav = [
     heading: 'Project',
     links: [
       { label: 'About', href: '/about/' },
-      { label: 'Privacy', href: '/privacy/' },
-      { label: 'License', href: '/license/' },
+      { label: 'Terms of Service', href: site.termsUrl },
+      { label: 'Privacy Notice', href: site.privacyUrl },
+      { label: 'Refund Policy', href: site.refundsUrl },
+      { label: 'PAIA Manual', href: site.paiaManualUrl },
+      { label: 'Licence and notices', href: site.licenseUrl },
     ],
   },
 ];

@@ -128,9 +128,9 @@ export function downloadFaq(site, commerce) {
       answer: html`<p>
         KerfDesk Free costs nothing and has no time limit.
         ${plan &&
-        html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)}, paid once, with a
-        year of updates.`}
-        Purchase isn’t open yet. See <a href="/pricing/">pricing</a>.
+        html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)} plus tax, paid once,
+        with a year of updates.`}
+        Purchase isn’t open yet. See <a href="${site.pricingUrl}">pricing</a>.
       </p>`,
     },
     {

@@ -1,21 +1,15 @@
 # Safety & responsible use
 
-**Read this before you run any job.** KerfDesk prepares toolpaths and sends
-commands to **laser cutters and CNC routers — machines that can cause fire,
-permanent eye injury, toxic fumes, serious cuts, and flying debris.** You are
-responsible for operating your machine safely. KerfDesk is a tool that generates
-instructions; it cannot see your workshop, your material, or your machine, and
-it **cannot guarantee a safe result.**
+**Read this before you run any job.** KerfDesk prepares toolpaths and sends commands to **laser cutters and CNC routers — machines that can cause fire, permanent eye injury, toxic fumes, serious cuts, and flying debris.** You are responsible for operating your machine safely. KerfDesk is a tool that generates instructions; it cannot see your workshop, your material, or your machine, and it **cannot guarantee a safe result.**
 
-## Use at your own risk
+## What KerfDesk can't do for you
 
-The software is provided **"as is," without any warranty.** You use it, and
-operate your machine, **entirely at your own risk.** To the maximum extent
-permitted by law, the authors and copyright holders are **not liable for any
-injury, death, fire, or damage to property, machines, or materials** arising
-from use of the software. Nothing in the software removes your responsibility to
-operate your equipment safely and in accordance with the machine manufacturer's
-instructions and the laws and regulations where you live.
+- **KerfDesk is not a safety device.** Its Abort and other stop controls are software stops. They depend on your computer, the connection and the machine's controller, and they may not stop the machine at once.
+- **A job can stop part-way.** Closing KerfDesk, or reloading the web app (clicking Update in the web app reloads it), stops a running job part-way. If your computer restarts, shuts down, goes to sleep or loses its connection to the machine during a job, the machine may keep moving, or the laser or spindle may stay on, until you stop it at the machine.
+- **Its aids are not guarantees.** Material settings, previews, simulations, time estimates, preflight checks and suggestions do not guarantee that a job is correct, safe or suited to your machine and material.
+- **No machine has been qualified yet.** Treat every new machine, controller, feature and version as untested. The [Machines page](https://kerfdesk.com/machines/) shows how far each has been tested.
+
+You are responsible for operating your machine safely and for the safety of everyone near it, and for following your machine maker's instructions and the safety laws and rules that apply where you work. Section 2 of the [Terms of Service](https://kerfdesk.com/terms/) sets this out. Warranties, the limits on our liability and your legal rights where you live are in sections 14 to 16 of the terms. Those limits never apply to death or personal injury caused by our negligence or by a defect in KerfDesk.
 
 ## Before every job
 
@@ -63,12 +57,8 @@ instructions and the laws and regulations where you live.
 
 ## Materials and local rules
 
-You are responsible for knowing that a material is safe to cut or engrave, for
-the fumes and dust it produces, and for complying with local fire, electrical,
-ventilation, and safety regulations. When in doubt, consult the material's
-safety data sheet (SDS) and your machine manufacturer's guidance.
+You are responsible for knowing that a material is safe to cut or engrave, for the fumes and dust it produces, and for complying with local fire, electrical, ventilation, and safety regulations. When in doubt, consult the material's safety data sheet (SDS) and your machine manufacturer's guidance.
 
 ---
 
-This safety information is also summarized in the app under **Help → Safety &
-liability**, and the licence terms are in the accompanying License & Safety Notice.
+The app summarizes this under **Help → Safety & liability**. It is published at https://kerfdesk.com/safety/.

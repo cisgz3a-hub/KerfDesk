@@ -1,9 +1,9 @@
-// Builds the pricing, terms, privacy and refund pages that ship with the web app
-// on kerfdesk.com (ADR-524 Amendment 3): the policies from the customer
-// documents in docs/legal/, and pricing from the settled offer in
-// website/commerce.config.mjs. The pages are committed, so a review shows the
-// exact published text, and generate-site-pages.test.mjs fails when one is out
-// of date.
+// Builds the pricing and legal pages that ship with the web app on kerfdesk.com
+// (ADR-524 Amendment 3) from the customer documents in docs/legal/, which the
+// sourced legal review of 29 September 2026 checked (ADR-247 Amendment 2), and
+// the machines and safety pages those documents link. The pages are committed,
+// so a review shows the exact published text, and generate-site-pages.test.mjs
+// fails when one is out of date.
 //
 //   node scripts/generate-site-pages.mjs          writes public/<page>/index.html
 //   node scripts/generate-site-pages.mjs --check  lists out-of-date pages, exits 1
@@ -16,31 +16,65 @@ import * as prettier from 'prettier';
 
 import { sitePage } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
-import { pricingPage } from './site-pages-pricing.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // The first document is the page; any others follow it as sections.
-const POLICY_PAGES = [
+export const POLICY_PAGES = [
+  {
+    path: '/pricing/',
+    title: 'Pricing',
+    description:
+      'KerfDesk Free and Pro: what each edition includes, what Pro will cost, and how a Pro licence, the trial and refunds work.',
+    sources: ['docs/legal/kerfdesk-pricing.md'],
+  },
   {
     path: '/terms/',
     title: 'Terms of Service',
     description:
-      'The KerfDesk Licence Agreement: the terms for using KerfDesk Free and Pro and for buying a Pro licence.',
+      'The KerfDesk Terms of Service and Licence Agreement: the terms for the website, KerfDesk Free, the Pro trial and Pro licences.',
     sources: ['docs/legal/kerfdesk-licence-agreement.md'],
   },
   {
     path: '/privacy/',
-    title: 'Privacy Policy',
+    title: 'Privacy Notice',
     description:
-      'What KerfDesk, its website and its licensing service send and keep, and your rights over your information.',
-    sources: ['docs/legal/kerfdesk-privacy-policy.md', 'docs/legal/kerfdesk-privacy-notice.md'],
+      'What personal information KerfDesk, its website and its licensing service collect, why, who handles it, how long it is kept, and your rights.',
+    sources: ['docs/legal/kerfdesk-privacy-notice.md'],
   },
   {
     path: '/refunds/',
     title: 'Refund Policy',
     description: 'How refunds work for KerfDesk Pro licences and update extensions.',
     sources: ['docs/legal/kerfdesk-refund-policy.md'],
+  },
+  {
+    path: '/paia-manual/',
+    title: 'PAIA Manual',
+    description:
+      "KerfDesk's manual under section 51 of South Africa's Promotion of Access to Information Act: the records it holds and how to ask for them.",
+    sources: ['docs/legal/kerfdesk-paia-manual.md'],
+  },
+  {
+    path: '/license/',
+    title: 'Licence and notices',
+    description:
+      'Which terms apply to which KerfDesk versions, the third-party components it includes, and its name.',
+    sources: ['docs/legal/kerfdesk-licence-and-notices.md'],
+  },
+  {
+    path: '/machines/',
+    title: 'Machines',
+    description:
+      'The controllers and machines KerfDesk supports, and how far each has been tested.',
+    sources: ['docs/site/machines.md'],
+  },
+  {
+    path: '/safety/',
+    title: 'Safety',
+    description:
+      'Laser and CNC safety: what KerfDesk cannot do for you, and what to check before every job.',
+    sources: ['docs/safety.md'],
   },
 ];
 
@@ -71,7 +105,7 @@ async function formatted(html, file) {
 
 // Map of repository-relative output file to its content.
 export async function buildSitePages() {
-  const pages = [pricingPage(), ...(await Promise.all(POLICY_PAGES.map(policyPage)))];
+  const pages = await Promise.all(POLICY_PAGES.map(policyPage));
   const built = new Map();
   for (const page of pages) {
     const file = outputFile(page.path);
