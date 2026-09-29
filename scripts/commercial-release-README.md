@@ -13,8 +13,10 @@ Set these protected environment inputs without putting their values in command h
 - `COMMERCIAL_R2_API_TOKEN`: restricted R2 access to that account and bucket.
 
 ```text
-node scripts/publish-commercial-release.mjs <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
+node scripts/publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
 ```
+
+`--expected-catalog-sha256` states the catalogue you reviewed: the SHA-256 of the live `desktop/commercial/catalog.json`, which the previous publication printed, or `none` only when no commercial catalogue exists yet. The publisher refuses before any write when the live catalogue differs, so a truncated, deleted or replaced catalogue is never accepted and then made permanent. The one exception is an identical retry after its own catalogue promotion landed: the live catalogue is then exactly the expected one plus that release, and the retry reports `already-published`. Each run prints the resulting catalogue SHA-256; record it for the next publication.
 
 The resources directory must contain the actual packaged `app.asar` and `app-update.yml`. The CLI verifies independently pinned release and entitlement keys, the exact signed prebuild identity, Authenticode status and publisher, and both resources streamed directly from the installer with electron-builder's pinned 7za. It repeats the native signer and embedded-resource checks on uploaded bytes. It does not install the application.
 

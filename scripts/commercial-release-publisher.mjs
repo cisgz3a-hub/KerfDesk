@@ -9,6 +9,7 @@ import {
   COMMERCIAL_PREFIX,
   COMMERCIAL_CATALOG_KEY,
   catalogBytes,
+  digest,
   readCommercialCatalog,
   signCommercialManifest,
   updatePayload,
@@ -17,6 +18,32 @@ import {
 
 const IMMUTABLE = 'public, max-age=31536000, immutable';
 const same = (a, b) => (a === null ? b === null : b !== null && a.equals(b));
+/** How an operator names a catalogue: its SHA-256, or `none` when it does not exist. */
+const catalogState = (bytes) => (bytes === null ? 'none' : digest(bytes));
+
+// The operator states the catalogue they reviewed. A deleted, truncated or
+// replaced live catalogue is refused before any write instead of being accepted
+// and then made permanent by this promotion. The one exception resumes an
+// identical run that already promoted this release: the live catalogue is then
+// exactly the expected one plus this release's entry.
+function requireExpectedCatalog(initial, keySet, payload, expected) {
+  const live = catalogState(initial);
+  if (live === expected) return;
+  let entries = [];
+  try {
+    entries = readCommercialCatalog(initial, keySet);
+  } catch {
+    // An unreadable catalogue that the operator did not state is a mismatch.
+  }
+  const others = entries.filter((item) => !isDeepStrictEqual(item.payload, payload));
+  const before =
+    others.length === 0 && expected === 'none' ? 'none' : catalogState(catalogBytes(others));
+  if (others.length === entries.length || before !== expected)
+    throw new Error(
+      `Live commercial catalogue (${live === 'none' ? 'missing' : `SHA-256 ${live}`}) is not the expected catalogue; review it before publishing.`,
+    );
+}
+
 export function commercialReleaseFiles(release, identity) {
   const names = stableArtifactNames(identity.version);
   if (
@@ -52,9 +79,15 @@ export async function publishCommercialRelease({
   privateKeyPem,
   keyId,
   verifyInstaller,
+  expectedCatalogSha256,
 }) {
   if (typeof verifyInstaller !== 'function')
     throw new Error('Native installer publisher verification is mandatory.');
+  if (
+    typeof expectedCatalogSha256 !== 'string' ||
+    !/^(?:none|[a-f0-9]{64})$/u.test(expectedCatalogSha256)
+  )
+    throw new Error('The expected commercial catalogue SHA-256, or none, is mandatory.');
   const identity = verifyCommercialEnvelope(release.identity, keySet, 'release-identity');
   const files = commercialReleaseFiles(release, identity);
   const payload = updatePayload(identity, files);
@@ -64,6 +97,7 @@ export async function publishCommercialRelease({
   const installer = files.get(stableArtifactNames(identity.version)[0]);
   await verifyInstaller(installer, 'local');
   const initial = await store.get(COMMERCIAL_CATALOG_KEY);
+  requireExpectedCatalog(initial, keySet, payload, expectedCatalogSha256);
   const prior = readCommercialCatalog(initial, keySet);
   const latest = prior[0]?.payload;
   if (latest && compareStableVersions(latest.version, identity.version) > 0)
@@ -117,12 +151,14 @@ export async function publishCommercialRelease({
   // distributed lock against an administrator writing directly to the bucket.
   if (!same(initial, await store.get(COMMERCIAL_CATALOG_KEY)))
     throw new Error('Commercial catalogue changed during publication.');
-  if (current) return { status: 'already-published', version: identity.version };
+  // The catalogue SHA-256 is what the operator states for the next publication.
+  const result = { version: identity.version, catalogSha256: catalogState(next) };
+  if (current) return { status: 'already-published', ...result };
   await store.put(COMMERCIAL_CATALOG_KEY, next, {
     contentType: 'application/json',
     cacheControl: 'no-store',
   });
   if (!same(next, await store.get(COMMERCIAL_CATALOG_KEY)))
     throw new Error('Commercial catalogue readback failed.');
-  return { status: 'published', version: identity.version };
+  return { status: 'published', ...result };
 }

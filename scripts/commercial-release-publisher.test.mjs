@@ -8,6 +8,7 @@ import {
   COMMERCIAL_CATALOG_KEY,
   readCommercialCatalog,
   catalogBytes,
+  digest,
   signCommercialManifest,
   updatePayload,
   verifyCommercialEnvelope,
@@ -20,15 +21,26 @@ import {
   keyId,
   signed,
 } from './commercial-release-test-support.mjs';
-const publish = (release, store, verifyInstaller = async () => undefined) =>
-  publishCommercialRelease({ release, store, keySet, privateKeyPem, keyId, verifyInstaller });
+const catalogState = (bytes) => (bytes === null ? 'none' : digest(bytes));
+// Unless a test states otherwise, the operator expects the live catalogue.
+const publish = async (release, store, verifyInstaller = async () => undefined, expected) =>
+  publishCommercialRelease({
+    release,
+    store,
+    keySet,
+    privateKeyPem,
+    keyId,
+    verifyInstaller,
+    expectedCatalogSha256: expected ?? catalogState(await store.get(COMMERCIAL_CATALOG_KEY)),
+  });
 
 test('publishes complete immutable assets and verified update manifest before the catalogue', async () => {
   const f = memoryStore();
   const verified = [];
   f.objects.set('desktop/latest.yml', Buffer.from('legacy'));
   f.objects.set('desktop/previews/latest.json', Buffer.from('preview'));
-  await publish(fixture(), f.store, async (_bytes, source) => verified.push(source));
+  const result = await publish(fixture(), f.store, async (_bytes, source) => verified.push(source));
+  assert.equal(result.catalogSha256, digest(f.objects.get(COMMERCIAL_CATALOG_KEY)));
   assert.deepEqual(verified, ['local', 'remote']);
   assert.equal(f.writes[0].key, 'desktop/commercial/releases/1.2.3/publication-reservation.json');
   assert.equal(f.writes.at(-2).key, 'desktop/commercial/releases/1.2.3/update-manifest.json');
@@ -88,6 +100,105 @@ test('interrupted publication resumes matching reserved bytes without promoting 
     f.objects.get('desktop/commercial/releases/1.2.3/publication-reservation.json'),
     reserved,
   );
+});
+test('a truncated, deleted or replaced catalogue is refused before any write; the reviewed one publishes', async () => {
+  const f = memoryStore();
+  const first = await publish(fixture('1.0.0'), f.store, undefined, 'none');
+  const reviewed = (await publish(fixture('1.1.0'), f.store, undefined, first.catalogSha256))
+    .catalogSha256;
+  const live = f.objects.get(COMMERCIAL_CATALOG_KEY);
+  const truncated = catalogBytes(readCommercialCatalog(live, keySet).slice(0, 1));
+  const cut = live.subarray(0, 40);
+  for (const [damaged, found] of [
+    [truncated, `SHA-256 ${digest(truncated)}`],
+    [cut, `SHA-256 ${digest(cut)}`],
+    [null, 'missing'],
+  ]) {
+    if (damaged === null) f.objects.delete(COMMERCIAL_CATALOG_KEY);
+    else f.objects.set(COMMERCIAL_CATALOG_KEY, damaged);
+    f.writes.length = 0;
+    await assert.rejects(
+      publish(fixture(), f.store, undefined, reviewed),
+      new RegExp(`\\(${found}\\) is not the expected catalogue`, 'u'),
+    );
+    assert.equal(f.writes.length, 0);
+  }
+  f.objects.set(COMMERCIAL_CATALOG_KEY, live);
+  await assert.rejects(
+    publish(fixture(), f.store, undefined, 'none'),
+    /not the expected catalogue/u,
+  );
+  assert.equal(f.writes.length, 0);
+  assert.equal((await publish(fixture(), f.store, undefined, reviewed)).status, 'published');
+  assert.deepEqual(
+    readCommercialCatalog(f.objects.get(COMMERCIAL_CATALOG_KEY), keySet).map(
+      (item) => item.payload.version,
+    ),
+    ['1.2.3', '1.1.0', '1.0.0'],
+  );
+});
+// The catalogue write lands, then the run dies before it can report success.
+function interruptAfterPromotion(f) {
+  const put = f.store.put;
+  f.store.put = async (key, bytes, metadata) => {
+    await put(key, bytes, metadata);
+    if (key === COMMERCIAL_CATALOG_KEY) throw new Error('interrupted after promotion');
+  };
+  return () => {
+    f.store.put = put;
+  };
+}
+test('an identical retry resumes after its own catalogue promotion but cannot hide lost history', async () => {
+  const f = memoryStore();
+  const expected = (await publish(fixture('1.0.0'), f.store, undefined, 'none')).catalogSha256;
+  const restore = interruptAfterPromotion(f);
+  await assert.rejects(publish(fixture(), f.store, undefined, expected), /interrupted/u);
+  restore();
+  const promoted = f.objects.get(COMMERCIAL_CATALOG_KEY);
+  assert.notEqual(digest(promoted), expected);
+  f.writes.length = 0;
+  const retry = await publish(fixture(), f.store, undefined, expected);
+  assert.deepEqual(retry, {
+    status: 'already-published',
+    version: '1.2.3',
+    catalogSha256: digest(promoted),
+  });
+  assert.equal(f.writes.length, 0);
+  const changed = fixture();
+  changed.files[1].bytes = Buffer.from('changed blockmap');
+  await assert.rejects(publish(changed, f.store, undefined, expected), /expected catalogue/u);
+  // A catalogue that still lists this release but lost 1.0.0 is not a resumable state.
+  f.objects.set(
+    COMMERCIAL_CATALOG_KEY,
+    catalogBytes(readCommercialCatalog(promoted, keySet).slice(0, 1)),
+  );
+  await assert.rejects(publish(fixture(), f.store, undefined, expected), /expected catalogue/u);
+  assert.equal(f.writes.length, 0);
+  // The first release resumes the same way against its stated `none`.
+  const first = memoryStore();
+  interruptAfterPromotion(first);
+  await assert.rejects(publish(fixture(), first.store, undefined, 'none'), /interrupted/u);
+  assert.equal(
+    (await publish(fixture(), first.store, undefined, 'none')).status,
+    'already-published',
+  );
+});
+test('the expected catalogue is a mandatory canonical SHA-256 or none', async () => {
+  const f = memoryStore();
+  for (const expectedCatalogSha256 of [undefined, '', 'NONE', 'A'.repeat(64), 'a'.repeat(63)])
+    await assert.rejects(
+      publishCommercialRelease({
+        release: fixture(),
+        store: f.store,
+        keySet,
+        privateKeyPem,
+        keyId,
+        verifyInstaller: async () => undefined,
+        expectedCatalogSha256,
+      }),
+      /expected commercial catalogue/u,
+    );
+  assert.equal(f.writes.length, 0);
 });
 test('all immutable conflicts, invalid catalogs and signature failures fail closed', async () => {
   const f = memoryStore();

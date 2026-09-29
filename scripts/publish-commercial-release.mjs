@@ -12,6 +12,26 @@ import {
 } from './commercial-release-package.mjs';
 import { publishCommercialRelease } from './commercial-release-publisher.mjs';
 
+const USAGE =
+  'Usage: publish-commercial-release.mjs --expected-catalog-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>';
+
+// The expected catalogue is the reviewed live catalog.json: the SHA-256 the
+// previous publication printed, or `none` before the first commercial release.
+export function parsePublicationArguments(args) {
+  const flag = args.indexOf('--expected-catalog-sha256');
+  const expectedCatalogSha256 = flag === -1 ? undefined : args[flag + 1]?.toLowerCase();
+  const paths =
+    flag === -1 ? args : args.filter((_, index) => index !== flag && index !== flag + 1);
+  if (
+    !/^(?:none|[a-f0-9]{64})$/u.test(expectedCatalogSha256 ?? '') ||
+    paths.length !== 3 ||
+    paths.some((path) => path === '' || path.startsWith('--'))
+  )
+    throw new Error(USAGE);
+  const [releaseDirectory, identityPath, resourcesDirectory] = paths;
+  return { releaseDirectory, identityPath, resourcesDirectory, expectedCatalogSha256 };
+}
+
 export function requireCommercialPublishContext(env, identity, platform = process.platform) {
   const required = [
     'DESKTOP_STABLE_MANIFEST_PRIVATE_KEY',
@@ -47,11 +67,8 @@ export async function requireCommercialSource(identity, root, execute = promisif
 }
 
 async function main() {
-  const [releaseDirectory, identityPath, resourcesDirectory, ...extra] = process.argv.slice(2);
-  if (!releaseDirectory || !identityPath || !resourcesDirectory || extra.length)
-    throw new Error(
-      'Usage: publish-commercial-release.mjs <release-directory> <commercial-release-identity.json> <packaged-resources-directory>',
-    );
+  const { releaseDirectory, identityPath, resourcesDirectory, expectedCatalogSha256 } =
+    parsePublicationArguments(process.argv.slice(2));
   const json = (bytes) => JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   const keySet = json(
     await readCommercialInput(
@@ -101,8 +118,11 @@ async function main() {
     privateKeyPem: process.env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY,
     keyId: process.env.DESKTOP_STABLE_MANIFEST_KEY_ID,
     verifyInstaller,
+    expectedCatalogSha256,
   });
-  console.log(`Commercial release ${result.version}: ${result.status}.`);
+  console.log(
+    `Commercial release ${result.version}: ${result.status}. Catalogue SHA-256: ${result.catalogSha256}.`,
+  );
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
   main().catch(() => {

@@ -85,14 +85,18 @@ For each version, from a clean checkout at the tagged source:
 
 ## 3. Publish version N
 
-- [ ] `node scripts/publish-commercial-release.mjs <release-dir> <identity.json> <resources-dir>`
-      prints `published` for N. Only one publisher runs at a time.
+- [ ] `node scripts/publish-commercial-release.mjs --expected-catalog-sha256 <sha256|none> <release-dir> <identity.json> <resources-dir>`
+      prints `published` for N. State the catalogue SHA-256 recorded after the
+      previous publication, or `none` only when no commercial catalogue exists
+      yet; any other live catalogue stops publication before it writes. Only one
+      publisher runs at a time.
 - [ ] From an ordinary browser without GitHub access, `https://kerfdesk.com/download.html`
       shows `KerfDesk N · Released <date> · Publisher signature verified.` and the
       SHA-256 printed there equals the local installer.
 - [ ] The installer downloaded from that page is byte-identical to the local one.
 - [ ] `catalog.json` is served with `Cache-Control: no-store`; versioned objects
-      are immutable. Record the catalogue SHA-256.
+      are immutable. Record the catalogue SHA-256 the publisher printed, check it
+      against the served file, and state it when publishing the next version.
 
 ## 4. Fresh install and trial
 

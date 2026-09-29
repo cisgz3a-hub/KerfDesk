@@ -12,6 +12,7 @@ import {
   verifyInstallerResources,
 } from './commercial-release-package.mjs';
 import {
+  parsePublicationArguments,
   requireCommercialPublishContext,
   requireCommercialSource,
 } from './publish-commercial-release.mjs';
@@ -192,6 +193,32 @@ test('absent, mismatched, duplicate, oversized, or failed archive output cannot 
     createCommercialInstallerVerifier(cleanup.options)(Buffer.from('exe')),
     /cleanup/u,
   );
+});
+
+test('the operator states the expected catalogue explicitly: its SHA-256 or none', () => {
+  const paths = ['release', 'identity.json', 'resources'];
+  const hash = 'ab'.repeat(32);
+  assert.deepEqual(parsePublicationArguments(['--expected-catalog-sha256', 'none', ...paths]), {
+    releaseDirectory: 'release',
+    identityPath: 'identity.json',
+    resourcesDirectory: 'resources',
+    expectedCatalogSha256: 'none',
+  });
+  assert.equal(
+    parsePublicationArguments([...paths, '--expected-catalog-sha256', hash.toUpperCase()])
+      .expectedCatalogSha256,
+    hash,
+  );
+  for (const args of [
+    paths,
+    ['--expected-catalog-sha256', ...paths],
+    ['--expected-catalog-sha256', 'latest', ...paths],
+    ['--expected-catalog-sha256', hash.slice(1), ...paths],
+    ['--expected-catalog-sha256', 'none', ...paths.slice(1)],
+    ['--expected-catalog-sha256', 'none', ...paths, 'extra'],
+    ['--expected-catalog-sha256', 'none', '--expected-catalog-sha256', 'none', ...paths],
+  ])
+    assert.throws(() => parsePublicationArguments(args), /Usage/u);
 });
 
 test('local operator publication requires explicit Windows signing/account inputs and the exact clean source checkout', async () => {

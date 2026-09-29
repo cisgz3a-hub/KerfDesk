@@ -137,6 +137,7 @@ test('signature tampering, wrong-purpose keys, unknown keys and noncanonical bas
       privateKeyPem: '',
       keyId,
       verifyInstaller: async () => undefined,
+      expectedCatalogSha256: 'none',
     }),
   );
   assert.equal(f.writes.length, 0);
