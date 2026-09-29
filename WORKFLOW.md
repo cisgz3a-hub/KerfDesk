@@ -3090,7 +3090,8 @@ settings and Job Review keep their existing read-only setup references.
    the standard and modules under 0.2 mm show a warning.
 4. For serials or CSV data, tick **Variable data** and insert fields as for variable text. The
    preview encodes the value the next output would use; each array copy and each output
-   re-encodes its own value.
+   re-encodes its own value. The canvas draws each code, with its text, for the current value
+   and redraws it when the serial, record or data changes (ADR-386 Amendment 2).
 5. **Insert** places the code centred on the bed on its own Fill operation, selected, as one undo
    step. Double-click a barcode, or use **Edit barcode...** in the artwork panel, to change it;
    **Apply** re-encodes it in place and keeps its position, rotation and operation.
