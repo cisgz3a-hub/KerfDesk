@@ -261,7 +261,7 @@ describe('variable sheets across actual export actions', () => {
     );
     const outputScope = { cutSelectedGraphics: true, useSelectionOrigin: false, selectedObjectIds };
     const advance = vi.fn(useStore.getState().advanceVariablesAfter);
-    const replacement = { ...project, notes: 'edited during save' };
+    const replacement = { ...project, variables: { ...project.variables!, recordIndex: 3 } };
     const adapter = platform('success', []);
     await handleSaveGcode({
       project,

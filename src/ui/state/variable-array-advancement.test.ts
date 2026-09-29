@@ -147,7 +147,7 @@ describe('variable sheet advancement', () => {
       serialValue: 11,
       recordIndex: 1,
     });
-    const replacement = { ...ordinary, notes: 'replaced while saving' };
+    const replacement = { ...ordinary, variables: { ...ordinary.variables!, recordIndex: 3 } };
     useStore.setState({ project: replacement });
     useStore.getState().advanceVariablesAfter(ordinary, 'successful-export');
     expect(useStore.getState().project).toBe(replacement);

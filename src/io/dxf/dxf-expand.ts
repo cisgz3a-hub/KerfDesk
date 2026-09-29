@@ -1,7 +1,8 @@
 // Raw-entity grouping + recursive INSERT expansion for the DXF importer
 // (Phase H.6). Pure: every function returns fresh collections; the caller
-// merges. Colors resolve here because BYBLOCK (ACI 0) needs the inserting
-// entity's color flowing down the recursion.
+// merges. Colors and layers resolve here because BYBLOCK (ACI 0) and block
+// content on layer 0 take the inserting entity's color and layer, which flow
+// down the recursion.
 
 import type { CurveSubpath, Polyline, Vec2 } from '../../core/scene';
 import { aciToHex, DXF_DEFAULT_COLOR, trueColorToHex } from './dxf-colors';
@@ -9,6 +10,7 @@ import {
   arcToPolyline,
   circleToPolyline,
   ellipseToPolyline,
+  entityExtrusion,
   firstNumber,
   firstString,
   hasUnreadableGeometry,
@@ -18,6 +20,7 @@ import {
   splineToPolyline,
   type EntityConversion,
 } from './dxf-entities';
+import { mirrorPointX, TILTED_PLANE_NOTE } from './dxf-ocs';
 import type { DxfTag } from './dxf-tags';
 import {
   dxfInsertGrid,
@@ -45,6 +48,8 @@ export type ColoredPolyline = {
 
 export type ExpandOutcome = {
   readonly polylines: ReadonlyArray<ColoredPolyline>;
+  // Counts of what was not imported: unsupported or unreadable entities by
+  // DXF type, and content CAD does not display under the labels below.
   readonly skipped: ReadonlyMap<string, number>;
   readonly notes: ReadonlyArray<string>;
 };
@@ -52,16 +57,34 @@ export type ExpandOutcome = {
 export type ExpandContext = {
   readonly scale: number;
   readonly layerColors: ReadonlyMap<string, string>;
+  // Upper-case names of layers that are off or frozen.
+  readonly hiddenLayers: ReadonlySet<string>;
   readonly blocks: ReadonlyMap<string, DxfBlock>;
 };
+
+// What block content inherits from the INSERT that places it: the color
+// BYBLOCK content takes, and the (upper-case) layer that content drawn on
+// layer 0 resolves to (ezdxf resolve_layer; AutoCAD's layer-0 rule).
+export type BlockReference = {
+  readonly color: string;
+  readonly layer: string;
+};
+
+// Skipped-summary labels for content that CAD does not show, read as
+// "skipped 3 on hidden layers".
+export const SKIPPED_ON_HIDDEN_LAYERS = 'on hidden layers';
+export const SKIPPED_IN_PAPER_SPACE = 'in paper space';
 
 const MAX_INSERT_DEPTH = 8;
 const ACI_BYBLOCK = 0;
 const ACI_BYLAYER = 256;
 const DEGREES_TO_RADIANS = Math.PI / 180;
+const DEFAULT_LAYER = '0';
+const PAPER_SPACE_FLAG = 1; // group 67
 
 // Split a section's tag run into entities: each starts at a (0, TYPE) tag.
-// Classic POLYLINE absorbs its VERTEX children through SEQEND.
+// Classic POLYLINE absorbs its VERTEX children through SEQEND. Any other
+// SEQEND ends an INSERT's ATTRIB list and draws nothing, so it is dropped.
 export function groupRawEntities(tags: ReadonlyArray<DxfTag>): ReadonlyArray<RawEntity> {
   const runs: { type: string; tags: DxfTag[] }[] = [];
   for (const tag of tags) {
@@ -71,6 +94,7 @@ export function groupRawEntities(tags: ReadonlyArray<DxfTag>): ReadonlyArray<Raw
   const entities: RawEntity[] = [];
   for (let i = 0; i < runs.length; i += 1) {
     const run = runs[i] as (typeof runs)[number];
+    if (run.type === 'SEQEND') continue;
     if (run.type !== 'POLYLINE') {
       entities.push({ type: run.type, tags: run.tags, vertexRuns: [] });
       continue;
@@ -88,49 +112,78 @@ export function groupRawEntities(tags: ReadonlyArray<DxfTag>): ReadonlyArray<Raw
   return entities;
 }
 
+// `reference` is the INSERT whose block holds `entities`, or null for the
+// ENTITIES section itself.
 export function expandEntities(
   entities: ReadonlyArray<RawEntity>,
   ctx: ExpandContext,
-  inheritedColor: string | null,
+  reference: BlockReference | null,
   depth: number,
 ): ExpandOutcome {
   const polylines: ColoredPolyline[] = [];
   const skipped = new Map<string, number>();
   const notes: string[] = [];
   for (const entity of entities) {
+    // CAD shows a layout's paper-space content (title block, viewport frames)
+    // only on that layout, never in the model a part is cut from. Block
+    // content lives wherever its INSERT does, so only top-level flags count.
+    if (reference === null && isInPaperSpace(entity.tags)) {
+      bumpSkipped(skipped, SKIPPED_IN_PAPER_SPACE);
+      continue;
+    }
+    const layer = resolveLayer(entity.tags, reference);
     if (entity.type === 'INSERT') {
-      const child = expandInsert(entity, ctx, inheritedColor, depth);
+      const color = resolveEntityColor(entity.tags, ctx.layerColors, layer, reference);
+      const child = expandInsert(entity, ctx, { color, layer }, depth);
       // Nested grids can compose far beyond the engine's function-argument limit.
       for (const polyline of child.polylines) polylines.push(polyline);
       mergeSkipped(skipped, child.skipped);
       for (const note of child.notes) notes.push(note);
       continue;
     }
-    // Reject value-level corruption (a non-numeric or astronomically-large
-    // geometry coordinate) instead of coercing it to 0 and importing wrong
-    // geometry — matches LightBurn, which drops unreadable entities.
-    if (hasUnreadableEntityGeometry(entity, ctx.scale)) {
-      bumpSkipped(skipped, entity.type);
-      notes.push(`${entity.type} skipped: unreadable or out-of-range coordinate value`);
+    // An INSERT's own layer state hides only the content that resolves to
+    // that layer (ezdxf resolve_visible), so the check follows the INSERT.
+    if (ctx.hiddenLayers.has(layer)) {
+      bumpSkipped(skipped, SKIPPED_ON_HIDDEN_LAYERS);
       continue;
     }
-    const conversion = convertEntity(entity, ctx.scale);
-    if (conversion === null) {
+    const conversion = convertReadableEntity(entity, ctx.scale);
+    if (conversion === null || conversion.kind === 'skip') {
       bumpSkipped(skipped, entity.type);
-      continue;
-    }
-    if (conversion.kind === 'skip') {
-      bumpSkipped(skipped, entity.type);
-      if (conversion.reason !== undefined) notes.push(conversion.reason);
+      if (conversion?.reason !== undefined) notes.push(conversion.reason);
       continue;
     }
     polylines.push({
-      color: resolveEntityColor(entity.tags, ctx.layerColors, inheritedColor),
+      color: resolveEntityColor(entity.tags, ctx.layerColors, layer, reference),
       polyline: conversion.polyline,
       curve: conversion.curve,
     });
   }
   return { polylines, skipped, notes };
+}
+
+function isInPaperSpace(tags: ReadonlyArray<DxfTag>): boolean {
+  return Math.trunc(firstNumber(tags, 67)) === PAPER_SPACE_FLAG;
+}
+
+// An entity without group 8 is on layer 0, and layer 0 inside a block means
+// the layer of the INSERT that places it.
+function resolveLayer(tags: ReadonlyArray<DxfTag>, reference: BlockReference | null): string {
+  const layer = (firstString(tags, 8) ?? DEFAULT_LAYER).toUpperCase();
+  return layer === DEFAULT_LAYER && reference !== null ? reference.layer : layer;
+}
+
+// Reject value-level corruption (a non-numeric or astronomically-large
+// geometry coordinate) instead of coercing it to 0 and importing wrong
+// geometry — matches LightBurn, which drops unreadable entities.
+function convertReadableEntity(entity: RawEntity, scale: number): EntityConversion | null {
+  if (hasUnreadableEntityGeometry(entity, scale)) {
+    return {
+      kind: 'skip',
+      reason: `${entity.type} skipped: unreadable or out-of-range coordinate value`,
+    };
+  }
+  return convertEntity(entity, scale);
 }
 
 // Classic POLYLINE carries its geometry in VERTEX children, not its own tags,
@@ -162,52 +215,57 @@ function convertEntity(entity: RawEntity, scale: number): EntityConversion | nul
   }
 }
 
+// `reference` is this INSERT's own resolved color and layer, which its block
+// content inherits.
 function expandInsert(
   entity: RawEntity,
   ctx: ExpandContext,
-  inheritedColor: string | null,
+  reference: BlockReference,
   depth: number,
 ): ExpandOutcome {
   const name = firstString(entity.tags, 2)?.toUpperCase() ?? '';
   const block = ctx.blocks.get(name);
-  if (block === undefined) {
-    return {
-      polylines: [],
-      skipped: new Map(),
-      notes: [`INSERT references unknown block "${name}"`],
-    };
-  }
+  // Every refusal below drops the block's parts, so each counts as a skipped
+  // INSERT as well as leaving a note.
+  if (block === undefined) return skippedInsert(`INSERT references unknown block "${name}"`);
   if (depth >= MAX_INSERT_DEPTH) {
-    return {
-      polylines: [],
-      skipped: new Map(),
-      notes: [`INSERT "${name}" skipped: nesting deeper than ${MAX_INSERT_DEPTH} (cycle?)`],
-    };
+    return skippedInsert(
+      `INSERT "${name}" skipped: nesting deeper than ${MAX_INSERT_DEPTH} (cycle?)`,
+    );
+  }
+  const extrusion = entityExtrusion(entity.tags);
+  if (extrusion === 'tilted') {
+    return skippedInsert(`INSERT "${name}" skipped: ${TILTED_PLANE_NOTE}`);
   }
   const grid = dxfInsertGrid(entity.tags);
   if (!isDxfInsertGridWithinBudget(grid)) {
-    return {
-      polylines: [],
-      skipped: new Map([['INSERT', 1]]),
-      notes: [
-        `INSERT "${name}" skipped: MINSERT grid has ${grid.instanceCount} instances (maximum ${MAX_MINSERT_INSTANCES})`,
-      ],
-    };
+    return skippedInsert(
+      `INSERT "${name}" skipped: MINSERT grid has ${grid.instanceCount} instances (maximum ${MAX_MINSERT_INSTANCES})`,
+    );
   }
-  const insertColor = resolveEntityColor(entity.tags, ctx.layerColors, inheritedColor);
-  const child = expandEntities(block.entities, ctx, insertColor, depth + 1);
-  const placed = placeInsertInstances(entity, block, ctx.scale, child.polylines);
+  const child = expandEntities(block.entities, ctx, reference, depth + 1);
+  const placed = placeInsertInstances(entity, block, ctx.scale, child.polylines, {
+    mirrored: extrusion === 'mirrored',
+  });
   return { polylines: placed, skipped: child.skipped, notes: child.notes };
+}
+
+function skippedInsert(note: string): ExpandOutcome {
+  return { polylines: [], skipped: new Map([['INSERT', 1]]), notes: [note] };
 }
 
 // Apply the INSERT transform (scale about the block base point, rotate,
 // translate) to already-converted child geometry, once per grid instance
-// (MINSERT rows/columns; a plain INSERT is the 1×1 case).
+// (MINSERT rows/columns; a plain INSERT is the 1×1 case). The insertion
+// point, rotation and grid are in the INSERT's OCS; for the extrusion
+// (0,0,-1) that OCS is world XY mirrored in X (see dxf-ocs), so the placed
+// point is mirrored last.
 function placeInsertInstances(
   entity: RawEntity,
   block: DxfBlock,
   scale: number,
   children: ReadonlyArray<ColoredPolyline>,
+  ocs: { readonly mirrored: boolean },
 ): ColoredPolyline[] {
   const insert: Vec2 = {
     x: firstNumber(entity.tags, 10) * scale,
@@ -232,10 +290,11 @@ function placeInsertInstances(
         const point = (p: Vec2): Vec2 => {
           const localX = (p.x - base.x) * scaleX + gridX;
           const localY = (p.y - base.y) * scaleY + gridY;
-          return {
+          const placed = {
             x: insert.x + localX * cos - localY * sin,
             y: insert.y + localX * sin + localY * cos,
           };
+          return ocs.mirrored ? mirrorPointX(placed) : placed;
         };
         out.push({
           color: child.color,
@@ -270,22 +329,20 @@ function transformCurve(curve: CurveSubpath, point: (value: Vec2) => Vec2): Curv
   };
 }
 
+// `layer` is the entity's resolved layer (see resolveLayer).
 function resolveEntityColor(
   tags: ReadonlyArray<DxfTag>,
   layerColors: ReadonlyMap<string, string>,
-  inheritedColor: string | null,
+  layer: string,
+  reference: BlockReference | null,
 ): string {
   const trueColor = firstNumber(tags, 420, Number.NaN);
   if (Number.isFinite(trueColor)) return trueColorToHex(trueColor);
+  const inheritedColor = reference?.color ?? null;
   const aci = Math.trunc(firstNumber(tags, 62, ACI_BYLAYER));
   if (aci === ACI_BYBLOCK) return inheritedColor ?? DXF_DEFAULT_COLOR;
   if (aci !== ACI_BYLAYER && aci > 0) return aciToHex(aci);
-  const layerName = firstString(tags, 8);
-  if (layerName !== null) {
-    const layerColor = layerColors.get(layerName.toUpperCase());
-    if (layerColor !== undefined) return layerColor;
-  }
-  return inheritedColor ?? DXF_DEFAULT_COLOR;
+  return layerColors.get(layer) ?? inheritedColor ?? DXF_DEFAULT_COLOR;
 }
 
 function bumpSkipped(skipped: Map<string, number>, type: string): void {

@@ -20,7 +20,8 @@
 // that drop arcs anyway, so they keep the usual flattening.
 //
 // Tabs placed by hand on a source contour follow it to the offset contour that
-// lies closest (ADR-494's rule, unchanged).
+// lies closest (ADR-494's rule, unchanged), and each offset contour starts at
+// its vertex nearest its source contour's start (kerf-ring-start.ts).
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
@@ -37,6 +38,7 @@ import { compilationPolylines } from './compilation-polylines';
 import { containmentDepths } from './containment-depth';
 import { laserArcFitForMachineChords } from './cut-arc-moves';
 import type { CutSegment } from './job';
+import { startKerfRingsAtSources } from './kerf-ring-start';
 import { placedTabPointsForKerfContours } from './laser-tab-anchors';
 import { perforationPatternFor } from './operation-cut-extras';
 
@@ -112,9 +114,10 @@ export function withLayerKerf(
   const offsets = pending.map((group, index): OffsetContours => {
     const offset = offsetGroup(rings[index] ?? [], outside[index] ?? [], layer.kerfOffsetMm);
     if (offset === null) failed = true;
+    const started = startKerfRingsAtSources(offset ?? [], rings[index] ?? [], layer.kerfOffsetMm);
     return {
-      segments: (offset ?? []).map((ring) => fit({ polyline: ring.points, closed: true })),
-      tabs: placedTabPointsForKerfContours(offset ?? [], group.sources),
+      segments: started.map((ring) => fit({ polyline: ring.points, closed: true })),
+      tabs: placedTabPointsForKerfContours(started, group.sources),
     };
   });
   return { ...interleave(collected, pending, offsets), failed };

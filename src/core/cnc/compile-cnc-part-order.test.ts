@@ -204,7 +204,10 @@ describe('compileCncJob profile part order', () => {
     });
 
     expect(compress(owners)).toEqual(['upper', 'lower']);
-    expect(owners).toEqual(['upper', 'lower', 'lower', 'lower']);
+    // Nothing roughed the thin part, so its finishing path follows the 1 mm
+    // depth ladder instead of one 2 mm pass (ADR-140 Amendment 1). The roughed
+    // square keeps its single full-depth finishing pass.
+    expect(owners).toEqual(['upper', 'upper', 'lower', 'lower', 'lower']);
   });
 
   it('ignores an open envelope when grouping closed pocket letters', () => {

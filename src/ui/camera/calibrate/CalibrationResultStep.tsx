@@ -6,6 +6,7 @@
 import { cameraModelHeightMm } from '../../../core/camera/model/camera-model-record';
 import { withSavedCameraModel } from '../../../core/camera/model/saved-cameras';
 import type { MarkError } from '../../../core/camera/target/bed-calibration';
+import { targetLayoutMismatch } from '../../../core/camera/target/target-coverage';
 import { useStore } from '../../state';
 import { calibrationGrade, type CalibrationGrade } from './calibration-result';
 import { useCameraCalibrationStore, type CalibrationResult } from './camera-calibration-store';
@@ -32,8 +33,11 @@ export function CalibrationResultStep(props: {
   const { record } = result;
   const grade = calibrationGrade(record);
   const checking = useCameraCalibrationStore((s) => s.mode) === 'check';
+  const layoutSuspect = targetLayoutMismatch(record) !== null;
   const check =
-    result.savedCheck === null ? null : <SavedCalibrationCheckNote check={result.savedCheck} />;
+    result.savedCheck === null ? null : (
+      <SavedCalibrationCheckNote check={result.savedCheck} layoutSuspect={layoutSuspect} />
+    );
 
   return (
     <div style={columnStyle}>
@@ -45,7 +49,12 @@ export function CalibrationResultStep(props: {
       {checking ? null : check}
       <OtherCamerasNote result={result} />
       <BedAccuracyMap result={result} />
-      <ResultActions result={result} checking={checking} save={props.save} />
+      <ResultActions
+        result={result}
+        checking={checking}
+        layoutSuspect={layoutSuspect}
+        save={props.save}
+      />
     </div>
   );
 }
@@ -71,17 +80,19 @@ function OtherCamerasNote(props: { readonly result: CalibrationResult }): JSX.El
 }
 
 // A check that finds the camera where it was makes keeping the saved
-// calibration the suggested action; anything else suggests saving the new one.
+// calibration the suggested action, and so does a photo that looks like a
+// target engraved with other settings; anything else suggests saving the new one.
 function ResultActions(props: {
   readonly result: CalibrationResult;
   readonly checking: boolean;
+  readonly layoutSuspect: boolean;
   readonly save: (result: CalibrationResult) => void;
 }): JSX.Element {
   const { savedCheck } = props.result;
   const closeWizard = useCameraCalibrationStore((s) => s.closeWizard);
   const setStep = useCameraCalibrationStore((s) => s.setStep);
   const unchanged = savedCheck?.kind === 'measured' && !savedCalibrationVerdict(savedCheck).moved;
-  const keepFirst = props.checking && unchanged;
+  const keepFirst = (props.checking && unchanged) || (savedCheck !== null && props.layoutSuspect);
   return (
     <div style={rowStyle}>
       <button

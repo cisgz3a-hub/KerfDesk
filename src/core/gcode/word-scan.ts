@@ -145,10 +145,24 @@ function stripDiagnosticBlockFraming(line: string): string {
 
 // Strips paired `(...)` inline comments (replaced by a space so adjacent words
 // never fuse) and everything from `;`, then trims. An unclosed `(` is left in
-// place — both parsers have always treated that as junk downstream, and this
-// stage is a pure refactor.
+// place, which the output, recovery and second-pass readers have always
+// treated as junk downstream; the viewers use stripControllerComments.
 export function stripInlineComments(line: string): string {
   const noParens = line.replace(/\([^)]*\)/g, ' ');
   const semicolon = noParens.indexOf(';');
   return (semicolon >= 0 ? noParens.slice(0, semicolon) : noParens).trim();
+}
+
+/**
+ * Strips comments the way GRBL reads a line (protocol.c): `(` starts a comment
+ * that ends at `)` or at the end of the line, and `;` comments out the rest.
+ * An unclosed `(` therefore hides only what follows it; the words before it
+ * still run, so the viewers draw them rather than dropping the line.
+ */
+export function stripControllerComments(line: string): string {
+  const noParens = line.replace(/\([^)]*\)/g, ' ');
+  const unclosed = noParens.indexOf('(');
+  const semicolon = noParens.indexOf(';');
+  const ends = [unclosed, semicolon].filter((index) => index >= 0);
+  return (ends.length === 0 ? noParens : noParens.slice(0, Math.min(...ends))).trim();
 }

@@ -3,6 +3,7 @@ import type { VariableCsvDataset } from '../../core/scene';
 import { parseVariableCsv } from '../../core/variables';
 import { Button } from '../kit';
 import { useStore, type useToastStore } from '../state';
+import { csvImportNotice, decodeCsvBytes, type DecodedCsvText } from './csv-file-text';
 import {
   isVariableCsvImportClaimCurrent,
   useVariableCsvImportOwner,
@@ -69,22 +70,25 @@ async function importVariableCsv(
   claim: VariableCsvImportClaim,
   props: VariableCsvImportProps,
 ): Promise<void> {
-  let text: string;
+  let decoded: DecodedCsvText;
   try {
-    text = await file.text();
+    // Bytes, not file.text(): text() always decodes UTF-8 and would silently
+    // replace every accented letter of a Windows-1252 Excel export.
+    decoded = decodeCsvBytes(new Uint8Array(await file.arrayBuffer()));
   } catch (error) {
     if (!isClaimCurrent(claim)) return;
     props.pushToast(`Could not read ${file.name}: ${errorMessage(error)}`, 'error');
     return;
   }
   if (!isClaimCurrent(claim)) return;
-  const result = parseVariableCsv(file.name, text);
+  const result = parseVariableCsv(file.name, decoded.text);
   if (!result.ok) {
     props.pushToast(`${result.message} Row ${result.row}, column ${result.column}.`, 'error');
     return;
   }
   props.setCsv(result.dataset);
-  props.pushToast(`Embedded ${result.dataset.records.length} CSV record(s).`, 'success');
+  const notice = csvImportNotice(result.dataset.records.length, decoded.encoding, result.delimiter);
+  props.pushToast(notice.message, notice.variant);
 }
 
 function isClaimCurrent(claim: VariableCsvImportClaim): boolean {

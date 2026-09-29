@@ -4,7 +4,8 @@
 // Model: tabs occupy the bottom `tabHeightMm` of the cut. Passes at or above
 // the tab top cut the full loop; passes below it skip the tab intervals —
 // (with a set stock thickness the compiler measures that height from the stock
-// bottom instead, through settingsWithStockTabGate; ADR-258 amendment 3) —
+// bottom instead, through settingsWithStockTabGate; ADR-258 amendment 3, and
+// cuts a tab no thinner than the stock half the stock thick; amendment 4) —
 // reusing the laser tab-splitting geometry (skip windows along the perimeter).
 // The skip length adds one tool diameter so the PHYSICAL bridge is the
 // requested width after the bit (radius on each side) eats into the gap.
@@ -48,20 +49,34 @@ export function passNeedsTabs(zMm: number, depthMm: number, tabHeightMm: number)
   return zMm < tabTopZMm(depthMm, tabHeightMm) - TAB_EPS;
 }
 
+// ADR-258 amendment 4 (second CNC audit P2-toolpath-2): the tab a set stock
+// thickness leaves standing on the stock bottom. A tab at least as thick as the
+// stock would reach the stock top, so no pass could cut over it and
+// passNeedsTabs dropped it, freeing a part cut through thin sheet under the
+// default 2 mm tab. Such a tab is cut half the stock thick instead: still a
+// real bridge, and still the same whatever the cut depth (amendment 3). The
+// shipped stock thickness reads as never set, so the request stands there.
+export function stockLimitedTabHeightMm(tabHeightMm: number, stockThicknessMm: number): number {
+  if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return tabHeightMm;
+  return tabHeightMm < stockThicknessMm - TAB_EPS ? tabHeightMm : stockThicknessMm / 2;
+}
+
 // ADR-258 amendment 1: tabs belong on cuts that can free the part. A floor at
 // least one tab height thick under the cut holds the part better than tabs, and
 // tabs there only leave bumps along the groove; Easel likewise adds tabs only
 // when the cut depth reaches the material thickness. A floor thinner than a tab
-// keeps them, so a stock thickness set slightly off still gets tabs. The shipped
-// stock thickness is indistinguishable from never having set it, so on that
-// value any cut may go through and the depth-only rule above stays in force.
+// keeps them, so a stock thickness set slightly off still gets tabs. The tab
+// compared is the one the compiler cuts (amendment 4). The shipped stock
+// thickness is indistinguishable from never having set it, so on that value
+// any cut may go through and the depth-only rule above stays in force.
 export function cutCanFreePart(
   depthMm: number,
   tabHeightMm: number,
   stockThicknessMm: number,
 ): boolean {
   if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return true;
-  return stockThicknessMm - depthMm < tabHeightMm - TAB_EPS;
+  const keptTabMm = stockLimitedTabHeightMm(tabHeightMm, stockThicknessMm);
+  return stockThicknessMm - depthMm < keptTabMm - TAB_EPS;
 }
 
 // ADR-258 amendment 3 (CNC audit TP-1): with a set stock thickness a tab is one
@@ -76,7 +91,8 @@ export function tabHeightAboveCutFloorMm(
   stockThicknessMm: number,
 ): number {
   if (stockThicknessMm === DEFAULT_CNC_STOCK.thicknessMm) return tabHeightMm;
-  return tabHeightMm + Math.max(0, depthMm) - stockThicknessMm;
+  const keptTabMm = stockLimitedTabHeightMm(tabHeightMm, stockThicknessMm);
+  return keptTabMm + Math.max(0, depthMm) - stockThicknessMm;
 }
 
 /** The layer settings the pass builders see: tabs off where the floor holds the

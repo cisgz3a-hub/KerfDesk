@@ -209,7 +209,7 @@ describe('textToPolylines', () => {
       if (attempts === 1) throw new Error('chunk failed');
       return {
         parse: () => ({
-          getAdvanceWidth: () => 0,
+          forEachGlyph: () => 0,
           getPath: () => ({ commands: [] }),
         }),
       };
@@ -257,4 +257,109 @@ function leftmostXOfFirstLine(
     }
   }
   return xMin;
+}
+
+describe('textToPolylines alignment anchor', () => {
+  it('sits on the first baseline at the line start, centre or end', async () => {
+    const left = await render('HH', { alignment: 'left' });
+    const centre = await render('HH', { alignment: 'center' });
+    const right = await render('HH', { alignment: 'right' });
+    const advance = (right.anchor?.x ?? Number.NaN) - (left.anchor?.x ?? Number.NaN);
+
+    // The advance includes both side bearings, so it is wider than the ink.
+    expect(advance).toBeGreaterThan(left.bounds.maxX);
+    expect((centre.anchor?.x ?? Number.NaN) - (left.anchor?.x ?? Number.NaN)).toBeCloseTo(
+      advance / 2,
+      9,
+    );
+    // H stands on the baseline, so the baseline is the bottom of its ink.
+    for (const rendered of [left, centre, right]) {
+      expect(rendered.anchor?.y).toBeCloseTo(rendered.bounds.maxY, 9);
+    }
+  });
+
+  it('keeps the first baseline and the common centre when more lines follow', async () => {
+    const one = await render('H', { alignment: 'center' });
+    const three = await render('H\nHHHH\nH', { alignment: 'center' });
+
+    expect(three.anchor?.y).toBeCloseTo(one.anchor?.y ?? Number.NaN, 9);
+    expect(three.anchor?.x).toBeCloseTo(three.bounds.maxX / 2, 1);
+  });
+
+  it('has no anchor when there is no ink', async () => {
+    expect((await render('   ')).anchor).toBeUndefined();
+  });
+});
+
+describe('textToPolylines characters the font cannot draw', () => {
+  it('reports each character the font has no glyph for, still drawing its missing-glyph shape', async () => {
+    const plain = await render('AB');
+    const withCheck = await render('A\u2713B\u2713');
+
+    expect(plain.missingCharacters).toBeUndefined();
+    expect(withCheck.missingCharacters).toEqual(['\u2713']);
+    expect(closedContours(withCheck)).toBeGreaterThan(closedContours(plain));
+  });
+
+  it('reports characters a font with an empty missing-glyph shape silently drops', async () => {
+    const rendered = await textToPolylines({
+      fontBuffer: readFontBuffer('StardosStencil-Regular.ttf'),
+      content: '\u015aL\u0104SK',
+      sizeMm: 10,
+      alignment: 'left',
+      lineHeight: 1.4,
+      color: '#000000',
+    });
+
+    expect(rendered.missingCharacters).toEqual(['\u015a', '\u0104']);
+  });
+
+  it('lays out a CRLF line break as LF and a TAB as a space', async () => {
+    const italianno = readFontBuffer('Italianno-Regular.ttf');
+    const script = (content: string) =>
+      textToPolylines({
+        fontBuffer: italianno,
+        content,
+        sizeMm: 10,
+        alignment: 'left',
+        lineHeight: 1.4,
+        color: '#000000',
+      });
+
+    const crlf = await script('Anna\r\nBen');
+    const tab = await script('Anna\tBen');
+
+    expect(crlf).toEqual(await script('Anna\nBen'));
+    expect(tab).toEqual(await script('Anna Ben'));
+    expect(crlf.missingCharacters).toBeUndefined();
+  });
+});
+
+describe('textToPolylines ligature alignment', () => {
+  it.each([0, 0.1])(
+    'right-aligns a line drawn with ligatures by its drawn width (letter spacing %s)',
+    async (letterSpacing) => {
+      const rendered = await textToPolylines({
+        fontBuffer: robotoBuffer,
+        content: 'office fluff affinity\nmany many many many',
+        sizeMm: 10,
+        alignment: 'right',
+        lineHeight: 1.4,
+        letterSpacing,
+        color: '#000000',
+      });
+      const points = rendered.paths.flatMap((path) =>
+        path.polylines.flatMap((polyline) => polyline.points),
+      );
+      // Both lines end in "y"; the first line's ink sits above 12 mm.
+      const rightEdge = (onFirstLine: boolean) =>
+        Math.max(...points.filter((point) => point.y < 12 === onFirstLine).map((point) => point.x));
+
+      expect(rightEdge(true)).toBeCloseTo(rightEdge(false), 9);
+    },
+  );
+});
+
+function closedContours(rendered: Awaited<ReturnType<typeof textToPolylines>>): number {
+  return rendered.paths.flatMap((path) => path.curves ?? []).filter((curve) => curve.closed).length;
 }

@@ -162,20 +162,56 @@ describe('SVG composition parsing', () => {
     expect(entry.transform.scaleY).toBeCloseTo(0.3);
   });
 
+  // ADR-358 Amendment 3: an unplaceable image is left out with its reason and
+  // never takes the file's vectors with it.
   it.each([
-    ['transform="skewX(20)" preserveAspectRatio="none"', /skew/i],
-    ['preserveAspectRatio="xMidYMid meet"', /aspect/i],
-    ['preserveAspectRatio="none" opacity="0.5"', /opacity/i],
+    ['width="10" height="10" transform="skewX(20)" preserveAspectRatio="none"', /skews/],
+    ['width="10" height="5" preserveAspectRatio="xMidYMid slice"', /crops them/],
+    ['width="10" height="10" preserveAspectRatio="none" opacity="0.5"', /opacity/],
+    ['width="100%" height="10"', /width and height/],
   ])(
-    'rejects unrepresentable image presentation without approximating it: %s',
-    (attributes, message) => {
+    'skips unrepresentable image presentation without approximating it: %s',
+    (attributes, reason) => {
       const svgText =
-        '<svg viewBox="0 0 20 20"><image width="10" height="10" ' +
+        '<svg viewBox="0 0 20 20"><path d="M0 0H5" stroke="red"/><image ' +
         attributes +
         ' href="' +
         pixel +
         '"/></svg>';
-      expect(() => parseSvg({ svgText, id: 'bad', source: 'bad.svg' })).toThrow(message);
+      const result = parseSvg({ svgText, id: 'bad', source: 'bad.svg' });
+      expect(result.fragment?.entries.map((item) => item.kind)).toEqual(['imported-svg']);
+      expect(result.notes.filter((note) => note.includes('embedded image'))).toEqual([
+        expect.stringMatching(reason),
+      ]);
     },
   );
+
+  it('skips an embedded GIF, which is not a bitmap KerfDesk decodes', () => {
+    const svgText =
+      '<svg viewBox="0 0 20 20"><path d="M0 0H5" stroke="red"/><image width="10" height="10" ' +
+      'href="data:image/gif;base64,R0lGODlhAQABAAAAACw="/></svg>';
+    const result = parseSvg({ svgText, id: 'gif', source: 'gif.svg' });
+    expect(result.fragment?.entries.map((item) => item.kind)).toEqual(['imported-svg']);
+    expect(result.notes.join('\n')).toMatch(/Skipped 1 embedded image\(s\).*GIF/);
+  });
+
+  it.each([
+    ['width="10" height="10" preserveAspectRatio="xMidYMid meet"', { minX: 0, maxX: 10, maxY: 10 }],
+    [
+      'width="10" height="10" preserveAspectRatio="xMaxYMax slice"',
+      { minX: 0, maxX: 10, maxY: 10 },
+    ],
+    ['width="20" height="10"', { minX: 5, maxX: 15, maxY: 10 }],
+    ['width="20" height="10" preserveAspectRatio="xMinYMin"', { minX: 0, maxX: 10, maxY: 10 }],
+    [
+      'width="20" height="10" preserveAspectRatio="xMaxYMid meet"',
+      { minX: 10, maxX: 20, maxY: 10 },
+    ],
+    ['width="10" height="20" preserveAspectRatio="xMidYMax"', { minX: 0, maxX: 10, maxY: 20 }],
+  ])('places the square bitmap as preserveAspectRatio fits it: %s', (attributes, bounds) => {
+    const entry = parsedImage(
+      '<svg viewBox="0 0 20 20"><image ' + attributes + ' href="' + pixel + '"/></svg>',
+    );
+    expect(entry.bounds).toEqual({ minY: bounds.maxY - 10, ...bounds });
+  });
 });

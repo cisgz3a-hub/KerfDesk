@@ -26,13 +26,15 @@ import type { SelectionAnchor } from '../../core/scene/selection-transform';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { applyCenterArtworkInRegistrationJigSet } from './registration-jig-artwork-actions';
+import { selectionReferenceId, type SelectionReferenceState } from './selection-reference';
 
 export type SelectionTransformEdit = {
   readonly id: string;
   readonly transform: Transform;
 };
 
-export type SelectionTransformActions = {
+// The selection's click order, which Align reads, lives with these actions.
+export type SelectionTransformActions = SelectionReferenceState & {
   readonly applySelectionTransforms: (edits: ReadonlyArray<SelectionTransformEdit>) => void;
   readonly alignSelection: (kind: SelectionAlignKind) => void;
   readonly distributeSelection: (kind: SelectionDistributeKind) => void;
@@ -116,19 +118,23 @@ function applyFitSelectionToBoardToState(state: AppState): AppState | Partial<Ap
   return applySelectionTransformsToState(state, [{ id: target.id, transform: fitted.transform }]);
 }
 
+// The reference is the object last clicked into the selection, as in LightBurn.
+// A selection made at once (a marquee, Select All) has no click order, so it
+// falls back to the last selected id, which is the top-most in the stack.
 function applySelectionAlignToState(
   state: AppState,
   kind: SelectionAlignKind,
 ): AppState | Partial<AppState> {
   const ids = selectedObjectIds(state);
-  const referenceId = ids[ids.length - 1];
-  if (referenceId === undefined) return state;
   const scene = state.project.scene;
-  const result = buildSelectionAlignEdit(
-    selectedObjects(scene, ids),
-    { kind, referenceId },
-    scene.groups ?? [],
-  );
+  const objects = selectedObjects(scene, ids);
+  const clickedId = selectionReferenceId(state);
+  const referenceId =
+    clickedId !== null && objects.some((object) => object.id === clickedId)
+      ? clickedId
+      : ids[ids.length - 1];
+  if (referenceId === undefined) return state;
+  const result = buildSelectionAlignEdit(objects, { kind, referenceId }, scene.groups ?? []);
   if (result.kind === 'error') return state;
   return applySelectionTransformsToState(state, result.transforms);
 }

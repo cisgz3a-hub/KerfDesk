@@ -1,8 +1,8 @@
 // DXF entity → canonical curve plus compatibility-polyline converters.
 // Every converter takes the entity's own tag run plus the drawing→mm scale and returns geometry in
-// millimeters, still in DXF's Y-up frame — parse-dxf flips and normalizes
-// once at the end. Z coordinates (codes 30/38) are deliberately ignored:
-// this is a 2.5D import (F-CNC9 edge 4).
+// millimeters and world XY (an entity stored in an OCS is mapped out of it, see dxf-ocs), still
+// in DXF's Y-up frame — parse-dxf flips and normalizes once at the end. Z coordinates (codes
+// 30/38) are deliberately ignored: this is a 2.5D import (F-CNC9 edge 4).
 
 import {
   polylineToCurveSubpath,
@@ -10,7 +10,16 @@ import {
   type Polyline,
   type Vec2,
 } from '../../core/scene';
+import { CLOSURE_EPS_MM } from '../../core/scene/polyline-closure';
 import type { DxfTag } from './dxf-tags';
+import {
+  classifyExtrusion,
+  mirrorCurveX,
+  mirrorPointX,
+  mirrorPolylineX,
+  TILTED_PLANE_NOTE,
+  type DxfExtrusion,
+} from './dxf-ocs';
 import {
   bulgeSegment,
   isFullEllipseSweep,
@@ -29,7 +38,14 @@ const CLOSED_FLAG_BIT = 1;
 // to be identical after floating-point evaluation.
 const PERIODIC_SPLINE_FLAG_BIT = 2;
 const POLYLINE_MESH_FLAG_BITS = 16 | 64; // polygon/polyface meshes — 3D, skipped
+const POLYLINE_SPLINE_FIT_FLAG = 4;
+const POLYLINE_3D_FLAG = 8;
+// VERTEX flag 16: a spline frame control point, which CAD shows only as the
+// construction frame of a spline-fit POLYLINE, never as part of the curve.
+const VERTEX_SPLINE_FRAME_FLAG = 16;
 const MIN_POLYLINE_POINTS = 2;
+// Same minimum as isClosedEnough: two points that meet are a dot, not an outline.
+const MIN_ENDS_MEET_POINTS = 3;
 
 export type EntityConversion =
   | { readonly kind: 'ok'; readonly polyline: Polyline; readonly curve: CurveSubpath }
@@ -46,6 +62,10 @@ export function lineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): Enti
 }
 
 export function circleToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
+  return inOcs(tags, 'CIRCLE', () => circleInOcs(tags, scale));
+}
+
+function circleInOcs(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const radius = firstNumber(tags, 40) * scale;
   if (!(radius > 0)) return SKIP;
   const center: Vec2 = { x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale };
@@ -57,6 +77,10 @@ export function circleToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): En
 }
 
 export function arcToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
+  return inOcs(tags, 'ARC', () => arcInOcs(tags, scale));
+}
+
+function arcInOcs(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const radius = firstNumber(tags, 40) * scale;
   if (!(radius > 0)) return SKIP;
   const center: Vec2 = { x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale };
@@ -85,7 +109,7 @@ export function lwpolylineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number)
     }
   }
   const closed = (Math.trunc(firstNumber(tags, 70)) & CLOSED_FLAG_BIT) !== 0;
-  return bulgeVerticesToPolyline(vertices, closed);
+  return inOcs(tags, 'LWPOLYLINE', () => bulgeVerticesToPolyline(vertices, closed));
 }
 
 // Classic POLYLINE: the header entity's flags plus its VERTEX children
@@ -97,44 +121,59 @@ export function polylineEntityToPolyline(
 ): EntityConversion {
   const flags = Math.trunc(firstNumber(headerTags, 70));
   if ((flags & POLYLINE_MESH_FLAG_BITS) !== 0) {
-    return { kind: 'skip', reason: 'polyface/polygon mesh POLYLINE' };
+    return { kind: 'skip', reason: 'POLYLINE skipped: 3D polygon or polyface mesh' };
   }
-  const vertices: BulgeVertex[] = vertexTagRuns.map((tags) => ({
+  // A spline-fit POLYLINE (flag 4) lists the fitted curve's vertices and the
+  // spline's frame control points; only the curve is drawn.
+  const drawnRuns =
+    (flags & POLYLINE_SPLINE_FIT_FLAG) === 0
+      ? vertexTagRuns
+      : vertexTagRuns.filter(
+          (tags) => (Math.trunc(firstNumber(tags, 70)) & VERTEX_SPLINE_FRAME_FLAG) === 0,
+        );
+  const vertices: BulgeVertex[] = drawnRuns.map((tags) => ({
     x: firstNumber(tags, 10) * scale,
     y: firstNumber(tags, 20) * scale,
     bulge: firstNumber(tags, 42),
   }));
   const closed = (flags & CLOSED_FLAG_BIT) !== 0;
-  return bulgeVerticesToPolyline(vertices, closed);
+  // A 3D polyline's vertices are world coordinates; a 2D one's are in its OCS.
+  if ((flags & POLYLINE_3D_FLAG) !== 0) return bulgeVerticesToPolyline(vertices, closed);
+  return inOcs(headerTags, 'POLYLINE', () => bulgeVerticesToPolyline(vertices, closed));
 }
 
+// ELLIPSE keeps its centre and major axis in world coordinates; only its minor
+// axis (extrusion x major, scaled by the ratio) depends on the extrusion.
+// Mapping both into the OCS and the result back out gives exactly that axis.
 export function ellipseToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
-  const center: Vec2 = { x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale };
-  const majorAxis: Vec2 = { x: firstNumber(tags, 11) * scale, y: firstNumber(tags, 21) * scale };
+  return inOcs(tags, 'ELLIPSE', (toOcs) => ellipseInOcs(tags, scale, toOcs));
+}
+
+function ellipseInOcs(
+  tags: ReadonlyArray<DxfTag>,
+  scale: number,
+  toOcs: (world: Vec2) => Vec2,
+): EntityConversion {
+  const center = toOcs({ x: firstNumber(tags, 10) * scale, y: firstNumber(tags, 20) * scale });
+  const majorAxis = toOcs({ x: firstNumber(tags, 11) * scale, y: firstNumber(tags, 21) * scale });
   const ratio = firstNumber(tags, 40);
   if (!(Math.hypot(majorAxis.x, majorAxis.y) > 0) || !(ratio > 0)) return SKIP;
   const startParam = firstNumber(tags, 41);
   const endParam = firstNumber(tags, 42, FULL_TURN);
   const points = sampleEllipse(center, majorAxis, ratio, startParam, endParam);
   const sweep = normalizedSweep(startParam, endParam);
-  if (isFullEllipseSweep(startParam, endParam)) {
-    points.pop(); // drop the seam duplicate; `closed` joins it
-    return {
-      kind: 'ok',
-      polyline: { points, closed: true },
-      curve: ellipseArcCurve(center, majorAxis, ratio, startParam, sweep, true),
-    };
-  }
+  const closed = isFullEllipseSweep(startParam, endParam);
+  if (closed) points.pop(); // drop the seam duplicate; `closed` joins it
   return {
     kind: 'ok',
-    polyline: { points, closed: false },
-    curve: ellipseArcCurve(center, majorAxis, ratio, startParam, sweep, false),
+    polyline: { points, closed },
+    curve: ellipseArcCurve(center, majorAxis, ratio, startParam, sweep, closed),
   };
 }
 
 export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): EntityConversion {
   const flags = Math.trunc(firstNumber(tags, 70));
-  const closed = (flags & (CLOSED_FLAG_BIT | PERIODIC_SPLINE_FLAG_BIT)) !== 0;
+  const flaggedClosed = (flags & (CLOSED_FLAG_BIT | PERIODIC_SPLINE_FLAG_BIT)) !== 0;
   const controlPoints: Vec2[] = [];
   for (const tag of tags) {
     if (tag.code === 10) controlPoints.push({ x: parseNumber(tag.value) * scale, y: 0 });
@@ -151,17 +190,10 @@ export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): En
     knots: allNumbers(tags, 40),
     controlPoints,
     weights: allNumbers(tags, 41),
-    closed,
+    closed: flaggedClosed,
   });
-  if (result.kind === 'error') return { kind: 'skip', reason: `SPLINE: ${result.reason}` };
-  const points = [...result.points];
-  if (
-    closed &&
-    points.length > 1 &&
-    samePoint(points[0] as Vec2, points[points.length - 1] as Vec2)
-  ) {
-    points.pop();
-  }
+  if (result.kind === 'error') return { kind: 'skip', reason: `SPLINE skipped: ${result.reason}` };
+  const { points, closed } = withoutRepeatedSeam(result.points, flaggedClosed);
   if (points.length < MIN_POLYLINE_POINTS) return SKIP;
   // General NURBS knot decomposition is not yet part of the curve kernel;
   // preserve the evaluated spline exactly as deterministic line segments.
@@ -170,9 +202,10 @@ export function splineToPolyline(tags: ReadonlyArray<DxfTag>, scale: number): En
 }
 
 function bulgeVerticesToPolyline(
-  vertices: ReadonlyArray<BulgeVertex>,
-  closed: boolean,
+  listed: ReadonlyArray<BulgeVertex>,
+  flaggedClosed: boolean,
 ): EntityConversion {
+  const { points: vertices, closed } = withoutRepeatedSeam(listed, flaggedClosed);
   if (vertices.length < MIN_POLYLINE_POINTS) return SKIP;
   const first = vertices[0] as BulgeVertex;
   const points: Vec2[] = [{ x: first.x, y: first.y }];
@@ -192,6 +225,56 @@ function bulgeVerticesToPolyline(
     polyline: { points, closed },
     curve: { start: { x: first.x, y: first.y }, segments, closed },
   };
+}
+
+// Exporters often close an outline by repeating its first point instead of
+// setting the closed flag. Kerf, tabs, overcut and weld read only the flag,
+// while fill and preflight already treat such a path as closed
+// (isClosedEnough), so the repeat is dropped and the path stored exactly like
+// a flagged closed one. A flagged path loses a repeated seam the same way.
+function withoutRepeatedSeam<T extends Vec2>(
+  points: ReadonlyArray<T>,
+  flaggedClosed: boolean,
+): { readonly points: ReadonlyArray<T>; readonly closed: boolean } {
+  const unchanged = { points, closed: flaggedClosed };
+  const minimum = flaggedClosed ? MIN_POLYLINE_POINTS : MIN_ENDS_MEET_POINTS;
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (points.length < minimum || first === undefined || last === undefined) return unchanged;
+  const endsMeet =
+    Math.abs(first.x - last.x) < CLOSURE_EPS_MM && Math.abs(first.y - last.y) < CLOSURE_EPS_MM;
+  return endsMeet ? { points: points.slice(0, -1), closed: true } : unchanged;
+}
+
+// Runs `build` in the entity's OCS and returns its geometry in world XY. The
+// `toOcs` argument maps a world point into the OCS, for the values (ELLIPSE's
+// centre and axis) that DXF stores in world coordinates. An entity on a
+// tilted plane is skipped with a note rather than silently projected.
+function inOcs(
+  tags: ReadonlyArray<DxfTag>,
+  type: string,
+  build: (toOcs: (world: Vec2) => Vec2) => EntityConversion,
+): EntityConversion {
+  const extrusion = entityExtrusion(tags);
+  if (extrusion === 'tilted') {
+    return { kind: 'skip', reason: `${type} skipped: ${TILTED_PLANE_NOTE}` };
+  }
+  if (extrusion === 'world') return build((world) => world);
+  const conversion = build(mirrorPointX);
+  if (conversion.kind === 'skip') return conversion;
+  return {
+    kind: 'ok',
+    polyline: mirrorPolylineX(conversion.polyline),
+    curve: mirrorCurveX(conversion.curve),
+  };
+}
+
+export function entityExtrusion(tags: ReadonlyArray<DxfTag>): DxfExtrusion {
+  return classifyExtrusion(
+    firstNumber(tags, 210),
+    firstNumber(tags, 220),
+    firstNumber(tags, 230, 1),
+  );
 }
 
 function normalizedSweep(startParam: number, endParam: number): number {
@@ -223,11 +306,14 @@ function parseNumber(value: string, fallback = 0): number {
 }
 
 // Group codes that carry geometry the converters actually read: point/vertex
-// coords (10/20, 11/21), radius/ratio/params/bulge (40/41/42), and angles
-// (50/51). Z (30/31/38) is deliberately absent — this is a 2.5D import that
-// ignores Z, so a corrupt Z is harmless. Non-geometry codes (layer 8, color 62,
-// flags 70, …) stay tolerant so ordinary files are unaffected.
-const DXF_GEOMETRY_CODES: ReadonlySet<number> = new Set([10, 20, 11, 21, 40, 41, 42, 50, 51]);
+// coords (10/20, 11/21), radius/ratio/params/bulge (40/41/42), angles
+// (50/51), and the extrusion direction (210/220/230). Z (30/31/38) is
+// deliberately absent — this is a 2.5D import that ignores Z, so a corrupt Z
+// is harmless. Non-geometry codes (layer 8, color 62, flags 70, …) stay
+// tolerant so ordinary files are unaffected.
+const DXF_GEOMETRY_CODES: ReadonlySet<number> = new Set([
+  10, 20, 11, 21, 40, 41, 42, 50, 51, 210, 220, 230,
+]);
 // Codes that are scaled lengths in machine mm — the magnitude cap applies to
 // these (after scale). Angles/ratios/params/bulge (41/42/50/51) are not lengths.
 const DXF_SCALED_LENGTH_CODES: ReadonlySet<number> = new Set([10, 20, 11, 21, 40]);
@@ -252,9 +338,4 @@ export function hasUnreadableGeometry(tags: ReadonlyArray<DxfTag>, scale: number
     }
   }
   return false;
-}
-
-function samePoint(a: Vec2, b: Vec2): boolean {
-  const EPSILON = 1e-9;
-  return Math.abs(a.x - b.x) < EPSILON && Math.abs(a.y - b.y) < EPSILON;
 }

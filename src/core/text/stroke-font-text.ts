@@ -9,6 +9,7 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
+import { missingCharacters, textForLayout } from './glyph-coverage';
 import type { TextRenderResult } from './text-to-polylines';
 
 export type StrokeFontGlyph = {
@@ -38,7 +39,8 @@ export function renderStrokeFontText(
 ): TextRenderResult {
   const scale = input.sizeMm / font.capHeight;
   const spacingMm = (input.letterSpacing ?? 0) * input.sizeMm;
-  const lines = input.content.split('\n').map((line) => Array.from(line));
+  const text = textForLayout(input.content);
+  const lines = text.split('\n').map((line) => Array.from(line));
   const widths = lines.map((line) => lineWidth(line, font, scale, spacingMm));
   const maxWidth = widths.reduce((maximum, width) => Math.max(maximum, width), 0);
   const curves = lines.flatMap((line, index) =>
@@ -51,7 +53,14 @@ export function renderStrokeFontText(
       font,
     }),
   );
-  return normalizedResult(curves, input.color);
+  // Where a zero-width line would sit is the point every line aligns to.
+  const result = normalizedResult(
+    curves,
+    input.color,
+    alignmentOffset(input.alignment, 0, maxWidth),
+  );
+  const missing = missingCharacters(text, (character) => font.glyphs.has(character));
+  return missing.length === 0 ? result : { ...result, missingCharacters: missing };
 }
 
 type LineRenderInput = {
@@ -143,7 +152,11 @@ function alignmentOffset(
   return 0;
 }
 
-function normalizedResult(curves: ReadonlyArray<CurveSubpath>, color: string): TextRenderResult {
+function normalizedResult(
+  curves: ReadonlyArray<CurveSubpath>,
+  color: string,
+  anchorX: number,
+): TextRenderResult {
   const bounds = curveBounds(curves);
   if (bounds === null) return emptyResult(color);
   const normalizedCurves = curves.map((curve) => translateCurve(curve, -bounds.minX, -bounds.minY));
@@ -152,6 +165,8 @@ function normalizedResult(curves: ReadonlyArray<CurveSubpath>, color: string): T
   return {
     paths,
     bounds: { minX: 0, minY: 0, maxX: bounds.maxX - bounds.minX, maxY: bounds.maxY - bounds.minY },
+    // The first line's baseline is y = 0 before the shift to the ink top-left.
+    anchor: { x: anchorX - bounds.minX, y: -bounds.minY },
   };
 }
 

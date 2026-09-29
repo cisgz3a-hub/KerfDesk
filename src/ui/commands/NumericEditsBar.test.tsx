@@ -66,6 +66,30 @@ describe('NumericEditsBar', () => {
     expect(input(container, 'Selection width').value).toBe('20');
   });
 
+  it('commits nothing when a box loses focus with its text as shown', async () => {
+    installProject(10.12345);
+    useStore.setState({ dirty: false });
+    const container = await render(<NumericEditsBar />);
+    const x = input(container, 'Selection X position');
+    expect(x.value).toBe('10.123');
+
+    await act(async () => Simulate.blur(x));
+
+    expect(useStore.getState().project.scene.objects[0]?.transform.x).toBe(10.12345);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(useStore.getState().dirty).toBe(false);
+  });
+
+  it('does not warn about a rotated selection when its untouched width loses focus', async () => {
+    installProject(40, 30);
+    const container = await render(<NumericEditsBar />);
+
+    await act(async () => Simulate.blur(input(container, 'Selection width')));
+
+    expect(useToastStore.getState().toasts).toEqual([]);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
+
   it('renders disabled numeric fields when nothing is selected', async () => {
     const container = await render(<NumericEditsBar />);
 
@@ -352,7 +376,7 @@ async function typeAndPress(
   });
 }
 
-function installProject(x = 0): void {
+function installProject(x = 0, rotationDeg = 0): void {
   useStore.setState({
     project: {
       ...createProject(),
@@ -365,7 +389,7 @@ function installProject(x = 0): void {
             spec: { kind: 'rect', widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
             color: '#000000',
             bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
-            transform: { ...IDENTITY_TRANSFORM, x },
+            transform: { ...IDENTITY_TRANSFORM, x, rotationDeg },
             paths: [],
           },
         ],

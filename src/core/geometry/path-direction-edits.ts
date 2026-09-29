@@ -14,6 +14,7 @@ import {
   type Transform,
   type Vec2,
 } from '../scene';
+import { CLOSURE_EPS_MM } from '../scene/polyline-closure';
 
 export type ClosePathsResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -28,9 +29,13 @@ export type ReversePathsResult = {
   readonly openReversed: number;
 };
 
-/** An open path with a real shape to close: three or more points whose ends do not meet. */
+/**
+ * An open path with a real shape to close: three or more points. One whose ends
+ * already meet counts too: fill and preflight treat it as closed, but kerf,
+ * tabs, overcut, containment and weld go by the closed flag, so it needs it.
+ */
 export function isCloseablePolyline(polyline: Polyline): boolean {
-  return polyline.points.length >= 3 && !isClosedEnough(polyline);
+  return polyline.points.length >= 3 && !polyline.closed;
 }
 
 export function closeOpenPaths(
@@ -114,14 +119,22 @@ function reverseCurveKeepingStart(curve: CurveSubpath): CurveSubpath {
 
 // A closed polyline repeats its first point, as imported and offset paths do, so
 // the canvas strokes the closing line and the curve's closing segment matches it.
+// A path whose ends already meet is stored as Z would have closed it: its last
+// point moves onto the first instead of a second closing point being added.
 function closePolyline(polyline: Polyline): Polyline {
-  return { closed: true, points: [...polyline.points, ...polyline.points.slice(0, 1)] };
+  const drawn = isClosedEnough(polyline) ? polyline.points.slice(0, -1) : polyline.points;
+  return { closed: true, points: [...drawn, ...polyline.points.slice(0, 1)] };
 }
 
 function closeCurve(curve: CurveSubpath): CurveSubpath {
-  const end = curve.segments.at(-1)?.to ?? curve.start;
-  const closing = samePoint(end, curve.start) ? [] : [{ kind: 'line' as const, to: curve.start }];
-  return { ...curve, segments: [...curve.segments, ...closing], closed: true };
+  const last = curve.segments.at(-1);
+  const end = last?.to ?? curve.start;
+  if (samePoint(end, curve.start)) return { ...curve, closed: true };
+  const segments =
+    last !== undefined && endsMeet(end, curve.start)
+      ? [...curve.segments.slice(0, -1), { ...last, to: curve.start }]
+      : [...curve.segments, { kind: 'line' as const, to: curve.start }];
+  return { ...curve, segments, closed: true };
 }
 
 function curvesPairWithPolylines(path: ColoredPath): boolean {
@@ -139,4 +152,9 @@ function worldGapMm(polyline: Polyline | undefined, transform: Transform): numbe
 
 function samePoint(a: Vec2, b: Vec2): boolean {
   return Math.abs(a.x - b.x) <= 1e-9 && Math.abs(a.y - b.y) <= 1e-9;
+}
+
+// isClosedEnough's test, so a curve and its polyline agree on whether they meet.
+function endsMeet(a: Vec2, b: Vec2): boolean {
+  return Math.abs(a.x - b.x) < CLOSURE_EPS_MM && Math.abs(a.y - b.y) < CLOSURE_EPS_MM;
 }

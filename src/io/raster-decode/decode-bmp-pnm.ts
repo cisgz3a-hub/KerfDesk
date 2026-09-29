@@ -4,6 +4,7 @@
 // RGB and BI_BITFIELDS, bottom-up or top-down; RLE is refused clearly.
 // Netpbm: P1-P6, any maxval, comments.
 
+import { pnmRasterDelimiter } from '../pnm/decode-pnm';
 import type { DecodedRaster } from './decoded-raster';
 import { assertRasterSize } from './decoded-raster';
 
@@ -185,6 +186,9 @@ function requirePnmPayload(
   maxval: number,
 ): void {
   const { bytes } = reader;
+  // A comment may directly follow the last header number; the CR or LF that
+  // ends it is then the delimiter.
+  reader.offset = pnmRasterDelimiter(bytes, reader.offset);
   const delimiter = bytes[reader.offset];
   if (delimiter === undefined || !(delimiter === 32 || (delimiter >= 9 && delimiter <= 13))) {
     throw new Error('The PNM header is malformed.');

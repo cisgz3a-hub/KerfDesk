@@ -82,6 +82,41 @@ describe('TIFF pages at their encoded pixel grid', () => {
     expect(() => decodeTiffPage(bytes, 1)).toThrow(/premultiplied bilevel/);
   });
 
+  // TIFF 6.0 defaults BitsPerSample and SamplesPerPixel to 1, and Pillow's
+  // uncompressed 1-bit writer omits BitsPerSample.
+  it.each([
+    { omitted: [258], little: true },
+    { omitted: [258, 277], little: false },
+  ])('decodes a bilevel page relying on the default of tags $omitted', ({ omitted, little }) => {
+    const complete = tiffDocument(
+      [{}, { width: 8, height: 1, bits: 1, pixels: [0b10110010] }],
+      little,
+    );
+    const bytes = withoutTags(complete, 2, omitted, little);
+    const original = bytes.slice();
+
+    const decoded = decodeTiffPage(bytes, 2);
+
+    expect(Array.from(decoded.rgba).filter((_, index) => index % 4 === 0)).toEqual([
+      255, 0, 255, 255, 0, 0, 255, 0,
+    ]);
+    expect(decoded).toEqual(decodeTiffPage(complete, 2));
+    expect(decodeTiffPage(bytes, 1)).toEqual(decodeTiffPage(complete, 1));
+    expect(bytes).toEqual(original);
+  });
+
+  it.each([
+    [2, /uses CCITT fax compression, which KerfDesk can't read/],
+    [4, /uses CCITT fax compression, which KerfDesk can't read/],
+    [7, /uses JPEG compression, which KerfDesk can't read/],
+    [32773, /uses PackBits compression, which KerfDesk can't read/],
+    [34887, /uses a compression KerfDesk can't read \(type 34887\)/],
+  ])('explains compression %i in plain words and how to re-save it', (compression, scheme) => {
+    const decodePage = (): unknown => decodeTiffPage(tiffDocument([{ compression }]), 1);
+    expect(decodePage).toThrow(scheme);
+    expect(decodePage).toThrow(/Re-save it as LZW or uncompressed\.$/);
+  });
+
   it('reports unsupported compression and malformed directory chains instead of partial artwork', () => {
     expect(() => decodeTiffPage(tiffDocument([{ compression: 32773 }]), 1)).toThrow(/PackBits/);
     const bytes = tiffDocument([{}]);
@@ -92,3 +127,29 @@ describe('TIFF pages at their encoded pixel grid', () => {
     expect(() => tiffPageCount(bytes.subarray(0, 20))).toThrow(/Incomplete/);
   });
 });
+
+// Drop entries from one page's directory, as a writer that omits them would.
+function withoutTags(
+  bytes: Uint8Array,
+  pageNumber: number,
+  tags: readonly number[],
+  little: boolean,
+): Uint8Array {
+  const out = bytes.slice();
+  const view = new DataView(out.buffer);
+  let directory = view.getUint32(4, little);
+  for (let page = 1; page < pageNumber; page += 1) {
+    directory = view.getUint32(directory + 2 + view.getUint16(directory, little) * 12, little);
+  }
+  for (const tag of tags) {
+    const count = view.getUint16(directory, little);
+    const index = Array.from({ length: count }, (_, i) =>
+      view.getUint16(directory + 2 + i * 12, little),
+    ).indexOf(tag);
+    const entry = directory + 2 + index * 12;
+    // Move the later entries and the next-directory pointer up over it.
+    out.copyWithin(entry, entry + 12, directory + 2 + count * 12 + 4);
+    view.setUint16(directory, count - 1, little);
+  }
+  return out;
+}

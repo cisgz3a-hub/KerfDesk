@@ -1,15 +1,46 @@
 import { describe, expect, it } from 'vitest';
+import { compileCncJob } from '../../core/cnc';
+import type { Job } from '../../core/job';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   DEFAULT_CNC_MACHINE_CONFIG,
+  IDENTITY_TRANSFORM,
   createLayer,
   createProject,
+  type CncLayerSettings,
   type CncStock,
+  type ImportedSvg,
   type Layer,
   type Project,
 } from '../../core/scene';
 import type { ControllerSettingsSnapshot } from '../../core/controllers/grbl';
 import { detectCncMachineLimitWarnings } from './cnc-machine-limit-warnings';
+
+function square(): ImportedSvg {
+  return {
+    kind: 'imported-svg',
+    id: 'part',
+    source: 'part.svg',
+    bounds: { minX: 50, minY: 50, maxX: 90, maxY: 90 },
+    transform: IDENTITY_TRANSFORM,
+    paths: [
+      {
+        color: '#ff0000',
+        polylines: [
+          {
+            closed: true,
+            points: [
+              { x: 50, y: 50 },
+              { x: 90, y: 50 },
+              { x: 90, y: 90 },
+              { x: 50, y: 90 },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
 
 // Default CNC stock is 400 × 400 mm; the default layer feed is 1000 mm/min,
 // plunge 300 mm/min, spindle 12000 RPM.
@@ -236,21 +267,20 @@ describe('detectCncMachineLimitWarnings with stage recipes', () => {
   }
   const libraryToolId = DEFAULT_CNC_MACHINE_CONFIG.tools[0]!.id;
   const hot = { feedMmPerMin: 4000, plungeMmPerMin: 1500, spindleRpm: 30_000 };
+  const WALL_RECIPE = 'The Wall finishing recipe on layer "Operation"';
 
   it('names a recipe whose feed, plunge or RPM exceeds $110/$112/$30', () => {
     const limits: ControllerSettingsSnapshot = { maxFeed: 2000, zMaxFeed: 500, maxPowerS: 24_000 };
     const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, hot), limits);
-    expect(warnings.some((w) => w.includes("Wall finishing recipe's feed 4000"))).toBe(true);
-    expect(warnings.some((w) => w.includes("Wall finishing recipe's plunge 1500"))).toBe(true);
-    expect(warnings.some((w) => w.includes('Wall finishing recipe requests spindle 30000'))).toBe(
-      true,
-    );
+    expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests feed 4000`))).toBe(true);
+    expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests plunge 1500`))).toBe(true);
+    expect(warnings.some((w) => w.includes(`${WALL_RECIPE} requests spindle 30000`))).toBe(true);
   });
 
   it('compares recipe RPM with the configured spindle ceiling offline', () => {
     const warnings = detectCncMachineLimitWarnings(withWallRecipe(libraryToolId, hot), null);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain('Wall finishing recipe requests spindle 30000');
+    expect(warnings[0]).toContain(`${WALL_RECIPE} requests spindle 30000`);
   });
 
   it('ignores a recipe bound to a cutter that is not in the tool library', () => {
@@ -258,5 +288,67 @@ describe('detectCncMachineLimitWarnings with stage recipes', () => {
     expect(detectCncMachineLimitWarnings(withWallRecipe('no-such-cutter', hot), limits)).toEqual(
       [],
     );
+  });
+});
+
+// P2-review-4: a layer keeps a recipe its cut type no longer uses (ADR-481).
+// With the compiled job only the stages the job ran count, and every advisory
+// names its layer (ADR-457 Amd 2).
+describe('detectCncMachineLimitWarnings with a compiled job', () => {
+  const libraryToolId = DEFAULT_CNC_MACHINE_CONFIG.tools[0]!.id;
+  const hot = { toolId: libraryToolId, depthPerPassMm: 1, feedMmPerMin: 5000 };
+  const limits: ControllerSettingsSnapshot = { maxFeed: 3000, zMaxFeed: 600, maxPowerS: 12_000 };
+
+  function profileProject(cnc: Partial<CncLayerSettings>): Project {
+    const layer: Layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000', name: 'Outline' }),
+      cnc: {
+        ...DEFAULT_CNC_LAYER_SETTINGS,
+        cutType: 'profile-outside',
+        depthMm: 3,
+        depthPerPassMm: 1.5,
+        ...cnc,
+      },
+    };
+    return {
+      ...createProject(),
+      machine: DEFAULT_CNC_MACHINE_CONFIG,
+      scene: { objects: [square()], layers: [layer] },
+    };
+  }
+
+  function compiled(project: Project): Job {
+    if (project.machine?.kind !== 'cnc') throw new Error('expected a CNC project');
+    return compileCncJob(project.scene, project.device, project.machine);
+  }
+
+  it('ignores a V-carve clearing recipe left on a profile layer', () => {
+    const project = profileProject({
+      stageRecipes: { 'v-clear': { ...hot, plungeMmPerMin: 1500, spindleRpm: 18_000 } },
+    });
+
+    expect(detectCncMachineLimitWarnings(project, limits, compiled(project))).toEqual([]);
+    // Without the compiled job the recipe still counts, as before.
+    expect(detectCncMachineLimitWarnings(project, limits)).toHaveLength(4);
+  });
+
+  it('compares a Wall finishing recipe the job ran and names its layer', () => {
+    const project = profileProject({
+      finishAllowanceMm: 0.5,
+      stageRecipes: { 'profile-finish': { ...hot, plungeMmPerMin: 300, spindleRpm: 12_000 } },
+    });
+
+    expect(detectCncMachineLimitWarnings(project, limits, compiled(project))).toEqual([
+      'The Wall finishing recipe on layer "Outline" requests feed 5000 mm/min, above the ' +
+        "machine's reported max rate 3000 mm/min — the controller clamps to its limit, so the " +
+        'cut runs slower than planned.',
+    ]);
+  });
+
+  it('names the layer whose own feed is above the limit', () => {
+    const project = profileProject({ feedMmPerMin: 4000 });
+
+    const [warning] = detectCncMachineLimitWarnings(project, limits, compiled(project));
+    expect(warning).toContain('Layer "Outline" requests feed 4000 mm/min');
   });
 });

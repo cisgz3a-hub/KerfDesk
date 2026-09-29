@@ -26,7 +26,10 @@ export type RingMark = {
 };
 
 export type RingDetectOptions = {
-  /** Adaptive-threshold window in px; defaults to 1/24 of the shorter side. */
+  /**
+   * Adaptive-threshold window in px. By default 1/24 of the shorter side, and
+   * when that loses anchors, a second look with a window sized from the rings.
+   */
   readonly windowPx?: number;
   /** How much darker than the local mean a pixel must be (grey levels). */
   readonly offset?: number;
@@ -47,19 +50,56 @@ const ANCHOR_MAX_AREA_RATIO = 1.8;
 // Grid step over disc radius is 8 by design; perspective moves it both ways.
 const ANCHOR_MIN_GAP = 3;
 const ANCHOR_MAX_GAP = 16;
-// Every anchor sits inside the grid with ring neighbours one step away on
-// every side. The reach allows for a tilted camera, which shortens the steps
-// along one axis.
-const ANCHOR_NEIGHBOUR_REACH = 1.6;
+// Every anchor sits inside the grid with ring neighbours around it. They are
+// looked for in the nearest ring's round frame (see roundFrame), where a
+// tilted camera's short steps along one axis are undone and the grid is square
+// again: side neighbours one step (eight radii) away, diagonal ones about
+// eleven radii. The reach, in that ring's radii, takes both with room for the
+// perspective change across a step. Where the neighbour one step away is
+// another anchor, not a ring, the diagonal rings still cover that side.
+const ANCHOR_NEIGHBOUR_REACH_RADII = 14;
 const ANCHOR_MIN_NEIGHBOURS = 3;
 // Widest direction with no ring neighbour an anchor may have, radians. Every
 // anchor sits inside the grid, so its neighbours surround it.
 const ANCHOR_MAX_EMPTY_ARC = 0.8 * Math.PI;
 
+// The anchors the target has; fewer found sends the detector for a second look.
+const TARGET_ANCHORS = 3;
+// The second look's window over the rings' median outer diameter. A solid
+// disc stays dark to its middle only while the window reaches well past it;
+// twice the rings' size also covers anchors that perspective makes larger.
+const WINDOW_OVER_RING_DIAMETER = 2;
+
+// A ring found, with the moments of its filled disc: its shape tells how the
+// camera stretches the bed around it.
+type Ring = { readonly mark: RingMark; readonly shape: Moments };
+
+type Detection = {
+  readonly rings: ReadonlyArray<Ring>;
+  readonly anchors: ReadonlyArray<RingMark>;
+};
+
 export function detectRingMarks(img: GrayImage, options: RingDetectOptions = {}): RingMark[] {
+  const first = detectWith(img, options);
+  const found = (detection: Detection): RingMark[] => [
+    ...detection.rings.map((ring) => ring.mark),
+    ...detection.anchors,
+  ];
+  if (options.windowPx !== undefined || first.anchors.length >= TARGET_ANCHORS) return found(first);
+  // The window was fixed before anything was seen. A solid disc wider than it
+  // is no darker in its middle than the local mean there, so the anchor comes
+  // out as a hollow ring or not at all; the rings, thin-stroked, survive and
+  // give the marks' size in this picture.
+  const windowPx = ringSizedWindow(first.rings, img);
+  if (windowPx === null) return found(first);
+  const second = detectWith(img, { ...options, windowPx });
+  return second.anchors.length > first.anchors.length ? found(second) : found(first);
+}
+
+function detectWith(img: GrayImage, options: RingDetectOptions): Detection {
   const dark = adaptiveDarkMask(img, options);
   const labels = labelComponents(dark, img.width, img.height);
-  const rings: RingMark[] = [];
+  const rings: Ring[] = [];
   const minArea = options.minAreaPx ?? DEFAULT_MIN_AREA;
   const solids: ComponentStats[] = [];
   for (const component of labels.dark) {
@@ -70,10 +110,28 @@ export function detectRingMarks(img: GrayImage, options: RingDetectOptions = {})
       solids.push(hole === undefined ? component : merged(component, hole));
       continue;
     }
-    const mark = ringMark(component, hole, labels.innerDotOf.get(hole.id));
-    if (mark !== null) rings.push(mark);
+    const ring = ringOf(component, hole, labels.innerDotOf.get(hole.id));
+    if (ring !== null) rings.push(ring);
   }
-  return [...rings, ...anchorDiscs(solids, rings)];
+  return { rings, anchors: anchorDiscs(solids, rings) };
+}
+
+// A window twice the rings' median outer diameter, when that is larger than
+// the default one; null when there are no rings or no larger window to try.
+function ringSizedWindow(rings: ReadonlyArray<Ring>, img: GrayImage): number | null {
+  const areas = rings.map((ring) => ring.mark.area).sort((a, b) => a - b);
+  const median = areas[Math.floor(areas.length / 2)];
+  if (median === undefined) return null;
+  const diameter = 2 * Math.sqrt(median / Math.PI);
+  const windowPx = Math.min(
+    Math.round(WINDOW_OVER_RING_DIAMETER * diameter),
+    Math.min(img.width, img.height),
+  );
+  return windowPx > defaultWindowPx(img) ? windowPx : null;
+}
+
+function defaultWindowPx(img: GrayImage): number {
+  return Math.max(15, Math.round(Math.min(img.width, img.height) / 24));
 }
 
 // Solid discs that look like a ring's twin: about the size of the nearest
@@ -82,7 +140,7 @@ export function detectRingMarks(img: GrayImage, options: RingDetectOptions = {})
 // single global size would admit honeycomb cells near the camera.
 function anchorDiscs(
   solids: ReadonlyArray<ComponentStats>,
-  rings: ReadonlyArray<RingMark>,
+  rings: ReadonlyArray<Ring>,
 ): RingMark[] {
   const anchors: RingMark[] = [];
   for (const disc of solids) {
@@ -90,13 +148,13 @@ function anchorDiscs(
     const y = disc.sumY / disc.area;
     const nearest = nearestRing(rings, x, y);
     if (nearest === null) continue;
-    const ratio = disc.area / nearest.ring.area;
+    const ratio = disc.area / nearest.ring.mark.area;
     if (ratio < ANCHOR_MIN_AREA_RATIO || ratio > ANCHOR_MAX_AREA_RATIO) continue;
     const radius = Math.sqrt(disc.area / Math.PI);
     if (nearest.distance < ANCHOR_MIN_GAP * radius || nearest.distance > ANCHOR_MAX_GAP * radius)
       continue;
-    if (!enclosedByRings(rings, x, y, ANCHOR_NEIGHBOUR_REACH * nearest.distance)) continue;
     if (elongation(disc) > MAX_ELONGATION) continue;
+    if (!enclosedByRings(rings, roundFrame(nearest.ring.shape, x, y))) continue;
     anchors.push({ x, y, area: disc.area, anchor: true });
   }
   return anchors;
@@ -115,19 +173,21 @@ function merged(a: ComponentStats, b: ComponentStats): ComponentStats {
   };
 }
 
-// True when enough rings lie within reach and they surround the point: no
-// empty half-plane around it. A blob of honeycomb just past the sheet's edge
-// can have several rings nearby, but all of them on the sheet's side.
+// True when enough rings lie within reach of the disc and they surround it:
+// no empty half-plane around it. A blob of honeycomb just past the sheet's
+// edge can have several rings nearby, but all of them on the sheet's side,
+// in any frame and at any reach. `toRound` maps a picture point to its offset
+// from the disc in the nearest ring's round frame, whose stretch is that of
+// the sheet next to the disc even when the disc is a blob of something else.
 function enclosedByRings(
-  rings: ReadonlyArray<RingMark>,
-  x: number,
-  y: number,
-  reach: number,
+  rings: ReadonlyArray<Ring>,
+  toRound: (x: number, y: number) => { x: number; y: number },
 ): boolean {
   const angles: number[] = [];
   for (const ring of rings) {
-    if (Math.hypot(ring.x - x, ring.y - y) <= reach)
-      angles.push(Math.atan2(ring.y - y, ring.x - x));
+    const offset = toRound(ring.mark.x, ring.mark.y);
+    if (Math.hypot(offset.x, offset.y) <= ANCHOR_NEIGHBOUR_REACH_RADII)
+      angles.push(Math.atan2(offset.y, offset.x));
   }
   if (angles.length < ANCHOR_MIN_NEIGHBOURS) return false;
   angles.sort((a, b) => a - b);
@@ -139,23 +199,23 @@ function enclosedByRings(
 }
 
 function nearestRing(
-  rings: ReadonlyArray<RingMark>,
+  rings: ReadonlyArray<Ring>,
   x: number,
   y: number,
-): { readonly ring: RingMark; readonly distance: number } | null {
-  let best: { readonly ring: RingMark; readonly distance: number } | null = null;
+): { readonly ring: Ring; readonly distance: number } | null {
+  let best: { readonly ring: Ring; readonly distance: number } | null = null;
   for (const ring of rings) {
-    const distance = Math.hypot(ring.x - x, ring.y - y);
+    const distance = Math.hypot(ring.mark.x - x, ring.mark.y - y);
     if (best === null || distance < best.distance) best = { ring, distance };
   }
   return best;
 }
 
-function ringMark(
+function ringOf(
   ring: ComponentStats,
   hole: ComponentStats,
   dot: ComponentStats | undefined,
-): RingMark | null {
+): Ring | null {
   // A dot left in the middle of the hole is part of the hole.
   const inner = sumMoments([hole, dot]);
   const filled = sumMoments([ring, inner]);
@@ -167,7 +227,7 @@ function ringMark(
   const offset = Math.hypot(inner.sumX / inner.area - x, inner.sumY / inner.area - y);
   if (offset > MAX_HOLE_OFFSET * radius) return null;
   if (elongation(filled) > MAX_ELONGATION) return null;
-  return { x, y, area, anchor: false };
+  return { mark: { x, y, area, anchor: false }, shape: filled };
 }
 
 type Moments = Pick<ComponentStats, 'area' | 'sumX' | 'sumY' | 'sumXX' | 'sumYY' | 'sumXY'>;
@@ -186,13 +246,43 @@ function sumMoments(parts: ReadonlyArray<Moments | undefined>): Moments {
   return sum;
 }
 
-// Ratio of the principal axes of the filled shape's second moments.
-function elongation(m: Moments): number {
+// Second central moments of a shape about its centre, px².
+type Spread = { readonly cxx: number; readonly cyy: number; readonly cxy: number };
+
+function spreadOf(m: Moments): Spread {
   const x = m.sumX / m.area;
   const y = m.sumY / m.area;
-  const cxx = m.sumXX / m.area - x * x;
-  const cyy = m.sumYY / m.area - y * y;
-  const cxy = m.sumXY / m.area - x * y;
+  return {
+    cxx: m.sumXX / m.area - x * x,
+    cyy: m.sumYY / m.area - y * y,
+    cxy: m.sumXY / m.area - x * y,
+  };
+}
+
+// A ring's filled disc is the picture of a round mark, so its second moments
+// describe how the camera stretches the bed around it. This maps a picture
+// point to its offset from (ox, oy) in the disc's radii, in the frame where
+// the disc is round again (up to a rotation); the grid steps near the disc
+// are stretched alike, so in that frame they are square.
+function roundFrame(
+  m: Moments,
+  ox: number,
+  oy: number,
+): (x: number, y: number) => { x: number; y: number } {
+  const { cxx, cyy, cxy } = spreadOf(m);
+  // A round disc of radius r spreads r²/4 along every axis, so an offset d is
+  // |d| / r radii where the disc is round: √(dᵀ S⁻¹ d) / 2. The Cholesky factor
+  // of S⁻¹ gives that length's components: (a·dx + b·dy, c·dy).
+  const det = cxx * cyy - cxy * cxy;
+  const a = Math.sqrt(cyy / det) / 2;
+  const b = -cxy / Math.sqrt(cyy * det) / 2;
+  const c = 1 / Math.sqrt(cyy) / 2;
+  return (x, y) => ({ x: a * (x - ox) + b * (y - oy), y: c * (y - oy) });
+}
+
+// Ratio of the principal axes of the filled shape's second moments.
+function elongation(m: Moments): number {
+  const { cxx, cyy, cxy } = spreadOf(m);
   const mean = (cxx + cyy) / 2;
   const spread = Math.sqrt(((cxx - cyy) / 2) ** 2 + cxy * cxy);
   const minor = mean - spread;
@@ -202,7 +292,7 @@ function elongation(m: Moments): number {
 /** 1 where a pixel is darker than its neighbourhood mean by `offset`. */
 export function adaptiveDarkMask(img: GrayImage, options: RingDetectOptions = {}): Uint8Array {
   const { width, height, data } = img;
-  const window = options.windowPx ?? Math.max(15, Math.round(Math.min(width, height) / 24));
+  const window = options.windowPx ?? defaultWindowPx(img);
   const half = Math.max(1, Math.floor(window / 2));
   const offset = options.offset ?? DEFAULT_OFFSET;
   const integral = integralImage(img);

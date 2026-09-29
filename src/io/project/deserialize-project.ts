@@ -345,22 +345,23 @@ function numberOrDefault(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
+// A saved frame feed is the operator's choice, even when it equals the generic
+// default, and Save refuses any value a reload would change (ADR-204). Only a
+// device saved without a usable feed takes a preset, and a Neotronics 4040
+// takes its own slower one rather than the generic default.
 function normalizeFramingFeed(dev: Record<string, unknown>): number {
-  const raw = positiveNumberOrDefault(
-    dev['framingFeedMmPerMin'],
-    DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
-  );
-  if (isLegacyNeotronicsFrameFeed(dev, raw)) {
-    return NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin;
-  }
-  return raw;
+  const saved = dev['framingFeedMmPerMin'];
+  if (isFiniteNumber(saved) && saved > 0) return saved;
+  return isNeotronicsDevice(dev)
+    ? NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.framingFeedMmPerMin
+    : DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin;
 }
 
-function isLegacyNeotronicsFrameFeed(dev: Record<string, unknown>, feed: number): boolean {
-  const isNeotronics =
+function isNeotronicsDevice(dev: Record<string, unknown>): boolean {
+  return (
     dev['profileId'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.profileId ||
-    dev['machineFamily'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.machineFamily;
-  return isNeotronics && feed === DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin;
+    dev['machineFamily'] === NEOTRONICS_4040_MAX_LT4LDS_V2_PROFILE.machineFamily
+  );
 }
 
 function positiveField<K extends string>(

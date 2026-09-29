@@ -8,13 +8,12 @@
 // SVG spec also defines <use>, <g>, <symbol>, gradients, masks, clip-paths,
 // patterns — these are walked transparently in parse-svg.ts where applicable.
 
-import type { Vec2 } from '../../core/scene';
-import { ellipseSegmentCount } from '../../core/shapes/primitives';
+import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM, type Vec2 } from '../../core/scene';
 import { DEFAULT_FLATNESS_MM } from './flatten-curves';
 import { parsePathD, type SubPath } from './parse-path-d';
+import { closureToleranceUserUnits, endsMeet } from './subpath-closure';
 import { parseSvgLengthUserUnitsOrNull } from './svg-units';
 
-const RECT_CORNER_SEGMENTS = 8;
 const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 
 // `scale` is the local user→mm distance stretch (from the accumulated import
@@ -30,11 +29,11 @@ export function elementToSubPaths(el: Element, scale = 1): ReadonlyArray<SubPath
     case 'line':
       return lineToSubs(el);
     case 'polyline':
-      return polylineToSubs(el, false);
+      return polylineToSubs(el, false, scale);
     case 'polygon':
-      return polylineToSubs(el, true);
+      return polylineToSubs(el, true, scale);
     case 'rect':
-      return rectToSubs(el);
+      return rectToSubs(el, scale);
     case 'circle':
       return circleToSubs(el, scale);
     case 'ellipse':
@@ -71,7 +70,7 @@ function optionalNumAttr(el: Element, name: string): number | null {
 function pathToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const d = el.getAttribute('d');
   if (d === null || d.trim() === '') return [];
-  return parsePathD(d, DEFAULT_FLATNESS_MM / positiveScale(scale));
+  return parsePathD(d, DEFAULT_FLATNESS_MM / positiveScale(scale), scale);
 }
 
 function lineToSubs(el: Element): ReadonlyArray<SubPath> {
@@ -107,29 +106,35 @@ function parsePointsAttr(value: string): ReadonlyArray<Vec2> {
   return points;
 }
 
-function polylineToSubs(el: Element, closed: boolean): ReadonlyArray<SubPath> {
+function polylineToSubs(el: Element, closed: boolean, scale: number): ReadonlyArray<SubPath> {
   const raw = el.getAttribute('points') ?? '';
   const points = parsePointsAttr(raw);
   if (points.length < 2) return [];
-  if (closed && points.length >= 2) {
-    const first = points[0];
-    if (first === undefined) return [];
-    return [{ points: [...points, first], closed: true }];
+  const first = points[0];
+  if (first === undefined) return [];
+  if (closed) return [{ points: [...points, first], closed: true }];
+  // A <polyline> that returns to its start is stored as the <polygon> of its
+  // other points (E-2): closed, ending on the first point exactly once.
+  if (endsMeet(points, closureToleranceUserUnits(scale))) {
+    return [{ points: [...points.slice(0, -1), first], closed: true }];
   }
   return [{ points, closed: false }];
 }
 
-function rectToSubs(el: Element): ReadonlyArray<SubPath> {
+function rectToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const x = numAttr(el, 'x');
   const y = numAttr(el, 'y');
   const w = numAttr(el, 'width');
   const h = numAttr(el, 'height');
   if (w <= 0 || h <= 0) return [];
-  const rawRx = optionalNumAttr(el, 'rx');
-  const rawRy = optionalNumAttr(el, 'ry');
-  const rx = Math.min(w / 2, Math.max(0, rawRx ?? rawRy ?? 0));
-  const ry = Math.min(h / 2, Math.max(0, rawRy ?? rawRx ?? 0));
-  if (rx > 0 && ry > 0) return [roundedRect(x, y, w, h, rx, ry)];
+  // SVG 2 corner radii: a missing, unreadable or negative radius is auto and
+  // takes the other one; both auto give square corners. Each is then clamped
+  // to half its side.
+  const rawRx = cornerRadiusAttr(el, 'rx');
+  const rawRy = cornerRadiusAttr(el, 'ry');
+  const rx = Math.min(w / 2, rawRx ?? rawRy ?? 0);
+  const ry = Math.min(h / 2, rawRy ?? rawRx ?? 0);
+  if (rx > 0 && ry > 0) return shapePathToSubs(roundedRectPathData(x, y, w, h, rx, ry), scale);
   const points: Vec2[] = [
     { x, y },
     { x: x + w, y },
@@ -140,52 +145,9 @@ function rectToSubs(el: Element): ReadonlyArray<SubPath> {
   return [{ points, closed: true }];
 }
 
-function roundedRect(x: number, y: number, w: number, h: number, rx: number, ry: number): SubPath {
-  const points: Vec2[] = [{ x: x + rx, y }];
-  addCorner(points, x + w - rx, y + ry, rx, ry, -90, 0);
-  addCorner(points, x + w - rx, y + h - ry, rx, ry, 0, 90);
-  addCorner(points, x + rx, y + h - ry, rx, ry, 90, 180);
-  addCorner(points, x + rx, y + ry, rx, ry, 180, 270);
-  points.push(points[0] ?? { x: x + rx, y });
-  return { points, closed: true };
-}
-
-function addCorner(
-  points: Vec2[],
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number,
-  startDeg: number,
-  endDeg: number,
-): void {
-  for (let i = 0; i <= RECT_CORNER_SEGMENTS; i += 1) {
-    const t = i / RECT_CORNER_SEGMENTS;
-    const deg = startDeg + (endDeg - startDeg) * t;
-    const rad = (deg / 180) * Math.PI;
-    const p = { x: cx + rx * Math.cos(rad), y: cy + ry * Math.sin(rad) };
-    const prev = points[points.length - 1];
-    if (prev !== undefined && closePoint(prev, p)) continue;
-    points.push(p);
-  }
-}
-
-function closePoint(a: Vec2, b: Vec2): boolean {
-  return Math.abs(a.x - b.x) < 1e-9 && Math.abs(a.y - b.y) < 1e-9;
-}
-
-function arcPolygon(cx: number, cy: number, rx: number, ry: number, scale: number): SubPath {
-  // Segment count targets a physical chord tolerance, so choose it from the
-  // radius in mm — a small-viewBox circle blown up to a large physical size
-  // needs more facets than its user-space radius implies (audit C2).
-  const physicalRadius = Math.max(Math.abs(rx), Math.abs(ry)) * positiveScale(scale);
-  const segments = ellipseSegmentCount(physicalRadius);
-  const points: Vec2[] = [];
-  for (let i = 0; i <= segments; i += 1) {
-    const t = (i / segments) * Math.PI * 2;
-    points.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
-  }
-  return { points, closed: true };
+function cornerRadiusAttr(el: Element, name: string): number | null {
+  const radius = optionalNumAttr(el, name);
+  return radius !== null && radius >= 0 ? radius : null;
 }
 
 function circleToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
@@ -193,7 +155,7 @@ function circleToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const cy = numAttr(el, 'cy');
   const r = numAttr(el, 'r');
   if (r <= 0) return [];
-  return [arcPolygon(cx, cy, r, r, scale)];
+  return shapePathToSubs(ellipsePathData(cx, cy, r, r), scale);
 }
 
 function ellipseToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
@@ -202,5 +164,69 @@ function ellipseToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   const rx = numAttr(el, 'rx');
   const ry = numAttr(el, 'ry');
   if (rx <= 0 || ry <= 0) return [];
-  return [arcPolygon(cx, cy, rx, ry, scale)];
+  return shapePathToSubs(ellipsePathData(cx, cy, rx, ry), scale);
+}
+
+// A basic shape imports as its SVG 2 "equivalent path", so its elliptical arcs
+// stay native curves that job compilation and export keep exact (A-12). Its
+// compatibility polyline is flattened at the machine tolerance rather than
+// the 0.25 mm path default: tools that still read polylines (offset,
+// preflight) had a 0.05 mm polygon for these shapes, and a small circle at
+// 0.25 mm would drop to an octagon there. The last arc ends exactly on the
+// start, so the path closes without a Z and its zero-length closing edge.
+function shapePathToSubs(d: string, scale: number): ReadonlyArray<SubPath> {
+  return parsePathD(d, DEFAULT_MACHINE_CURVE_TOLERANCE_MM / positiveScale(scale), scale);
+}
+
+// From the rightmost point, an arc to each quarter point in turn.
+function ellipsePathData(cx: number, cy: number, rx: number, ry: number): string {
+  return [
+    `M${pathNumber(cx + rx)} ${pathNumber(cy)}`,
+    arcTo(rx, ry, cx, cy + ry),
+    arcTo(rx, ry, cx - rx, cy),
+    arcTo(rx, ry, cx, cy - ry),
+    arcTo(rx, ry, cx + rx, cy),
+  ].join(' ');
+}
+
+// From (x+rx, y), each edge and then its corner arc, clockwise on screen. An
+// edge that clamping shrank to nothing is left out rather than kept as a
+// zero-length segment.
+function roundedRectPathData(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  rx: number,
+  ry: number,
+): string {
+  const left = x + rx;
+  const right = x + w - rx;
+  const top = y + ry;
+  const bottom = y + h - ry;
+  // Exact when clamping set a radius to half its side.
+  const hasWidth = 2 * rx < w;
+  const hasHeight = 2 * ry < h;
+  const commands = [`M${pathNumber(left)} ${pathNumber(y)}`];
+  if (hasWidth) commands.push(`H${pathNumber(right)}`);
+  commands.push(arcTo(rx, ry, x + w, top));
+  if (hasHeight) commands.push(`V${pathNumber(bottom)}`);
+  commands.push(arcTo(rx, ry, right, y + h));
+  if (hasWidth) commands.push(`H${pathNumber(left)}`);
+  commands.push(arcTo(rx, ry, x, bottom));
+  if (hasHeight) commands.push(`V${pathNumber(top)}`);
+  commands.push(arcTo(rx, ry, left, y));
+  return commands.join(' ');
+}
+
+// The spec's arcs: unrotated, small (large-arc 0) and sweep-flag 1.
+function arcTo(rx: number, ry: number, x: number, y: number): string {
+  return `A${pathNumber(rx)} ${pathNumber(ry)} 0 0 1 ${pathNumber(x)} ${pathNumber(y)}`;
+}
+
+// String() round-trips every finite double exactly. A sum that overflowed
+// refuses the file, as a non-finite <path> coordinate does.
+function pathNumber(value: number): string {
+  if (!Number.isFinite(value)) throw new Error('SVG shape contains a non-finite coordinate.');
+  return String(value);
 }

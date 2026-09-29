@@ -18,6 +18,10 @@ export type AutosaveSessionProbe<T> =
 
 export class AutosaveSessionLocks {
   private readonly manager: LockManager | undefined;
+  // This page's probes of one session run one after another. A probe that met
+  // this page's own probe would take it for a live window: StrictMode runs the
+  // recovery read twice in development, and both probe the same session.
+  private readonly probes = new Map<string, Promise<void>>();
 
   constructor(manager: LockManager | null | undefined = availableLockManager()) {
     this.manager = manager ?? undefined;
@@ -60,19 +64,40 @@ export class AutosaveSessionLocks {
     sessionId: string,
     reconcile: () => Promise<T>,
   ): Promise<AutosaveSessionProbe<T>> {
-    if (this.manager === undefined) return { kind: 'unsupported' };
+    const manager = this.manager;
+    if (manager === undefined) return { kind: 'unsupported' };
+    const probe = (this.probes.get(sessionId) ?? Promise.resolve()).then(() =>
+      probeSession(manager, sessionId, reconcile),
+    );
+    const settled = probe.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.probes.set(sessionId, settled);
     try {
-      return await this.manager.request(
-        autosaveSessionLockName(sessionId),
-        { mode: 'exclusive', ifAvailable: true },
-        async (lock) => {
-          if (lock === null) return { kind: 'live' } as const;
-          return { kind: 'reconciled', value: await reconcile() } as const;
-        },
-      );
-    } catch (error) {
-      return { kind: 'failed', error };
+      return await probe;
+    } finally {
+      if (this.probes.get(sessionId) === settled) this.probes.delete(sessionId);
     }
+  }
+}
+
+async function probeSession<T>(
+  manager: LockManager,
+  sessionId: string,
+  reconcile: () => Promise<T>,
+): Promise<AutosaveSessionProbe<T>> {
+  try {
+    return await manager.request(
+      autosaveSessionLockName(sessionId),
+      { mode: 'exclusive', ifAvailable: true },
+      async (lock) => {
+        if (lock === null) return { kind: 'live' } as const;
+        return { kind: 'reconciled', value: await reconcile() } as const;
+      },
+    );
+  } catch (error) {
+    return { kind: 'failed', error };
   }
 }
 

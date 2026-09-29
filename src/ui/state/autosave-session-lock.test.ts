@@ -65,6 +65,35 @@ describe('AutosaveSessionLocks', () => {
     await expect(reconciliation).resolves.toMatchObject({ kind: 'reconciled' });
   });
 
+  it("waits for this page's own probe of a session instead of calling it live", async () => {
+    // StrictMode runs the recovery read twice in development, and both reads
+    // probe the session a reloaded page moved away from (audit D-1).
+    const locks = new AutosaveSessionLocks(new TestLockManager().asLockManager());
+    let started = (): void => undefined;
+    const holding = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    let finish = (): void => undefined;
+    const waiting = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const order: string[] = [];
+    const first = locks.runIfAbandoned(SESSION_A, async () => {
+      started();
+      await waiting;
+      order.push('first');
+    });
+    await holding;
+    const second = locks.runIfAbandoned(SESSION_A, async () => {
+      order.push('second');
+    });
+    finish();
+
+    await expect(first).resolves.toMatchObject({ kind: 'reconciled' });
+    await expect(second).resolves.toMatchObject({ kind: 'reconciled' });
+    expect(order).toEqual(['first', 'second']);
+  });
+
   it('releases the probe lock when reconciliation fails', async () => {
     const locks = new AutosaveSessionLocks(new TestLockManager().asLockManager());
     const failure = new Error('cleanup failed');

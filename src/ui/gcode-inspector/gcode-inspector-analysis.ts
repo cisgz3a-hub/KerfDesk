@@ -1,4 +1,5 @@
 import { buildProgramTime, type MotionLimits } from '../../core/gcode-time';
+import type { ProgramTimingOptions } from '../../core/gcode-time/program-timing-options';
 import {
   findProgramIssues,
   type GcodeRenderModel,
@@ -36,16 +37,21 @@ export function analyzeGcodeModel(
   return {
     time: inspectorProgramTime(
       model,
-      buildProgramTime(model, timing?.limits ?? STOCK_LIMITS, {
-        ...(timing?.cutTimeScale === undefined ? {} : { cutTimeScale: timing.cutTimeScale }),
-        ...(timing?.travelTimeScale === undefined
-          ? {}
-          : { travelTimeScale: timing.travelTimeScale }),
-        ...(context.machineKind === undefined ? {} : { machineKind: context.machineKind }),
-      }),
+      buildProgramTime(model, timing?.limits ?? STOCK_LIMITS, timingOptions(context)),
     ),
     findings: findProgramIssues(model),
     timedFor: timing?.deviceName ?? null,
     toolMarks,
+  };
+}
+
+/** The calibration, planner window and machine kind the context times with. */
+function timingOptions(context: GcodeInspectionContext): ProgramTimingOptions {
+  const timing = context.timing;
+  return {
+    ...(timing?.cutTimeScale === undefined ? {} : { cutTimeScale: timing.cutTimeScale }),
+    ...(timing?.travelTimeScale === undefined ? {} : { travelTimeScale: timing.travelTimeScale }),
+    ...(timing?.plannerBlocks === undefined ? {} : { plannerBlocks: timing.plannerBlocks }),
+    ...(context.machineKind === undefined ? {} : { machineKind: context.machineKind }),
   };
 }

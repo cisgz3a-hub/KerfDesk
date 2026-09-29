@@ -1,13 +1,21 @@
+import type { PngTransparentKey } from './png-chunk-metadata';
 import { consumePngFilteredRows } from './png-filtered-row-reader';
 
 // Four ulps of the compared magnitude absorbs the handful of multiply/add
 // roundings in `targetY * scale` without ever spanning a whole source row.
 const ROW_EDGE_TOLERANCE_ULPS = 4;
+const PAPER_LUMA = 255;
 
 export type QualifiedPngHeader = {
   readonly width: number;
   readonly height: number;
   readonly channels: 1 | 3 | 4;
+  /**
+   * The tRNS colour of a grayscale or truecolour source, read as rows arrive.
+   * Chunks are still being read then, but tRNS must precede IDAT, so the key
+   * is settled before the first row decodes.
+   */
+  readonly transparentKey?: () => PngTransparentKey | undefined;
 };
 
 export type PngSamplingTarget = {
@@ -33,7 +41,7 @@ export async function consumePngLumaRows(
     { height: header.height, rowBytes: stride, bytesPerPixel: header.channels },
     signal,
     async (row, sourceY) => {
-      sampleLumaRow(row, header, horizontal);
+      sampleLumaRow(row, header, horizontal, header.transparentKey?.());
       targetY = await accumulateVertical(
         horizontal,
         sourceY,
@@ -65,7 +73,12 @@ export function pngSamplingTarget(
   };
 }
 
-function sampleLumaRow(row: Uint8Array, header: QualifiedPngHeader, result: Float64Array): void {
+function sampleLumaRow(
+  row: Uint8Array,
+  header: QualifiedPngHeader,
+  result: Float64Array,
+  transparentKey: PngTransparentKey | undefined,
+): void {
   const scale = header.width / result.length;
   for (let targetX = 0; targetX < result.length; targetX += 1) {
     const start = targetX * scale;
@@ -73,14 +86,22 @@ function sampleLumaRow(row: Uint8Array, header: QualifiedPngHeader, result: Floa
     let sum = 0;
     for (let sourceX = Math.floor(start); sourceX < Math.ceil(end); sourceX += 1) {
       const overlap = Math.min(end, sourceX + 1) - Math.max(start, sourceX);
-      if (overlap > 0) sum += pixelLuma(row, sourceX, header.channels) * overlap;
+      if (overlap > 0) sum += pixelLuma(row, sourceX, header.channels, transparentKey) * overlap;
     }
     result[targetX] = sum / scale;
   }
 }
 
-function pixelLuma(row: Uint8Array, x: number, channels: number): number {
+function pixelLuma(
+  row: Uint8Array,
+  x: number,
+  channels: number,
+  transparentKey: PngTransparentKey | undefined,
+): number {
   const offset = x * channels;
+  // PNG tRNS: a pixel of exactly the key colour has alpha 0, so it is paper.
+  // The route only qualifies 8-bit sources, so each byte is a whole sample.
+  if (transparentKey !== undefined && isKeyColour(row, offset, transparentKey)) return PAPER_LUMA;
   if (channels === 1) return row[offset] ?? 0;
   const alpha = channels === 4 ? (row[offset + 3] ?? 255) : 255;
   const opacity = alpha / 255;
@@ -88,6 +109,13 @@ function pixelLuma(row: Uint8Array, x: number, channels: number): number {
   const green = composite(row[offset + 1] ?? 0, opacity);
   const blue = composite(row[offset + 2] ?? 0, opacity);
   return Math.round(0.299 * red + 0.587 * green + 0.114 * blue);
+}
+
+function isKeyColour(row: Uint8Array, offset: number, key: PngTransparentKey): boolean {
+  for (let sample = 0; sample < key.length; sample += 1) {
+    if (row[offset + sample] !== key[sample]) return false;
+  }
+  return true;
 }
 
 function composite(channel: number, opacity: number): number {

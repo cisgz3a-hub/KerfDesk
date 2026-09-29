@@ -40,6 +40,7 @@ import {
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
+  type Vec2,
 } from '../scene';
 import {
   textOutlineGeometry,
@@ -47,6 +48,7 @@ import {
   type TextOutlineGeometry,
 } from './text-outline-path';
 import { cncStrokeTextToPolylines } from './cnc-stroke-font';
+import { missingCharacters, textForLayout } from './glyph-coverage';
 
 // Module surface we actually use. Lets the loader narrow the dynamic-
 // import result to something callable without a sprawling cast.
@@ -95,23 +97,34 @@ export type TextRenderInput = TextRenderSharedInput &
 export type TextRenderResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
   readonly bounds: Bounds;
+  /**
+   * The alignment anchor, in the same frame as `paths` and `bounds`: the
+   * point on the first line's baseline where every line starts, centres or
+   * ends (left, center or right alignment). Each render re-roots at its own
+   * ink top-left, so variable output uses this to keep a changing value
+   * where the operator placed it. Absent when the text has no ink, or when
+   * bending or path placement reshaped it and no single anchor survives.
+   */
+  readonly anchor?: Vec2;
+  /**
+   * Characters the font has no glyph for, once each in reading order: an
+   * outline font draws its missing-glyph shape for them (often a box, for
+   * some fonts nothing) and a single-line font draws "?". Absent when the
+   * font covers the whole text.
+   */
+  readonly missingCharacters?: ReadonlyArray<string>;
 };
 
 export async function textToPolylines(input: TextRenderInput): Promise<TextRenderResult> {
   if (input.geometry === 'single-line') return cncStrokeTextToPolylines(input);
   const ot = await loadOpentype();
   const font = ot.parse(input.fontBuffer);
-  const lines = input.content.split('\n');
+  const text = textForLayout(input.content);
+  const lines = text.split('\n');
   const lineSpacingMm = input.sizeMm * input.lineHeight;
   const letterSpacing = input.letterSpacing ?? 0;
-  // Per-line widths drive alignment. With letterSpacing != 0 the
-  // natural advance changes — add (N-1) * spacing × sizeMm per line
-  // since opentype's getAdvanceWidth doesn't apply our tracking.
-  const lineWidths = lines.map(
-    (line) =>
-      measureLineWidth(font, line, input.sizeMm) +
-      Math.max(0, line.length - 1) * letterSpacing * input.sizeMm,
-  );
+  // Per-line widths drive alignment, so they measure the glyphs as drawn.
+  const lineWidths = lines.map((line) => measureLineWidth(font, line, input.sizeMm, letterSpacing));
   const maxWidth = lineWidths.reduce((m, w) => (w > m ? w : m), 0);
   const raw: Polyline[] = [];
   const rawCurves: CurveSubpath[] = [];
@@ -128,11 +141,30 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
   // matching ImportedSvg's viewBox convention. fit-to-bed, hit-test,
   // and the workspace renderer all treat object-local bounds as
   // starting at top-left; text needs to behave the same.
-  const { polylines, curves, bounds } = normalizeToOrigin(raw, rawCurves);
+  const { polylines, curves, bounds, offset } = normalizeToOrigin(raw, rawCurves);
+  // Where a zero-width line would sit is the point every line aligns to.
+  const anchorX = alignOffset(input.alignment, 0, maxWidth);
+  const missing = missingCharacters(text, outlineGlyphCoverage(font));
   return {
     paths: [{ color: input.color, polylines, curves }],
     bounds,
+    ...(offset === null ? {} : { anchor: { x: anchorX + offset.x, y: offset.y } }),
+    ...(missing.length === 0 ? {} : { missingCharacters: missing }),
   };
+}
+
+/** The characters of `content` an outline font has no glyph for, as its render reports them. */
+export async function outlineFontMissingCharacters(
+  fontBuffer: ArrayBuffer,
+  content: string,
+): Promise<ReadonlyArray<string>> {
+  const font = (await loadOpentype()).parse(fontBuffer);
+  return missingCharacters(textForLayout(content), outlineGlyphCoverage(font));
+}
+
+function outlineGlyphCoverage(font: opentype.Font): (character: string) => boolean {
+  // Glyph 0 is .notdef, which opentype.js draws for any unmapped character.
+  return (character) => font.charToGlyphIndex(character) > 0;
 }
 
 function normalizeToOrigin(
@@ -142,9 +174,16 @@ function normalizeToOrigin(
   readonly polylines: ReadonlyArray<Polyline>;
   readonly curves: ReadonlyArray<CurveSubpath>;
   readonly bounds: Bounds;
+  // The translation applied to the layout, or null when there was no ink.
+  readonly offset: Vec2 | null;
 } {
   if (polylines.length === 0) {
-    return { polylines: [], curves: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+    return {
+      polylines: [],
+      curves: [],
+      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      offset: null,
+    };
   }
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
@@ -158,7 +197,12 @@ function normalizeToOrigin(
     maxY = Math.max(maxY, curveBounds.maxY);
   }
   if (!Number.isFinite(minX)) {
-    return { polylines: [], curves: [], bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
+    return {
+      polylines: [],
+      curves: [],
+      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+      offset: null,
+    };
   }
   const dx = -minX;
   const dy = -minY;
@@ -167,13 +211,28 @@ function normalizeToOrigin(
     polylines: shifted.polylines,
     curves: shifted.curves,
     bounds: { minX: 0, minY: 0, maxX: maxX - minX, maxY: maxY - minY },
+    offset: { x: dx, y: dy },
   };
 }
 
-function measureLineWidth(font: opentype.Font, line: string, sizeMm: number): number {
-  // opentype's getAdvanceWidth returns the pen advance in font units;
-  // multiply by sizeMm/unitsPerEm to convert. Includes kerning.
-  return font.getAdvanceWidth(line, sizeMm);
+// Ligatures and kerning as lineGeometry draws them. Measured without them, a
+// line with "ffi" or "fl" was aligned as if it were wider than drawn.
+const SHAPING_OPTIONS = { kerning: true, features: { liga: true, rlig: true } } as const;
+
+function measureLineWidth(
+  font: opentype.Font,
+  line: string,
+  sizeMm: number,
+  letterSpacing: number,
+): number {
+  // The pen advance of the shaped glyphs, kerning included, in mm. Tracking
+  // falls between glyphs, so a ligature is one glyph and the line's last
+  // glyph adds no trailing gap.
+  let glyphs = 0;
+  const advance = font.forEachGlyph(line, 0, 0, sizeMm, SHAPING_OPTIONS, () => {
+    glyphs += 1;
+  });
+  return advance + Math.max(0, glyphs - 1) * letterSpacing * sizeMm;
 }
 
 function alignOffset(
@@ -214,9 +273,8 @@ function lineGeometry(
   // the user sees a visible regression vs Inkscape / CorelDRAW
   // (MIT-compare audit recommendation).
   const path = font.getPath(line, xOffset, yBaseline, sizeMm, {
-    kerning: true,
+    ...SHAPING_OPTIONS,
     letterSpacing,
-    features: { liga: true, rlig: true },
   });
   return textOutlineGeometry(path.commands);
 }

@@ -121,7 +121,10 @@ export type GcodeMetadata = {
 // Entry provenance reflects compiled passes, including specialised entry paths.
 // Repeated CNC depth passes retain only placement-stable clearance proofs.
 // Relief floors require the same complete repeated path and represented Z bounds.
-export const EMITTER_REVISION = 'cnc-entry-clearance-relief-adaptive-audited-20260928-v15';
+// Second CNC audit: finish-only features step down the depth ladder (ADR-140 Amd 1),
+// tabs no thinner than set stock are halved (ADR-258 Amd 4), and STL reliefs plan
+// from each cell's highest point (ADR-412 Amd 1).
+export const EMITTER_REVISION = 'cnc-finish-ladder-thin-stock-tabs-mesh-footprint-20260929-v16';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

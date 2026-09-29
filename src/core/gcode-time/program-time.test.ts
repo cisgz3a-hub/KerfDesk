@@ -49,6 +49,9 @@ describe('buildProgramTime', () => {
     ['M0', 0],
     ['M1', 0],
     ['M400', 0],
+    // GRBL drains the planner at a program end and then runs the lines after it.
+    ['M2', 0],
+    ['M30', 0],
   ])('restarts lookahead from rest across the %s synchronization boundary', (barrier, dwell) => {
     const firstMove = buildProgramTime(model('G21 G90\nG1 X10 F6000'), LIMITS);
     const separated = buildProgramTime(

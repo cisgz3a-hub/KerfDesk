@@ -213,6 +213,43 @@ describe('VariableCsvImport request ownership', () => {
   });
 });
 
+describe('VariableCsvImport file encoding', () => {
+  it('reads an Excel Windows-1252 CSV without corrupting names and says how it was read', async () => {
+    const harness = await renderCsvImport();
+    // "name\r\nJörg\r\nZoë\r\n" as Excel's "CSV (Comma delimited)" writes it on a Western-locale PC.
+    const cp1252 = [
+      0x6e, 0x61, 0x6d, 0x65, 0x0d, 0x0a, 0x4a, 0xf6, 0x72, 0x67, 0x0d, 0x0a, 0x5a, 0x6f, 0xeb,
+      0x0d, 0x0a,
+    ];
+
+    await importFile(harness, bytesFile('names.csv', cp1252));
+    await settleAsyncWork();
+
+    expect(harness.setCsv).toHaveBeenCalledWith(
+      expect.objectContaining({ records: [['J\u00f6rg'], ['Zo\u00eb']] }),
+    );
+    expect(harness.pushToast).toHaveBeenCalledWith(
+      expect.stringContaining('read as Windows-1252'),
+      'warning',
+    );
+  });
+
+  it('names a semicolon separator in the import message', async () => {
+    const harness = await renderCsvImport();
+
+    await importFile(harness, textFile('names.csv', Promise.resolve('name;number\nAlice;1\n')));
+    await settleAsyncWork();
+
+    expect(harness.setCsv).toHaveBeenCalledWith(
+      expect.objectContaining({ headers: ['name', 'number'], records: [['Alice', '1']] }),
+    );
+    expect(harness.pushToast).toHaveBeenCalledWith(
+      'Embedded 1 CSV record(s). Columns are separated by semicolons.',
+      'success',
+    );
+  });
+});
+
 async function renderCsvImport(): Promise<CsvImportHarness> {
   return renderCsvImportElement((component) => component);
 }
@@ -282,8 +319,15 @@ async function settleAsyncWork(): Promise<void> {
 }
 
 function textFile(name: string, contents: Promise<string>): File {
-  // A real File cannot expose a controlled delayed text() read, so the fixture supplies that browser contract.
-  return { name, text: () => contents } as File;
+  // A real File cannot expose a controlled delayed arrayBuffer() read, so the fixture supplies that browser contract.
+  return {
+    name,
+    arrayBuffer: () => contents.then((text) => new TextEncoder().encode(text).buffer),
+  } as File;
+}
+
+function bytesFile(name: string, bytes: readonly number[]): File {
+  return { name, arrayBuffer: () => Promise.resolve(Uint8Array.from(bytes).buffer) } as File;
 }
 
 function deferred<T>(): {

@@ -3,10 +3,19 @@
 // consults device or machine state (that would make it a policy judgment).
 
 import type { ProgramFinding } from './finding-types';
+import { rapidDescentsIntoCutAir } from './rapid-descent-clearance';
 import { LINE_CATEGORY, SEG_KIND, SEG_MOTION, type GcodeRenderModel } from './render-model-types';
 
 /** A rapid this far below Z0 is genuinely below the work surface, not noise. */
 const BELOW_SURFACE_EPSILON_MM = 0.001;
+const JUNK_LINES: ReadonlySet<number> = new Set([LINE_CATEGORY.junk]);
+/** Lines a controller acts on: all but blanks, comments, markers and junk. */
+const RUNNABLE_LINES: ReadonlySet<number> = new Set([
+  LINE_CATEGORY.motion,
+  LINE_CATEGORY.modalOnly,
+  LINE_CATEGORY.event,
+  LINE_CATEGORY.unsupported,
+]);
 
 export function unsupportedWordFindings(model: GcodeRenderModel): ReadonlyArray<ProgramFinding> {
   return model.unsupportedWords.map((entry) => ({
@@ -33,7 +42,7 @@ export function skippedMotionFinding(model: GcodeRenderModel): ProgramFinding | 
 }
 
 export function junkLineFinding(model: GcodeRenderModel): ProgramFinding | null {
-  const tally = countCategory(model, LINE_CATEGORY.junk);
+  const tally = countCategory(model, JUNK_LINES);
   if (tally === null) return null;
   return {
     id: 'junk-line',
@@ -45,14 +54,18 @@ export function junkLineFinding(model: GcodeRenderModel): ProgramFinding | null 
   };
 }
 
+/** GRBL resets some modes at M2/M30 but keeps running the lines after it, and
+ * the streamer sends every line, so the model draws and times them too. */
 export function afterEndFinding(model: GcodeRenderModel): ProgramFinding | null {
-  const tally = countCategory(model, LINE_CATEGORY.afterEnd);
+  const end = model.events.find((event) => event.kind === 'program-end');
+  if (end === undefined) return null;
+  const tally = countCategory(model, RUNNABLE_LINES, end.line + 1);
   if (tally === null) return null;
   return {
     id: 'lines-after-end',
     severity: 'notice',
     title: 'Lines after the program end',
-    detail: `${tally.count} line(s) follow M2/M30 and will not run.`,
+    detail: `${tally.count} line(s) follow M2/M30 and still run on GRBL. The program end switches the spindle and coolant off and resets some modes (G1, G17, G90), then the following lines execute, so their moves are drawn and timed.`,
     line: tally.firstLine,
     count: tally.count,
   };
@@ -92,15 +105,24 @@ export function rapidThroughMaterialFinding(model: GcodeRenderModel): ProgramFin
   };
 }
 
-/** Rapids that descend below Z0 — entering the work at rapid speed. */
+/**
+ * Rapids that descend below Z0 into work no earlier move has cut that deep at
+ * their XY: entering the work at rapid speed. A deeper pass rapiding down into
+ * its own slot (ADR-489, ADR-520) stops in air and is not one (P2-preview-1).
+ */
 export function rapidPlungeFinding(model: GcodeRenderModel): ProgramFinding | null {
-  const scan = scanRapids(model, SEG_KIND.plunge, (_z0, z1) => z1 < -BELOW_SURFACE_EPSILON_MM);
+  const intoCutAir = rapidDescentsIntoCutAir(model, -BELOW_SURFACE_EPSILON_MM);
+  const scan = scanRapids(
+    model,
+    SEG_KIND.plunge,
+    (_z0, z1, index) => z1 < -BELOW_SURFACE_EPSILON_MM && !intoCutAir.has(index),
+  );
   if (scan === null) return null;
   return {
     id: 'rapid-plunge',
     severity: 'warning',
     title: 'Rapid plunge below Z0',
-    detail: `${scan.count} rapid (G0) move(s) descend below Z0, to Z ${scan.deepest.toFixed(2)} mm, instead of feeding in at plunge rate.`,
+    detail: `${scan.count} rapid (G0) move(s) descend below Z0, to Z ${scan.deepest.toFixed(2)} mm, where no earlier move has cut that deep, instead of feeding in at plunge rate.`,
     line: scan.firstLine,
     count: scan.count,
   };
@@ -109,7 +131,7 @@ export function rapidPlungeFinding(model: GcodeRenderModel): ProgramFinding | nu
 function scanRapids(
   model: GcodeRenderModel,
   kind: number,
-  matches: (z0: number, z1: number) => boolean,
+  matches: (z0: number, z1: number, index: number) => boolean,
 ): { readonly count: number; readonly firstLine: number; readonly deepest: number } | null {
   let count = 0;
   let firstLine = -1;
@@ -119,7 +141,7 @@ function scanRapids(
     const base = index * 6;
     const z0 = model.positions[base + 2] ?? 0;
     const z1 = model.positions[base + 5] ?? 0;
-    if (!matches(z0, z1)) continue;
+    if (!matches(z0, z1, index)) continue;
     count += 1;
     deepest = Math.min(deepest, z0, z1);
     if (firstLine < 0) firstLine = model.segLine[index] ?? 0;
@@ -218,9 +240,17 @@ export function noProgramEndFinding(model: GcodeRenderModel): ProgramFinding | n
 
 function firstCuttingSegment(model: GcodeRenderModel): number | null {
   for (let index = 0; index < model.segmentCount; index += 1) {
-    if (isCutting(model, index)) return index;
+    if (cutsWork(model, index)) return index;
   }
   return null;
+}
+
+// A G0 never cuts (the rapid checks above cover a rapid into the work), and a
+// feed plunge that stops above Z0 is still in air (weakness audit WA-5).
+function cutsWork(model: GcodeRenderModel, index: number): boolean {
+  if (model.segMotion[index] === SEG_MOTION.rapid || !isCutting(model, index)) return false;
+  if (model.segKind[index] !== SEG_KIND.plunge) return true;
+  return (model.positions[index * 6 + 5] ?? 0) < -BELOW_SURFACE_EPSILON_MM;
 }
 
 function isCutting(model: GcodeRenderModel, index: number): boolean {
@@ -230,12 +260,13 @@ function isCutting(model: GcodeRenderModel, index: number): boolean {
 
 function countCategory(
   model: GcodeRenderModel,
-  category: number,
+  categories: ReadonlySet<number>,
+  fromLine = 0,
 ): { readonly count: number; readonly firstLine: number } | null {
   let count = 0;
   let firstLine = -1;
-  for (let line = 0; line < model.lineCount; line += 1) {
-    if (model.lineCategories[line] !== category) continue;
+  for (let line = fromLine; line < model.lineCount; line += 1) {
+    if (!categories.has(model.lineCategories[line] ?? LINE_CATEGORY.blank)) continue;
     count += 1;
     if (firstLine < 0) firstLine = line;
   }

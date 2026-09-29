@@ -249,13 +249,17 @@ describe('stylesheet presentation in composed SVG fragments', () => {
   });
 
   it.each(['opacity: 50%', 'filter: url(#effect)', 'mask: url(#effect)'])(
-    'rejects unsupported image presentation from ancestor rules: %s',
+    'skips images under unsupported presentation from ancestor rules: %s',
     (declaration) => {
       const markup = svg(`<style>.effect { ${declaration} }</style>
         <path fill="red" d="M0 0H4V4Z"/>
         <g class="effect">${image('')}</g>`);
-      expect(() => parseSvg(args(markup))).toThrow(/opacity, filters and SVG masks/i);
-      expect(() => parseSvgInWorker(args(markup))).toThrow(/opacity, filters and SVG masks/i);
+      for (const result of [parseSvg(args(markup)), parseSvgInWorker(args(markup))]) {
+        expect(result.fragment?.entries.map((entry) => entry.kind)).toEqual(['imported-svg']);
+        expect(result.notes.join('\n')).toMatch(
+          /Skipped 1 embedded image\(s\).*opacity, a filter or a mask/,
+        );
+      }
     },
   );
 });

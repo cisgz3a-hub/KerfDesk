@@ -52,19 +52,13 @@ export async function importDxfFiles(
       }
       if (result.object === null) {
         ctx.pushToast(emptyImportMessage(file.name, result.skippedSummary), 'warning');
+        pushNoteToasts(file.name, result.notes, ctx.pushToast);
         continue;
       }
       const claimed = claimImportSuccessIndex(ctx.nextSuccessIndex, successIdx);
       successIdx = claimed.nextLocalIndex;
       const outcome = ctx.importObject(result.object, claimed.batchIndex);
-      if (outcome.kind === 'replaced') {
-        const toast = describeReimportOutcome(outcome);
-        ctx.pushToast(toast.message, toast.variant);
-        continue;
-      }
-      ctx.pushToast(successMessage(file.name, result.pathCount, result.skippedSummary), 'success');
-      const fitNotice = describeImportBedFit(file.name, outcome);
-      if (fitNotice !== null) ctx.pushToast(fitNotice.message, fitNotice.variant);
+      reportDxfImport(file.name, result, outcome, ctx.pushToast);
     } catch (err) {
       ctx.pushToast(
         isImportCancellation(err)
@@ -109,6 +103,44 @@ function parseDxfInWorker(
   options: ImportWorkerRequestOptions,
 ): Promise<ParseDxfResult> | null {
   return blob === null ? null : parseDxfOffThread(blob, id, name, options);
+}
+
+function reportDxfImport(
+  name: string,
+  result: Extract<ParseDxfResult, { kind: 'ok' }>,
+  outcome: ImportOutcome,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): void {
+  if (outcome.kind === 'replaced') {
+    const toast = describeReimportOutcome(outcome);
+    pushToast(toast.message, toast.variant);
+  } else {
+    pushToast(successMessage(name, result.pathCount, result.skippedSummary), 'success');
+  }
+  // A re-import loses the same parts, so its notes are shown too.
+  pushNoteToasts(name, result.notes, pushToast);
+  // Last, so the three-toast stack cannot push it out of view.
+  const fitNotice = describeImportBedFit(name, outcome);
+  if (fitNotice !== null) pushToast(fitNotice.message, fitNotice.variant);
+}
+
+// Parser notes name parts the import dropped or guessed at: an unknown block,
+// an unrecognized $INSUNITS, nesting past the depth cap, a tilted entity.
+// Each gets its own warning toast, as SVG import notes do; past the cap one
+// toast counts the rest so they cannot bury the other toasts.
+const MAX_NOTE_TOASTS = 3;
+
+function pushNoteToasts(
+  name: string,
+  notes: ReadonlyArray<string>,
+  pushToast: (message: string, variant?: ToastVariant) => void,
+): void {
+  const overflows = notes.length > MAX_NOTE_TOASTS;
+  const shown = overflows ? notes.slice(0, MAX_NOTE_TOASTS - 1) : notes;
+  for (const note of shown) pushToast(`${name}: ${note}`, 'warning');
+  if (overflows) {
+    pushToast(`${name}: ${notes.length - shown.length} more import warnings.`, 'warning');
+  }
 }
 
 function successMessage(name: string, pathCount: number, skippedSummary: string | null): string {

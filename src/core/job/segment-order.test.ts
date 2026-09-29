@@ -1,7 +1,48 @@
 import { describe, expect, it } from 'vitest';
 
+import { DEFAULT_PROJECT_OPTIMIZATION } from '../scene';
 import type { CutSegment } from './job';
-import { bucketSegmentsByContainmentDepth, startCursorForSegments } from './segment-order';
+import {
+  bucketSegmentsByContainmentDepth,
+  configuredSegmentOrder,
+  startCursorForSegments,
+} from './segment-order';
+
+function closedSegment(...points: ReadonlyArray<readonly [number, number]>): CutSegment {
+  const polyline = points.map(([x, y]) => ({ x, y }));
+  return { polyline: [...polyline, ...polyline.slice(0, 1)], closed: true };
+}
+
+describe('inside-first order', () => {
+  it('cuts a hole in a U-shaped plate before the plate, though the hole’s bounds centre is in the notch', () => {
+    const plate = closedSegment(
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [70, 100],
+      [70, 40],
+      [30, 40],
+      [30, 100],
+      [0, 100],
+    );
+    // The plate inset by 3 mm: inside the material everywhere.
+    const hole = closedSegment(
+      [3, 3],
+      [97, 3],
+      [97, 97],
+      [73, 97],
+      [73, 37],
+      [27, 37],
+      [27, 97],
+      [3, 97],
+    );
+
+    expect(configuredSegmentOrder([plate, hole], DEFAULT_PROJECT_OPTIMIZATION)).toEqual([
+      hole,
+      plate,
+    ]);
+  });
+});
 
 describe('startCursorForSegments', () => {
   it('reduces 125,000 usable bounds without spreading them into Math.min or Math.max', () => {
