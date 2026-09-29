@@ -7,7 +7,7 @@ export type DesktopCloseNotice = {
 
 export type DesktopCloseReply =
   | { readonly status: 'ready'; readonly dirty: boolean }
-  | { readonly status: 'cancelled' | 'approved' | 'retry' };
+  | { readonly status: 'saved' | 'cancelled' | 'approved' | 'retry' };
 
 export interface DesktopCloseSnapshot {
   readonly active: boolean;
@@ -120,6 +120,22 @@ export class DesktopCloseController {
       this.prepareResult(this.attempt, this.shownWarning);
     }
   };
+
+  /**
+   * Save before closing (ADR-549), for the prepared attempt only. The save
+   * changes the document, so the approval that follows answers retry and the
+   * close is prepared again with the saved project.
+   */
+  async save(id: number, saveProject: () => Promise<boolean>): Promise<DesktopCloseReply> {
+    if (this.attempt?.id !== id || this.attempt.preparedDocument === null) {
+      return { status: 'cancelled' };
+    }
+    try {
+      return (await saveProject()) ? { status: 'saved' } : { status: 'cancelled' };
+    } catch {
+      return { status: 'cancelled' };
+    }
+  }
 
   approve(id: number): DesktopCloseReply {
     const attempt = this.attempt;

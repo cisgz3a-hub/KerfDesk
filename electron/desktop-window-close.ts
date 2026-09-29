@@ -1,7 +1,7 @@
 import { dialog, type BrowserWindow } from 'electron';
 import { rendererCloseRequestScript } from './renderer-close-request.js';
 import { WindowCloseGuard } from './window-close-guard.js';
-import type { WindowUnloadDecision } from './window-unload-decision.js';
+import type { UnsavedCloseDecision, WindowUnloadDecision } from './window-unload-decision.js';
 
 interface DesktopCloseOptions {
   isTrustedRenderer(url: string): boolean;
@@ -38,9 +38,15 @@ export function installDesktopWindowClose(
       // Admission may settle between prepare and approve. The new workspace
       // must receive its own complete handoff, even before its receiver mounts.
       if (operation === 'approve' && gatePreparedId === requestId) return { status: 'retry' };
-      return window.webContents.executeJavaScript(rendererCloseRequestScript(operation, requestId));
+      // Save may open the file picker, which Chromium shows only for a user
+      // gesture: here, the operator's Save click in the close question (ADR-549).
+      return window.webContents.executeJavaScript(
+        rendererCloseRequestScript(operation, requestId),
+        operation === 'save',
+      );
     },
     decideUnsaved: () => decideUnsaved(window),
+    decideUnsavedClose: () => decideUnsavedClose(window),
     decideUnavailable: () => decideUnavailable(window),
     forceClose: () => window.destroy(),
     reportFailure: (error: unknown) => console.warn('Desktop close deferred:', error),
@@ -59,6 +65,22 @@ function decideUnsaved(window: BrowserWindow): WindowUnloadDecision {
     detail: 'Changes you made may not be saved.',
   });
   return response === 0 ? 'leave' : 'stay';
+}
+
+// Closing KerfDesk (ADR-549): Save is the default, so Enter never discards work.
+function decideUnsavedClose(window: BrowserWindow): UnsavedCloseDecision {
+  const response = dialog.showMessageBoxSync(window, {
+    type: 'warning',
+    buttons: ['Save', "Don't Save", 'Cancel'],
+    defaultId: 0,
+    cancelId: 2,
+    noLink: true,
+    title: 'Unsaved changes',
+    message: 'Save your changes before closing KerfDesk?',
+    detail: "Changes you don't save may be lost.",
+  });
+  if (response === 0) return 'save';
+  return response === 1 ? 'leave' : 'stay';
 }
 
 function decideUnavailable(window: BrowserWindow): WindowUnloadDecision {

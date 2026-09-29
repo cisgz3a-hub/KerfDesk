@@ -74,8 +74,12 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 #### Edge — close an idle window with unsaved changes
 1. The existing renderer dirty predicate requests the ordinary Leave/Stay decision only while no job
    is active. It does not widen to clean documents or active jobs.
-2. Browsers use their native leave-site prompt. Electron shows **Leave** and **Stay** for that exact
-   renderer request; **Leave** permits the close and **Stay** keeps the window and project unchanged.
+2. Browsers use their native leave-site prompt. Closing the Electron window or quitting asks "Save
+   your changes before closing KerfDesk?" with **Save** (the default), **Don't Save** and
+   **Cancel** (ADR-549). **Save** runs File > Save (the Save dialog for a new project) and closes
+   only once the save finishes; a cancelled or failed save keeps the window open. **Don't Save**
+   permits the close and **Cancel** keeps the window and project unchanged. A page navigation in
+   Electron still asks **Leave** or **Stay**.
 3. Active-job unload retains its independent stop-and-recovery behavior and does not show this dirty
    prompt. This flow does not create, change, or consume a Frame permit.
 
@@ -7670,7 +7674,7 @@ behavior or create a second product implementation.
 2. An ordinary desktop close or quit keeps the renderer alive while its active-job
    `stopJob()` handoff is pending. Repeated close requests share that attempt. A
    failed preparation keeps the window available for recovery, and unsaved edits
-   still require the existing Leave/Stay decision before teardown.
+   still get the Save, Don't Save or Cancel question (ADR-549) before teardown.
 3. A settled transport write does not prove that controller buffers are empty or
    the laser/spindle is off. Controllers without a realtime reset can retain queued
    motion; follow the displayed stop-unconfirmed guidance. Forced termination,

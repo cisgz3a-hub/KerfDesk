@@ -78,6 +78,9 @@ release before it is tagged.
   sign-out during a job is asked to wait, and one that goes ahead anyway gets Abort first. Help's
   connection guide explains USB power saving and Windows Update's Active hours
   ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Save when closing.** Closing the desktop app with unsaved changes asks Save, Don't Save or
+  Cancel, and Save is the default, so pressing Enter keeps your work
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

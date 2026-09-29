@@ -13,7 +13,7 @@ function harness(initiallyAdmitted = false, includeAdmission = true) {
   const webContents = Object.assign(new EventEmitter(), {
     getURL: () => 'app://app/index.html',
     executeJavaScript: vi.fn(
-      async (script: string): Promise<unknown> =>
+      async (script: string, _userGesture?: boolean): Promise<unknown> =>
         script.includes('"operation":"prepare"')
           ? { status: 'ready', dirty: false }
           : { status: 'approved' },
@@ -116,5 +116,59 @@ describe('desktop close at commercial admission', () => {
     finish({ status: 'ready', dirty: false });
     await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledTimes(1));
     expect(h.target.webContents.executeJavaScript).toHaveBeenCalledTimes(2);
+  });
+});
+
+function operations(h: ReturnType<typeof harness>): Array<string | undefined> {
+  return h.target.webContents.executeJavaScript.mock.calls.map(
+    ([script]) => /"operation":"(\w+)"/.exec(script)?.[1],
+  );
+}
+
+describe('closing with unsaved changes (ADR-549)', () => {
+  it("asks Save, Don't Save or Cancel with Save as the default", async () => {
+    prompt.mockClear();
+    const h = harness(true);
+    const replies: unknown[] = [
+      { status: 'ready', dirty: true },
+      { status: 'saved' },
+      { status: 'retry' },
+      { status: 'ready', dirty: false },
+      { status: 'approved' },
+    ];
+    h.target.webContents.executeJavaScript.mockImplementation(async () => replies.shift());
+    prompt.mockReturnValueOnce(0);
+    h.target.close();
+    await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledTimes(1));
+
+    expect(prompt).toHaveBeenCalledOnce();
+    expect(prompt.mock.calls[0]).toContainEqual(
+      expect.objectContaining({
+        buttons: ['Save', "Don't Save", 'Cancel'],
+        defaultId: 0,
+        cancelId: 2,
+      }),
+    );
+    expect(operations(h)).toEqual(['prepare', 'save', 'approve', 'prepare', 'approve']);
+    // Only Save runs as the operator's gesture, so Chromium may open its file picker.
+    expect(h.target.webContents.executeJavaScript.mock.calls.map(([, gesture]) => gesture)).toEqual(
+      [false, true, false, false, false],
+    );
+  });
+
+  it.each([
+    [1, ['prepare', 'approve'], true],
+    [2, ['prepare', 'cancel'], false],
+  ])('answers %i without saving', async (response, expected, closes) => {
+    const h = harness(true);
+    h.target.webContents.executeJavaScript.mockImplementation(async (script: string) =>
+      script.includes('"operation":"prepare"')
+        ? { status: 'ready', dirty: true }
+        : { status: script.includes('"operation":"approve"') ? 'approved' : 'cancelled' },
+    );
+    prompt.mockReturnValueOnce(response);
+    h.target.close();
+    await vi.waitFor(() => expect(operations(h)).toEqual(expected));
+    await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledTimes(closes ? 1 : 0));
   });
 });

@@ -1,5 +1,5 @@
 import { rendererCloseReply, type RendererCloseOperation } from './renderer-close-request.js';
-import type { WindowUnloadDecision } from './window-unload-decision.js';
+import type { UnsavedCloseDecision, WindowUnloadDecision } from './window-unload-decision.js';
 
 interface CloseEvent {
   preventDefault(): void;
@@ -19,6 +19,8 @@ interface CloseOptions {
   request(operation: RendererCloseOperation, requestId: number): Promise<unknown>;
   isApprovalCurrent?(requestId: number): boolean;
   decideUnsaved(): WindowUnloadDecision;
+  /** Closing with unsaved changes (ADR-549); decideUnsaved answers without it. */
+  decideUnsavedClose?(): UnsavedCloseDecision;
   decideUnavailable(): WindowUnloadDecision;
   forceClose(): void;
   isQuitRequested(): boolean;
@@ -96,10 +98,7 @@ export class WindowCloseGuard {
         await this.cancel(id);
         return;
       }
-      if (reply.dirty && this.options.decideUnsaved() === 'stay') {
-        await this.cancel(id);
-        return;
-      }
+      if (reply.dirty && !(await this.continueWithUnsaved(id))) return;
       const approval = rendererCloseReply(await this.options.request('approve', id));
       if (!this.isCurrent(id)) return;
       if (approval.status === 'retry') {
@@ -119,6 +118,23 @@ export class WindowCloseGuard {
       if (!this.isCurrent(id)) return;
       await this.unavailable(id, error);
     }
+  }
+
+  /**
+   * Save, Don't Save or Cancel for unsaved changes (ADR-549). Resolves true
+   * when the close goes on; otherwise the close has ended here. A save changes
+   * the document, so the approval that follows answers retry and the close is
+   * prepared again with the saved project.
+   */
+  private async continueWithUnsaved(id: number): Promise<boolean> {
+    const decision = this.options.decideUnsavedClose?.() ?? this.options.decideUnsaved();
+    const goOn =
+      decision === 'save'
+        ? rendererCloseReply(await this.options.request('save', id)).status === 'saved'
+        : decision === 'leave';
+    if (!this.isCurrent(id)) return false;
+    if (!goOn) await this.cancel(id);
+    return goOn;
   }
 
   private async unavailable(id: number, error: unknown, ownedId = id): Promise<void> {

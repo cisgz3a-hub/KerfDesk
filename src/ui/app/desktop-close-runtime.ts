@@ -65,7 +65,7 @@ function closeWarning(laser: ReturnType<typeof useLaserStore.getState>): string 
 }
 
 interface CloseRequest {
-  readonly operation: 'prepare' | 'approve' | 'cancel';
+  readonly operation: 'prepare' | 'save' | 'approve' | 'cancel';
   readonly requestId: number;
   readonly respond: (reply: DesktopCloseReply) => void;
 }
@@ -74,7 +74,7 @@ function isCloseRequest(value: unknown): value is CloseRequest {
   if (typeof value !== 'object' || value === null) return false;
   return (
     'operation' in value &&
-    ['prepare', 'approve', 'cancel'].includes(String(value.operation)) &&
+    ['prepare', 'save', 'approve', 'cancel'].includes(String(value.operation)) &&
     'requestId' in value &&
     typeof value.requestId === 'number' &&
     Number.isSafeInteger(value.requestId) &&
@@ -84,18 +84,24 @@ function isCloseRequest(value: unknown): value is CloseRequest {
 }
 
 /**
- * Main invokes these three fixed renderer operations. This DOM event grants no
+ * Main invokes these four fixed renderer operations. This DOM event grants no
  * main-process capability: no preload, ipcRenderer, filesystem or shell API is
  * exposed. Ordinary web unload keeps the existing best-effort fallback until
- * the desktop main process requests ownership of a close attempt.
+ * the desktop main process requests ownership of a close attempt. `save` runs
+ * the project's own Save (ADR-549); without it, Save before closing cancels.
  */
-export function installDesktopCloseReceiver(target: Window): () => void {
+export function installDesktopCloseReceiver(
+  target: Window,
+  saveProject: () => Promise<boolean> = async () => false,
+): () => void {
   const receive = (event: Event): void => {
     if (!(event instanceof CustomEvent) || !isCloseRequest(event.detail)) return;
     event.preventDefault();
     const request = event.detail;
     if (request.operation === 'prepare') {
       void desktopCloseController.prepare(request.requestId).then(request.respond);
+    } else if (request.operation === 'save') {
+      void desktopCloseController.save(request.requestId, saveProject).then(request.respond);
     } else if (request.operation === 'approve') {
       request.respond(desktopCloseController.approve(request.requestId));
     } else {
