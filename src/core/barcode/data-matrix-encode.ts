@@ -1,7 +1,13 @@
 // Data Matrix ECC 200 encoder (ISO/IEC 16022) for square symbols 10x10 to
-// 144x144. Text is encoded with ASCII encodation — digit pairs share one
+// 132x132. Text is encoded with ASCII encodation — digit pairs share one
 // codeword and Latin-1 characters above 127 use Upper Shift — which every
 // reader supports. The smallest square symbol that holds the codewords wins.
+//
+// 144x144 is not made (ADR-386 Amendment 2). Readers such as ZXing expect its
+// ten check blocks in another order than the one ISO/IEC 16022 describes, and
+// nothing in this repository pins that order, so a 144x144 code built here
+// does not scan in them. The size table keeps the size so its placement stays
+// checked.
 
 import { DATA_MATRIX_FIELD, reedSolomonGenerator, reedSolomonRemainder } from './reed-solomon';
 import {
@@ -44,6 +50,9 @@ export const DATA_MATRIX_SIZES: readonly DataMatrixSize[] = SIZES.map(
   }),
 );
 
+// Every size up to 132x132, the largest made (see above).
+const MADE_SIZES = DATA_MATRIX_SIZES.filter((entry) => entry.size <= 132);
+
 export type DataMatrixSymbol = {
   readonly size: number;
   /** Row-major, 1 = dark. */
@@ -65,19 +74,20 @@ export function encodeDataMatrix(text: string): DataMatrixEncodeResult {
       message: 'Data Matrix here supports Latin-1 text only. Use QR Code for other characters.',
     };
   }
-  const size = DATA_MATRIX_SIZES.find((candidate) => candidate.dataCodewords >= data.length);
-  if (size === undefined) {
-    return {
-      ok: false,
-      message: `Too much data for a Data Matrix (${data.length} of ${maxCapacity()} codewords). Shorten the text.`,
-    };
-  }
+  const size = MADE_SIZES.find((candidate) => candidate.dataCodewords >= data.length);
+  if (size === undefined) return { ok: false, message: tooMuchData(data.length) };
   const codewords = dataMatrixCodewords(padDataMatrix(data, size.dataCodewords), size);
   return { ok: true, symbol: assembleSymbol(codewords, size), codewords };
 }
 
-function maxCapacity(): number {
-  return DATA_MATRIX_SIZES[DATA_MATRIX_SIZES.length - 1]?.dataCodewords ?? 0;
+function tooMuchData(codewords: number): string {
+  const largest = MADE_SIZES.at(-1);
+  const edge = largest?.size ?? 0;
+  return (
+    `Too much data for a Data Matrix: this text needs ${codewords} codewords and the largest ` +
+    `size KerfDesk makes, ${edge} × ${edge}, holds ${largest?.dataCodewords ?? 0}. ` +
+    'Shorten the text or use a QR Code.'
+  );
 }
 
 /** ASCII encodation, or null when a character is outside Latin-1. */

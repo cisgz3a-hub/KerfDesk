@@ -144,7 +144,7 @@ describe('encodeDataMatrix', () => {
   });
 
   it('picks the smallest square symbol and scans across region and block counts', () => {
-    // 204 digit pairs fill 52x52 (two blocks); 1558 fill 144x144 (ten blocks).
+    // 204 digit pairs fill 52x52 (two blocks); 1304 fill 132x132 (eight blocks).
     const cases: Array<readonly [number, number]> = [
       [3 * 2, 10],
       [5 * 2, 12],
@@ -155,7 +155,6 @@ describe('encodeDataMatrix', () => {
       [816 * 2, 104],
       [1050 * 2, 120],
       [1304 * 2, 132],
-      [1558 * 2, 144],
     ];
     for (const [digits, edge] of cases) {
       const text = '7'.repeat(digits);
@@ -165,10 +164,22 @@ describe('encodeDataMatrix', () => {
     }
   });
 
-  it('refuses text beyond 144x144 or outside Latin-1 with a clear message', () => {
-    const tooLong = encodeDataMatrix('7'.repeat(1558 * 2 + 1));
-    expect(tooLong.ok).toBe(false);
-    if (!tooLong.ok) expect(tooLong.message).toContain('Too much data for a Data Matrix');
+  // Readers such as ZXing expect the check blocks of a 144x144 symbol in another
+  // order than the one ISO/IEC 16022 describes (audit F-7), and nothing in this
+  // repository pins that order. So 132x132 is the largest size made, and longer
+  // text is refused with the reason instead of drawn as a code that fails.
+  it('stops at 132x132 and says when the text does not fit', () => {
+    for (const digits of [1304 * 2 + 1, 1304 * 2 + 2, 1558 * 2]) {
+      const beyond = encodeDataMatrix('7'.repeat(digits));
+      const codewords = Math.ceil(digits / 2);
+      expect(beyond.ok ? `${beyond.symbol.size}x${beyond.symbol.size}` : beyond.message).toBe(
+        `Too much data for a Data Matrix: this text needs ${codewords} codewords and the ` +
+          'largest size KerfDesk makes, 132 × 132, holds 1304. Shorten the text or use a QR Code.',
+      );
+    }
+  });
+
+  it('refuses text outside Latin-1 with a clear message', () => {
     const wide = encodeDataMatrix('✓');
     expect(wide.ok).toBe(false);
     if (!wide.ok) expect(wide.message).toContain('QR Code');

@@ -12,6 +12,10 @@ what it engraves or what a scanner reads.
   advancing the serial (Next, or a completed job) changes only the project's variables, so the
   canvas kept the old serial while every output encoded the new one. The human-readable text
   under a 1D code was stale in the same way.
+- **The largest Data Matrix did not scan (F-7).** Text of 1305 to 1558 codewords made a
+  144 x 144 symbol, built to the letter of ISO/IEC 16022. ZXing could not read it: readers expect
+  the ten check blocks of that one size in another order than the standard's text gives. No test
+  vector or reader in the repository pins that order, so it cannot be verified offline.
 
 ### Decision
 
@@ -27,6 +31,14 @@ what it engraves or what a scanner reads.
    - A value that cannot be evaluated or encoded leaves the stored code on the canvas; output
      stops on that value with the reason, as before.
    - Preview mode's faint artwork shows the current value too, so it lines up with the route.
+2. **The largest Data Matrix made is 132 x 132.** 144 x 144 is no longer offered, because a code
+   in the reader order could not be checked and a code in the standard's order does not scan.
+   Text that needs more than the 1304 codewords of 132 x 132 is refused with "Too much data for a
+   Data Matrix: this text needs N codewords and the largest size KerfDesk makes, 132 × 132, holds
+   1304. Shorten the text or use a QR Code." The dialog shows it under the preview and disables
+   Insert or Apply; a variable value that long stops output with the barcode and value named, as
+   any value that cannot be encoded does. The size table still lists 144 x 144 so its placement
+   stays tested; offering it again needs a verified reference for the reader order.
 
 ### Consequences
 
@@ -36,6 +48,10 @@ what it engraves or what a scanner reads.
   changes the code's size (a longer serial in a 1D code, a larger QR version), the selection
   box follows the drawn code but a click on the added part does not select it until the code is
   edited. Convert to Path still converts the stored code.
+- A 144 x 144 code saved by an earlier build keeps its stored outlines until it is edited; Edit
+  barcode then shows the message. Text that long needs a QR Code or shorter text.
 - Tests: `src/ui/workspace/use-canvas-display-barcode.test.tsx` (the canvas after Next, QR Code
   and Code 128 with its text, project untouched) and `variable-barcode-display.test.ts`
-  (bindings, the last value while encoding, values that cannot be encoded or evaluated).
+  (bindings, the last value while encoding, values that cannot be encoded or evaluated);
+  `src/core/barcode/data-matrix-encode.test.ts` (132 x 132 at most, the message) and
+  `src/ui/barcode/BarcodeDialog.test.tsx` (the message in the dialog, Insert disabled).

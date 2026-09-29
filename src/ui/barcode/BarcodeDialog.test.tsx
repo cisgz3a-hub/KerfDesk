@@ -129,6 +129,26 @@ describe('BarcodeDialog', () => {
     }
   });
 
+  it('says when text does not fit the largest Data Matrix instead of drawing 144 x 144', async () => {
+    const onSubmit = vi.fn<BarcodeSubmit>(async () => null);
+    const view = await renderDialog(onSubmit, defaultBarcodeSpec('data-matrix'));
+    const largest = 'Barcode preview: Data Matrix ECC 200 (132 × 132 modules)';
+    try {
+      const data = control<HTMLTextAreaElement>(view.host, 'textarea[aria-label="Barcode data"]');
+      await change(data, '7'.repeat(1304 * 2));
+      expect(previewLabel(view.host)).toBe(largest);
+      await change(data, '7'.repeat(1304 * 2 + 2));
+      expect(previewLabel(view.host)).toBe(largest);
+      expect(control(view.host, '[role="alert"]').textContent).toBe(
+        'Too much data for a Data Matrix: this text needs 1305 codewords and the largest size ' +
+          'KerfDesk makes, 132 × 132, holds 1304. Shorten the text or use a QR Code.',
+      );
+      expect(insertButton(view.host).disabled).toBe(true);
+    } finally {
+      await unmount(view);
+    }
+  });
+
   it('shows only the settings the chosen type uses', async () => {
     const view = await renderDialog(vi.fn<BarcodeSubmit>(async () => null));
     const labels = (): string[] =>
