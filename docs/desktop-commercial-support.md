@@ -49,6 +49,25 @@ main process, `window` for the app window). A startup line without a `KerfDesk
 quit.` line before it usually means the previous session ended abnormally: a
 crash, a forced close or a power cut.
 
+### An update did not arrive
+
+Ask what **Help > Check for Updates** says (ADR-547).
+
+- "KerfDesk is up to date": the computer has the newest version its ring lists.
+  Everyone gets a new version once it has had four quiet days in beta (ADR-541);
+  **Get new versions early (beta)** gets it sooner.
+- "... is ready. It installs when you close KerfDesk.": close KerfDesk when no job
+  is running, and it installs then.
+- "... is out, but your licence's updates ended on ...": the version they have keeps
+  working. A renewal covers newer versions.
+- "KerfDesk couldn't check for updates": the computer could not reach
+  `dl.kerfdesk.com`. Check the connection and any firewall, then **Check now**.
+- "... couldn't be prepared": the download failed its checks, and KerfDesk tries
+  again the next time it opens. If it keeps failing, ask for a support report: its
+  log says why.
+- "This copy of KerfDesk doesn't update itself": a Preview or source build. Point
+  them to the download page.
+
 ### The trial will not start
 
 The first registration needs the internet. "Unable to reach the licence service"

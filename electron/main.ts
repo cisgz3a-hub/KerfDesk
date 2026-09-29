@@ -98,7 +98,6 @@ import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
 import { createDesktopLicensing } from './desktop-licensing.js';
-import { withLicensingRoutes } from './licensing-routes.js';
 import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
 import { startDesktopSupportLog } from './support-log.js';
@@ -536,11 +535,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       protocol.handle(
         'app',
         withSupportRoutes(
-          withLicensingRoutes(
-            DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot)),
-            licence.runtime,
-            licence.earlyUpdates,
-          ),
+          licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
           SUPPORT_LOG,
         ),
       );

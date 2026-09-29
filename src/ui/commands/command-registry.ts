@@ -11,6 +11,7 @@ import {
   windowCommands,
 } from './command-families';
 import {
+  checkForUpdatesCommand,
   discussionsCommand,
   licenceCommand,
   reportBugCommand,
@@ -49,6 +50,7 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       supportReportCommand(),
       discussionsCommand(),
       ...(ctx.licensing === true ? [licenceCommand()] : []),
+      checkForUpdatesCommand(),
     ],
     ctx.machineKind,
   );

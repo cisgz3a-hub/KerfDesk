@@ -235,6 +235,49 @@ describe('commercial signed and licence-aware updates', () => {
     expect(updater.autoInstallOnAppQuit).toBe(false);
     expect(events.listenerCount('update-downloaded')).toBe(0);
   });
+  it('reports what each check found (ADR-547)', async () => {
+    const ready = fixture();
+    const onDownloading = vi.fn();
+    expect(
+      await checkCommercialUpdates(ready.updater, { ...ready.options, onDownloading }),
+    ).toEqual({ kind: 'ready', version: '1.2.0' });
+    expect(onDownloading).toHaveBeenCalledWith('1.2.0');
+
+    const current = fixture([manifest('1.0.0')]);
+    expect(await checkCommercialUpdates(current.updater, current.options)).toEqual({
+      kind: 'up-to-date',
+    });
+    const unpackaged = fixture();
+    expect(
+      await checkCommercialUpdates(unpackaged.updater, {
+        ...unpackaged.options,
+        isPackaged: false,
+      }),
+    ).toEqual({ kind: 'not-offered' });
+  });
+  it('names the newest release a licence does not cover, or a download that will not install', async () => {
+    const uncovered = fixture([manifest('1.3.0'), manifest('1.2.0')]);
+    uncovered.options.isEligible.mockResolvedValue(false);
+    expect(await checkCommercialUpdates(uncovered.updater, uncovered.options)).toEqual({
+      kind: 'not-covered',
+      version: '1.3.0',
+    });
+    const changed = fixture();
+    changed.options.isEligible.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    expect(await checkCommercialUpdates(changed.updater, changed.options)).toEqual({
+      kind: 'not-covered',
+      version: '1.2.0',
+    });
+    const mismatched = fixture();
+    mismatched.updater.downloadUpdate.mockImplementation(async () => {
+      mismatched.events.emit('update-downloaded', feed('1.3.0'));
+      return ['wrong.exe'];
+    });
+    expect(await checkCommercialUpdates(mismatched.updater, mismatched.options)).toEqual({
+      kind: 'not-installed',
+      version: '1.2.0',
+    });
+  });
   it('cleans the listener and disarms on download failure', async () => {
     const { updater, options, events } = fixture();
     updater.downloadUpdate.mockRejectedValue(new Error('download failed'));

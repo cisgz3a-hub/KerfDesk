@@ -1,4 +1,4 @@
-import type { EarlyUpdates, LicenceAdapter, LicenceStatus } from '../types';
+import type { CommercialUpdateStatus, EarlyUpdates, LicenceAdapter, LicenceStatus } from '../types';
 
 type FetchLicence = (input: string, init: RequestInit) => Promise<Response>;
 const STATES: ReadonlyArray<LicenceStatus['state']> = [
@@ -57,6 +57,33 @@ export function parseEarlyUpdates(value: unknown): EarlyUpdates {
     throw new Error('Invalid update setting.');
   return { available: setting.available, enabled: setting.enabled };
 }
+const UPDATE_STATES: ReadonlyArray<CommercialUpdateStatus['state']> = [
+  'unavailable',
+  'idle',
+  'checking',
+  'downloading',
+  'up-to-date',
+  'ready',
+  'not-covered',
+  'failed',
+];
+const RELEASE_VERSION = /^\d{1,16}\.\d{1,16}\.\d{1,16}$/;
+
+/** The main process's answer to Help > Check for Updates (ADR-547). */
+export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateStatus {
+  if (typeof value !== 'object' || value === null) throw new Error('Invalid update status.');
+  const status = value as CommercialUpdateStatus;
+  if (
+    !UPDATE_STATES.includes(status.state) ||
+    typeof status.currentVersion !== 'string' ||
+    status.currentVersion.length > 100 ||
+    !(status.version === null || RELEASE_VERSION.test(String(status.version))) ||
+    !(status.checkedAt === null || Number.isSafeInteger(status.checkedAt))
+  )
+    throw new Error('Invalid update status.');
+  const { state, currentVersion, version, checkedAt } = status;
+  return { state, currentVersion, version, checkedAt };
+}
 
 export function createDesktopLicenceAdapter(
   fetchLicence: FetchLicence = (input, init) => fetch(input, init),
@@ -92,5 +119,7 @@ export function createDesktopLicenceAdapter(
     discardPayment: () => request('discard-payment', {}),
     earlyUpdates: async () => parseEarlyUpdates(await send('early-updates')),
     setEarlyUpdates: async (enabled) => parseEarlyUpdates(await send('early-updates', { enabled })),
+    updateStatus: async () => parseCommercialUpdateStatus(await send('update-status')),
+    checkForUpdates: async () => parseCommercialUpdateStatus(await send('check-updates', {})),
   };
 }

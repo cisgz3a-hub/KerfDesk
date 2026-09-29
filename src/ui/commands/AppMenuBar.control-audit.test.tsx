@@ -12,7 +12,7 @@ type Outcome = {
   readonly args?: ReadonlyArray<string | number>;
   readonly guard?: string;
   readonly url?: string;
-  readonly special?: 'tutorials' | 'unavailable' | 'licence' | 'support-report';
+  readonly special?: 'tutorials' | 'unavailable' | 'licence' | 'support-report' | 'check-updates';
 };
 
 // Independent command-to-action expectations. Each command is clicked through
@@ -175,6 +175,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.safety': { callback: 'showSafety' },
   'help.report-bug': { url: 'https://kerfdesk.com/support.html#report' },
   'help.support-report': { special: 'support-report' },
+  'help.check-updates': { special: 'check-updates' },
   'help.discussions': { url: 'https://kerfdesk.com/support.html' },
 };
 
@@ -246,6 +247,8 @@ describe('every registered application menu action', () => {
       const supportReportEvent = vi.fn();
       window.addEventListener('kerfdesk:licence-settings', licenceEvent, { once: true });
       window.addEventListener('kerfdesk:support-report', supportReportEvent, { once: true });
+      const checkUpdatesEvent = vi.fn();
+      window.addEventListener('kerfdesk:check-updates', checkUpdatesEvent, { once: true });
       const opened: Array<{ href: string; target: string; rel: string }> = [];
       vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
         this: HTMLAnchorElement,
@@ -259,6 +262,8 @@ describe('every registered application menu action', () => {
       );
       window.removeEventListener('kerfdesk:licence-settings', licenceEvent);
       window.removeEventListener('kerfdesk:support-report', supportReportEvent);
+      expect(checkUpdatesEvent).toHaveBeenCalledTimes(Number(outcome.special === 'check-updates'));
+      window.removeEventListener('kerfdesk:check-updates', checkUpdatesEvent);
       if (outcome.special === 'unavailable') {
         expect(button.disabled).toBe(true);
         expect(button.title).toContain('Z-motion generator');

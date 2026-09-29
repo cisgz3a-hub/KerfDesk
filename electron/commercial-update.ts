@@ -37,9 +37,25 @@ type Options = {
   readonly isEligibleCached: (envelope: unknown, version: string) => boolean;
   readonly now?: () => number;
   readonly onVerifiedDownload?: (envelope: unknown, version: string) => void;
+  /** Called when a covered, newer release starts downloading (ADR-547). */
+  readonly onDownloading?: (version: string) => void;
   /** The beta ring only when this device's owner asked for it (ADR-541). */
   readonly ring?: 'stable' | 'beta';
 };
+
+/**
+ * What one update check found (ADR-547). `ready` is a verified download that
+ * installs when KerfDesk closes. `not-covered` names the newest release this
+ * device's licence does not cover. `not-installed` is a download that failed
+ * its checks, or whose licence changed while it downloaded: nothing installs.
+ */
+export type UpdateCheckOutcome =
+  | { readonly kind: 'not-offered' }
+  | { readonly kind: 'up-to-date' }
+  | { readonly kind: 'not-covered'; readonly version: string }
+  | { readonly kind: 'ready'; readonly version: string }
+  | { readonly kind: 'not-installed'; readonly version: string };
+const UP_TO_DATE: UpdateCheckOutcome = { kind: 'up-to-date' };
 
 /**
  * The catalogue this device reads. The beta ring lists every beta and every
@@ -204,7 +220,10 @@ export function trustedCandidates(
     .sort((a, b) => compare(b.version, a.version));
 }
 
-function canCheck(options: Options): boolean {
+/** Whether this build takes commercial updates at all: a trusted, packaged Windows build. */
+export function commercialUpdatesOffered(
+  options: Pick<Options, 'isPackaged' | 'isChannelTrusted' | 'platform' | 'currentVersion'>,
+): boolean {
   return (
     options.isPackaged &&
     options.isChannelTrusted &&
@@ -217,8 +236,8 @@ function canCheck(options: Options): boolean {
 export async function checkCommercialUpdates(
   updater: CommercialUpdater,
   options: Options,
-): Promise<void> {
-  if (!canCheck(options)) return;
+): Promise<UpdateCheckOutcome> {
+  if (!commercialUpdatesOffered(options)) return { kind: 'not-offered' };
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = false;
   updater.disableWebInstaller = true;
@@ -234,22 +253,34 @@ export async function checkCommercialUpdates(
       headers: { Accept: 'application/json' },
     }),
   );
-  const valid = trustedCandidates(envelopes, options);
-  for (const candidate of valid) {
-    if (
-      compare(candidate.version, options.currentVersion) <= 0 ||
-      !(await options.isEligible(candidate.envelope, candidate.version))
-    )
-      continue;
-    updater.setFeedURL({ provider: 'generic', url: `${ORIGIN}/releases/${candidate.version}` });
-    const result = await updater.checkForUpdates();
-    if (result === null || result.isUpdateAvailable !== true) return;
-    if (!updateInfoMatchesManifest(result.updateInfo, candidate))
-      throw new Error('Update feed does not match signed release');
-    if (!(await options.isEligible(candidate.envelope, candidate.version))) return;
-    await downloadVerifiedCandidate(updater, options, candidate);
-    return;
+  let uncovered: string | null = null;
+  for (const candidate of trustedCandidates(envelopes, options)) {
+    if (compare(candidate.version, options.currentVersion) <= 0) continue;
+    if (await options.isEligible(candidate.envelope, candidate.version))
+      return takeCandidate(updater, options, candidate);
+    uncovered ??= candidate.version;
   }
+  return uncovered === null ? UP_TO_DATE : { kind: 'not-covered', version: uncovered };
+}
+
+async function takeCandidate(
+  updater: CommercialUpdater,
+  options: Options,
+  candidate: Candidate,
+): Promise<UpdateCheckOutcome> {
+  const { version } = candidate;
+  updater.setFeedURL({ provider: 'generic', url: `${ORIGIN}/releases/${version}` });
+  const result = await updater.checkForUpdates();
+  if (result === null || result.isUpdateAvailable !== true) return UP_TO_DATE;
+  if (!updateInfoMatchesManifest(result.updateInfo, candidate))
+    throw new Error('Update feed does not match signed release');
+  if (!(await options.isEligible(candidate.envelope, version)))
+    return { kind: 'not-covered', version };
+  options.onDownloading?.(version);
+  await downloadVerifiedCandidate(updater, options, candidate);
+  return updater.autoInstallOnAppQuit
+    ? { kind: 'ready', version }
+    : { kind: 'not-installed', version };
 }
 
 async function downloadVerifiedCandidate(

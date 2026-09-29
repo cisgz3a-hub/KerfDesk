@@ -7697,7 +7697,11 @@ behavior or create a second product implementation.
    catalog: the stable ring, or the beta ring when **Get new versions early (beta)**
    is ticked in Help → Licence (ADR-541). Beta lists every stable release plus the
    newest builds a few quiet days before stable; the choice applies from the next
-   launch's update check, and unticking it never downgrades. The newest eligible
+   update check, and unticking it never downgrades. **Help → Check for Updates**
+   shows the installed version and where updates stand (checking, downloading,
+   ready to install when KerfDesk closes, not covered by the licence, failed),
+   offers Check now and the beta choice, and the status bar shows **Update ready**
+   once a version has downloaded (ADR-547). The newest eligible
    signed release is selected by immutable release date and version; an ineligible
    newer release cannot replace an older eligible one. Manifest hashes, native
    publisher validation and actual updater availability

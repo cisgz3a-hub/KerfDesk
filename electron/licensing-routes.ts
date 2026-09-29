@@ -1,15 +1,17 @@
 import type { LicensingRuntime } from './licensing-runtime.js';
 import { record } from './licensing-verification.js';
 import type { EarlyUpdates } from './update-ring-store.js';
+import type { DesktopUpdates } from './update-status.js';
 
 const PREFIX = '/api/licensing/';
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
-type ProtocolHandler = (request: Request) => Promise<Response>;
+export type ProtocolHandler = (request: Request) => Promise<Response>;
 
 export function withLicensingRoutes(
   fallback: ProtocolHandler,
   runtime: LicensingRuntime,
   earlyUpdates?: EarlyUpdates,
+  updates?: DesktopUpdates,
 ): ProtocolHandler {
   return async (request) => {
     const url = new URL(request.url);
@@ -17,6 +19,8 @@ export function withLicensingRoutes(
     if (!exactUrl(url) || !sameOriginHeaders(request)) return missing();
     const action = url.pathname.slice(PREFIX.length);
     if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
+    if (action === 'update-status' || action === 'check-updates')
+      return updateRoute(action, request, updates);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
     if (!jsonPost(request)) return missing();
     const body = await readBody(request);
@@ -49,6 +53,26 @@ async function earlyUpdateRoute(
   } catch {
     return response({ error: 'unavailable' }, 503);
   }
+}
+
+/**
+ * Help > Check for Updates (ADR-547): `update-status` reads where updates
+ * stand; `check-updates` starts a check and answers at once, so a long
+ * download never holds the request open.
+ */
+async function updateRoute(
+  action: string,
+  request: Request,
+  updates: DesktopUpdates | undefined,
+): Promise<Response> {
+  if (updates === undefined) return missing();
+  if (action === 'update-status')
+    return request.method === 'GET' ? response(updates.status()) : missing();
+  if (!jsonPost(request)) return missing();
+  const body = await readBody(request);
+  if (!record(body) || Object.keys(body).length !== 0)
+    return response({ error: 'invalid_request' }, 400);
+  return response(updates.check());
 }
 
 function exactUrl(url: URL): boolean {

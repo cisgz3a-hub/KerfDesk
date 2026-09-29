@@ -352,6 +352,11 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     tooltip:
       'See your Free or Pro edition, start the Pro trial, and manage your licence key, devices and updates.',
   },
+  'help.check-updates': {
+    family: 'help',
+    tooltip:
+      'See which KerfDesk version you have and whether a newer one is ready. The desktop app downloads new versions in the background and installs them when you close it; you can check now or get new versions early.',
+  },
   'help.tutorials': {
     family: 'help',
     tooltip: 'Browse step-by-step visual tutorials for tools, artwork, and machine workflows.',

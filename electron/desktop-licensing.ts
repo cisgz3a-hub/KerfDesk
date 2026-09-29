@@ -1,10 +1,20 @@
 import { net, Notification, safeStorage, shell } from 'electron';
-import { readLicensingConfig } from './licensing-config.js';
+import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
 import { licensingDeviceId } from './licensing-device.js';
+import { withLicensingRoutes, type ProtocolHandler } from './licensing-routes.js';
 import { createLicensingStore } from './licensing-store.js';
-import { createLicensingRuntime } from './licensing-runtime.js';
-import { checkCommercialUpdates, type CommercialUpdater } from './commercial-update.js';
-import { createUpdateRingStore, earlyUpdateSetting } from './update-ring-store.js';
+import { createLicensingRuntime, type LicensingRuntime } from './licensing-runtime.js';
+import {
+  checkCommercialUpdates,
+  commercialUpdatesOffered,
+  type CommercialUpdater,
+} from './commercial-update.js';
+import {
+  createUpdateRingStore,
+  earlyUpdateSetting,
+  type UpdateRingStore,
+} from './update-ring-store.js';
+import { createDesktopUpdates, type DesktopUpdates } from './update-status.js';
 
 // A plain label for the device list; the computer's own name is never sent.
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
@@ -21,14 +31,16 @@ function announceDownloadedUpdate(version: string): void {
     }).show();
 }
 
-export function createDesktopLicensing(options: {
+type Options = {
   readonly appPath: string;
   readonly userDataPath: string;
   readonly version: string;
   readonly packaged: boolean;
   readonly trustedUpdates: boolean;
   readonly updater: CommercialUpdater;
-}) {
+};
+
+export function createDesktopLicensing(options: Options) {
   const config = readLicensingConfig(options.appPath);
   let pendingUpdate: { envelope: unknown; version: string } | null = null;
   const runtime = createLicensingRuntime({
@@ -59,32 +71,19 @@ export function createDesktopLicensing(options: {
     },
   });
   const rings = createUpdateRingStore(options.userDataPath);
-  const checkUpdates = (): Promise<void> =>
-    rings
-      .read()
-      .then((ring) =>
-        checkCommercialUpdates(options.updater, {
-          isPackaged: options.packaged,
-          isChannelTrusted: options.trustedUpdates,
-          platform: process.platform,
-          currentVersion: options.version,
-          releaseKeys: config.channel === 'commercial' ? config.releaseKeys : {},
-          fetch: (url, init) => net.fetch(url, init),
-          isEligible: runtime.isReleaseEligible,
-          isEligibleCached: runtime.isReleaseEligibleCached,
-          ring,
-          onVerifiedDownload: (envelope, version) => {
-            pendingUpdate = { envelope, version };
-            announceDownloadedUpdate(version);
-          },
-        }),
-      )
-      .catch(() => console.warn('Commercial update check could not complete.'));
+  /** Help > Licence's "Get new versions early (beta)" setting (ADR-541). */
+  const earlyUpdates = earlyUpdateSetting(config.channel === 'commercial', rings);
+  const updates = commercialUpdates(options, config, runtime, rings, (envelope, version) => {
+    pendingUpdate = { envelope, version };
+    announceDownloadedUpdate(version);
+  });
   return {
     runtime,
     config,
-    /** Help > Licence's "Get new versions early (beta)" setting (ADR-541). */
-    earlyUpdates: earlyUpdateSetting(config.channel === 'commercial', rings),
+    updates,
+    /** The licensing and update routes in front of the app's own files. */
+    routes: (fallback: ProtocolHandler): ProtocolHandler =>
+      withLicensingRoutes(fallback, runtime, earlyUpdates, updates),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
      * the signed update check. The workspace never waits for either (ADR-540).
@@ -94,7 +93,9 @@ export function createDesktopLicensing(options: {
       void runtime
         .refreshInBackground()
         .catch(() => undefined)
-        .then(checkUpdates);
+        .then(() => {
+          updates.check();
+        });
     },
     prepareQuit: () => {
       if (config.channel !== 'commercial') return;
@@ -103,4 +104,45 @@ export function createDesktopLicensing(options: {
         runtime.isReleaseEligibleCached(pendingUpdate.envelope, pendingUpdate.version);
     },
   };
+}
+
+/**
+ * The update status Help > Check for Updates shows (ADR-547). Only a trusted,
+ * packaged commercial Windows build checks; every other build reports that it
+ * does not update itself.
+ */
+function commercialUpdates(
+  options: Options,
+  config: LicensingConfig,
+  runtime: LicensingRuntime,
+  rings: UpdateRingStore,
+  onVerifiedDownload: (envelope: unknown, version: string) => void,
+): DesktopUpdates {
+  const build = {
+    isPackaged: options.packaged,
+    isChannelTrusted: options.trustedUpdates,
+    platform: process.platform,
+    currentVersion: options.version,
+  };
+  return createDesktopUpdates({
+    offered: config.channel === 'commercial' && commercialUpdatesOffered(build),
+    currentVersion: options.version,
+    run: async (onDownloading) => {
+      try {
+        return await checkCommercialUpdates(options.updater, {
+          ...build,
+          releaseKeys: config.channel === 'commercial' ? config.releaseKeys : {},
+          fetch: (url, init) => net.fetch(url, init),
+          isEligible: runtime.isReleaseEligible,
+          isEligibleCached: runtime.isReleaseEligibleCached,
+          ring: await rings.read(),
+          onDownloading,
+          onVerifiedDownload,
+        });
+      } catch (error) {
+        console.warn('Commercial update check could not complete:', error);
+        throw error;
+      }
+    },
+  });
 }

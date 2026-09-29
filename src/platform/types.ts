@@ -48,6 +48,33 @@ export type LicenceAdapter = {
   readonly discardPayment: () => Promise<LicenceStatus>;
   readonly earlyUpdates: () => Promise<EarlyUpdates>;
   readonly setEarlyUpdates: (enabled: boolean) => Promise<EarlyUpdates>;
+  /** Where this device's own updates stand (ADR-547). */
+  readonly updateStatus: () => Promise<CommercialUpdateStatus>;
+  /** Starts an update check and answers at once; `updateStatus` gives the result. */
+  readonly checkForUpdates: () => Promise<CommercialUpdateStatus>;
+};
+
+/**
+ * Where the desktop app's own updates stand (ADR-547). `unavailable` is a
+ * build that does not update itself; `ready` is a downloaded version that
+ * installs when KerfDesk closes; `not-covered` is a newer version this
+ * licence's updates do not cover.
+ */
+export type CommercialUpdateStatus = {
+  readonly state:
+    | 'unavailable'
+    | 'idle'
+    | 'checking'
+    | 'downloading'
+    | 'up-to-date'
+    | 'ready'
+    | 'not-covered'
+    | 'failed';
+  readonly currentVersion: string;
+  /** The newer version being downloaded, ready, not covered or not installed. */
+  readonly version: string | null;
+  /** When the last check finished, in milliseconds since 1970. */
+  readonly checkedAt: number | null;
 };
 
 /**

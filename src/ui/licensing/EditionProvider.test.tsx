@@ -1,7 +1,14 @@
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import type { CommercialUpdateStatus, LicenceAdapter, LicenceStatus } from '../../platform/types';
+
+const NO_UPDATES: CommercialUpdateStatus = {
+  state: 'unavailable',
+  currentVersion: '1.0.0',
+  version: null,
+  checkedAt: null,
+};
 import { EditionProvider, LICENCE_SETTINGS_EVENT } from './EditionProvider';
 import { proFeaturesUnlocked, requestProFeature, useEdition } from './edition';
 import { editionLabel } from './EditionStatusButton';
@@ -55,6 +62,8 @@ function client(status: LicenceStatus = free): LicenceAdapter {
     discardPayment: vi.fn(async () => ({ ...status, paymentPending: false })),
     earlyUpdates: vi.fn(async () => ({ available: true, enabled: false })),
     setEarlyUpdates: vi.fn(async (enabled: boolean) => ({ available: true, enabled })),
+    updateStatus: vi.fn(async () => NO_UPDATES),
+    checkForUpdates: vi.fn(async () => NO_UPDATES),
   };
 }
 function button(text: string): HTMLButtonElement {

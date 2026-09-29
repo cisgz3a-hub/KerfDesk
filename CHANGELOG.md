@@ -67,6 +67,10 @@ release before it is tagged.
 - **Support reports.** Help > Save Support Report saves a file with your version, machine, recent
   problems and, in the desktop app, its log, for you to read and send to KerfDesk support. Large
   pictures zoom smoothly ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Desktop updates you can see.** Help > Check for Updates shows your version and whether a newer
+  one is downloading or ready, checks now, and offers new versions early; the status bar says
+  Update ready when one will install as KerfDesk closes
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

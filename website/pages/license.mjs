@@ -57,9 +57,11 @@ function currentLicenseSection() {
     content: html`<div class="prose">
       <p>KerfDesk is © 2026 Johann Stolk. All rights reserved, except as set out here.</p>
       <p>
-        You may use the web app and the free desktop builds free of charge, for personal or business
-        work, under the License &amp; Safety Notice that comes with them. KerfDesk Pro in the
-        desktop app comes with the KerfDesk Licence Agreement, which is published before sales open.
+        You may use the web app and the desktop app free of charge, for personal or business work,
+        under the License &amp; Safety Notice that comes with them. That free use doesn’t cover the
+        tools the app marks as Pro: they need an active trial or a paid license under the KerfDesk
+        Licence Agreement, which is published before sales open. Bypassing or disabling the license
+        checks isn’t allowed.
       </p>
       <p>
         Versions up to and including the one tagged “mit-final” in KerfDesk’s source history were

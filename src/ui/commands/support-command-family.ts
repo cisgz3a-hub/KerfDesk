@@ -5,6 +5,7 @@
 // open a URL (not a store action), so these builders need no AppCommandContext.
 // The command ids keep their original names so saved shortcuts still resolve.
 
+import { CHECK_UPDATES_EVENT } from '../licensing/update-status-text';
 import { SUPPORT_REPORT_EVENT } from '../support/support-report-event';
 import { enabled, type AppCommand } from './command-types';
 
@@ -52,6 +53,18 @@ export function discussionsCommand(): AppCommand {
     'Get Help',
     'Open KerfDesk support for questions, ideas and feedback',
     () => openExternalUrl(SUPPORT_URL),
+  );
+}
+
+// The desktop app's version and update status, with Check now and the beta
+// choice; the web app explains that it updates itself (ADR-547).
+export function checkForUpdatesCommand(): AppCommand {
+  return enabled(
+    'help.check-updates',
+    'help',
+    'Check for Updates...',
+    'See which version you have, whether a newer one is ready, and get new versions early',
+    () => window.dispatchEvent(new Event(CHECK_UPDATES_EVENT)),
   );
 }
 

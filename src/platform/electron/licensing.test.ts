@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createDesktopLicenceAdapter, parseEarlyUpdates } from './licensing';
+import {
+  createDesktopLicenceAdapter,
+  parseCommercialUpdateStatus,
+  parseEarlyUpdates,
+} from './licensing';
 
 describe('desktop early updates setting (ADR-541)', () => {
   it('reads and changes the setting through the licensing route', async () => {
@@ -36,5 +40,41 @@ describe('desktop early updates setting (ADR-541)', () => {
       async () => new Response('Not Found', { status: 404 }),
     );
     await expect(missing.earlyUpdates()).rejects.toThrow('unavailable');
+  });
+});
+
+describe('desktop update status (ADR-547)', () => {
+  const ready = {
+    state: 'ready',
+    currentVersion: '2026.40.0',
+    version: '2026.41.0',
+    checkedAt: 1_790_000_000_000,
+  };
+
+  it('reads the status and starts a check through the licensing routes', async () => {
+    const fetchLicence = vi.fn(async (_input: string, init: RequestInit) =>
+      Response.json(init.method === 'POST' ? { ...ready, state: 'checking' } : ready),
+    );
+    const adapter = createDesktopLicenceAdapter(fetchLicence);
+    expect(await adapter.updateStatus()).toEqual(ready);
+    expect(await adapter.checkForUpdates()).toMatchObject({ state: 'checking' });
+    const [read, check] = fetchLicence.mock.calls;
+    expect(read?.[0]).toBe('./api/licensing/update-status');
+    expect(read?.[1].method).toBe('GET');
+    expect(check?.[0]).toBe('./api/licensing/check-updates');
+    expect(check?.[1]).toMatchObject({ method: 'POST', body: '{}' });
+  });
+
+  it('refuses a malformed status and keeps only the known fields', () => {
+    for (const value of [
+      null,
+      { ...ready, state: 'installing' },
+      { ...ready, currentVersion: 7 },
+      { ...ready, version: '2026.41' },
+      { ...ready, version: '<b>2026.41.0</b>' },
+      { ...ready, checkedAt: 1.5 },
+    ])
+      expect(() => parseCommercialUpdateStatus(value)).toThrow('Invalid update status');
+    expect(parseCommercialUpdateStatus({ ...ready, extra: true })).toEqual(ready);
   });
 });

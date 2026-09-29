@@ -8,7 +8,10 @@ import {
 } from './edition';
 import { UNLICENSED_BUILDS_RUN_FREE } from './edition-policy';
 import { FreeOnlyEdition, useLicenceSettingsEvent, useProInDesktop } from './FreeOnlyEdition';
+import { BrowserUpdatesNotice, CommercialUpdates } from './CommercialUpdates';
 import { LicencePanel } from './LicencePanel';
+import { panelOverlay, useDismissOnEscape } from './panel-overlay';
+import { CHECK_UPDATES_EVENT } from './update-status-text';
 import { ProFeatureDialog } from './ProFeatureDialog';
 import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
@@ -33,7 +36,12 @@ export function EditionProvider({
   readonly children: ReactNode;
 }): JSX.Element {
   if (client === undefined)
-    return unlicensedRunsFree ? <FreeOnlyEdition>{children}</FreeOnlyEdition> : <>{children}</>;
+    return (
+      <>
+        {unlicensedRunsFree ? <FreeOnlyEdition>{children}</FreeOnlyEdition> : children}
+        <BrowserUpdatesNotice />
+      </>
+    );
   return (
     <LicensedEdition client={client} unlicensedRunsFree={unlicensedRunsFree}>
       {children}
@@ -79,7 +87,7 @@ function LicensedEdition({
     <EditionContext.Provider value={value}>
       {children}
       {managing ? (
-        <div role="dialog" aria-modal="false" aria-label="KerfDesk licence" style={overlay}>
+        <div role="dialog" aria-modal="false" aria-label="KerfDesk licence" style={panelOverlay}>
           <LicencePanel
             client={client}
             status={session.status}
@@ -109,6 +117,7 @@ function LicensedEdition({
       {desktop.shown === null ? null : (
         <ProInDesktopDialog feature={desktop.shown} onClose={desktop.close} />
       )}
+      <CommercialUpdates client={client} updatesUntil={session.status?.updatesUntil ?? null} />
     </EditionContext.Provider>
   );
 }
@@ -130,6 +139,11 @@ function useLicenceManager(
   }, [freeBuild, load, showProInDesktop]);
   useLicenceSettingsEvent(manage);
   const closeManager = useCallback(() => setManaging(false), []);
+  // Help > Check for Updates opens its panel in the same place.
+  useEffect(() => {
+    window.addEventListener(CHECK_UPDATES_EVENT, closeManager);
+    return () => window.removeEventListener(CHECK_UPDATES_EVENT, closeManager);
+  }, [closeManager]);
   useDismissOnEscape(managing, closeManager);
   return { managing, closeManager };
 }
@@ -187,26 +201,3 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   );
   return { status, failure, pending, settle, accept, load, requestPro };
 }
-
-function useDismissOnEscape(open: boolean, close: () => void): void {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') close();
-    };
-    if (open) window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, close]);
-}
-
-// A nonmodal panel leaves the workspace usable and keyboard recovery active.
-const overlay = {
-  position: 'fixed',
-  zIndex: 1000,
-  top: 56,
-  left: 16,
-  maxWidth: 'min(480px, calc(100vw - 32px))',
-  maxHeight: 'calc(100vh - 80px)',
-  overflow: 'auto',
-  border: '1px solid var(--lf-border-strong)',
-  background: 'var(--lf-bg-1)',
-} as const;

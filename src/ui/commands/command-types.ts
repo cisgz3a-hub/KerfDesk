@@ -135,6 +135,7 @@ export type CommandId =
   | 'help.report-bug'
   | 'help.support-report'
   | 'help.licence'
+  | 'help.check-updates'
   | 'help.discussions';
 
 export type AppCommand = {

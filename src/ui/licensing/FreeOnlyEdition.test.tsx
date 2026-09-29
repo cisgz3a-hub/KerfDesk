@@ -1,7 +1,14 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import type { CommercialUpdateStatus, LicenceAdapter, LicenceStatus } from '../../platform/types';
+
+const NO_UPDATES: CommercialUpdateStatus = {
+  state: 'unavailable',
+  currentVersion: '1.0.0',
+  version: null,
+  checkedAt: null,
+};
 import { EditionProvider } from './EditionProvider';
 import { EditionStatusButton, PRO_IN_DESKTOP_LABEL } from './EditionStatusButton';
 import { LICENCE_SETTINGS_EVENT, proFeaturesUnlocked, useEdition } from './edition';
@@ -53,6 +60,8 @@ function client(status: LicenceStatus): LicenceAdapter {
     discardPayment: vi.fn(async () => status),
     earlyUpdates: vi.fn(async () => ({ available: false, enabled: false })),
     setEarlyUpdates: vi.fn(async () => ({ available: false, enabled: false })),
+    updateStatus: vi.fn(async () => NO_UPDATES),
+    checkForUpdates: vi.fn(async () => NO_UPDATES),
   };
 }
 function VcarveTool({ onOpen }: { readonly onOpen: () => void }): JSX.Element {

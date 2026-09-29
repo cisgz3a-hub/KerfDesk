@@ -1,7 +1,19 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import type { EarlyUpdates, LicenceAdapter, LicenceStatus } from '../../platform/types';
+import type {
+  CommercialUpdateStatus,
+  EarlyUpdates,
+  LicenceAdapter,
+  LicenceStatus,
+} from '../../platform/types';
+
+const NO_UPDATES: CommercialUpdateStatus = {
+  state: 'unavailable',
+  currentVersion: '1.0.0',
+  version: null,
+  checkedAt: null,
+};
 import { LicencePanel } from './LicencePanel';
 
 const free: LicenceStatus = {
@@ -47,6 +59,8 @@ function client(setting: () => Promise<EarlyUpdates>): LicenceAdapter {
     discardPayment: vi.fn(async () => free),
     earlyUpdates: vi.fn(setting),
     setEarlyUpdates: vi.fn(async (enabled: boolean) => ({ available: true, enabled })),
+    updateStatus: vi.fn(async () => NO_UPDATES),
+    checkForUpdates: vi.fn(async () => NO_UPDATES),
   };
 }
 const offered = (enabled: boolean) => async (): Promise<EarlyUpdates> => ({
