@@ -350,8 +350,8 @@ their own licences. The third-party notices shipped with KerfDesk list them. Tho
 those components, and nothing in this agreement limits your rights under them.
 
 **16.2** KerfDesk versions released up to and including the version tagged "mit-final" in the
-KerfDesk source repository [PLACEHOLDER: its date, from the cutoff record in ADR-543] were released
-under the MIT License. Your rights in those versions come from the MIT License, not from this
+KerfDesk source repository, the last version before KerfDesk's licence changed on 29 September 2026,
+were released under the MIT License. Your rights in those versions come from the MIT License, not from this
 agreement, and this agreement does not reduce them. This agreement covers KerfDesk versions released
 after that version.
 

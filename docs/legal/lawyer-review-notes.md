@@ -319,9 +319,9 @@ settled decisions and on section B.
   and support. It cannot give exclusive rights over code that is already public.
 
 **Status, 29 September 2026:** John confirmed step 1 at 05:29 UTC: `stolkjohannjohann-sudo` is his
-own older account. Steps 3, 5 and 6 are draft PR #1022 (ADR-543), which waits for his merge; he
-tags `mit-final` after it. Step 4 is his separate call. After #1022 merges, fill §16.2's date from
-ADR-543's cutoff record.
+own older account. PR #1022 (ADR-543) did steps 5 and 6 and was merged at 07:33 UTC. Its cutoff
+commit is `2f6f84d` (#1016), the merge's first parent; step 3, tagging `mit-final` on that commit,
+is still John's. Step 4 is his separate call. §16.2 now names the 29 September 2026 change.
 
 **Recommended path, in order:**
 
@@ -371,7 +371,6 @@ for a paid product.
 - Support email address, once it exists: §24, refund policy, privacy notice.
 - The Information Officer's registration number with the Information Regulator: privacy notice.
 - The date sales open: all three documents.
-- The MIT cutoff date and the first version under the agreement: §16.2 (from step D5).
 
 ## F. What the software and website must do for these terms to be true
 
