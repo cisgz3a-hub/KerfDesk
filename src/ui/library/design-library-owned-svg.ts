@@ -1,13 +1,15 @@
 import type { LibraryEntry } from './design-library-types';
 
+// KerfDesk's own artwork is not MIT (ADR-543 Amendment 1). The notice is the
+// grant: people may use these designs in their own work, including work they sell.
 const OWNED_PROVENANCE = {
   sourceKind: 'owned',
   sourceName: 'KerfDesk',
-  creator: 'KerfDesk contributors',
-  license: 'MIT',
-  licenseId: 'MIT',
-  licenseUrl: 'https://opensource.org/license/mit',
-  notice: 'Authored for KerfDesk in this repository.',
+  creator: 'KerfDesk',
+  license: 'Free to use in your designs',
+  licenseId: 'LicenseRef-KerfDesk-Designs',
+  notice:
+    'Made for KerfDesk. You may use it in your own designs and in the things you make with them, including things you sell.',
 } as const;
 
 function svg(width: number, height: number, body: string): string {

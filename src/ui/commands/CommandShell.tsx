@@ -359,7 +359,7 @@ function aboutText(): string {
     '',
     'Copyright © 2026 Johann Stolk. All rights reserved.',
     'Terms of use: License & Safety Notice (/eula.txt).',
-    'Bundled open-source components: see /third-party-notices.txt.',
+    'Third-party components and their licences: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',
     'job (preview, simulation, or air run) before cutting, and never',

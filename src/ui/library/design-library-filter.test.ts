@@ -124,8 +124,8 @@ describe('filterDesignLibrary', () => {
       entry({
         id: 'license',
         provenance: {
-          sourceKind: 'owned',
-          sourceName: 'KerfDesk',
+          sourceKind: 'lucide',
+          sourceName: 'Lucide',
           license: 'Friendly Permit',
           licenseId: 'FRIENDLY-1.0',
         },
@@ -138,6 +138,26 @@ describe('filterDesignLibrary', () => {
         search: `  ${query.toUpperCase()}  `,
       }).map((item) => item.id),
     ).toEqual([matchingEntry.id]);
+  });
+
+  it("keeps an original's own licence out of the substring search", () => {
+    const original = entry({
+      id: 'original',
+      title: 'Original',
+      provenance: {
+        sourceKind: 'owned',
+        sourceName: 'KerfDesk',
+        creator: 'KerfDesk',
+        license: 'Free to use in your designs',
+        licenseId: 'LicenseRef-KerfDesk-Designs',
+      },
+    });
+    const ids = (search: string) =>
+      filterDesignLibrary([...entries, original], { search }).map((item) => item.id);
+
+    expect(ids('designs')).toEqual([]);
+    expect(ids('licenseref')).toEqual([]);
+    expect(ids('kerf')).toEqual(['laser-kerf-comb']);
   });
 
   it('composes category, machine, kind, operation, and source filters', () => {

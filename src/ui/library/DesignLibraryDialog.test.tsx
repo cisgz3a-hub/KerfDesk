@@ -229,8 +229,11 @@ describe('DesignLibraryDialog', () => {
     await click(h.querySelector('button[aria-label="View details for Kerf Comb"]'));
     expect(useStore.getState().project.scene.objects.length).toBe(before);
     expect(h.textContent).toContain('Suggested uses');
-    expect(h.querySelector('.lf-library-detail')?.textContent).toContain('KerfDesk contributors');
-    expect(h.textContent).toContain('MIT');
+    const details = h.querySelector('.lf-library-detail')?.textContent ?? '';
+    expect(details).toContain('Free to use in your designs');
+    expect(details).toContain('including things you sell');
+    expect(details).not.toContain('MIT');
+    expect(details).not.toContain('LicenseRef-');
 
     await click(
       [...h.querySelectorAll('button')].find((button) => button.textContent === 'Add to canvas') ??
@@ -245,7 +248,7 @@ describe('DesignLibraryDialog', () => {
         schemaVersion: 1,
         assetId: 'laser-kerf-comb',
         sourceName: 'KerfDesk',
-        licenseId: 'MIT',
+        licenseId: 'LicenseRef-KerfDesk-Designs',
       });
       expect(inserted).not.toHaveProperty('operationOverride');
       expect(inserted).not.toHaveProperty('powerScale');
