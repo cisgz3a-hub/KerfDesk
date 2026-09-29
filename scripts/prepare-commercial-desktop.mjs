@@ -3,6 +3,7 @@ import { mkdir, open, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { extractFile } from '@electron/asar';
+import { validateCommercialPayload } from './commercial-release-manifest.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const API_ORIGIN = 'https://license.kerfdesk.com';
@@ -104,8 +105,22 @@ function trustedKeys(entitlementKeySet, releaseKeySet) {
   return { entitlementKeys, releaseKeys };
 }
 
-export function prepareCommercialMetadata(input) {
+// The publisher checks this identity with validateCommercialPayload. Refuse here,
+// before signing, what it would refuse: a source ref other than this version's
+// tag, or a publication time more than five minutes ahead of this clock.
+function requirePublishableIdentity(payload, now) {
+  try {
+    validateCommercialPayload(payload, 'release-identity', now);
+  } catch (error) {
+    throw new PreparationError(
+      `The publisher would refuse this identity (${error.message}): the source ref must be refs/tags/v${payload.version} and publishedAt no more than five minutes ahead.`,
+    );
+  }
+}
+
+export function prepareCommercialMetadata(input, now = Date.now()) {
   const payload = identity(input);
+  requirePublishableIdentity(payload, now);
   const keys = trustedKeys(input.entitlementKeySet, input.releaseKeySet);
   requireInput(
     Object.hasOwn(keys.releaseKeys, input.keyId),
@@ -358,7 +373,7 @@ export async function runPreparation(args, env = process.env, root = ROOT) {
     const field = names[args[index]];
     requireInput(
       field && args[index + 1] && !Object.hasOwn(input, field),
-      'Usage: prepare-commercial-desktop.mjs --output-dir <external-dir> --terms-file <external-terms.txt> --version <X.Y.Z> --source-sha <sha> --source-ref <ref> --published-at <canonical-UTC> --key-id <stable-key-id>',
+      'Usage: prepare-commercial-desktop.mjs --output-dir <external-dir> --terms-file <external-terms.txt> --version <X.Y.Z> --source-sha <sha> --source-ref refs/tags/v<X.Y.Z> --published-at <canonical-UTC> --key-id <stable-key-id>',
     );
     input[field] = args[index + 1];
   }

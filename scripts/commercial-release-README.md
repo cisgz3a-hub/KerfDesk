@@ -1,8 +1,8 @@
 # Commercial Windows publication
 
-The publisher is an operator CLI. It does not create releases, tags, accounts or signing credentials, and no commercial publication workflow is enabled yet. Run it on Windows from a clean checkout whose HEAD matches the approved signed source SHA. Build outputs and generated preparation files must be ignored or outside that checkout.
+The publisher is an operator CLI. It does not create releases, tags, accounts or signing credentials, and no commercial publication workflow is enabled yet. Run it on Windows from a clean checkout whose HEAD matches the approved signed source SHA and whose `vX.Y.Z` tag resolves to that same commit. Build outputs and generated preparation files must be ignored or outside that checkout.
 
-First run `prepare-commercial-desktop.mjs` with the explicit release timestamp, approved external seller terms and the protected stable signing key. Build with its generated configuration and retain its `commercial-release-identity.json`. The build must use a valid Windows Authenticode certificate and the approved publisher name.
+First run `prepare-commercial-desktop.mjs` with the explicit release timestamp, approved external seller terms and the protected stable signing key. It refuses any identity the publisher would refuse: `--source-ref` must be `refs/tags/vX.Y.Z` for the version, and `--published-at` no more than five minutes ahead. Build with its generated configuration and retain its `commercial-release-identity.json`. The build must use a valid Windows Authenticode certificate and the approved publisher name.
 
 Set these protected environment inputs without putting their values in command history:
 

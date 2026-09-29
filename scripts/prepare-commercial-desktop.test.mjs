@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -134,6 +134,28 @@ test('invalid release identity, Preview keys, key reuse and wrong private signin
     { privateKeyPem: key().privateKeyPem },
   ])
     assert.throws(() => prepareCommercialMetadata({ ...input, ...changes }));
+});
+
+test('preparation refuses the identities the publisher refuses: a non-tag ref or a future date', () => {
+  const input = fixture();
+  const now = Date.parse(TIMESTAMP);
+  for (const sourceRef of ['refs/heads/main', 'refs/tags/v1.2.4', 'refs/tags/1.2.3', 'v1.2.3'])
+    assert.throws(
+      () => prepareCommercialMetadata({ ...input, sourceRef }, now),
+      /\(Invalid commercial release: source\): the source ref must be refs\/tags\/v1\.2\.3/u,
+    );
+  assert.equal(
+    prepareCommercialMetadata({ ...input, publishedAt: '2026-09-28T12:05:00.000Z' }, now).version,
+    '1.2.3',
+  );
+  for (const [publishedAt, clock] of [
+    ['2026-09-28T12:05:00.001Z', now],
+    ['2099-01-01T00:00:00.000Z', undefined],
+  ])
+    assert.throws(
+      () => prepareCommercialMetadata({ ...input, publishedAt }, clock),
+      /\(Invalid commercial release: publication timestamp\)/u,
+    );
   assert.throws(() =>
     prepareCommercialMetadata({
       ...input,
@@ -209,7 +231,10 @@ test('external preparation is idempotent, leaves root package unchanged, and req
   );
   assert.equal(await readFile(join(paths.root, 'package.json'), 'utf8'), original);
   await assert.rejects(
-    writeCommercialPreparation({ ...input, version: '1.2.4' }, paths.root),
+    writeCommercialPreparation(
+      { ...input, version: '1.2.4', sourceRef: 'refs/tags/v1.2.4' },
+      paths.root,
+    ),
     /different contents/u,
   );
   await assert.rejects(
@@ -271,6 +296,12 @@ test('CLI sources private key only from explicit protected env or file and never
     ),
     /exactly one/u,
   );
+  const branch = args.map((value) => (value === input.sourceRef ? 'refs/heads/main' : value));
+  await assert.rejects(
+    runPreparation(branch, { DESKTOP_STABLE_MANIFEST_PRIVATE_KEY_FILE: keyFile }, paths.root),
+    /publisher would refuse/u,
+  );
+  await assert.rejects(access(paths.outputDir));
   const result = await runPreparation(
     args,
     { DESKTOP_STABLE_MANIFEST_PRIVATE_KEY_FILE: keyFile },

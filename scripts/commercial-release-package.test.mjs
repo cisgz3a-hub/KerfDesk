@@ -236,10 +236,28 @@ test('local operator publication requires explicit Windows signing/account input
   for (const name of Object.keys(env))
     assert.throws(() => requireCommercialPublishContext({ ...env, [name]: '' }, identity, 'win32'));
   assert.throws(() => requireCommercialPublishContext(env, identity, 'linux'), /Windows/u);
-  const exec = (head, status) => async (_command, args) => ({
-    stdout: args[0] === 'rev-parse' ? head : status,
-  });
+  const lookups = [];
+  const exec =
+    (head, status, tag = head) =>
+    async (_command, args) => {
+      if (args[0] === 'status') return { stdout: status };
+      if (args.at(-1) === 'HEAD') return { stdout: head };
+      lookups.push(args);
+      if (tag instanceof Error) throw tag;
+      return { stdout: tag };
+    };
+  const exit = (code) => Object.assign(new Error(`git exited ${code}`), { code });
   await requireCommercialSource(identity, 'repo', exec(`${identity.sourceSha}\n`, ''));
+  assert.deepEqual(lookups, [['rev-parse', '--verify', '--quiet', 'refs/tags/v1.2.3^{commit}']]);
+  for (const tag of ['b'.repeat(40), exit(1)])
+    await assert.rejects(
+      requireCommercialSource(identity, 'repo', exec(identity.sourceSha, '', tag)),
+      /Release tag v1\.2\.3 must exist in this checkout and point at the signed source SHA/u,
+    );
+  await assert.rejects(
+    requireCommercialSource(identity, 'repo', exec(identity.sourceSha, '', exit(128))),
+    /git exited 128/u,
+  );
   await assert.rejects(
     requireCommercialSource(identity, 'repo', exec('b'.repeat(40), '')),
     /source SHA/u,

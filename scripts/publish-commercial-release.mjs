@@ -64,6 +64,21 @@ export async function requireCommercialSource(identity, root, execute = promisif
     throw new Error(
       'Publication checkout must be clean and match the signed source SHA; use ignored or external build outputs.',
     );
+  // The signed identity names the release tag; it must exist here and resolve to
+  // the signed commit, so what is published is the tagged source, not only HEAD.
+  const { stdout: tagged } = await execute(
+    'git',
+    ['rev-parse', '--verify', '--quiet', `refs/tags/v${identity.version}^{commit}`],
+    options,
+  ).catch((error) => {
+    // --verify --quiet exits 1, silently, only when the tag does not resolve.
+    if (error?.code === 1) return { stdout: '' };
+    throw error;
+  });
+  if (tagged.trim() !== identity.sourceSha)
+    throw new Error(
+      `Release tag v${identity.version} must exist in this checkout and point at the signed source SHA.`,
+    );
 }
 
 async function main() {
