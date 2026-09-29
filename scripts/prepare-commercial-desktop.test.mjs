@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { generateKeyPairSync } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -69,7 +69,9 @@ function fixture(overrides = {}) {
 }
 
 async function files() {
-  const workspace = await mkdtemp(join(tmpdir(), 'kerfdesk-commercial-prep-'));
+  // The preparation resolves real paths; macOS's /var link and Windows's short
+  // RUNNER~1 temp name would otherwise differ from the paths asserted here.
+  const workspace = await realpath(await mkdtemp(join(tmpdir(), 'kerfdesk-commercial-prep-')));
   const root = join(workspace, 'repository');
   const outputDir = join(workspace, 'generated');
   const termsFile = join(workspace, 'approved-terms-fixture.txt');
