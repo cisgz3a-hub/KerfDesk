@@ -48,7 +48,9 @@ const adapter: PlatformAdapter = isElectronRenderer()
       ...webAdapter,
       id: 'electron',
       desktopUpdates: createDesktopPreviewUpdateAdapter(),
-      ...createDesktopProjectFiles(webAdapter.recentFiles),
+      ...createDesktopProjectFiles(webAdapter.recentFiles, {
+        handleSaveTarget: webAdapter.openedProjectSaveTarget,
+      }),
       // The main process serves its support log (ADR-546) and takes job
       // reports (ADR-548) only on app://.
       ...(window.location.protocol === 'app:'

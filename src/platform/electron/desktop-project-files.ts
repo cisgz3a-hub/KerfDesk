@@ -3,7 +3,8 @@
 // as on the web, and go to the handle adapter passed in. A file the operating
 // system opened arrives as { path, token } from main, and is read back
 // through main's exact app:// routes; main refuses any path it did not hand
-// over. Every response is untrusted and parsed fail-closed.
+// over. Every response is untrusted and parsed fail-closed. Save writes a
+// KerfDesk project back through the same route (ADR-550).
 
 import type {
   ExternalFileOpenRequest,
@@ -13,6 +14,7 @@ import type {
   RecentFileOpenResult,
   RecentFileProbe,
   RecentFileRef,
+  SaveTarget,
 } from '../types';
 import { parseDesktopOpenRequests, parseDesktopProbe } from './desktop-project-responses';
 
@@ -29,14 +31,19 @@ type HandleRef = Extract<RecentFileRef, { kind: 'handle' }>;
 type RouteFetch = (input: string, init: RequestInit) => Promise<Response>;
 type Listener = (request: ExternalFileOpenRequest) => void;
 
+type OpenedSaveTarget = (ref: RecentFileRef) => SaveTarget | null;
+
 export type DesktopProjectFiles = {
   readonly recentFiles: RecentFileAdapter;
   readonly externalFileOpens: ExternalFileOpenSource;
+  readonly openedProjectSaveTarget: OpenedSaveTarget;
 };
 
 export type DesktopProjectFileOptions = {
   readonly fetchRoute?: RouteFetch;
   readonly events?: EventTarget;
+  /** Save targets for files picked in the app (handles), as on the web. */
+  readonly handleSaveTarget?: OpenedSaveTarget | undefined;
 };
 
 const GET_INIT: RequestInit = { method: 'GET', cache: 'no-store', credentials: 'same-origin' };
@@ -58,7 +65,56 @@ export function createDesktopProjectFiles(
       isSameFile: (left, right) => sameFile(left, right, handleFiles, pathFiles.probe),
     },
     externalFileOpens: desktopExternalOpens(fetchRoute, options.events ?? window),
+    openedProjectSaveTarget: (ref) =>
+      ref.kind === 'desktop-path'
+        ? desktopPathSaveTarget(fetchRoute, ref)
+        : (options.handleSaveTarget?.(ref) ?? null),
   };
+}
+
+/** Save over a KerfDesk project the operating system opened (ADR-550): main
+ * checks the path's token again and replaces the file whole, or not at all. */
+function desktopPathSaveTarget(fetchRoute: RouteFetch, ref: DesktopPathRef): SaveTarget | null {
+  if (!/\.lf2$/i.test(ref.path)) return null;
+  const identity: DesktopPathIdentity = { kind: 'desktop-path', path: ref.path };
+  return {
+    displayName: fileName(ref.path),
+    recentRef: ref,
+    destinationIdentity: identity,
+    isSameDestination: async (other) =>
+      isDesktopPathIdentity(other.destinationIdentity) &&
+      sameDesktopPath(identity.path, other.destinationIdentity.path),
+    write: async (data) => {
+      const response = await fetchRoute(pathRoute(FILE_ROUTE, ref), {
+        method: 'PUT',
+        cache: 'no-store',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/octet-stream', 'X-KerfDesk-Project': '1' },
+        body: data,
+      });
+      if (response.status !== 204) throw new Error(saveFailureMessage(response.status));
+    },
+  };
+}
+
+type DesktopPathIdentity = { readonly kind: 'desktop-path'; readonly path: string };
+
+function isDesktopPathIdentity(value: unknown): value is DesktopPathIdentity {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'kind' in value &&
+    value.kind === 'desktop-path' &&
+    'path' in value &&
+    typeof value.path === 'string'
+  );
+}
+
+function saveFailureMessage(status: number): string {
+  if (status === 404) return 'the file is no longer there. Use Save As to choose where to save.';
+  if (status === 403) return 'KerfDesk may no longer change it. Use Save As to save a copy.';
+  if (status === 413) return 'the project is too large to save.';
+  return 'KerfDesk could not write the file. It may be read-only or open in another program.';
 }
 
 function openHandle(

@@ -14,6 +14,7 @@ import { createReadStream } from 'node:fs';
 import { Readable } from 'node:stream';
 import { checkDesktopProjectPath, type DesktopProjectFile } from './desktop-project-file-check.js';
 import { createDesktopProjectOpenQueue } from './desktop-project-open-queue.js';
+import { saveDesktopProjectFile } from './desktop-project-save.js';
 import {
   projectPathsFromArgv,
   projectPathsFromLaunchData,
@@ -95,6 +96,7 @@ export function installDesktopProjectOpens(
         read: readProjectFile,
         drainOpens: async () =>
           queue.drain(await tokens(), (file) => checkDesktopProjectPath(file)),
+        save: (file, body) => saveDesktopProjectFile(file.realPath, body),
       }),
   };
 }

@@ -441,6 +441,11 @@ export type PlatformAdapter = {
   // association, or an installed web app's file handler.
   readonly externalFileOpens?: ExternalFileOpenSource;
 
+  // Where Save writes a KerfDesk project opened from `ref`, so the first Save
+  // after Open replaces that file (ADR-550). Null when this platform cannot
+  // write it back; Save then asks where to save, as for a new project.
+  readonly openedProjectSaveTarget?: (ref: RecentFileRef) => SaveTarget | null;
+
   // The desktop app's local support log (ADR-546): its newest part, for Help >
   // Save Support Report. Absent in the web app, which keeps no log.
   readonly readSupportLog?: () => Promise<string>;

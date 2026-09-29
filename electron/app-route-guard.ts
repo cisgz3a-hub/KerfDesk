@@ -16,7 +16,8 @@ function exactAppUrl(url: URL): boolean {
   );
 }
 
-function sameOriginRequest(request: Request, header: string): boolean {
+/** The route's own header and a same-origin request (ADR-550 adds a query). */
+export function sameOriginRequest(request: Request, header: string): boolean {
   const origin = request.headers.get('Origin');
   const site = request.headers.get('Sec-Fetch-Site');
   return (

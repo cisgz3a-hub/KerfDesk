@@ -1237,6 +1237,18 @@ the completed physical Frame is the spatial source of truth.
 2. **No dialog.** File written to known path.
 3. Toast briefly: `Saved`.
 
+#### Success — Save after Open (ADR-550)
+1. After `File → Open`, a recent project, or double-clicking a `.lf2` in Explorer, `File → Save`
+   writes over that file with no dialog. Toast: `Saved`.
+2. In a browser the first Save asks once whether KerfDesk may change the file. Refusing shows
+   `Could not save project: KerfDesk may not change <name>. Use Save As to save a copy.` and writes
+   nothing. The desktop app allows it without asking.
+3. A LightBurn project (`.lbrn`, `.lbrn2`) opens as an import and is never written; its first Save
+   asks where to save the `.lf2`, as it does for a template or a project dropped on the window.
+4. The desktop app replaces an Explorer-opened file whole: it writes the new bytes beside it and
+   then swaps them in, so a failed save leaves the old file as it was. A file that has gone, become
+   read-only or stays held by another program reports why and stays unsaved; Save As still works.
+
 #### Success — Save As
 1. `File → Save As` (`Cmd/Ctrl+Shift+S`).
 2. Always shows dialog. Default name: current project name.
@@ -1277,11 +1289,13 @@ the completed physical Frame is the spatial source of truth.
 3. On confirm, file is read and parsed.
 4. Schema version checked against current.
 5. If equal: project loaded. Window title updates.
+6. Save writes over the opened file (F-A11, ADR-550).
 
 #### Success — schema older
 1. Migration runs to current version.
 2. Toast (info) identifies the migration, for example: `Project migrated from v1 to v2.`
-3. Project saved-as does not auto-trigger; user can save to persist migration.
+3. Nothing is written until the user saves. Save then writes the migrated project over the file
+   (ADR-550); earlier KerfDesk versions report it as newer instead of misreading it.
 
 > **Current note:** project schema v7 stores canonical curves, artwork-to-operation bindings, canonical relief heightfields, operation-owned overrides, tile registration plans, and converted text/stroke semantics. The registered v1→v2 migration promotes legacy polylines to line-segment curves; v2→v3 promotes color membership, object overrides, and sub-layers to named operations; v3→v4 promotes relief meshes where exact conversion is available. The v4→v5→v6→v7 migrations preserve existing settings, bindings and geometry (ADR-159, ADR-211, ADR-292, ADR-317, ADR-318, ADR-319). Earlier readers report a newer schema instead of silently discarding cutting semantics.
 
