@@ -1,6 +1,12 @@
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
-import { useLaserStore } from '../state/laser-store';
-import { resolveJobPlacement, type JobPlacementSettings } from '../job-placement';
+import { useLaserStore, type LaserState } from '../state/laser-store';
+import {
+  placementAssumesZeroWorkOffset,
+  resolveJobPlacement,
+  type JobPlacementSettings,
+} from '../job-placement';
+import { waitForControllerStatus } from './frame-status-wait';
+import { controllerReportsWorkOffset } from './work-offset-assumption';
 
 const FRAME_POSITION_TIMEOUT_MS = 3_000;
 const FRAME_POSITION_POLL_MS = 25;
@@ -51,6 +57,31 @@ function needsAbsoluteFrameOffset(
       laser.capabilities.wcs === 'g92-and-g10' &&
       laser.wcoCache === null) ||
     !resolveJobPlacement(placement, laser).ok
+  );
+}
+
+/** GRBL puts WCO in only some status reports, so a Frame pressed soon after
+ * connecting or a reset can find none yet, homed or not, and Absolute or
+ * Current Position would be placed at an assumed zero offset. Its jog targets
+ * are work coordinates, so a real offset would shift the trace (ADR-375). Ask
+ * for the offset with the same bounded status burst. Never a refusal: when no
+ * WCO arrives the Frame continues as before and Job Review says what was
+ * assumed (work-offset-assumption).
+ * https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/jogging.md#L23 */
+export async function waitForUnreportedFrameWorkOffset(
+  placement: JobPlacementSettings,
+): Promise<void> {
+  await waitForControllerStatus((laser) => !awaitsReportedWorkOffset(laser, placement));
+}
+
+function awaitsReportedWorkOffset(laser: LaserState, placement: JobPlacementSettings): boolean {
+  return (
+    controllerReportsWorkOffset(laser.capabilities) &&
+    // While position evidence is suppressed the store discards WCO as well
+    // (statusPositionPatch), so no report could end the wait.
+    laser.positionEvidenceSuppressed !== true &&
+    laser.reportUnitsUnconfirmed !== true &&
+    placementAssumesZeroWorkOffset(placement.startFrom, laser)
   );
 }
 

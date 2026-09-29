@@ -65,6 +65,7 @@ import type { PreparedJobMetrics } from './prepared-job-metrics';
 import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
+import { workOffsetAssumptionWarnings } from './work-offset-assumption';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 
@@ -146,6 +147,9 @@ export type MachineStartSnapshot = {
   readonly homingState?: HomingState;
   readonly trustedPositionEpoch?: number;
   readonly statusQuery?: StatusQueryCapability;
+  // The connected driver's status reports carry WCO (work-offset-assumption),
+  // so a missing offset is one not reported yet and Job Review says so.
+  readonly reportsWorkOffset?: boolean;
   readonly reportInches?: boolean;
   readonly controllerBuildInfo?: GrblBuildInfo | null;
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
@@ -331,6 +335,7 @@ export function finalizeStartPreparation(
     options.controllerSettings,
     [
       ...coordinates.warnings,
+      ...workOffsetAssumptionWarnings(options.placement, options.machineWithReportUnits),
       ...(largeJobWarning === null ? [] : [largeJobWarning]),
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),

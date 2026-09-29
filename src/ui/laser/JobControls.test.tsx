@@ -152,6 +152,8 @@ describe('JobControls Frame action', () => {
       connection: { kind: 'connected' },
       streamer: null,
       activeWcs: 'G54',
+      // Reported zero offset: Frame need not ask for WCO first (ADR-375).
+      wcoCache: { x: 0, y: 0, z: 0 },
       statusReport: {
         state: 'Idle',
         subState: null,

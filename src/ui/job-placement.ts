@@ -297,6 +297,28 @@ function resolveVerifiedOrigin(
   };
 }
 
+/** True when this start mode resolves only through the zero offset assumed
+ * while no WCO has been reported and no custom origin is known: Absolute then
+ * compensates nothing, and Current Position subtracts nothing from the one
+ * position its report carries. GRBL sends WCO in only some status reports, so
+ * this holds for a while after connecting (ADR-375).
+ * https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/doc/markdown/interface.md#L561-L568 */
+export function placementAssumesZeroWorkOffset(
+  startFrom: JobStartMode,
+  machine: MachinePlacementSnapshot,
+): boolean {
+  if (knownWco(machine) !== null || defaultWco(machine) === null) return false;
+  if (startFrom === 'absolute') return true;
+  // Current Position takes the offset from a report carrying both positions
+  // and refuses one carrying neither (currentWorkPosition).
+  const report = machine.statusReport;
+  return (
+    startFrom === 'current-position' &&
+    report !== null &&
+    (report.mPos === null) !== (report.wPos === null)
+  );
+}
+
 function currentWorkPosition(
   machine: MachinePlacementSnapshot,
 ): { readonly work: Axis3; readonly offset: Axis3 } | null {

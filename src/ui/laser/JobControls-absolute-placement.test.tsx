@@ -32,6 +32,8 @@ beforeEach(() => {
       spindle: 0,
     },
     activeWcs: 'G54',
+    // Reported zero offset: Frame need not ask for WCO first (ADR-375).
+    wcoCache: { x: 0, y: 0, z: 0 },
     frame: vi.fn(async () => undefined),
   });
   useToastStore.setState({ toasts: [] });
@@ -123,7 +125,9 @@ describe('JobControls Absolute Coordinates frame-first', () => {
         expect.any(Object),
         expect.any(Number),
         expect.objectContaining({
-          frameVerification: frameVerificationForProject(useStore.getState().project),
+          frameVerification: frameVerificationForProject(useStore.getState().project, {
+            wco: { x: 0, y: 0, z: 0 },
+          }),
         }),
       );
       // The exact candidate is armed at dispatch, but a mocked trace that has
