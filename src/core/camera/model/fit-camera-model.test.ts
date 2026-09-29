@@ -157,7 +157,8 @@ describe('plane pose initialisation', () => {
     ] as const) {
       const pixel = projectWorldPoint(lens, pose, bedPoint(x, y, 2));
       const ray = undistortPixel(pixel?.x ?? 0, pixel?.y ?? 0, lens.intrinsics, lens.distortion);
-      pairs.push({ plane: { x, y }, ray });
+      expect(ray).not.toBeNull();
+      pairs.push({ plane: { x, y }, ray: ray ?? { x: 0, y: 0 } });
     }
     const h = fitPlaneHomography(pairs);
     expect(h).not.toBeNull();

@@ -200,7 +200,7 @@ export function prepareStartJob(
     motionOffset: input.motionOffset,
     inspected,
     canvasPlanKey: canvasPlanRetentionKey(project, outputScope, input.effectivePlacement),
-    printCutRegistrationActive: false,
+    printCutRegistration: undefined,
     sourceGeometryChecks: 'full',
   });
 }
@@ -272,7 +272,7 @@ export async function prepareStartJobSnapshot(
     motionOffset,
     inspected,
     canvasPlanKey,
-    printCutRegistrationActive: options.registration !== undefined,
+    printCutRegistration: options.registration,
     sourceGeometryChecks: 'full',
   });
 }
@@ -290,7 +290,8 @@ type FinalizeStartPreparationOptions = {
   readonly motionOffset: PreflightOptions['motionOffset'];
   readonly inspected: SuccessfulPreparedStartInspection;
   readonly canvasPlanKey: string;
-  readonly printCutRegistrationActive: boolean;
+  /** The Print-and-Cut registration output applies; undefined when none is active. */
+  readonly printCutRegistration: SimilarityTransform | null | undefined;
   readonly sourceGeometryChecks: 'full' | 'compiled-evidence-only';
 };
 
@@ -340,7 +341,7 @@ export function finalizeStartPreparation(
       ...emitSplit.warnings,
       ...collectPrintCutFrameWarnings(
         prepared.project,
-        options.printCutRegistrationActive,
+        options.printCutRegistration,
         options.placement.jobOrigin,
       ),
       ...(options.machine.activeControllerKind === undefined

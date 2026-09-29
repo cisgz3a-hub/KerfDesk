@@ -7276,7 +7276,7 @@ as the pane's design record.
 - **Edge / camera without its own calibration.** The setup steps say to calibrate it, the canvas
   says the saved calibration belongs to another camera, and calibrating it keeps the others.
 
-### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1 and 3)
+### F-CAM2. One-photo camera calibration (ADR-441, Amendments 1, 3 and 4)
 
 - **Success / calibrated.** **Calibrate camera…** opens the wizard. The operator covers the bed
   with one flat sheet, enters its thickness and, optionally, the camera lens height by tape
@@ -7288,7 +7288,11 @@ as the pane's design record.
   photo flattened onto the bed with each ring coloured by its error. **Save calibration** stores
   the camera model on the machine profile (undoable) and turns the overlay on.
 - **Reuse / target already engraved.** **Target already engraved** skips the job and goes to the
-  photo, using the same margins.
+  photo. It looks for the target last engraved from this computer on this machine while the
+  margin (or head target size) still matches, and otherwise for the layout the settings describe.
+  The setup and photo steps name the layout it looks for: its size, margin, bed and where it came
+  from. A target engraved with another margin is described by entering that margin first
+  (Amendment 4).
 - **Edge / small bed.** When the usual grid of 10 mm rings 40 mm apart does not fit inside the
   margins, the rings and spacing shrink together so every ring stays on the bed. The grid keeps
   rings around all three solid anchors. Engrave a new target if an older one ran off the bed or
@@ -7296,7 +7300,18 @@ as the pane's design record.
 - **Error / engrave not started or stopped.** If review, preflight or confirmation stops the job,
   or the stream errors, is cancelled or disconnects, the wizard returns to setup with the reason.
 - **Error / rings not found.** No rings, anchors covered, a mirrored picture or too few rings each
-  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled.
+  give a plain message saying what to fix; nothing is saved. A long solve can be cancelled. A
+  target that fills the picture edge to edge says to move the camera back or engrave a smaller
+  target, and a lens the rings cannot model out to the picture's edges asks for a larger target
+  (Amendment 4).
+- **Edge / target smaller than the picture.** The fit keeps only the lens terms the rings pin
+  down. When a quarter or more of what the camera sees lies outside the target, the result says
+  that the accuracy is measured on the rings and the rest of the picture is estimated
+  (Amendment 4).
+- **Edge / target engraved with other settings.** When the rings found form a complete grid
+  smaller than the layout looked for, and the camera sees where the missing rings would be, the
+  result is rough and names the setting to correct. A check then suggests keeping the saved
+  calibration (Amendment 4).
 - **Edge / rough fit.** A fit with a large error is described with what to check (sheet moved,
   not flat, out of focus) and can still be saved; the operator decides.
 - **Edge / camera straight down.** When one photo cannot pin the camera height down and none was
@@ -7472,7 +7487,7 @@ as the pane's design record.
 - **Empty / no feed.** **Find pieces** is disabled without a live camera; without a calibration
   the section is absent.
 
-### F-CAM10. Print and Cut marks found by the camera (ADR-443)
+### F-CAM10. Print and Cut marks found by the camera (ADR-443, Amendment 1)
 
 - **Success / register a printed sheet.** With Print and Cut on in Labs, a saved calibration and a
   live camera, the operator lays the printed sheet on the bed and sets the material height in the
@@ -7481,7 +7496,11 @@ as the pane's design record.
   x, y**, and the dialog reports the measured spacing, print scale and turn. **Apply
   registration** registers the design on the sheet. The head never moves.
 - **Success / mixed.** **Capture head** still works on either target, so a camera point can be
-  replaced by jogging onto that mark.
+  replaced by jogging onto that mark. Head captures report the same spacing, print scale and turn.
+- **Edge / unusual registration.** When the targets or the captures are closer than 10 mm, the
+  print scale is more than 2 % off, or the turn is near 180°, the dialog says why and applies it
+  only once **Use this registration anyway** is ticked. Job Review repeats the note at Start and
+  never refuses (Amendment 1).
 - **Edge / repeated marks.** When other pairs of marks are the same distance apart, the pair
   nearest the design's targets is used and the dialog says how many others fitted.
 - **Edge / no pair.** When no two marks are the design's spacing apart (within 2 %), the points

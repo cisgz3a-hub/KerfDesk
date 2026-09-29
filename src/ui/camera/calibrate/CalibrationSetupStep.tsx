@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { bedTargetLayout } from '../../../core/camera/target/bed-target';
 import { useStore } from '../../state';
 import { useLaserStore } from '../../state/laser-store';
+import { useAssumedTarget } from './assumed-target';
 import { calibrationTargetArea, engraveCalibrationTarget } from './calibration-actions';
 import { useCameraCalibrationStore, type CalibrationSettings } from './camera-calibration-store';
 import {
@@ -28,6 +29,7 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
   const bedHeight = useStore((s) => s.project.device.bedHeight);
   const area = calibrationTargetArea(bedWidth, bedHeight, settings);
   const rings = bedTargetLayout({ area }).marks.length;
+  const assumed = useAssumedTarget();
 
   const engrave = async (): Promise<void> => {
     // A new target is engraved where these settings put it, whatever area an
@@ -72,17 +74,29 @@ export function CalibrationSetupStep(props: { readonly note: string | null }): J
           type="button"
           className="lf-btn"
           onClick={() => setStep({ kind: 'photo', status: { kind: 'idle' } })}
-          title="The ring target is already engraved on the bed with these margins. Go to the photo."
+          title="The ring target is already engraved on the bed. Go to the photo."
         >
           Target already engraved
         </button>
       </div>
+      <p style={noteStyle}>
+        Target already engraved looks for {assumed.description}.
+        {assumed.source === 'settings' ? correctionHint(settings.headCamera) : null}
+      </p>
       {connected ? null : (
         <p style={noteStyle}>Connect the machine to engrave, or use a target engraved earlier.</p>
       )}
       {props.note === null ? null : <p style={errStyle}>{props.note}</p>}
     </div>
   );
+}
+
+// The rings are matched to the layout the settings describe, so a target
+// engraved with other settings must be described first.
+function correctionHint(headCamera: boolean): string {
+  return headCamera
+    ? ' If it was engraved at another size, enter that size first.'
+    : ' If it was engraved with another margin, enter that margin first.';
 }
 
 function SettingsFields(props: { readonly settings: CalibrationSettings }): JSX.Element {

@@ -8,6 +8,7 @@ import {
   type CameraPose,
   type LensModel,
 } from '../model/camera-model';
+import { lensFoldsInPicture } from '../model/fit-determined-lens';
 import { lookAt, overheadPose, wideLens } from '../model/model-fixtures';
 import { calibrateFromBedTarget } from './bed-calibration';
 import { bedTargetLayout, type BedTargetLayout } from './bed-target';
@@ -145,5 +146,75 @@ describe('calibrateFromBedTarget with a camera looking straight down', () => {
         }
       }
     }
-  });
+    // Rendering the photo dominates; a busy machine can take several seconds.
+  }, 20_000);
+});
+
+describe('calibrateFromBedTarget with a target over the middle of the bed only', () => {
+  it('fits no lens terms the rings cannot pin down, so the bed corners stay close', () => {
+    // A 300 mm target on a 400 mm bed: before, four free terms folded the lens
+    // back inside the picture and put the bed corner 86 mm off.
+    const wide = wideLens(1280);
+    const middle = { x: 50, y: 50, width: 300, height: 300 };
+    const middleLayout = bedTargetLayout({ area: middle });
+    const middleFrame = renderTargetScene({
+      lens: wide,
+      pose,
+      layout: middleLayout,
+      sheet: middle,
+      sheetThicknessMm: THICKNESS,
+      noise: 4,
+      honeycombPitchMm: 6,
+    });
+    const result = calibrateFromBedTarget({
+      frame: middleFrame,
+      layout: middleLayout,
+      sheetThicknessMm: THICKNESS,
+    });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.foundMarks).toBe(64);
+    expect(result.lens.distortion[3]).toBe(0);
+    expect(lensFoldsInPicture(result.lens)).toBe(false);
+    for (const [x, y] of [
+      [0, 0],
+      [400, 0],
+      [0, 400],
+      [400, 400],
+    ] as const) {
+      const pixel = projectWorldPoint(wide, pose, bedPoint(x, y, THICKNESS));
+      const seen = pixelToBed(result.lens, result.pose, pixel ?? { x: 0, y: 0 }, THICKNESS);
+      expect(Math.hypot((seen?.x ?? 0) - x, (seen?.y ?? 0) - y)).toBeLessThan(2);
+    }
+  }, 20_000);
+});
+
+describe('calibrateFromBedTarget with a target too large for the picture', () => {
+  it('says so instead of blaming something covering the anchors', () => {
+    // A camera on the head 50 mm above a 40 mm target: its outer rings touch
+    // the top and bottom of the picture, and the anchors beside them go unfound.
+    const headLens: LensModel = {
+      intrinsics: { fx: 900, fy: 900, cx: 639.5, cy: 359.5 },
+      distortion: [0.02, -0.01, 0, 0],
+      imageWidth: 1280,
+      imageHeight: 720,
+    };
+    const headLayout = bedTargetLayout({ area: { x: 180, y: 130, width: 40, height: 40 } });
+    const headFrame = renderTargetScene({
+      lens: headLens,
+      pose: lookAt([200, 150, -50], [200, 150.001, 0]),
+      layout: headLayout,
+      sheet: { x: 150, y: 100, width: 100, height: 100 },
+      sheetThicknessMm: THICKNESS,
+      noise: 2,
+    });
+    expect(
+      calibrateFromBedTarget({
+        frame: headFrame,
+        layout: headLayout,
+        sheetThicknessMm: THICKNESS,
+        measuredCameraHeightMm: 50,
+      }),
+    ).toEqual({ kind: 'failed', reason: 'target-too-large' });
+  }, 20_000);
 });

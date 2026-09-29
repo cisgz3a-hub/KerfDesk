@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { solveTwoPointRegistration } from '../../core/registration';
+import { checkTwoPointRegistration } from '../../core/registration/registration-check';
 import type { PrintAndCutDesignTargets, Vec2 } from '../../core/scene';
 import { Button, Dialog, DialogActions, NumberInput } from '../kit';
 import type { CaptureSource } from '../state/print-cut-session-store';
@@ -36,9 +36,13 @@ type PrintAndCutDialogProps = {
 
 export function PrintAndCutDialog(props: PrintAndCutDialogProps): JSX.Element {
   const [targets, setTargets] = useState(props.initialTargets);
-  const invalidReason =
-    props.captureBasisError ??
-    registrationDraftError(targets, props.firstMachinePoint, props.secondMachinePoint);
+  const registration = useRegistrationState(
+    targets,
+    props.firstMachinePoint,
+    props.secondMachinePoint,
+    props.captureBasisError ?? null,
+  );
+  const { invalidReason } = registration;
   const changeTargets = (next: PrintAndCutDesignTargets): void => {
     if (sameTargets(targets, next)) return;
     props.onTargetsChanged?.();
@@ -90,7 +94,7 @@ export function PrintAndCutDialog(props: PrintAndCutDialogProps): JSX.Element {
       {props.captureFrameNotice != null ? (
         <p style={warningStyle}>{props.captureFrameNotice}</p>
       ) : null}
-      {invalidReason !== null ? <p style={warningStyle}>{invalidReason}</p> : null}
+      <RegistrationStatus state={registration} />
       <DialogActions>
         <Button onClick={props.onDisable}>Disable</Button>
         <Button onClick={props.onCancel}>Cancel</Button>
@@ -111,19 +115,106 @@ function sameTargets(a: PrintAndCutDesignTargets, b: PrintAndCutDesignTargets): 
   );
 }
 
-export function registrationDraftError(
+export type RegistrationDraft = {
+  /** Why the registration cannot be applied; null when it can. */
+  readonly error: string | null;
+  /** The captured spacing, print scale and turn, once both points are captured. */
+  readonly measured: string | null;
+  /** Why the operator must confirm it first (registration-check.ts); null when not. */
+  readonly unusual: string | null;
+};
+
+export function registrationDraft(
   targets: PrintAndCutDesignTargets,
   firstMachinePoint: Vec2 | null,
   secondMachinePoint: Vec2 | null,
-): string | null {
+): RegistrationDraft {
   if (firstMachinePoint === null || secondMachinePoint === null) {
-    return 'Capture both machine registration points.';
+    return { error: 'Capture both machine registration points.', measured: null, unusual: null };
   }
-  const solved = solveTwoPointRegistration({
+  const checked = checkTwoPointRegistration({
     design: [targets.first, targets.second],
     machine: [firstMachinePoint, secondMachinePoint],
   });
-  return solved.ok ? null : solved.reason;
+  return checked.ok
+    ? { error: null, measured: checked.measured, unusual: checked.unusual }
+    : { error: checked.reason, measured: null, unusual: null };
+}
+
+type RegistrationState = {
+  /** Why Apply is off; null when the registration can be applied. */
+  readonly invalidReason: string | null;
+  readonly measured: string | null;
+  readonly unusual: string | null;
+  readonly confirmedUnusual: boolean;
+  readonly setConfirmed: (checked: boolean) => void;
+};
+
+function useRegistrationState(
+  targets: PrintAndCutDesignTargets,
+  first: Vec2 | null,
+  second: Vec2 | null,
+  basisError: string | null,
+): RegistrationState {
+  const [confirmed, setConfirmed] = useState<string | null>(null);
+  const draft = registrationDraft(targets, first, second);
+  // Points captured in different bases measure nothing.
+  const measured = basisError === null ? draft.measured : null;
+  const unusual = basisError === null ? draft.unusual : null;
+  // A confirmation holds for the figures it was given for; any change asks again.
+  const key = unusual === null ? null : `${measured} ${unusual}`;
+  const confirmedUnusual = key !== null && confirmed === key;
+  const unconfirmed = unusual !== null && !confirmedUnusual ? unusual : null;
+  return {
+    invalidReason: basisError ?? draft.error ?? unconfirmed,
+    measured,
+    unusual,
+    confirmedUnusual,
+    setConfirmed: (checked) => setConfirmed(checked ? key : null),
+  };
+}
+
+function RegistrationStatus(props: { readonly state: RegistrationState }): JSX.Element {
+  const { state } = props;
+  return (
+    <>
+      {state.measured !== null ? <p style={measuredStyle}>{state.measured}</p> : null}
+      {state.unusual !== null ? (
+        <UnusualRegistrationRow
+          reason={state.unusual}
+          confirmed={state.confirmedUnusual}
+          onConfirm={state.setConfirmed}
+        />
+      ) : state.invalidReason !== null ? (
+        <p style={warningStyle}>{state.invalidReason}</p>
+      ) : null}
+    </>
+  );
+}
+
+// Targets too close together, an unusual scale or a turn near 180° is more
+// often a capture mistake than the sheet, so the dialog applies it only once
+// the operator ticks the box (ADR-443 Amendment 1). Output still uses what was
+// captured; Job Review repeats the note at Start.
+function UnusualRegistrationRow(props: {
+  readonly reason: string;
+  readonly confirmed: boolean;
+  readonly onConfirm: (checked: boolean) => void;
+}): JSX.Element {
+  return (
+    <div style={unusualStyle}>
+      <p style={{ ...warningStyle, margin: 0 }}>{props.reason}</p>
+      <label style={confirmStyle}>
+        <input
+          type="checkbox"
+          className="lf-checkbox"
+          checked={props.confirmed}
+          onChange={(event) => props.onConfirm(event.currentTarget.checked)}
+        />
+        <span>Use this registration anyway</span>
+      </label>
+    </div>
+  );
 }
 
 function TargetRow(props: {
@@ -256,4 +347,12 @@ const warningStyle: React.CSSProperties = {
   color: 'var(--lf-warning-fg)',
   fontSize: 12,
   margin: '8px 0 0',
+};
+const measuredStyle: React.CSSProperties = { fontSize: 12, margin: '8px 0 0' };
+const unusualStyle: React.CSSProperties = { display: 'grid', gap: 6, margin: '8px 0 0' };
+const confirmStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 12,
 };
