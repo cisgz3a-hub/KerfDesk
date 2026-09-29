@@ -1286,12 +1286,14 @@ the completed physical Frame is the spatial source of truth.
   dirty/autosave state, or show ordinary success/failure feedback. A stale selected write still runs.
 
 #### Edge — a project the file limits cannot hold (ADR-307 amendment 1)
-- A project file holds at most 10,000 objects, 10,000 groups and 50,000 group members; a larger
-  one cannot be opened again (F-A12). So no editing command makes one. Array and Copy Along Path
-  say how many copies fit (F-A6a, F-A6f).
-- **Duplicate** adds what is selected, so it is refused whole when the result would pass a limit:
-  a warning names the limit and says to duplicate fewer objects or delete some first, and nothing
-  changes. Everything that fits is made exactly as before; nothing is ever made in part.
+- A project file holds at most 10,000 objects, 10,000 groups, 50,000 group members and 256
+  operations; a larger one cannot be opened again (F-A12). So no editing command makes one. Array
+  and Copy Along Path say how many copies fit (F-A6a, F-A6f).
+- **Duplicate** adds what is selected, and **Paste** and **Paste in Place** add what the clipboard
+  holds (with its operations, when it came from another project). Each is refused whole when the
+  result would pass a limit: a warning names the limit and says what to change (duplicate fewer
+  objects, copy fewer objects to paste, or delete some first), and nothing changes. The clipboard
+  is kept. Everything that fits is made exactly as before; nothing is ever made in part.
 - A project already over a limit can still be changed in any way that adds nothing to it.
 
 ---

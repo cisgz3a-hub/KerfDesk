@@ -25,7 +25,9 @@ any kind (the 2026-09-28 weakness audit, found while fixing H-5, ADR-498 amendme
   action (ADR-442) and said "Placed on N pieces" whether or not anything was placed.
 - **Other commands that add objects in one step had the same hole.** Duplicate made a project of
   6,000 selected objects into 12,000, and the saved file reopened as "invalid `scene.objects`:
-  count 12000 exceeds 10000".
+  count 12000 exceeds 10000". Paste and Paste in Place did the same from a clipboard of 6,000,
+  and a paste from another project brought its operations with it: 200 copied into a project of
+  100 made 300, past the loader's 256 ("invalid `scene.layers`").
 
 ADR-307 decision 5 says every valid requested placement is materialized. This amendment says what
 valid means: one the project can hold. It is not the policy cap decision 5 removed, because the
@@ -81,11 +83,16 @@ figure is the loader's and not a judgement, and every request that fits is still
    command's own words:
    - **Duplicate:** "This would take the project past its limit of 10000 objects. Duplicate fewer
      objects, or delete some objects first."
+   - **Paste and Paste in Place:** "... Copy fewer objects to paste, or delete some objects
+     first." The clipboard is kept, to paste once there is room.
 
    These commands add what the selection or the clipboard holds, not a number the operator typed,
    so no room is worked out in advance and there is nothing to lay out first. No cap below the
    loader's limits is added, and a project that is already over one stays free to change in ways
-   that add nothing to it.
+   that add nothing to it. The exact check now holds the fourth count the loader does, operations
+   (256), as well as objects, groups and group members, because a paste from another project
+   brings its operations with it. Array and Copy Along Path add no operations, so nothing changes
+   for them.
 
 ### Alternatives
 
@@ -111,7 +118,7 @@ figure is the loader's and not a judgement, and every request that fits is still
 - Array never takes a project over the limit it can be reopened with. A project that is already
   over it (Array could make one until now) gets "no room" until objects are deleted.
 - Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
-- Duplicate keeps to the same limits (item 7). Paste, Break Apart, Cut Shapes, Design Studio
+- Duplicate and Paste keep to the same limits (item 7). Break Apart, Cut Shapes, Design Studio
   Apply and tiling into a board do not check them yet.
 - No schema change and no change to G-code.
 
@@ -126,8 +133,8 @@ figure is the loader's and not a judgement, and every request that fits is still
   instances placed in one undo step and saved and reopened; group members past their limit
   refused though the objects fit; the first placement's extra copy refused at the limit; a project
   already over the limit still moves things.
-- `src/ui/state/scene-copy-room.test.ts`: the room, the messages, and the exact check against the
-  loader's own `validateSceneBudgets`.
+- `src/ui/state/scene-copy-room.test.ts`: the room, the messages, the command's own words, and the
+  exact check against the loader's own `validateSceneBudgets`, operations included.
 - `src/ui/state/prepare-variable-array-limits.test.ts`: no render for a refused request, exactly
   the room prepared and applied, absurd counts refused.
 - `src/ui/commands/ArrayDialogHost.limits.test.tsx`: the status line and Create array for all
@@ -140,3 +147,7 @@ figure is the loader's and not a judgement, and every request that fits is still
   saved and reopened; an image's mask counted, to the last object; group members past their limit
   refused though the objects fit, and exactly 50,000 accepted; a project already over the limit
   not grown.
+- `src/ui/state/paste-limits.test.ts`: Paste and Paste in Place of 6,000 into 6,000 refused with
+  the clipboard kept; 5,000 into 5,000 pasted in one undo step and reopened; one object past the
+  limit refused; 200 operations from another project refused in a project of 100 and pasted, to
+  exactly 256, in a project of 56.

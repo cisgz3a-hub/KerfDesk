@@ -59,8 +59,9 @@ type Budget = {
   readonly count: (scene: Scene) => number;
 };
 
-// The three counts the project loader holds a scene to (validateSceneBudgets).
-// Copies add objects and, when they carry whole groups, groups and members.
+// The four counts the project loader holds a scene to (validateSceneBudgets).
+// Copies add objects and, when they carry whole groups, groups and members; a
+// paste from another project brings its operations (scene layers) with it.
 const BUDGETS: ReadonlyArray<Budget> = [
   { what: 'objects', limit: PROJECT_SCENE_LIMITS.objects, count: (scene) => scene.objects.length },
   {
@@ -73,6 +74,7 @@ const BUDGETS: ReadonlyArray<Budget> = [
     limit: PROJECT_SCENE_LIMITS.groupMembers,
     count: (scene) => (scene.groups ?? []).reduce((sum, group) => sum + group.objectIds.length, 0),
   },
+  { what: 'operations', limit: PROJECT_SCENE_LIMITS.layers, count: (scene) => scene.layers.length },
 ];
 
 /**

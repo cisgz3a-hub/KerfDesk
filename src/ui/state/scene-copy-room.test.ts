@@ -55,6 +55,15 @@ function objects(count: number, prefix = 'o'): ReadonlyArray<SceneObject> {
   return Array.from({ length: count }, (_, index) => rect(`${prefix}-${index}`));
 }
 
+// A scene of four objects on `count` operations.
+function operations(count: number): Scene {
+  const layers = Array.from({ length: count }, (_, index) => {
+    const color = `#${index.toString(16).padStart(6, '0')}`;
+    return createLayer({ id: `operation-${index}`, color });
+  });
+  return { ...scene(objects(4)), layers };
+}
+
 function groupsOf(count: number, members: number): ReadonlyArray<SceneGroup> {
   return Array.from({ length: count }, (_, index) => ({
     id: `g-${index}`,
@@ -138,9 +147,18 @@ describe('sceneLimitOverrun', () => {
       scene(objects(10), groupsOf(PROJECT_SCENE_LIMITS.groupMembers / 10 + 1, 10)),
       PROJECT_SCENE_LIMITS.groupMembers,
     ],
+    ['operations', operations(PROJECT_SCENE_LIMITS.layers + 1), PROJECT_SCENE_LIMITS.layers],
   ])('refuses a scene whose %s grew past their limit', (what, after, limit) => {
     expect(sceneLimitOverrun(scene(objects(4)), after)).toBe(
       `This would take the project past its limit of ${limit} ${what}. Ask for fewer copies, or delete some objects first.`,
+    );
+  });
+
+  it("says what to change in the refused command's own words", () => {
+    expect(
+      sceneLimitOverrun(scene(objects(4)), scene(objects(LIMIT + 1)), 'Duplicate fewer objects.'),
+    ).toBe(
+      `This would take the project past its limit of ${LIMIT} objects. Duplicate fewer objects.`,
     );
   });
 
@@ -152,6 +170,8 @@ describe('sceneLimitOverrun', () => {
       scene(objects(4), groupsOf(PROJECT_SCENE_LIMITS.groups + 1, 2)),
       scene(objects(10), groupsOf(PROJECT_SCENE_LIMITS.groupMembers / 10, 10)),
       scene(objects(10), groupsOf(PROJECT_SCENE_LIMITS.groupMembers / 10 + 1, 10)),
+      operations(PROJECT_SCENE_LIMITS.layers),
+      operations(PROJECT_SCENE_LIMITS.layers + 1),
     ];
     const empty = scene([]);
 
