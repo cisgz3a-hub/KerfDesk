@@ -17,7 +17,8 @@ import {
   consoleCommandBlockReason,
   consoleCommandNeedsFreshIdle,
 } from './console-command-readiness';
-import { isOwnedControllerIdentityCommand, writeConsoleCommand } from './console-command-transport';
+import { consoleOwnershipBlockReason } from './console-command-ownership';
+import { writeConsoleCommand } from './console-command-transport';
 import {
   canSelectFrameWcs,
   frameWcsSelectionPatch,
@@ -35,7 +36,6 @@ import {
   settingWriteStaysUnverified,
 } from './laser-console-completion';
 import type { LaserSafetyAction } from './laser-safety-notice';
-import { hasPendingControllerWrite } from './laser-start-queue-fence';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
@@ -257,18 +257,6 @@ function invalidateConsoleCommandEvidence(set: SetFn, command: PreparedConsoleCo
       ? { accessoryCache: invalidateAccessoryObservation(state.accessoryCache) }
       : {}),
   }));
-}
-
-function consoleOwnershipBlockReason(
-  state: LaserState,
-  refs: ConsoleActionRefs,
-  command: { readonly normalized: string },
-): string | null {
-  if (refs.controllerCommand !== null) return 'Wait for the current controller command to finish.';
-  if (isOwnedControllerIdentityCommand(refs, command) && hasPendingControllerWrite(state)) {
-    return 'Wait for the previous controller write and acknowledgement before reading controller firmware identity.';
-  }
-  return null;
 }
 
 function consoleSettingWriteBlockReason(
