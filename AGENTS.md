@@ -16,6 +16,7 @@ Keep this file small. It defines durable repository rules; task-specific details
 - Before asking a blocking question, complete the authorized read-only or reversible preparation that makes the decision concrete and reviewable.
 - Ask a focused question only when a missing choice would materially change the result, an action is destructive or irreversible, or external authorization is required.
 - Inspect the current checkout and `git status` before editing. Preserve unrelated tracked and untracked work; do not reset, discard, or silently rewrite it.
+- Start from GitHub. Claude cloud sessions, Claude Code on the maintainer's PC and Codex all push to `origin`, so begin each task with `git fetch origin` and work from the latest `origin/main`: branch from it for new work, or merge it into a branch you continue.
 - Keep each change scoped to the requested outcome. Avoid unrelated cleanup.
 - Verify uncertain facts in the current source or a primary upstream source. Never invent controller settings, G-code behavior, safety behavior, version constraints, API details, or test results.
 - Treat current code as evidence of behaviour, not proof of correctness. Challenge its algorithms, maths, configuration model, and assumptions with independent reasoning, reproductions, tests, and primary sources. Revise confirmed in-scope flaws without repeatedly asking permission, while preserving unrelated work and the machine, output, Frame, hardware, and publication boundaries below.

@@ -75,6 +75,10 @@ protect is work first published after it, plus official builds, updates and supp
    installer description check follow the new wording.
 8. **ADR-523.** Its "`LICENSE` remains unchanged" no longer holds; `LICENSE` follows this ADR.
    Its commercial runtime decisions under ADR-247 §3 are untouched.
+9. **Agent rules.** `AGENTS.md`, which `CLAUDE.md` defers to, tells every coding agent to start
+   from the latest `origin/main`, to push only a branch whose `LICENSE` is all rights reserved,
+   never to call KerfDesk open source or MIT-licensed, and to take in outside code only under
+   licences that allow a paid, closed-source app.
 
 ### Consequences
 
@@ -89,9 +93,12 @@ protect is work first published after it, plus official builds, updates and supp
 
 ### Cutoff record
 
-- Cutoff commit (last MIT commit on `main`): to be recorded after merge.
-- Date of the change on `main`: to be recorded after merge.
-- `mit-final` annotated tag: to be created by the maintainer on the cutoff commit.
+- Cutoff commit (last MIT commit on `main`): `2f6f84decc8e3188f481e07dc3fead9d26fb2219`, "fix:
+  preserve second-pass motion and recovery ownership (#1016)". It is the first parent of
+  `f8e8c4b1262a16b9545e074d2209e3a9dbabecf4`, the merge of PR #1022 that brought this ADR to
+  `main`.
+- Date of the change on `main`: 2026-09-29, 07:33:45 UTC.
+- `mit-final` annotated tag: to be created on the cutoff commit at the maintainer's word.
 
 ### Verification
 
