@@ -16,18 +16,59 @@
 // found through a box index of the first round, and rings that changed since
 // that index was built are matched among themselves; when they become many,
 // the index is rebuilt.
+//
+// Nearly all of this work proves that pieces do not meet, and the sample test
+// that runs just before (contour-contact-cache.ts) already knows where they
+// cannot: next to its contacts it records whether two rings' sample edges, or
+// two edges of one ring that are not neighbours, come within SAMPLES_NEAR_PX.
+// A ring's curves meet only where its samples say they might:
+// - A fitted ring's samples are sampleCompactCurve's (curvedTraceRing in
+//   contour-trace.ts is the only maker of a ring that carries a curve). Each
+//   cubic is sampled at even parameter steps, at least cubicFlatnessSteps for
+//   0.02 px, so every point of the curve lies within 0.02 px of the edge of
+//   its own step; a line is its own edge. A ring without a fitted curve is
+//   tested on its own edges.
+// - piecesMeet reports a meeting only where the two curves come within 4e-4
+//   px: its leaves lie within 1e-4 px of their chords, every point of a chord
+//   is within that of its curve, and leaves meet when their chords come
+//   within the two flatnesses.
+// - So curves of two rings meet only where their sample edges come within
+//   2 x 0.02 + 4e-4 = 0.0404 px, and two rings whose samples the sample test
+//   found apart are not tested.
+// - Within one ring, a cubic is cut into 2^k pieces with 2^k no more than its
+//   sample steps (about 3 px of control polygon against at most 1.5 px of it
+//   per step), so a piece spans at least one step's parameter, a line piece is
+//   one edge, and two pieces in a row contain a whole edge: two of one cubic
+//   span two steps, and a piece that ends its segment covers the segment's
+//   last step. Two pieces three or more places apart both ways round the ring
+//   therefore have a whole edge between them both ways, and they meet only
+//   where two edges that are not neighbours come within 0.0404 px. A ring
+//   whose samples have no such edges is tested piece by piece against the
+//   pieces one and two places away only (ringMeetsNeighbours). A ring of
+//   fewer than four pieces had them halved, and a halved line is half an
+//   edge, so it is always tested in full.
+// Both skips are exact: the conflicts are the same as testing everything.
 
-import type { Polyline } from '../scene';
+import type { Polyline, Vec2 } from '../scene';
 import { type ContourBox } from './contour-bounds';
 import { ContourBoxIndex } from './contour-box-index';
 import {
   ringMeetsItself,
+  ringMeetsNeighbours,
   ringPiecesSteps,
   ringsMeet,
   type RingPieces,
 } from './compact-curve-pieces';
 import { traceRingCurve } from './trace-curves';
 import type { TraceSteps } from './trace-steps';
+
+/** What the sample test measured (ContourContactCache.samplesNear and
+ *  samplesNearItself): false when the samples stay more than SAMPLES_NEAR_PX
+ *  apart, undefined when it did not measure them. */
+export type SampleProximity = {
+  readonly near: (a: ReadonlyArray<Vec2>, b: ReadonlyArray<Vec2>) => boolean | undefined;
+  readonly nearItself: (points: ReadonlyArray<Vec2>) => boolean | undefined;
+};
 
 type Slot = ContourBox & { readonly slot: number; readonly id: number };
 // Two rings, by position, whose curves met when last tested.
@@ -41,9 +82,14 @@ export class CurveContactCache {
   private readonly rings = new WeakMap<Polyline, RingPieces | null>();
   private nextId = 0;
   private current: (RingPieces | null)[] = [];
+  private polylines: ReadonlyArray<Polyline> = [];
   private index: ContourBoxIndex<Slot> | null = null;
   private indexedIds: number[] = [];
   private meetings: Meeting[] = [];
+
+  /** `samples`, when given, is what the sample test of the same rounds
+   *  measured; rings it found apart are not tested (the header). */
+  constructor(private readonly samples?: SampleProximity) {}
 
   /** `onPair` hears the two rings of each meeting between different rings. */
   *conflictsSteps(
@@ -58,12 +104,13 @@ export class CurveContactCache {
     const previous = this.current;
     const geometries: (RingPieces | null)[] = [];
     const changed: number[] = [];
+    this.polylines = rings;
     for (const [slot, polyline] of rings.entries()) {
       if (cooperate) yield;
       const geometry = yield* this.piecesSteps(polyline);
       geometries.push(geometry);
       if (geometry?.id !== previous[slot]?.id) changed.push(slot);
-      if (meetsItself(geometry)) conflicts.add(slot);
+      if (this.meetsItself(geometry, polyline)) conflicts.add(slot);
     }
     this.current = geometries;
     if (this.index === null || previous.length !== geometries.length) {
@@ -166,13 +213,22 @@ export class CurveContactCache {
     const second = this.current[b];
     if (first === null || first === undefined || second === null || second === undefined) return;
     if (first.cubics.length === 0 && second.cubics.length === 0) return;
+    // Rings whose samples stay apart have curves that do (the header).
+    const pointsA = (this.polylines[a] as Polyline).points;
+    const pointsB = (this.polylines[b] as Polyline).points;
+    if (this.samples?.near(pointsA, pointsB) === false) return;
     if (ringsMeet(first, second)) this.meetings.push({ a, b });
   }
-}
 
-// Whether a ring's curves meet themselves (tested once per ring).
-function meetsItself(geometry: RingPieces | null): boolean {
-  if (geometry === null || geometry.cubics.length === 0) return false;
-  geometry.meetsItself ??= ringMeetsItself(geometry);
-  return geometry.meetsItself;
+  // Whether a ring's curves meet themselves (tested once per ring). Only
+  // pieces close along the ring can meet when its samples that are not
+  // neighbours stay apart, unless its pieces were halved (the header).
+  private meetsItself(geometry: RingPieces | null, polyline: Polyline): boolean {
+    if (geometry === null || geometry.cubics.length === 0) return false;
+    geometry.meetsItself ??=
+      !geometry.halved && this.samples?.nearItself(polyline.points) === false
+        ? ringMeetsNeighbours(geometry)
+        : ringMeetsItself(geometry);
+    return geometry.meetsItself;
+  }
 }

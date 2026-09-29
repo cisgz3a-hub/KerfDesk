@@ -202,3 +202,123 @@ empty geometric-container list must not replace those depths with zero. Regressi
 jobs exercise tabs on both inner and outer contours, tab power, and perforation through
 the compiler and optimiser. Main's strict containment rule is retained for coincident
 bounds, and kerf rebuilding still falls back to geometric containment.
+
+### Amendment 1 - the curve guard skips pieces the samples keep apart, same output (2026-09-29)
+
+Each repair round runs the sample test and then the curve guard of point 5 on the same rings, and
+the guard's work is nearly all proof that pieces do not meet. On the centerline stress test (Line
+Art) the guard tested 17,803 pairs of rings and 3,382 rings against themselves, and in 17,680 of
+those pairs no sample edge of one ring comes within 0.045 px of the other. The sample test now
+records that, and the guard skips the work it proves unnecessary:
+
+- `ContourBoxIndex.overlapIdsSteps` takes an optional margin, default 0 (the same comparisons on the
+  same doubles as before), and tells its visitor whether the two boxes themselves overlap.
+- `ContourContactCache` visits the edge pairs of a measured pair of boundaries, and of each boundary
+  against itself, whose boxes come within `SAMPLES_NEAR_PX` = 0.045 px. The contact test still runs
+  only on pairs whose boxes overlap, so every contact and every earliest-contact choice is
+  unchanged. Next to its cached contacts, each pair records whether two of its edges come within
+  0.045 px, and each boundary whether two of its edges that are not neighbours do (`samplesNear`,
+  `samplesNearItself`: undefined when the cache has not measured the pair or the boundary). The
+  coarse cells that decide which pairs are measured are widened by the same 0.045 px. A pair that
+  shares no widened cell has no edges that close, and a pair that shares a cell only once widened
+  has no overlapping edge boxes, so no contact is lost or added.
+- `CurveContactCache`, given those lookups by `preserveContourTopologySteps`, skips `ringsMeet` for
+  two rings only when `samplesNear` is exactly false. When `samplesNearItself` is exactly false and
+  the ring's pieces were not halved to make up four (`RingPieces.halved`), `ringMeetsNeighbours`
+  tests each cubic piece against itself and against the pieces one and two places along the ring
+  either way, under the same joint rules, instead of every pair of pieces whose boxes meet. With
+  fewer than six pieces every two are that close, and the full test runs.
+
+Why no verdict can change (each step re-derived for this amendment):
+
+1. A ring carries a curve only as `curvedTraceRing(sampleCompactCurve(curve), curve)`
+   (`compactRefinement`); `closeContour` passes such a ring through unchanged or makes a new ring
+   without a curve. A line segment is one sample edge. A cubic is sampled at n even parameter steps,
+   n at least `cubicFlatnessSteps` for 0.02 px: the distance from B(t) to the chord of its step is at
+   most h^2/8 x max|B''| (the linear interpolation error, which holds for a vector-valued curve in
+   its integral form), and |B''| is at most 6 x the larger second difference of the control points,
+   the bound `cubicFlatnessSteps` meets. So every point of a fitted curve lies within 0.02 px of the
+   edge of its own sample step.
+2. `piecesMeet` reports a meeting only for two leaves within 1e-4 px of their chords whose chords
+   come within the two flatnesses. Every chord point is within its flatness of its curve, so the
+   curves come within 4e-4 px. The depth cap never decides: 2^k >= len / 3 pieces of a control
+   polygon of length len have second differences of at most len / 4^k <= 3 px, each halving
+   quarters them, and a piece's flatness is at most its largest second difference, so a piece is
+   flat to 1e-4 px after 8 halvings and a pair after 16 of the 48.
+3. Two rings: pieces that meet put two curve points within 4e-4 px, each within 0.02 px of an edge
+   of its ring, so two edges come within 0.0404 px; the rest of 0.045 px is room for rounding. The
+   edge distance is the least end-to-edge distance, or 0 for a crossing; the sign test misses a
+   crossing only when an end lies within rounding of the other edge, where the end distance finds
+   it. Two such edges have boxes within 0.045 px (visited under the margin) and widened boxes that
+   share a cell (the pair is measured). A pair the cache has not measured is tested in full.
+4. One ring: a cubic is cut into 2^k pieces of equal parameter length, and 2^k is at most its sample
+   steps. 2^k = 2^ceil(log2 m) with m = max(ceil(len / 3), 2 for a cubic that returns to its start,
+   else 1), and the samples take at least max(4, ceil(len / 1.5)) steps of the same polygon length:
+   for m = ceil(len / 3) >= 2, 2^ceil(log2 m) <= 2m - 2 <= ceil(len / 1.5), and otherwise
+   2^ceil(log2 m) <= 2 < 4. A single piece need not hold a whole step, but two pieces in a row always
+   do: two of one cubic span two steps, the last piece of a cubic covers its last step and the first
+   piece its first, and an unhalved line is itself an edge. A curve point that is a sample lies on
+   both edges at that sample, so the points of the pieces on either side can be placed on edges
+   before and after the held step. Pieces three or more places apart both ways round the ring
+   therefore lie on edges that are not neighbours, and a meeting between them makes the ring near
+   itself. Both limits are tight: pieces two apart can lie on neighbouring edges (a cubic of 5 steps
+   in 4 pieces: the first and third lie on edges 0 to 1 and 2 to 3), so they are tested, and pieces
+   three apart can lie on edges two apart, so the flag counts edges two apart. A halved ring has
+   lines of half an edge and pieces shorter than a step, and keeps the full test. A repeated sample
+   point, or a closing edge that is not a sample step, only adds edges, which can only turn a flag
+   to near.
+5. Line against line is tested by neither path: the sample test is exact for straight edges.
+
+Equivalence instrument: a SHA-256 of the whole traced output (every path, polyline vertex and curve
+coordinate). It is unchanged from `9fdc73cd0` on noise192 (Line Art, Smooth, Sharp, Edge
+Detection), noise512 Line Art, the centerline stress test (Line Art, Smooth, Sharp), astronaut (Line
+Art, Smooth, Sharp, Edge Detection) and the arch house (Line Art, Sharp). The parity oracle
+(`TRACE_PARITY=1`, light corpus, 66 cases) recorded on `9fdc73cd0` passes. Tests pin the margin
+against brute force, the flags at 0.03 and 0.06 px (between rings and within one), curves that meet
+between their samples, and the guard with and without the lookups on random rings, looped and
+cusp-like cubics included.
+
+How often the skips apply (Line Art; a pair is counted each time the guard reaches it, a ring once):
+
+| Case | Pairs skipped / near / not measured | Rings by neighbours / full, near / full, under six pieces or halved |
+|---|---|---|
+| centerline stress test | 17,680 / 9 / 114 | 2,485 / 424 / 473 |
+| noise512 | 44,128 / 601 / 161 | 3,472 / 317 / 2 |
+| noise192 | 4,313 / 66 / 10 | 476 / 41 / 1 |
+
+Measured (node bundles, one process per run, base and change interleaved in alternating order on a
+machine running other benchmarks, so only ratios within a round mean anything; the splits come from
+a timing wrapper around each named function, and self tests are the guard's per-ring entry):
+
+| Case | Base (`9fdc73cd0`) | After |
+|---|---|---|
+| stress test Line Art, whole trace, 3 rounds | 6.51 / 6.79 / 6.98 s | 6.14 / 6.59 / 6.38 s |
+| noise512 Line Art, whole trace, 3 rounds | 24.5 / 25.9 / 23.4 s | 21.6 / 22.8 / 21.7 s |
+| stress test, `preserveContourTopologySteps`, 2 rounds | 2.42 / 2.53 s | 2.16 / 2.15 s |
+| stress test, `ringsMeet` | 407 / 489 ms (17,803 calls) | 6 / 6 ms (123 calls) |
+| stress test, self tests | 390 / 452 ms | 384 / 371 ms |
+| noise512, `preserveContourTopologySteps`, 2 rounds | 17.1 / 17.0 s | 15.7 / 15.4 s |
+| noise512, `ringsMeet` | 1,542 / 1,539 ms (44,890 calls) | 626 / 676 ms (762 calls) |
+| noise512, self tests | 1,372 / 1,485 ms | 1,132 / 1,113 ms |
+
+The whole trace is 3 to 8.5 percent faster on the stress test and 7 to 12 percent on noise512. Of
+the self tests after the change, the full tests took 207 / 214 ms (897 rings, 389 of them under six
+pieces and reached through `ringMeetsNeighbours`) and the neighbour tests 178 / 161 ms (2,874 rings)
+on the stress test; 844 / 869 ms (319 rings) and 272 / 231 ms (3,474 rings) on noise512. The near
+flags cost the sample test up to about 10 percent: run cold (fresh caches) on every round's rings
+of a trace, 7 runs each, it took 983 / 994 ms before and 1,076 / 1,087 ms after on the stress test
+(minimums; medians 1,144 / 1,088 and 1,211 / 1,202 ms), 6,323 / 5,878 ms before and 6,827 / 5,859
+ms after on noise512 (medians 6,834 / 6,441 and 7,422 / 6,843 ms). The laser commit guard pays this
+too, and its rings carry no curve to skip. The wrapped `intersectingContourLoopsSteps` and
+`ringPiecesSteps` times move both ways between runs (they absorb collection pauses from the rest of
+the repair). Peak RSS stays within collector noise: noise512 958 to 1,128 MB after against 1,015 to
+1,080 MB before over 7 and 6 runs, and under `--trace-gc` the largest heap before a full collection
+was 675 MB after against 737 MB before.
+
+What is left: the self tests of rings whose samples are near themselves, and the pair tests of
+rings whose samples are near somewhere, still test every piece. On noise512 those 319 rings and 762
+pairs take about 1.5 s. Of the rings near themselves, 233 of 424 on the stress test and 206 of 317
+on noise512 are near only through edges two apart, mostly because the edge between them is shorter
+than 0.045 px (median 0.04 px), which puts its two neighbours that close by itself. Testing only
+the pieces around the near edges, or a flag that ignores edges two apart, would need its own
+argument and is not attempted here.
