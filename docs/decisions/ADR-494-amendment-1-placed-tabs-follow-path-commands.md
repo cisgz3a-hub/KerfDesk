@@ -19,6 +19,9 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither for 
   copy carrying laser tabs matched an untabbed copy and could be the one deleted, and two copies
   with the same fractions on contours that start at different corners, which put the tabs at
   different places, counted as one.
+- **Reverse Direction** (ADR-480 item 6) moved CNC tabs with the reversed contour (`t` becomes
+  `1 − t`) but left laser tabs at their old fraction, so each laser tab landed somewhere else on
+  the part: a tab 12 mm along the bottom edge of a 40 × 20 mm part moved about 17 mm.
 
 ### Decision
 
@@ -28,11 +31,15 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither for 
    its authored transform, contour order, start point and direction, as ADR-480 item 5 already did
    for CNC tabs. Laser and CNC tabs at the same fractions are different output and are kept apart.
    When a copy is deleted, the kept copy has the same tabs at the same places.
+2. **Reverse Direction.** Laser tabs follow each reversed contour exactly as CNC tabs do: `t`
+   becomes `1 − t` (0, the start, stays 0), and anchors on contours the command leaves unchanged
+   keep their fraction.
 
 ### Consequences
 
 - Delete Duplicates deletes fewer objects only where copies differ in placed laser tabs, or where
   tabbed copies start or run differently.
+- Reverse Direction changes only the cutting direction of a tabbed part; its laser tabs stay put.
 
 ### Verification
 
@@ -40,3 +47,5 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither for 
   either order and burn different outlines; copies whose start point or authored scale moves the
   same fraction are kept while a true copy, which burns the same outline, is deleted; laser and
   CNC tabs at the same fraction are kept apart.
+- `src/ui/state/path-cleanup-actions.test.ts`: after Reverse Direction every laser and CNC tab is
+  at its old place, a tab at the start keeps 0, and a path the command skips keeps its fractions.

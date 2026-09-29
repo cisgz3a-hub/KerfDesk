@@ -144,18 +144,7 @@ function withPaths(
   reversed: boolean,
 ): SceneObject | null {
   const bounds = boundsForPaths(paths) ?? object.bounds;
-  const anchors =
-    reversed && object.cncTabAnchors !== undefined
-      ? {
-          cncTabAnchors: object.cncTabAnchors.map((anchor) => {
-            const before = object.paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
-            const after = paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
-            return before !== undefined && after !== undefined && before !== after
-              ? reverseAnchor(anchor)
-              : anchor;
-          }),
-        }
-      : {};
+  const anchors = reversed ? reversedTabAnchors(object, paths) : {};
   if (object.kind === 'shape') {
     const synced = synchronizePolylineShapeGeometry(object, paths, bounds);
     return synced === null ? null : { ...synced, ...anchors };
@@ -163,9 +152,31 @@ function withPaths(
   return { ...object, paths, bounds, ...anchors };
 }
 
-// A CNC tab sits at a fraction of its contour's length from the start.
+// Tabs placed by hand, CNC and laser (ADR-494 Amendment 1), follow each
+// reversed contour; anchors on contours left unchanged keep their fraction.
+function reversedTabAnchors(
+  object: EditableObject,
+  paths: ReadonlyArray<ColoredPath>,
+): Pick<SceneObject, 'cncTabAnchors' | 'laserTabAnchors'> {
+  const follow = <A extends CncTabAnchor>(anchors: ReadonlyArray<A>): ReadonlyArray<A> =>
+    anchors.map((anchor) => {
+      const before = object.paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
+      const after = paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
+      return before !== undefined && after !== undefined && before !== after
+        ? reverseAnchor(anchor)
+        : anchor;
+    });
+  return {
+    ...(object.cncTabAnchors === undefined ? {} : { cncTabAnchors: follow(object.cncTabAnchors) }),
+    ...(object.laserTabAnchors === undefined
+      ? {}
+      : { laserTabAnchors: follow(object.laserTabAnchors) }),
+  };
+}
+
+// A placed tab sits at a fraction of its contour's length from the start.
 // Reversing a contour (a closed one keeps its start) moves t to 1 - t.
-function reverseAnchor(anchor: CncTabAnchor): CncTabAnchor {
+function reverseAnchor<A extends CncTabAnchor>(anchor: A): A {
   return { ...anchor, pathT: anchor.pathT === 0 ? 0 : 1 - anchor.pathT };
 }
 

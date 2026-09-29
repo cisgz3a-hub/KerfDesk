@@ -562,9 +562,10 @@ destination and cannot overwrite the template source.
    closed. Text and drawn rectangles, ellipses and polygons keep their own paths; the notice says
    to convert them to paths first.
 3. **Tools → Vector → Reverse Direction** reverses the same kinds of paths. Open paths swap ends;
-   closed paths keep their start point and run the other way round. CNC tabs stay where they were
-   on the shape. When Cut Planner may cut open paths from either end, the notice says to set Path
-   direction to Preserve direction to keep the new direction.
+   closed paths keep their start point and run the other way round. Tabs placed by hand, CNC and
+   laser, stay where they were on the shape (ADR-494 Amendment 1). When Cut Planner may cut open
+   paths from either end, the notice says to set Path direction to Preserve direction to keep the
+   new direction.
 4. **Edit → Delete Duplicates** (`Alt+D`) deletes later copies of artwork drawn twice in the same
    place on the same operation: moved-back copies, and closed shapes starting at another corner or
    drawn the other way, count. Copies on another operation, or with another power scale,
@@ -896,9 +897,10 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    a tab to remove it, or drag a tab to move it; each is one undo step. Placed tabs draw filled and
    the automatic tabs they replace draw hollow. **Done** or Esc returns to Select.
 4. Placed tabs replace the automatic tabs on their shape only, and only while tabs are on. They
-   move, rotate and scale with the artwork and survive copy and paste and break apart. **Delete
-   Duplicates** keeps a copy whose placed tabs differ (ADR-494 Amendment 1). **Clear placed
-   tabs** (in Cut Settings or in the canvas hint) returns the artwork to automatic tabs.
+   move, rotate and scale with the artwork and survive copy and paste and break apart. **Reverse
+   Direction** keeps them where they were on the shape, and **Delete Duplicates** keeps a copy
+   whose placed tabs differ (ADR-494 Amendment 1). **Clear placed tabs** (in Cut Settings or in
+   the canvas hint) returns the artwork to automatic tabs.
 5. Job Review's detail line reads e.g. "tabs every 50 mm (at most 6) × 0.5 mm, cut at 20%" or
    "tabs 4 × 0.5 mm, 3 placed by hand". With none of this set, output is unchanged.
 6. Material presets do not store these settings; applying a preset keeps what the operation has.
