@@ -9,9 +9,11 @@ ADR-548 had the window send the close handoff's Abort once Windows was ending th
 notice told the operator "If Windows restarts anyway, KerfDesk sends Abort first" and then
 "KerfDesk sent Abort". A re-audit before the desktop app merged found that this cannot be relied
 on. The window owns the serial port, so the main process can only ask it, asynchronously, to send
-Abort. Windows may end a process once it has returned from `WM_ENDSESSION`, and the audit found
-that Electron 44 ends its own process right after the `session-end` handlers run, unless the app is
-already quitting. The window's Abort then never leaves. A forced session end
+Abort. Windows may end a process once it has returned from `WM_ENDSESSION`, and Electron 44.4.5
+ends its own process right after the `session-end` handlers run, unless the app is already quitting
+(`shell/browser/native_window_views_win.cc`, `WM_ENDSESSION`, whose comment notes that the OS kills
+the process and its children right after that message returns). The window's Abort then never
+leaves. A forced session end
 (`ENDSESSION_CRITICAL` on `query-session-end`) leaves the window only the moment until
 `WM_ENDSESSION` arrives. Only asking Windows to wait, while no restart is forced, is reliable.
 

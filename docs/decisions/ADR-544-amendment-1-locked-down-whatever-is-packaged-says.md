@@ -7,8 +7,10 @@
 A re-audit of the desktop app before it merged found that ADR-544's refusal of
 remote debugging, and the main process's DevTools and development-renderer
 switches, all asked Electron's `app.isPackaged`. Electron answers that from the
-executable's name alone: a copy named `electron` (`electron.exe` on Windows)
-counts as unpackaged. KerfDesk installs for the current user (ADR-545), so its
+executable's name alone: a copy named `electron` (`electron.exe` on Windows, in
+any letter case) counts as unpackaged (`App::IsPackaged` in Electron 44.4.5's
+`shell/browser/api/electron_api_app.cc`; `ELECTRON_FORCE_IS_PACKAGED` can only
+make it true). KerfDesk installs for the current user (ADR-545), so its
 folder is writable without administrator rights. A copy of `KerfDesk.exe` renamed
 `electron.exe` beside the original still loads the integrity-checked `app.asar`
 and keeps every fuse, which live in the executable, but:
