@@ -27,4 +27,9 @@ export function verifyPreviewManifest(
   keySet: unknown,
   now?: number,
 ): Promise<PreviewManifest>;
-export function readBoundedManifest(response: Response): Promise<string>;
+export function verifySignedEnvelope(
+  envelope: unknown,
+  keySet: unknown,
+  channel: 'preview' | 'stable',
+): Promise<unknown>;
+export function readBoundedManifest(response: Response, limit?: number): Promise<string>;

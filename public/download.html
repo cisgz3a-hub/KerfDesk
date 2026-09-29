@@ -13,7 +13,7 @@
     <link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <title>Download KerfDesk Preview</title>
+    <title>Download KerfDesk</title>
     <style>
       * {
         box-sizing: border-box;
@@ -133,73 +133,142 @@
         border-top: 1px solid #dbe3ec;
         color: #4b5563;
       }
+      .edition {
+        margin-top: 2rem;
+        padding: 1.25rem;
+        background: #ffffff;
+        border: 1px solid #dbe3ec;
+        border-radius: 12px;
+      }
+      .edition > h2 {
+        margin-top: 0;
+      }
+      .edition-kind {
+        margin: -0.4rem 0 0.75rem;
+        color: #4b5563;
+        font-weight: 600;
+      }
+      .edition .card {
+        background: #f8fafc;
+      }
+      .edition .single {
+        max-width: 26rem;
+        margin: 1rem 0;
+      }
     </style>
   </head>
   <body>
     <main>
-      <h1>Download KerfDesk Preview</h1>
+      <h1>Download KerfDesk</h1>
       <p class="intro">
-        KerfDesk Preview is free and offline-capable. These early desktop builds are unsigned.
-        Downloads are served from <strong>dl.kerfdesk.com</strong>. This page verifies the
-        publisher's release signature before showing download links.
+        KerfDesk has two desktop editions. <strong>KerfDesk for Windows</strong> is the signed,
+        licensed edition with a 30-day full trial and in-app updates.
+        <strong>KerfDesk Preview</strong> is the free, unsigned early build for Windows and Mac that
+        you update by hand. Downloads are served from <strong>dl.kerfdesk.com</strong>, and this
+        page verifies the publisher's release signature before it shows any download link.
       </p>
 
-      <div class="notice">
-        <strong>Preview updates are manual.</strong>
-        KerfDesk may notify you that a newer Preview exists, but it never downloads or installs an
-        unsigned update. Finish any machine work, close KerfDesk, return to this page, and install
-        the newer exact-version asset yourself.
-      </div>
-
-      <h2>Choose your computer</h2>
-      <p id="release-status" role="status">Checking for verified downloads…</p>
-      <noscript>Enable JavaScript to verify and show the desktop download links.</noscript>
-      <div class="grid">
-        <section class="card">
+      <section class="edition" aria-labelledby="commercial-heading">
+        <h2 id="commercial-heading">KerfDesk for Windows</h2>
+        <p class="edition-kind">Licensed edition · 30-day full trial</p>
+        <p>
+          Every feature is included for 30 days from the day KerfDesk first registers your trial
+          online. A licence then costs US$49.50 plus any applicable tax. It works on three active
+          computers, includes one year of updates, and never stops working for the versions released
+          while your updates are covered. Another year of updates costs US$20 and never renews
+          automatically. Buy or renew from <strong>Help &gt; Licence</strong> inside the app.
+        </p>
+        <p id="commercial-status" role="status">Checking for the licensed Windows edition…</p>
+        <div class="card single">
           <h3>Windows</h3>
           <p class="requirements">Windows 10 or 11, 64-bit (x64)</p>
-          <code class="asset-name">KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code>
-          <p class="artifact-hash"></p>
-          <a class="download" data-preview-suffix="windows-x64-setup.exe" hidden>
-            Download Windows Preview
-          </a>
-        </section>
+          <code class="asset-name" id="commercial-asset"
+            >KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code
+          >
+          <p class="artifact-hash" id="commercial-hash"></p>
+          <a class="download" id="commercial-download" hidden>Download the Windows trial</a>
+        </div>
+        <p>
+          The licensed installer is code-signed. If Windows reports an unknown publisher for this
+          installer, do not run it; download it again from this page. Updates are checked inside the
+          app and install only after you quit KerfDesk yourself, never during a job. Installing this
+          edition is always your choice; a Preview never turns into it on its own.
+          <a id="commercial-manifest" hidden>Signed update manifest</a>
+        </p>
+        <details id="commercial-history" hidden>
+          <summary>Earlier versions</summary>
+          <p>
+            A licence keeps working with every version released while its updates were covered. If
+            your updates have ended, install the newest version released on or before the
+            <strong>Updates through</strong> date shown in <strong>Help &gt; Licence</strong>.
+          </p>
+          <ul id="commercial-history-list"></ul>
+        </details>
+      </section>
 
-        <section class="card">
-          <h3>Mac with Intel</h3>
-          <p class="requirements">macOS 13 or newer, Intel x64</p>
-          <code class="asset-name">KerfDesk-&lt;version&gt;-macos-x64.dmg</code>
-          <p class="artifact-hash"></p>
-          <a class="download" data-preview-suffix="macos-x64.dmg" hidden>
-            Download Intel Mac Preview
-          </a>
-        </section>
+      <section class="edition" aria-labelledby="preview-heading">
+        <h2 id="preview-heading">KerfDesk Preview</h2>
+        <p class="edition-kind">Free · unsigned · manual updates</p>
+        <p>
+          KerfDesk Preview is free and offline-capable. These early desktop builds are unsigned.
+        </p>
 
-        <section class="card">
-          <h3>Mac with Apple Silicon</h3>
-          <p class="requirements">macOS 13 or newer, Apple Silicon (arm64)</p>
-          <code class="asset-name">KerfDesk-&lt;version&gt;-macos-arm64.dmg</code>
-          <p class="artifact-hash"></p>
-          <a class="download" data-preview-suffix="macos-arm64.dmg" hidden>
-            Download Apple Silicon Preview
-          </a>
-        </section>
-      </div>
+        <div class="notice">
+          <strong>Preview updates are manual.</strong>
+          KerfDesk may notify you that a newer Preview exists, but it never downloads or installs an
+          unsigned update. Finish any machine work, close KerfDesk, return to this page, and install
+          the newer exact-version asset yourself.
+        </div>
 
+        <p id="release-status" role="status">Checking for verified downloads…</p>
+        <noscript>Enable JavaScript to verify and show the desktop download links.</noscript>
+        <div class="grid">
+          <section class="card">
+            <h3>Windows</h3>
+            <p class="requirements">Windows 10 or 11, 64-bit (x64)</p>
+            <code class="asset-name">KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code>
+            <p class="artifact-hash"></p>
+            <a class="download" data-preview-suffix="windows-x64-setup.exe" hidden>
+              Download Windows Preview
+            </a>
+          </section>
+
+          <section class="card">
+            <h3>Mac with Intel</h3>
+            <p class="requirements">macOS 13 or newer, Intel x64</p>
+            <code class="asset-name">KerfDesk-&lt;version&gt;-macos-x64.dmg</code>
+            <p class="artifact-hash"></p>
+            <a class="download" data-preview-suffix="macos-x64.dmg" hidden>
+              Download Intel Mac Preview
+            </a>
+          </section>
+
+          <section class="card">
+            <h3>Mac with Apple Silicon</h3>
+            <p class="requirements">macOS 13 or newer, Apple Silicon (arm64)</p>
+            <code class="asset-name">KerfDesk-&lt;version&gt;-macos-arm64.dmg</code>
+            <p class="artifact-hash"></p>
+            <a class="download" data-preview-suffix="macos-arm64.dmg" hidden>
+              Download Apple Silicon Preview
+            </a>
+          </section>
+        </div>
+
+        <p>
+          In each filename, <code>&lt;version&gt;</code> is the prerelease tag without its leading
+          <code>v</code> (for example, tag <code>v0.2.0-preview.1</code> uses version
+          <code>0.2.0-preview.1</code>).
+        </p>
+
+        <p id="preview-links" hidden>
+          <a id="signed-manifest" hidden>Signed release manifest</a> ·
+          <a data-preview-suffix="release-notes.md" hidden>Release notes</a> ·
+          <a data-preview-suffix="SHA256SUMS.txt" hidden>Checksums</a> ·
+          <a data-preview-suffix="sbom.cdx.json" hidden>Software bill of materials</a>
+        </p>
+      </section>
       <p>
-        In each filename, <code>&lt;version&gt;</code> is the prerelease tag without its leading
-        <code>v</code> (for example, tag <code>v0.2.0-preview.1</code> uses version
-        <code>0.2.0-preview.1</code>).
-      </p>
-
-      <p>
-        <a id="signed-manifest" hidden>Signed release manifest</a> ·
-        <a data-preview-suffix="release-notes.md" hidden>Release notes</a> ·
-        <a data-preview-suffix="SHA256SUMS.txt" hidden>Checksums</a> ·
-        <a data-preview-suffix="sbom.cdx.json" hidden>Software bill of materials</a>
-      </p>
-      <p>
-        The signed manifest binds each filename, size and SHA-256 digest to a version and source
+        Each signed manifest binds filenames, sizes and SHA-256 digests to a version and source
         revision. It proves the publisher approved these bytes; it is not an operating-system code
         signature, notarization, or an independent GitHub build attestation for private source.
         Verification keys are available <a href="/desktop-release-keys.json">here</a>.
@@ -209,8 +278,8 @@
       <ol class="instructions">
         <li>Run the downloaded setup file.</li>
         <li>
-          Only continue if it came from the verified dl.kerfdesk.com links above and its filename
-          matches the Windows pattern.
+          Only continue if it came from the verified Preview links above and its filename contains
+          <code>-preview.</code> followed by a number.
         </li>
         <li>
           If SmartScreen shows <strong>Windows protected your PC</strong>, select

@@ -47,6 +47,22 @@ describe('desktop Preview download page', () => {
     expect(page).not.toMatch(/<script(?![^>]*\bsrc=)[^>]*>/i);
   });
 
+  it('keeps the licensed Windows trial separate from the free Preview', () => {
+    const page = downloadPage();
+    const commercial = page.slice(
+      page.indexOf('aria-labelledby="commercial-heading"'),
+      page.indexOf('aria-labelledby="preview-heading"'),
+    );
+
+    expect(commercial).toContain('Licensed edition · 30-day full trial');
+    expect(commercial).toContain('id="commercial-status" role="status"');
+    expect(commercial).toMatch(/<a class="download" id="commercial-download" hidden>/);
+    expect(commercial).not.toContain('data-preview-suffix');
+    expect(commercial).not.toMatch(/\shref=/);
+    expect(page).toContain('Free · unsigned · manual updates');
+    expect(page.indexOf('commercial-heading')).toBeLessThan(page.indexOf('preview-heading'));
+  });
+
   it('keeps Linux users on the web app', () => {
     const page = downloadPage();
 

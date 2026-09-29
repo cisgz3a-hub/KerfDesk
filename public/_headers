@@ -51,6 +51,8 @@
   Cache-Control: no-cache
 /desktop-downloads.mjs
   Cache-Control: no-cache
+/desktop-commercial-catalog.mjs
+  Cache-Control: no-cache
 
 # Payment pages alone permit Paddle; the workspace keeps its original CSP.
 /buy

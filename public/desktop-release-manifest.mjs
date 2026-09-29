@@ -8,7 +8,7 @@ const VERSION =
   /^(0|[1-9]\d{0,15})\.(0|[1-9]\d{0,15})\.(0|[1-9]\d{0,15})-preview\.(0|[1-9]\d{0,15})$/u;
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 function requireValue(condition, message) {
-  if (!condition) throw new Error(`Invalid Preview manifest: ${message}`);
+  if (!condition) throw new Error(`Invalid signed release metadata: ${message}`);
 }
 function exactKeys(value, keys) {
   return record(value) && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
@@ -130,7 +130,14 @@ export async function verifyPreviewManifest(text, keySet, now = Date.now()) {
     typeof text === 'string' && new TextEncoder().encode(text).length <= PREVIEW_MANIFEST_LIMIT,
     'size',
   );
-  const envelope = JSON.parse(text);
+  return validatePreviewPayload(
+    await verifySignedEnvelope(JSON.parse(text), keySet, 'preview'),
+    now,
+  );
+}
+// A website/package anchor authorizes a key for exactly one release channel, so a
+// Preview key can never sign a commercial release and a stable key never a Preview.
+export async function verifySignedEnvelope(envelope, keySet, channel) {
   requireValue(
     exactKeys(envelope, ['schemaVersion', 'keyId', 'algorithm', 'payload', 'signature']) &&
       envelope.schemaVersion === 1 &&
@@ -150,7 +157,7 @@ export async function verifyPreviewManifest(text, keySet, now = Date.now()) {
   );
   const matches = keySet.keys.filter((key) => record(key) && key.keyId === envelope.keyId);
   requireValue(
-    matches.length === 1 && matches[0].algorithm === 'Ed25519' && matches[0].channel === 'preview',
+    matches.length === 1 && matches[0].algorithm === 'Ed25519' && matches[0].channel === channel,
     'unknown or wrong-purpose signing key',
   );
   const key = await crypto.subtle.importKey(
@@ -166,18 +173,12 @@ export async function verifyPreviewManifest(text, keySet, now = Date.now()) {
     signature.length === 64 && (await crypto.subtle.verify('Ed25519', key, signature, payload)),
     'signature',
   );
-  return validatePreviewPayload(
-    JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(payload)),
-    now,
-  );
+  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(payload));
 }
-export async function readBoundedManifest(response) {
+export async function readBoundedManifest(response, limit = PREVIEW_MANIFEST_LIMIT) {
   requireValue(response.status === 200 && response.body !== null, 'HTTP response');
   const length = response.headers.get('content-length');
-  requireValue(
-    length === null || (/^\d+$/u.test(length) && Number(length) <= PREVIEW_MANIFEST_LIMIT),
-    'HTTP size',
-  );
+  requireValue(length === null || (/^\d+$/u.test(length) && Number(length) <= limit), 'HTTP size');
   const reader = response.body.getReader();
   const chunks = [];
   let received = 0;
@@ -186,7 +187,7 @@ export async function readBoundedManifest(response) {
       const { done, value } = await reader.read();
       if (done) break;
       received += value.byteLength;
-      requireValue(received <= PREVIEW_MANIFEST_LIMIT, 'HTTP size');
+      requireValue(received <= limit, 'HTTP size');
       chunks.push(value);
     }
   } finally {
