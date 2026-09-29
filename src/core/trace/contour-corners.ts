@@ -41,13 +41,8 @@
 
 import type { Vec2 } from '../scene';
 import { latticeCandidates } from './contour-corner-lattice';
-import {
-  fitLeg,
-  growLeg,
-  legCandidates,
-  legIntersection,
-  LEG_SLOPE_TOLERANCE,
-} from './contour-corner-legs';
+import { fitLeg, growLeg, LEG_SLOPE_TOLERANCE } from './contour-corner-leg-runs';
+import { legCandidates, legIntersection } from './contour-corner-legs';
 import {
   LATTICE_STEP_COST_PX,
   MIN_LEG_POINTS,

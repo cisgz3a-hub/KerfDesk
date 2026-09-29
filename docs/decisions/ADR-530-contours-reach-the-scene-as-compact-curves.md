@@ -264,7 +264,8 @@ tail and follow that staircase; see Known gaps.
     remains is the corner dial (about 1.3 s) and the fit's span projection (about 0.8 s); on noise
     the live heap as the repair starts is 191 MB against main's 110 MB at 512 px, the 0.02 px
     samples and the finished contours. Follow-up owner: the tracer audit, in a pull request after
-    this branch merges (real-art time first, then that memory).
+    this branch merges (real-art time first, then that memory). Amendment 10 re-measures both
+    after the merge.
 - Node editing, SVG export, bounds and the laser commit read the carried cubics; the downscale and
   Region Enhance routes no longer lose them.
 
@@ -679,3 +680,89 @@ Measured as in Amendment 8, against it, 2 rounds, with another benchmark sharing
 Uniform noise at 1024 px (Line Art, one run each, with another benchmark sharing the machine)
 took 59.6 s against main's 40.6 s (1.47x, against the 1.46x target), with a peak of 3.0 GB
 against main's 2.12 GB (1.42x).
+
+### Amendment 10 - same-output speedups after the merge: corner legs and preparation (2026-09-29)
+
+This is the follow-up the Known gaps name (real-art time first, then memory), measured after this
+decision merged (#1029). Every change keeps the traced output bit for bit.
+
+- Corner legs. The corner dial's leg search moves to `contour-corner-leg-runs.ts`
+  (`contour-corner-legs.ts` was at the 400-line cap) and keeps the line each straightness test
+  fits. A run grows one point at a time, and each growth fits the longer run's total-least-squares
+  line to test it, so the test that grew a run to its final length has already fitted that run.
+  The leg reuses that line (the same sums in the same order); only a run that did not grow at its
+  index is fitted again. Before, every index fitted its final run once more.
+- Preparation floods. The pinhole fill (its outside flood and its component floods), speck removal
+  and the small-mark judge's labels flood on one typed stack and mark a pixel when they push it, so
+  no pixel is pushed twice. A component that grows past the size its stage acts on (the pinhole
+  area cap, the speck limit, the lone-mark floor) is still flooded but no longer listed, and the
+  components that are listed keep the order in which their pixels are reached. The pinhole fill
+  tests a diagonal paper step only where ink lies on both sides of the corner, and speck removal
+  asks the saddle decision only for an unvisited ink pixel; the decision reads the mask alone, so
+  asking it less often changes nothing.
+- Light-solid recovery. The box means advance every column sum a row at a time (the same
+  additions in the same order, reading memory along rows), and the thick-material test counts
+  square windows along rows and then columns instead of spreading 8-connected rings, which reach
+  exactly the pixels within that Chebyshev distance.
+
+The preparation is the same code before this decision. On the arch house it was two thirds of the
+trace.
+
+Tests compare each change with the code it replaced: `contour-corner-leg-runs.test.ts` (every
+leg's count, centroid, direction and residual, bit for bit), `fill-pinholes-flood.test.ts` and
+`preprocess-despeckle-flood.test.ts` (the same fills and erasures, and the same judge calls with the
+same components in the same order, under each saddle policy), and `light-solid-pixels.test.ts`
+(bit-identical box means, the same thick-material masks). Each fails on a deliberate mistake: a
+line carried over from the previous index, or a changed step order, window or size limit.
+
+Output: the whole-trace hash is unchanged on all eleven cases below.
+
+Measured with esbuild bundles of `traceImageToColoredPaths`, one process per run, with main before
+this decision (`1ff88ad5a`), main (`e5f0a266b`) and this amendment interleaved, 4 rounds, medians
+of warm runs, on a 4-core machine:
+
+| Case | Before this decision | main | After | After / before |
+|---|---|---|---|---|
+| astronaut, Line Art | 0.55 s | 0.71 s | 0.65 s | 1.18x |
+| astronaut, Sharp | 0.31 s | 0.43 s | 0.41 s | 1.33x |
+| astronaut, Smooth | 1.10 s | 1.33 s | 1.16 s | 1.05x |
+| astronaut, Edge Detection | 0.69 s | 1.01 s | 0.95 s | 1.39x |
+| stress test 1254 px, Line Art | 3.41 s | 5.04 s | 4.89 s | 1.43x |
+| stress test 1254 px, Sharp | 3.26 s | 5.34 s | 5.26 s | 1.61x |
+| text-sans-96, Line Art | 0.12 s | 0.13 s | 0.13 s | 1.03x |
+| arch house, Line Art | 3.36 s | 3.20 s | 2.37 s | 0.70x |
+| arch house, Sharp | 0.38 s | 0.40 s | 0.36 s | 0.97x |
+| noise192, Line Art | 1.01 s | 1.29 s | 1.27 s | 1.26x |
+| noise192, Sharp | 0.73 s | 1.17 s | 1.14 s | 1.56x |
+
+Peak memory against main before this decision is 0.77x (the arch house with Line Art) to 1.15x (the
+stress test with Sharp); main measured 0.91x to 1.15x. The 29 September re-time of #1029's head
+measured 0.87x on noise512 and 0.89x on noise1024 (Line Art), so on large noise the memory
+follow-up is met in peak terms.
+
+Where the time goes now (timers round each stage, which add their own cost; three runs in one
+process, the first cold):
+
+- Stress test, Line Art, 4.6 to 5.8 s a run: preparation 0.30 to 0.39 s (0.58 to 0.65 s before
+  this decision); finishing the 3,302 rings 2.5 to 3.0 s, of which the corner dial is 0.79 to
+  0.99 s and the compact fit 1.6 to 1.9 s; the topology repair 1.6 to 2.0 s over three rounds (1.1
+  to 1.4 s before this decision), of which the sample crossing test is 0.49 to 0.57 s, the curve
+  guard 0.35 to 0.46 s and the nesting check 0.34 to 0.46 s, the rest being refits of the rings
+  that back off.
+- Arch house, Line Art, 2.2 to 2.8 s a run: preparation 1.2 to 1.5 s (2.0 to 2.6 s before these
+  changes), of which light-solid recovery is 0.54 to 0.69 s over its two passes and the mask
+  cleanup 0.41 to 0.52 s.
+
+Tried and dropped, with the same output and no gain beyond noise: the merge step skipping spans that
+cannot improve its segment count (104k to 94k span evaluations on the stress test, the same wall
+time), and skipping the corner-field coverage memo at native scale. Typed arrays for span points
+were 10% faster in a microbenchmark of the projection loop alone, too little of the fit to pursue.
+
+What remains: real art is 0.70x to 1.61x the time before this decision, against the target of
+about 1.15x, and the stress test and the astronaut's Sharp and Edge Detection traces are above it.
+The rest is the corner dial and the compact fit, which this decision adds, and the curve guard
+(ADR-531). No further exact saving was found in them beyond micro-tuning. Each ring's finish
+depends only on its boundary, the mask, the crack field and the options, so finishing rings on
+several cores would keep the output identical: the trace worker would start helper workers, give
+each the mask and field, and wait on them from the step runner. That larger change is not part of
+this amendment.

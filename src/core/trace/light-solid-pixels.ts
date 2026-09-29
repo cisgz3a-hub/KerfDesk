@@ -29,22 +29,30 @@ export function boxMoments(
       sumSq += into * into - out * out;
     }
   }
+  // Column sums, advanced a row at a time: the additions of a pass down each
+  // column, in the same order, reading memory along rows.
   const mean = new Float32Array(luma.length);
   const meanSquare = new Float32Array(luma.length);
-  for (let x = 0; x < width; x += 1) {
-    let sum = 0;
-    let sumSq = 0;
-    for (let y = -radius; y <= radius; y += 1) {
-      sum += rowMean[clamp(y, height) * width + x] as number;
-      sumSq += rowSquare[clamp(y, height) * width + x] as number;
+  const sum = new Float64Array(width);
+  const sumSq = new Float64Array(width);
+  for (let y = -radius; y <= radius; y += 1) {
+    const row = clamp(y, height) * width;
+    for (let x = 0; x < width; x += 1) {
+      sum[x] = (sum[x] as number) + (rowMean[row + x] as number);
+      sumSq[x] = (sumSq[x] as number) + (rowSquare[row + x] as number);
     }
-    for (let y = 0; y < height; y += 1) {
-      mean[y * width + x] = sum / window;
-      meanSquare[y * width + x] = sumSq / window;
-      const out = clamp(y - radius, height) * width + x;
-      const into = clamp(y + radius + 1, height) * width + x;
-      sum += (rowMean[into] as number) - (rowMean[out] as number);
-      sumSq += (rowSquare[into] as number) - (rowSquare[out] as number);
+  }
+  for (let y = 0; y < height; y += 1) {
+    const row = y * width;
+    const out = clamp(y - radius, height) * width;
+    const into = clamp(y + radius + 1, height) * width;
+    for (let x = 0; x < width; x += 1) {
+      const s = sum[x] as number;
+      const q = sumSq[x] as number;
+      mean[row + x] = s / window;
+      meanSquare[row + x] = q / window;
+      sum[x] = s + ((rowMean[into + x] as number) - (rowMean[out + x] as number));
+      sumSq[x] = q + ((rowSquare[into + x] as number) - (rowSquare[out + x] as number));
     }
   }
   return { mean, meanSquare };
@@ -53,68 +61,53 @@ export function boxMoments(
 /** 1 on pixels within `reach` (Chebyshev) of THICK material: pixels farther
  *  than `halfWidth` from every light pixel. A band of non-light pixels up to
  *  about 2·halfWidth wide (an outline, a divider) has no thick pixels; a
- *  ground or a wide dark shape does. `queue` is scratch of image size. */
+ *  ground or a wide dark shape does. */
 export function nearThickMaterial(
   light: Uint8Array,
   width: number,
   height: number,
   span: { readonly halfWidth: number; readonly reach: number },
-  queue: Int32Array,
 ): Uint8Array {
-  const FAR = 255;
-  const distance = new Uint8Array(light.length).fill(FAR);
-  let tail = 0;
-  for (let i = 0; i < light.length; i += 1) {
-    if (light[i] !== 1) continue;
-    distance[i] = 0;
-    queue[tail] = i;
-    tail += 1;
-  }
-  spreadRings(distance, width, height, { queue, tail, rings: span.halfWidth, unreached: FAR });
-  // Reuse the plane: thick pixels become the sources, everything else FAR.
-  tail = 0;
-  for (let i = 0; i < distance.length; i += 1) {
-    if (distance[i] === FAR) {
-      distance[i] = 0;
-      queue[tail] = i;
-      tail += 1;
-    } else {
-      distance[i] = FAR;
-    }
-  }
-  spreadRings(distance, width, height, { queue, tail, rings: span.reach, unreached: FAR });
-  for (let i = 0; i < distance.length; i += 1) distance[i] = distance[i] === FAR ? 0 : 1;
-  return distance;
+  const thick = withinSquare(light, width, height, span.halfWidth);
+  for (let i = 0; i < thick.length; i += 1) thick[i] = thick[i] === 1 ? 0 : 1;
+  return withinSquare(thick, width, height, span.reach);
 }
 
-/** Breadth-first rings (8-connected) from the `tail` queued sources, writing
- *  each reached pixel's ring number into `distance`. */
-function spreadRings(
-  distance: Uint8Array,
-  width: number,
-  height: number,
-  frontier: {
-    readonly queue: Int32Array;
-    tail: number;
-    readonly rings: number;
-    readonly unreached: number;
-  },
-): void {
-  const { queue } = frontier;
-  const around = new Int32Array(8);
-  let head = 0;
-  for (let ring = 1; ring <= frontier.rings && head < frontier.tail; ring += 1) {
-    const end = frontier.tail;
-    for (; head < end; head += 1) {
-      neighbours8(around, queue[head] as number, width, height);
-      for (const n of around) {
-        if (n < 0 || distance[n] !== frontier.unreached) continue;
-        distance[n] = ring;
-        queue[frontier.tail] = n;
-        frontier.tail += 1;
-      }
+/** 1 on pixels with a set pixel of `mask` at most `radius` away along both
+ *  axes (Chebyshev distance, which 8-connected rings from the set reach in
+ *  as many steps): a count over a sliding window along each row, then over
+ *  a sliding window of rows. */
+function withinSquare(mask: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  const rows = new Uint8Array(mask.length);
+  for (let y = 0; y < height; y += 1) {
+    const row = y * width;
+    let count = 0;
+    for (let x = 0; x < Math.min(radius, width); x += 1) count += mask[row + x] as number;
+    for (let x = 0; x < width; x += 1) {
+      if (x + radius < width) count += mask[row + x + radius] as number;
+      if (x > radius) count -= mask[row + x - radius - 1] as number;
+      rows[row + x] = count > 0 ? 1 : 0;
     }
   }
+  return withinRows(rows, width, height, radius);
+}
+
+/** 1 on pixels with a set pixel of `rows` at most `radius` rows away in their column. */
+function withinRows(rows: Uint8Array, width: number, height: number, radius: number): Uint8Array {
+  const within = new Uint8Array(rows.length);
+  const counts = new Int32Array(width);
+  const addRow = (y: number, sign: number): void => {
+    for (let x = 0; x < width; x += 1) {
+      counts[x] = (counts[x] as number) + sign * (rows[y * width + x] as number);
+    }
+  };
+  for (let y = 0; y < Math.min(radius, height); y += 1) addRow(y, 1);
+  for (let y = 0; y < height; y += 1) {
+    if (y + radius < height) addRow(y + radius, 1);
+    if (y > radius) addRow(y - radius - 1, -1);
+    for (let x = 0; x < width; x += 1) within[y * width + x] = (counts[x] as number) > 0 ? 1 : 0;
+  }
+  return within;
 }
 
 /** How many of the first `length` queued pixels have `values` below `level`. */

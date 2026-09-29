@@ -70,9 +70,12 @@ export function fillPinholes(
             saddlePolicy.pixelScale,
           ),
   };
-  const outside = floodOutsideBackground(grid);
+  // One stack serves every flood: each marks a pixel when it pushes it, so
+  // no flood holds more than the image.
+  const stack = new Int32Array(width * height);
+  const outside = floodOutsideBackground(grid, stack);
   const data = new Uint8ClampedArray(image.data);
-  fillEnclosedPinholes(data, grid, outside, {
+  fillEnclosedPinholes(data, new PaperFlood(grid, new Uint8Array(width * height), outside, stack), {
     maxAreaPx: PINHOLE_MAX_AREA_PX * scale * scale,
     // The inscribed radius is a whole-pixel depth, so a fractional working
     // grid (the supersample taper) rounds its cap up: a sliver of the capped
@@ -103,31 +106,16 @@ type PaperGrid = {
 };
 
 // Scan every enclosed white component once; fill those under both caps.
-function fillEnclosedPinholes(
-  data: Uint8ClampedArray,
-  grid: PaperGrid,
-  outside: Uint8Array,
-  caps: PinholeCaps,
-): void {
-  const { ink, width, height } = grid;
-  const seen = new Uint8Array(width * height);
+function fillEnclosedPinholes(data: Uint8ClampedArray, flood: PaperFlood, caps: PinholeCaps): void {
+  const { ink, width, height } = flood.grid;
   for (let start = 0; start < ink.length; start += 1) {
-    if (!isUnvisitedEnclosedWhite(ink, outside, seen, start)) continue;
-    const component = collectComponent(grid, outside, seen, start);
-    if (component.length > caps.maxAreaPx) continue;
+    if (!flood.opens(start)) continue;
+    const component = collectComponent(flood, start, caps.maxAreaPx);
+    if (component === null) continue;
     if (!isHairlineThin(component, ink, width, height, caps.maxRadiusPx)) continue;
     if (caps.judge !== undefined && !caps.judge(component)) continue;
     paintComponentInk(data, component);
   }
-}
-
-function isUnvisitedEnclosedWhite(
-  ink: Uint8Array,
-  outside: Uint8Array,
-  seen: Uint8Array,
-  i: number,
-): boolean {
-  return (ink[i] ?? 1) === 0 && (outside[i] ?? 1) === 0 && (seen[i] ?? 1) === 0;
 }
 
 function paintComponentInk(data: Uint8ClampedArray, component: ReadonlyArray<number>): void {
@@ -161,57 +149,123 @@ function inkMap(image: RawImageData): Uint8Array {
 // Flood the background reachable from any border pixel (4-connected, plus
 // the diagonal paper steps the saddle policy joins). Everything white that
 // this flood cannot reach is enclosed by ink.
-function floodOutsideBackground(grid: PaperGrid): Uint8Array {
-  const { ink, width, height } = grid;
+function floodOutsideBackground(grid: PaperGrid, stack: Int32Array): Uint8Array {
+  const { width, height } = grid;
   const outside = new Uint8Array(width * height);
-  const stack: number[] = [];
+  const flood = new PaperFlood(grid, outside, null, stack);
   for (let x = 0; x < width; x += 1) {
-    stack.push(x, (height - 1) * width + x);
+    flood.push(x);
+    flood.push((height - 1) * width + x);
   }
   for (let y = 0; y < height; y += 1) {
-    stack.push(y * width, y * width + width - 1);
+    flood.push(y * width);
+    flood.push(y * width + width - 1);
   }
-  while (stack.length > 0) {
-    const pixel = stack.pop();
-    if (pixel === undefined) break;
-    if ((outside[pixel] ?? 1) === 1 || (ink[pixel] ?? 1) === 1) continue;
-    outside[pixel] = 1;
-    pushPaperNeighbours(stack, pixel, grid);
-  }
+  for (let pixel = flood.pop(); pixel >= 0; pixel = flood.pop()) flood.pushSteps(pixel);
   return outside;
 }
 
-function collectComponent(
-  grid: PaperGrid,
-  outside: Uint8Array,
-  seen: Uint8Array,
-  start: number,
-): number[] {
-  const { ink } = grid;
+// The enclosed paper component holding `start`, in the depth-first order it
+// has always been collected in, or null once it holds more than `maxArea`
+// pixels. The rest of a large component is still flooded, so no later scan
+// starts inside it.
+function collectComponent(flood: PaperFlood, start: number, maxArea: number): number[] | null {
   const component: number[] = [];
-  const stack = [start];
-  seen[start] = 1;
-  while (stack.length > 0) {
-    const pixel = stack.pop();
-    if (pixel === undefined) break;
-    component.push(pixel);
-    const before = stack.length;
-    pushPaperNeighbours(stack, pixel, grid);
-    for (let i = stack.length - 1; i >= before; i -= 1) {
-      const neighbour = stack[i];
-      if (
-        neighbour === undefined ||
-        (seen[neighbour] ?? 1) === 1 ||
-        (ink[neighbour] ?? 1) === 1 ||
-        (outside[neighbour] ?? 1) === 1
-      ) {
-        stack.splice(i, 1);
-        continue;
-      }
-      seen[neighbour] = 1;
-    }
+  let size = 0;
+  flood.push(start);
+  for (let pixel = flood.pop(); pixel >= 0; pixel = flood.pop()) {
+    size += 1;
+    if (size <= maxArea) component.push(pixel);
+    flood.pushSteps(pixel);
   }
-  return component;
+  return size > maxArea ? null : component;
+}
+
+// Which sides of a paper pixel at column `x` are ink, for its diagonal steps.
+type DiagonalSides = {
+  readonly x: number;
+  readonly inkLeft: boolean;
+  readonly inkRight: boolean;
+  readonly inkJoinsAt: SaddleResolver;
+};
+
+// A depth-first flood over paper steps: four-neighbours, plus each diagonal
+// paper neighbour whose shared corner is a saddle the policy resolves in
+// favour of paper (a diagonal whose corner is not a saddle is already
+// reachable through a paper four-neighbour). A pixel is marked when it is
+// pushed, never pushed twice, and never pushed when ink or `blocked`.
+class PaperFlood {
+  private top = 0;
+
+  constructor(
+    readonly grid: PaperGrid,
+    private readonly marks: Uint8Array,
+    private readonly blocked: Uint8Array | null,
+    private readonly stack: Int32Array,
+  ) {}
+
+  /** Whether a flood from `pixel` would take it: paper, unmarked, not blocked. */
+  opens(pixel: number): boolean {
+    return (
+      this.marks[pixel] === 0 && this.grid.ink[pixel] === 0 && (this.blocked?.[pixel] ?? 0) === 0
+    );
+  }
+
+  push(pixel: number): void {
+    if (!this.opens(pixel)) return;
+    this.marks[pixel] = 1;
+    this.stack[this.top] = pixel;
+    this.top += 1;
+  }
+
+  /** The most recently pushed pixel, or −1 once the flood is done. */
+  pop(): number {
+    if (this.top === 0) return -1;
+    this.top -= 1;
+    return this.stack[this.top] as number;
+  }
+
+  pushSteps(pixel: number): void {
+    const { width, height, inkJoinsAt } = this.grid;
+    const x = pixel % width;
+    if (x > 0) this.push(pixel - 1);
+    if (x < width - 1) this.push(pixel + 1);
+    if (pixel >= width) this.push(pixel - width);
+    if (pixel < width * (height - 1)) this.push(pixel + width);
+    if (inkJoinsAt !== null) this.pushDiagonalSteps(pixel, x, inkJoinsAt);
+  }
+
+  // A diagonal paper step crosses a corner whose two other pixels are ink, so
+  // only a pixel with ink on both sides of a corner has one to test. Steps go
+  // up-left, up-right, down-left, down-right, as they always have.
+  private pushDiagonalSteps(pixel: number, x: number, inkJoinsAt: SaddleResolver): void {
+    const { width, height, ink } = this.grid;
+    const inkLeft = x > 0 && ink[pixel - 1] === 1;
+    const inkRight = x < width - 1 && ink[pixel + 1] === 1;
+    if (!inkLeft && !inkRight) return;
+    const y = (pixel - x) / width;
+    const sides = { x, inkLeft, inkRight, inkJoinsAt };
+    if (y > 0 && ink[pixel - width] === 1) this.pushAcrossRow(pixel - width, y, sides);
+    if (y < height - 1 && ink[pixel + width] === 1) this.pushAcrossRow(pixel + width, y + 1, sides);
+  }
+
+  // The diagonal steps beside `ink`, the ink pixel above or below, across
+  // corners on lattice row `cornerY`.
+  private pushAcrossRow(ink: number, cornerY: number, sides: DiagonalSides): void {
+    if (sides.inkLeft) this.pushAcross(ink - 1, sides.x, cornerY, sides.inkJoinsAt);
+    if (sides.inkRight) this.pushAcross(ink + 1, sides.x + 1, cornerY, sides.inkJoinsAt);
+  }
+
+  // Push `target` across the saddle at lattice corner (cornerX, cornerY)
+  // unless the policy joins ink there.
+  private pushAcross(
+    target: number,
+    cornerX: number,
+    cornerY: number,
+    inkJoinsAt: SaddleResolver,
+  ): void {
+    if (this.opens(target) && !inkJoinsAt(cornerX, cornerY)) this.push(target);
+  }
 }
 
 // Max inscribed radius via multi-source BFS from the ink-adjacent rim
@@ -257,45 +311,6 @@ function hasInkNeighbour(pixel: number, ink: Uint8Array, width: number, height: 
   pushNeighbours(scratch, pixel, width, height);
   return scratch.some((neighbour) => (ink[neighbour] ?? 0) === 1);
 }
-
-// Four-neighbours, plus each diagonal paper neighbour whose shared corner is
-// a saddle the policy resolves in favour of paper. (A diagonal whose corner
-// is not a saddle is already reachable through a paper four-neighbour.)
-function pushPaperNeighbours(stack: number[], pixel: number, grid: PaperGrid): void {
-  const { ink, width, height, inkJoinsAt } = grid;
-  pushNeighbours(stack, pixel, width, height);
-  if (inkJoinsAt === null) return;
-  const x = pixel % width;
-  const y = (pixel - x) / width;
-  for (const [sx, sy] of DIAGONAL_STEPS) {
-    const nx = x + sx;
-    const ny = y + sy;
-    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-    if (paperJoinsDiagonally(ink, width, x, y, nx, ny, inkJoinsAt)) stack.push(ny * width + nx);
-  }
-}
-
-// Paper (x,y) → paper (nx,ny) across a saddle whose two other pixels are ink.
-function paperJoinsDiagonally(
-  ink: Uint8Array,
-  width: number,
-  x: number,
-  y: number,
-  nx: number,
-  ny: number,
-  inkJoinsAt: SaddleResolver,
-): boolean {
-  if ((ink[ny * width + nx] ?? 1) === 1) return false;
-  if ((ink[y * width + nx] ?? 0) !== 1 || (ink[ny * width + x] ?? 0) !== 1) return false;
-  return !inkJoinsAt(Math.max(x, nx), Math.max(y, ny));
-}
-
-const DIAGONAL_STEPS: ReadonlyArray<readonly [number, number]> = [
-  [-1, -1],
-  [1, -1],
-  [-1, 1],
-  [1, 1],
-];
 
 function pushNeighbours(stack: number[], pixel: number, width: number, height: number): void {
   const x = pixel % width;
