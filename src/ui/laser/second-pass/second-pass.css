@@ -6,6 +6,18 @@
   overflow: hidden;
   padding: 20px;
 }
+.second-pass-workbench > .second-pass-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+.second-pass-body > :not(.second-pass-layout) {
+  flex-shrink: 0;
+}
 .second-pass-intro {
   margin: 0;
   color: var(--lf-text-muted);
@@ -15,8 +27,8 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 260px;
   gap: 16px;
-  flex: 1;
-  min-height: 180px;
+  flex: 1 0 280px;
+  min-height: 280px;
 }
 .second-pass-stage {
   min-width: 0;
@@ -126,11 +138,17 @@
   justify-content: flex-end;
   gap: 8px;
 }
-.second-pass-footer > p {
+.second-pass-summary {
   flex: 1;
   min-width: 160px;
-  margin: 0;
   font-size: 12px;
+}
+.second-pass-summary > p {
+  margin: 0;
+}
+.second-pass-summary > .second-pass-cap-warning {
+  margin-top: 4px;
+  color: var(--lf-warning-fg);
 }
 .second-pass-status {
   margin: 0;
@@ -147,5 +165,14 @@
   }
   .lf-dialog.second-pass-workbench {
     padding: 12px;
+  }
+}
+@media (max-height: 480px) {
+  .second-pass-workbench .lf-toast-dialog-host > .lf-toasts {
+    max-height: 64px;
+  }
+  .second-pass-footer {
+    gap: 6px;
+    padding-top: 8px;
   }
 }

@@ -2,17 +2,16 @@ import { create } from 'zustand';
 import type { ExecutionArtifactV1 } from './recovery';
 
 /**
- * The latest laser run the execution archive could not keep: its program was
- * over the archive budget, or the archive write failed. This page still holds
- * the exact program it sent, so the run keeps an in-memory artifact and, once
- * it settles cleanly, is offered a second pass like an archived run. Another
- * run beginning, an interruption, or the page closing ends the offer (ADR-341
- * Amendment 7).
+ * The latest accepted run the archive could not keep: its lifecycle marker
+ * lets the checkpoint tracker retire its Start intent after physical settlement.
+ * Eligible flat laser runs also keep the exact program in this page and can
+ * offer a second pass after a clean finish. Another run beginning, an
+ * interruption, or the page closing ends that offer (ADR-341 Amendment 7).
  */
 type UnarchivedRunState = {
   /** The run the checkpoint tracker knows has no archive, even once released. */
   readonly runId: string | null;
-  /** Builds the run's artifact; null once the run was interrupted. */
+  /** Builds an eligible flat laser artifact; null for other jobs or a stop. */
   readonly openArtifact: (() => Promise<ExecutionArtifactV1>) | null;
   /** The run settled cleanly: the counterpart of an archived receipt. */
   readonly completedRun: CompletedUnarchivedRun | null;
@@ -29,10 +28,11 @@ export const useUnarchivedRunStore = create<UnarchivedRunState>(() => EMPTY);
 
 export function rememberUnarchivedRun(
   runId: string,
-  build: () => Promise<ExecutionArtifactV1>,
+  build: (() => Promise<ExecutionArtifactV1>) | null,
 ): void {
   let opening: Promise<ExecutionArtifactV1> | null = null;
-  const openArtifact = (): Promise<ExecutionArtifactV1> => (opening ??= build());
+  const openArtifact =
+    build === null ? null : (): Promise<ExecutionArtifactV1> => (opening ??= build());
   useUnarchivedRunStore.setState({ runId, openArtifact, completedRun: null });
 }
 

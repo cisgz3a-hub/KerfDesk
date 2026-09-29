@@ -1,14 +1,23 @@
 KerfDesk License & Safety Notice
 
-Copyright (c) 2026 Johann Stolk
+Copyright (c) 2026 Johann Stolk. All rights reserved.
 
 1. LICENSE. The KerfDesk software, in web or desktop form, including
-   updates (the "Software"), is free and open-source software released
-   under the MIT License. You may use, copy, modify, and redistribute it
-   under the MIT License terms, which are reproduced at the end of this
-   notice. The source code is available in the project's public
-   repository. This notice adds no restriction to the MIT permissions
-   or to rights granted by applicable third-party licenses.
+   updates (the "Software"), is proprietary. You may install and use
+   it free of charge, for personal or business work. That free use
+   does not cover features the Software marks as Pro: they need an
+   active trial or a paid licence under the KerfDesk Licence
+   Agreement. You may not sell, rent, sublicense or distribute the
+   Software, offer it to others as a hosted service, copy, modify,
+   decompile or reverse engineer it, or bypass or disable its licence
+   checks, except as needed to install and use it or as the law
+   allows. A commercial KerfDesk build supplied with the KerfDesk
+   Licence Agreement is governed by that agreement instead of this
+   section. Versions released up to and including the "mit-final" tag
+   of the KerfDesk source repository were released under the MIT
+   License; your rights in those versions are unchanged. Nothing in
+   this notice limits rights granted by applicable third-party
+   licenses.
 
 2. MACHINE SAFETY — READ CAREFULLY. The Software generates toolpaths
    and streams commands to laser cutters, CNC routers, and similar
@@ -36,26 +45,3 @@ Copyright (c) 2026 Johann Stolk
 5. THIRD-PARTY COMPONENTS. The Software bundles open-source components
    under their own licenses; see the accompanying
    third-party-notices.txt for the required notices and license texts.
-
-----------------------------------------------------------------------
-
-MIT License
-
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

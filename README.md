@@ -503,7 +503,10 @@ PR titles follow Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `d
 
 ## License
 
-[MIT](LICENSE) © 2026 Johann Stolk.
+© 2026 Johann Stolk. All rights reserved; see [`LICENSE`](LICENSE). The app is free to use under
+its [License & Safety Notice](public/eula.txt), except features marked Pro, which need a trial or a
+paid licence. Versions up to and including the `mit-final` tag were released under the MIT License
+([`LICENSE-MIT`](LICENSE-MIT)), and anyone who received them keeps those rights (ADR-543).
 
 Bundled dependencies, fonts and assets remain under their own licenses — see
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for the readable summary and

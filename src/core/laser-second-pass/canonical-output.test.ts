@@ -173,7 +173,7 @@ describe('second pass from the real prepared-output composition', () => {
     },
   );
 
-  it('omits unselected rows when controlled-dark row changes share the engraving feed', () => {
+  it('retains controlled-dark row junctions but burns only the selected row', () => {
     const source = canonicalSource(imageProject('engraving-feed'));
     const burn = simulateProgram(source).filter((move) => move.power > 0);
     const rowsY = [...new Set(burn.map((move) => move.from.y))].sort((a, b) => a - b);
@@ -200,8 +200,12 @@ describe('second pass from the real prepared-output composition', () => {
     if (result.kind !== 'ready') throw new Error(result.message);
     const motions = simulateProgram(result.gcode);
     expect(motions.some((move) => move.power > 0)).toBe(true);
-    // Every emitted move, including the beam-off approach, stays on the painted row.
-    expect(new Set(motions.map((move) => move.to.y))).toEqual(new Set([target]));
+    // These G1 row changes carry continuous velocity context. Keep their
+    // dark motion rather than inventing a new entry speed at the chosen row.
+    expect(new Set(motions.map((move) => move.to.y))).toEqual(new Set(rowsY));
+    expect(new Set(motions.filter((move) => move.power > 0).map((move) => move.to.y))).toEqual(
+      new Set([target]),
+    );
     expect(result.gcode).not.toMatch(/^G0/m);
   });
 
@@ -283,10 +287,19 @@ describe('second pass from the real prepared-output composition', () => {
     if (built.kind === 'error') expect(built.message).toContain(label);
   });
 
-  it('handles a dense raster without collecting or replaying unselected rows', () => {
+  it('omits unselected stopped contexts of a dense raster without collecting its full route', () => {
     const rows: string[] = ['G21', 'G90', 'M4S0'];
     for (let row = 0; row < 15000; row += 1) {
-      rows.push(`G0X-1Y${row}S0`, 'G1X0F1800S0', 'X4S120', 'X7S0', 'X10S320', 'X11S0');
+      rows.push(
+        'M5',
+        'M4S0',
+        `G0X-1Y${row}S0`,
+        'G1X0F1800S0',
+        'X4S120',
+        'X7S0',
+        'X10S320',
+        'X11S0',
+      );
     }
     rows.push('M5');
     const selection: LaserSecondPassSelection = {
@@ -305,11 +318,12 @@ describe('second pass from the real prepared-output composition', () => {
     if (result.kind !== 'ready') throw new Error(result.message);
     expect(result.burnLengthMm).toBeCloseTo(0.4, 12);
     expect(result.gcode.length).toBeLessThan(400);
-    // Writer 2 replays the painted X1.8..X2.2 plus the row's own 1 mm runway
-    // on each side; writer 1 replayed the whole row, overscan to overscan.
-    expect(result.motionBounds.minX).toBeCloseTo(0.8, 12);
-    expect(result.motionBounds.maxX).toBeCloseTo(3.2, 12);
-    expect([result.motionBounds.minY, result.motionBounds.maxY]).toEqual([7450, 7450]);
+    // Writer 3 keeps the complete selected context; stopped unpainted rows
+    // remain omitted. Stored overscan is not proof of sufficient run-up.
+    expect(result.motionBounds.minX).toBe(-1);
+    expect(result.motionBounds.maxX).toBe(11);
+    // Preserve the rapid's original starting point on the preceding row too.
+    expect([result.motionBounds.minY, result.motionBounds.maxY]).toEqual([7449, 7450]);
     const whole = buildLaserSecondPassProgram(rows.join('\n'), selection, { writerVersion: 1 });
     if (whole.kind !== 'ready') throw new Error(whole.message);
     expect(whole.motionBounds).toEqual({ minX: -1, minY: 7450, maxX: 11, maxY: 7450 });

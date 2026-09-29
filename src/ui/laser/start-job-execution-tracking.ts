@@ -1,7 +1,7 @@
 import { fingerprintGcode, fingerprintsEqual } from '../../core/recovery';
 import type { SimilarityTransform } from '../../core/registration';
 import type { JobOriginPlacement } from '../../core/job';
-import { machineKindOf, type MachineKind, type OutputScope } from '../../core/scene';
+import type { MachineKind, OutputScope } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import type { LaserState } from '../state/laser-store';
@@ -20,13 +20,13 @@ import { reportedWorkOffsetMm } from '../state/infer-machine-position';
 import { createStartIntent } from '../state/recovery/start-intent';
 import type { UntrackedRunRecord } from '../state/recovery/untracked-run-record';
 import { useToastStore } from '../state/toast-store';
-import { rememberUnarchivedRun } from '../state/laser-unarchived-run';
 import type { JobReviewModel } from './job-review';
 import { createExecutionProvenance } from '../state/recovery/execution-provenance';
 import { ordinaryExecutionEvidence } from '../state/recovery/execution-workflow-evidence';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import type { prepareCurrentStartJob } from './start-job-source';
-import { secondPassOfferableFor } from './second-pass/second-pass-offer';
+import { secondPassProjectEligible } from './second-pass/second-pass-eligibility';
+import type { FreshExecutionRetention } from './start-job-retained-execution';
 
 type PreparedCurrentStart = Extract<
   Awaited<ReturnType<typeof prepareCurrentStartJob>>,
@@ -92,6 +92,11 @@ function startControllerObservation(laser: LaserState) {
   };
 }
 
+export type FreshExecutionArchive = {
+  readonly staged: boolean;
+  readonly keep: (() => ExecutionArtifactV1) | null;
+};
+
 export async function stageFreshExecutionArtifact(args: {
   readonly runId: RunId;
   readonly prepared: PreparedCurrentStart;
@@ -103,7 +108,7 @@ export async function stageFreshExecutionArtifact(args: {
   readonly laserModeStartEvidence?: LaserModeStartEvidence;
   readonly cncSetupAttestation?: CncSetupAttestation;
   readonly completedReplaySourceRunId?: RunId;
-}): Promise<boolean> {
+}): Promise<FreshExecutionArchive> {
   let keep: (() => ExecutionArtifactV1) | null = null;
   try {
     const evidence = ordinaryExecutionEvidence({
@@ -158,41 +163,51 @@ export async function stageFreshExecutionArtifact(args: {
     const artifact = createExecutionArtifact(artifactArgs);
     keep = () => artifact;
     const staged = await args.repository.stageArtifact(artifact);
-    if (staged.ok) return true;
+    if (staged.ok) return { staged: true, keep };
   } catch {
     // Recovery persistence is best-effort and must never refuse current Start.
   }
-  if (keep !== null) keepUnarchivedLaserRun(args.runId, args.prepared, keep);
-  return false;
+  return { staged: false, keep };
 }
 
 /** A laser run the archive refused keeps its artifact in this page, so the job
  * that just finished is still offered a second pass (ADR-341 Amendment 7). The
  * copy is built only when the operator opens it: building it at Start would
  * delay acknowledgements the way a full archive walk did (ADR-352). */
-function keepUnarchivedLaserRun(
-  runId: RunId,
-  prepared: PreparedCurrentStart,
-  build: () => ExecutionArtifactV1,
-): void {
-  const project = prepared.prepared.project;
-  if (!secondPassOfferableFor(machineKindOf(project.machine), project.device.controllerKind)) {
-    return;
-  }
-  rememberUnarchivedRun(runId, async () => build());
-}
-
 export async function activateAcceptedFreshRun(
   runId: RunId,
-  staged: boolean,
+  archive: FreshExecutionArchive,
   repository: RecoveryRepository,
-  untracked?: UntrackedRunRecord,
+  retention: FreshExecutionRetention,
+  prepared: PreparedCurrentStart,
+  untrackedRecord: () => UntrackedRunRecord | undefined,
 ): Promise<void> {
-  if (staged) {
-    const activated = await repository.activateFreshRun(runId);
+  if (!retention.current()) {
+    await repository.discardStagedRun(runId);
+    return;
+  }
+  if (archive.staged) {
+    const activated = await repository.activateFreshRun(runId, undefined, retention.current);
     if (activated.ok && activated.value) return;
   }
-  await repository.noteUntrackedRunAccepted(runId, untracked);
+  if (!retention.current()) {
+    await repository.discardStagedRun(runId);
+    return;
+  }
+  retention.retain(secondPassProjectEligible(prepared.prepared.project) ? archive.keep : null);
+  const untracked = untrackedRecord();
+  const fallback = await repository.noteUntrackedRunAccepted(runId, untracked, retention);
+  await retention.settle();
+  if (!retention.current()) return;
+  if (!fallback.ok) {
+    useToastStore
+      .getState()
+      .pushToast(
+        'Recovery storage is unavailable for this accepted run. The job can continue, but its saved recovery record could not be updated.',
+        'warning',
+      );
+    return;
+  }
   useToastStore
     .getState()
     .pushToast(

@@ -32,8 +32,10 @@ export type LaserSecondPassSelection = {
  * 2: replays each selected sweep only from its painted span less the sweep's
  *    own lead-in to the painted span plus its own lead-out, and leaves out
  *    motion and power words that repeat the modal value.
+ * 3: retains complete connected motion contexts, including rapids, feed changes
+ *    and dark turns, and darkens M3 motion before source synchronisations.
  */
-export type LaserSecondPassWriterVersion = 1 | 2;
+export type LaserSecondPassWriterVersion = 1 | 2 | 3;
 
 export type LaserSecondPassSegment = {
   readonly from: LaserSecondPassPoint;

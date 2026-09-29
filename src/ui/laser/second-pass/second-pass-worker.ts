@@ -1,4 +1,4 @@
-import { rotaryAppliesTo, estimateJobDuration } from '../../../core/job';
+import { estimateJobDuration } from '../../../core/job';
 import { buildMotionManifest } from '../../../core/job/motion-manifest';
 import {
   buildLaserSecondPassProgram,
@@ -10,6 +10,7 @@ import type { ExecutionArtifactV1 } from '../../state/recovery';
 import { executionArtifactIntegrityIsValid } from '../../state/recovery/execution-artifact-integrity';
 import { recoveryArtifactPreparedProgramMatches } from '../recovery-artifact-binding';
 import { secondPassDrawing, sourceInitialPosition } from './second-pass-preview';
+import { secondPassProjectEligible } from './second-pass-eligibility';
 
 let source: ExecutionArtifactV1 | null = null;
 let sourceGeneration = 0;
@@ -90,7 +91,7 @@ function compileSelectedPass(source: ExecutionArtifactV1, selection: LaserSecond
     prepared: source.prepared,
     ...(source.jobOrigin === undefined ? {} : { jobOrigin: source.jobOrigin }),
     warnings: [
-      'Second pass: keep the material in its original position and use the same work origin. Painted power multiplies the saved S values; original speed and grayscale are retained. Any repeated passes in the saved job repeat within the painted areas.',
+      'Second pass: keep the material in its original position and use the same work origin. Painted power multiplies the saved S values; saved feed commands and grayscale are retained. Any repeated passes in the saved job repeat within the painted areas.',
       ...(result.clamped
         ? [
             'Some painted power reaches the saved machine profile maximum. Those values are capped; lighter tones retain their original proportions until that limit.',
@@ -122,15 +123,14 @@ function compileSelectedPass(source: ExecutionArtifactV1, selection: LaserSecond
     },
   };
   const drawing = secondPassDrawing(result.gcode, device);
-  return { prepared, drawing, burnLengthMm: result.burnLengthMm };
+  return { prepared, drawing, burnLengthMm: result.burnLengthMm, clamped: result.clamped };
 }
 
 async function validateSource(candidate: ExecutionArtifactV1): Promise<void> {
-  if (
-    candidate.machineKind !== 'laser' ||
-    rotaryAppliesTo(candidate.prepared.project.device, candidate.prepared.project.machine)
-  ) {
-    throw new Error('Painted second passes require a flat laser job.');
+  if (candidate.machineKind !== 'laser' || !secondPassProjectEligible(candidate.prepared.project)) {
+    throw new Error(
+      'Painted second passes require a flat laser job generated for GRBL, grblHAL or FluidNC.',
+    );
   }
   if (
     !(await executionArtifactIntegrityIsValid(candidate)) ||

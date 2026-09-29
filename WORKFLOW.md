@@ -2477,7 +2477,9 @@ authorization, Frame proof, controller command, or safety boundary.
   list of older jobs, and a later job that is aborted or interrupted removes the button
   rather than bringing back an older one (ADR-341 Amendment 4). A job too large for the
   execution archive is offered too: the page keeps its program until another job starts or
-  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). When the finished run
+  KerfDesk is closed or reloaded, and the prompt says so (ADR-341 Amendment 7). A storage failure
+  while activating an already staged run uses the same page-only fallback after a clean finish
+  (ADR-341 Amendment 9); it does not claim that the archive succeeded. When the finished run
   was a recovery or a painted pass, the preview follows its independently verified retained
   ancestor so the original full engraving is available where that archive still exists.
   The current artwork document is never replaced or recompiled by this workflow.
@@ -2485,33 +2487,37 @@ authorization, Frame proof, controller command, or safety boundary.
   a selected-area second pass repeats chosen parts of an already completed engraving.
 - Use **Paintbrush**, set its diameter in millimetres and paint areas to repeat. **Eraser**
   removes areas; **Hand**, Alt-drag and wheel zoom support detailed marking. Several strokes
-  can have different power. Select a painted stroke to edit its power, delete individual
+  can have different power. Select a painted stroke in the list to highlight it on the canvas
+  and edit its power, delete individual
   strokes, or use Undo/Redo and Clear areas. The most recent stroke wins in overlaps. A
   painted overlap never adds an extra pass; any deliberate repeated passes in the source
   program remain repeated inside the mask.
 - **Power (% of original)** is a multiplier of every saved S value, preserving grayscale:
   100% repeats the source power and 150% multiplies it by 1.5. Values that exceed the saved
-  profile's maximum S are capped and disclosed. Speed, beam mode, scan direction, scan
-  offsets, pixel-width correction and useful unpowered runways remain as emitted originally.
+  profile's maximum S are capped and disclosed after Preview as well as in Job Review.
+  Programmed feed, beam mode, scan direction, scan offsets, pixel-width correction and
+  unpowered approach/departure motion are retained.
   The mask does not crop/reprocess the source image or restart its dithering.
 - **Preview second pass** compiles off the UI thread. Its coloured burn paths show the
   actual selected output; faint paths show the saved engraving for context. The painted
-  mask is a selection, not a physical prediction of material darkness. Entire unselected
-  sweeps are omitted. A sweep ends at a rapid, a beam or air word, a feed change, or a
-  laser-off feed move that leaves the current line (a controlled-dark row change, even when it
-  runs at the engraving feed); a laser-off move that continues the line is a runway and stays
-  with its burn. A selected sweep is replayed only from its first painted point less the
-  sweep's own lead-in to its last painted point plus its own lead-out, crossing unpainted parts
-  in between at S0, so the head passes each painted point at the speed the original reached
-  there; a side with no lead-in (or lead-out) keeps the sweep's full approach on that side. A
-  small painted spot on a wide image row no longer replays the whole row. Repeated `G1` and
-  unchanged S words are left out (ADR-341 Amendment 3); saved passes record which writer built
-  them and replay with it. Every repositioning command carries S0 while the beam mode stays
-  armed; the mode word is written only when the mode changes and the program ends with one M5,
-  so the controller does not stop and drain around every selected sweep. Painted passes
+  mask is a selection, not a physical prediction of material darkness. New passes use writer 3
+  (ADR-341 Amendment 9). They retain the continuous motion context around a selected area,
+  including rapid travel and changes of feed and direction, and cross unpainted parts with S0. A short original
+  overscan is not proof that a shortened approach would reach the original speed. This can
+  retain several rows or a longer route of connected moves; entirely unselected
+  contexts can be omitted between actual synchronising state changes. Exact physical speed and material darkness still require
+  controller and material qualification. Repeated `G1` and unchanged S words are left out.
+  Every repositioning command carries S0. Air or beam-mode changes after constant-power cutting
+  occur only after real dark motion, including when the next cut shares the previous endpoint.
+  Saved passes record which writer built them; writers 1 and 2 remain available for exact
+  historical replay. Painted passes
   archived before 2026-09-22 were emitted with per-sweep beam words; they stay in history but
   no longer reproduce byte-exactly, so recovering them or painting from them is refused with the
   lineage message. The original engravings they came from are unaffected.
+- Dense previews reuse a display bitmap while panning or zooming and redraw the exact visible
+  paths after interaction settles. This changes only the display; pointer selection and output
+  keep their original coordinates. On short viewports the workbench body scrolls while its
+  action buttons remain reachable.
 - **Frame second pass** traces the exact derived motion bounds and returns to its captured
   position. **Start second pass** opens one immutable Job Review with current controller
   facts, selected-pass metrics and acknowledgements. Editing the painted output invalidates
@@ -2534,10 +2540,11 @@ authorization, Frame proof, controller command, or safety boundary.
   different: the **Execution archive** under History & recovery still retains at most 20
   terminal runs within 100 MiB for export and recovery, with its existing protected slots.
 - Supported inputs are the flat XY laser image, fill and vector programs KerfDesk generates
-  for GRBL, grblHAL and FluidNC. Marlin and Smoothieware programs are refused with a message
-  naming the controller, and their completed runs get no darkening prompt and no Machine-panel
-  entry; where older completions remain, the panel says so and keeps the selector. Native
-  external arcs, coordinate-changing commands, Z/rotary motion, dwell and stationary M3
+  for GRBL, grblHAL and FluidNC. G17 XY arcs using I/J centres are read as chords at the stock
+  GRBL arc tolerance of 0.002 mm (ADR-432); this does not establish equality with a controller
+  using a different arc setting. Marlin, Smoothieware and rotary completions get no darkening
+  prompt or Machine-panel entry. Other arc forms, coordinate-changing commands, Z motion,
+  dwell and stationary M3
   exposure cannot yet be transformed faithfully and produce a specific preparation error.
   No physical result, browser-minimisation behaviour or Falcon qualification follows from
   the software tests alone.

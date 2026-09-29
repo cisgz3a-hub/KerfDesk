@@ -226,6 +226,7 @@ class JobCheckpointTracker {
           interruption,
           this.nowIso(),
         );
+        if (isUnarchivedRun(runId)) await this.repository.finishUnarchivedStart(runId, false);
         if (terminalRecordedOrUnarchived(interrupted, runId)) {
           this.clearDeferredArchiveHandoff(runId);
           return;
@@ -377,6 +378,8 @@ class JobCheckpointTracker {
                 pending.interruption,
                 pending.settledAtIso,
               );
+        if (isUnarchivedRun(pending.runId))
+          await this.repository.finishUnarchivedStart(pending.runId, pending.kind === 'completed');
         if (!settled.ok || !settled.value) {
           retryAfterActivation = this.missingTerminalNotSettled(pending, before, settled);
           return;
@@ -408,12 +411,16 @@ class JobCheckpointTracker {
     before: ReturnType<RecoveryRepository['getSnapshot']>,
     settled: Awaited<ReturnType<RecoveryRepository['completeRun']>>,
   ): boolean {
+    // Start positively identified this accepted run as an in-memory fallback.
+    // Its clean settlement remains true even if storage could not retire the
+    // durable start intent; do not wait forever for an archive that failed.
+    if (this.settleUnarchivedRun(pending)) return false;
     const handoff = this.archiveHandoffOrRetire(before, pending.runId);
     if (this.deferMissingTerminal(pending, handoff)) {
       if (!settled.ok) this.reportQueueFailure(settled);
       return this.repository.getSnapshot().activeRun?.runId === pending.runId;
     }
-    if (!settled.ok || !this.settleUnarchivedRun(pending)) this.reportQueueFailure(settled);
+    this.reportQueueFailure(settled);
     return false;
   }
 

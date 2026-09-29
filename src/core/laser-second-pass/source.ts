@@ -11,6 +11,9 @@ import type {
 export type SourceTravelStyle = { readonly rapid: boolean; readonly feed: number };
 export type SourceSegment = LaserSecondPassSegment & {
   readonly group: number;
+  /** Continuous motion between actual synchronising changes, including rapids. */
+  readonly context: number;
+  readonly contextEntry: SourceTravelStyle;
   readonly air: number;
   readonly entry: SourceTravelStyle;
 };
@@ -31,6 +34,9 @@ type SourceState = {
   ended: boolean;
   breakGroup: boolean;
   group: number;
+  context: number;
+  breakContext: boolean;
+  contextEntry: SourceTravelStyle;
   entry: SourceTravelStyle;
   lastTravel: SourceTravelStyle;
   /** Unit direction of the previous movement with length. */
@@ -63,6 +69,9 @@ function initialState(initial: LaserSecondPassPoint | undefined): SourceState {
     ended: false,
     breakGroup: true,
     group: 0,
+    context: 0,
+    breakContext: true,
+    contextEntry: { rapid: true, feed: 0 },
     entry: { rapid: true, feed: 0 },
     lastTravel: { rapid: true, feed: 0 },
     lastDirection: null,
@@ -104,9 +113,26 @@ function applyMWords(state: SourceState, codes: ReadonlyArray<number>): void {
 }
 
 function updateModal(state: SourceState, block: SourceBlock): void {
+  const previousEnabled = state.enabled;
+  const previousMode = state.mode;
+  const previousAir = state.air;
+  const previousPower = state.power;
+  const previousRapid = state.rapid;
   applyGWords(state, block.g);
   applyMWords(state, block.m);
   if (block.s !== undefined) state.power = block.s;
+  if (
+    sourceSynchronises(
+      state,
+      block,
+      previousEnabled,
+      previousMode,
+      previousAir,
+      previousPower,
+      previousRapid,
+    )
+  )
+    state.breakContext = true;
   if (block.f !== undefined) {
     const feed = block.f * state.unit;
     if (!Number.isFinite(feed))
@@ -114,6 +140,25 @@ function updateModal(state: SourceState, block: SourceBlock): void {
     if (feed !== state.feed) state.breakGroup = true;
     state.feed = feed;
   }
+}
+
+/** Feed changes, rapids, dark turns and redundant state words do not prove
+ * a stop. Retain their junction context; split only on actual sync evidence. */
+function sourceSynchronises(
+  state: SourceState,
+  block: SourceBlock,
+  previousEnabled: boolean,
+  previousMode: 3 | 4,
+  previousAir: number,
+  previousPower: number,
+  previousRapid: boolean,
+): boolean {
+  if (state.enabled !== previousEnabled || state.air !== previousAir || state.ended) return true;
+  if (state.enabled && state.mode !== previousMode) return true;
+  if (block.x !== undefined || block.y !== undefined || !previousEnabled) return false;
+  // GRBL gcode.c [4]: standalone S updates sync for M3 and M4. In M3,
+  // standalone G0 <-> G1/G2/G3 also sets LASER_FORCE_SYNC (lines 795-847).
+  return state.power !== previousPower || (previousMode === 3 && state.rapid !== previousRapid);
 }
 
 function axisTarget(
@@ -205,15 +250,27 @@ function movementTo(state: SourceState, from: LaserSecondPassPoint | null): Sour
   const to = knownPoint(state.x, state.y);
   const direction = movementDirection(from, to, power);
   beginSweepIfNeeded(state, direction, power);
+  if (state.breakContext) {
+    state.context += 1;
+    state.contextEntry = state.context === 1 ? state.entry : state.lastTravel;
+    state.breakContext = false;
+  }
   state.lastTravel = { rapid: state.rapid, feed: state.feed };
-  if (state.rapid) state.breakGroup = true;
+  if (state.rapid) {
+    state.breakGroup = true;
+  }
   if (from === null || to === null) {
     if (power > 0)
       throw new Error('The first engraving move needs the original starting X and Y position.');
     state.breakGroup = true;
     return null;
   }
-  if (direction === null) return null;
+  if (direction === null) {
+    // GRBL mc_line synchronises an empty M3 planner block. A powered
+    // stationary move was refused above; an S0 one still carries a stop.
+    noteEmptyMotionStop(state);
+    return null;
+  }
   return {
     from,
     to,
@@ -222,9 +279,15 @@ function movementTo(state: SourceState, from: LaserSecondPassPoint | null): Sour
     mode: state.mode,
     rapid: state.rapid,
     group: state.group,
+    context: state.context,
+    contextEntry: state.contextEntry,
     air: state.air,
     entry: state.entry,
   };
+}
+
+function noteEmptyMotionStop(state: SourceState): void {
+  if (state.enabled && state.mode === 3) state.breakContext = true;
 }
 
 /** A G2/G3 source line as the chords GRBL runs for it (source-arc.ts), each

@@ -128,7 +128,7 @@ test('reads pnpm keyed dependency nodes and installed license facts, including n
   writePackage(root, {
     name: 'laserforge',
     version: '0.1.0',
-    license: 'MIT',
+    license: 'SEE LICENSE IN LICENSE',
     devDependencies: { electron: '^40.0.0' },
   });
   const react = writePackage(path.join(root, 'react'), {
@@ -190,7 +190,7 @@ test('reads pnpm keyed dependency nodes and installed license facts, including n
     })),
     [
       { name: 'electron', versionInfo: '40.0.0', licenseDeclared: 'MIT' },
-      { name: 'laserforge', versionInfo: '1.2.3', licenseDeclared: 'MIT' },
+      { name: 'laserforge', versionInfo: '1.2.3', licenseDeclared: 'NOASSERTION' },
       { name: 'nested', versionInfo: '1.0.0', licenseDeclared: 'ISC' },
       { name: 'optional', versionInfo: '2.0.0', licenseDeclared: 'NOASSERTION' },
       { name: 'react', versionInfo: '18.3.1', licenseDeclared: 'MIT' },
