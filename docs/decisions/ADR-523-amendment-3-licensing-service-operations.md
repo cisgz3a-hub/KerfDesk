@@ -129,7 +129,10 @@ support once it is switched on:
   that, check that rate-limit namespace IDs `1002` and `1003` are unused in the
   account. The `LicenseAuthority` class, its `v1` migration and
   `REQUEST_RATE_LIMITER` with `1001` are unchanged, so the redeploy needs no
-  migration. `LICENSING_ENABLED` and `PAYMENTS_ENABLED` stay `"false"`.
+  migration. `LICENSING_ENABLED` and `PAYMENTS_ENABLED` stay `"false"`. The first
+  deploy set `SIGNING_KEY_ID` only in the dashboard, which a deploy from the file
+  deletes, so `wrangler.jsonc` now carries it (`entitlement-2026-09`) and
+  `deploy-config.test.mjs` checks it against the key the desktop app pins.
 - The desktop app needs messages for `payment_rejected` (409) and
   `checkout_failed` (502). After `checkout_failed` or `invalid_provider_response`,
   a retry with the same checkout request ID creates a new order and a new Paddle

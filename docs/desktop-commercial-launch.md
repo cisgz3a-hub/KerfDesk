@@ -38,7 +38,8 @@ Abort and controller workflows intact.
    Create the fixed one-time USD purchase and renewal catalog, approve
    `https://kerfdesk.com/buy.html`, configure the signed webhook and run complete
    sandbox purchase/claim, renewal, duplicate-delivery and interrupted-checkout
-   scenarios. Set live credentials only after these pass. Never put private API or
+   scenarios. Set live credentials only after these pass. There is no staging
+   service for them yet; see "No staging service" below. Never put private API or
    webhook keys in the browser or app package.
 5. In Paddle, set both prices, purchase and renewal, to quantity minimum 1 and
    maximum 1, and apply no discount to them. The checkout page hides the discount
@@ -47,8 +48,9 @@ Abort and controller workflows intact.
    (`desktop-commercial-support.md`). Include one refused sandbox payment in the
    scenarios above and check that the app shows the refusal and the lookup finds it.
 6. Point an uptime monitor at `https://license.kerfdesk.com/v1/public/health`,
-   expecting status 200 and `{"ok":true}`. It answers while licensing is switched
-   off, so it can run from now on.
+   expecting status 200 and `{"ok":true}`, right after the next redeploy. The
+   route answers while licensing is switched off, but the Worker deployed from
+   27855387e predates it (ADR-523 Amendment 3) and answers 503 until then.
 7. Finalize seller identity, customer terms, privacy, refunds/chargebacks and support
    recovery before accepting money. Retain the existing MIT and third-party rights;
    private source visibility does not revoke earlier grants. Supply the reviewed
@@ -94,6 +96,26 @@ across, and nothing is signed again.
 
 ## Pilot verification
 
+### No staging service
+
+There is only the production licence service. Commercial builds are pinned to
+`https://license.kerfdesk.com` (`scripts/prepare-commercial-desktop.mjs`), so every
+pilot trial, activation and test order lands in the production database.
+
+- A trial belongs to the Windows installation and cannot be started again, so run
+  pilot trials on disposable Windows installations, such as a virtual machine, and
+  never on the owner's own PC: a pilot trial there uses up that PC's one trial
+  unless the trial is deleted through the administration API.
+- Paddle's sandbox needs the service switched to `PADDLE_ENVIRONMENT=sandbox` with
+  sandbox credentials. Doing that on the production Worker puts sandbox orders in
+  the live database, and a sandbox payment, made with a test card, creates a
+  licence signed with the production key that works in the real app. Revoke and
+  delete every such licence, and switch the service back to live credentials,
+  before selling.
+- A separate staging Worker (its own name, hostname, database and signing keys,
+  with a test build pinned to it) avoids both, but the build's pinned endpoint
+  would have to change first.
+
 After the service is live and its public keys match the package, privately issue
 the idempotent `johann` and `father` developer grants described in the service
 README. Store their actual licence keys privately and deliver each only to its
@@ -121,7 +143,10 @@ Record the exact source, artifact and hosted identity. Only then enable customer
 checkout and advertise automatic commercial updates.
 
 The same change that enables checkout sets `UNLICENSED_BUILDS_RUN_FREE = true` in
-`src/ui/licensing/edition-policy.ts` (ADR-544). From that deploy, the web app and
+`src/ui/licensing/edition-policy.ts` (ADR-544) and drops "Once sales open," from
+`public/download.html`. The website's `trialOpen` and `salesOpen` are set as
+`website/commerce.config.mjs` describes; buyers purchase inside the app, never
+through a checkout link on the website (ADR-524 Amendment 2). From that deploy, the web app and
 the free Preview builds run KerfDesk Free and send Pro tools to the desktop app.
 Before merging it, confirm the owner's own machines run the commercial build with
 a developer licence, since the free builds stop offering Pro to him too. On the
