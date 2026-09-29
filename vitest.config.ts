@@ -27,9 +27,10 @@ export default mergeConfig(
       setupFiles: ['src/__fixtures__/jsdom-canvas-setup.ts'],
       include: ['src/**/*.test.{ts,tsx}', 'electron/**/*.test.ts'],
       exclude: ['node_modules/**', 'dist/**', 'release/**'],
-      // CI-only worker throttle (1 on CI, 4 locally). The rationale and the
-      // CI-detection contract live in src/__fixtures__/vitest-workers.ts with a
-      // co-located policy test (D-S02-003).
+      // CI-only worker throttle (half the runner's cores on CI, 4 locally). The
+      // rationale and the CI-detection contract live in
+      // src/__fixtures__/vitest-workers.ts with a co-located policy test
+      // (D-S02-003).
       maxWorkers: vitestMaxWorkers(process.env),
       coverage: {
         provider: 'v8',
