@@ -62,7 +62,7 @@ describe('CameraDiagnostics', () => {
     await render(mockBridge());
     expect(container.textContent).toContain('Bridge: running');
     expect(container.textContent).toContain('frame proxy yes');
-    expect(container.textContent).toContain('ffmpeg no');
+    expect(container.textContent).toContain('FFmpeg no (network cameras need FFmpeg on PATH');
   });
 
   it('reports an unreachable bridge with its reason', async () => {

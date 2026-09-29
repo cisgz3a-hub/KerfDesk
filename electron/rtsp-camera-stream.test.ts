@@ -2,8 +2,12 @@ import { EventEmitter } from 'node:events';
 import type { ServerResponse } from 'node:http';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
+const { spawnMock, installedFfmpeg } = vi.hoisted(() => ({
+  spawnMock: vi.fn(),
+  installedFfmpeg: vi.fn((): string | null => '/opt/ffmpeg/bin/ffmpeg'),
+}));
 vi.mock('node:child_process', () => ({ default: { spawn: spawnMock }, spawn: spawnMock }));
+vi.mock('./ffmpeg-path.js', () => ({ FFMPEG_MISSING_REASON: 'No FFmpeg.', installedFfmpeg }));
 
 import { streamWithFfmpeg } from './rtsp-camera-stream';
 
@@ -58,6 +62,31 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe('starting FFmpeg for a network camera (ADR-551)', () => {
+  it('runs the installed FFmpeg by its full path', () => {
+    spawnMock.mockReturnValue(fakeFfmpeg());
+    streamWithFfmpeg(
+      new URL('rtsp://192.168.1.20/live'),
+      fakeResponse() as unknown as ServerResponse,
+    );
+    expect(spawnMock.mock.calls[0]?.[0]).toBe('/opt/ffmpeg/bin/ffmpeg');
+  });
+
+  it('refuses the preview without starting anything when FFmpeg is not installed', () => {
+    installedFfmpeg.mockReturnValueOnce(null);
+    const response = fakeResponse();
+    const lifecycle = { onLive: vi.fn(), onFailure: vi.fn(), onClosed: vi.fn() };
+    streamWithFfmpeg(
+      new URL('rtsp://192.168.1.20/live'),
+      response as unknown as ServerResponse,
+      lifecycle,
+    );
+    expect(spawnMock).not.toHaveBeenCalled();
+    expect(lifecycle.onFailure).toHaveBeenCalledWith('No FFmpeg.');
+    expect(response.end).toHaveBeenCalledOnce();
+  });
 });
 
 describe('streamWithFfmpeg lifecycle', () => {

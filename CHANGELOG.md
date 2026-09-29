@@ -84,6 +84,9 @@ release before it is tagged.
 - **Save over the project you opened.** After opening a project, Save writes back to that file
   instead of asking where to save, including projects double-clicked in Explorer. LightBurn files
   are never overwritten ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
+- **Safer network cameras.** The desktop app starts FFmpeg only from the folders on PATH, never
+  from the current folder, and says how to install it when it is missing
+  ([#1021](https://github.com/cisgz3a-hub/KerfDesk/pull/1021)).
 
 ### All changes
 

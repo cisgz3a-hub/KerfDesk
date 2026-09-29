@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
 import { handleDiscoverRequest, handleFrameRequest } from './camera-frame-proxy.js';
+import { FFMPEG_MISSING_REASON } from './ffmpeg-path.js';
 import { rtspCameraUrlPolicy } from './rtsp-camera-bridge-policy.js';
 import { RtspPreviewSessions } from './rtsp-camera-session.js';
 import { hasFfmpeg, hasFreeFfmpegSlot, streamWithFfmpeg } from './rtsp-camera-stream.js';
@@ -147,7 +148,7 @@ async function handleStream(
     return;
   }
   if (!(await hasFfmpeg())) {
-    const reason = 'FFmpeg is not available on this computer.';
+    const reason = FFMPEG_MISSING_REASON;
     lifecycle.markRejected(reason);
     writeJson(res, { kind: 'unavailable', reason });
     return;

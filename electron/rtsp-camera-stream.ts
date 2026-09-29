@@ -6,6 +6,7 @@
 import { spawn } from 'node:child_process';
 import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
+import { FFMPEG_MISSING_REASON, installedFfmpeg } from './ffmpeg-path.js';
 
 // Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
 // exhaust the machine (S03-001 DoS hardening).
@@ -48,9 +49,10 @@ function createPreviewActivityWatch(onTimeout: () => void): PreviewActivityWatch
   };
 }
 
-function spawnPreviewFfmpeg(url: URL) {
+// Always the full path of the installed FFmpeg, never a bare name (ADR-551).
+function spawnPreviewFfmpeg(executable: string, url: URL) {
   return spawn(
-    'ffmpeg',
+    executable,
     [
       '-hide_banner',
       '-loglevel',
@@ -83,7 +85,9 @@ export function streamWithFfmpeg(
   res: ServerResponse,
   lifecycle?: RtspPreviewLifecycleObserver,
 ): void {
-  const ffmpeg = spawnPreviewFfmpeg(url);
+  const executable = installedFfmpeg();
+  if (executable === null) return refuseWithoutFfmpeg(res, lifecycle);
+  const ffmpeg = spawnPreviewFfmpeg(executable, url);
   const releaseSlot = acquireFfmpegSlot();
   let clientClosed = false;
   let responseStarted = false;
@@ -156,6 +160,11 @@ export function streamWithFfmpeg(
   });
 }
 
+function refuseWithoutFfmpeg(res: ServerResponse, lifecycle?: RtspPreviewLifecycleObserver): void {
+  lifecycle?.onFailure(FFMPEG_MISSING_REASON);
+  writeJson(res, { kind: 'unavailable', reason: FFMPEG_MISSING_REASON });
+}
+
 function writePreviewChunk(
   ffmpeg: ReturnType<typeof spawnPreviewFfmpeg>,
   res: ServerResponse,
@@ -196,13 +205,16 @@ export type RtspFrameCaptureResult =
  * so the /frame.jpg route asks ffmpeg for a single image instead.
  */
 export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> {
+  const executable = installedFfmpeg();
+  if (executable === null)
+    return Promise.resolve({ kind: 'failed', reason: FFMPEG_MISSING_REASON });
   if (!hasFreeFfmpegSlot()) {
     return Promise.resolve({ kind: 'failed', reason: 'Too many concurrent camera streams.' });
   }
   const releaseSlot = acquireFfmpegSlot();
   return new Promise((resolve) => {
     const ffmpeg = spawn(
-      'ffmpeg',
+      executable,
       [
         '-hide_banner',
         '-loglevel',
@@ -268,7 +280,12 @@ let ffmpegAvailable: Promise<boolean> | null = null;
 
 export function hasFfmpeg(): Promise<boolean> {
   ffmpegAvailable ??= new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', ['-version'], { stdio: 'ignore', windowsHide: true });
+    const executable = installedFfmpeg();
+    if (executable === null) {
+      resolve(false);
+      return;
+    }
+    const ffmpeg = spawn(executable, ['-version'], { stdio: 'ignore', windowsHide: true });
     ffmpeg.on('error', () => resolve(false));
     ffmpeg.on('exit', (code) => resolve(code === 0));
   });

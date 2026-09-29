@@ -7435,6 +7435,13 @@ as the pane's design record.
   existing explicit FFmpeg-missing error path when a Finder launch cannot
   discover `ffmpeg`; the Preview does not bundle FFmpeg or add a
   platform-specific gate.
+- **Edge / where FFmpeg comes from (ADR-551).** The bridge runs FFmpeg only by
+  the full path of the first `ffmpeg.exe` (or `ffmpeg`) in an absolute PATH
+  folder, found once per run; the current folder and relative PATH entries are
+  never searched. Without one, RTSP previews say: "Network cameras need FFmpeg,
+  which is not installed. Install FFmpeg, add its bin folder to PATH, then
+  restart KerfDesk." A blocked USB camera points to Windows Settings, Privacy &
+  security, Camera.
 
 ### F-CAM7. Click-to-position the laser head (ADR-122)
 
