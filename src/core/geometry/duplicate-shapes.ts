@@ -52,13 +52,15 @@ export function duplicateSignature(
   layers: ReadonlyArray<Layer>,
 ): string | null {
   if (!isVectorPathObject(object)) return null;
-  const anchored = hasPlacedTabs(object);
+  const cncAnchors = placedAnchors(object, object.cncTabAnchors);
+  const laserAnchors = placedAnchors(object, object.laserTabAnchors);
+  const anchored = cncAnchors !== null || laserAnchors !== null;
   const binding = JSON.stringify([
     [...operationIdsForObject(object, layers)].sort(),
     object.powerScale ?? null,
     object.operationOverride ?? null,
-    object.cncTabAnchors ?? null,
-    object.laserTabAnchors ?? null,
+    cncAnchors,
+    laserAnchors,
     // A tab fraction is measured in local space before the transform. Equal
     // world outlines need not put that fraction at the same physical point
     // when one copy has a different non-uniform scale. Keep its authored basis.
@@ -84,9 +86,19 @@ export function duplicateSignature(
 }
 
 // Tabs placed by hand, CNC and laser (ADR-494 Amendment 1), are part of what a
-// copy cuts, so copies whose placed tabs differ are not duplicates.
-function hasPlacedTabs(object: SceneObject): boolean {
-  return (object.cncTabAnchors?.length ?? 0) > 0 || (object.laserTabAnchors?.length ?? 0) > 0;
+// copy cuts, so copies whose placed tabs differ are not duplicates. An empty
+// list places no tab, and neither does an anchor whose path has since changed
+// colour, so both sign as no anchors at all. Anchors held on an open contour
+// still count, since closing it again puts those tabs back.
+function placedAnchors<T extends { readonly layerColor: string; readonly pathIndex: number }>(
+  object: SceneObject,
+  anchors: ReadonlyArray<T> | undefined,
+): ReadonlyArray<T> | null {
+  if (anchors === undefined || !('paths' in object)) return null;
+  const placed = anchors.filter(
+    (anchor) => object.paths[anchor.pathIndex]?.color === anchor.layerColor,
+  );
+  return placed.length === 0 ? null : placed;
 }
 
 function orderedKeys(keys: string[], anchored: boolean): string[] {

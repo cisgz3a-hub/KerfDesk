@@ -44,7 +44,10 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
    `laserTabAnchors` differ are kept, and an object carrying placed laser tabs is compared with
    its authored transform, contour order, start point and direction, as ADR-480 item 5 already did
    for CNC tabs. Laser and CNC tabs at the same fractions are different output and are kept apart.
-   When a copy is deleted, the kept copy has the same tabs at the same places.
+   When a copy is deleted, the kept copy has the same tabs at the same places. Only anchors that
+   place a tab count: an empty list (which Break Apart, Join and Trim can leave) is the same as
+   none, and so is an anchor whose path has since changed colour, which output skips. Anchors held
+   on an open contour (item 3) still count, since closing the contour puts those tabs back.
 2. **Reverse Direction.** Laser tabs follow each reversed contour exactly as CNC tabs do: `t`
    becomes `1 − t` (0, the start, stays 0), and anchors on contours the command leaves unchanged
    keep their fraction. An open contour (after Break, item 3) holds its tabs for the straight line
@@ -97,7 +100,9 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
 - `src/core/geometry/duplicate-shapes.test.ts`: a tabbed and an untabbed copy are both kept in
   either order and burn different outlines; copies whose start point or authored scale moves the
   same fraction are kept while a true copy, which burns the same outline, is deleted; laser and
-  CNC tabs at the same fraction are kept apart.
+  CNC tabs at the same fraction are kept apart; a copy whose laser or CNC tab list is empty, or
+  whose only tab is on a path that changed colour, burns the same outline as a plain copy and is
+  deleted.
 - `src/ui/state/path-cleanup-actions.test.ts`: after Reverse Direction every laser and CNC tab is
   at its old place, a tab at the start keeps 0, and a path the command skips keeps its fractions.
 - `src/ui/state/path-node-curve-command-tabs.test.ts`: after Start on a polyline part, a curved

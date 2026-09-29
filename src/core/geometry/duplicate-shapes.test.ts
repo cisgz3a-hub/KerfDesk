@@ -292,6 +292,24 @@ describe('delete duplicates with laser tabs placed by hand (ADR-494)', () => {
 
     expect(duplicateObjectIds([laser, cnc], LAYERS, new Set())).toEqual([]);
   });
+
+  it('deletes a copy whose tab list is empty or whose tabs no longer cut', () => {
+    const plain = art('plain', [closed(SQUARE)]);
+    // Break Apart, Join and Trim write an empty list; it cuts no tab.
+    const emptyLaser = { ...art('empty-laser', [closed(SQUARE)]), laserTabAnchors: [] };
+    const emptyCnc = { ...art('empty-cnc', [closed(SQUARE)]), cncTabAnchors: [] };
+    // An anchor kept from before the path changed colour cuts no tab either.
+    const stale = {
+      ...art('stale', [closed(SQUARE)]),
+      laserTabAnchors: [{ ...anchor, layerColor: '#0000ff' }],
+    };
+
+    expect(laserLineOutput(emptyLaser)).toEqual(laserLineOutput(plain));
+    expect(laserLineOutput(stale)).toEqual(laserLineOutput(plain));
+    expect(
+      duplicateObjectIds([plain, emptyLaser, emptyCnc, stale], TABBED_LASER_LAYERS, new Set()),
+    ).toEqual(['empty-laser', 'empty-cnc', 'stale']);
+  });
 });
 
 const TABBED_LASER_LAYERS: ReadonlyArray<Layer> = [
