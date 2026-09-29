@@ -12,6 +12,7 @@ import {
   createDesktopJobActivityReporter,
   createDesktopSerialAdapter,
   createDesktopSupportLogReader,
+  createDesktopWindowCommands,
   isElectronRenderer,
 } from '../../platform/electron';
 import type { PlatformAdapter } from '../../platform/types';
@@ -53,12 +54,13 @@ const adapter: PlatformAdapter = isElectronRenderer()
       ...createDesktopProjectFiles(webAdapter.recentFiles, {
         handleSaveTarget: webAdapter.openedProjectSaveTarget,
       }),
-      // The main process serves its support log (ADR-546) and takes job
-      // reports (ADR-548) only on app://.
+      // The main process serves its support log (ADR-546), takes job reports
+      // (ADR-548) and runs File > Exit (ADR-554) only on app://.
       ...(window.location.protocol === 'app:'
         ? {
             readSupportLog: createDesktopSupportLogReader(),
             reportJobActivity: createDesktopJobActivityReporter(),
+            desktopWindow: createDesktopWindowCommands(),
           }
         : {}),
     }

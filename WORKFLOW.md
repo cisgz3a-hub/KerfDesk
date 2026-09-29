@@ -7729,6 +7729,14 @@ behavior or create a second product implementation.
 3. The window reports a change in the job's state at once and its progress, in whole percent, at
    most once a second. Nothing here touches the machine.
 
+#### Success — File > Exit and Help > Open Data Folder (ADR-554)
+1. In the desktop app, **File > Exit** closes KerfDesk exactly as the window's X does: unsaved
+   changes get Save, Don't Save or Cancel (ADR-549), a running job gets the Abort handoff, and
+   Cancel keeps KerfDesk open. The web app has no Exit; the browser closes its tab.
+2. **Help > Open Data Folder** opens the folder with KerfDesk's settings, licence record and
+   support log in Explorer (on Windows `%APPDATA%\laserforge`). If it cannot be opened, an error
+   toast names the folder. Projects are saved wherever the operator chooses, not there.
+
 ### F-DESK-LIC. Commercial admission, payment and updates (ADR-523)
 
 1. An explicitly prepared commercial package checks its signed saved licence before

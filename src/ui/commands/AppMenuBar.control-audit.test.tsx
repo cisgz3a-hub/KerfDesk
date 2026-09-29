@@ -38,6 +38,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'file.export-geojson': { callback: 'exportGeoJson' },
   'file.open-gcode': { callback: 'openGcodePreview' },
   'file.inspect-gcode': { callback: 'inspectCurrentGcode' },
+  'file.exit': { callback: 'exitApp' },
   'edit.undo': { callback: 'undo' },
   'edit.redo': { callback: 'redo' },
   'edit.select-all': { callback: 'selectAll' },
@@ -176,6 +177,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.report-bug': { url: 'https://kerfdesk.com/support.html#report' },
   'help.support-report': { special: 'support-report' },
   'help.check-updates': { special: 'check-updates' },
+  'help.open-data-folder': { callback: 'openDataFolder' },
   'help.discussions': { url: 'https://kerfdesk.com/support.html' },
 };
 
@@ -213,6 +215,8 @@ function availableContext(id: CommandId): AppCommandContext {
     printAndCut: vi.fn(),
     createArray: vi.fn(),
     quickNest: vi.fn(),
+    exitApp: vi.fn(),
+    openDataFolder: vi.fn(),
   });
 }
 

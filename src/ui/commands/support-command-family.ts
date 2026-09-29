@@ -46,6 +46,17 @@ export function supportReportCommand(): AppCommand {
   );
 }
 
+// Desktop app only (ADR-554): the folder support asks for, and the one to back up.
+export function openDataFolderCommand(invoke: () => void): AppCommand {
+  return enabled(
+    'help.open-data-folder',
+    'help',
+    'Open Data Folder',
+    'Show the folder where KerfDesk keeps its settings, licence and support log',
+    invoke,
+  );
+}
+
 export function discussionsCommand(): AppCommand {
   return enabled(
     'help.discussions',

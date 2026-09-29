@@ -102,6 +102,7 @@ import { startDesktopSupportLog } from './support-log.js';
 import { installSessionEndGuard, withDesktopActivityRoute } from './session-end-guard.js';
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withSupportRoutes } from './support-routes.js';
+import { withDesktopWindowCommands } from './desktop-window-commands.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -524,10 +525,12 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       // every build opens, and Pro tools unlock only in the renderer (ADR-540).
       protocol.handle(
         'app',
-        withDesktopActivityRoute(
-          withSupportRoutes(
-            licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
-            SUPPORT_LOG,
+        withDesktopWindowCommands(
+          withDesktopActivityRoute(
+            withSupportRoutes(
+              licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+              SUPPORT_LOG,
+            ),
           ),
         ),
       );

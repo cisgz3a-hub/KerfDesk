@@ -458,6 +458,19 @@ export type PlatformAdapter = {
   // restart, shutdown or sign-out waits for it (ADR-548), and how far a
   // streamed job is, for the taskbar button (ADR-553). Absent in the web app.
   readonly reportJobActivity?: (report: DesktopJobReport) => Promise<void>;
+
+  // File > Exit and Help > Open Data Folder in the desktop app (ADR-554).
+  // Absent in the web app, where the browser closes its own tab.
+  readonly desktopWindow?: DesktopWindowAdapter;
+};
+
+export type DesktopWindowAdapter = {
+  // Closes KerfDesk as its window's X does: the unsaved-changes question and
+  // the job Abort handoff run first, and Cancel keeps it open.
+  readonly exit: () => Promise<void>;
+  // Opens the folder with settings, the licence record and the support log.
+  // Rejects with a message that names the folder when it could not.
+  readonly openDataFolder: () => Promise<void>;
 };
 
 // A job or a latched Fire that ending the session would cut off, and for a

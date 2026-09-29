@@ -49,6 +49,7 @@ export type CommandId =
   | 'file.export-geojson'
   | 'file.open-gcode'
   | 'file.inspect-gcode'
+  | 'file.exit'
   | 'edit.undo'
   | 'edit.redo'
   | 'edit.select-all'
@@ -136,6 +137,7 @@ export type CommandId =
   | 'help.support-report'
   | 'help.licence'
   | 'help.check-updates'
+  | 'help.open-data-folder'
   | 'help.discussions';
 
 export type AppCommand = {
@@ -159,6 +161,9 @@ type CommandContextSlices = EditingToolsCommandContext &
 
 export type AppCommandContext = CommandContextSlices & {
   readonly licensing?: boolean;
+  // Desktop app only (ADR-554): File > Exit and Help > Open Data Folder.
+  readonly exitApp?: () => void;
+  readonly openDataFolder?: () => void;
   // ADR-101 gate-and-hide: laser-only commands are filtered out of the
   // registry's output when the project machine is CNC.
   readonly machineKind: MachineKind;

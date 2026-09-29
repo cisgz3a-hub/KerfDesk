@@ -4,4 +4,5 @@ export { createDesktopProjectFiles } from './desktop-project-files';
 export { createDesktopLicenceAdapter } from './licensing';
 export { createDesktopSupportLogReader } from './support-log';
 export { createDesktopJobActivityReporter } from './job-activity';
+export { createDesktopWindowCommands } from './desktop-window';
 export { createDesktopSerialAdapter } from './desktop-serial';

@@ -17,6 +17,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import type { CommandShellCallbacks } from './app-command-context-types';
 import type { AppCommandContext } from './command-types';
 import { selectedObjectIds } from './selection-command-state';
+import { desktopWindowCommandContext } from './desktop-window-command-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useUiStore } from '../state/ui-store';
@@ -44,6 +45,8 @@ type FileCommandContext = Pick<
   | 'exportGeoJson'
   | 'openGcodePreview'
   | 'inspectCurrentGcode'
+  | 'exitApp'
+  | 'openDataFolder'
 >;
 
 export function fileCommandContext(
@@ -120,6 +123,8 @@ export function fileCommandContext(
     ...artworkFormatExports(platform, pushToast),
     openGcodePreview: () => openGcodeInspectorAction(gcodeDeps())(),
     inspectCurrentGcode: () => inspectCurrentGcodeAction(gcodeDeps())(),
+    // Desktop app only (ADR-554): File > Exit and Help > Open Data Folder.
+    ...desktopWindowCommandContext(platform, pushToast),
   };
 }
 
