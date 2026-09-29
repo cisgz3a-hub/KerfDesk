@@ -1,0 +1,428 @@
+From 5e2dc31fe77b6739b31083e54286b24a171496f6 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 15:35:46 +0000
+Subject: [PATCH 03/14] feat(trace): carry the trace report to the preview
+ (ADR-396)
+
+No visible change on its own. The worker and the cooperative inline
+fallback now collect what a trace reported and return it with the result,
+and the ready preview keeps it. A cropped boundary keeps the report of the
+region it traced; a relaxed zero-path retry keeps the retry's report.
+
+The next commits use it to start Manual brightness band at the threshold
+the preview actually used and to show which route Line Art's automatic
+detection took.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/trace/cooperative-trace-runner.ts      |  7 +-
+ src/ui/trace/trace-report-collector.ts        | 20 ++++++
+ src/ui/trace/trace-worker-heartbeat.test.ts   | 30 ++++++++
+ src/ui/trace/trace-worker.ts                  | 14 +++-
+ src/ui/trace/use-trace-preview-report.test.ts | 53 ++++++++++++++
+ src/ui/trace/use-trace-preview-settlement.ts  |  1 +
+ src/ui/trace/use-trace-preview.ts             |  3 +
+ .../use-trace-worker-client-report.test.ts    | 70 +++++++++++++++++++
+ src/ui/trace/use-trace-worker-client.ts       |  9 ++-
+ 9 files changed, 203 insertions(+), 4 deletions(-)
+ create mode 100644 src/ui/trace/trace-report-collector.ts
+ create mode 100644 src/ui/trace/use-trace-preview-report.test.ts
+ create mode 100644 src/ui/trace/use-trace-worker-client-report.test.ts
+
+diff --git a/src/ui/trace/cooperative-trace-runner.ts b/src/ui/trace/cooperative-trace-runner.ts
+index 35f047df9..fb3b43626 100644
+--- a/src/ui/trace/cooperative-trace-runner.ts
++++ b/src/ui/trace/cooperative-trace-runner.ts
+@@ -1,10 +1,14 @@
++import type { TraceReport } from '../../core/trace';
+ import type { TraceStepRunner, TraceSteps } from '../../core/trace/trace-steps';
+ 
+ // Clock and browser task scheduling stay outside pure core. Checkpoints retain
+ // the algorithm's exact order; only its execution is split across tasks.
+ const SLICE_MS = 8;
+ 
+-export function createCooperativeTraceRunner(checkCurrent: () => void): TraceStepRunner {
++export function createCooperativeTraceRunner(
++  checkCurrent: () => void,
++  onReport: (report: TraceReport) => void = () => undefined,
++): TraceStepRunner {
+   // Count work before dispatch (including working-grid resampling) in the
+   // first slice instead of appending a fresh slice to that same browser task.
+   let deadline = performance.now() + SLICE_MS;
+@@ -21,6 +25,7 @@ export function createCooperativeTraceRunner(checkCurrent: () => void): TraceSte
+         }
+         const step = steps.next(true);
+         if (step.done) return step.value;
++        if (step.value !== undefined) onReport(step.value);
+       }
+     } finally {
+       // Close suspended generator frames on supersession or failure.
+diff --git a/src/ui/trace/trace-report-collector.ts b/src/ui/trace/trace-report-collector.ts
+new file mode 100644
+index 000000000..4c3b5126e
+--- /dev/null
++++ b/src/ui/trace/trace-report-collector.ts
+@@ -0,0 +1,20 @@
++import type { TraceReport } from '../../core/trace';
++
++/** Gathers what one trace request reported (see TraceReport). A scale plan
++ * or lane may report more than once; a later report replaces the fields it
++ * repeats. */
++export type TraceReportCollector = {
++  readonly add: (report: TraceReport) => void;
++  /** Spread into a result: empty when nothing was reported. */
++  readonly entry: () => { readonly report?: TraceReport };
++};
++
++export function collectTraceReports(): TraceReportCollector {
++  let merged: TraceReport | undefined;
++  return {
++    add: (report) => {
++      merged = { ...merged, ...report };
++    },
++    entry: () => (merged === undefined ? {} : { report: merged }),
++  };
++}
+diff --git a/src/ui/trace/trace-worker-heartbeat.test.ts b/src/ui/trace/trace-worker-heartbeat.test.ts
+index 0d6e1c51d..a36bbbef1 100644
+--- a/src/ui/trace/trace-worker-heartbeat.test.ts
++++ b/src/ui/trace/trace-worker-heartbeat.test.ts
+@@ -158,6 +158,36 @@ describe('trace worker heartbeat', () => {
+     expect(beats).toBe(Math.floor(checkpoints / checkpointsPerBeat));
+   });
+ 
++  it('sends what the trace reported with its result', async () => {
++    const posted: TraceWorkerResponse[] = [];
++    const scope: WorkerScope = {
++      onmessage: null,
++      postMessage: (response) => posted.push(response),
++    };
++    mocks.trace.mockImplementation(
++      async (_image: unknown, _options: unknown, run: (steps: TraceSteps<string[]>) => string[]) =>
++        run(
++          (function* reporting(): TraceSteps<string[]> {
++            yield;
++            yield { automaticThresholdLuma: 141 };
++            return [];
++          })(),
++        ),
++    );
++    vi.stubGlobal('self', scope);
++    vi.resetModules();
++    await import('./trace-worker');
++    scope.onmessage?.({ data: request(9) } as MessageEvent<TraceWorkerRequest>);
++    await Promise.resolve();
++    await Promise.resolve();
++
++    expect(posted.at(-1)).toMatchObject({
++      id: 9,
++      kind: 'ok',
++      report: { automaticThresholdLuma: 141 },
++    });
++  });
++
+   it('reports the failure instead of heartbeating forever when the trace throws', async () => {
+     const posted: TraceWorkerResponse[] = [];
+     const scope: WorkerScope = {
+diff --git a/src/ui/trace/trace-worker.ts b/src/ui/trace/trace-worker.ts
+index 0a5223d31..362a1913c 100644
+--- a/src/ui/trace/trace-worker.ts
++++ b/src/ui/trace/trace-worker.ts
+@@ -22,11 +22,13 @@ import type { Bounds, ColoredPath } from '../../core/scene';
+ import {
+   type RawImageData,
+   type TraceOptions,
++  type TraceReport,
+   boundsFromColoredPaths,
+   traceImageToColoredPaths,
+ } from '../../core/trace';
+ import type { TraceSteps } from '../../core/trace/trace-steps';
+ import type { TracePhase, TraceProgress } from '../../core/trace/trace-progress';
++import { collectTraceReports } from './trace-report-collector';
+ 
+ export type TraceWorkerRequest = {
+   readonly id: number;
+@@ -61,6 +63,8 @@ export type TraceWorkerResponse =
+       readonly bounds: Bounds;
+       readonly width: number;
+       readonly height: number;
++      // What automatic detection chose, for display (see TraceReport).
++      readonly report?: TraceReport;
+     }
+   | { readonly id: number; readonly kind: 'error'; readonly message: string };
+ 
+@@ -76,10 +80,11 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
+   self.postMessage(startedAck);
+   void (async (): Promise<void> => {
+     try {
++      const reports = collectTraceReports();
+       const paths = await traceImageToColoredPaths(
+         image,
+         options,
+-        heartbeatRunner(id),
++        heartbeatRunner(id, reports.add),
+         phaseReporter(id),
+       );
+       const bounds = boundsFromColoredPaths(paths);
+@@ -90,6 +95,7 @@ self.onmessage = (e: MessageEvent<TraceWorkerRequest>): void => {
+         bounds,
+         width: image.width,
+         height: image.height,
++        ...reports.entry(),
+       };
+       self.postMessage(response);
+     } catch (err) {
+@@ -123,12 +129,16 @@ function phaseReporter(id: number): TraceProgress {
+  * Nothing here awaits, so the worker's event loop stays blocked as before; a
+  * blocked worker can still post, because delivery does not need it to yield.
+  */
+-function heartbeatRunner(id: number): <T>(steps: TraceSteps<T>) => T {
++function heartbeatRunner(
++  id: number,
++  onReport: (report: TraceReport) => void,
++): <T>(steps: TraceSteps<T>) => T {
+   let due = performance.now() + HEARTBEAT_INTERVAL_MS;
+   return <T>(steps: TraceSteps<T>): T => {
+     for (;;) {
+       const step = steps.next(false);
+       if (step.done) return step.value;
++      if (step.value !== undefined) onReport(step.value);
+       const now = performance.now();
+       if (now < due) continue;
+       due = now + HEARTBEAT_INTERVAL_MS;
+diff --git a/src/ui/trace/use-trace-preview-report.test.ts b/src/ui/trace/use-trace-preview-report.test.ts
+new file mode 100644
+index 000000000..66cfe1fda
+--- /dev/null
++++ b/src/ui/trace/use-trace-preview-report.test.ts
+@@ -0,0 +1,53 @@
++// The ready preview keeps what the trace reported, so the dialog can show the
++// band automatic detection used and start Manual from it (ADR-396).
++
++import { describe, expect, it, vi } from 'vitest';
++
++vi.mock('./use-trace-worker-client', () => ({
++  traceImageWithFallback: vi.fn(),
++  isTraceRequestSuperseded: (error: unknown) =>
++    error instanceof Error && error.name === 'TraceRequestSupersededError',
++}));
++
++import type { RawImageData, TraceOptions } from '../../core/trace';
++import { traceImageWithFallback } from './use-trace-worker-client';
++import { runTrace } from './use-trace-preview';
++
++const img: RawImageData = { width: 2, height: 2, data: new Uint8ClampedArray(16) };
++const options: TraceOptions = {
++  numberOfColors: 2,
++  pathOmit: 8,
++  lineTolerance: 1,
++  quadraticTolerance: 1,
++  blurRadius: 0,
++  blurDelta: 0,
++  lineFilter: true,
++};
++const line = {
++  closed: false,
++  points: [
++    { x: 0, y: 0 },
++    { x: 1, y: 1 },
++  ],
++};
++
++describe('runTrace keeps the trace report', () => {
++  it('shows what automatic detection chose, including on a cropped region', async () => {
++    const report = { automaticThresholdLuma: 150 };
++    vi.mocked(traceImageWithFallback).mockResolvedValue({
++      paths: [{ color: '#000000', polylines: [line] }],
++      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
++      width: 2,
++      height: 2,
++      report,
++    });
++    const setState = vi.fn();
++    const boundary = { x: 1, y: 1, width: 2, height: 2 };
++
++    await runTrace({ img, options, isCurrent: () => true, setState });
++    await runTrace({ img, options, boundary, isCurrent: () => true, setState });
++
++    expect(setState).toHaveBeenNthCalledWith(1, expect.objectContaining({ kind: 'ready', report }));
++    expect(setState).toHaveBeenNthCalledWith(2, expect.objectContaining({ kind: 'ready', report }));
++  });
++});
+diff --git a/src/ui/trace/use-trace-preview-settlement.ts b/src/ui/trace/use-trace-preview-settlement.ts
+index 7a741578f..7aa7a3bc6 100644
+--- a/src/ui/trace/use-trace-preview-settlement.ts
++++ b/src/ui/trace/use-trace-preview-settlement.ts
+@@ -128,6 +128,7 @@ export function readyTracePreview(
+     height: result.height,
+     preparedTrace: { request, result },
+     ...(result.notices === undefined ? {} : { notices: result.notices }),
++    ...(result.report === undefined ? {} : { report: result.report }),
+     sourceHasTransparency: sourceHasTransparency ?? result.sourceHasTransparency,
+   };
+ }
+diff --git a/src/ui/trace/use-trace-preview.ts b/src/ui/trace/use-trace-preview.ts
+index 161670a00..cb378220d 100644
+--- a/src/ui/trace/use-trace-preview.ts
++++ b/src/ui/trace/use-trace-preview.ts
+@@ -6,6 +6,7 @@ import {
+   type RawImageData,
+   type TraceBoundary,
+   type TraceOptions,
++  type TraceReport,
+   coloredPathsToSvg,
+ } from '../../core/trace';
+ import type { PreparedTrace, TracePreparationRequest } from './prepared-trace';
+@@ -42,6 +43,7 @@ export type TracePreviewState =
+       readonly paths: ReadonlyArray<ColoredPath>;
+       readonly preparedTrace?: PreparedTrace;
+       readonly notices?: ReadonlyArray<TraceNotice>;
++      readonly report?: TraceReport;
+       readonly sourceHasTransparency?: boolean | undefined;
+     }
+   | { readonly kind: 'error'; readonly message: string };
+@@ -153,6 +155,7 @@ export function runTrace(args: {
+         height,
+         paths,
+         ...(result.notices === undefined ? {} : { notices: result.notices }),
++        ...(result.report === undefined ? {} : { report: result.report }),
+         ...(args.request === undefined ? {} : { preparedTrace: { request: args.request, result } }),
+         sourceHasTransparency: args.sourceHasTransparency,
+       });
+diff --git a/src/ui/trace/use-trace-worker-client-report.test.ts b/src/ui/trace/use-trace-worker-client-report.test.ts
+new file mode 100644
+index 000000000..2f39e73b4
+--- /dev/null
++++ b/src/ui/trace/use-trace-worker-client-report.test.ts
+@@ -0,0 +1,70 @@
++// The automatic threshold a trace chose travels with its result on both
++// routes: from the worker's 'ok' message and from the cooperative inline
++// fallback. The dialog seeds Manual brightness band from it.
++
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import { TRACE_PRESETS, otsuThreshold, type RawImageData } from '../../core/trace';
++import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
++
++afterEach(() => {
++  vi.unstubAllGlobals();
++});
++
++describe('trace results carry the trace report', () => {
++  it('keeps the report a worker sent', async () => {
++    vi.resetModules();
++    class ReportingWorker {
++      onmessage: ((e: MessageEvent<TraceWorkerResponse>) => void) | null = null;
++      onerror: (() => void) | null = null;
++
++      postMessage(request: TraceWorkerRequest): void {
++        const response: TraceWorkerResponse = {
++          id: request.id,
++          kind: 'ok',
++          paths: [],
++          bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
++          width: request.image.width,
++          height: request.image.height,
++          report: { automaticThresholdLuma: 97 },
++        };
++        queueMicrotask(() => {
++          this.onmessage?.({ data: response } as MessageEvent<TraceWorkerResponse>);
++        });
++      }
++
++      terminate(): void {
++        /* healthy worker is reused */
++      }
++    }
++    vi.stubGlobal('Worker', ReportingWorker);
++    const client = await import('./use-trace-worker-client');
++
++    const result = await client.traceImage(barsImage(), TRACE_PRESETS['Sharp']!);
++
++    expect(result.report).toEqual({ automaticThresholdLuma: 97 });
++  });
++
++  it('collects the report on the inline fallback', async () => {
++    vi.resetModules();
++    const client = await import('./use-trace-worker-client');
++    const image = barsImage();
++
++    const result = await client.traceImage(image, TRACE_PRESETS['Sharp']!);
++
++    expect(result.paths.length).toBeGreaterThan(0);
++    expect(result.report).toEqual({ automaticThresholdLuma: otsuThreshold(image) });
++  });
++});
++
++// Mid-grey bars on light paper: Otsu settles well away from the 128 default.
++function barsImage(): RawImageData {
++  const width = 48;
++  const height = 32;
++  const data = new Uint8ClampedArray(width * height * 4);
++  for (let pixel = 0; pixel < width * height; pixel += 1) {
++    const x = pixel % width;
++    const grey = x % 12 < 5 ? 120 : 240;
++    data.set([grey, grey, grey, 255], pixel * 4);
++  }
++  return { width, height, data };
++}
+diff --git a/src/ui/trace/use-trace-worker-client.ts b/src/ui/trace/use-trace-worker-client.ts
+index a9497e9ab..3363a7139 100644
+--- a/src/ui/trace/use-trace-worker-client.ts
++++ b/src/ui/trace/use-trace-worker-client.ts
+@@ -28,12 +28,14 @@ import type { Bounds, ColoredPath } from '../../core/scene';
+ import {
+   type RawImageData,
+   type TraceOptions,
++  type TraceReport,
+   boundsFromColoredPaths,
+   traceImageToColoredPaths,
+ } from '../../core/trace';
+ import { hasAggressivePreprocessing, relaxAggressivePreprocessing } from './trace-options';
+ import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
+ import { createCooperativeTraceRunner } from './cooperative-trace-runner';
++import { collectTraceReports } from './trace-report-collector';
+ import type { TraceNotice } from './trace-notices';
+ import type { TraceProgress } from '../../core/trace/trace-progress';
+ 
+@@ -49,6 +51,8 @@ export type TraceResult = {
+   readonly notices?: ReadonlyArray<TraceNotice>;
+   // Submit's fallback decoder can recover source metadata before any crop.
+   readonly sourceHasTransparency?: boolean;
++  // What automatic detection chose, for display only; never a trace input.
++  readonly report?: TraceReport;
+ };
+ 
+ export class TraceRequestSupersededError extends Error {
+@@ -154,6 +158,7 @@ function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse
+       bounds: e.data.bounds,
+       width: e.data.width,
+       height: e.data.height,
++      ...(e.data.report === undefined ? {} : { report: e.data.report }),
+     });
+     return;
+   }
+@@ -310,10 +315,11 @@ async function traceInline(
+   epoch: number,
+   progress?: TraceProgress,
+ ): Promise<TraceResult> {
++  const reports = collectTraceReports();
+   const paths = await traceImageToColoredPaths(
+     image,
+     options,
+-    createCooperativeTraceRunner(() => checkTraceEpoch(epoch)),
++    createCooperativeTraceRunner(() => checkTraceEpoch(epoch), reports.add),
+     progress,
+   );
+   checkTraceEpoch(epoch);
+@@ -322,6 +328,7 @@ async function traceInline(
+     bounds: boundsFromColoredPaths(paths),
+     width: image.width,
+     height: image.height,
++    ...reports.entry(),
+   };
+ }
+ 
+-- 
+2.43.0
+

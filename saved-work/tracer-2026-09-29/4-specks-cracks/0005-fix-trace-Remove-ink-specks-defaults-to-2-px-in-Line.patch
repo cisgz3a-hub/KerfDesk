@@ -1,0 +1,95 @@
+From 0ec8c000be513a801eee6f0d4b3fe2d2a3c4495b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:21:31 +0000
+Subject: [PATCH 5/8] =?UTF-8?q?fix(trace):=20Remove=20ink=20specks=20defau?=
+ =?UTF-8?q?lts=20to=202=20px=C2=B2=20in=20Line=20Art=20and=20Smooth=20(ADR?=
+ =?UTF-8?q?-392)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Operator change: Line Art (was 12) and Smooth (was 24) now remove lone
+1-px ink specks only, as potrace's default speck size of 2 does. Small
+text keeps the dot on its i, and Smooth keeps whole letters in 16 px text.
+Sharp, Centerline and Edge Detection keep their values, and the control
+still takes larger values for art that needs more cleanup.
+
+Measured against 85ee406 with the whole package applied: Line Art and
+Smooth trace 25 of 25 shapes on the audit's sans 32 px, serif 32 px,
+noisy 32 px and sans 16 px text (were 24, and Smooth 22 on 16 px text);
+IoU rises in all eight, and the noisy text gains no specks. On the dragon
+the default adds 657 Line Art and 443 Smooth outlines on top of the
+connectivity and crack changes (3,468 and 3,691 in total, from 1,804 and
+1,713); the added marks are darker than the cut. On the Arch House logo
+Line Art gains five pale spots (1 to 19 px², darkest pixels luma 115 to
+234) that the local-contrast detail pass finds in light shading; speck
+removal at 12 used to hide them.
+
+Updated expectation, the intended fix: the Centerline connectivity test
+now expects Line Art to keep both diagonals (23 ink pixels) and drop only
+the lone speck. TraceSettingsControls.semantic.test.tsx's speck test
+assumed the old default; the next commit adapts it.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../trace/centerline/centerline-preset-scale.test.ts |  4 ++--
+ src/core/trace/trace-presets.ts                      | 12 +++++++-----
+ 2 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/src/core/trace/centerline/centerline-preset-scale.test.ts b/src/core/trace/centerline/centerline-preset-scale.test.ts
+index 727aa5c6d..6b8b8ff2b 100644
+--- a/src/core/trace/centerline/centerline-preset-scale.test.ts
++++ b/src/core/trace/centerline/centerline-preset-scale.test.ts
+@@ -87,9 +87,9 @@ describe('Centerline preset connectivity', () => {
+ 
+     // The 12-pixel diagonal meets Centerline's area threshold; the 11-pixel
+     // diagonal and lone speck remain noise. Line Art counts the same
+-    // corner-touching marks (ADR-392), so its 12 px² setting agrees.
++    // corner-touching marks (ADR-392) and, at 2 px², drops only the speck.
+     expect(lowerInkPixels(preprocessForTrace(image, CENTERLINE))).toBe(12);
+-    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(12);
++    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(23);
+   });
+ });
+ 
+diff --git a/src/core/trace/trace-presets.ts b/src/core/trace/trace-presets.ts
+index a0ec515ba..250e4e301 100644
+--- a/src/core/trace/trace-presets.ts
++++ b/src/core/trace/trace-presets.ts
+@@ -21,9 +21,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     //     brightness band, inclusive 0..128.
+     //   * fixedPalette [white, black] — guarantees a 2-layer output
+     //     even if the input has stray non-monochrome pixels.
+-    //   * despeckleMinPixels 12 — removes connected ink blobs under
+-    //     12 pixels. Kills JPEG dot artefacts that survived the
+-    //     threshold.
++    //   * despeckleMinPixels 2 — removes lone 1-px ink specks only; 2 is
++    //     also the default speck size in potrace and Inkscape. At 12 it
++    //     deleted the dot of an i in text up to about 34 px tall (ADR-392).
+     //   * pathOmit 16 — second-line defence: drops short paths the
+     //     tracer might still emit at edges.
+     numberOfColors: 2,
+@@ -40,7 +40,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     ignoreLessThanPixels: 2,
+     smoothness: 1,
+     optimize: 0.2,
+-    despeckleMinPixels: 12,
++    despeckleMinPixels: 2,
+     // Fill hairline threshold cracks enclosed in solid ink (letter-stem
+     // slivers) so they don't trace as spurious inner contours. Slivers of
+     // bright paper, such as drawn white lines, stay open (ADR-392).
+@@ -153,7 +153,9 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     fixedPalette: ['#ffffff', '#000000'],
+     medianFilter: 'auto',
+     useOtsuThreshold: true,
+-    despeckleMinPixels: 24,
++    // Lone 1-px specks only; at 24 it deleted the whole letter i in 16 px
++    // text (ADR-392).
++    despeckleMinPixels: 2,
+     // Same hairline-crack cleanup as Line Art; Sharp deliberately omits it
+     // (pixel-fidelity preset — every notch matters, even a crack).
+     fillPinholeCracks: true,
+-- 
+2.43.0
+

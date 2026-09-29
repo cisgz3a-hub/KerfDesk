@@ -1,0 +1,813 @@
+From dc76c40e4c03677b07fef1044cbc767f659d91b0 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:44:56 +0000
+Subject: [PATCH 2/4] fix(trace): even-width Centerline strokes trace on their
+ centre (ADR-394)
+
+A stroke an even number of pixels wide has its centre between two pixel
+centres, and the skeleton keeps whole pixels, so Centerline traced such
+strokes half a pixel to one side. Each traced point on a pixel centre now
+moves to the ridge of the distance field, read one pixel to either side
+across the stroke, by at most half a pixel. Junctions stay where they are.
+
+Two changes come with it, because centring exposed them:
+- The tip walk that runs a stroke out to the end of its ink read the
+  ridge from the nearest pixel, which turned the walk 22.5 degrees off a
+  round cap's axis. It now reads between pixel centres. Without this,
+  centring pushed the regression bar's 9 px arc to 1.25 px, over its
+  1 px limit.
+- After rebuilding a corner, the sharpener could build a second one
+  beside it from the next point's window. Centred legs pass the gates more
+  often, and on a 12 px stroke's 45 degree corners the second corner stood
+  1.5-1.8 px off the pen's path. Centreline strokes now skip a candidate
+  whose window or tangent chords take in a corner already rebuilt. The
+  contour tracer does not ask for this rule, so outlines are unchanged.
+
+Measured against the previous commit with the audit's centreline bench:
+- 21-stroke corpus: mean distance from the true centre 0.250 -> 0.102 px,
+  mean 95th percentile 0.39 -> 0.20 px; coverage stays 100% and fragment
+  counts are unchanged. Every stroke holds or improves its mean except the
+  4 px X (0.093 -> 0.186 px): one tip ends 0.71 px off its axis instead of
+  1.28 px, and the output spline shared with the contour tracer bows the
+  248 px chord next to it by up to its 0.45 px cap.
+- The 8 px corner and tee: largest deviation 4.03 -> 4.00 px, exactly the
+  half stroke width the traced line runs past the true centreline's end.
+- In-repo regression bar: largest deviation 0.69 -> 0.19 px for h-stroke,
+  l-corner and cross; the arc 0.79 -> 0.10 px.
+- 290 synthetic bends: mean local error 0.85 -> 0.57 px. 209 improve by
+  more than 0.1 px and 28 get worse, by at most 0.79 px, 21 of them at
+  3-6 px widths. The one-corner rule alone changes five bends, all for
+  the better (the 12 px 45 degree corners to 0.6-0.7 px).
+- Contour presets: identical output, timing aside, on the 48 audit corpus
+  traces and the 8 traces of the dragon and logo.
+- Dragon: 2,518 -> 2,522 paths, 67,610 -> 65,986 vertices; share of traced
+  length on ink 0.822 -> 0.835. Logo: 74 paths, 2,588 -> 2,665 vertices;
+  traced radius relative to the local ridge 0.909 -> 0.917. On the two
+  images the one-corner rule leaves out 36 of 752 rebuilt corners.
+  Centring costs about 68 ms on the dragon's 98,000 chain points.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/centerline/bend-geometry.ts    |  25 ++-
+ .../centerline/corner-rebuilt-once.test.ts    | 101 ++++++++++
+ .../trace/centerline/ridge-centering.test.ts  | 126 +++++++++++++
+ src/core/trace/centerline/ridge-centering.ts  | 172 ++++++++++++++++++
+ src/core/trace/centerline/sharpen-bends.ts    |  81 +++++++--
+ src/core/trace/centerline/stroke-chains.ts    |  13 +-
+ .../trace/centerline/tip-extension.test.ts    |  19 ++
+ src/core/trace/centerline/trace-centerline.ts |   4 +-
+ 8 files changed, 521 insertions(+), 20 deletions(-)
+ create mode 100644 src/core/trace/centerline/corner-rebuilt-once.test.ts
+ create mode 100644 src/core/trace/centerline/ridge-centering.test.ts
+ create mode 100644 src/core/trace/centerline/ridge-centering.ts
+
+diff --git a/src/core/trace/centerline/bend-geometry.ts b/src/core/trace/centerline/bend-geometry.ts
+index c64e72d8a..00b150ce5 100644
+--- a/src/core/trace/centerline/bend-geometry.ts
++++ b/src/core/trace/centerline/bend-geometry.ts
+@@ -359,6 +359,29 @@ function chordAnchorIn(
+   high: number,
+ ): Vec2 | undefined {
+   if (high - low < 1) return undefined;
++  return points[chordAnchorIndex(points, startIdx, step, low, high)];
++}
++
++/** Index range of every point `bendVertexAt` reads for the window
++ *  `headEnd`..`tailStart`: both tangent chords and the points between. */
++export function bendVertexSpan(
++  points: ReadonlyArray<Vec2>,
++  headEnd: number,
++  tailStart: number,
++): { readonly from: number; readonly to: number } {
++  return {
++    from: chordAnchorIndex(points, headEnd - 1, -1, 0, headEnd - 1),
++    to: chordAnchorIndex(points, tailStart, 1, tailStart, points.length - 1),
++  };
++}
++
++function chordAnchorIndex(
++  points: ReadonlyArray<Vec2>,
++  startIdx: number,
++  step: -1 | 1,
++  low: number,
++  high: number,
++): number {
+   let cum = 0;
+   let idx = startIdx;
+   while (idx + step >= low && idx + step <= high && cum < TANGENT_CHORD_PX) {
+@@ -368,7 +391,7 @@ function chordAnchorIn(
+     cum += Math.hypot(b.x - a.x, b.y - a.y);
+     idx += step;
+   }
+-  return points[idx];
++  return idx;
+ }
+ 
+ function unit(x: number, y: number): Vec2 | null {
+diff --git a/src/core/trace/centerline/corner-rebuilt-once.test.ts b/src/core/trace/centerline/corner-rebuilt-once.test.ts
+new file mode 100644
+index 000000000..805188442
+--- /dev/null
++++ b/src/core/trace/centerline/corner-rebuilt-once.test.ts
+@@ -0,0 +1,101 @@
++// A drawn corner in a centreline stroke is rebuilt once. After the rebuild,
++// the next candidate along the chain sees the new corner inside its own
++// window and used to build a second one from a tangent read further down the
++// other leg (ADR-394).
++
++import { describe, expect, it } from 'vitest';
++import type { Polyline, Vec2 } from '../../scene';
++import type { RawImageData, TraceOptions } from '../trace-image';
++import { traceCenterlineStrokePaths } from './trace-centerline';
++
++const SIZE = 180;
++const RADIUS = 6; // a 12 px stroke
++const VERTEX: Vec2 = { x: 110, y: 90 };
++// The pen turns 45° at the vertex; neither leg runs along the pixel grid.
++const PEN_PATH: ReadonlyArray<Vec2> = [
++  { x: 165.2303, y: 113.4439 },
++  VERTEX,
++  { x: 87.5236, y: 34.369 },
++];
++
++const CENTERLINE_OPTIONS: TraceOptions = {
++  traceMode: 'centerline',
++  numberOfColors: 2,
++  pathOmit: 0,
++  lineTolerance: 1,
++  quadraticTolerance: 1,
++  blurRadius: 0,
++  blurDelta: 0,
++  lineFilter: true,
++  fixedPalette: ['#ffffff', '#000000'],
++  useOtsuThreshold: true,
++  despeckleMinPixels: 4,
++  centerlineJoinGapPx: 3,
++};
++
++function distanceToPath(p: Vec2, path: ReadonlyArray<Vec2>): number {
++  let best = Infinity;
++  for (let k = 1; k < path.length; k += 1) {
++    const a = path[k - 1]!;
++    const b = path[k]!;
++    const dx = b.x - a.x;
++    const dy = b.y - a.y;
++    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
++    best = Math.min(best, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
++  }
++  return best;
++}
++
++// Share of a pixel a round nib of RADIUS along the pen path covers, from a
++// 16 x 16 grid of samples where the edge crosses it.
++function coverage(x: number, y: number): number {
++  const centre = distanceToPath({ x: x + 0.5, y: y + 0.5 }, PEN_PATH);
++  if (centre <= RADIUS - 0.75) return 1;
++  if (centre >= RADIUS + 0.75) return 0;
++  let inside = 0;
++  for (let sy = 0; sy < 16; sy += 1) {
++    for (let sx = 0; sx < 16; sx += 1) {
++      const p = { x: x + (sx + 0.5) / 16, y: y + (sy + 0.5) / 16 };
++      if (distanceToPath(p, PEN_PATH) <= RADIUS) inside += 1;
++    }
++  }
++  return inside / 256;
++}
++
++// The stroke drawn anti-aliased, black on white.
++function strokeImage(): RawImageData {
++  const data = new Uint8ClampedArray(SIZE * SIZE * 4).fill(255);
++  for (let y = 0; y < SIZE; y += 1) {
++    for (let x = 0; x < SIZE; x += 1) {
++      const i = y * SIZE + x;
++      data.fill(Math.round(255 * (1 - coverage(x, y))), i * 4, i * 4 + 3);
++    }
++  }
++  return { width: SIZE, height: SIZE, data };
++}
++
++// Worst distance from the traced line to the pen path around the bend.
++function bendError(polyline: Polyline): number {
++  let worst = 0;
++  for (let k = 1; k < polyline.points.length; k += 1) {
++    const a = polyline.points[k - 1]!;
++    const b = polyline.points[k]!;
++    for (let s = 0; s <= 10; s += 1) {
++      const p = { x: a.x + ((b.x - a.x) * s) / 10, y: a.y + ((b.y - a.y) * s) / 10 };
++      if (Math.hypot(p.x - VERTEX.x, p.y - VERTEX.y) > 20) continue;
++      worst = Math.max(worst, distanceToPath(p, PEN_PATH));
++    }
++  }
++  return worst;
++}
++
++describe('centreline corner rebuild', () => {
++  it('rebuilds a 45° corner of a thick stroke once, on the pen path', () => {
++    const traced = traceCenterlineStrokePaths(strokeImage(), CENTERLINE_OPTIONS).flatMap(
++      (path) => path.polylines,
++    );
++    expect(traced).toHaveLength(1);
++    // The second corner stood 3 px past the first and 1.46 px off the path.
++    expect(bendError(traced[0]!)).toBeLessThan(1);
++  });
++});
+diff --git a/src/core/trace/centerline/ridge-centering.test.ts b/src/core/trace/centerline/ridge-centering.test.ts
+new file mode 100644
+index 000000000..96c7ea7fd
+--- /dev/null
++++ b/src/core/trace/centerline/ridge-centering.test.ts
+@@ -0,0 +1,126 @@
++// Sub-pixel ridge centring (ADR-394): an even-width stroke's skeleton runs
++// half a pixel to one side of the two-pixel ridge; centring moves it onto
++// the true centre without touching junctions.
++
++import { describe, expect, it } from 'vitest';
++import type { Vec2 } from '../../scene';
++import type { RawImageData, TraceOptions } from '../trace-image';
++import { squaredDistanceField, type InkMask } from './distance-field';
++import { centerGraphOnRidge, peakOffset } from './ridge-centering';
++import type { StrokeGraph, StrokeNodeKind } from './stroke-graph';
++import { traceCenterlineStrokePaths } from './trace-centerline';
++
++const WIDTH = 60;
++const HEIGHT = 16;
++const BAR_TOP = 4;
++
++// A horizontal bar `thickness` pixels tall from row BAR_TOP.
++function barMask(thickness: number): InkMask {
++  const ink = new Uint8Array(WIDTH * HEIGHT);
++  for (let y = BAR_TOP; y < BAR_TOP + thickness; y += 1) {
++    for (let x = 5; x < 55; x += 1) ink[y * WIDTH + x] = 1;
++  }
++  return { width: WIDTH, height: HEIGHT, ink };
++}
++
++// A skeleton chain along one pixel row, as thinning leaves it.
++function rowGraph(row: number, ends: readonly [StrokeNodeKind, StrokeNodeKind]): StrokeGraph {
++  const points: Vec2[] = [];
++  for (let x = 10; x < 50; x += 1) points.push({ x: x + 0.5, y: row + 0.5 });
++  return {
++    nodes: [
++      { id: 0, pos: points[0]!, kind: ends[0], pixels: [] },
++      { id: 1, pos: points.at(-1)!, kind: ends[1], pixels: [] },
++    ],
++    chains: [{ a: 0, b: 1, points, closed: false }],
++  };
++}
++
++describe('peakOffset', () => {
++  it('puts the peak of a two-pixel plateau midway between its pixels', () => {
++    expect(peakOffset(1, 2, 2)).toBe(0.5);
++    expect(peakOffset(2, 2, 1)).toBe(-0.5);
++  });
++
++  it('keeps the centre pixel of an odd-width stroke', () => {
++    expect(peakOffset(1, 2, 1)).toBe(0);
++  });
++
++  it('meets two equal slopes between pixel centres', () => {
++    expect(peakOffset(1.2, 2, 1.6)).toBeCloseTo(0.25, 12);
++  });
++
++  it('refuses a point that is not a ridge maximum', () => {
++    expect(peakOffset(3, 2, 1)).toBeNull();
++    expect(peakOffset(2, 2, 2)).toBeNull();
++  });
++});
++
++describe('centerGraphOnRidge', () => {
++  it('moves an even-width stroke onto its true centre, tips included', () => {
++    // Rows 4-7 are ink, so the centre is y = 6; thinning keeps row 5 (y 5.5).
++    const distSq = squaredDistanceField(barMask(4));
++    const graph = rowGraph(BAR_TOP + 1, ['endpoint', 'endpoint']);
++    const centred = centerGraphOnRidge(graph, distSq, WIDTH);
++    const points = centred.chains[0]!.points;
++    expect(points.map((p) => p.y)).toEqual(points.map(() => 6));
++    expect(points.map((p) => p.x)).toEqual(graph.chains[0]!.points.map((p) => p.x));
++    expect(centred.nodes[0]!.pos).toEqual(points[0]);
++    expect(centred.nodes[1]!.pos).toEqual(points.at(-1));
++  });
++
++  it('leaves an odd-width stroke that is already centred untouched', () => {
++    const distSq = squaredDistanceField(barMask(5));
++    const graph = rowGraph(BAR_TOP + 2, ['endpoint', 'endpoint']);
++    expect(centerGraphOnRidge(graph, distSq, WIDTH)).toBe(graph);
++  });
++
++  it('never moves a junction or a former junction', () => {
++    const distSq = squaredDistanceField(barMask(4));
++    const graph = rowGraph(BAR_TOP + 1, ['endpoint', 'junction']);
++    const seam = graph.chains[0]!.points[20]!;
++    const centred = centerGraphOnRidge({ ...graph, seamJunctions: [seam] }, distSq, WIDTH);
++    const points = centred.chains[0]!.points;
++    expect(points.at(-1)).toBe(graph.chains[0]!.points.at(-1));
++    expect(centred.nodes[1]).toBe(graph.nodes[1]);
++    expect(points[20]).toBe(seam);
++    expect(points[10]!.y).toBe(6);
++  });
++});
++
++describe('even-width strokes trace on their centre', () => {
++  it('traces a 4 px ring on its centre circle, not half a pixel to one side', () => {
++    // Ink wherever a pixel centre lies within 2 px of a circle of radius 20:
++    // four pixels across everywhere, so thinning leaves a two-pixel ridge.
++    const size = 80;
++    const centre = { x: 40, y: 40 };
++    const data = new Uint8ClampedArray(size * size * 4).fill(255);
++    for (let y = 0; y < size; y += 1) {
++      for (let x = 0; x < size; x += 1) {
++        const r = Math.hypot(x + 0.5 - centre.x, y + 0.5 - centre.y);
++        if (Math.abs(r - 20) <= 2) data.fill(0, (y * size + x) * 4, (y * size + x) * 4 + 3);
++      }
++    }
++    const image: RawImageData = { width: size, height: size, data };
++    const options: TraceOptions = {
++      traceMode: 'centerline',
++      numberOfColors: 2,
++      pathOmit: 0,
++      lineTolerance: 1,
++      quadraticTolerance: 1,
++      blurRadius: 0,
++      blurDelta: 0,
++      lineFilter: true,
++      fixedPalette: ['#ffffff', '#000000'],
++      useOtsuThreshold: true,
++      despeckleMinPixels: 4,
++      centerlineJoinGapPx: 3,
++    };
++    const polylines = traceCenterlineStrokePaths(image, options).flatMap((p) => p.polylines);
++    expect(polylines).toHaveLength(1);
++    // Measured: worst 0.13 px, mean 0.06 px (worst 0.57, mean 0.26 before).
++    const errors = polylines[0]!.points.map((p) => Math.abs(Math.hypot(p.x - 40, p.y - 40) - 20));
++    expect(Math.max(...errors)).toBeLessThan(0.2);
++    expect(errors.reduce((sum, e) => sum + e, 0) / errors.length).toBeLessThan(0.1);
++  });
++});
+diff --git a/src/core/trace/centerline/ridge-centering.ts b/src/core/trace/centerline/ridge-centering.ts
+new file mode 100644
+index 000000000..fd9a089ca
+--- /dev/null
++++ b/src/core/trace/centerline/ridge-centering.ts
+@@ -0,0 +1,172 @@
++// Sub-pixel ridge centring for the raw skeleton. Thinning keeps whole
++// pixels, so a stroke whose width is an even number of pixels leaves a
++// two-pixel ridge plateau and its skeleton runs along one side of it, half a
++// pixel off the true centre (any thinning that keeps whole pixels does).
++// The distance field still knows where the centre is: across the stroke it
++// rises to the ridge and falls again, so the peak interpolated through the
++// skeleton pixel and the field one pixel to either side of it lands on the
++// centre — midway between the plateau's pixels for an even width, on the
++// pixel itself for an odd one. The same interpolation takes the pixel
++// staircase out of diagonal and curved strokes.
++//
++// Only positions move, and never a junction's: pairing, seam repair and the
++// attachment pins find junctions by position, so every decision keyed on
++// them is unchanged.
++
++import type { Vec2 } from '../../scene';
++import { interpolatedRadius } from './distance-field';
++import type { StrokeChain, StrokeGraph, StrokeNode } from './stroke-graph';
++
++// Chain points on each side used for the local stroke direction. One pixel
++// step only knows eight directions; two average a staircase into a usable
++// normal without reaching around a bend.
++const TANGENT_REACH_POINTS = 2;
++// A skeleton pixel that is the ridge maximum has its interpolated peak within
++// half a pixel by construction; the clamp only guards rounding.
++const MAX_SHIFT_PX = 0.5;
++const NEAR_ZERO = 1e-9;
++
++type Field = {
++  readonly distSq: Float64Array;
++  readonly width: number;
++};
++
++type Context = {
++  readonly field: Field;
++  readonly nodes: ReadonlyArray<StrokeNode>;
++  /** Junction and former-junction positions, which must not move. */
++  readonly fixed: ReadonlySet<string>;
++  readonly movedTips: Map<number, Vec2>;
++};
++
++/**
++ * Move every skeleton pixel of the graph onto the distance field's sub-pixel
++ * ridge, measured across the local stroke direction. Stroke tips (endpoint
++ * nodes) move with their chain; junctions stay exactly where they are.
++ */
++export function centerGraphOnRidge(
++  graph: StrokeGraph,
++  distSq: Float64Array,
++  width: number,
++): StrokeGraph {
++  if (width <= 0) return graph;
++  const fixedPositions = [
++    ...graph.nodes.filter((node) => node.kind === 'junction').map((node) => node.pos),
++    ...(graph.seamJunctions ?? []),
++  ];
++  const context: Context = {
++    field: { distSq, width },
++    nodes: graph.nodes,
++    fixed: new Set(fixedPositions.map(positionKey)),
++    movedTips: new Map(),
++  };
++  const chains = graph.chains.map((chain) => centerChain(chain, context));
++  if (chains.every((chain, i) => chain === graph.chains[i])) return graph;
++  const nodes = graph.nodes.map((node) => {
++    const pos = context.movedTips.get(node.id);
++    return pos === undefined ? node : { ...node, pos };
++  });
++  return { ...graph, nodes, chains };
++}
++
++function centerChain(chain: StrokeChain, context: Context): StrokeChain {
++  const points = chain.points;
++  const n = points.length;
++  if (n < 2) return chain;
++  const out = points.map((p, i) => {
++    if (context.fixed.has(positionKey(p))) return p;
++    const end = chain.closed ? null : endNode(chain, i, n);
++    if (end !== null && !isOwnTip(chain, end, context.nodes)) return p;
++    return ridgePoint(points, i, chain.closed, context.field) ?? p;
++  });
++  if (out.every((p, i) => p === points[i])) return chain;
++  if (!chain.closed) {
++    recordTip(chain.a, points[0], out[0], context.movedTips);
++    recordTip(chain.b, points[n - 1], out[n - 1], context.movedTips);
++  }
++  return { ...chain, points: out };
++}
++
++function endNode(chain: StrokeChain, i: number, n: number): number | null {
++  if (i === 0) return chain.a;
++  return i === n - 1 ? chain.b : null;
++}
++
++// A chain end moves only when it is a stroke tip of this chain alone; a chain
++// whose ends share one node (a dead-end stub) keeps that node in place.
++function isOwnTip(chain: StrokeChain, nodeId: number, nodes: ReadonlyArray<StrokeNode>): boolean {
++  return chain.a !== chain.b && nodes[nodeId]?.kind === 'endpoint';
++}
++
++function recordTip(
++  nodeId: number,
++  before: Vec2 | undefined,
++  after: Vec2 | undefined,
++  movedTips: Map<number, Vec2>,
++): void {
++  if (before !== undefined && after !== undefined && after !== before) movedTips.set(nodeId, after);
++}
++
++// The ridge position through one skeleton pixel, or null when the point is
++// not a pixel centre (a junction anchor) or the field shows no ridge there.
++// The field is read exactly across the stroke: sampling along a pixel axis
++// instead mixes in the fall-off ALONG the stroke wherever it is not constant,
++// and near a tip or a junction that dragged the point sideways by up to half
++// a pixel (measured on the 45° cross fixture).
++function ridgePoint(
++  points: ReadonlyArray<Vec2>,
++  i: number,
++  closed: boolean,
++  field: Field,
++): Vec2 | null {
++  const p = points[i];
++  if (p === undefined) return null;
++  if (!Number.isInteger(p.x - 0.5) || !Number.isInteger(p.y - 0.5)) return null;
++  const normal = localNormal(points, i, closed);
++  if (normal === null) return null;
++  const shift = peakOffset(
++    radiusAtPoint(field, p.x - normal.x, p.y - normal.y),
++    radiusAtPoint(field, p.x, p.y),
++    radiusAtPoint(field, p.x + normal.x, p.y + normal.y),
++  );
++  if (shift === null || shift === 0) return null;
++  return { x: p.x + shift * normal.x, y: p.y + shift * normal.y };
++}
++
++/** Sub-pixel offset of the peak through three samples one pixel apart, in
++ *  [-0.5, 0.5], or null when the middle sample is not a ridge maximum. The
++ *  distance to the stroke edge falls off linearly on both sides of the
++ *  centre, so the peak is where two lines of equal and opposite slope meet:
++ *  exact for a straight edge, and exactly ±0.5 on the two-pixel plateau of
++ *  an even-width stroke. (A parabola through the same samples is exact only
++ *  at those two cases and measured slightly worse on the corpus.) */
++export function peakOffset(before: number, at: number, after: number): number | null {
++  if (at < before || at < after) return null;
++  const drop = at - Math.min(before, after);
++  if (drop < NEAR_ZERO) return null;
++  const offset = (after - before) / (2 * drop);
++  return Math.max(-MAX_SHIFT_PX, Math.min(MAX_SHIFT_PX, offset));
++}
++
++function localNormal(points: ReadonlyArray<Vec2>, i: number, closed: boolean): Vec2 | null {
++  const n = points.length;
++  const back = closed ? (i - TANGENT_REACH_POINTS + n) % n : Math.max(0, i - TANGENT_REACH_POINTS);
++  const ahead = closed ? (i + TANGENT_REACH_POINTS) % n : Math.min(n - 1, i + TANGENT_REACH_POINTS);
++  const a = points[back];
++  const b = points[ahead];
++  if (a === undefined || b === undefined) return null;
++  const tx = b.x - a.x;
++  const ty = b.y - a.y;
++  const length = Math.hypot(tx, ty);
++  if (length < NEAR_ZERO) return null;
++  return { x: -ty / length, y: tx / length };
++}
++
++// Exact at pixel centres, so an axis-aligned normal reads the field itself.
++function radiusAtPoint(field: Field, x: number, y: number): number {
++  return interpolatedRadius(field.distSq, field.width, x, y);
++}
++
++function positionKey(p: Vec2): string {
++  return `${p.x},${p.y}`;
++}
+diff --git a/src/core/trace/centerline/sharpen-bends.ts b/src/core/trace/centerline/sharpen-bends.ts
+index 3dbbef615..58ed4c718 100644
+--- a/src/core/trace/centerline/sharpen-bends.ts
++++ b/src/core/trace/centerline/sharpen-bends.ts
+@@ -7,7 +7,8 @@
+ // arc's tangent intersection stands far off), replace the bend window with
+ // the intersection vertex. Deliberate fillets (roundings ≳ 2 stroke radii)
+ // keep their distance and stay round; centreline strokes also keep tighter
+-// roundings round unless the ink shows a drawn corner (round-bend-guard.ts).
++// roundings round unless the ink shows a drawn corner (round-bend-guard.ts),
++// and never build a second corner out of one already rebuilt.
+ //
+ // This file is the ORCHESTRATION (the scan, the per-candidate attempt, the
+ // closed-ring rotation); the pure geometric predicates it calls live in
+@@ -21,6 +22,7 @@ import {
+   apexSupportedByInk,
+   arcLengthOf,
+   bendVertexAt,
++  bendVertexSpan,
+   bendWindow,
+   legIsStraight,
+   netTurnAcross,
+@@ -56,8 +58,26 @@ export type SharpenOptions = {
+    *  thick stroke keeps its curve. Outline chains have no stroke width to
+    *  read and leave this off. */
+   readonly keepRoundedBends?: boolean;
++  /** Centreline strokes: build no corner from points that take in a corner
++   *  already rebuilt on the chain (see `readsRebuiltCorner`). Outline chains
++   *  leave this off and keep only the distance rule above. */
++  readonly oneCornerPerBend?: boolean;
+ };
+ 
++// The centreline-only rules in force for one chain. `rebuilt` is the live set
++// of corners rebuilt so far, present only under `oneCornerPerBend`.
++type StrokeRules = {
++  readonly keepRounded: boolean;
++  readonly rebuilt: ReadonlySet<Vec2> | undefined;
++};
++
++function strokeRules(options: SharpenOptions | undefined, corners: ReadonlySet<Vec2>): StrokeRules {
++  return {
++    keepRounded: options?.keepRoundedBends === true,
++    rebuilt: options?.oneCornerPerBend === true ? corners : undefined,
++  };
++}
++
+ export type SharpenedChain = {
+   readonly points: Vec2[];
+   /** The rebuilt drawn-corner vertices, by object reference. Output
+@@ -90,9 +110,9 @@ export function* sharpenChainBendsSteps(
+   options?: SharpenOptions,
+ ): TraceSteps<SharpenedChain> {
+   const cooperate = yield;
+-  const keepRounded = options?.keepRoundedBends === true;
+   let pts = [...points];
+   const corners = new Set<Vec2>();
++  const rules = strokeRules(options, corners);
+   let closedMaxArm: number | undefined;
+   let i = 1;
+   // Every closed-chain replacement restarts the scan (the returned array is
+@@ -117,9 +137,9 @@ export function* sharpenChainBendsSteps(
+           distSq,
+           width,
+           (closedMaxArm ??= arcLengthOf(pts) / CLOSED_ARM_LENGTH_DIVISOR),
+-          keepRounded,
++          rules,
+         )
+-      : trySharpenOpen(pts, i, distSq, width, Infinity, keepRounded);
++      : trySharpenOpen(pts, i, distSq, width, Infinity, rules);
+     if (!acceptableBend(bent, corners, anchors)) {
+       i += 1;
+       continue;
+@@ -191,12 +211,12 @@ function trySharpenOpen(
+   i: number,
+   distSq: Float64Array,
+   width: number,
+-  maxArm = Infinity,
+-  keepRounded = false,
++  maxArm: number,
++  rules: StrokeRules,
+ ): BendResult | null {
+   const window = bendWindow(pts, i, distSq, width);
+   const baseArm = Math.min(window.arm, maxArm);
+-  const base = attemptBend(pts, i, baseArm, window.maxRadius, distSq, width, keepRounded);
++  const base = attemptBend(pts, i, baseArm, window.maxRadius, distSq, width, rules);
+   if (base !== null) return base;
+   const nearTurn = netTurnAcross(pts, i, RETRY_NEAR_SPAN_PX);
+   if (nearTurn === null || nearTurn < RETRY_MIN_NEAR_TURN_RAD) return null;
+@@ -204,7 +224,7 @@ function trySharpenOpen(
+     if (armPx <= baseArm || armPx > maxArm) continue;
+     const turn = netTurnAcross(pts, i, armPx);
+     if (turn === null || turn < RETRY_MIN_TURN_RAD) continue;
+-    const bent = attemptBend(pts, i, armPx, window.maxRadius, distSq, width, keepRounded);
++    const bent = attemptBend(pts, i, armPx, window.maxRadius, distSq, width, rules);
+     if (bent !== null) return bent;
+   }
+   return null;
+@@ -217,7 +237,7 @@ function attemptBend(
+   maxRadius: number,
+   distSq: Float64Array,
+   width: number,
+-  keepRounded: boolean,
++  rules: StrokeRules,
+ ): BendResult | null {
+   const p = pts[i];
+   if (p === undefined) return null;
+@@ -236,9 +256,7 @@ function attemptBend(
+   const bend = bendVertexAt(pts, headEnd, tailStart);
+   if (bend === null) return null;
+   if (!wedgeFitsWindow(pts, headEnd, tailStart, bend, maxRadius, distSq, width)) return null;
+-  if (keepRounded && bendIsRounded(pts, headEnd, tailStart, bend.vertex, distSq, width)) {
+-    return null;
+-  }
++  if (strokeRulesReject(pts, headEnd, tailStart, bend.vertex, distSq, width, rules)) return null;
+   return {
+     points: [...pts.slice(0, headEnd), bend.vertex, ...pts.slice(tailStart)],
+     resumeAt: headEnd + 1,
+@@ -274,6 +292,41 @@ function wedgeFitsWindow(
+   );
+ }
+ 
++function strokeRulesReject(
++  pts: ReadonlyArray<Vec2>,
++  headEnd: number,
++  tailStart: number,
++  vertex: Vec2,
++  distSq: Float64Array,
++  width: number,
++  rules: StrokeRules,
++): boolean {
++  if (rules.rebuilt !== undefined && readsRebuiltCorner(pts, headEnd, tailStart, rules.rebuilt)) {
++    return true;
++  }
++  return rules.keepRounded && bendIsRounded(pts, headEnd, tailStart, vertex, distSq, width);
++}
++
++// A corner rebuilt earlier on this chain is where the chain turns. A candidate
++// that takes it in, inside the window it would replace or in a leg's tangent
++// chord, is that corner seen again from one of its legs. Its vertex comes from
++// a tangent read further down the other leg and lands beside the first: a
++// second corner 3 px from the first, 1.5 px off a 12 px stroke's 45° bend.
++function readsRebuiltCorner(
++  pts: ReadonlyArray<Vec2>,
++  headEnd: number,
++  tailStart: number,
++  rebuilt: ReadonlySet<Vec2>,
++): boolean {
++  if (rebuilt.size === 0) return false;
++  const { from, to } = bendVertexSpan(pts, headEnd, tailStart);
++  for (let k = from; k <= to; k += 1) {
++    const p = pts[k];
++    if (p !== undefined && rebuilt.has(p)) return true;
++  }
++  return false;
++}
++
+ // Physical gate: ink must accompany BOTH wedge legs to the apex. The
+ // reach-scaled hugs/coverage tolerances legitimately widen for needle-sharp
+ // turns (a real tip's apex stands ~radius past the rounded chain end), but
+@@ -329,14 +382,14 @@ function trySharpenClosed(
+   distSq: Float64Array,
+   width: number,
+   maxArm: number,
+-  keepRounded: boolean,
++  rules: StrokeRules,
+ ): BendResult | null {
+   const mid = Math.floor(pts.length / 2);
+   const shift = (i - mid + pts.length) % pts.length;
+   // Centre the candidate so the open-chain gates retain their exact boundary
+   // rules. This still copies one whole ring per admitted candidate; only the
+   // tangent legs below are read by index without copies.
+-  return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm, keepRounded);
++  return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm, rules);
+ }
+ 
+ // One allocation and one pass. The scan rotates the ring once per candidate
+diff --git a/src/core/trace/centerline/stroke-chains.ts b/src/core/trace/centerline/stroke-chains.ts
+index 005bba2eb..393889e29 100644
+--- a/src/core/trace/centerline/stroke-chains.ts
++++ b/src/core/trace/centerline/stroke-chains.ts
+@@ -18,7 +18,7 @@ import {
+ } from './chain-attachments';
+ import { smoothChainCurvature } from './chain-smoothing';
+ import { refineChainForOutput } from './curve-refine';
+-import type { InkMask } from './distance-field';
++import { interpolatedRadius, type InkMask } from './distance-field';
+ import { bridgeNearbyEndsSteps, pairThroughJunctionsSteps, type Chain } from './junction-pairing';
+ import { LOOP_TOUCH_GAP_PX, type LoopClosureOptions } from './loop-closure';
+ import { pointAtArcDistance, radiusAtPosition } from './polyline-window';
+@@ -176,7 +176,8 @@ function* finalizeChainsSteps(
+     if (chain.closed && isJunctionArtifactLoop(chain, distSq, mask.width)) continue;
+     // Thinning chamfers drawn corners and round nibs round them; rebuild the
+     // vertices before simplification eats the dense points the tangent
+-    // estimates need. A bend the pen drew round keeps its curve.
++    // estimates need. A bend the pen drew round keeps its curve, and a
++    // rebuilt corner is not built a second time from one of its own legs.
+     const attached = attachments.get(chain);
+     const sharpened = yield* sharpenChainBendsSteps(
+       chain.points,
+@@ -184,7 +185,7 @@ function* finalizeChainsSteps(
+       distSq,
+       mask.width,
+       attached,
+-      { keepRoundedBends: true },
++      { keepRoundedBends: true, oneCornerPerBend: true },
+     );
+     const pinned =
+       attached === undefined ? sharpened.corners : new Set([...sharpened.corners, ...attached]);
+@@ -388,7 +389,11 @@ function bestForwardStep(
+     // Prefer straight continuation (current heading AND initial tangent — the
+     // tangent term makes ties resolve straight instead of drifting), tie-broken
+     // toward the distance ridge so the extension stays centred into the cap.
+-    const score = forward + alignment + radiusAtPosition(candidate, distSq, mask.width) * 0.2;
++    // The ridge is read between pixel centres: the nearest pixel's radius
++    // jumps a whole lattice step between neighbouring candidates and turned
++    // the walk 22.5° off a round cap's axis.
++    const ridge = interpolatedRadius(distSq, mask.width, candidate.x, candidate.y);
++    const score = forward + alignment + ridge * 0.2;
+     if (score > bestScore) {
+       bestScore = score;
+       best = candidate;
+diff --git a/src/core/trace/centerline/tip-extension.test.ts b/src/core/trace/centerline/tip-extension.test.ts
+index 920ff97f1..2ae7521da 100644
+--- a/src/core/trace/centerline/tip-extension.test.ts
++++ b/src/core/trace/centerline/tip-extension.test.ts
+@@ -1,5 +1,6 @@
+ import { describe, expect, it } from 'vitest';
+ import { minDistanceToPolylines } from '../../../__fixtures__/perceptual/centerline-geometry';
++import { CENTERLINE_TRUTH_FIXTURES } from '../../../__fixtures__/perceptual/centerline-truth';
+ import type { Vec2 } from '../../scene';
+ import { DEFAULT_TRACE_OPTIONS } from '../trace-image';
+ import { TRACE_PRESETS } from '../trace-presets';
+@@ -9,6 +10,7 @@ import { condenseJunctions } from './junction-condense';
+ import { thinToMedialAxis } from './medial-thinning';
+ import { pruneSpurs } from './spur-pruning';
+ import { buildStrokeGraph, type StrokeGraph } from './stroke-graph';
++import { traceCenterlineStrokePaths } from './trace-centerline';
+ 
+ function flatBar(thickness: number, vertical: boolean, reflected: boolean) {
+   const width = 128;
+@@ -55,6 +57,23 @@ describe('Centerline cap recovery after spur pruning', () => {
+     }
+   }
+ 
++  it('walks a round cap along the stroke axis', () => {
++    // The regression bar's 9 px quarter arc leaves (32, 96) heading up and
++    // (96, 32) heading right, so its caps' axes are x = 32 and y = 32. Read
++    // from the nearest pixel, the ridge turned the tip walk 22.5° off the
++    // axis: 1.34 px off at the tip (0.69 px before ridge centring). Read
++    // between pixel centres, the tips end 0.19 px off.
++    const arc = CENTERLINE_TRUTH_FIXTURES.find((fixture) => fixture.name === 'arc')!;
++    const traced = traceCenterlineStrokePaths(arc.image, TRACE_PRESETS.Centerline!);
++    const polylines = traced.flatMap((path) => path.polylines);
++    expect(polylines).toHaveLength(1);
++    const ends = [polylines[0]!.points[0]!, polylines[0]!.points.at(-1)!];
++    const rightTip = ends.find((p) => p.x > 64)!;
++    const lowerTip = ends.find((p) => p.y > 64)!;
++    expect(Math.abs(rightTip.y - 32)).toBeLessThan(0.5);
++    expect(Math.abs(lowerTip.x - 32)).toBeLessThan(0.5);
++  });
++
+   it('returns current endpoint roles and only incident nodes without mutating the input graph', () => {
+     const { mask } = flatBar(17, false, false);
+     const distance = squaredDistanceField(mask);
+diff --git a/src/core/trace/centerline/trace-centerline.ts b/src/core/trace/centerline/trace-centerline.ts
+index 55624166c..8b36bb3ad 100644
+--- a/src/core/trace/centerline/trace-centerline.ts
++++ b/src/core/trace/centerline/trace-centerline.ts
+@@ -20,6 +20,7 @@ import { condenseJunctions } from './junction-condense';
+ import { DEFAULT_SPUR_OPTIONS, pruneSpursSteps } from './spur-pruning';
+ import { assembleStrokePathsSteps } from './stroke-chains';
+ import { closeRingEndpoints } from './loop-closure';
++import { centerGraphOnRidge } from './ridge-centering';
+ import { runTraceSteps, type TraceSteps } from '../trace-steps';
+ 
+ const CENTERLINE_COLOR = '#000000';
+@@ -56,7 +57,8 @@ export function* traceCenterlineStrokePathsSteps(
+   });
+   const condensed = condenseJunctions(pruned, distSq, mask.width);
+   if (cooperate) yield;
+-  const polylines = yield* assembleStrokePathsSteps(condensed, distSq, mask, {
++  const centered = centerGraphOnRidge(condensed, distSq, mask.width);
++  const polylines = yield* assembleStrokePathsSteps(centered, distSq, mask, {
+     // Assembly measures the working grid; the option is a source-pixel
+     // distance, so automatic enlargement must enlarge its allowance too.
+     joinGapPx: (options.centerlineJoinGapPx ?? DEFAULT_JOIN_GAP_PX) * effectivePixelScale(options),
+-- 
+2.43.0
+

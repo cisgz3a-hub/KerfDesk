@@ -1,0 +1,94 @@
+diff --git a/src/platform/types.ts b/src/platform/types.ts
+index 1de67ac33..856c9108f 100644
+--- a/src/platform/types.ts
++++ b/src/platform/types.ts
+@@ -38,6 +38,12 @@ export type SaveTarget = {
+ /** A picked directory that can mint named targets later. Merely reserving the
+  * directory never creates or truncates a file. */
+ export type SaveDirectoryTarget = {
++  /** The folder's own name when the platform exposes it, for messages only. */
++  readonly displayName?: string;
++  /** Whether a file or folder named `name` is already there. Never creates it.
++   * A target from `file()` replaces a same-name file, so a caller that must
++   * keep existing files asks this first. */
++  readonly hasEntry: (name: string) => Promise<boolean>;
+   readonly file: (displayName: string) => SaveTarget;
+ };
+ 
+diff --git a/src/platform/web/web-adapter.ts b/src/platform/web/web-adapter.ts
+index d0c5867f6..232b62258 100644
+--- a/src/platform/web/web-adapter.ts
++++ b/src/platform/web/web-adapter.ts
+@@ -88,7 +88,34 @@ async function reserveSaveDirectory(): Promise<SaveDirectoryTarget | null> {
+     if (err instanceof Error && err.name === 'AbortError') return null;
+     throw err;
+   }
+-  return { file: (displayName) => directoryFileTarget(directory, displayName) };
++  return {
++    // Without a usable name, callers fall back to generic wording.
++    ...(directory.name ? { displayName: directory.name } : {}),
++    hasEntry: (name) => directoryHasEntry(directory, name),
++    file: (displayName) => directoryFileTarget(directory, displayName),
++  };
++}
++
++// File System Access has no exclusive create: getFileHandle(name, { create:
++// true }) opens a same-name file and createWritable then replaces it. Looking
++// without create is the only non-destructive check; NotFoundError means free
++// and TypeMismatchError means a folder already has the name.
++async function directoryHasEntry(
++  directory: FileSystemDirectoryHandle,
++  name: string,
++): Promise<boolean> {
++  try {
++    await directory.getFileHandle(name, { create: false });
++    return true;
++  } catch (err) {
++    if (errorNamed(err, 'NotFoundError')) return false;
++    if (errorNamed(err, 'TypeMismatchError')) return true;
++    throw err;
++  }
++}
++
++function errorNamed(err: unknown, name: string): boolean {
++  return typeof err === 'object' && err !== null && 'name' in err && err.name === name;
+ }
+ 
+ function directoryFileTarget(
+diff --git a/src/ui/common/free-file-name.ts b/src/ui/common/free-file-name.ts
+new file mode 100644
+index 000000000..c2829dd9a
+--- /dev/null
++++ b/src/ui/common/free-file-name.ts
+@@ -0,0 +1,31 @@
++// freeFileName — the first name a save can use without replacing anything:
++// the requested name, then "name (2).ext", "name (3).ext" and so on, the way
++// desktop file managers number a copy. The caller's `isTaken` decides what
++// counts as used, for example a file already in the folder or a name the same
++// save has just written.
++
++// A bound, not a policy: it only stops a broken `isTaken` that never answers
++// "free" from looping forever. Reaching it is reported, never skipped.
++const MAX_COPY_NUMBER = 9999;
++
++export async function freeFileName(
++  requested: string,
++  isTaken: (name: string) => Promise<boolean>,
++): Promise<string> {
++  if (!(await isTaken(requested))) return requested;
++  for (let copy = 2; copy <= MAX_COPY_NUMBER; copy += 1) {
++    const candidate = numberedFileName(requested, copy);
++    if (!(await isTaken(candidate))) return candidate;
++  }
++  throw new Error(
++    `every name from ${requested} to ${numberedFileName(requested, MAX_COPY_NUMBER)} is taken`,
++  );
++}
++
++/** "logo.svg" → "logo (2).svg"; a name without an extension gets the number
++ * at the end, and a leading dot is part of the name, not an extension. */
++export function numberedFileName(name: string, copy: number): string {
++  const dot = name.lastIndexOf('.');
++  if (dot <= 0) return `${name} (${copy})`;
++  return `${name.slice(0, dot)} (${copy})${name.slice(dot)}`;
++}

@@ -1,0 +1,48 @@
+From b06e79c65a32786c4c2c2b876672036f42436fb9 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:21:45 +0000
+Subject: [PATCH 6/8] =?UTF-8?q?test(ui):=20speck=20control=20test=20follow?=
+ =?UTF-8?q?s=20the=202=20px=C2=B2=20Line=20Art=20default=20(ADR-392)?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Outside this package's files: TraceSettingsControls.semantic.test.tsx,
+flagged for the integrator.
+
+Operator change: none; the dialog shows Remove ink specks at 2 for Line
+Art, as the previous commit set. The test still proves that the control
+reaches the engine without coupling to Ignore Less Than: at the default
+the 3x2 detail (6 px) is kept (406 ink pixels), and raising the setting
+to 7 removes it (400), where before it started at 12 and lowered to 2.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/trace/TraceSettingsControls.semantic.test.tsx | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/ui/trace/TraceSettingsControls.semantic.test.tsx b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+index 6bf850baa..58124640c 100644
+--- a/src/ui/trace/TraceSettingsControls.semantic.test.tsx
++++ b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+@@ -132,12 +132,12 @@ describe('trace controls describe the options the engine actually receives', ()
+     fill(image, 60, 40, 3, 2, [0, 0, 0]);
+     await withControls('Line Art', async (controls) => {
+       expect(controls.number('Ignore Less Than').value).toBe('2');
+-      expect(controls.number('Remove ink specks').value).toBe('12');
+-      expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
++      expect(controls.number('Remove ink specks').value).toBe('2');
++      expect(ink(preprocessForTrace(image, controls.options()))).toBe(406);
+       await controls.change('Ignore Less Than', 3);
+-      expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
+-      await controls.change('Remove ink specks', 2);
+       expect(ink(preprocessForTrace(image, controls.options()))).toBe(406);
++      await controls.change('Remove ink specks', 7);
++      expect(ink(preprocessForTrace(image, controls.options()))).toBe(400);
+       expect(controls.options().ignoreLessThanPixels).toBe(3);
+     });
+   });
+-- 
+2.43.0
+

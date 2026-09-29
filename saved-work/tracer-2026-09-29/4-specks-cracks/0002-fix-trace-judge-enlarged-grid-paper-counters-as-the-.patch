@@ -1,0 +1,171 @@
+From 061d7c21cbb29851c7862489c5fe987fa22f7a75 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:12:25 +0000
+Subject: [PATCH 2/8] fix(trace): judge enlarged-grid paper counters as the
+ walker traces them (ADR-392)
+
+Outside this package's files: a minimal change to contour-support.ts from
+main's #880, flagged for the integrator.
+
+Operator change: none by itself. On an enlarged working grid,
+restoreEnlargedContourSupport restores a paper counter from the native
+mask when enlargement erased it. It grouped paper 4-connected, while the
+outline walker joins two paper pixels across a corner wherever paper is
+the scarcer colour there. A one-pixel notch of a counter that touches it
+only at such a corner was therefore judged as a counter of its own and
+patched back with the bilinear support field, even though the counter it
+belongs to survived. Grouping now uses the walker's own test
+(paperJoinsDiagonally), so a counter is judged whole.
+
+Found through trace-supersample-support ("keeps Smooth bilinear
+measurements outside erased detail"), which failed once crack filling
+grouped slivers the walker's way; this commit keeps it passing. The new
+contour-input test fails on main's contour-support.ts and passes here.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/contour-input.test.ts | 22 ++++++++++++
+ src/core/trace/contour-support.ts    | 52 ++++++++++++++++++++++------
+ 2 files changed, 64 insertions(+), 10 deletions(-)
+
+diff --git a/src/core/trace/contour-input.test.ts b/src/core/trace/contour-input.test.ts
+index 1f652a007..44739d65b 100644
+--- a/src/core/trace/contour-input.test.ts
++++ b/src/core/trace/contour-input.test.ts
+@@ -92,6 +92,28 @@ describe('source-mask support through optional enlargement', () => {
+     expect(restored.crackField?.lumaAt(-1, -1)).toBe(255);
+   });
+ 
++  it('judges a paper pixel joined to a kept counter across a corner as that counter', () => {
++    // Solid ink with a 2×2 counter and one more paper pixel touching its
++    // corner. Ink is the majority around that corner, so the walk joins the
++    // two into one hole (ADR-392). Enlargement keeps the counter and closes
++    // the pixel; the hole is still there, so nothing is restored.
++    const source = whiteImage(8);
++    const enlarged = whiteImage(16);
++    const counter = (x: number, y: number): boolean =>
++      (x >= 2 && x <= 3 && y >= 2 && y <= 3) || (x === 4 && y === 4);
++    for (let y = 0; y < 8; y += 1) {
++      for (let x = 0; x < 8; x += 1) if (!counter(x, y)) paint(source, x, y, 0);
++    }
++    for (let y = 0; y < 16; y += 1) {
++      for (let x = 0; x < 16; x += 1) {
++        if (x < 4 || x > 7 || y < 4 || y > 7) paint(enlarged, x, y, 0);
++      }
++    }
++    const native = { image: source, prepared: source, options: LINE_ART, crackField: null };
++    const big = { image: enlarged, prepared: enlarged, options: LINE_ART, crackField: null };
++    expect(restoreEnlargedContourSupport(native, big, 2)).toBe(big);
++  });
++
+   it('allows a coherent stroke edge to move within the nearby working samples', () => {
+     const source = whiteImage(64);
+     const shifted = whiteImage(128);
+diff --git a/src/core/trace/contour-support.ts b/src/core/trace/contour-support.ts
+index fbec0e34d..fcb944aee 100644
+--- a/src/core/trace/contour-support.ts
++++ b/src/core/trace/contour-support.ts
+@@ -1,4 +1,5 @@
+-import type { CrackSubPixelField } from './contour-boundary';
++import type { InkMask } from './centerline';
++import { paperJoinsDiagonally, type CrackSubPixelField } from './contour-boundary';
+ import { coherentContourDetailMask } from './contour-detail-detector';
+ import type { ContourTraceInput } from './contour-input';
+ import { isValidRawImageData, type RawImageData } from './trace-image';
+@@ -10,6 +11,13 @@ type SupportGrid = {
+   readonly restored: Uint8Array;
+ };
+ 
++const DIAGONAL_STEPS = [
++  [-1, -1],
++  [1, -1],
++  [-1, 1],
++  [1, 1],
++] as const;
++
+ /** Restore only genuinely erased source detail after optional bilinear
+  * enlargement. The accepted native mask supplies a local, bilinear support
+  * field, with its matching threshold, where the enlarged detector has lost a
+@@ -64,16 +72,17 @@ function restoreErasedThinInk(grid: SupportGrid): void {
+ }
+ 
+ function restoreErasedPaper(grid: SupportGrid): void {
++  const mask = sourceInkMask(grid.source);
+   const visited = new Uint8Array(grid.restored.length);
+   for (let index = 0; index < visited.length; index += 1) {
+-    if (visited[index] !== 0 || inkAt(grid.source, index)) continue;
++    if (visited[index] !== 0 || mask.ink[index] === 1) continue;
+     const x = index % grid.source.width;
+     const y = Math.floor(index / grid.source.width);
+     if (cellHasClass(grid, x, y, false)) {
+       visited[index] = 1;
+       continue;
+     }
+-    const { pixels, retained } = paperSupport(grid, visited, index);
++    const { pixels, retained } = paperSupport(grid, mask, visited, index);
+     for (const pixel of pixels) {
+       visited[pixel] = 1;
+       if (!retained) markRestoredNeighbourhood(grid, pixel);
+@@ -86,6 +95,7 @@ function restoreErasedPaper(grid: SupportGrid): void {
+  * the large background from ordinary shifted boundary cells. */
+ function paperSupport(
+   grid: SupportGrid,
++  mask: InkMask,
+   visited: Uint8Array,
+   start: number,
+ ): { pixels: number[]; retained: boolean } {
+@@ -95,7 +105,7 @@ function paperSupport(
+     const x = index % grid.source.width;
+     const y = Math.floor(index / grid.source.width);
+     if (cellHasClass(grid, x, y, false)) return { pixels, retained: true };
+-    for (const next of paperNeighbours(grid.source, x, y)) {
++    for (const next of paperNeighbours(mask, x, y)) {
+       if (visited[next] === 1) return { pixels, retained: true };
+       if (visited[next] !== 0) continue;
+       visited[next] = 2;
+@@ -105,13 +115,35 @@ function paperSupport(
+   return { pixels, retained: false };
+ }
+ 
+-function paperNeighbours(image: RawImageData, x: number, y: number): number[] {
++function paperNeighbours(mask: InkMask, x: number, y: number): number[] {
++  const indices: number[] = [];
++  if (x > 0) indices.push(y * mask.width + x - 1);
++  if (x + 1 < mask.width) indices.push(y * mask.width + x + 1);
++  if (y > 0) indices.push((y - 1) * mask.width + x);
++  if (y + 1 < mask.height) indices.push((y + 1) * mask.width + x);
++  const paper = indices.filter((index) => mask.ink[index] !== 1);
++  return [...paper, ...diagonalPaperNeighbours(mask, x, y)];
++}
++
++// Paper pixels that touch only at a corner are one region wherever the
++// contour walk joins paper there (ADR-392), so a counter is judged whole, as
++// the walk traces it, and a corner pixel of a kept counter is not restored
++// as a counter of its own.
++function diagonalPaperNeighbours(mask: InkMask, x: number, y: number): number[] {
+   const indices: number[] = [];
+-  if (x > 0) indices.push(y * image.width + x - 1);
+-  if (x + 1 < image.width) indices.push(y * image.width + x + 1);
+-  if (y > 0) indices.push((y - 1) * image.width + x);
+-  if (y + 1 < image.height) indices.push((y + 1) * image.width + x);
+-  return indices.filter((index) => !inkAt(image, index));
++  for (const [dx, dy] of DIAGONAL_STEPS) {
++    const nx = x + dx;
++    const ny = y + dy;
++    if (nx < 0 || ny < 0 || nx >= mask.width || ny >= mask.height) continue;
++    if (paperJoinsDiagonally(mask, x, y, dx, dy)) indices.push(ny * mask.width + nx);
++  }
++  return indices;
++}
++
++function sourceInkMask(image: RawImageData): InkMask {
++  const ink = new Uint8Array(image.width * image.height);
++  for (let index = 0; index < ink.length; index += 1) ink[index] = inkAt(image, index) ? 1 : 0;
++  return { width: image.width, height: image.height, ink };
+ }
+ 
+ function cellHasClass(grid: SupportGrid, x: number, y: number, ink: boolean, halo = 0): boolean {
+-- 
+2.43.0
+

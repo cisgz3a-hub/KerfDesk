@@ -1,0 +1,100 @@
+From 4ab8dd1ee1b40d12094ca4c72da4568bea715e80 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:37:02 +0000
+Subject: [PATCH 14/14] docs(workflow): Trace dialog shows the band in use,
+ Join gaps and Alt+T (ADR-396)
+
+F-A15 lists Alt+T for Trace Image and Option+M for Measure on macOS.
+F-E1 says how to open Trace Image, what Detection shows in automatic
+modes and where Manual starts, which grid pixel settings count on, which
+kept adjustments a style uses, that Edge Detection previews and exports
+as strokes like Centerline, and names the Join gaps control.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ WORKFLOW.md | 38 ++++++++++++++++++++++++++++----------
+ 1 file changed, 28 insertions(+), 10 deletions(-)
+
+diff --git a/WORKFLOW.md b/WORKFLOW.md
+index 5b72eee0d..9f27ae168 100644
+--- a/WORKFLOW.md
++++ b/WORKFLOW.md
+@@ -905,7 +905,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
+ - `Cmd/Ctrl+R` - Rectangle
+ - `Cmd/Ctrl+E` - Ellipse
+ - `Cmd/Ctrl+L` - Line/pen
+-- `Alt+M` - Measure
++- `Alt+M` - Measure (Option+M on macOS)
++- `Alt+T` - Trace Image (Option+T on macOS; LightBurn's binding; no-op unless the selected
++  object is a raster image)
+ - `Cmd/Ctrl+Shift+B` - Convert to Bitmap (LightBurn's binding; no-op unless a
+   single convertible vector is selected)
+ 
+@@ -2290,7 +2292,8 @@ settings and Job Review keep their existing read-only setup references.
+ ### F-E1. Import and trace a raster image
+ 
+ **Success**:
+-1. Choose a raster image and open the trace dialog. The image is decoded at the
++1. Choose a raster image and open the trace dialog (**Tools → Trace Image**, the top toolbar,
++   or `Alt+T`). The image is decoded at the
+    preview budget and the selected preset starts tracing in a worker.
+    The large preview and scrollable settings panel sit side by side on wide screens and stack
+    on narrow screens, with Cancel and Trace kept in the footer. Compare **Original**, **Trace**,
+@@ -2335,30 +2338,45 @@ settings and Job Review keep their existing read-only setup references.
+    **Faint lines (keep solid areas)**, or **Sketch (local contrast)**. Faint lines adds coherent
+    pale strokes to the preset's solid ink while rejecting isolated pale specks. Sketch uses
+    local contrast alone and can remove dark shadow backgrounds. Cutoff/Threshold appear when the band is actually used, including
+-   alpha-mask tracing. Returning to preset detection restores its policy. **Remove ink specks**
++   alpha-mask tracing. In automatic and Faint lines modes, Detection shows the band in use
++   read-only once the preview has traced: Line Art's Cutoff 0, Threshold 128, or the band an
++   automatic threshold chose from the image. Line Art also says whether it added locally darker
++   colour detail. The first switch to **Manual brightness band** starts Threshold one level below
++   the automatic threshold, so the preview keeps the same ink; a band set earlier is kept, and
++   before any preview finishes the band starts at 0–128. Returning to preset detection restores
++   its policy. **Remove ink specks**
+    controls connected ink area; **Ignore Less Than** controls closed-contour and hole area. Both
+    use pixels of the decoded image grid supplied to the tracing core and preserve their separate
+    preset values. If dense artwork is traced on a smaller working grid, both area thresholds are
+    converted using the actual width and height ratios, without rounding the internal values.
+-   The preceding UI decode cap still defines that source grid. Expand **Curve finishing** for
++   The preceding UI decode cap still defines that source grid; when it differs from the image's
++   own size the settings panel names it ("Tracing at W × H px; pixel settings use this grid.").
++   Expand **Curve finishing** for
+    **Smoothness** and **Optimize** on filled outlines and Edge Detection, or **Transparency**
+    for alpha-mask tracing. **Fill tiny holes** controls cleanup of small enclosed white marks;
+    it does not bridge open gaps. Turn it off to retain those small highlights. Sliders and numeric fields stay in sync. Manual adjustments persist
+-   when switching presets; **Settings edited** identifies this state, and **Reset trace settings**
+-   restores the selected preset's defaults. Automatic Line Art detail
+-   recovery retains the preset's brightness-selected solid ink and adds locally darker detail.
++   when switching presets and apply wherever the selected style has the same control.
++   **Settings edited** appears when the adjustments the selected style uses change its trace, and
++   the preset hint names kept adjustments that style ignores (for example "Not used by Line Art:
++   Sensitivity."). **Reset trace settings** restores the selected preset's defaults. Photo shading
++   traces a boundary with Crop while selected and restores the chosen boundary mode afterwards.
++   Automatic Line Art detail recovery retains the preset's brightness-selected solid ink and, in
++   colour artwork, adds locally darker detail.
+    Changes are debounced; the
+    newest request supersedes and cancels any older trace still running.
+ 3. The preview displays only the newest completed result. A late response from
+    a retired worker is ignored and cannot replace the current preview.
+    A zero-paths retry with relaxed settings is disclosed in the preview and retained in successful
+-   commit/export feedback. Centerline previews and explicit Centerline SVG exports draw both
+-   closed and open paths as strokes. Filled presets retain their contour fills and holes.
++   commit/export feedback. Centerline and Edge Detection previews, Overlay, and
++   their SVG exports draw both closed and open paths as strokes, matching the Line operation or
++   raster Outlines they engrave with (ADR-235); preview strokes stay one screen pixel wide at any
++   zoom. Filled presets retain their contour fills and holes.
+    Submitted results use their captured request's paint intent; a newer preset request still
+    supersedes an older result.
+    Edge Detection creates closed outlines around dark artwork and locally
+    darker detail. Adjacent dark tones may merge into one outline. Centerline follows stroke centres.
+-   Centerline's separate-end gap bridge uses source-grid distance (preset/default 3 pixels),
++   Centerline's separate-end gap bridge (**Join gaps**, shown in place of Ignore Less Than) joins
++   facing ends strictly closer than its source-grid distance (preset/default 3 pixels),
+    converted once on enlarged working rasters, including Enhance regions. Zero disables that
+    gap bridge; true-junction repairs and ring closure keep their existing separate policies.
+    Centerline removes corner spurs before condensing junctions, then carries shared junction
+-- 
+2.43.0
+

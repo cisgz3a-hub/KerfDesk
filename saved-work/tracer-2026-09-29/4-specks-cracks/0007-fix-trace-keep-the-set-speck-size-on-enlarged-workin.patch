@@ -1,0 +1,155 @@
+From e04c286b6ef8233b15e661a4d1b4464d977fb294 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:24:52 +0000
+Subject: [PATCH 7/8] fix(trace): keep the set speck size on enlarged working
+ grids (ADR-392)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Operator change: Remove ink specks now keeps and removes the same marks
+when a small image traces on a 2x or 3x working grid as it does at native
+size. Bilinear enlargement rounds a mark's corners and takes part of a
+source pixel off its area (a 3x3 speck keeps 77 of its 81 working pixels
+at 3x), so a mark of exactly the set size could vanish on the enlarged
+grid. The enlarged test now compares against (N - 1/2) x scale² working
+pixels; at native size nothing changes, because pixel counts are whole
+numbers. despeckle takes the scale as a named option, so an older call
+that passes a connectivity of 4 or 8 in third place no longer
+type-checks instead of silently running as a scale.
+
+Measured: despeckle-supersample.test.ts checks marks of 1 to 9 px against
+settings 2 to 10 at native size, 2x and 3x; every enlarged result now
+matches the native one. Against the same code without the margin, the 48
+audit corpus traces and the dragon traces are identical. On the Arch
+House logo (2x grid) Smooth keeps one more pale 2-px mark (49 to 50
+outlines; 50 on 85ee406 too).
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/despeckle-supersample.test.ts | 57 ++++++++++++++++++++
+ src/core/trace/preprocess.ts                 | 19 ++++++-
+ src/core/trace/trace-image.ts                |  2 +-
+ 3 files changed, 75 insertions(+), 3 deletions(-)
+ create mode 100644 src/core/trace/despeckle-supersample.test.ts
+
+diff --git a/src/core/trace/despeckle-supersample.test.ts b/src/core/trace/despeckle-supersample.test.ts
+new file mode 100644
+index 000000000..44ea9f611
+--- /dev/null
++++ b/src/core/trace/despeckle-supersample.test.ts
+@@ -0,0 +1,57 @@
++// Remove ink specks counts SOURCE pixels on every route (ADR-392). Small
++// images trace on a 2x or 3x bilinear supersample, where each mark loses a
++// little area at its rounded corners. The setting must still keep an N-pixel
++// mark and remove an (N − 1)-pixel one, as the native trace does.
++
++import { describe, expect, it } from 'vitest';
++import { upscaleBy } from './auto-upscale';
++import { prepareTraceForContour, type RawImageData, type TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++
++type Mark = { readonly name: string; readonly width: number; readonly height: number };
++
++const MARKS: ReadonlyArray<Mark> = [
++  { name: '1x1', width: 1, height: 1 },
++  { name: '1x2', width: 2, height: 1 },
++  { name: '2x2', width: 2, height: 2 },
++  { name: '2x3', width: 3, height: 2 },
++  { name: '3x3', width: 3, height: 3 },
++];
++
++function markImage(mark: Mark): RawImageData {
++  const size = 24;
++  const data = new Uint8ClampedArray(size * size * 4).fill(255);
++  for (let y = 0; y < mark.height; y += 1) {
++    for (let x = 0; x < mark.width; x += 1) data.set([0, 0, 0, 255], ((8 + y) * size + 8 + x) * 4);
++  }
++  return { width: size, height: size, data };
++}
++
++function survives(mark: Mark, setting: number, scale: number): boolean {
++  const options: TraceOptions = {
++    ...TRACE_PRESETS['Line Art']!,
++    despeckleMinPixels: setting,
++    pixelScale: scale,
++  };
++  const source = markImage(mark);
++  const image = scale > 1 ? upscaleBy(source, scale) : source;
++  const { prepared } = prepareTraceForContour(image, options);
++  for (let i = 0; i < prepared.width * prepared.height; i += 1) {
++    if ((prepared.data[i * 4] ?? 255) < 128) return true;
++  }
++  return false;
++}
++
++describe('Remove ink specks on supersampled routes', () => {
++  it.each([2, 3])('keeps and removes the same marks at %sx as natively', (scale) => {
++    for (const mark of MARKS) {
++      for (let setting = 2; setting <= 10; setting += 1) {
++        const expected = mark.width * mark.height >= setting;
++        expect(survives(mark, setting, 1), `${mark.name} native at ${setting}`).toBe(expected);
++        expect(survives(mark, setting, scale), `${mark.name} at ${scale}x, ${setting}`).toBe(
++          expected,
++        );
++      }
++    }
++  });
++});
+diff --git a/src/core/trace/preprocess.ts b/src/core/trace/preprocess.ts
+index 490896582..74dff3df6 100644
+--- a/src/core/trace/preprocess.ts
++++ b/src/core/trace/preprocess.ts
+@@ -258,10 +258,25 @@ export function otsuThreshold(image: RawImageData): number {
+ // specks that any setting of 2 or more would erase. The contour walker joins
+ // such pixels too wherever ink is the scarcer colour around the corner.
+ //
++// minPixels counts SOURCE pixels; pixelScale is how far `image` was
++// supersampled. Pixel counts are whole numbers, so natively "fewer than N
++// pixels" is the same test as "fewer than N − ½". Bilinear supersampling
++// rounds each mark's corners and takes part of a source pixel off its area
++// (at ×3 a 3×3 speck keeps 77 of its 81 working pixels), so the scaled test
++// keeps that half-pixel margin and an N-pixel mark survives on every route,
++// as it does natively (ADR-392). The scale is a named option so that an
++// older call passing a connectivity of 4 or 8 in third place fails to
++// type-check instead of running as a scale.
++//
+ // BFS using a single Uint8 visited mask + an index queue. O(N) total
+ // work for N pixels regardless of region count.
+-export function despeckle(image: RawImageData, minPixels: number): RawImageData {
++export function despeckle(
++  image: RawImageData,
++  minPixels: number,
++  { pixelScale = 1 }: { readonly pixelScale?: number } = {},
++): RawImageData {
+   if (minPixels <= 1) return image;
++  const minWorkingPixels = pixelScale > 1 ? (minPixels - 0.5) * pixelScale * pixelScale : minPixels;
+   const { width: w, height: h } = image;
+   const out = new Uint8ClampedArray(image.data);
+   const visited = new Uint8Array(w * h);
+@@ -270,7 +285,7 @@ export function despeckle(image: RawImageData, minPixels: number): RawImageData
+     visited[startIdx] = 1;
+     if (lumaAt(out, startIdx * 4) >= 128) continue; // background pixel — skip
+     const region = bfsInkRegion(out, visited, w, h, startIdx);
+-    if (region.length < minPixels) {
++    if (region.length < minWorkingPixels) {
+       eraseRegion(out, region);
+     }
+   }
+diff --git a/src/core/trace/trace-image.ts b/src/core/trace/trace-image.ts
+index c95c592ea..6db087061 100644
+--- a/src/core/trace/trace-image.ts
++++ b/src/core/trace/trace-image.ts
+@@ -199,7 +199,7 @@ function cleanBinaryMask(mask: ContourMask, options: TraceOptions): ContourMask
+   // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
+   const scale = effectivePixelScale(options);
+   const despeckled = shouldDespeckle(options)
+-    ? despeckle(mask.prepared, (options.despeckleMinPixels ?? 0) * scale * scale)
++    ? despeckle(mask.prepared, options.despeckleMinPixels ?? 0, { pixelScale: scale })
+     : mask.prepared;
+   const prepared =
+     options.fillPinholeCracks === true
+-- 
+2.43.0
+

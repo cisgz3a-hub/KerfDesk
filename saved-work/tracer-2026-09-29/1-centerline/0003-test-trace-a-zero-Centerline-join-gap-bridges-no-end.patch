@@ -1,0 +1,55 @@
+From 68188a19acec7bbe9f72b394c2de749f01045d7f Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:44:56 +0000
+Subject: [PATCH 3/4] test(trace): a zero Centerline join gap bridges no ends
+ (ADR-394)
+
+WORKFLOW says "Zero disables that gap bridge" for the separate-end join
+gap, and a trace-dialog control for it is being added in a separate
+change. bridgeNearbyEnds returns before pairing any ends when the gap is
+zero or less, so the statement holds. The test pins it: a gap of 0 (with
+aligned factors 1 and 3) or -1 bridges no ends, even touching, aligned
+ones. No behaviour changes.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../trace/centerline/gap-distance.test.ts     | 22 +++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/src/core/trace/centerline/gap-distance.test.ts b/src/core/trace/centerline/gap-distance.test.ts
+index 91244f752..1945ecccd 100644
+--- a/src/core/trace/centerline/gap-distance.test.ts
++++ b/src/core/trace/centerline/gap-distance.test.ts
+@@ -74,6 +74,28 @@ describe('Centerline source-distance gap bridging', () => {
+     },
+   );
+ 
++  it.each([
++    [0, 1],
++    [0, 3],
++    [-1, 1],
++  ])('a join gap of %s (aligned factor %s) bridges no ends, even touching ones', (gap, factor) => {
++    // WORKFLOW: "Zero disables that gap bridge". Half a pixel apart and
++    // perfectly aligned is the easiest pair any positive gap would join.
++    const left = chain([
++      { x: -20, y: 0 },
++      { x: 0, y: 0 },
++    ]);
++    const right = chain([
++      { x: 0.5, y: 0 },
++      { x: 20.5, y: 0 },
++    ]);
++    bridgeNearbyEnds([left, right], gap, factor);
++    expect([left.alive, right.alive]).toEqual([true, true]);
++    expect([left.points.length, right.points.length]).toEqual([2, 2]);
++    bridgeNearbyEnds([left, right], 1, factor);
++    expect(left.alive !== right.alive).toBe(true);
++  });
++
+   it.each([
+     [1, 3],
+     [2, 3],
+-- 
+2.43.0
+

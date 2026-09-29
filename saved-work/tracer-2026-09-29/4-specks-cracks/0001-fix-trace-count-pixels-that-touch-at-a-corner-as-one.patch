@@ -1,0 +1,713 @@
+From 69c4b7e8f5369a6a6827612c3511d556b0f5322d Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:10:35 +0000
+Subject: [PATCH 1/8] fix(trace): count pixels that touch at a corner as one
+ mark (ADR-392)
+
+Operator change: a 1-px diagonal line is now one mark in every outline
+preset. Remove ink specks counts ink that touches only at a corner as one
+mark in every trace mode (it did so for Centerline only), so Line Art and
+Smooth no longer erase diagonal hairlines as rows of 1-px specks. Where
+ink and paper pixels meet only at a corner, the outline walker now joins
+whichever colour is scarcer in the 4x4, 6x6 or 8x8 window around that
+corner (a full tie joins ink), instead of always keeping the ink apart.
+Sharp and Edge Detection therefore trace a diagonal hairline as one
+outline, not one square per pixel, and without crack filling (Sharp) a
+white diagonal line through ink stays one hole. The rule was written from
+potrace's published description of its minority turn policy; no potrace
+code was used.
+
+Measured against 85ee406 on the audit corpus: Sharp traces the 12 thin
+lines as 12 outlines instead of 38 (IoU 0.740 to 0.746; mean edge error
+0.322 to 0.329 px, worse, because each 1-px 30/60 degree line is now one
+band). On the noisy star Edge Detection traces 33 outlines instead of 31;
+reverting only the walker rule restores 31.
+
+Updated expectations, each the intended fix: the despeckle unit test and
+Sharp's fine-marks test now treat a diagonal pair or line as one mark, and
+the Centerline connectivity test expects Line Art to agree with Centerline
+(12 ink pixels kept) instead of erasing both diagonals.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../centerline-preset-scale.test.ts           |   9 +-
+ src/core/trace/contour-boundary.test.ts       | 208 +++++++++++++++++-
+ src/core/trace/contour-boundary.ts            |  80 ++++++-
+ src/core/trace/preprocess.test.ts             |  20 +-
+ src/core/trace/preprocess.ts                  |  35 ++-
+ src/core/trace/sharp-fine-marks.test.ts       |  19 +-
+ .../trace/trace-diagonal-connectivity.test.ts |  99 +++++++++
+ src/core/trace/trace-image.ts                 |   6 +-
+ 8 files changed, 422 insertions(+), 54 deletions(-)
+ create mode 100644 src/core/trace/trace-diagonal-connectivity.test.ts
+
+diff --git a/src/core/trace/centerline/centerline-preset-scale.test.ts b/src/core/trace/centerline/centerline-preset-scale.test.ts
+index 07adbbb6c..727aa5c6d 100644
+--- a/src/core/trace/centerline/centerline-preset-scale.test.ts
++++ b/src/core/trace/centerline/centerline-preset-scale.test.ts
+@@ -78,17 +78,18 @@ describe('Centerline preset connectivity', () => {
+     expect(lowerPaths(traced)).toHaveLength(1);
+   });
+ 
+-  it('still removes small detached components and retains the contour connectivity convention', () => {
++  it('still removes small detached components with the same connectivity as filled contours', () => {
+     const image = whiteImage();
+     addBroadContext(image);
+     for (let i = 0; i < 12; i += 1) inkRect(image, 20 + i, 64 + i, 1, 1);
+     for (let i = 0; i < 11; i += 1) inkRect(image, 70 + i, 90 + i, 1, 1);
+     inkRect(image, 100, 70, 1, 1);
+ 
+-    // The 12-pixel diagonal meets the area threshold; the 11-pixel diagonal
+-    // and lone speck remain noise. Filled contours keep four-connectivity.
++    // The 12-pixel diagonal meets Centerline's area threshold; the 11-pixel
++    // diagonal and lone speck remain noise. Line Art counts the same
++    // corner-touching marks (ADR-392), so its 12 px² setting agrees.
+     expect(lowerInkPixels(preprocessForTrace(image, CENTERLINE))).toBe(12);
+-    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(0);
++    expect(lowerInkPixels(preprocessForTrace(image, TRACE_PRESETS['Line Art']!))).toBe(12);
+   });
+ });
+ 
+diff --git a/src/core/trace/contour-boundary.test.ts b/src/core/trace/contour-boundary.test.ts
+index c2dd6742c..19236f850 100644
+--- a/src/core/trace/contour-boundary.test.ts
++++ b/src/core/trace/contour-boundary.test.ts
+@@ -1,6 +1,14 @@
+ import { describe, expect, it } from 'vitest';
+ import type { InkMask } from './centerline';
+-import { midCrackChain, traceBoundaryLoops } from './contour-boundary';
++import {
++  midCrackChain,
++  paperJoinsDiagonally,
++  saddleJoinsInk,
++  traceBoundaryLoops,
++  type CrackSubPixelField,
++} from './contour-boundary';
++import { intersectingContourLoopsSteps } from './contour-intersections';
++import { runTraceSteps } from './trace-steps';
+ 
+ function maskFrom(rows: ReadonlyArray<string>): InkMask {
+   const height = rows.length;
+@@ -18,6 +26,50 @@ function inkCount(mask: InkMask): number {
+   return n;
+ }
+ 
++function sortedAreas(mask: InkMask): number[] {
++  return traceBoundaryLoops(mask)
++    .map((loop) => loop.area)
++    .sort((a, b) => a - b);
++}
++
++function paperRows(width: number, height: number): string[][] {
++  return Array.from({ length: height }, () => Array.from({ length: width }, () => '.'));
++}
++
++function joinRows(rows: ReadonlyArray<ReadonlyArray<string>>): string[] {
++  return rows.map((row) => row.join(''));
++}
++
++// Deterministic pseudo-random mask (LCG) so the property tests are stable.
++function randomMask(width: number, height: number, seed: number, inkShare: number): InkMask {
++  let state = seed >>> 0;
++  const ink = new Uint8Array(width * height);
++  for (let i = 0; i < ink.length; i += 1) {
++    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
++    ink[i] = state / 2 ** 32 < inkShare ? 1 : 0;
++  }
++  return { width, height, ink };
++}
++
++function transformMask(mask: InkMask, map: (x: number, y: number) => [number, number]): InkMask {
++  const [probeX, probeY] = map(mask.width - 1, mask.height - 1);
++  const [originX, originY] = map(0, 0);
++  const width = Math.abs(probeX - originX) + 1;
++  const height = Math.abs(probeY - originY) + 1;
++  const ink = new Uint8Array(width * height);
++  for (let y = 0; y < mask.height; y += 1) {
++    for (let x = 0; x < mask.width; x += 1) {
++      const [tx, ty] = map(x, y);
++      ink[ty * width + tx] = mask.ink[y * mask.width + x] ?? 0;
++    }
++  }
++  return { width, height, ink };
++}
++
++function isSimpleRing(points: ReadonlyArray<{ x: number; y: number }>): boolean {
++  return runTraceSteps(intersectingContourLoopsSteps([{ points, closed: true }])).size === 0;
++}
++
+ describe('traceBoundaryLoops', () => {
+   it('traces a single pixel as one 4-corner loop of area 1', () => {
+     const loops = traceBoundaryLoops(maskFrom(['#']));
+@@ -40,10 +92,77 @@ describe('traceBoundaryLoops', () => {
+     expect(areas).toEqual([-1, 9]);
+   });
+ 
+-  it('keeps diagonally-touching pixels as separate loops (right-turn policy)', () => {
++  it('joins ink pixels that touch at a corner on paper (minority policy)', () => {
+     const loops = traceBoundaryLoops(maskFrom(['#.', '.#']));
+-    expect(loops).toHaveLength(2);
+-    expect(loops.every((l) => l.area === 1)).toBe(true);
++    expect(loops).toHaveLength(1);
++    expect(loops[0]?.area).toBe(2);
++    // The joined loop passes the saddle corner twice.
++    expect(loops[0]?.points).toHaveLength(8);
++  });
++
++  it('traces a 1-px diagonal hairline as one loop, not one loop per pixel', () => {
++    const size = 170;
++    const rows = paperRows(size, size);
++    for (let i = 0; i < 160; i += 1) (rows[i + 5] as string[])[i + 5] = '#';
++    const loops = traceBoundaryLoops(maskFrom(joinRows(rows)));
++    expect(loops).toHaveLength(1);
++    expect(loops[0]?.area).toBe(160);
++  });
++
++  it('keeps a 1-px white diagonal through solid ink as one hole', () => {
++    const rows = Array.from({ length: 14 }, () => Array.from({ length: 14 }, () => '#'));
++    for (let i = 2; i < 12; i += 1) (rows[i] as string[])[i] = '.';
++    expect(sortedAreas(maskFrom(joinRows(rows)))).toEqual([-10, 196]);
++  });
++
++  it('joins a checkerboard patch on paper into one mark with enclosed holes', () => {
++    const rows = paperRows(10, 10);
++    for (let y = 0; y < 4; y += 1) {
++      for (let x = 0; x < 4; x += 1) if ((x + y) % 2 === 0) (rows[y + 3] as string[])[x + 3] = '#';
++    }
++    const mask = maskFrom(joinRows(rows));
++    // Eight ink pixels; the two paper pixels enclosed on all four sides by the
++    // joined ink become holes, the rest open onto the surrounding paper.
++    expect(sortedAreas(mask)).toEqual([-1, -1, 10]);
++  });
++
++  it('keeps the hole of an eight-connected ring a hole', () => {
++    const mask = maskFrom([
++      '.........',
++      '.........',
++      '....#....',
++      '...#.#...',
++      '..#...#..',
++      '...#.#...',
++      '....#....',
++      '.........',
++      '.........',
++    ]);
++    expect(sortedAreas(mask)).toEqual([-5, 13]);
++  });
++
++  it('keeps nested outlines alternating in orientation around a joined diagonal', () => {
++    const mask = maskFrom([
++      '...............',
++      '.#############.',
++      '.#...........#.',
++      '.#.#########.#.',
++      '.#.#.......#.#.',
++      '.#.#.......#.#.',
++      '.#.#..#....#.#.',
++      '.#.#...#...#.#.',
++      '.#.#....#..#.#.',
++      '.#.#.......#.#.',
++      '.#.#.......#.#.',
++      '.#.#########.#.',
++      '.#...........#.',
++      '.#############.',
++      '...............',
++    ]);
++    // Ring, its hole, inner ring, its hole, and the three-pixel diagonal
++    // island inside as one loop.
++    expect(sortedAreas(mask)).toEqual([-121, -49, 3, 81, 169]);
++    expect(traceBoundaryLoops(mask).reduce((sum, l) => sum + l.area, 0)).toBe(inkCount(mask));
+   });
+ 
+   it('signed loop areas sum to the ink pixel count (holes subtract)', () => {
+@@ -57,6 +176,65 @@ describe('traceBoundaryLoops', () => {
+     const rows = ['.##..', '####.', '.###.', '..#..'];
+     expect(traceBoundaryLoops(maskFrom(rows))).toEqual(traceBoundaryLoops(maskFrom(rows)));
+   });
++
++  it.each([
++    [0.2, 11],
++    [0.5, 12],
++    [0.8, 13],
++  ])(
++    'decides every saddle from the corner and the mask alone (ink share %s, seed %s)',
++    (share, seed) => {
++      // Rotating or mirroring the mask must not change which pixels connect,
++      // whatever order the walk happens to visit the saddles in.
++      const mask = randomMask(23, 17, seed, share);
++      const expected = sortedAreas(mask);
++      expect(expected.reduce((sum, area) => sum + area, 0)).toBe(inkCount(mask));
++      const w = mask.width;
++      const h = mask.height;
++      const maps: Array<(x: number, y: number) => [number, number]> = [
++        (x, y) => [w - 1 - x, y],
++        (x, y) => [x, h - 1 - y],
++        (x, y) => [y, x],
++        (x, y) => [h - 1 - y, x],
++      ];
++      for (const map of maps) expect(sortedAreas(transformMask(mask, map))).toEqual(expected);
++    },
++  );
++});
++
++describe('saddleJoinsInk', () => {
++  it('joins ink where paper is the local majority and paper where ink is', () => {
++    expect(saddleJoinsInk(maskFrom(['......', '......', '..#...', '...#..', '......']), 3, 3)).toBe(
++      true,
++    );
++    expect(saddleJoinsInk(maskFrom(['######', '######', '##.###', '###.##', '######']), 3, 3)).toBe(
++      false,
++    );
++  });
++
++  it('joins ink when every window is balanced', () => {
++    const rows = Array.from({ length: 8 }, (_, y) =>
++      Array.from({ length: 8 }, (_, x) => ((x + y) % 2 === 0 ? '#' : '.')).join(''),
++    );
++    expect(saddleJoinsInk(maskFrom(rows), 4, 4)).toBe(true);
++  });
++});
++
++describe('paperJoinsDiagonally', () => {
++  it('joins paper across a corner exactly where the walk joins paper', () => {
++    // A white diagonal through ink: paper is scarce, so the walk joins it.
++    const white = maskFrom(['####', '#.##', '##.#', '####']);
++    expect(paperJoinsDiagonally(white, 1, 1, 1, 1)).toBe(true);
++    expect(paperJoinsDiagonally(white, 2, 2, -1, -1)).toBe(true);
++    // A black diagonal on paper: ink is scarce, so the walk joins ink and the
++    // two paper pixels beside it stay apart.
++    const black = maskFrom(['....', '.#..', '..#.', '....']);
++    expect(paperJoinsDiagonally(black, 2, 1, -1, 1)).toBe(false);
++    // With paper on one side of the corner there is no saddle: those two
++    // paper pixels already connect through their shared paper neighbour.
++    const open = maskFrom(['....', '.#..', '....', '....']);
++    expect(paperJoinsDiagonally(open, 2, 1, -1, 1)).toBe(false);
++  });
+ });
+ 
+ describe('midCrackChain', () => {
+@@ -70,4 +248,26 @@ describe('midCrackChain', () => {
+     expect(xs).toEqual([0, 0.5, 0.5, 1]);
+     expect(ys).toEqual([0, 0.5, 0.5, 1]);
+   });
++
++  it('keeps a loop joined through saddles free of self-contact', () => {
++    const rows = paperRows(12, 12);
++    for (let i = 0; i < 8; i += 1) (rows[i + 2] as string[])[i + 2] = '#';
++    const loop = traceBoundaryLoops(maskFrom(joinRows(rows)))[0];
++    expect(loop).toBeDefined();
++    const plain = midCrackChain(loop?.points ?? []);
++    expect(isSimpleRing(plain)).toBe(true);
++    // Push every vertex to either sub-pixel clamp: the ink-side pixels read
++    // barely darker than the threshold and the paper-side ones barely lighter,
++    // or the reverse. The necks at the saddles must stay open either way.
++    for (const [inkLuma, paperLuma] of [
++      [127, 255],
++      [0, 129],
++    ] as const) {
++      const field: CrackSubPixelField = {
++        lumaAt: (x, y) => (x === y && x >= 2 && x < 10 ? inkLuma : paperLuma),
++        thresholdAt: () => 128,
++      };
++      expect(isSimpleRing(midCrackChain(loop?.points ?? [], field))).toBe(true);
++    }
++  });
+ });
+diff --git a/src/core/trace/contour-boundary.ts b/src/core/trace/contour-boundary.ts
+index fc8cdf3ea..bed18980a 100644
+--- a/src/core/trace/contour-boundary.ts
++++ b/src/core/trace/contour-boundary.ts
+@@ -6,6 +6,8 @@
+ // separate loops with opposite orientation, so even-odd filling downstream
+ // keeps holes hollow. Written from scratch against our own mask/Vec2 types —
+ // boundary following on a lattice is textbook material (Pavlidis 1982).
++// Where pixels touch only at a corner, the minority turn policy decides
++// which colour connects (ADR-392).
+ 
+ import type { Vec2 } from '../scene';
+ import type { InkMask } from './centerline';
+@@ -193,26 +195,90 @@ function walkLoop(mask: InkMask, edges: EdgeMap, startKey: number, startDir: num
+     // Shoelace accumulates over the directed edge (x,y)→(nx,ny).
+     area += x * ny - nx * y;
+     key = ny * stride + nx;
+-    dir = nextDirection(edges, key, dir);
++    dir = nextDirection(mask, edges, key, dir);
+   } while (!(key === startKey && dir === startDir) && dir !== -1);
+   return { points, area: area / 2 };
+ }
+ 
+-// At almost every corner exactly one out-edge remains. Two remain only at a
+-// "saddle" (two diagonally-touching ink pixels): prefer the RIGHT turn, which
+-// hugs the ink we are already tracing and keeps diagonal blobs as separate
+-// loops instead of welding them through the corner.
+-function nextDirection(edges: EdgeMap, key: number, incomingDir: number): number {
++// Away from saddles exactly one out-edge leaves a corner. A saddle corner has
++// two ink pixels touching across one diagonal and two paper pixels across the
++// other, so two out-edges leave it. With ink on the right of travel, the
++// RIGHT turn keeps hugging the ink pixel being traced (the ink pixels stay
++// separate loops and the paper pixels connect); the LEFT turn crosses to the
++// other ink pixel (the ink pixels join and the paper pixels part). The
++// choice depends only on the corner and the mask, so both walks through a
++// saddle pair up its edges the same way.
++function nextDirection(mask: InkMask, edges: EdgeMap, key: number, incomingDir: number): number {
+   const set = edges.get(key);
+   if (set === undefined || set.size === 0) return -1;
++  const x = key % (mask.width + 1);
++  const y = (key - x) / (mask.width + 1);
+   const right = (incomingDir + 1) % 4;
++  const left = (incomingDir + 3) % 4;
++  if (isSaddle(mask, x, y)) {
++    const turn = saddleJoinsInk(mask, x, y) ? left : right;
++    return set.has(turn) ? turn : -1;
++  }
+   if (set.has(right)) return right;
+   if (set.has(incomingDir)) return incomingDir;
+-  const left = (incomingDir + 3) % 4;
+   if (set.has(left)) return left;
+   return -1;
+ }
+ 
++function isSaddle(mask: InkMask, x: number, y: number): boolean {
++  const northWest = isInk(mask, x - 1, y - 1);
++  const northEast = isInk(mask, x, y - 1);
++  return (
++    northWest !== northEast &&
++    northWest === isInk(mask, x, y) &&
++    northEast === isInk(mask, x - 1, y)
++  );
++}
++
++// Square windows centred on a saddle corner, 4×4, 6×6 and 8×8 pixels. The
++// 2×2 core always holds two ink and two paper pixels, so the smallest window
++// with more of one colour decides.
++const SADDLE_WINDOW_HALF_WIDTHS = [2, 3, 4] as const;
++
++/** The turn policy at a saddle corner (x, y) on the pixel-corner lattice:
++ *  true joins the two diagonal ink pixels, false joins the two paper pixels.
++ *  Minority policy, potrace's documented default: connect whichever colour
++ *  is scarcer around the corner, so a 1-px diagonal line on paper stays one
++ *  mark and a 1-px white line through solid ink stays one gap. A full tie (a
++ *  checkerboard) joins ink, so dithered ink stays one mark instead of loose
++ *  pixels. Pixels outside the mask count as paper, as they do for the walk. */
++export function saddleJoinsInk(mask: InkMask, x: number, y: number): boolean {
++  for (const half of SADDLE_WINDOW_HALF_WIDTHS) {
++    let balance = 0;
++    for (let py = y - half; py < y + half; py += 1) {
++      for (let px = x - half; px < x + half; px += 1) balance += isInk(mask, px, py) ? 1 : -1;
++    }
++    if (balance !== 0) return balance < 0;
++  }
++  return true;
++}
++
++/** Whether paper pixel (x, y) connects to paper pixel (x + dx, y + dy) across
++ *  their shared corner (dx, dy = ±1) the way the walk connects them: only at
++ *  a saddle, where the two pixels beside that corner are ink, and only where
++ *  the walk joins paper there. Callers that group paper into regions use it
++ *  so their regions are the holes the walk traces. */
++export function paperJoinsDiagonally(
++  mask: InkMask,
++  x: number,
++  y: number,
++  dx: number,
++  dy: number,
++): boolean {
++  if (isInk(mask, x + dx, y + dy)) return false;
++  if (!isInk(mask, x + dx, y) || !isInk(mask, x, y + dy)) return false;
++  return !saddleJoinsInk(mask, x + Math.max(dx, 0), y + Math.max(dy, 0));
++}
++
++function isInk(mask: InkMask, x: number, y: number): boolean {
++  return inkAt(mask, x, y) !== 0;
++}
++
+ function consumeEdge(edges: EdgeMap, key: number, dir: number): void {
+   const set = edges.get(key);
+   if (set === undefined) return;
+diff --git a/src/core/trace/preprocess.test.ts b/src/core/trace/preprocess.test.ts
+index efb708e3c..18fed8549 100644
+--- a/src/core/trace/preprocess.test.ts
++++ b/src/core/trace/preprocess.test.ts
+@@ -244,21 +244,23 @@ describe('despeckle', () => {
+     expect(lumaOf(out, 2, 2)).toBe(0);
+   });
+ 
+-  it('treats 4-connected speckles as separate regions', () => {
+-    // Two diagonally-touching ink pixels are NOT connected under
+-    // 4-connectivity, so each is its own 1-pixel region. With
+-    // minPixels=2 both vanish.
++  it('counts ink pixels that touch at a corner as one mark', () => {
++    // A diagonal pair is one 2-pixel mark (ADR-392): minPixels=2 keeps it,
++    // and only a setting above its area removes it.
+     const img = gridImage([
+       [0, 255, 255],
+       [255, 0, 255],
+       [255, 255, 255],
+     ]);
+-    const out = despeckle(img, 2);
+-    expect(lumaOf(out, 0, 0)).toBe(255);
+-    expect(lumaOf(out, 1, 1)).toBe(255);
++    const kept = despeckle(img, 2);
++    expect(lumaOf(kept, 0, 0)).toBe(0);
++    expect(lumaOf(kept, 1, 1)).toBe(0);
++    const removed = despeckle(img, 3);
++    expect(lumaOf(removed, 0, 0)).toBe(255);
++    expect(lumaOf(removed, 1, 1)).toBe(255);
+   });
+ 
+-  it('can retain diagonal strokes while removing smaller eight-connected components', () => {
++  it('retains diagonal strokes while removing smaller eight-connected components', () => {
+     const img = gridImage([
+       [0, 255, 255, 255, 255, 255],
+       [255, 0, 255, 255, 255, 255],
+@@ -268,7 +270,7 @@ describe('despeckle', () => {
+       [255, 255, 255, 255, 255, 0],
+     ]);
+     const before = new Uint8ClampedArray(img.data);
+-    const out = despeckle(img, 3, 8);
++    const out = despeckle(img, 3);
+     for (let i = 0; i < 3; i += 1) expect(lumaOf(out, i, i)).toBe(0);
+     expect(lumaOf(out, 4, 4)).toBe(255);
+     expect(lumaOf(out, 5, 5)).toBe(255);
+diff --git a/src/core/trace/preprocess.ts b/src/core/trace/preprocess.ts
+index def6b2d96..490896582 100644
+--- a/src/core/trace/preprocess.ts
++++ b/src/core/trace/preprocess.ts
+@@ -253,15 +253,14 @@ export function otsuThreshold(image: RawImageData): number {
+ // tiny holes" — preserving hole topology is critical for letters
+ // like O / B / R / etc.
+ //
+-// Contours use four-connected ink; Centerline opts into eight-connectivity
+-// so a diagonal stroke is one component rather than a row of isolated specks.
++// Ink pixels that touch only at a corner belong to one mark, in every trace
++// mode (ADR-392): a diagonal hairline is one component, not a row of 1-px
++// specks that any setting of 2 or more would erase. The contour walker joins
++// such pixels too wherever ink is the scarcer colour around the corner.
++//
+ // BFS using a single Uint8 visited mask + an index queue. O(N) total
+ // work for N pixels regardless of region count.
+-export function despeckle(
+-  image: RawImageData,
+-  minPixels: number,
+-  connectivity: 4 | 8 = 4,
+-): RawImageData {
++export function despeckle(image: RawImageData, minPixels: number): RawImageData {
+   if (minPixels <= 1) return image;
+   const { width: w, height: h } = image;
+   const out = new Uint8ClampedArray(image.data);
+@@ -270,7 +269,7 @@ export function despeckle(
+     if (visited[startIdx] !== 0) continue;
+     visited[startIdx] = 1;
+     if (lumaAt(out, startIdx * 4) >= 128) continue; // background pixel — skip
+-    const region = bfsInkRegion(out, visited, w, h, startIdx, connectivity);
++    const region = bfsInkRegion(out, visited, w, h, startIdx);
+     if (region.length < minPixels) {
+       eraseRegion(out, region);
+     }
+@@ -278,16 +277,14 @@ export function despeckle(
+   return { width: w, height: h, data: out };
+ }
+ 
+-// BFS the connected ink region (luma < 128) starting at `startIdx`.
+-// Marks every visited cell in `visited`. Diagonal neighbours participate only
+-// for callers whose stroke topology uses eight-connected ink.
++// BFS the eight-connected ink region (luma < 128) starting at `startIdx`.
++// Marks every visited cell in `visited`.
+ function bfsInkRegion(
+   out: Uint8ClampedArray,
+   visited: Uint8Array,
+   w: number,
+   h: number,
+   startIdx: number,
+-  connectivity: 4 | 8,
+ ): number[] {
+   const region: number[] = [startIdx];
+   const queue: number[] = [startIdx];
+@@ -295,15 +292,11 @@ function bfsInkRegion(
+     const cur = queue.pop() ?? 0;
+     const cx = cur % w;
+     const cy = (cur - cx) / w;
+-    visitNeighbour(out, visited, w, h, cx - 1, cy, region, queue);
+-    visitNeighbour(out, visited, w, h, cx + 1, cy, region, queue);
+-    visitNeighbour(out, visited, w, h, cx, cy - 1, region, queue);
+-    visitNeighbour(out, visited, w, h, cx, cy + 1, region, queue);
+-    if (connectivity === 8) {
+-      visitNeighbour(out, visited, w, h, cx - 1, cy - 1, region, queue);
+-      visitNeighbour(out, visited, w, h, cx + 1, cy - 1, region, queue);
+-      visitNeighbour(out, visited, w, h, cx - 1, cy + 1, region, queue);
+-      visitNeighbour(out, visited, w, h, cx + 1, cy + 1, region, queue);
++    for (let dy = -1; dy <= 1; dy += 1) {
++      for (let dx = -1; dx <= 1; dx += 1) {
++        if (dx === 0 && dy === 0) continue;
++        visitNeighbour(out, visited, w, h, cx + dx, cy + dy, region, queue);
++      }
+     }
+   }
+   return region;
+diff --git a/src/core/trace/sharp-fine-marks.test.ts b/src/core/trace/sharp-fine-marks.test.ts
+index de649c4a6..540c9b42a 100644
+--- a/src/core/trace/sharp-fine-marks.test.ts
++++ b/src/core/trace/sharp-fine-marks.test.ts
+@@ -10,8 +10,8 @@ function fineMarks(reflected: boolean): RawImageData {
+   const ink = (x: number, y: number): void => {
+     data.set([0, 0, 0, 255], (y * width + (reflected ? width - 1 - x : x)) * 4);
+   };
+-  // A thin diagonal is a coherent visual line, but every pixel is a separate
+-  // component under four-connectivity. Include short detached hatch marks too.
++  // A thin diagonal is one visual line whose pixels touch only at corners.
++  // Include short detached hatch marks too.
+   for (let i = 0; i < 24; i += 1) ink(10 + i, 10 + i);
+   for (let length = 1; length <= 3; length += 1) {
+     for (let x = 0; x < length; x += 1) ink(10 + length * 10 + x, 45);
+@@ -39,10 +39,21 @@ describe('Sharp fine source marks', () => {
+ 
+   it('still lets the operator remove these marks explicitly', async () => {
+     const source = fineMarks(false);
+-    const paths = await traceImageToColoredPaths(source, {
++    // The 1-3 px hatch marks fall below 4 px². The diagonal's pixels touch at
++    // corners, so it is one 24 px² mark (ADR-392) and needs a larger setting.
++    const hatchRemoved = await traceImageToColoredPaths(source, {
+       ...TRACE_PRESETS.Sharp!,
+       despeckleMinPixels: 4,
+     });
+-    expect(paths).toEqual([]);
++    const remaining = hatchRemoved.flatMap((path) => path.polylines);
++    expect(remaining).toHaveLength(1);
++    for (const point of remaining[0]?.points ?? []) {
++      expect(Math.abs(point.x - point.y)).toBeLessThanOrEqual(1);
++    }
++    const allRemoved = await traceImageToColoredPaths(source, {
++      ...TRACE_PRESETS.Sharp!,
++      despeckleMinPixels: 25,
++    });
++    expect(allRemoved).toEqual([]);
+   });
+ });
+diff --git a/src/core/trace/trace-diagonal-connectivity.test.ts b/src/core/trace/trace-diagonal-connectivity.test.ts
+new file mode 100644
+index 000000000..a1e9c4922
+--- /dev/null
++++ b/src/core/trace/trace-diagonal-connectivity.test.ts
+@@ -0,0 +1,99 @@
++// Pixels that touch only at a corner are one mark in every outline mode
++// (ADR-392). Before, Line Art and Smooth erased a 1-px diagonal as a row of
++// 1-px specks, and Sharp traced it as one square per pixel.
++
++import { describe, expect, it } from 'vitest';
++import type { Polyline } from '../scene';
++import type { RawImageData, TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++import { traceImageToColoredPaths } from './trace-to-paths';
++
++const OUTLINE_PRESETS = ['Line Art', 'Smooth', 'Sharp', 'Edge Detection'] as const;
++
++function canvas(size: number, paper: number): RawImageData {
++  const data = new Uint8ClampedArray(size * size * 4).fill(paper);
++  return { width: size, height: size, data };
++}
++
++function paint(image: RawImageData, x: number, y: number, luma: number): void {
++  image.data.set([luma, luma, luma, 255], (y * image.width + x) * 4);
++}
++
++// A 1-px black diagonal, 160 px long, on white paper.
++function diagonalHairline(): RawImageData {
++  const image = canvas(200, 255);
++  for (let i = 0; i < 160; i += 1) paint(image, 20 + i, 20 + i, 0);
++  return image;
++}
++
++// A black block and a pale X of two 1-px diagonals (luma 175), the kind of
++// stroke Faint lines adds to the mask.
++function paleCross(): RawImageData {
++  const image = canvas(220, 255);
++  for (let y = 10; y < 40; y += 1) {
++    for (let x = 10; x < 40; x += 1) paint(image, x, y, 0);
++  }
++  for (let i = 0; i < 90; i += 1) {
++    paint(image, 60 + i, 60 + i, 175);
++    paint(image, 160 - i, 60 + i, 175);
++  }
++  return image;
++}
++
++// Large images trace at their own resolution, where no supersampling blurs a
++// diagonal into a 4-connected band; these overrides give a small test image
++// the same route.
++const NATIVE_SCALE: Partial<TraceOptions> = {
++  supersampleContour: false,
++  autoUpscaleSmallSources: false,
++  upscaleSmallSmoothSources: false,
++};
++
++async function outlines(
++  image: RawImageData,
++  preset: string,
++  overrides: Partial<TraceOptions> = {},
++): Promise<Polyline[]> {
++  const options = TRACE_PRESETS[preset];
++  if (options === undefined) throw new Error(`missing preset ${preset}`);
++  const paths = await traceImageToColoredPaths(image, { ...options, ...overrides });
++  return paths.flatMap((path) => path.polylines);
++}
++
++function span(polyline: Polyline): { readonly min: number; readonly max: number } {
++  const xs = polyline.points.map((point) => point.x);
++  return { min: Math.min(...xs), max: Math.max(...xs) };
++}
++
++function expectOneHairlineOutline(traced: ReadonlyArray<Polyline>): void {
++  expect(traced).toHaveLength(1);
++  const outline = traced[0]!;
++  expect(outline.closed).toBe(true);
++  const { min, max } = span(outline);
++  expect(min).toBeLessThan(22);
++  expect(max).toBeGreaterThan(178);
++}
++
++describe('corner-touching pixels are one mark (ADR-392)', () => {
++  it.each(OUTLINE_PRESETS)(
++    '%s traces a 160 px diagonal hairline as one closed outline',
++    async (preset) => {
++      expectOneHairlineOutline(await outlines(diagonalHairline(), preset));
++    },
++  );
++
++  it.each(OUTLINE_PRESETS)('%s keeps the hairline whole at native scale', async (preset) => {
++    expectOneHairlineOutline(await outlines(diagonalHairline(), preset, NATIVE_SCALE));
++  });
++
++  it.each(['Line Art', 'Smooth'])(
++    '%s with Faint lines keeps a pale diagonal X as one outline',
++    async (preset) => {
++      const traced = await outlines(paleCross(), preset, { faintLineRecovery: true });
++      const onCross = traced.filter((polyline) =>
++        polyline.points.every((point) => point.x > 55 && point.y > 55),
++      );
++      expect(onCross).toHaveLength(1);
++    },
++  );
++});
+diff --git a/src/core/trace/trace-image.ts b/src/core/trace/trace-image.ts
+index 34ad5e7cc..d1d210e89 100644
+--- a/src/core/trace/trace-image.ts
++++ b/src/core/trace/trace-image.ts
+@@ -200,11 +200,7 @@ function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageDa
+   // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
+   const scale = effectivePixelScale(options);
+   const despeckled = shouldDespeckle(options)
+-    ? despeckle(
+-        image,
+-        (options.despeckleMinPixels ?? 0) * scale * scale,
+-        options.traceMode === 'centerline' ? 8 : 4,
+-      )
++    ? despeckle(image, (options.despeckleMinPixels ?? 0) * scale * scale)
+     : image;
+   return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale) : despeckled;
+ }
+
+base-commit: e90d52822becac36ba494d37b01c6cc7eb56572a
+-- 
+2.43.0
+

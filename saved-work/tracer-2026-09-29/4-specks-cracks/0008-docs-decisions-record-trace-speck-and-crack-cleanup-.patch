@@ -1,0 +1,189 @@
+From aa58211fcd0c31bc7ab9a5d7fd8ed12cc85738e8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:25:29 +0000
+Subject: [PATCH 8/8] docs(decisions): record trace speck and crack cleanup
+ (ADR-392)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Operator change: none; this records the decision behind the previous
+seven commits. Remove ink specks defaults to 2 px² in Line Art and
+Smooth; pixels that touch only at a corner are grouped by one rule in
+speck removal, the outline walker (potrace-style minority rule), crack
+filling and enlarged-grid support; crack filling closes only grey cracks;
+and the speck size keeps a half-pixel margin on enlarged grids.
+
+The record carries the before and after measurements against 85ee406,
+including the worse results: Sharp's mean edge error on the thin-lines
+image (0.322 to 0.329 px), two more noise outlines in Edge Detection on
+the noisy star, twice the CPU time for Smooth on the dragon (4.0 to
+8.2 s, from twice the outlines), and five pale marks on the Arch House
+logo in Line Art. Sources are potrace's paper, library reference and
+manual, Inkscape 1.4.2's trace dialog, and LaserGRBL's vectoriser.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ ...s-corner-touching-marks-and-white-lines.md | 149 ++++++++++++++++++
+ 1 file changed, 149 insertions(+)
+ create mode 100644 docs/decisions/ADR-392-trace-cleanup-keeps-corner-touching-marks-and-white-lines.md
+
+diff --git a/docs/decisions/ADR-392-trace-cleanup-keeps-corner-touching-marks-and-white-lines.md b/docs/decisions/ADR-392-trace-cleanup-keeps-corner-touching-marks-and-white-lines.md
+new file mode 100644
+index 000000000..ebe1f301c
+--- /dev/null
++++ b/docs/decisions/ADR-392-trace-cleanup-keeps-corner-touching-marks-and-white-lines.md
+@@ -0,0 +1,149 @@
++## ADR-392 - Trace cleanup keeps corner-touching marks and drawn white lines (2026-09-24)
++
++**Status:** Accepted. | **Date:** 2026-09-24
++
++### Context
++
++Line Art, Smooth, Sharp and Edge Detection clean the binary mask before the outline walker
++(`contour-boundary.ts`) traces it. **Remove ink specks** (`despeckle`) erases ink marks smaller than
++its setting, and **Fill tiny holes** (`fillPinholes`) paints enclosed hairline slivers of paper as
++ink. The 2026-09-24 tracer audit found three problems in this cleanup (Findings 2 and 6, and item 3
++of Finding 9):
++
++- The speck defaults deleted real text. Line Art removed marks under 12 px² and Smooth under 24 px².
++  The dot on an i in 32 px text covers about 10 px², so both presets deleted it. In 16 px text
++  Smooth deleted the whole letter i.
++- The three stages grouped pixels that touch only at a corner in different ways. Speck removal
++  counted 4-connected ink in the outline presets (Centerline already counted 8-connected). At a
++  corner where two ink and two paper pixels meet diagonally, the walker always turned right, so it
++  traced corner-touching ink as separate outlines. Crack filling grouped paper 4-connected. A 1-px
++  diagonal line was therefore a row of 1-px marks. Line Art and Smooth erased it at any speck
++  setting of 2 or more, and Sharp traced it as one square per pixel: 38 outlines for the 12 lines of
++  the thin-lines test image.
++- Crack filling could not tell a crack from a drawn white line. It filled every enclosed paper
++  region at most about 2 px wide and 120 px² in area. On the dragon test image
++  (`centerline-stress-test-20260909.png`, 1254 px) Line Art made 1,804 outlines, and 2,635 with
++  crack filling off. Filling had closed 831 white shapes, including drawn white channels.
++
++Main's 85ee406 (PRs #880 and #897) made **Fill tiny holes** a visible checkbox and added **Faint
++lines**. On enlarged working grids it now restores thin ink and paper counters that enlargement
++erased (`contour-support.ts`), and it grouped that paper 4-connected too.
++
++Other tracers use a small speck size and connect corner-touching pixels by local majority.
++potrace despeckles by "dropping all paths whose interior consists of fewer than t pixels"
++(Selinger 2003, §2.1.3), and its default t is 2 (potracelib §2.3.1). Its default turn policy is
++minority, which "prefers to connect the color (black or white) that occurs least frequently within
++a given neighborhood of the current position" (Selinger 2003, §2.1.2) and "tends to keep visual
++lines connected" (potracelib §2.3.2). Inkscape 1.4.2's Speckles option defaults to 2, and LaserGRBL
++passes 2 to its potrace port unless Spot Removal is set.
++
++### Decision
++
++1. **Remove ink specks** defaults to 2 in Line Art and Smooth, so it removes lone 1-px specks only.
++   Sharp (off), Centerline (12) and Edge Detection (12) keep their values. The control keeps its
++   range, so heavier cleanup is still one setting away.
++2. Corner-touching pixels are grouped the same way at every stage:
++   - Speck removal counts 8-connected ink in every trace mode.
++   - At a corner where two ink and two paper pixels meet diagonally, the walker uses a minority
++     rule. It counts ink and paper in the 4×4 window centred on the corner, then 6×6, then 8×8. The
++     first window that is not balanced decides, and the scarcer colour connects. A full tie, such
++     as a checkerboard, connects ink. Pixels outside the image count as paper, as they already did
++     for the walk. The rule depends only on the corner and the mask, so the outline and the hole
++     that meet at a corner always agree. Line Art, Smooth, Sharp and Edge Detection all trace with
++     this walker.
++   - Crack filling and the enlarged-grid restoration in `contour-support.ts` join two paper pixels
++     across a corner exactly where the walker joins paper there (`paperJoinsDiagonally`). A sliver
++     or a counter is then judged as the walker traces it: by its whole area and all its pixels.
++3. Crack filling fills an enclosed hairline sliver only when every one of its pixels was nearer the
++   threshold than the paper level in the luma before the cut:
++   `luma − threshold ≤ paper − luma`, where the paper level is the median luma of the mask's paper
++   pixels. A crack from anti-aliasing or shading passes; on the Arch House logo, every crack is at
++   most 39 luma above the threshold. A white line the artist drew has pixels at paper level, so it
++   stays open. Masks with no luma before the cut (alpha masks and two-sided brightness bands) keep
++   the shape tests only. **Fill tiny holes** turns this filling on or off, preset defaults are
++   unchanged (on for Line Art, Smooth and Centerline, off for Sharp), and its tooltip now says that
++   grey cracks fill and white lines stay open.
++4. On supersampled grids, speck removal compares a mark's working pixels with (N − ½)·s² instead of
++   N·s². Bilinear enlargement rounds a mark's corners (a 3×3 speck keeps 77 of its 81 working
++   pixels at ×3), so an N-pixel source mark now survives on every route, as it does at native size.
++   The native test is unchanged because pixel counts are whole numbers. `despeckle` takes the scale
++   as a named option, so an older call that passes a connectivity of 4 or 8 in third place fails to
++   type-check instead of running as a scale.
++
++The minority rule was written from the published descriptions cited below. No potrace source was
++consulted or ported, and the window sizes and the tie rule were chosen here, so the tracer stays
++an own engine under the MIT licence (ADR-120, ADR-123).
++
++### Consequences
++
++All numbers compare this change with 85ee406, run in the same session.
++
++- Audit corpus (12 synthetic images with exact answers, four presets): 11 of 48 traces change and
++  37 are identical.
++  - Text keeps its i-dots. Line Art and Smooth now trace 25 of 25 shapes on the sans 32 px, serif
++    32 px, noisy 32 px and sans 16 px text. They traced 24, and Smooth 22 on the 16 px text. IoU
++    rises in all eight traces (Smooth 16 px: 0.653 to 0.672), and no specks appear on the noisy
++    images.
++  - Diagonal lines stay whole. Sharp traces the 12 thin lines as 12 outlines instead of 38, and Line
++    Art as 12 instead of 13. IoU rises (Sharp 0.740 to 0.746, Line Art 0.736 to 0.742).
++  - Worse: on the thin lines, Sharp's mean edge error rises from 0.322 to 0.329 px, because each
++    1-px 30° and 60° line is now one continuous band. On the noisy star, Edge Detection traces 33
++    outlines instead of 31 (the star and its noise), and its mean edge error rises from 10.04 to
++    10.45 px. Reverting only the walker rule restores 31; the speck counting does not change this
++    trace. The restored i-dot on the 16 px text adds 0.0003 px to Line Art's mean edge error.
++- Dragon, outlines and process CPU time (best of 3 on a shared machine; expect ±10%):
++
++  | Preset | Outlines before | Outlines after | CPU before | CPU after |
++  | --- | --- | --- | --- | --- |
++  | Line Art | 1,804 | 3,468 | 5.6 s | 6.3 s |
++  | Smooth | 1,713 | 3,691 | 4.0 s | 8.2 s |
++  | Sharp | 7,711 | 4,948 | 7.1 s | 6.0 s |
++  | Edge Detection | 2,196 | 2,430 | 6.2 s | 6.6 s |
++
++  At the old speck sizes, with the connectivity and crack changes also reverted, the counts and
++  times return to the base values. With only the old speck sizes, this change makes 2,811 (Line
++  Art) and 3,248 (Smooth) outlines. Of those, leaving bright slivers open adds 730 and 1,158, and
++  8-connected speck counting keeps 340 and 453 corner-touching marks. The walker rule joins pieces
++  that would otherwise be separate outlines: without it the counts would be 4,750 and 5,712. The
++  speck default of 2 then adds 657 and 443. For comparison, the speck default alone on the base
++  gives 4,559 and 3,285.
++- The added dragon outlines are content of the image. Of 1,337 added Line Art holes, 1,050 contain
++  source pixels at luma 230 or above (paper) and 17 stay below 180. Of 971 added ink outlines, 305
++  have pixels at luma 64 or darker and 354 have none darker than 100; 655 are under 4 px². In the
++  crops checked they are dots of grey shading inside horns and leaves, and white gaps between hatch
++  strokes. Crack filling now closes 718 of the 1,461 slivers that pass the shape tests, and leaves
++  743 bright ones open. An operator who wants the old, cleaner result sets **Remove ink specks**
++  back to 12 or turns off **Fill tiny holes**.
++- Smooth on the dragon takes twice as long because its outline count doubles. The profile puts
++  the extra time in the outline topology check (1.4 s to 4.8 s), not in the new cleanup code;
++  finishing grows from 1.5 s to 1.8 s.
++- Arch House logo: Line Art traces 64 outlines instead of 60, all from the speck default. The added
++  marks are five pale spots of 1 to 19 px² in light shading, found by the local-contrast detail pass
++  on this colour image. Their darkest pixels are luma 115 to 234, so four of the five are lighter
++  than the 128 cut. They are the only added marks measured that are lighter than their preset's
++  cut (on the dragon every added mark is darker than it), and speck removal at 12 hid them. Every
++  sliver that passes the shape tests on the logo is grey, so the grey test leaves crack filling as
++  it was (6 slivers in Line Art and 35 in Smooth on the ×2 grid). Smooth, Sharp and Edge Detection
++  change by at most 7 outlines, and times are unchanged within noise.
++- The half-pixel speck margin changes one of these traces. Compared with the same code without it,
++  the 48 corpus traces and the dragon are identical, and the logo's Smooth trace keeps one more pale
++  2-px mark (50 outlines, as on 85ee406).
++- Tests: `trace-diagonal-connectivity.test.ts` traces a 160 px 1-px diagonal as one closed outline in
++  all four outline presets, both at default settings and at native scale. It also checks a pale X
++  under Faint lines, a white diagonal through ink that stays one hole, and a grey diagonal crack that
++  still closes. `contour-boundary.test.ts` covers checkerboards, 8-connected rings, nesting, and
++  rotated and reflected random masks. `fill-pinholes.test.ts` pins the grey test,
++  `contour-input.test.ts` checks that a counter's corner pixel is not restored as a counter of its
++  own, and `despeckle-supersample.test.ts` pins the speck size at ×2 and ×3.
++
++### Sources
++
++- P. Selinger, "Potrace: a polygon-based tracing algorithm", 2003, §2.1.2 (turn policies) and §2.1.3
++  (despeckling): https://potrace.sourceforge.net/potrace.pdf
++- potracelib API reference, §2.3.1 (turdsize default 2) and §2.3.2 (turn policy default minority):
++  https://potrace.sourceforge.net/potracelib.pdf
++- potrace manual page (`--turnpolicy`, default minority): https://potrace.sourceforge.net/potrace.1.html
++- Inkscape 1.4.2 Trace Bitmap dialog (Speckles default 2):
++  https://gitlab.com/inkscape/inkscape/-/blob/INKSCAPE_1_4_2/share/ui/dialog-trace.glade
++- LaserGRBL vectorisation (turdsize is Spot Removal or 2):
++  https://github.com/arkypita/LaserGRBL/blob/master/LaserGRBL/RasterConverter/ImageProcessor.cs
+-- 
+2.43.0
+

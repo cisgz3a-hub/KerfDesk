@@ -1,0 +1,162 @@
+diff --git a/src/core/trace/contour-boundary.ts b/src/core/trace/contour-boundary.ts
+index fc8cdf3ea..851c930c3 100644
+--- a/src/core/trace/contour-boundary.ts
++++ b/src/core/trace/contour-boundary.ts
+@@ -47,6 +47,9 @@ export type CrackSubPixelField = {
+   readonly lumaAt: (x: number, y: number) => number;
+   /** Ink is luma ≤ thresholdAt(x,y) at that position. */
+   readonly thresholdAt: (x: number, y: number) => number;
++  /** Brightness bands only: ink is also luma ≥ lowerThresholdAt(x,y). A crack
++   *  whose paper side is darker than the band crosses this lower iso-line. */
++  readonly lowerThresholdAt?: (x: number, y: number) => number;
+ };
+ 
+ // Interpolation clamp: near-flat luma pairs put the crossing arbitrarily
+@@ -81,16 +84,16 @@ export function midCrackChain(loop: ReadonlyArray<Vec2>, field?: CrackSubPixelFi
+ 
+ export type MidCrackChain = {
+   readonly points: Vec2[];
+-  /** Fraction of cracks whose crossing carried real sub-pixel information
+-   *  (|t − 0.5| beyond noise). ~0 on binary sources (saturated steps stay at
+-   *  the midpoint), high on anti-aliased art — the signal callers use to
+-   *  decide whether quantization-noise smoothing is still needed. */
++  /** Fraction of cracks whose crossing was measured from a genuine
++   *  anti-aliasing straddle of the iso-line. ~0 on binary sources (saturated
++   *  steps stay at the midpoint), high on anti-aliased art — the signal
++   *  callers use to decide whether quantization-noise smoothing is still
++   *  needed. A measurement that lands on the midpoint still counts: a
++   *  symmetric ramp cut at its own midpoint level is exact, not missing
++   *  (ADR-393). */
+   readonly interpolatedFraction: number;
+ };
+ 
+-// |t − 0.5| below this is indistinguishable from the plain midpoint.
+-const INTERPOLATED_T_EPS = 0.05;
+-
+ export function midCrackChainWithStats(
+   loop: ReadonlyArray<Vec2>,
+   field?: CrackSubPixelField,
+@@ -113,26 +116,30 @@ export function midCrackChainWithStats(
+     const rightX = -(b.y - a.y);
+     const rightY = b.x - a.x;
+     const t = crackCrossing(field, midX, midY, rightX, rightY);
+-    if (Math.abs(t - MID_CRACK_T) > INTERPOLATED_T_EPS) interpolated += 1;
+-    out.push({ x: midX + (t - MID_CRACK_T) * rightX, y: midY + (t - MID_CRACK_T) * rightY });
++    if (t !== null) interpolated += 1;
++    const offset = (t ?? MID_CRACK_T) - MID_CRACK_T;
++    out.push({ x: midX + offset * rightX, y: midY + offset * rightY });
+   }
+   return { points: out, interpolatedFraction: n === 0 ? 0 : interpolated / n };
+ }
+ 
++// The crossing parameter t (0 = paper pixel centre, 1 = ink pixel centre),
++// or null when the pair carries no measurement and the vertex stays at the
++// crack midpoint.
+ function crackCrossing(
+   field: CrackSubPixelField,
+   midX: number,
+   midY: number,
+   rightX: number,
+   rightY: number,
+-): number {
++): number | null {
+   const inkX = Math.floor(midX + MID_CRACK_T * rightX);
+   const inkY = Math.floor(midY + MID_CRACK_T * rightY);
+   const bgX = Math.floor(midX - MID_CRACK_T * rightX);
+   const bgY = Math.floor(midY - MID_CRACK_T * rightY);
+   const inkLuma = field.lumaAt(inkX, inkY);
+   const bgLuma = field.lumaAt(bgX, bgY);
+-  if (bgLuma >= SATURATED_BG_LUMA && inkLuma <= SATURATED_INK_LUMA) return MID_CRACK_T;
++  if (bgLuma >= SATURATED_BG_LUMA && inkLuma <= SATURATED_INK_LUMA) return null;
+   // The iso-line is the zero of luma minus the threshold at that position.
+   // Interpolate those residuals: averaging the thresholds first changes the
+   // crossing whenever a local threshold varies across the crack.
+@@ -143,12 +150,37 @@ function crackCrossing(
+   // Only a proper straddle interpolates. Cleanup stages (despeckle, pinhole
+   // fill) flip mask pixels without touching the luma, so cracks they create
+   // have no crossing — those stay at the plain midpoint.
+-  if (!(bgResidual > 0 && inkResidual <= 0)) return MID_CRACK_T;
++  if (!(bgResidual > 0 && inkResidual <= 0)) {
++    return lowerCrossing(field, inkX, inkY, inkLuma, bgX, bgY, bgLuma);
++  }
+   // Keep the established constant-threshold arithmetic exactly unchanged.
+   const t =
+     inkThreshold === bgThreshold
+       ? bgResidual / (bgLuma - inkLuma)
+       : bgResidual / (bgResidual - inkResidual);
++  return clampCrossing(t);
++}
++
++// A band's lower edge mirrors the upper one: the paper pixel is darker than
++// the band, so luma rises from paper to ink across the crack.
++function lowerCrossing(
++  field: CrackSubPixelField,
++  inkX: number,
++  inkY: number,
++  inkLuma: number,
++  bgX: number,
++  bgY: number,
++  bgLuma: number,
++): number | null {
++  if (field.lowerThresholdAt === undefined) return null;
++  if (bgLuma <= SATURATED_INK_LUMA && inkLuma >= SATURATED_BG_LUMA) return null;
++  const inkResidual = field.lowerThresholdAt(inkX, inkY) - inkLuma;
++  const bgResidual = field.lowerThresholdAt(bgX, bgY) - bgLuma;
++  if (!(bgResidual > 0 && inkResidual <= 0)) return null;
++  return clampCrossing(bgResidual / (bgResidual - inkResidual));
++}
++
++function clampCrossing(t: number): number {
+   return Math.min(SUBPIXEL_T_MAX, Math.max(SUBPIXEL_T_MIN, t));
+ }
+ 
+diff --git a/src/core/trace/contour-local-threshold.test.ts b/src/core/trace/contour-local-threshold.test.ts
+index 3583cf8a4..db6ca0769 100644
+--- a/src/core/trace/contour-local-threshold.test.ts
++++ b/src/core/trace/contour-local-threshold.test.ts
+@@ -23,6 +23,23 @@ describe('local threshold contour interpolation', () => {
+     expect(midCrackChain(pixel, field)[1]?.x).toBeCloseTo(2.5 - 2 / 3, 13);
+   });
+ 
++  it.each([
++    { inkL: 180, bgL: 20, expected: 0.5 },
++    { inkL: 180, bgL: 60, expected: 40 / 120 },
++  ])(
++    'crosses a band cutoff when the paper side is darker than the band (%o)',
++    ({ inkL, bgL, expected }) => {
++      // Ink is 100 <= luma <= 200. The background pixel sits below the band,
++      // so the crossing is the zero of cutoff − luma between the centres.
++      const field: CrackSubPixelField = {
++        lumaAt: (x, y) => (x === 1 && y === 1 ? inkL : bgL),
++        thresholdAt: () => 200,
++        lowerThresholdAt: () => 100,
++      };
++      expect(midCrackChain(pixel, field)[1]?.x).toBeCloseTo(2.5 - expected, 13);
++    },
++  );
++
+   it('uses the midpoint when cleanup creates a boundary without a residual straddle', () => {
+     const field: CrackSubPixelField = {
+       lumaAt: (x, y) => (x === 1 && y === 1 ? 100 : 120),
+diff --git a/src/core/trace/contour-subpixel.test.ts b/src/core/trace/contour-subpixel.test.ts
+index 2ffc34f36..b0390dae4 100644
+--- a/src/core/trace/contour-subpixel.test.ts
++++ b/src/core/trace/contour-subpixel.test.ts
+@@ -86,6 +86,17 @@ describe('midCrackChain sub-pixel interpolation', () => {
+     expect(midCrackChainWithStats(loop).interpolatedFraction).toBe(0);
+   });
+ 
++  it('counts a measured crossing that lands exactly on the crack midpoint', () => {
++    // A symmetric ramp cut at its own midpoint level: background 200, ink
++    // 56, threshold 128 gives t = 72/144 = 0.5 exactly. The vertex does not
++    // move, but its position is measured, not guessed (ADR-393).
++    const luma = Array.from({ length: 9 }, () => 200);
++    luma[4] = 56;
++    const stats = midCrackChainWithStats(loop, fieldFromLuma(3, 3, luma));
++    expect(stats.points).toEqual(midCrackChain(loop));
++    expect(stats.interpolatedFraction).toBe(1);
++  });
++
+   it('clamps extreme interpolation and falls back to the midpoint when the pair does not straddle the threshold', () => {
+     // Both pixels dark (a filled pinhole crack): no threshold crossing
+     // between the centres — the vertex must stay at the midpoint rather

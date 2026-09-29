@@ -1,0 +1,100 @@
+From c880a1a5411885beb5dd6d4906f3b060c4916209 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 15:33:44 +0000
+Subject: [PATCH 02/14] feat(trace): Centerline reports its automatic threshold
+ too (ADR-396)
+
+Touches the centerline worker's file (centerline/trace-centerline.ts):
+the lane now calls prepareTraceForContour, which returns the same
+prepared mask preprocessForTrace returned, and yields its report. The
+traced paths are unchanged.
+
+For the operator, Centerline's Manual brightness band can then start at
+the threshold Centerline's automatic detection used, as the filled
+presets do.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/centerline/trace-centerline.ts |  8 +++--
+ src/core/trace/trace-report.test.ts           | 33 ++++++++++++++-----
+ 2 files changed, 30 insertions(+), 11 deletions(-)
+
+diff --git a/src/core/trace/centerline/trace-centerline.ts b/src/core/trace/centerline/trace-centerline.ts
+index 55624166c..3fa8a8d89 100644
+--- a/src/core/trace/centerline/trace-centerline.ts
++++ b/src/core/trace/centerline/trace-centerline.ts
+@@ -9,7 +9,7 @@ import type { ColoredPath } from '../../scene';
+ import { withCanonicalTraceCurves } from '../trace-curves';
+ import {
+   effectivePixelScale,
+-  preprocessForTrace,
++  prepareTraceForContour,
+   type RawImageData,
+   type TraceOptions,
+ } from '../trace-image';
+@@ -38,7 +38,11 @@ export function* traceCenterlineStrokePathsSteps(
+   options: TraceOptions,
+ ): TraceSteps<ColoredPath[]> {
+   const cooperate = yield;
+-  const prepared = preprocessForTrace(image, { ...options, traceMode: 'centerline' });
++  const { prepared, report } = prepareTraceForContour(image, {
++    ...options,
++    traceMode: 'centerline',
++  });
++  if (report !== undefined) yield report;
+   if (cooperate) yield;
+   const mask = inkMaskFromPrepared(prepared);
+   if (!hasInk(mask)) return [];
+diff --git a/src/core/trace/trace-report.test.ts b/src/core/trace/trace-report.test.ts
+index 842cfed5a..2fade1b91 100644
+--- a/src/core/trace/trace-report.test.ts
++++ b/src/core/trace/trace-report.test.ts
+@@ -51,20 +51,35 @@ describe('trace reports what automatic detection chose', () => {
+ 
+   it('carries the report to the runner without changing the traced paths', async () => {
+     const image = rampImage();
+-    const reports: TraceReport[] = [];
+-    const reporting = <T>(steps: TraceSteps<T>): T => {
+-      for (;;) {
+-        const step = steps.next(false);
+-        if (step.done) return step.value;
+-        if (step.value !== undefined) reports.push(step.value);
+-      }
+-    };
+-    const paths = await traceImageToColoredPaths(image, SHARP, reporting);
++    const { reports, run } = reportingRunner();
++    const paths = await traceImageToColoredPaths(image, SHARP, run);
+     expect(reports).toEqual([{ automaticThresholdLuma: otsuThreshold(image) }]);
+     expect(paths).toEqual(await traceImageToColoredPaths(image, SHARP));
+   });
++
++  it('reports the automatic threshold from the Centerline lane', async () => {
++    const image = rampImage();
++    const { reports, run } = reportingRunner();
++    await traceImageToColoredPaths(image, TRACE_PRESETS['Centerline']!, run);
++    expect(reports).toEqual([{ automaticThresholdLuma: otsuThreshold(image) }]);
++  });
+ });
+ 
++function reportingRunner(): {
++  readonly reports: TraceReport[];
++  readonly run: <T>(steps: TraceSteps<T>) => T;
++} {
++  const reports: TraceReport[] = [];
++  const run = <T>(steps: TraceSteps<T>): T => {
++    for (;;) {
++      const step = steps.next(false);
++      if (step.done) return step.value;
++      if (step.value !== undefined) reports.push(step.value);
++    }
++  };
++  return { reports, run };
++}
++
+ // Dark bars on light paper with a full 0-255 ramp along the top rows, so pixels
+ // sit on both sides of every possible cut. `tint` colours the dark bars.
+ function rampImage(tint?: readonly [number, number, number]): RawImageData {
+-- 
+2.43.0
+

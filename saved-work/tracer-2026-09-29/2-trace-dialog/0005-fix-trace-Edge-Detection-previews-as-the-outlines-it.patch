@@ -1,0 +1,581 @@
+From daf8106ea421cd52b24a52a79b03800c4390c486 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 15:42:50 +0000
+Subject: [PATCH 05/14] fix(trace): Edge Detection previews as the outlines it
+ engraves (ADR-396)
+
+Edge Detection results engrave as lines: a Line operation for vectors
+and Outlines for raster scan (ADR-235 section 2). The preview, Overlay
+and Multi-File Trace SVGs filled them as solid shapes, so the operator
+saw filled letters that would burn only as outlines. They are now drawn
+as strokes, like Centerline, and preview strokes stay one screen pixel
+wide at any zoom so thin outlines on a large trace grid stay visible.
+
+The style label no longer calls Edge Detection and the filled presets
+both "Closed outlines": filled presets say "Filled shapes", Edge
+Detection says "Outline paths". The Result hint says what each result
+engraves as (Fill operation, Line operation, or thin raster lines).
+
+Expectation updated in ImportImageDialog.workflow.test.ts: the filled
+vector hint now reads "Editable filled shapes, engraved with a Fill
+operation." because the old text offered line operations for fills.
+The Edge case in paths-to-svg-centerline.test.ts now expects strokes.
+Dialog state helpers moved to trace-dialog-state.ts so DialogBody stays
+under the function-size cap.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../trace/paths-to-svg-centerline.test.ts     |  16 ++-
+ src/core/trace/paths-to-svg.ts                |  23 ++--
+ .../ImportImageDialog.trace-dialog.test.ts    |  41 +++++++
+ src/ui/trace/ImportImageDialog.tsx            |  37 ++-----
+ .../trace/ImportImageDialog.workflow.test.ts  |   4 +-
+ src/ui/trace/TraceSettingsControls.tsx        |   4 +-
+ src/ui/trace/dialog-parts.tsx                 |  54 ++++++++--
+ src/ui/trace/trace-dialog-state.ts            |  44 ++++++++
+ src/ui/trace/trace-dialog.test-support.ts     | 100 ++++++++++++++++++
+ src/ui/trace/trace-preview.css                |   7 ++
+ 10 files changed, 278 insertions(+), 52 deletions(-)
+ create mode 100644 src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+ create mode 100644 src/ui/trace/trace-dialog-state.ts
+ create mode 100644 src/ui/trace/trace-dialog.test-support.ts
+
+diff --git a/src/core/trace/paths-to-svg-centerline.test.ts b/src/core/trace/paths-to-svg-centerline.test.ts
+index 21abc85e0..e844dba9d 100644
+--- a/src/core/trace/paths-to-svg-centerline.test.ts
++++ b/src/core/trace/paths-to-svg-centerline.test.ts
+@@ -50,13 +50,21 @@ describe('explicit Centerline SVG paint', () => {
+     expect(countVisibleColoredPaths(paths, 'centerline')).toBe(2);
+   });
+ 
+-  it('keeps physical dimensions, rounding and implicit filled/Edge defaults', () => {
++  it('strokes Edge Detection outlines like Centerline, since both engrave as lines', () => {
++    // Edge used to share the filled default, so the preview showed solid
++    // shapes while the Line operation and raster Outlines burn only edges.
++    const paths = [path([outer, inner])];
++    const edge = coloredPathsToSvg(paths, 16, 16, undefined, 'edge');
++    expect(edge).toBe(coloredPathsToSvg(paths, 16, 16, undefined, 'centerline'));
++    expect(elements(edge)[0]?.getAttribute('fill')).toBe('none');
++    expect(countVisibleColoredPaths(paths, 'edge')).toBe(1);
++  });
++
++  it('keeps physical dimensions, rounding and the implicit filled default', () => {
+     const paths = [path([outer, inner, branch])],
+       size = { widthMm: 12.3456, heightMm: 6.789 };
+     const plain = coloredPathsToSvg(paths, 16, 16, size);
+-    for (const mode of ['filled-contours', 'edge'] as const) {
+-      expect(coloredPathsToSvg(paths, 16, 16, size, mode)).toBe(plain);
+-    }
++    expect(coloredPathsToSvg(paths, 16, 16, size, 'filled-contours')).toBe(plain);
+     const svg = coloredPathsToSvg(paths, 16, 16, size, 'centerline');
+     expect(svg).toContain('width="12.35mm" height="6.79mm"');
+     expect(svg).toContain('M1.23 1 L11 1');
+diff --git a/src/core/trace/paths-to-svg.ts b/src/core/trace/paths-to-svg.ts
+index 582723bfd..2e89575a1 100644
+--- a/src/core/trace/paths-to-svg.ts
++++ b/src/core/trace/paths-to-svg.ts
+@@ -9,6 +9,9 @@
+ //     <path d="M x y L x y L x y Z M ..." fill="#color" stroke="none"/>
+ //     ...
+ //   </svg>
++// Centerline and Edge Detection results are drawn as strokes (fill="none")
++// instead, because they engrave as lines: a Line operation for vectors and
++// Outlines for raster output (ADR-235 section 2).
+ //
+ // One <path> per ColoredPath; subpaths within a path are concatenated
+ // in the same `d` attribute, separated by `M` move commands. Closed
+@@ -66,15 +69,14 @@ function svgOpen(width: number, height: number, physicalSize?: SvgPhysicalSize):
+ 
+ function coloredPathToSvgPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): string {
+   if (!isVisibleColor(path.color)) return '';
+-  const closedVisible =
+-    traceMode === 'centerline' ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
++  const lines = engravesAsLines(traceMode);
++  const closedVisible = lines ? isVisibleStrokedPolyline : isVisibleClosedPolyline;
+   const closed = path.polylines.filter((pl) => pl.closed && closedVisible(pl));
+   const open = path.polylines.filter((pl) => !pl.closed && isVisibleStrokedPolyline(pl));
+-  // A closed Centerline is still a line operation; closure does not imply fill.
+-  const closedSvg =
+-    traceMode === 'centerline'
+-      ? strokedPolylinesToSvgPath(path.color, closed)
+-      : closedPolylinesToSvgPath(path.color, closed);
++  // A closed Centerline or Edge outline is still a line; closure does not imply fill.
++  const closedSvg = lines
++    ? strokedPolylinesToSvgPath(path.color, closed)
++    : closedPolylinesToSvgPath(path.color, closed);
+   const openSvg = strokedPolylinesToSvgPath(path.color, open);
+   return `${closedSvg}${openSvg}`;
+ }
+@@ -121,13 +123,18 @@ function polylineToSubPath(polyline: ColoredPath['polylines'][number]): string {
+ 
+ function isVisibleColoredPath(path: ColoredPath, traceMode: TraceOptions['traceMode']): boolean {
+   if (!isVisibleColor(path.color)) return false;
++  const lines = engravesAsLines(traceMode);
+   return path.polylines.some((polyline) =>
+-    polyline.closed && traceMode !== 'centerline'
++    polyline.closed && !lines
+       ? isVisibleClosedPolyline(polyline)
+       : isVisibleStrokedPolyline(polyline),
+   );
+ }
+ 
++function engravesAsLines(traceMode: TraceOptions['traceMode']): boolean {
++  return traceMode === 'centerline' || traceMode === 'edge';
++}
++
+ function isVisibleColor(color: string): boolean {
+   const normalized = color.trim().toLowerCase();
+   if (normalized === '' || normalized === 'none' || normalized === 'transparent') return false;
+diff --git a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+new file mode 100644
+index 000000000..bfc2c8770
+--- /dev/null
++++ b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+@@ -0,0 +1,41 @@
++// Trace dialog copy and state that must match what the engine does (ADR-396).
++
++import { describe, expect, it, vi } from 'vitest';
++
++vi.mock('./image-loader', () => ({
++  PREVIEW_MAX_EDGE_PX: 2048,
++  loadImageAsRawData: vi.fn(async () => ({
++    width: 2,
++    height: 2,
++    data: new Uint8ClampedArray([
++      255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255,
++    ]),
++  })),
++}));
++vi.mock('./use-trace-worker-client', () => ({
++  traceImageWithFallback: vi.fn(async () => ({
++    paths: [{ color: '#000000', polylines: [] }],
++    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
++    width: 2,
++    height: 2,
++  })),
++}));
++
++import { changeSelect, selectByLabel, withTraceDialog } from './trace-dialog.test-support';
++
++describe('Trace dialog describes what each style engraves', () => {
++  it('calls Edge Detection line outlines in the style label and both output hints', async () => {
++    await withTraceDialog(async (host) => {
++      const text = (): string => host.textContent ?? '';
++      expect(text()).toContain('Filled shapes');
++      await changeSelect(selectByLabel(host, 'Trace preset'), 'Edge Detection');
++      expect(text()).toContain('Outline paths');
++      expect(text()).not.toContain('Filled shapes');
++      expect(text()).toContain(
++        'Editable outline paths, engraved along each line with a Line operation.',
++      );
++      await changeSelect(selectByLabel(host, 'Trace output'), 'raster');
++      expect(text()).toContain('their insides stay unburned');
++    });
++  });
++});
+diff --git a/src/ui/trace/ImportImageDialog.tsx b/src/ui/trace/ImportImageDialog.tsx
+index 7e8467bbd..402c1cb9e 100644
+--- a/src/ui/trace/ImportImageDialog.tsx
++++ b/src/ui/trace/ImportImageDialog.tsx
+@@ -47,6 +47,11 @@ import {
+ import { isTraceRequestSuperseded } from './use-trace-worker-client';
+ import { isTraceAbort, traceAbortError } from './trace-cancellation';
+ import { useTraceSourceFile } from './use-trace-source-file';
++import {
++  isFilledContourTraceOptions,
++  traceSourceHasTransparency,
++  useTraceOutputChoice,
++} from './trace-dialog-state';
+ 
+ export function ImportImageDialog(): JSX.Element | null {
+   const dialog = useUiStore((s) => s.imageDialog);
+@@ -107,8 +112,6 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+   const boundarySelection = useBoundarySelection();
+   const { preset, selectPreset } = useTracePreset(machineKind, boundarySelection.setBoundaryMode);
+   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
+-  const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
+-  const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
+   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(true);
+   const [busy, setBusy] = useState(false);
+   const captureLifetime = useTraceCommitLifetime(props.requestToken);
+@@ -126,7 +129,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+   // otherwise be ref-unstable too.
+   const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
+   const options = useTraceOptions(presetOptions, traceSettings);
+-  const effectiveTraceOutput: TraceOutput = machineKind === 'cnc' ? 'vector' : traceOutput;
++  const output = useTraceOutputChoice(machineKind, options);
+   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
+ 
+   const onSubmit = (): void =>
+@@ -134,9 +137,9 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+       file,
+       options,
+       seed,
+-      traceOutput: effectiveTraceOutput,
++      traceOutput: output.traceOutput,
+       machineKind,
+-      traceFillStyle,
++      traceFillStyle: output.traceFillStyle,
+       deleteSourceAfterTrace,
+       boundary: boundarySelection.boundary,
+       boundaryMode: boundarySelection.boundaryMode,
+@@ -165,22 +168,14 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+         sourceHasTransparency: traceSourceHasTransparency(preview),
+         onChange: setTraceSettings,
+       }}
+-      output={{
+-        photoShading: options.photoDetail !== undefined,
+-        machineKind,
+-        traceOutput,
+-        onTraceOutputChange: setTraceOutput,
+-        supportsFillStyle: isFilledContourTraceOptions(options),
+-        traceFillStyle,
+-        onTraceFillStyleChange: setTraceFillStyle,
+-      }}
++      output={output.fields}
+       preview={
+         <TracePreviewPanel
+           preview={preview}
+           seed={seed}
+           boundarySelection={boundarySelection}
+           photoShading={options.photoDetail !== undefined}
+-          submission={{ busy, output: effectiveTraceOutput }}
++          submission={{ busy, output: output.traceOutput }}
+         />
+       }
+       deleteSource={deleteSourceAfterTrace}
+@@ -215,18 +210,6 @@ function useSelectedTracePreview(
+   );
+ }
+ 
+-function isFilledContourTraceOptions(options: TraceOptions): boolean {
+-  return options.traceMode !== 'centerline' && options.traceMode !== 'edge';
+-}
+-
+-function traceSourceHasTransparency(
+-  preview: ReturnType<typeof useTracePreview>,
+-): boolean | undefined {
+-  return preview.kind === 'tracing' || preview.kind === 'ready'
+-    ? preview.sourceHasTransparency
+-    : undefined;
+-}
+-
+ function TracePreviewPanel(props: {
+   readonly submission: { readonly busy: boolean; readonly output: TraceOutput };
+   readonly photoShading: boolean;
+diff --git a/src/ui/trace/ImportImageDialog.workflow.test.ts b/src/ui/trace/ImportImageDialog.workflow.test.ts
+index 7ec75e66d..f6931c54c 100644
+--- a/src/ui/trace/ImportImageDialog.workflow.test.ts
++++ b/src/ui/trace/ImportImageDialog.workflow.test.ts
+@@ -59,7 +59,9 @@ describe('Trace Image workflow controls', () => {
+         'Editable vectors',
+         'Raster scan',
+       ]);
+-      expect(host.textContent ?? '').toContain('Editable paths for line or fill operations.');
++      expect(host.textContent ?? '').toContain(
++        'Editable filled shapes, engraved with a Fill operation.',
++      );
+       await changeSelect(output, 'raster');
+       expect(host.textContent ?? '').toContain(
+         'Black-and-white traced artwork engraved with image scan motion.',
+diff --git a/src/ui/trace/TraceSettingsControls.tsx b/src/ui/trace/TraceSettingsControls.tsx
+index aafb57f78..1cc374b40 100644
+--- a/src/ui/trace/TraceSettingsControls.tsx
++++ b/src/ui/trace/TraceSettingsControls.tsx
+@@ -271,8 +271,8 @@ function ResetTraceSettingsButton(props: {
+ function EdgeTraceModeNote(): JSX.Element {
+   return (
+     <p style={edgeTraceNoteStyle}>
+-      Closed outlines around dark artwork and locally darker detail. Adjacent dark tones may merge
+-      into one outline. Use Centerline for a single path down the middle of a stroke.
++      Outlines around dark artwork and locally darker detail, engraved as lines. Adjacent dark tones
++      may merge into one outline. Use Centerline for a single path down the middle of a stroke.
+     </p>
+   );
+ }
+diff --git a/src/ui/trace/dialog-parts.tsx b/src/ui/trace/dialog-parts.tsx
+index 668c5fcc6..c6c3205ae 100644
+--- a/src/ui/trace/dialog-parts.tsx
++++ b/src/ui/trace/dialog-parts.tsx
+@@ -1,6 +1,6 @@
+ // Presentational controls; trace requests and commit ownership stay in the dialog.
+ import type { RasterImage } from '../../core/scene';
+-import { TRACE_PRESETS } from '../../core/trace';
++import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+ import { Button, DialogActions as KitDialogActions } from '../kit';
+ import { TutorialButton } from '../tutorials/TutorialButton';
+ 
+@@ -29,7 +29,7 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
+   Centerline:
+     'One path along the middle of each stroke. Useful for single-stroke lettering and linework.',
+   'Edge Detection':
+-    'Outlines around dark artwork and local detail. Neighbouring dark tones may merge.',
++    'Line outlines around dark artwork and local detail; their insides are not filled. Neighbouring dark tones may merge.',
+ };
+ 
+ export function TraceDialogHeader(props: {
+@@ -112,11 +112,13 @@ export function PresetPicker(props: {
+ 
+ function presetGeometryLabel(preset: string): string {
+   if (preset === 'Photo shading') return 'Shaded vectors';
+-  return preset === 'Centerline' ? 'Single paths' : 'Closed outlines';
++  if (preset === 'Edge Detection') return 'Outline paths';
++  return preset === 'Centerline' ? 'Single paths' : 'Filled shapes';
+ }
+ 
+ export function TraceOutputFields(props: {
+   readonly photoShading?: boolean;
++  readonly traceMode?: TraceOptions['traceMode'];
+   readonly machineKind: 'laser' | 'cnc';
+   readonly traceOutput: TraceOutput;
+   readonly onTraceOutputChange: (output: TraceOutput) => void;
+@@ -135,6 +137,7 @@ export function TraceOutputFields(props: {
+           value={props.traceOutput}
+           onChange={props.onTraceOutputChange}
+           photoShading={props.photoShading === true}
++          traceMode={props.traceMode}
+         />
+       )}
+       {showFillStyle ? (
+@@ -155,6 +158,7 @@ export function TraceOutputFields(props: {
+ 
+ export function TraceOutputPicker(props: {
+   readonly photoShading?: boolean;
++  readonly traceMode?: TraceOptions['traceMode'] | undefined;
+   readonly value: TraceOutput;
+   readonly onChange: (next: TraceOutput) => void;
+ }): JSX.Element {
+@@ -174,18 +178,48 @@ export function TraceOutputPicker(props: {
+         </select>
+       </label>
+       <p className="lf-trace-hint">
+-        {props.photoShading
+-          ? props.value === 'vector'
+-            ? 'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.'
+-            : 'Engraves the shaded line pattern with image scan motion.'
+-          : props.value === 'vector'
+-            ? 'Editable paths for line or fill operations.'
+-            : 'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.'}
++        {OUTPUT_HINTS[traceResultKind(props.photoShading === true, props.traceMode)][props.value]}
+       </p>
+     </div>
+   );
+ }
+ 
++// Each hint names what the result engraves as: filled presets get a Fill
++// operation, Centerline and Edge Detection a Line operation, and their raster
++// scan draws only the lines (Outlines, ADR-235 section 2).
++type TraceResultKind = 'photo' | 'filled' | 'centerline' | 'edge';
++
++const OUTPUT_HINTS: Readonly<Record<TraceResultKind, Readonly<Record<TraceOutput, string>>>> = {
++  photo: {
++    vector:
++      'Editable filled lines reproduce the photo’s shades. Use a fill operation to keep the shading.',
++    raster: 'Engraves the shaded line pattern with image scan motion.',
++  },
++  filled: {
++    vector: 'Editable filled shapes, engraved with a Fill operation.',
++    raster:
++      'Black-and-white traced artwork engraved with image scan motion. Original grayscale shading is not retained.',
++  },
++  centerline: {
++    vector: 'Editable single-line paths, engraved with a Line operation.',
++    raster:
++      'Engraves the paths as thin lines with image scan motion. Original grayscale shading is not retained.',
++  },
++  edge: {
++    vector: 'Editable outline paths, engraved along each line with a Line operation.',
++    raster:
++      'Engraves the outlines as thin lines with image scan motion; their insides stay unburned. Original grayscale shading is not retained.',
++  },
++};
++
++function traceResultKind(
++  photoShading: boolean,
++  traceMode: TraceOptions['traceMode'] | undefined,
++): TraceResultKind {
++  if (photoShading) return 'photo';
++  return traceMode === 'centerline' || traceMode === 'edge' ? traceMode : 'filled';
++}
++
+ export function TraceFillStylePicker(props: {
+   readonly value: TraceFillStyle;
+   readonly onChange: (next: TraceFillStyle) => void;
+diff --git a/src/ui/trace/trace-dialog-state.ts b/src/ui/trace/trace-dialog-state.ts
+new file mode 100644
+index 000000000..4323eab29
+--- /dev/null
++++ b/src/ui/trace/trace-dialog-state.ts
+@@ -0,0 +1,44 @@
++// Trace dialog state that does not own trace requests or commits. Split from
++// ImportImageDialog.tsx to keep its render function inside the size caps.
++
++import { useState, type ComponentProps } from 'react';
++import type { TraceOptions } from '../../core/trace';
++import type { TraceFillStyle, TraceOutput, TraceOutputFields } from './dialog-parts';
++import type { TracePreviewState } from './use-trace-preview';
++
++export function isFilledContourTraceOptions(options: TraceOptions): boolean {
++  return options.traceMode !== 'centerline' && options.traceMode !== 'edge';
++}
++
++export function traceSourceHasTransparency(preview: TracePreviewState): boolean | undefined {
++  return preview.kind === 'tracing' || preview.kind === 'ready'
++    ? preview.sourceHasTransparency
++    : undefined;
++}
++
++/** The Output section's choices. CNC always commits vectors. */
++export function useTraceOutputChoice(
++  machineKind: 'laser' | 'cnc',
++  options: TraceOptions,
++): {
++  readonly traceOutput: TraceOutput;
++  readonly traceFillStyle: TraceFillStyle;
++  readonly fields: ComponentProps<typeof TraceOutputFields>;
++} {
++  const [traceFillStyle, setTraceFillStyle] = useState<TraceFillStyle>('scanline');
++  const [traceOutput, setTraceOutput] = useState<TraceOutput>('vector');
++  return {
++    traceOutput: machineKind === 'cnc' ? 'vector' : traceOutput,
++    traceFillStyle,
++    fields: {
++      photoShading: options.photoDetail !== undefined,
++      traceMode: options.traceMode,
++      machineKind,
++      traceOutput,
++      onTraceOutputChange: setTraceOutput,
++      supportsFillStyle: isFilledContourTraceOptions(options),
++      traceFillStyle,
++      onTraceFillStyleChange: setTraceFillStyle,
++    },
++  };
++}
+diff --git a/src/ui/trace/trace-dialog.test-support.ts b/src/ui/trace/trace-dialog.test-support.ts
+new file mode 100644
+index 000000000..011014900
+--- /dev/null
++++ b/src/ui/trace/trace-dialog.test-support.ts
+@@ -0,0 +1,100 @@
++// Render helpers for Trace dialog tests. The caller mocks the image loader and
++// the trace client; these helpers only mount the dialog and drive its controls.
++
++import { act, createElement } from 'react';
++import { createRoot, type Root } from 'react-dom/client';
++import { expect } from 'vitest';
++import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
++import { useUiStore } from '../state/ui-store';
++import { ImportImageDialog } from './ImportImageDialog';
++
++(
++  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++export function traceDialogSeed(over: Partial<RasterImage> = {}): RasterImage {
++  return {
++    kind: 'raster-image',
++    id: 'raster-1',
++    source: 'logo.png',
++    dataUrl: 'data:image/png;base64,AAA',
++    pixelWidth: 100,
++    pixelHeight: 80,
++    bounds: { minX: 0, minY: 0, maxX: 50, maxY: 40 },
++    transform: IDENTITY_TRANSFORM,
++    // eslint-disable-next-line no-restricted-syntax -- Scene fixture colour.
++    color: '#808080',
++    dither: 'floyd-steinberg',
++    linesPerMm: 10,
++    ...over,
++  };
++}
++
++export async function withTraceDialog(
++  run: (host: HTMLElement) => Promise<void>,
++  source: RasterImage = traceDialogSeed(),
++): Promise<void> {
++  const host = document.createElement('div');
++  document.body.appendChild(host);
++  useUiStore.getState().openImageDialog(source);
++  let root: Root | null = null;
++  await act(async () => {
++    root = createRoot(host);
++    root.render(createElement(ImportImageDialog));
++  });
++  try {
++    await run(host);
++  } finally {
++    const mounted = root as Root | null;
++    await act(async () => mounted?.unmount());
++    host.remove();
++    useUiStore.setState({ imageDialog: null });
++  }
++}
++
++export function selectByLabel(host: HTMLElement, label: string): HTMLSelectElement {
++  const select = host.querySelector(`select[aria-label="${label}"]`);
++  expect(select).toBeInstanceOf(HTMLSelectElement);
++  return select as HTMLSelectElement;
++}
++
++export function inputByLabel(host: HTMLElement, label: string): HTMLInputElement | null {
++  return host.querySelector(`input[aria-label="${label}"]`);
++}
++
++export async function changeSelect(select: HTMLSelectElement, value: string): Promise<void> {
++  await act(async () => {
++    select.value = value;
++    select.dispatchEvent(new Event('change', { bubbles: true }));
++  });
++}
++
++export async function typeNumber(input: HTMLInputElement | null, value: string): Promise<void> {
++  expect(input).toBeInstanceOf(HTMLInputElement);
++  await act(async () => {
++    if (input === null) return;
++    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
++    setter?.call(input, value);
++    input.dispatchEvent(new Event('input', { bubbles: true }));
++  });
++}
++
++export async function waitForText(host: HTMLElement, text: string): Promise<void> {
++  await waitFor(() => expect(host.textContent ?? '').toContain(text));
++}
++
++export async function waitFor(assertion: () => void): Promise<void> {
++  let lastError: unknown;
++  for (let attempt = 0; attempt < 80; attempt += 1) {
++    try {
++      assertion();
++      return;
++    } catch (err) {
++      lastError = err;
++    }
++    await act(async () => {
++      await new Promise((resolve) => window.setTimeout(resolve, 10));
++    });
++  }
++  throw lastError;
++}
+diff --git a/src/ui/trace/trace-preview.css b/src/ui/trace/trace-preview.css
+index 3296c3d02..6f3bddaaf 100644
+--- a/src/ui/trace/trace-preview.css
++++ b/src/ui/trace/trace-preview.css
+@@ -134,6 +134,13 @@
+   height: 100%;
+ }
+ 
++/* Centerline and Edge Detection results are strokes. Keep them one screen
++   pixel wide at any zoom: one pixel of a 2048 px trace grid shrinks to a faint
++   quarter pixel when the preview is fitted. */
++.lf-trace-preview__vectors [stroke]:not([stroke='none']) {
++  vector-effect: non-scaling-stroke;
++}
++
+ /* Comparison paint only: preserve empty interiors, holes, markers and the
+    generated SVG's actual colours when the user switches to Trace view. */
+ .lf-trace-preview__stage[data-view='overlay'] .lf-trace-preview__vectors [fill]:not([fill='none']) {
+-- 
+2.43.0
+

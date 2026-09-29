@@ -1,0 +1,91 @@
+From 525b84cb2419e363a6697b2676e43afccf623118 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 20:14:11 +0000
+Subject: [PATCH 11/14] fix(trace): Smooth and Sharp say what they do
+ differently (ADR-396)
+
+The Smooth and Sharp descriptions in Trace Image, and the tutorial step
+that suggests them, now name what these presets change rather than a
+curve style they did not deliver. Smooth: for scans and noisy artwork;
+sets its threshold from the image and removes isolated noise dots when
+the image has many. Sharp: for pixel art and technical drawings; sets its
+threshold from the image, keeps single-pixel marks and tiny holes, and
+rounds fewer corners into curves. The tutorial says to try Smooth for a
+noisy scan, or Sharp to keep single-pixel marks and tiny holes.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/trace/dialog-parts.tsx                 |  5 ++--
+ .../trace/trace-preset-descriptions.test.ts   | 28 +++++++++++++++++++
+ src/ui/tutorials/image-tutorials.ts           |  2 +-
+ 3 files changed, 32 insertions(+), 3 deletions(-)
+ create mode 100644 src/ui/trace/trace-preset-descriptions.test.ts
+
+diff --git a/src/ui/trace/dialog-parts.tsx b/src/ui/trace/dialog-parts.tsx
+index 4fe420614..c5f418186 100644
+--- a/src/ui/trace/dialog-parts.tsx
++++ b/src/ui/trace/dialog-parts.tsx
+@@ -24,9 +24,10 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
+     'For portraits and real photographs. Fine filled lines vary in width to keep highlights, midtones and shadows.',
+   'Line Art':
+     'A balanced start for logos, lettering and drawings. Traces brightness 0–128 as ink and, in colour artwork, adds pale details.',
+-  Smooth: 'Clean curves and quieter outlines for rough or noisy artwork. Very fine gaps may close.',
++  Smooth:
++    'For scans and noisy artwork. Sets its threshold from the image and removes isolated noise dots when the image has many of them.',
+   Sharp:
+-    'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',
++    'For pixel art and technical drawings. Sets its threshold from the image, keeps single-pixel marks and tiny holes, and rounds fewer corners into curves.',
+   Centerline:
+     'One path along the middle of each stroke. Useful for single-stroke lettering and linework.',
+   'Edge Detection':
+diff --git a/src/ui/trace/trace-preset-descriptions.test.ts b/src/ui/trace/trace-preset-descriptions.test.ts
+new file mode 100644
+index 000000000..3879d1ba4
+--- /dev/null
++++ b/src/ui/trace/trace-preset-descriptions.test.ts
+@@ -0,0 +1,28 @@
++// The Smooth and Sharp descriptions name what those presets do differently
++// from each other; these checks keep that copy true to the engine (ADR-396).
++
++import { describe, expect, it } from 'vitest';
++import { TRACE_PRESETS, type RawImageData } from '../../core/trace';
++import { prepareTraceForContour } from '../../core/trace/trace-image';
++import { fill, paper } from './trace-controls.test-support';
++
++function isInk(image: RawImageData, x: number, y: number): boolean {
++  return image.data[(y * image.width + x) * 4] === 0;
++}
++
++describe('Smooth and Sharp descriptions', () => {
++  it('Sharp keeps a single-pixel mark and a tiny hole that Smooth cleans up', () => {
++    const image = paper();
++    fill(image, 5, 5, 1, 1, [0, 0, 0]);
++    fill(image, 30, 20, 20, 20, [0, 0, 0]);
++    fill(image, 40, 30, 1, 1, [255, 255, 255]);
++    const smooth = prepareTraceForContour(image, TRACE_PRESETS['Smooth']!);
++    const sharp = prepareTraceForContour(image, TRACE_PRESETS['Sharp']!);
++    expect([smooth.prepared.width, sharp.prepared.width]).toEqual([image.width, image.width]);
++    expect([isInk(smooth.prepared, 5, 5), isInk(smooth.prepared, 40, 30)]).toEqual([false, true]);
++    expect([isInk(sharp.prepared, 5, 5), isInk(sharp.prepared, 40, 30)]).toEqual([true, false]);
++    // Both set their threshold from the image rather than a fixed band.
++    expect(smooth.report?.automaticThresholdLuma).toBeDefined();
++    expect(sharp.report?.automaticThresholdLuma).toBeDefined();
++  });
++});
+diff --git a/src/ui/tutorials/image-tutorials.ts b/src/ui/tutorials/image-tutorials.ts
+index afac265d4..bd7af21a3 100644
+--- a/src/ui/tutorials/image-tutorials.ts
++++ b/src/ui/tutorials/image-tutorials.ts
+@@ -126,7 +126,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
+       {
+         title: 'Choose a trace style',
+         instruction:
+-          'Open Trace Image. Start with Line Art for a logo or drawing. Try Smooth for smoother outlines or Sharp to keep fine detail.',
++          'Open Trace Image. Start with Line Art for a logo or drawing. Try Smooth for a noisy scan, or Sharp to keep single-pixel marks and tiny holes.',
+         focus: 'Trace preset',
+         result: 'The preview shows the traced outlines.',
+       },
+-- 
+2.43.0
+

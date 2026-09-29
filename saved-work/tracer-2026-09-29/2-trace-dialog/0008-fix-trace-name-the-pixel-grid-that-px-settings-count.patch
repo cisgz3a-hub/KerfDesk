@@ -1,0 +1,259 @@
+From 578ac1234bea12bc42a81fcfeeacfa4308965a00 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 19:56:47 +0000
+Subject: [PATCH 08/14] fix(trace): name the pixel grid that px settings count
+ on (ADR-396)
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Trace decodes large images at most 2048 px on a side, and Remove ink
+specks, Ignore Less Than, Minimum line and Centerline's gap all count
+pixels of that decoded grid. The dialog header shows the imported image's
+own size, so on a 4096 px image a 12 px² speck setting silently meant 48
+source px². When the decoded grid differs from the image size, the
+settings panel now says so under Refine detail, for example "Tracing at
+2048 × 1536 px; pixel settings use this grid." The size comes from the
+latest finished preview of the same image.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../ImportImageDialog.trace-dialog.test.ts    | 16 ++++++++
+ src/ui/trace/ImportImageDialog.tsx            |  1 +
+ src/ui/trace/TraceSettingsControls.tsx        | 16 ++++++++
+ src/ui/trace/tracer-dialog.css                |  3 ++
+ src/ui/trace/use-trace-preview-facts.test.ts  | 17 ++++++++-
+ src/ui/trace/use-trace-preview-facts.ts       | 37 ++++++++++++++-----
+ 6 files changed, 79 insertions(+), 11 deletions(-)
+
+diff --git a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+index ea2f61862..e16654983 100644
+--- a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
++++ b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+@@ -34,6 +34,7 @@ import {
+   changeSelect,
+   inputByLabel,
+   selectByLabel,
++  traceDialogSeed,
+   waitForText,
+   withTraceDialog,
+ } from './trace-dialog.test-support';
+@@ -66,3 +67,18 @@ describe('Trace dialog shows what automatic detection chose', () => {
+     });
+   });
+ });
++
++describe('Trace dialog names the grid pixel settings count on', () => {
++  it('shows the decoded grid when it differs from the image size', async () => {
++    await withTraceDialog(async (host) => {
++      await waitForText(host, 'Tracing at 2 × 2 px; pixel settings use this grid.');
++    });
++    await withTraceDialog(
++      async (host) => {
++        await waitForText(host, 'No colour detail found');
++        expect(host.textContent).not.toContain('Tracing at');
++      },
++      traceDialogSeed({ pixelWidth: 2, pixelHeight: 2 }),
++    );
++  });
++});
+diff --git a/src/ui/trace/ImportImageDialog.tsx b/src/ui/trace/ImportImageDialog.tsx
+index 15309aa3b..7abe80381 100644
+--- a/src/ui/trace/ImportImageDialog.tsx
++++ b/src/ui/trace/ImportImageDialog.tsx
+@@ -169,6 +169,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+         overrides: traceSettings,
+         sourceHasTransparency: traceSourceHasTransparency(preview),
+         report: facts.report,
++        workingGrid: facts.workingGrid,
+         onChange: setTraceSettings,
+       }}
+       output={output.fields}
+diff --git a/src/ui/trace/TraceSettingsControls.tsx b/src/ui/trace/TraceSettingsControls.tsx
+index f9fcca49e..5b5fef2c1 100644
+--- a/src/ui/trace/TraceSettingsControls.tsx
++++ b/src/ui/trace/TraceSettingsControls.tsx
+@@ -15,6 +15,7 @@ import { TraceCheckboxRow } from './TraceCheckboxRow';
+ import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
+ import { TraceNumberRow } from './TraceNumberRow';
+ import { TRACE_SETTING_HINTS } from './trace-setting-hints';
++import type { TraceGrid } from './trace-boundary-grid';
+ 
+ type TraceSettingsControlsProps = {
+   readonly preset: TraceOptions;
+@@ -22,6 +23,8 @@ type TraceSettingsControlsProps = {
+   readonly sourceHasTransparency?: boolean | undefined;
+   /** The matching finished preview's report of its automatic choices. */
+   readonly report?: TraceReport | undefined;
++  /** The decoded grid pixel settings count on, when it differs from the image size. */
++  readonly workingGrid?: TraceGrid | undefined;
+   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
+ };
+ 
+@@ -41,6 +44,7 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
+   return (
+     <fieldset className="lf-trace-settings">
+       <legend>Refine detail</legend>
++      <WorkingGridNote grid={props.workingGrid} />
+       <div className="lf-trace-settings-group">
+         <TraceNumberRow
+           label="Sensitivity"
+@@ -99,6 +103,7 @@ function FilledTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Ele
+   return (
+     <fieldset className="lf-trace-settings">
+       <legend>Refine detail</legend>
++      <WorkingGridNote grid={props.workingGrid} />
+       <div className="lf-trace-settings-group">
+         <TraceDetectionControls {...props} alphaMask={alphaMask}>
+           <BrightnessBandControls {...props} />
+@@ -286,6 +291,17 @@ function ResetTraceSettingsButton(props: {
+   );
+ }
+ 
++// Large images are decoded at most 2048 px on a side before tracing, and every
++// px and px² setting counts pixels of that decoded grid.
++function WorkingGridNote(props: { readonly grid: TraceGrid | undefined }): JSX.Element | null {
++  if (props.grid === undefined) return null;
++  return (
++    <p className="lf-trace-hint lf-trace-working-grid">
++      Tracing at {props.grid.width} × {props.grid.height} px; pixel settings use this grid.
++    </p>
++  );
++}
++
+ function EdgeTraceModeNote(): JSX.Element {
+   return (
+     <p style={noteStyle}>
+diff --git a/src/ui/trace/tracer-dialog.css b/src/ui/trace/tracer-dialog.css
+index cbdb7b645..a1aaade4f 100644
+--- a/src/ui/trace/tracer-dialog.css
++++ b/src/ui/trace/tracer-dialog.css
+@@ -199,6 +199,9 @@
+   font-weight: 650;
+   padding: 0 8px 0 0;
+ }
++.lf-trace-working-grid {
++  margin: 0 0 12px;
++}
+ .lf-trace-settings-group {
+   display: grid;
+   gap: 12px;
+diff --git a/src/ui/trace/use-trace-preview-facts.test.ts b/src/ui/trace/use-trace-preview-facts.test.ts
+index d143d6f5a..4e58d5524 100644
+--- a/src/ui/trace/use-trace-preview-facts.test.ts
++++ b/src/ui/trace/use-trace-preview-facts.test.ts
+@@ -10,6 +10,7 @@ const traced: TraceDetectionRequest = {
+   boundaryMode: 'crop',
+ };
+ const report = { automaticThresholdLuma: 118 };
++const grid = { width: 8, height: 8 };
+ 
+ describe('what the settings panel may say about the finished preview', () => {
+   it('keeps the report while only finishing controls change', () => {
+@@ -24,7 +25,7 @@ describe('what the settings panel may say about the finished preview', () => {
+         options: { ...SHARP, ...change },
+         boundary: { ...traced.boundary! },
+       };
+-      expect(tracePreviewFacts({ request: traced, report }, current)).toEqual({ report });
++      expect(tracePreviewFacts({ request: traced, grid, report }, current)).toEqual({ report });
+     }
+   });
+ 
+@@ -36,7 +37,19 @@ describe('what the settings panel may say about the finished preview', () => {
+       { ...traced, boundaryMode: 'enhance' as const },
+       { ...traced, file: new File(['image'], 'logo.png') },
+     ]) {
+-      expect(tracePreviewFacts({ request: traced, report }, current)).toEqual({});
++      expect(tracePreviewFacts({ request: traced, grid, report }, current)).toEqual({});
+     }
+   });
++
++  it('names the decoded grid only when it differs from the image size', () => {
++    const decoded = { width: 2048, height: 1536 };
++    const request = { ...traced, sourceGrid: { width: 4096, height: 3072 } };
++    expect(tracePreviewFacts({ request, grid: decoded }, traced)).toEqual({
++      workingGrid: decoded,
++    });
++    const sameSize = { ...traced, sourceGrid: decoded };
++    expect(tracePreviewFacts({ request: sameSize, grid: decoded }, traced)).toEqual({});
++    const otherImage = { ...traced, file: new File(['image'], 'logo.png') };
++    expect(tracePreviewFacts({ request, grid: decoded }, otherImage)).toEqual({});
++  });
+ });
+diff --git a/src/ui/trace/use-trace-preview-facts.ts b/src/ui/trace/use-trace-preview-facts.ts
+index ab0f9ba7f..4a8b52405 100644
+--- a/src/ui/trace/use-trace-preview-facts.ts
++++ b/src/ui/trace/use-trace-preview-facts.ts
+@@ -1,15 +1,21 @@
+-// What the settings panel may say about the latest finished preview. Its
+-// report (the automatic threshold, whether Line Art added pale detail) belongs
+-// to one detection: it stays while only finishing controls change, so the
+-// panel does not flicker on every curve tweak, and it is withdrawn as soon as
+-// anything that decides detection differs from the traced request.
++// What the settings panel may say about the latest finished preview.
++//
++// The working grid is the decoded image the tracer measured, which pixel
++// settings count on; it is named only when it differs from the image's own
++// pixel size. The report (the automatic threshold, whether Line Art added pale
++// detail) belongs to one detection: it stays while only finishing controls
++// change, so the panel does not flicker on every curve tweak, and it is
++// withdrawn as soon as anything that decides detection differs from the
++// traced request.
+ 
+ import { useRef } from 'react';
+ import type { TraceOptions, TraceReport } from '../../core/trace';
+ import { sameBoundary, type TracePreparationRequest } from './prepared-trace';
++import type { TraceGrid } from './trace-boundary-grid';
+ import type { TracePreviewState } from './use-trace-preview';
+ 
+ export type TracePreviewFacts = {
++  readonly workingGrid?: TraceGrid;
+   readonly report?: TraceReport;
+ };
+ 
+@@ -19,7 +25,8 @@ export type TraceDetectionRequest = Pick<
+ >;
+ 
+ export type FinishedTracePreview = {
+-  readonly request: TraceDetectionRequest;
++  readonly request: TraceDetectionRequest & { readonly sourceGrid?: TraceGrid | undefined };
++  readonly grid: TraceGrid;
+   readonly report?: TraceReport | undefined;
+ };
+ 
+@@ -31,7 +38,11 @@ export function useTracePreviewFacts(
+ ): TracePreviewFacts {
+   const finished = useRef<FinishedTracePreview | null>(null);
+   if (preview.kind === 'ready' && preview.preparedTrace !== undefined) {
+-    finished.current = { request: preview.preparedTrace.request, report: preview.report };
++    finished.current = {
++      request: preview.preparedTrace.request,
++      grid: { width: preview.width, height: preview.height },
++      report: preview.report,
++    };
+   }
+   const current =
+     file === null
+@@ -44,8 +55,16 @@ export function tracePreviewFacts(
+   finished: FinishedTracePreview | null,
+   current: TraceDetectionRequest | null,
+ ): TracePreviewFacts {
+-  if (finished?.report === undefined || current === null) return {};
+-  return sameDetection(finished.request, current) ? { report: finished.report } : {};
++  if (finished === null || current === null || finished.request.file !== current.file) return {};
++  const source = finished.request.sourceGrid;
++  const resized =
++    source !== undefined &&
++    (source.width !== finished.grid.width || source.height !== finished.grid.height);
++  const detected = finished.report !== undefined && sameDetection(finished.request, current);
++  return {
++    ...(resized ? { workingGrid: finished.grid } : {}),
++    ...(detected ? { report: finished.report } : {}),
++  };
+ }
+ 
+ function sameDetection(a: TraceDetectionRequest, b: TraceDetectionRequest): boolean {
+-- 
+2.43.0
+

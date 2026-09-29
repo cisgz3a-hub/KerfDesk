@@ -1,0 +1,292 @@
+From 9b2644616af0e297febe6395ae4b7982e336b55c Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 15:32:38 +0000
+Subject: [PATCH 01/14] feat(trace): report the automatic threshold a trace
+ chose (ADR-396)
+
+No visible change on its own. Trace steps can now yield a display-only
+report: the filled-outline lane reports the luma the automatic (Otsu)
+threshold picked, and whether Line Art's automatic detection added marks
+found by local contrast to its 0-128 brightness band. The Trace dialog
+needs this so Manual brightness band starts where the automatic threshold
+was, and so Line Art can say which route ran.
+
+With Faint lines on, Line Art's colour check does not run, so only an
+automatic threshold is reported there.
+
+Nothing reads a report back as an input, so trace output and the options
+that key prepared and cached results are unchanged. Runners that do not
+show reports treat the yield as one more checkpoint. trace-image.ts gains
+one counted line; the builders live in trace-report.ts.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/contour-trace.ts     |  3 +-
+ src/core/trace/index.ts             |  1 +
+ src/core/trace/trace-image.ts       | 17 +++---
+ src/core/trace/trace-report.test.ts | 87 +++++++++++++++++++++++++++++
+ src/core/trace/trace-report.ts      | 26 +++++++++
+ src/core/trace/trace-steps.ts       | 17 +++++-
+ 6 files changed, 141 insertions(+), 10 deletions(-)
+ create mode 100644 src/core/trace/trace-report.test.ts
+ create mode 100644 src/core/trace/trace-report.ts
+
+diff --git a/src/core/trace/contour-trace.ts b/src/core/trace/contour-trace.ts
+index 7b8bbe29e..b1f597300 100644
+--- a/src/core/trace/contour-trace.ts
++++ b/src/core/trace/contour-trace.ts
+@@ -138,10 +138,11 @@ export function* traceImageToContourColoredPathsSteps(
+   preparedInput?: ContourTraceInput,
+ ): TraceSteps<ColoredPath[]> {
+   const cooperate = yield;
+-  const { prepared, crackField } =
++  const { prepared, crackField, report } =
+     preparedInput !== undefined && contourTraceInputMatches(preparedInput, image, options)
+       ? preparedInput
+       : prepareTraceForContour(image, options);
++  if (report !== undefined) yield report;
+   if (cooperate) yield;
+   const mask = inkMaskFromPrepared(prepared);
+   // Sub-pixel crack interpolation: vertex POSITIONS come from the
+diff --git a/src/core/trace/index.ts b/src/core/trace/index.ts
+index b344f1c0f..a00d8d41f 100644
+--- a/src/core/trace/index.ts
++++ b/src/core/trace/index.ts
+@@ -18,6 +18,7 @@
+ // threshold → despeckle), except photo shading which retains continuous tone.
+ 
+ export type { RawImageData, TraceOptions } from './trace-image';
++export type { TraceReport } from './trace-steps';
+ export {
+   DEFAULT_TRACE_OPTIONS,
+   thresholdBandToMonochrome,
+diff --git a/src/core/trace/trace-image.ts b/src/core/trace/trace-image.ts
+index 34ad5e7cc..564b8c427 100644
+--- a/src/core/trace/trace-image.ts
++++ b/src/core/trace/trace-image.ts
+@@ -35,6 +35,7 @@ import { shouldTraceAlphaMask } from './trace-alpha';
+ import { traceImageToPhotoPathsSteps } from './photo-trace';
+ import { coloredPathsToSvg } from './paths-to-svg';
+ import { runTraceSteps } from './trace-steps';
++import { brightnessDetectionReport, LOCAL_DETAIL_REPORT, type Reported } from './trace-report';
+ 
+ // Internal type for the imagetracer module surface we use. Keeps
+ // the `as` cast contained to one place.
+@@ -132,7 +133,7 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions):
+ export function prepareTraceForContour(
+   image: RawImageData,
+   options: TraceOptions,
+-): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
++): Reported<{ readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null }> {
+   // Fail closed on a malformed buffer: every downstream stage indexes
+   // data[i..i+3] assuming length === width*height*4, so a short/oversized
+   // buffer or non-integer dims would read past the array or size a wrong-shape
+@@ -157,7 +158,8 @@ export function prepareTraceForContour(
+         sketchCrackField(adjusted, radiusPx),
+         options,
+       );
+-      return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
++      const mask = cleanBinaryMask(recovered.prepared, options);
++      return { ...recovered, prepared: mask, report: LOCAL_DETAIL_REPORT };
+     }
+     const prepared = sketchTraceToMonochrome(
+       adjusted,
+@@ -176,6 +178,7 @@ export function prepareTraceForContour(
+   const thresholded = applyThresholdWithIso(prepared, options);
+   const field =
+     thresholded.thresholdLuma === null ? null : lumaCrackField(prepared, thresholded.thresholdLuma);
++  const report = brightnessDetectionReport(options, thresholded.report);
+   if (options.faintLineRecovery === true) {
+     const recovered = prepareFaintLineMask(
+       thresholded.prepared,
+@@ -183,12 +186,9 @@ export function prepareTraceForContour(
+       sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
+       effectivePixelScale(options),
+     );
+-    return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
++    return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options), ...report };
+   }
+-  return {
+-    prepared: cleanBinaryMask(thresholded.prepared, options),
+-    crackField: field,
+-  };
++  return { prepared: cleanBinaryMask(thresholded.prepared, options), crackField: field, ...report };
+ }
+ 
+ // Mask cleanup is the shared tail of every preprocessing branch: despeckle
+@@ -233,7 +233,7 @@ const BACKGROUND_LUMA = 255;
+ function applyThresholdWithIso(
+   prepared: RawImageData,
+   options: TraceOptions,
+-): { readonly prepared: RawImageData; readonly thresholdLuma: number | null } {
++): Reported<{ readonly prepared: RawImageData; readonly thresholdLuma: number | null }> {
+   if (options.cutoffLuma !== undefined) {
+     const upper = options.thresholdLuma ?? 128;
+     return {
+@@ -252,6 +252,7 @@ function applyThresholdWithIso(
+     return {
+       prepared: thresholdToMonochrome(prepared, thresholdLuma),
+       thresholdLuma,
++      report: { automaticThresholdLuma: thresholdLuma },
+     };
+   }
+   return { prepared, thresholdLuma: null };
+diff --git a/src/core/trace/trace-report.test.ts b/src/core/trace/trace-report.test.ts
+new file mode 100644
+index 000000000..842cfed5a
+--- /dev/null
++++ b/src/core/trace/trace-report.test.ts
+@@ -0,0 +1,87 @@
++import { describe, expect, it } from 'vitest';
++import { otsuThreshold } from './preprocess';
++import { prepareTraceForContour, type RawImageData, type TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++import type { TraceReport, TraceSteps } from './trace-steps';
++import { traceImageToColoredPaths } from './trace-to-paths';
++
++const SHARP = TRACE_PRESETS['Sharp']!;
++const LINE_ART = TRACE_PRESETS['Line Art']!;
++
++describe('trace reports what automatic detection chose', () => {
++  it('reports the Otsu threshold, and the band ending one level lower selects the same ink', () => {
++    const image = rampImage();
++    const { prepared, report } = prepareTraceForContour(image, SHARP);
++    const automatic = otsuThreshold(image);
++    expect(report).toEqual({ automaticThresholdLuma: automatic });
++    // The manual band is inclusive; Otsu keeps only pixels darker than its cut.
++    const manual = (upper: number): TraceOptions => ({
++      ...SHARP,
++      useOtsuThreshold: false,
++      cutoffLuma: 0,
++      thresholdLuma: upper,
++    });
++    expect(prepareTraceForContour(image, manual(automatic - 1)).prepared.data).toEqual(
++      prepared.data,
++    );
++    expect(prepareTraceForContour(image, manual(automatic)).prepared.data).not.toEqual(
++      prepared.data,
++    );
++    expect(prepareTraceForContour(image, manual(automatic - 1)).report).toBeUndefined();
++  });
++
++  it('says whether Line Art added local-contrast detail to its band', () => {
++    expect(prepareTraceForContour(rampImage(), LINE_ART).report).toEqual({
++      localDetailAdded: false,
++    });
++    expect(prepareTraceForContour(rampImage([40, 90, 200]), LINE_ART).report).toEqual({
++      localDetailAdded: true,
++    });
++  });
++
++  it('keeps reporting the threshold when Faint lines replaces the colour check', () => {
++    const image = rampImage([40, 90, 200]);
++    expect(prepareTraceForContour(image, { ...SHARP, faintLineRecovery: true }).report).toEqual({
++      automaticThresholdLuma: otsuThreshold(image),
++    });
++    expect(
++      prepareTraceForContour(image, { ...LINE_ART, faintLineRecovery: true }).report,
++    ).toBeUndefined();
++  });
++
++  it('carries the report to the runner without changing the traced paths', async () => {
++    const image = rampImage();
++    const reports: TraceReport[] = [];
++    const reporting = <T>(steps: TraceSteps<T>): T => {
++      for (;;) {
++        const step = steps.next(false);
++        if (step.done) return step.value;
++        if (step.value !== undefined) reports.push(step.value);
++      }
++    };
++    const paths = await traceImageToColoredPaths(image, SHARP, reporting);
++    expect(reports).toEqual([{ automaticThresholdLuma: otsuThreshold(image) }]);
++    expect(paths).toEqual(await traceImageToColoredPaths(image, SHARP));
++  });
++});
++
++// Dark bars on light paper with a full 0-255 ramp along the top rows, so pixels
++// sit on both sides of every possible cut. `tint` colours the dark bars.
++function rampImage(tint?: readonly [number, number, number]): RawImageData {
++  const width = 256;
++  const height = 64;
++  const data = new Uint8ClampedArray(width * height * 4);
++  for (let y = 0; y < height; y += 1) {
++    for (let x = 0; x < width; x += 1) {
++      const bar = y >= 16 && x % 32 < 12;
++      const grey = y < 4 ? x : bar ? 50 : 225;
++      const rgb = bar && tint !== undefined ? tint : [grey, grey, grey];
++      const offset = (y * width + x) * 4;
++      data[offset] = rgb[0]!;
++      data[offset + 1] = rgb[1]!;
++      data[offset + 2] = rgb[2]!;
++      data[offset + 3] = 255;
++    }
++  }
++  return { width, height, data };
++}
+diff --git a/src/core/trace/trace-report.ts b/src/core/trace/trace-report.ts
+new file mode 100644
+index 000000000..48b1eecb7
+--- /dev/null
++++ b/src/core/trace/trace-report.ts
+@@ -0,0 +1,26 @@
++// Builders for the display-only TraceReport (see trace-steps.ts). Kept out of
++// trace-image.ts so the preprocessing chain only gains the lines that attach
++// a report where a decision is made.
++
++import type { TraceOptions } from './trace-option-types';
++import type { TraceReport } from './trace-steps';
++
++export type Reported<T> = T & { readonly report?: TraceReport };
++
++/** Line Art found colour detail and added marks found by local contrast. */
++export const LOCAL_DETAIL_REPORT: TraceReport = { localDetailAdded: true };
++
++/** The brightness route ran. For Line Art that means its colour check found
++ * nothing to add, unless Faint lines replaced that check. An automatic
++ * threshold, if one ran, rides along. */
++export function brightnessDetectionReport(
++  options: TraceOptions,
++  threshold: TraceReport | undefined,
++): { readonly report?: TraceReport } {
++  const checkedColour = options.autoSketchTrace === true && options.faintLineRecovery !== true;
++  const report: TraceReport = {
++    ...threshold,
++    ...(checkedColour ? { localDetailAdded: false } : {}),
++  };
++  return Object.keys(report).length === 0 ? {} : { report };
++}
+diff --git a/src/core/trace/trace-steps.ts b/src/core/trace/trace-steps.ts
+index 2a09939fe..a4913d85a 100644
+--- a/src/core/trace/trace-steps.ts
++++ b/src/core/trace/trace-steps.ts
+@@ -4,7 +4,22 @@
+ // A generator's first yield receives the execution mode. Native consumers
+ // send false, so hot loops run through without allocating checkpoint results;
+ // cooperative consumers send true to retain checkpoints between work units.
+-export type TraceSteps<T> = Generator<void, T, boolean>;
++//
++// A yield may also carry a TraceReport. Runners that do not show reports treat
++// it as one more checkpoint.
++export type TraceSteps<T> = Generator<TraceReport | undefined, T, boolean>;
++
++/** What a trace decided on its own, so the dialog can show it. Nothing reads a
++ * report back as an input, so reporting cannot change trace output or the
++ * options a cached result is keyed on. */
++export type TraceReport = {
++  /** The luma the automatic (Otsu) threshold chose. Pixels darker than this
++   * are ink; the inclusive manual band that matches it ends one level lower. */
++  readonly automaticThresholdLuma?: number;
++  /** Line Art's automatic detection: true when marks found by local contrast
++   * were added to the brightness band, false when the band ran alone. */
++  readonly localDetailAdded?: boolean;
++};
+ export type TraceStepRunner = <T>(steps: TraceSteps<T>) => T | Promise<T>;
+ 
+ export function runTraceSteps<T>(steps: TraceSteps<T>): T {
+
+base-commit: 5d4bafa1663194602067e9244f44802269526dd2
+-- 
+2.43.0
+

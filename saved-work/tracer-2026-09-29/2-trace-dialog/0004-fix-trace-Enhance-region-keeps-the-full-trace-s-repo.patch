@@ -1,0 +1,59 @@
+From 6c538ed29a7523c75b8786aba890ad853e32dca7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 15:36:21 +0000
+Subject: [PATCH 04/14] fix(trace): Enhance region keeps the full trace's
+ report (ADR-396)
+
+Touches the settings worker's file (region-enhance-trace.ts): one
+spread line. With an Enhance boundary, the dialog shows the automatic
+threshold and Line Art route of the full-image trace, which decides
+detection for everything outside the box, instead of losing the report.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/trace/region-enhance-trace.test.ts | 17 +++++++++++++++++
+ src/ui/trace/region-enhance-trace.ts      |  2 ++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/src/ui/trace/region-enhance-trace.test.ts b/src/ui/trace/region-enhance-trace.test.ts
+index b2d8efdb0..52b9db5b7 100644
+--- a/src/ui/trace/region-enhance-trace.test.ts
++++ b/src/ui/trace/region-enhance-trace.test.ts
+@@ -218,4 +218,21 @@ describe('traceImageWithBoundaryMode — enhance mode', () => {
+     // right: one survivor + one replacement = two, not three).
+     expect(polylines).toHaveLength(2);
+   });
++
++  it('shows the full trace report, not the region re-trace report', async () => {
++    const trace = (report: { readonly automaticThresholdLuma: number }) => ({
++      paths: [],
++      bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
++      width: 20,
++      height: 20,
++      report,
++    });
++    vi.mocked(traceImageWithFallback)
++      .mockResolvedValueOnce(trace({ automaticThresholdLuma: 120 }))
++      .mockResolvedValueOnce(trace({ automaticThresholdLuma: 90 }));
++
++    const result = await traceImageWithBoundaryMode(image, options, region, 'enhance');
++
++    expect(result.report).toEqual({ automaticThresholdLuma: 120 });
++  });
+ });
+diff --git a/src/ui/trace/region-enhance-trace.ts b/src/ui/trace/region-enhance-trace.ts
+index 4ca4c076d..fe65e715d 100644
+--- a/src/ui/trace/region-enhance-trace.ts
++++ b/src/ui/trace/region-enhance-trace.ts
+@@ -64,5 +64,7 @@ export async function traceImageWithBoundaryMode(
+     width: full.width,
+     height: full.height,
+     ...(notices.size === 0 ? {} : { notices: [...notices] }),
++    // The full trace sets detection for most of the image; show its report.
++    ...(full.report === undefined ? {} : { report: full.report }),
+   };
+ }
+-- 
+2.43.0
+

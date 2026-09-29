@@ -1,0 +1,235 @@
+From 117c044e400417a5aff2fcf33109910e6aae3e65 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 20:07:39 +0000
+Subject: [PATCH 10/14] feat(trace): Centerline Join gaps control (ADR-396)
+
+Centerline now shows a Join gaps setting (pixels, default 3) where the
+filled styles show Ignore Less Than. It sets how close two line ends must
+be, while pointing toward each other, for the tracer to join them into one
+line; 0 leaves gaps open. The value carries over like other adjustments:
+it applies only while Centerline is selected, is listed as "Not used by"
+under other styles, counts toward "Settings edited", and Reset trace
+settings restores the preset's 3.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../TraceSettingsControls.semantic.test.tsx   | 26 +++++++++++++++++++
+ src/ui/trace/TraceSettingsControls.tsx        | 18 ++++++++++++-
+ src/ui/trace/trace-options.test.ts            | 15 +++++++++++
+ src/ui/trace/trace-options.ts                 | 18 ++++++++++---
+ src/ui/trace/trace-setting-edits.test.ts      |  8 ++++++
+ src/ui/trace/trace-setting-edits.ts           |  5 +++-
+ src/ui/trace/trace-setting-hints.ts           |  2 ++
+ 7 files changed, 87 insertions(+), 5 deletions(-)
+
+diff --git a/src/ui/trace/TraceSettingsControls.semantic.test.tsx b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+index 9ac26ffaa..396917106 100644
+--- a/src/ui/trace/TraceSettingsControls.semantic.test.tsx
++++ b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+@@ -143,6 +143,32 @@ describe('trace controls describe the options the engine actually receives', ()
+     });
+   });
+ 
++  it('joins Centerline line ends across a gap only when Join gaps reaches it', async () => {
++    const image = paper();
++    fill(image, 5, 28, 30, 3, [0, 0, 0]);
++    fill(image, 37, 28, 30, 3, [0, 0, 0]);
++    const lines = async (options: TraceOptions): Promise<number> =>
++      (await traceImageToColoredPaths(image, options)).reduce(
++        (n, path) => n + path.polylines.length,
++        0,
++      );
++    await withControls('Centerline', async (controls) => {
++      expect(controls.number('Join gaps').value).toBe('3');
++      expect(await lines(controls.options())).toBe(2);
++      await controls.change('Join gaps', 6);
++      expect(await lines(controls.options())).toBe(1);
++      await controls.change('Join gaps', 0);
++      expect(await lines(controls.options())).toBe(2);
++      await controls.selectPreset('Line Art');
++      expect(controls.host.querySelector('[aria-label="Trace Join gaps"]')).toBeNull();
++      expect(controls.options()).toEqual(TRACE_PRESETS['Line Art']);
++      await controls.selectPreset('Centerline');
++      expect(controls.number('Join gaps').value).toBe('0');
++      await controls.reset();
++      expect(controls.options()).toEqual(TRACE_PRESETS['Centerline']);
++    });
++  });
++
+   it('says which pixels a Cutoff above Threshold selects', async () => {
+     const image = paper();
+     fill(image, 5, 5, 10, 10, [0, 0, 0]);
+diff --git a/src/ui/trace/TraceSettingsControls.tsx b/src/ui/trace/TraceSettingsControls.tsx
+index 5b5fef2c1..e39a0fe74 100644
+--- a/src/ui/trace/TraceSettingsControls.tsx
++++ b/src/ui/trace/TraceSettingsControls.tsx
+@@ -4,6 +4,7 @@ import {
+   type TraceReport,
+ } from '../../core/trace';
+ import {
++  DEFAULT_CENTERLINE_JOIN_GAP_PX,
+   DEFAULT_EDGE_MINIMUM_LINE_PX,
+   edgeDetailFromOptions,
+   edgeSensitivityFromOptions,
+@@ -207,7 +208,22 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
+           value={props.overrides.ignoreLessThanPixels ?? props.preset.ignoreLessThanPixels ?? 0}
+           onChange={(ignoreLessThanPixels) => set({ ignoreLessThanPixels })}
+         />
+-      ) : null}
++      ) : (
++        <TraceNumberRow
++          label="Join gaps"
++          hint={TRACE_SETTING_HINTS.joinGaps}
++          unit="px"
++          min={0}
++          max={50}
++          step={1}
++          value={
++            props.overrides.centerlineJoinGapPx ??
++            props.preset.centerlineJoinGapPx ??
++            DEFAULT_CENTERLINE_JOIN_GAP_PX
++          }
++          onChange={(centerlineJoinGapPx) => set({ centerlineJoinGapPx })}
++        />
++      )}
+       <TraceCheckboxRow
+         label="Fill tiny holes"
+         checked={props.overrides.fillPinholeCracks ?? props.preset.fillPinholeCracks ?? false}
+diff --git a/src/ui/trace/trace-options.test.ts b/src/ui/trace/trace-options.test.ts
+index 5680f1db7..4026ae7f9 100644
+--- a/src/ui/trace/trace-options.test.ts
++++ b/src/ui/trace/trace-options.test.ts
+@@ -148,6 +148,21 @@ describe('mergeLightBurnTraceSettings', () => {
+     expect(merged.edgeJoinGapPx).toBeUndefined();
+     expect(merged.edgeMinLengthPx).toBeUndefined();
+   });
++
++  it('gives Join gaps to Centerline only, keeping 0 as the off value', () => {
++    const CENTERLINE = TRACE_PRESETS['Centerline'] as TraceOptions;
++    expect(mergeLightBurnTraceSettings(CENTERLINE, { centerlineJoinGapPx: 0 })).toEqual({
++      ...CENTERLINE,
++      centerlineJoinGapPx: 0,
++    });
++    expect(
++      mergeLightBurnTraceSettings(CENTERLINE, { centerlineJoinGapPx: -4 }).centerlineJoinGapPx,
++    ).toBe(0);
++    expect(mergeLightBurnTraceSettings(LINE_ART, { centerlineJoinGapPx: 9 })).toEqual(LINE_ART);
++    expect(mergeLightBurnTraceSettings(EDGE, { centerlineJoinGapPx: 9 }).centerlineJoinGapPx).toBe(
++      EDGE.centerlineJoinGapPx,
++    );
++  });
+ });
+ 
+ describe('hasAggressivePreprocessing', () => {
+diff --git a/src/ui/trace/trace-options.ts b/src/ui/trace/trace-options.ts
+index 078e949e2..abf05c7e3 100644
+--- a/src/ui/trace/trace-options.ts
++++ b/src/ui/trace/trace-options.ts
+@@ -28,11 +28,14 @@ export type LightBurnTraceSettingOverrides = {
+   readonly edgeSensitivity?: number;
+   readonly edgeDetail?: number;
+   readonly edgeMinimumLinePx?: number;
++  readonly centerlineJoinGapPx?: number;
+ };
+ 
+ export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
+ 
+ export const DEFAULT_EDGE_MINIMUM_LINE_PX = 3;
++// The centerline tracer's own gap when options omit it (trace-centerline.ts).
++export const DEFAULT_CENTERLINE_JOIN_GAP_PX = 3;
+ 
+ export function mergeLightBurnTraceSettings(
+   preset: TraceOptions,
+@@ -55,9 +58,8 @@ export function mergeLightBurnTraceSettings(
+   if (settings.traceTransparency !== undefined) {
+     out['traceTransparency'] = settings.traceTransparency;
+   }
+-  if (preset.traceMode === 'edge') {
+-    applyEdgeTraceSettings(out, preset, settings);
+-  }
++  if (preset.traceMode === 'edge') applyEdgeTraceSettings(out, preset, settings);
++  else if (preset.traceMode === 'centerline') applyCenterlineSettings(out, settings);
+   return out as TraceOptions;
+ }
+ 
+@@ -173,6 +175,16 @@ function applyManualDetection(
+   out['thresholdLuma'] = clampByte(settings.thresholdLuma ?? preset.thresholdLuma ?? 128);
+ }
+ 
++function applyCenterlineSettings(
++  out: Record<string, unknown>,
++  settings: LightBurnTraceSettingOverrides,
++): void {
++  // Join gaps: 0 turns the bridge between separate line ends off.
++  if (settings.centerlineJoinGapPx !== undefined) {
++    out['centerlineJoinGapPx'] = clampMin(settings.centerlineJoinGapPx, 0);
++  }
++}
++
+ // Edge Detection's detector reads two of the preset's Canny-era fields
+ // (edge-input.ts): the low ratio sets how much darker than its surroundings a
+ // mark must be, and the blur sigma sets the neighbourhood size. Sensitivity
+diff --git a/src/ui/trace/trace-setting-edits.test.ts b/src/ui/trace/trace-setting-edits.test.ts
+index 730f50374..f0ad67b60 100644
+--- a/src/ui/trace/trace-setting-edits.test.ts
++++ b/src/ui/trace/trace-setting-edits.test.ts
+@@ -46,6 +46,14 @@ describe('which kept adjustments the selected style uses', () => {
+     expect(
+       traceSettingEdits(CENTERLINE, { smoothness: 0.4, ignoreLessThanPixels: 9 }, false),
+     ).toEqual({ edited: false, unused: ['Ignore Less Than', 'Smoothness'] });
++    expect(traceSettingEdits(CENTERLINE, { centerlineJoinGapPx: 0 }, false)).toEqual({
++      edited: true,
++      unused: [],
++    });
++    expect(traceSettingEdits(SHARP, { centerlineJoinGapPx: 0 }, false)).toEqual({
++      edited: false,
++      unused: ['Join gaps'],
++    });
+     expect(
+       traceSettingEdits(PHOTO, { photoGamma: 1.4, detectionMode: 'faint-lines' }, false),
+     ).toEqual({ edited: true, unused: ['Detection'] });
+diff --git a/src/ui/trace/trace-setting-edits.ts b/src/ui/trace/trace-setting-edits.ts
+index 29822ed68..c979fa505 100644
+--- a/src/ui/trace/trace-setting-edits.ts
++++ b/src/ui/trace/trace-setting-edits.ts
+@@ -29,6 +29,7 @@ const OVERRIDE_LABELS: Readonly<Record<OverrideKey, string>> = {
+   edgeSensitivity: 'Sensitivity',
+   edgeDetail: 'Detail',
+   edgeMinimumLinePx: 'Minimum line',
++  centerlineJoinGapPx: 'Join gaps',
+   detectionMode: 'Detection',
+   sketchTrace: 'Detection',
+   cutoffLuma: 'Cutoff',
+@@ -64,6 +65,7 @@ const MASK_KEYS: ReadonlyArray<OverrideKey> = [
+   'traceTransparency',
+ ];
+ const CONTOUR_KEYS: ReadonlyArray<OverrideKey> = ['ignoreLessThanPixels', 'smoothness', 'optimize'];
++const CENTERLINE_KEYS: ReadonlyArray<OverrideKey> = ['centerlineJoinGapPx'];
+ 
+ export function traceSettingEdits(
+   preset: TraceOptions,
+@@ -93,7 +95,8 @@ function usedOverrideKeys(
+   if (preset.photoDetail !== undefined) return new Set(PHOTO_KEYS);
+   if (preset.traceMode === 'edge') return new Set(EDGE_KEYS);
+   const used = new Set<OverrideKey>(MASK_KEYS);
+-  if (preset.traceMode !== 'centerline') for (const key of CONTOUR_KEYS) used.add(key);
++  const styleKeys = preset.traceMode === 'centerline' ? CENTERLINE_KEYS : CONTOUR_KEYS;
++  for (const key of styleKeys) used.add(key);
+   // An opaque image ignores the alpha mask (trace-alpha.ts), and the band is
+   // read only by Manual detection or by the alpha mask.
+   const alphaMask =
+diff --git a/src/ui/trace/trace-setting-hints.ts b/src/ui/trace/trace-setting-hints.ts
+index d7f9a651f..66257458c 100644
+--- a/src/ui/trace/trace-setting-hints.ts
++++ b/src/ui/trace/trace-setting-hints.ts
+@@ -18,4 +18,6 @@ export const TRACE_SETTING_HINTS = {
+   detail:
+     'Neighbourhood that marks must be darker than, from about 25 px at 0 to 6 px at 100. Higher finds finer detail next to dark ink; lower keeps broader pale areas.',
+   minimumLine: 'Discard outlines shorter than this many pixels. Holes inside shapes are kept.',
++  joinGaps:
++    'Join line ends that are closer than this many pixels and point toward each other. 0 leaves gaps open.',
+ } as const;
+-- 
+2.43.0
+

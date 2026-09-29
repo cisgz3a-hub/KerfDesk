@@ -1,0 +1,591 @@
+From 62f8439fdebc44a4e5a82e4e3791c729d6c635a8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 19:46:10 +0000
+Subject: [PATCH 06/14] fix(trace): trace control hints say what the tracer
+ does (ADR-396)
+
+Every numeric trace control now has a hint checked against the engine:
+Cutoff and Threshold describe the inclusive brightness band; Remove ink
+specks and Ignore Less Than say that pixels touching at a corner count as
+one mark; Smoothness and Optimize describe corner rounding and point
+merging; Edge Sensitivity says how much darker than its surroundings a
+mark must be; Edge Detail names the neighbourhood size (about 25 px at 0
+to 6 px at 100) instead of claiming to smooth noise; Minimum line says
+holes inside shapes are kept. The alpha-mask note says opacity is read as
+brightness, 0 for fully opaque.
+
+Area fields step in whole pixels and round what is typed, so a field no
+longer shows 2.5 while the tracer uses 3. A Cutoff above Threshold now
+shows which pixels the band selects (the tracer orders the two ends).
+
+Edge Sensitivity is shown from the low ratio the detector reads, and
+changing it writes only that ratio. The high ratio and the join gap that
+Sensitivity and Detail used to rewrite have no reader in the detector.
+The unreachable Sensitivity 50 and Detail 68 fallbacks are removed; the
+default preset still shows Sensitivity 44 and Detail 68.
+
+The number row moves to TraceNumberRow.tsx with an explicit hint and
+unit, and the hint texts to trace-setting-hints.ts.
+
+Expectations updated in trace-options.test.ts: Sensitivity and Detail no
+longer change edgeHighThresholdRatio or edgeJoinGapPx, because nothing
+reads them. New tests check the displayed Sensitivity for every value,
+whole-pixel rounding, and the swapped-band note against the traced ink.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/trace/TraceDetectionControls.tsx       |   5 +-
+ src/ui/trace/TraceNumberRow.tsx               |  66 +++++++++
+ .../TraceSettingsControls.semantic.test.tsx   |  24 +++
+ src/ui/trace/TraceSettingsControls.tsx        | 137 +++++-------------
+ src/ui/trace/trace-options.test.ts            |  17 ++-
+ src/ui/trace/trace-options.ts                 |  76 +++-------
+ src/ui/trace/trace-setting-hints.ts           |  21 +++
+ 7 files changed, 184 insertions(+), 162 deletions(-)
+ create mode 100644 src/ui/trace/TraceNumberRow.tsx
+ create mode 100644 src/ui/trace/trace-setting-hints.ts
+
+diff --git a/src/ui/trace/TraceDetectionControls.tsx b/src/ui/trace/TraceDetectionControls.tsx
+index e292d8d86..c7fc4d417 100644
+--- a/src/ui/trace/TraceDetectionControls.tsx
++++ b/src/ui/trace/TraceDetectionControls.tsx
+@@ -16,7 +16,10 @@ export function TraceDetectionControls(props: {
+   if (props.alphaMask) {
+     return (
+       <>
+-        <p style={noteStyle}>Tracing transparency. Cutoff and Threshold apply to the alpha mask.</p>
++        <p style={noteStyle}>
++          Tracing transparency: Cutoff and Threshold read opacity as brightness, 0 for fully opaque
++          and 255 for fully transparent.
++        </p>
+         {props.children}
+       </>
+     );
+diff --git a/src/ui/trace/TraceNumberRow.tsx b/src/ui/trace/TraceNumberRow.tsx
+new file mode 100644
+index 000000000..63a372138
+--- /dev/null
++++ b/src/ui/trace/TraceNumberRow.tsx
+@@ -0,0 +1,66 @@
++import { useId } from 'react';
++
++/** One numeric trace control: a number field, a slider for short ranges, and a
++ * visible hint that describes both. */
++export function TraceNumberRow(props: {
++  readonly label: string;
++  readonly hint: string;
++  readonly min: number;
++  readonly max: number;
++  readonly step: number;
++  readonly value: number;
++  readonly unit?: 'px' | 'px²';
++  readonly onChange: (next: number) => void;
++}): JSX.Element {
++  const inputId = useId();
++  const hintId = useId();
++  const change = (raw: string): void => props.onChange(settleTraceNumber(Number(raw), props));
++  return (
++    <div className="lf-trace-number">
++      <label htmlFor={inputId}>
++        <span>{props.label}</span>
++        <span className="lf-trace-number-input">
++          <input
++            id={inputId}
++            className="lf-input"
++            type="number"
++            min={props.min}
++            max={props.max}
++            step={props.step}
++            value={props.value}
++            onChange={(e) => change(e.target.value)}
++            aria-label={`Trace ${props.label}`}
++            aria-describedby={hintId}
++            title={props.hint}
++          />
++          {props.unit === undefined ? null : <span>{props.unit}</span>}
++        </span>
++      </label>
++      {props.max <= 255 ? (
++        <input
++          type="range"
++          min={props.min}
++          max={props.max}
++          step={props.step}
++          value={props.value}
++          aria-label={`Trace ${props.label} slider`}
++          title={props.hint}
++          aria-describedby={hintId}
++          onChange={(e) => change(e.target.value)}
++        />
++      ) : null}
++      <p id={hintId}>{props.hint}</p>
++    </div>
++  );
++}
++
++// Whole-number controls round what is typed, so the field always shows the
++// value the tracer receives (the area settings are rounded when merged).
++function settleTraceNumber(
++  value: number,
++  range: { readonly min: number; readonly max: number; readonly step: number },
++): number {
++  if (!Number.isFinite(value)) return range.min;
++  const settled = Number.isInteger(range.step) ? Math.round(value) : value;
++  return Math.max(range.min, Math.min(range.max, settled));
++}
+diff --git a/src/ui/trace/TraceSettingsControls.semantic.test.tsx b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+index 29600bc8a..aafe4e23c 100644
+--- a/src/ui/trace/TraceSettingsControls.semantic.test.tsx
++++ b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+@@ -136,6 +136,30 @@ describe('trace controls describe the options the engine actually receives', ()
+     });
+   });
+ 
++  it('rounds typed areas to the whole pixels the tracer uses', async () => {
++    await withControls('Line Art', async (controls) => {
++      await controls.change('Remove ink specks', 2.4);
++      expect(controls.number('Remove ink specks').value).toBe('2');
++      expect(controls.options().despeckleMinPixels).toBe(2);
++      await controls.change('Ignore Less Than', 2.5);
++      expect(controls.number('Ignore Less Than').value).toBe('3');
++      expect(controls.options().ignoreLessThanPixels).toBe(3);
++    });
++  });
++
++  it('says which pixels a Cutoff above Threshold selects', async () => {
++    const image = paper();
++    fill(image, 5, 5, 10, 10, [0, 0, 0]);
++    fill(image, 30, 5, 20, 10, [150, 150, 150]);
++    await withControls('Line Art', async (controls) => {
++      await controls.detect('manual');
++      await controls.change('Cutoff', 200);
++      await controls.change('Threshold', 100);
++      expect(controls.host.textContent).toContain('pixels from 100 to 200 trace as ink');
++      expect(ink(preprocessForTrace(image, controls.options()))).toBe(200);
++    });
++  });
++
+   it('hides the brightness band in explicit sketch mode and returns to manual values', async () => {
+     await withControls('Sharp', async (controls) => {
+       await controls.detect('manual');
+diff --git a/src/ui/trace/TraceSettingsControls.tsx b/src/ui/trace/TraceSettingsControls.tsx
+index 1cc374b40..825a1d6f7 100644
+--- a/src/ui/trace/TraceSettingsControls.tsx
++++ b/src/ui/trace/TraceSettingsControls.tsx
+@@ -1,9 +1,6 @@
+-import { useId } from 'react';
+ import { DEFAULT_LIGHTBURN_TRACE_SETTINGS, type TraceOptions } from '../../core/trace';
+ import {
+-  DEFAULT_EDGE_DETAIL,
+   DEFAULT_EDGE_MINIMUM_LINE_PX,
+-  DEFAULT_EDGE_SENSITIVITY,
+   edgeDetailFromOptions,
+   edgeSensitivityFromOptions,
+   mergeLightBurnTraceSettings,
+@@ -12,6 +9,8 @@ import {
+ import { TraceDetectionControls } from './TraceDetectionControls';
+ import { TraceCheckboxRow } from './TraceCheckboxRow';
+ import { PhotoTraceSettingsControls } from './PhotoTraceSettingsControls';
++import { TraceNumberRow } from './TraceNumberRow';
++import { TRACE_SETTING_HINTS } from './trace-setting-hints';
+ 
+ type TraceSettingsControlsProps = {
+   readonly preset: TraceOptions;
+@@ -37,30 +36,28 @@ function EdgeTraceSettingsControls(props: TraceSettingsControlsProps): JSX.Eleme
+     <fieldset className="lf-trace-settings">
+       <legend>Refine detail</legend>
+       <div className="lf-trace-settings-group">
+-        <NumberRow
++        <TraceNumberRow
+           label="Sensitivity"
++          hint={TRACE_SETTING_HINTS.sensitivity}
+           min={0}
+           max={100}
+           step={1}
+-          value={
+-            props.overrides.edgeSensitivity ??
+-            edgeSensitivityFromOptions(props.preset) ??
+-            DEFAULT_EDGE_SENSITIVITY
+-          }
++          value={props.overrides.edgeSensitivity ?? edgeSensitivityFromOptions(props.preset)}
+           onChange={(edgeSensitivity) => set({ edgeSensitivity })}
+         />
+-        <NumberRow
++        <TraceNumberRow
+           label="Detail"
++          hint={TRACE_SETTING_HINTS.detail}
+           min={0}
+           max={100}
+           step={1}
+-          value={
+-            props.overrides.edgeDetail ?? edgeDetailFromOptions(props.preset) ?? DEFAULT_EDGE_DETAIL
+-          }
++          value={props.overrides.edgeDetail ?? edgeDetailFromOptions(props.preset)}
+           onChange={(edgeDetail) => set({ edgeDetail })}
+         />
+-        <NumberRow
++        <TraceNumberRow
+           label="Minimum line"
++          hint={TRACE_SETTING_HINTS.minimumLine}
++          unit="px"
+           min={0}
+           max={1000}
+           step={1}
+@@ -144,22 +141,31 @@ function BrightnessBandControls(props: TraceSettingsControlsProps): JSX.Element
+     });
+   return (
+     <>
+-      <NumberRow
++      <TraceNumberRow
+         label="Cutoff"
++        hint={TRACE_SETTING_HINTS.cutoff}
+         min={0}
+         max={255}
+         step={1}
+         value={cutoffLuma}
+         onChange={(next) => set({ cutoffLuma: next })}
+       />
+-      <NumberRow
++      <TraceNumberRow
+         label="Threshold"
++        hint={TRACE_SETTING_HINTS.threshold}
+         min={0}
+         max={255}
+         step={1}
+         value={thresholdLuma}
+         onChange={(next) => set({ thresholdLuma: next })}
+       />
++      {cutoffLuma > thresholdLuma ? (
++        // The tracer orders the two ends itself (trace-image.ts band and alpha
++        // masks), so say which pixels that selects instead of implying none.
++        <p style={noteStyle}>
++          Cutoff is above Threshold, so pixels from {thresholdLuma} to {cutoffLuma} trace as ink.
++        </p>
++      ) : null}
+     </>
+   );
+ }
+@@ -169,8 +175,10 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
+     props.onChange({ ...props.overrides, ...patch });
+   return (
+     <>
+-      <NumberRow
++      <TraceNumberRow
+         label="Remove ink specks"
++        hint={TRACE_SETTING_HINTS.removeInkSpecks}
++        unit="px²"
+         min={0}
+         max={10000}
+         step={1}
+@@ -178,8 +186,10 @@ function TraceAreaControls(props: TraceSettingsControlsProps): JSX.Element {
+         onChange={(despeckleMinPixels) => set({ despeckleMinPixels })}
+       />
+       {props.preset.traceMode !== 'centerline' ? (
+-        <NumberRow
++        <TraceNumberRow
+           label="Ignore Less Than"
++          hint={TRACE_SETTING_HINTS.ignoreLessThan}
++          unit="px²"
+           min={0}
+           max={10000}
+           step={1}
+@@ -202,16 +212,18 @@ function ContourGeometryControls(props: TraceSettingsControlsProps): JSX.Element
+   };
+   return (
+     <>
+-      <NumberRow
++      <TraceNumberRow
+         label="Smoothness"
++        hint={TRACE_SETTING_HINTS.smoothness}
+         min={0}
+         max={1.33}
+         step={0.01}
+         value={traceValue(props.preset, props.overrides, 'smoothness')}
+         onChange={(smoothness) => set({ smoothness })}
+       />
+-      <NumberRow
++      <TraceNumberRow
+         label="Optimize"
++        hint={TRACE_SETTING_HINTS.optimize}
+         min={0}
+         max={2}
+         step={0.01}
+@@ -270,7 +282,7 @@ function ResetTraceSettingsButton(props: {
+ 
+ function EdgeTraceModeNote(): JSX.Element {
+   return (
+-    <p style={edgeTraceNoteStyle}>
++    <p style={noteStyle}>
+       Outlines around dark artwork and locally darker detail, engraved as lines. Adjacent dark tones
+       may merge into one outline. Use Centerline for a single path down the middle of a stroke.
+     </p>
+@@ -289,88 +301,7 @@ function AlphaMaskCheckingNote(): JSX.Element {
+   return <p style={alphaMaskNoteStyle}>Checking image transparency...</p>;
+ }
+ 
+-function NumberRow(props: {
+-  readonly label: string;
+-  readonly min: number;
+-  readonly max: number;
+-  readonly step: number;
+-  readonly value: number;
+-  readonly onChange: (next: number) => void;
+-}): JSX.Element {
+-  const inputId = useId();
+-  const hintId = useId();
+-  const unit = props.max === 10000 ? 'px²' : props.label === 'Minimum line' ? 'px' : undefined;
+-  const hasSlider = props.max <= 255;
+-  return (
+-    <div className="lf-trace-number">
+-      <label htmlFor={inputId}>
+-        <span>{props.label}</span>
+-        <span className="lf-trace-number-input">
+-          <input
+-            id={inputId}
+-            className="lf-input"
+-            type="number"
+-            min={props.min}
+-            max={props.max}
+-            step={props.step}
+-            value={props.value}
+-            onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
+-            aria-label={`Trace ${props.label}`}
+-            aria-describedby={hintId}
+-            title={traceNumberTitle(props.label)}
+-          />
+-          {unit === undefined ? null : <span>{unit}</span>}
+-        </span>
+-      </label>
+-      {hasSlider ? (
+-        <input
+-          type="range"
+-          min={props.min}
+-          max={props.max}
+-          step={props.step}
+-          value={props.value}
+-          aria-label={`Trace ${props.label} slider`}
+-          title={traceNumberTitle(props.label)}
+-          aria-describedby={hintId}
+-          onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
+-        />
+-      ) : null}
+-      <p id={hintId}>{traceNumberTitle(props.label)}</p>
+-    </div>
+-  );
+-}
+-
+-function clamp(value: number, min: number, max: number): number {
+-  if (!Number.isFinite(value)) return min;
+-  return Math.max(min, Math.min(max, value));
+-}
+-
+-function traceNumberTitle(label: string): string {
+-  switch (label) {
+-    case 'Cutoff':
+-      return 'Exclude artwork darker than this brightness.';
+-    case 'Threshold':
+-      return 'Raise this to include lighter marks; lower it to keep darker ink.';
+-    case 'Ignore Less Than':
+-      return 'Remove shapes and holes below this pixel area. Use 0 to keep the smallest gaps.';
+-    case 'Remove ink specks':
+-      return 'Remove ink marks below this pixel area. Lower values keep fine detail; holes stay intact.';
+-    case 'Smoothness':
+-      return 'Smooth traced edges to reduce jagged vector paths.';
+-    case 'Optimize':
+-      return 'Simplify traced paths while preserving shape.';
+-    case 'Sensitivity':
+-      return 'Higher values keep weaker edges in Edge Detection.';
+-    case 'Detail':
+-      return 'Higher values preserve more fine edge detail; lower values smooth noise.';
+-    case 'Minimum line':
+-      return 'Discard closed edge outlines whose perimeter is shorter than this many source-image pixels.';
+-    default:
+-      return `Trace ${label.toLowerCase()} setting.`;
+-  }
+-}
+-
+-const edgeTraceNoteStyle: React.CSSProperties = {
++const noteStyle: React.CSSProperties = {
+   gridColumn: '1 / -1',
+   margin: 0,
+   fontSize: 12,
+diff --git a/src/ui/trace/trace-options.test.ts b/src/ui/trace/trace-options.test.ts
+index 88598601c..5680f1db7 100644
+--- a/src/ui/trace/trace-options.test.ts
++++ b/src/ui/trace/trace-options.test.ts
+@@ -98,7 +98,7 @@ describe('mergeLightBurnTraceSettings', () => {
+     expect(merged.useOtsuThreshold).toBe(true);
+   });
+ 
+-  it('maps simple Edge Detection controls to Canny options', () => {
++  it('maps the Edge Detection controls to the detector inputs only', () => {
+     const merged = mergeLightBurnTraceSettings(EDGE, {
+       edgeSensitivity: 85,
+       edgeDetail: 20,
+@@ -106,14 +106,19 @@ describe('mergeLightBurnTraceSettings', () => {
+     });
+ 
+     expect(merged.traceMode).toBe('edge');
+-    expect(merged.edgeHighThresholdRatio).toBeLessThan(EDGE.edgeHighThresholdRatio ?? 0.2);
+     expect(merged.edgeLowThresholdRatio).toBeLessThan(EDGE.edgeLowThresholdRatio ?? 0.08);
+     expect(merged.edgeBlurSigma).toBeGreaterThan(EDGE.edgeBlurSigma ?? 1.2);
+-    // Join gap scales WITH blur (heavier smoothing widens Canny dropouts);
+-    // lower Detail must therefore RAISE the gap, never collapse it below the
+-    // preset the way the old outline-era [0.5, 2] mapping did.
+-    expect(merged.edgeJoinGapPx).toBeGreaterThan(EDGE.edgeJoinGapPx ?? 5);
+     expect(merged.edgeMinLengthPx).toBe(9);
++    // The detector reads neither field (edge-input.ts), so they stay as the preset set them.
++    expect(merged.edgeHighThresholdRatio).toBe(EDGE.edgeHighThresholdRatio);
++    expect(merged.edgeJoinGapPx).toBe(EDGE.edgeJoinGapPx);
++  });
++
++  it('shows the Sensitivity that the detector input it wrote stands for', () => {
++    for (let sensitivity = 0; sensitivity <= 100; sensitivity += 1) {
++      const merged = mergeLightBurnTraceSettings(EDGE, { edgeSensitivity: sensitivity });
++      expect(edgeSensitivityFromOptions(merged)).toBe(sensitivity);
++    }
+   });
+ 
+   it('roundtrips displayed Edge Detection defaults back to the preset Canny values', () => {
+diff --git a/src/ui/trace/trace-options.ts b/src/ui/trace/trace-options.ts
+index 0b183bcd2..7c4b65e69 100644
+--- a/src/ui/trace/trace-options.ts
++++ b/src/ui/trace/trace-options.ts
+@@ -32,8 +32,6 @@ export type LightBurnTraceSettingOverrides = {
+ 
+ export type TraceDetectionMode = 'preset' | 'manual' | 'sketch' | 'faint-lines';
+ 
+-export const DEFAULT_EDGE_SENSITIVITY = 50;
+-export const DEFAULT_EDGE_DETAIL = 68;
+ export const DEFAULT_EDGE_MINIMUM_LINE_PX = 3;
+ 
+ export function mergeLightBurnTraceSettings(
+@@ -151,9 +149,19 @@ function applyManualDetection(
+   out['thresholdLuma'] = clampByte(settings.thresholdLuma ?? preset.thresholdLuma ?? 128);
+ }
+ 
++// Edge Detection's detector reads two of the preset's Canny-era fields
++// (edge-input.ts): the low ratio sets how much darker than its surroundings a
++// mark must be, and the blur sigma sets the neighbourhood size. Sensitivity
++// and Detail are shown from, and written to, only those two fields.
++// Sensitivity 0..100 moves the low ratio from 0.128 down to 0.02.
++const EDGE_DETECTOR_DEFAULT_LOW_RATIO = 0.074;
++const EDGE_LOW_RATIO_AT_SENSITIVITY_0 = 0.128;
++const EDGE_LOW_RATIO_SPAN = 0.108;
++
+ export function edgeSensitivityFromOptions(options: TraceOptions): number {
+-  const high = options.edgeHighThresholdRatio ?? 0.2;
+-  return clamp(Math.round(((0.32 - high) / (0.32 - 0.05)) * 100), 0, 100);
++  const low = options.edgeLowThresholdRatio ?? EDGE_DETECTOR_DEFAULT_LOW_RATIO;
++  const t = (EDGE_LOW_RATIO_AT_SENSITIVITY_0 - low) / EDGE_LOW_RATIO_SPAN;
++  return clamp(Math.round(t * 100), 0, 100);
+ }
+ 
+ export function edgeDetailFromOptions(options: TraceOptions): number {
+@@ -170,63 +178,27 @@ function applyEdgeTraceSettings(
+     settings.edgeSensitivity !== undefined &&
+     settings.edgeSensitivity !== edgeSensitivityFromOptions(preset)
+   ) {
+-    const thresholds = edgeSensitivityToThresholds(settings.edgeSensitivity);
+-    out['edgeLowThresholdRatio'] = thresholds.low;
+-    out['edgeHighThresholdRatio'] = thresholds.high;
+-  } else {
+-    copyIfDefined(out, 'edgeLowThresholdRatio', preset.edgeLowThresholdRatio);
+-    copyIfDefined(out, 'edgeHighThresholdRatio', preset.edgeHighThresholdRatio);
++    out['edgeLowThresholdRatio'] = edgeSensitivityToLowRatio(settings.edgeSensitivity);
+   }
+   if (settings.edgeDetail !== undefined && settings.edgeDetail !== edgeDetailFromOptions(preset)) {
+-    const detail = edgeDetailToCanny(settings.edgeDetail);
+-    out['edgeBlurSigma'] = detail.blurSigma;
+-    out['edgeJoinGapPx'] = detail.joinGapPx;
+-  } else {
+-    copyIfDefined(out, 'edgeBlurSigma', preset.edgeBlurSigma);
+-    copyIfDefined(out, 'edgeJoinGapPx', preset.edgeJoinGapPx);
+-  }
+-  if (settings.edgeMinimumLinePx !== undefined) {
+-    out['edgeMinLengthPx'] = Math.max(0, settings.edgeMinimumLinePx);
+-  } else {
+-    out['edgeMinLengthPx'] = preset.edgeMinLengthPx ?? DEFAULT_EDGE_MINIMUM_LINE_PX;
++    out['edgeBlurSigma'] = edgeDetailToBlurSigma(settings.edgeDetail);
+   }
++  out['edgeMinLengthPx'] =
++    settings.edgeMinimumLinePx !== undefined
++      ? Math.max(0, settings.edgeMinimumLinePx)
++      : (preset.edgeMinLengthPx ?? DEFAULT_EDGE_MINIMUM_LINE_PX);
+ }
+ 
+-function edgeSensitivityToThresholds(sensitivity: number): {
+-  readonly low: number;
+-  readonly high: number;
+-} {
++// Computed as 0.4 of a high ratio running 0.32 -> 0.05, with the same
++// rounding as before, so every Sensitivity value keeps its detector input.
++function edgeSensitivityToLowRatio(sensitivity: number): number {
+   const t = clamp(sensitivity, 0, 100) / 100;
+-  const high = roundRatio(0.32 + (0.05 - 0.32) * t);
+-  return { low: roundRatio(high * 0.4), high };
++  return roundRatio(roundRatio(0.32 + (0.05 - 0.32) * t) * 0.4);
+ }
+ 
+-// Join gap scales WITH blur: Canny's detection dropouts widen with the blur
+-// kernel, so heavier smoothing needs a proportionally longer bridge. The
+-// ratio is anchored so the preset default (blur 1.2, joinGap 5) round-trips
+-// exactly at the default Detail position — the old fixed [0.5, 2] range was
+-// calibrated for the deleted outline backend and collapsed the preset's
+-// join gap the moment Detail moved at all.
+-const EDGE_JOIN_GAP_PX_PER_BLUR_SIGMA = 5 / 1.2;
+-
+-function edgeDetailToCanny(detail: number): {
+-  readonly blurSigma: number;
+-  readonly joinGapPx: number;
+-} {
++function edgeDetailToBlurSigma(detail: number): number {
+   const t = clamp(detail, 0, 100) / 100;
+-  const blurSigma = roundRatio(2.5 + (0.6 - 2.5) * t);
+-  return {
+-    blurSigma,
+-    joinGapPx: roundRatio(blurSigma * EDGE_JOIN_GAP_PX_PER_BLUR_SIGMA),
+-  };
+-}
+-
+-function copyIfDefined<T extends keyof TraceOptions>(
+-  out: Record<string, unknown>,
+-  key: T,
+-  value: TraceOptions[T],
+-): void {
+-  if (value !== undefined) out[key] = value;
++  return roundRatio(2.5 + (0.6 - 2.5) * t);
+ }
+ 
+ // True when the options stack any of the three preset features that
+diff --git a/src/ui/trace/trace-setting-hints.ts b/src/ui/trace/trace-setting-hints.ts
+new file mode 100644
+index 000000000..d7f9a651f
+--- /dev/null
++++ b/src/ui/trace/trace-setting-hints.ts
+@@ -0,0 +1,21 @@
++// What each trace control does in the tracer, shown under the control and as
++// its tooltip. Pixel values count pixels of the grid the image is traced on,
++// which the settings panel names when it differs from the image's own size.
++
++export const TRACE_SETTING_HINTS = {
++  cutoff: 'Leave out pixels darker than this brightness (0–255). 0 keeps the darkest ink.',
++  threshold:
++    'Pixels from Cutoff up to this brightness trace as ink. Raise it to include lighter marks.',
++  removeInkSpecks:
++    'Remove ink marks smaller than this many pixels. Pixels touching at a corner count as one mark; holes are kept.',
++  ignoreLessThan:
++    'Remove traced shapes and holes smaller than this area. Pixels touching at a corner count as one shape. 0 keeps everything.',
++  smoothness:
++    'Lower keeps more sharp corners (0 draws straight lines and corners only); higher rounds corners into curves (1.33 rounds every corner).',
++  optimize: '0 keeps every traced point; higher values merge points into fewer lines and curves.',
++  sensitivity:
++    'How much darker than its surroundings a mark must be to count as ink. Higher values outline fainter marks.',
++  detail:
++    'Neighbourhood that marks must be darker than, from about 25 px at 0 to 6 px at 100. Higher finds finer detail next to dark ink; lower keeps broader pale areas.',
++  minimumLine: 'Discard outlines shorter than this many pixels. Holes inside shapes are kept.',
++} as const;
+-- 
+2.43.0
+

@@ -1,0 +1,111 @@
+From 3da57f94acc65d3b30c1d7a02ba499e345d640ff Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:20:32 +0000
+Subject: [PATCH 4/8] test(ui): tiny-hole checkbox fills grey cracks and keeps
+ white lines open (ADR-392)
+
+Outside this package's files: TraceSettingsControls.semantic.test.tsx and
+TraceCheckboxRow.tsx from main's #897, flagged for the integrator.
+
+Operator change: the Fill tiny holes tooltip now reads "Fill grey
+hairline cracks enclosed in solid ink. White lines and bright highlights
+stay open; turn off to keep every crack. Open gaps always stay open." The
+old text told operators to turn the box off to keep tiny highlights,
+which the previous commit now keeps with the box on.
+
+The semantic test still proves that the checkbox controls filling in Line
+Art, Smooth and Sharp and that open gaps stay open. Its slits are now grey
+(luma 160, just lighter than the cut) inside an ink block with a one-pixel
+anti-aliased rim, as rasterised art has, and it adds the intended new
+case: a slit as bright as the paper stays open with the box on. Before,
+the test used pure white slits, which are drawn white lines under
+ADR-392.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/trace/TraceCheckboxRow.tsx             |  2 +-
+ .../TraceSettingsControls.semantic.test.tsx   | 37 ++++++++++++++-----
+ 2 files changed, 28 insertions(+), 11 deletions(-)
+
+diff --git a/src/ui/trace/TraceCheckboxRow.tsx b/src/ui/trace/TraceCheckboxRow.tsx
+index e36d51ee1..b141fbda7 100644
+--- a/src/ui/trace/TraceCheckboxRow.tsx
++++ b/src/ui/trace/TraceCheckboxRow.tsx
+@@ -22,7 +22,7 @@ export function TraceCheckboxRow(props: {
+ function traceCheckboxTitle(label: string): string {
+   switch (label) {
+     case 'Fill tiny holes':
+-      return 'Fill enclosed hairline holes in solid ink. Turn off to keep tiny highlights and slots; open gaps stay open.';
++      return 'Fill grey hairline cracks enclosed in solid ink. White lines and bright highlights stay open; turn off to keep every crack. Open gaps always stay open.';
+     case 'Trace alpha mask':
+       return 'Only changes images with transparent pixels; opaque images trace the same.';
+     default:
+diff --git a/src/ui/trace/TraceSettingsControls.semantic.test.tsx b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+index 29600bc8a..6bf850baa 100644
+--- a/src/ui/trace/TraceSettingsControls.semantic.test.tsx
++++ b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+@@ -45,7 +45,7 @@ describe('trace controls describe the options the engine actually receives', ()
+   });
+ 
+   it.each(['Line Art', 'Smooth', 'Sharp'])(
+-    '%s tiny-hole checkbox controls enclosed slits while leaving open gaps open',
++    '%s tiny-hole checkbox controls enclosed grey slits while white lines and open gaps stay open',
+     async (name) => {
+       await withControls(name, async (controls) => {
+         for (const [width, height] of [
+@@ -53,18 +53,24 @@ describe('trace controls describe the options the engine actually receives', ()
+           [2, 20],
+           [2, 2],
+         ]) {
+-          const image = paper();
+-          fill(image, 10, 10, 40, 35, [0, 0, 0]);
+-          fill(image, 25, 15, width!, height!, [255, 255, 255]);
++          // A grey slit, just lighter than the cut, is a threshold crack.
++          const image = inkBlock();
++          fill(image, 25, 15, width!, height!, [160, 160, 160]);
+           await controls.check('Fill tiny holes', false);
+-          expect(ink(preprocessForTrace(image, controls.options()))).toBe(1400 - width! * height!);
++          expect(ink(preprocessForTrace(image, controls.options()))).toBe(
++            INK_BLOCK - width! * height!,
++          );
+           await controls.check('Fill tiny holes', true);
+-          expect(ink(preprocessForTrace(image, controls.options()))).toBe(1400);
++          expect(ink(preprocessForTrace(image, controls.options()))).toBe(INK_BLOCK);
++          // A slit as bright as the paper is a drawn white line (ADR-392).
++          fill(image, 25, 15, width!, height!, [255, 255, 255]);
++          expect(ink(preprocessForTrace(image, controls.options()))).toBe(
++            INK_BLOCK - width! * height!,
++          );
+         }
+-        const open = paper();
+-        fill(open, 10, 10, 40, 35, [0, 0, 0]);
+-        fill(open, 25, 10, 1, 35, [255, 255, 255]);
+-        expect(ink(preprocessForTrace(open, controls.options()))).toBe(1365);
++        const open = inkBlock();
++        fill(open, 25, 9, 1, 37, [160, 160, 160]);
++        expect(ink(preprocessForTrace(open, controls.options()))).toBe(INK_BLOCK - 37);
+       });
+     },
+   );
+@@ -316,6 +322,17 @@ async function withControls(
+   }
+ }
+ 
++// A 40 by 35 ink block with a one-pixel anti-aliased rim, as rasterised art
++// has; the rim also gives Otsu a cut between ink and paper.
++const INK_BLOCK = 42 * 37;
++
++function inkBlock(): RawImageData {
++  const image = paper();
++  fill(image, 9, 9, 42, 37, [128, 128, 128]);
++  fill(image, 10, 10, 40, 35, [0, 0, 0]);
++  return image;
++}
++
+ function paper(gray = 255): RawImageData {
+   const data = new Uint8ClampedArray(80 * 60 * 4);
+   for (let i = 0; i < data.length; i += 4) data.set([gray, gray, gray, 255], i);
+-- 
+2.43.0
+

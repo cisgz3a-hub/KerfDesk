@@ -1,0 +1,1205 @@
+diff --git a/docs/decisions/ADR-395-trace-settings-do-what-the-dialog-says.md b/docs/decisions/ADR-395-trace-settings-do-what-the-dialog-says.md
+new file mode 100644
+index 000000000..3389524db
+--- /dev/null
++++ b/docs/decisions/ADR-395-trace-settings-do-what-the-dialog-says.md
+@@ -0,0 +1,120 @@
++## ADR-395 - Trace Smoothness, Optimize and automatic detection do what the dialog says (2026-09-25)
++
++**Status:** Accepted. | **Date:** 2026-09-25
++
++### Context
++
++The 2026-09-24 tracer audit (Finding 9) and its settings audit followed each Trace dialog control from
++its label to the code. This decision covers the outline finisher's curve controls, Line Art's
++automatic detection, the Enhance region re-trace and the preset definitions:
++
++- **Smoothness** set only the wobble flattener and arc evening. Loops measured from anti-aliased
++  pixels skip both, so the logo and the dragon traced byte-identically at 0, 0.83, 1 and 1.33 in
++  Line Art, Smooth and Edge Detection. On 1-bit art 0 to 0.83 did nothing, and Sharp's 0.55 sat in
++  that range, so Smooth and Sharp finished curves almost like Line Art (settings audit findings 1
++  and 9).
++- LightBurn's Smoothness runs from 0.0, which creates only lines, to 1.33, which creates only
++  curves [1], and its default of 1.0 is "generally a good starting point to produce smooth curves
++  without losing sharp corners" [2]. These are potrace's alphamax values: "If this parameter is 0, then no smoothing will be
++  performed and the output is a polygon. If this parameter is greater than 4/3, then all corners
++  are suppressed and the output is completely smooth" [3]. potrace scores each polygon vertex with
++  α = 4γ/3, rounds it if α < αmax and makes it a corner otherwise, and clamps α to 0.55–1 when it
++  places the curve [4].
++- **Optimize** 0 still merged boundary points into fewer vertices and curves. LightBurn documents
++  "0 means no merging" and a default of 0.2 [2] (finding 17).
++- Line Art's **Automatic (preserve pale details)** adds local-contrast detail only when the image
++  has colour: at least 32 pixels, and at least 0.2% of the image, non-white with channels 12 or
++  more apart. Pale grey detail was dropped and the operator could not tell (finding 5).
++- **Enhance region** decided the automatic (Otsu) threshold and that colour gate again on the boxed
++  crop, so the patched box could split ink from paper differently from the trace around it
++  (finding 11).
++- Every preset carried pathOmit, quadraticTolerance, blurRadius, blurDelta and lineFilter, which
++  only the multi-colour imagetracerjs path reads; no preset reaches it (finding 15).
++- 1-bit bars 4 and 8 px tall traced about 0.9 px too wide (X1). The dense-colour working grid above
++  1.5 MP was suspected of coarsening curve tolerances in source pixels (S1).
++
++### Decision
++
++1. **Smoothness is the corner control on every source** (`contour-smoothness.ts`,
++   `contour-corner-rounding.ts`), for the filled outlines and Edge Detection.
++   - At 1 the finisher keeps its own corners, and the output is unchanged.
++   - Below 1 each boundary loop is simplified to a 1 px polygon, and every vertex whose potrace alpha
++     reaches 4/3 × Smoothness becomes a corner. At 0 the outline is that polygon, drawn as straight
++     lines.
++   - Above 1 the finisher's corners whose alpha is below 4/3 × (Smoothness − 1) / 0.33 are released,
++     weakest first, all of them at 1.33. Each one is drawn the way potrace draws a curve vertex: one
++     cubic from a point on the edge before it to one on the edge after it, controls pulled toward
++     the vertex by its alpha clamped to 0.55–1. A curve reaches 0.45 of the shorter neighbouring
++     polygon edge and at most 8 source px, so a 12-point star keeps its points and a square keeps
++     its sides.
++   - The wobble flattener keeps its ramp, max(0, 6s − 5).
++2. **Optimize 0 is "no merging".** The merge tolerance is 0 there, and the finisher keeps every
++   measured boundary point with no simplification, spline resample or cubic fit. From 0 to 0.2 the
++   tolerance scale rises from 0.25 to 1; 0.25 is where fitted curves still carry fewer points than
++   the boundary they replace. At 0.2 and above nothing changes.
++3. **Preset values stay.** Sharp keeps Smoothness 0.55 and Optimize 0.15, which now give it more
++   corners and a tighter fit than Line Art. Smooth keeps Smoothness 1: every value above 1 scored
++   worse on both corpora.
++4. **The legacy tail's spline stays within the boundary it replaces**
++   (`contour-spline-envelope.ts`). Between two simplified vertices a resampled point may stand off
++   the chord no farther than the boundary does within 1 source px along the chord. Loops that end
++   in the least-squares fit (anti-aliased loops of 260 chain points or more) are unchanged; smaller
++   anti-aliased loops, such as glyphs, take the legacy tail and are held too.
++5. **Line Art keeps the colour gate, and the trace reports which path ran.**
++   `traceInkReport(image, options)` (`trace-ink-report.ts`) returns the path that decides ink
++   (`alpha`, `sketch`, `automatic-detail`, `faint-lines` or `brightness`), the brightness cut it
++   uses (a band, or a threshold with a flag when Otsu picked it) and, for Line Art, whether colour
++   was found. It follows `prepareTraceForContour`'s branch order and calls the trace's own gate and
++   threshold functions. It returns null for Edge Detection, Photo shading and the multi-colour path.
++6. **Enhance region uses the full source's verdicts.** `resolveRegionSourceOptions` decides the
++   colour gate (`resolveAutoSketchSource`) and the automatic threshold
++   (`automaticThresholdForTrace`) once on the whole image and carries them into the crop's trace as
++   `sourceAutoSketch` and `sourceOtsuThreshold`.
++7. **Presets drop the imagetracerjs-only fields.** They become optional in `TraceOptions`, and
++   `buildImageTracerOptions` leaves an absent field out, because imagetracerjs fills a default only
++   for a key that is missing.
++8. **S1 stays as it is.** The working grid keeps its tolerances in working pixels; converting them
++   to source pixels was measured and gains nothing (see Consequences).
++
++### Consequences
++
++- Line Art, Smooth and Edge Detection defaults are byte-identical to 85ee406 after decisions 1, 2
++  and 5 to 7 on the 12-image anti-aliased corpus, its 1-bit version, and the logo and dragon. Sharp
++  changes (Optimize commit: corpus IoU 0.9343 to 0.9370, nodes 15879 to 17064).
++- Smoothness now changes every kind of source. Drawn corners in Line Art at 0 / 0.3 / 0.6 / 0.83 /
++  1 / 1.33: 1838 / 712 / 371 / 260 / 243 / 76 on the anti-aliased corpus, 24484 / 12381 / 8695 /
++  7274 / 7189 / 1276 on the logo and dragon. potrace 1.16 at the same alphamax values on the
++  corpus: 1510 / 1151 / 859 / 699 / 553 / 455. Each step changes at least 4 of the 12 corpus
++  images and both real ones.
++- At 1.33 the wobble flattener runs at strength 2.98, and the 1-bit 12-point star crosses itself;
++  the topology repair then falls back to its pixel staircase, as it did before this decision.
++  Capping the flattener at strength 1 above Smoothness 1 fixes that shape and scored slightly
++  better on the 1-bit corpus (IoU 0.8907 against 0.8888 at 1.33), but it would remove the
++  ~3 px wobble erase that the ramp documents for rough scans, which these corpora do not test. It
++  is left for a decision with scanned sources.
++- X1: TODO_X1
++- Line Art's colour gate stays because opening it on greyscale art, which is what a luma
++  local-contrast gate would do on nearly every anti-aliased image, was measured to cost accuracy.
++  Forced on the greyscale corpus, the recovery moved IoU from 0.9576 to 0.8678 and mean edge error
++  from 0.086 to 0.375 px: its local cut sits above the anti-aliasing ramp, so text strokes widened
++  by 0.33 to 0.43 px and the thin-lines image by 0.73 px, and the noisy star gained a speckle loop
++  62 px from the shape. On the dragon it merged 1804 outlines into 1552. On a black disc beside a
++  pale grey bar and ring it does keep the pale detail when the image is clean, but grey noise with
++  a standard deviation of 24 levels adds 11 speckle loops, and 14 beside a disc with no pale
++  detail at all. TODO_GATE1BIT
++- Faint lines, the explicit option, recovers pale grey strokes 2 to 3 px wide but not an 8 px
++  bar. On the clean corpus it also widens thin strokes (IoU 0.8437 to 0.6618 on 16 px text, 0.9248
++  to 0.7195 on thin lines) and adds the noisy star's speckle loop, so it stays opt-in.
++- S1: on a tiled photograph traced by Line Art, the working grid holds 73, 61 and 49 points per
++  100 px of outline at 1.69, 2.56 and 4.19 MP, against 87 to 88 natively. Scaling the curve
++  tolerances to source pixels raised the point count by 4%, 9% and 19% and left the mean distance
++  to the native trace unchanged (0.315 to 0.315 px, 0.466 to 0.467, 0.625 to 0.637). The loss is
++  the smaller raster: 17%, 25% and 34% of the native outlines are missing.
++
++### References
++
++1. LightBurn 2.1, Trace Image reference: https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/
++2. LightBurn legacy documentation, Tracing Images: https://docs.lightburnsoftware.com/legacy/Tools/TracingImages
++3. potrace(1) manual, `--alphamax`: https://potrace.sourceforge.net/potrace.1.html
++4. P. Selinger, "Potrace: a polygon-based tracing algorithm", 2003, section 2.3.3:
++   https://potrace.sourceforge.net/potrace.pdf
+diff --git a/src/core/trace/auto-sketch-trace.ts b/src/core/trace/auto-sketch-trace.ts
+index 2d5e68c2f..2973c2bf4 100644
+--- a/src/core/trace/auto-sketch-trace.ts
++++ b/src/core/trace/auto-sketch-trace.ts
+@@ -3,6 +3,8 @@ import type { RawImageData } from './trace-image';
+ export type AutoSketchTraceOptions = {
+   readonly sketchTrace?: boolean;
+   readonly autoSketchTrace?: boolean;
++  /** The full source's answer, fixed by resolveAutoSketchSource. */
++  readonly sourceAutoSketch?: boolean;
+ };
+ 
+ export function shouldUseSketchTrace(
+@@ -11,10 +13,27 @@ export function shouldUseSketchTrace(
+ ): boolean {
+   if (options.sketchTrace === true) return true;
+   if (options.autoSketchTrace !== true) return false;
+-  return hasEnoughColourForAutoSketch(image);
++  return options.sourceAutoSketch ?? hasEnoughColourForAutoSketch(image);
+ }
+ 
+-function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
++/** Decide the automatic gate once, on the full source, so a raster derived
++ *  from it (an Enhance region crop) traces the way the source does. */
++export function resolveAutoSketchSource<T extends AutoSketchTraceOptions>(
++  image: RawImageData,
++  options: T,
++): T {
++  if (options.autoSketchTrace !== true || options.sketchTrace === true) return options;
++  if (options.sourceAutoSketch !== undefined) return options;
++  return { ...options, sourceAutoSketch: hasEnoughColourForAutoSketch(image) };
++}
++
++/** The automatic gate. It looks for colour, not for pale detail: at least 32
++ *  pixels, and at least 0.2% of the image, must be non-white (luma below 245)
++ *  with channels 12 or more apart. Pale grey detail on a greyscale image does
++ *  not open it. Opening it on greyscale art was measured and rejected
++ *  (ADR-395): the local-contrast cut sits above the anti-aliasing ramp, so
++ *  thin strokes widen by up to 0.7 px, and grain turns into loops. */
++export function hasEnoughColourForAutoSketch(image: RawImageData): boolean {
+   const pixelCount = image.width * image.height;
+   if (pixelCount === 0) return false;
+   let colourPixels = 0;
+diff --git a/src/core/trace/automatic-threshold.ts b/src/core/trace/automatic-threshold.ts
+new file mode 100644
+index 000000000..c2ef0b073
+--- /dev/null
++++ b/src/core/trace/automatic-threshold.ts
+@@ -0,0 +1,26 @@
++import { shouldUseSketchTrace } from './auto-sketch-trace';
++import { otsuThreshold } from './preprocess';
++import { shouldTraceAlphaMask } from './trace-alpha';
++import {
++  applyImageAdjustments,
++  applyMedian,
++  isValidRawImageData,
++  type RawImageData,
++  type TraceOptions,
++} from './trace-image';
++
++/** The automatic (Otsu) threshold a trace of `image` picks, or undefined when
++ *  it would not threshold automatically. Mirrors prepareTraceForContour's
++ *  branch order (trace-image.ts). A region re-trace resolves it once on the
++ *  full source (region-enhance.ts); the dialog reports it
++ *  (trace-ink-report.ts). */
++export function automaticThresholdForTrace(
++  image: RawImageData,
++  options: TraceOptions,
++): number | undefined {
++  if (options.useOtsuThreshold !== true || !isValidRawImageData(image)) return undefined;
++  if (options.cutoffLuma !== undefined || options.thresholdLuma !== undefined) return undefined;
++  if (shouldTraceAlphaMask(image, options)) return undefined;
++  if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) return undefined;
++  return otsuThreshold(applyMedian(applyImageAdjustments(image, options), options.medianFilter));
++}
+diff --git a/src/core/trace/contour-spline-envelope.test.ts b/src/core/trace/contour-spline-envelope.test.ts
+new file mode 100644
+index 000000000..5d41d338f
+--- /dev/null
++++ b/src/core/trace/contour-spline-envelope.test.ts
+@@ -0,0 +1,106 @@
++import { describe, expect, it } from 'vitest';
++import type { Vec2 } from '../scene';
++import { holdSplineToBoundary } from './contour-spline-envelope';
++import type { RawImageData, TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++import { traceImageToColoredPaths } from './trace-to-paths';
++
++const A = { x: 0, y: 0 };
++const B = { x: 10, y: 0 };
++const C = { x: 10, y: 4 };
++const D = { x: 0, y: 4 };
++const VERTICES: ReadonlyArray<Vec2> = [A, B, C, D];
++
++// The ring A-B-C-D walked every 0.5 px, holding the vertices themselves.
++function boundaryAlong(offset: (x: number) => number): Vec2[] {
++  const points: Vec2[] = [A];
++  for (let x = 0.5; x < 10; x += 0.5) points.push({ x, y: offset(x) });
++  points.push(B);
++  for (let y = 0.5; y < 4; y += 0.5) points.push({ x: 10, y });
++  points.push(C);
++  for (let x = 9.5; x > 0; x -= 0.5) points.push({ x, y: 4 });
++  points.push(D);
++  for (let y = 3.5; y > 0; y -= 0.5) points.push({ x: 0, y });
++  return points;
++}
++
++function splineWith(samples: ReadonlyArray<Vec2>): Vec2[] {
++  return [A, ...samples, B, C, D];
++}
++
++describe('holdSplineToBoundary', () => {
++  it('pulls a bow off a straight boundary back onto its chord', () => {
++    const bow = [
++      { x: 2.5, y: -0.4 },
++      { x: 5, y: -0.45 },
++      { x: 7.5, y: -0.4 },
++    ];
++    const held = holdSplineToBoundary(
++      splineWith(bow),
++      VERTICES,
++      boundaryAlong(() => 0),
++      1,
++    );
++    expect(held.slice(1, 4).map((point) => [point.x, point.y])).toEqual([
++      [2.5, 0],
++      [5, 0],
++      [7.5, 0],
++    ]);
++    expect(held[0]).toBe(A);
++    expect(held[4]).toBe(B);
++  });
++
++  it('keeps a curve that stays within the boundary it replaces', () => {
++    const arc = (x: number): number => -0.5 * Math.sin((Math.PI * x) / 10);
++    const inside = { x: 5, y: -0.3 };
++    const beyond = { x: 5, y: -0.8 };
++    const held = holdSplineToBoundary(
++      splineWith([inside, beyond]),
++      VERTICES,
++      boundaryAlong(arc),
++      1,
++    );
++    expect(held[1]).toBe(inside);
++    expect(held[2]?.x).toBe(5);
++    expect(held[2]?.y).toBeCloseTo(-0.5, 9);
++  });
++
++  it('leaves chords without boundary points between their vertices alone', () => {
++    const bow = { x: 5, y: -0.45 };
++    const held = holdSplineToBoundary(splineWith([bow]), VERTICES, VERTICES, 1);
++    expect(held[1]).toBe(bow);
++  });
++});
++
++// Settings audit X1: 1-bit bars 4 and 8 px tall traced about 0.9 px too
++// wide (Smooth 1.9 px), both long edges bowing out to the spline's
++// deviation cap.
++function bar(height: number): RawImageData {
++  const width = 200;
++  const data = new Uint8ClampedArray(width * 200 * 4).fill(255);
++  for (let y = 50; y < 50 + height; y += 1) {
++    for (let x = 40; x < 160; x += 1) data.fill(0, (y * width + x) * 4, (y * width + x) * 4 + 3);
++  }
++  return { width, height: 200, data };
++}
++
++async function edgeRows(image: RawImageData, preset: string): Promise<[number, number]> {
++  const paths = await traceImageToColoredPaths(image, TRACE_PRESETS[preset] as TraceOptions);
++  const middle = paths
++    .flatMap((path) => path.polylines.flatMap((polyline) => polyline.points))
++    .filter((point) => point.x > 80 && point.x < 120);
++  const rows = middle.map((point) => point.y);
++  return [Math.min(...rows), Math.max(...rows)];
++}
++
++describe('thin 1-bit bars', () => {
++  for (const preset of ['Line Art', 'Smooth', 'Edge Detection']) {
++    for (const height of [4, 8]) {
++      it(`${preset} traces a ${height} px bar on its pixel edges`, async () => {
++        const [top, bottom] = await edgeRows(bar(height), preset);
++        expect(Math.abs(top - 50)).toBeLessThan(0.1);
++        expect(Math.abs(bottom - (50 + height))).toBeLessThan(0.1);
++      });
++    }
++  }
++});
+diff --git a/src/core/trace/contour-spline-envelope.ts b/src/core/trace/contour-spline-envelope.ts
+new file mode 100644
+index 000000000..d0dd75cd4
+--- /dev/null
++++ b/src/core/trace/contour-spline-envelope.ts
+@@ -0,0 +1,130 @@
++// The legacy tail's centripetal Catmull-Rom resample passes through the
++// simplified vertices, but between two of them its shape follows the tangents
++// the neighbouring vertices set. Beside a short, sharply turning span (the
++// rounded end of a thin bar) that tangent tilts off a long straight chord, and
++// the curve bows away from the boundary until the ε deviation cap stops it: a
++// 1-bit bar 4 or 8 px tall traced with both long edges 0.45 px outside the
++// pixels (settings audit X1). The boundary between the two vertices records
++// where the edge actually runs, so a resampled point may stand off its chord
++// no farther than that boundary does around the same place along the chord.
++
++import type { Vec2 } from '../scene';
++
++// Boundary points within this distance along the chord of a resampled point
++// set its limit, in source px.
++const ENVELOPE_WINDOW_PX = 1;
++const MIN_CHORD_PX = 1e-9;
++
++type ChordEnvelope = {
++  readonly origin: Vec2;
++  readonly along: Vec2;
++  readonly across: Vec2;
++  /** Boundary points strictly between the chord's vertices, as
++   *  (along, across) offsets from the chord's start. */
++  readonly offsets: ReadonlyArray<readonly [number, number]>;
++};
++
++/** Hold every resampled point of `spline` (the resample of the closed ring
++ *  `vertices`, which it contains by reference) within the envelope that
++ *  `boundary`, the chain the vertices were simplified from, keeps around the
++ *  chord the point belongs to. Chords with no boundary point between their
++ *  vertices keep their resample unchanged. */
++export function holdSplineToBoundary(
++  spline: ReadonlyArray<Vec2>,
++  vertices: ReadonlyArray<Vec2>,
++  boundary: ReadonlyArray<Vec2>,
++  pixelScale: number,
++): Vec2[] {
++  const vertexIndex = new Map<Vec2, number>();
++  vertices.forEach((vertex, index) => vertexIndex.set(vertex, index));
++  const at = boundaryIndices(vertices, boundary);
++  const envelopes = new Map<number, ChordEnvelope | null>();
++  const window = ENVELOPE_WINDOW_PX * pixelScale;
++  let chord = -1;
++  return spline.map((point) => {
++    const index = vertexIndex.get(point);
++    if (index !== undefined) {
++      chord = index;
++      return point;
++    }
++    if (chord < 0) return point;
++    if (!envelopes.has(chord)) envelopes.set(chord, chordEnvelope(vertices, boundary, at, chord));
++    const envelope = envelopes.get(chord);
++    return envelope === null || envelope === undefined
++      ? point
++      : clampToEnvelope(point, envelope, window);
++  });
++}
++
++// Each vertex's position on the boundary: its own index when the simplifier
++// kept the boundary point itself, else the nearest boundary point (the
++// straight-run flattener moves some vertices onto a fitted line).
++function boundaryIndices(vertices: ReadonlyArray<Vec2>, boundary: ReadonlyArray<Vec2>): number[] {
++  const indexOf = new Map<Vec2, number>();
++  boundary.forEach((point, index) => indexOf.set(point, index));
++  return vertices.map((vertex) => indexOf.get(vertex) ?? nearestIndex(boundary, vertex));
++}
++
++function nearestIndex(boundary: ReadonlyArray<Vec2>, target: Vec2): number {
++  let best = 0;
++  let bestDistance = Infinity;
++  boundary.forEach((point, index) => {
++    const distance = Math.hypot(point.x - target.x, point.y - target.y);
++    if (distance < bestDistance) {
++      best = index;
++      bestDistance = distance;
++    }
++  });
++  return best;
++}
++
++function chordEnvelope(
++  vertices: ReadonlyArray<Vec2>,
++  boundary: ReadonlyArray<Vec2>,
++  at: ReadonlyArray<number>,
++  chord: number,
++): ChordEnvelope | null {
++  const start = vertices[chord] as Vec2;
++  const end = vertices[(chord + 1) % vertices.length] as Vec2;
++  const length = Math.hypot(end.x - start.x, end.y - start.y);
++  if (length < MIN_CHORD_PX) return null;
++  const along = { x: (end.x - start.x) / length, y: (end.y - start.y) / length };
++  const across = { x: -along.y, y: along.x };
++  const offsets: Array<readonly [number, number]> = [];
++  const first = at[chord] as number;
++  const last = at[(chord + 1) % vertices.length] as number;
++  for (let index = first; first !== last; ) {
++    index = (index + 1) % boundary.length;
++    if (index === last) break;
++    const point = boundary[index] as Vec2;
++    const dx = point.x - start.x;
++    const dy = point.y - start.y;
++    offsets.push([dx * along.x + dy * along.y, dx * across.x + dy * across.y]);
++  }
++  return offsets.length === 0 ? null : { origin: start, along, across, offsets };
++}
++
++// The chord itself is always inside the envelope, so a point is only ever
++// pulled toward its chord, never pushed away from it.
++function clampToEnvelope(point: Vec2, envelope: ChordEnvelope, window: number): Vec2 {
++  const { origin, along, across } = envelope;
++  const dx = point.x - origin.x;
++  const dy = point.y - origin.y;
++  const u = dx * along.x + dy * along.y;
++  const v = dx * across.x + dy * across.y;
++  let low = 0;
++  let high = 0;
++  let seen = false;
++  for (const [offsetAlong, offsetAcross] of envelope.offsets) {
++    if (Math.abs(offsetAlong - u) > window) continue;
++    seen = true;
++    low = Math.min(low, offsetAcross);
++    high = Math.max(high, offsetAcross);
++  }
++  if (!seen || (v >= low && v <= high)) return point;
++  const held = Math.min(high, Math.max(low, v));
++  return {
++    x: origin.x + along.x * u + across.x * held,
++    y: origin.y + along.y * u + across.y * held,
++  };
++}
+diff --git a/src/core/trace/contour-trace.ts b/src/core/trace/contour-trace.ts
+index 321daba24..eee20ae73 100644
+--- a/src/core/trace/contour-trace.ts
++++ b/src/core/trace/contour-trace.ts
+@@ -39,6 +39,7 @@ import {
+   type SmoothnessCorners,
+ } from './contour-smoothness';
+ import { roundReleasedCorners } from './contour-corner-rounding';
++import { holdSplineToBoundary } from './contour-spline-envelope';
+ import {
+   closeContour,
+   contourRefinement,
+@@ -414,14 +415,17 @@ function finishLegacyLoop(
+   // renderers and emitters draw points as given and never synthesise the
+   // closing edge, so a ring left "open" engraves with a seam gap.
+   return contourRefinement(straightened, (amount) =>
+-    legacyOutline(straightened, shaped, finish, amount),
++    legacyOutline(straightened, arcSmoothed, shaped, finish, amount),
+   );
+ }
+ 
+ // Smoothness 0 keeps the chords themselves, so the outline is only lines.
+-// Above 1 the corners it releases are rounded on the finished outline.
++// The spline between two vertices stays within the boundary it replaces
++// (contour-spline-envelope.ts); above 1 the corners Smoothness releases are
++// rounded on the finished outline.
+ function legacyOutline(
+   points: ReadonlyArray<Polyline['points'][number]>,
++  boundary: ReadonlyArray<Polyline['points'][number]>,
+   shaped: SmoothnessCorners,
+   finish: LoopFinish,
+   amount: number,
+@@ -430,7 +434,12 @@ function legacyOutline(
+   const deviationCapPx = finish.epsilonPx * amount;
+   const outline =
+     deviationCapPx > 0
+-      ? refineChainForOutput(points, true, shaped.corners, deviationCapPx)
++      ? holdSplineToBoundary(
++          refineChainForOutput(points, true, shaped.corners, deviationCapPx),
++          points,
++          boundary,
++          finish.pixelScale,
++        )
+       : points;
+   return roundReleasedCorners(
+     outline,
+diff --git a/src/core/trace/region-enhance-source.test.ts b/src/core/trace/region-enhance-source.test.ts
+new file mode 100644
+index 000000000..046eae279
+--- /dev/null
++++ b/src/core/trace/region-enhance-source.test.ts
+@@ -0,0 +1,108 @@
++// Enhance region re-traces a crop of the source. The crop must split ink from
++// background the way the full trace did: the automatic sketch gate and the
++// automatic (Otsu) threshold are decided once, on the whole source.
++
++import { describe, expect, it } from 'vitest';
++import type { ColoredPath } from '../scene';
++import { shouldUseSketchTrace } from './auto-sketch-trace';
++import { otsuThreshold } from './preprocess';
++import { enhanceRegionPaths, resolveRegionSourceOptions } from './region-enhance';
++import { cropRawImageData } from './trace-boundary';
++import type { RawImageData, TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++import { traceImageToColoredPaths } from './trace-to-paths';
++
++type Rgb = readonly [number, number, number];
++type Box = readonly [number, number, number, number];
++
++// White canvas with filled boxes [x0, y0, x1, y1).
++function paint(width: number, height: number, boxes: ReadonlyArray<[Box, Rgb]>): RawImageData {
++  const data = new Uint8ClampedArray(width * height * 4).fill(255);
++  for (const [[x0, y0, x1, y1], [r, g, b]] of boxes) {
++    for (let y = y0; y < y1; y += 1) {
++      for (let x = x0; x < x1; x += 1) {
++        const offset = (y * width + x) * 4;
++        data[offset] = r;
++        data[offset + 1] = g;
++        data[offset + 2] = b;
++      }
++    }
++  }
++  return { width, height, data };
++}
++
++const SMOOTH = TRACE_PRESETS['Smooth'] as TraceOptions;
++const LINE_ART = TRACE_PRESETS['Line Art'] as TraceOptions;
++const REGION = { x: 150, y: 20, width: 60, height: 60 };
++
++// A large dark block and a pale grey stroke. The whole image's Otsu cut falls
++// between the block and the grey, so the full trace leaves the stroke out; the
++// crop around the stroke alone would cut between grey and white and trace it.
++const TWO_TONES = paint(240, 100, [
++  [
++    [10, 10, 110, 90],
++    [20, 20, 20],
++  ],
++  [
++    [170, 45, 190, 55],
++    [170, 170, 170],
++  ],
++]);
++
++describe('resolveRegionSourceOptions', () => {
++  it('carries the whole image automatic threshold into the crop', () => {
++    const resolved = resolveRegionSourceOptions(TWO_TONES, SMOOTH);
++    const crop = cropRawImageData(TWO_TONES, REGION);
++    expect(resolved.sourceOtsuThreshold).toBe(otsuThreshold(TWO_TONES));
++    expect(resolved.sourceOtsuThreshold).toBeLessThan(170);
++    expect(otsuThreshold(crop)).toBeGreaterThan(170);
++  });
++
++  it('carries the whole image sketch verdict into a crop without colour', () => {
++    const colourful = paint(240, 100, [
++      [
++        [10, 10, 110, 90],
++        [200, 40, 40],
++      ],
++      [
++        [170, 45, 190, 55],
++        [0, 0, 0],
++      ],
++    ]);
++    const crop = cropRawImageData(colourful, REGION);
++    expect(shouldUseSketchTrace(crop, LINE_ART)).toBe(false);
++    const resolved = resolveRegionSourceOptions(colourful, LINE_ART);
++    expect(resolved.sourceAutoSketch).toBe(true);
++    expect(shouldUseSketchTrace(crop, resolved)).toBe(true);
++  });
++
++  it('leaves presets without an automatic threshold or gate alone', () => {
++    const resolved = resolveRegionSourceOptions(TWO_TONES, {
++      ...LINE_ART,
++      autoSketchTrace: false,
++    });
++    expect(resolved.sourceOtsuThreshold).toBeUndefined();
++    expect(resolved.sourceAutoSketch).toBeUndefined();
++  });
++});
++
++describe('enhanceRegionPaths', () => {
++  it('traces the region with the threshold the full trace used', async () => {
++    const trace = (image: RawImageData, options: TraceOptions): Promise<ColoredPath[]> =>
++      traceImageToColoredPaths(image, options);
++    const full = await trace(TWO_TONES, SMOOTH);
++    const inRegion = (paths: ReadonlyArray<ColoredPath>): number =>
++      paths
++        .flatMap((path) => path.polylines)
++        .filter((polyline) => polyline.points.every((point) => point.x > REGION.x)).length;
++    expect(inRegion(full)).toBe(0);
++    const enhanced = await enhanceRegionPaths({
++      image: TWO_TONES,
++      region: REGION,
++      fullTracePaths: full,
++      options: SMOOTH,
++      trace,
++    });
++    expect(inRegion(enhanced)).toBe(0);
++  });
++});
+diff --git a/src/core/trace/region-enhance.ts b/src/core/trace/region-enhance.ts
+index 0d66d8056..d53e85255 100644
+--- a/src/core/trace/region-enhance.ts
++++ b/src/core/trace/region-enhance.ts
+@@ -28,8 +28,10 @@ import type { ColoredPath, Polyline } from '../scene';
+ import { downscaleTracedPaths, upscaleBy } from './auto-upscale';
+ import { cropRawImageData, normalizeTraceBoundary, offsetColoredPaths } from './trace-boundary';
+ import type { TraceBoundary } from './trace-boundary';
++import { automaticThresholdForTrace } from './automatic-threshold';
+ import type { RawImageData, TraceOptions } from './trace-image';
+ import { resolveTraceSourceOptions } from './trace-alpha';
++import { resolveAutoSketchSource } from './auto-sketch-trace';
+ import { fitsTraceWorkingPixelBudget } from './trace-work-budget';
+ 
+ // 2x is mkbitmap's documented sweet spot ("a greyscale image contains more
+@@ -72,7 +74,7 @@ export function computeRegionUpscaleFactor(crop: RawImageData, options: TraceOpt
+ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<ColoredPath[]> {
+   const region = normalizeTraceBoundary(args.region, args.image.width, args.image.height);
+   if (region === null) return [...args.fullTracePaths];
+-  const options = resolveTraceSourceOptions(args.image, args.options);
++  const options = resolveRegionSourceOptions(args.image, args.options);
+   const crop = cropRawImageData(args.image, region);
+   const factor = computeRegionUpscaleFactor(crop, options);
+   const traced = await args.trace(
+@@ -90,6 +92,21 @@ export async function enhanceRegionPaths(args: EnhanceRegionArgs): Promise<Color
+   return replacePathsInRegion(args.fullTracePaths, interior, replacement);
+ }
+ 
++/** The full source's own verdicts, resolved once before cropping: its
++ *  transparency (trace-alpha.ts), the automatic sketch gate and the automatic
++ *  threshold. A crop can lack the colour that switched the full trace to local
++ *  contrast, or have a different histogram; without them the patched region
++ *  splits ink from background differently from the trace around it. */
++export function resolveRegionSourceOptions(
++  image: RawImageData,
++  options: TraceOptions,
++): TraceOptions {
++  const withSketch = resolveAutoSketchSource(image, resolveTraceSourceOptions(image, options));
++  if (withSketch.sourceOtsuThreshold !== undefined) return withSketch;
++  const threshold = automaticThresholdForTrace(image, withSketch);
++  return threshold === undefined ? withSketch : { ...withSketch, sourceOtsuThreshold: threshold };
++}
++
+ function optionsForRegionScale(options: TraceOptions, factor: number): TraceOptions {
+   if (factor <= 1) return options;
+   const priorScale =
+diff --git a/src/core/trace/trace-image.ts b/src/core/trace/trace-image.ts
+index 34ad5e7cc..31f2b24c9 100644
+--- a/src/core/trace/trace-image.ts
++++ b/src/core/trace/trace-image.ts
+@@ -248,7 +248,7 @@ function applyThresholdWithIso(
+     };
+   }
+   if (options.useOtsuThreshold === true) {
+-    const thresholdLuma = otsuThreshold(prepared);
++    const thresholdLuma = options.sourceOtsuThreshold ?? otsuThreshold(prepared);
+     return {
+       prepared: thresholdToMonochrome(prepared, thresholdLuma),
+       thresholdLuma,
+@@ -292,7 +292,7 @@ function sketchCrackField(adjusted: RawImageData, radiusPx = SKETCH_RADIUS_PX):
+ 
+ // Forced median and selective automatic cleanup have different contracts. The
+ // automatic path computes and applies its result once, preserving connected ink.
+-function applyMedian(
++export function applyMedian(
+   image: RawImageData,
+   medianFilterOption: boolean | 'auto' | undefined,
+ ): RawImageData {
+@@ -303,7 +303,7 @@ function applyMedian(
+ // Brightness → contrast → gamma → invert. Each is a no-op at its
+ // neutral value (0 / 0 / 1 / false) and returns the input ref-equal,
+ // so chaining is cheap when the user hasn't touched a slider.
+-function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
++export function applyImageAdjustments(image: RawImageData, options: TraceOptions): RawImageData {
+   let out = image;
+   // Non-finite brightness/contrast normalize to their neutral 0 (a NaN/Infinity
+   // delta or factor otherwise clamps every channel to 0 — silent blackening);
+@@ -451,23 +451,27 @@ function clampLuma(value: number): number {
+ // off-the-mark fixed-palette / colour-sampling interaction; we now
+ // pin the wired-through options directly.
+ export function buildImageTracerOptions(options: TraceOptions): Record<string, unknown> {
+-  const opts: Record<string, unknown> = {
+-    numberofcolors: options.numberOfColors,
+-    pathomit: options.pathOmit,
+-    ltres: options.lineTolerance,
+-    qtres: options.quadraticTolerance,
+-    blurradius: options.blurRadius,
+-    blurdelta: options.blurDelta,
+-    linefilter: options.lineFilter,
+-    viewbox: false,
+-    desc: false,
+-    rightangleenhance: false,
+-    colorquantcycles: 1,
+-    layering: 0,
+-    roundcoords: 1,
+-    strokewidth: 0,
+-    scale: 1,
+-  };
++  // imagetracerjs fills in its own default only for a key that is absent, so
++  // a field the option bundle leaves out must not arrive as undefined.
++  const opts: Record<string, unknown> = Object.fromEntries(
++    Object.entries({
++      numberofcolors: options.numberOfColors,
++      pathomit: options.pathOmit,
++      ltres: options.lineTolerance,
++      qtres: options.quadraticTolerance,
++      blurradius: options.blurRadius,
++      blurdelta: options.blurDelta,
++      linefilter: options.lineFilter,
++      viewbox: false,
++      desc: false,
++      rightangleenhance: false,
++      colorquantcycles: 1,
++      layering: 0,
++      roundcoords: 1,
++      strokewidth: 0,
++      scale: 1,
++    }).filter(([, value]) => value !== undefined),
++  );
+   // colorsampling 0 + fixed palette ONLY when caller forced a palette
+   // (Line Art / Smooth / Sharp). A multi-colour options object
+   // (numberOfColors > 2, no fixedPalette) needs imagetracerjs's adaptive
+diff --git a/src/core/trace/trace-ink-report.test.ts b/src/core/trace/trace-ink-report.test.ts
+new file mode 100644
+index 000000000..4f35a7209
+--- /dev/null
++++ b/src/core/trace/trace-ink-report.test.ts
+@@ -0,0 +1,119 @@
++import { describe, expect, it } from 'vitest';
++import { otsuThreshold } from './preprocess';
++import { preprocessForTrace, type RawImageData, type TraceOptions } from './trace-image';
++import { traceInkReport } from './trace-ink-report';
++import { TRACE_PRESETS } from './trace-presets';
++
++type Rgba = readonly [number, number, number, number];
++type Box = readonly [number, number, number, number];
++
++// White canvas with filled boxes [x0, y0, x1, y1).
++function paint(boxes: ReadonlyArray<[Box, Rgba]>): RawImageData {
++  const width = 160;
++  const height = 100;
++  const data = new Uint8ClampedArray(width * height * 4).fill(255);
++  for (const [[x0, y0, x1, y1], colour] of boxes) {
++    for (let y = y0; y < y1; y += 1) {
++      for (let x = x0; x < x1; x += 1) data.set(colour, (y * width + x) * 4);
++    }
++  }
++  return { width, height, data };
++}
++
++const preset = (name: string): TraceOptions => TRACE_PRESETS[name] as TraceOptions;
++const BLOCK: Box = [10, 10, 60, 90];
++const PALE_BAR: Box = [90, 40, 150, 48];
++// A black block and a pale bar of the same luma (172), grey or gold.
++const GREY = paint([
++  [BLOCK, [0, 0, 0, 255]],
++  [PALE_BAR, [172, 172, 172, 255]],
++]);
++const GOLD = paint([
++  [BLOCK, [0, 0, 0, 255]],
++  [PALE_BAR, [212, 175, 55, 255]],
++]);
++const LINE_ART_BAND = { kind: 'band', low: 0, high: 128 } as const;
++
++// Whether the prepared mask holds ink at the pale bar's centre.
++function barIsInk(image: RawImageData, options: TraceOptions): boolean {
++  const prepared = preprocessForTrace(image, options);
++  return (prepared.data[(44 * prepared.width + 120) * 4] ?? 255) < 128;
++}
++
++describe('traceInkReport', () => {
++  it('says when Line Art found no colour and kept the band alone', () => {
++    expect(traceInkReport(GREY, preset('Line Art'))).toEqual({
++      path: 'brightness',
++      cut: LINE_ART_BAND,
++      colourDetail: 'not-found',
++    });
++    expect(barIsInk(GREY, preset('Line Art'))).toBe(false);
++  });
++
++  it('says when Line Art found colour and added local detail', () => {
++    expect(traceInkReport(GOLD, preset('Line Art'))).toEqual({
++      path: 'automatic-detail',
++      cut: LINE_ART_BAND,
++      colourDetail: 'found',
++    });
++    expect(barIsInk(GOLD, preset('Line Art'))).toBe(true);
++  });
++
++  it('reports Faint lines ahead of the colour gate', () => {
++    const options = { ...preset('Line Art'), faintLineRecovery: true };
++    expect(traceInkReport(GOLD, options)).toEqual({
++      path: 'faint-lines',
++      cut: LINE_ART_BAND,
++      colourDetail: null,
++    });
++  });
++
++  it('reports the automatic threshold the trace picks, and a manual one', () => {
++    expect(traceInkReport(GREY, preset('Smooth'))).toEqual({
++      path: 'brightness',
++      cut: { kind: 'below', threshold: otsuThreshold(GREY), automatic: true },
++      colourDetail: null,
++    });
++    expect(traceInkReport(GREY, { ...preset('Smooth'), thresholdLuma: 100 })?.cut).toEqual({
++      kind: 'below',
++      threshold: 100,
++      automatic: false,
++    });
++    expect(traceInkReport(GREY, preset('Centerline'))?.cut).toEqual({
++      kind: 'below',
++      threshold: otsuThreshold(GREY),
++      automatic: true,
++    });
++  });
++
++  it('reports Sketch and the alpha mask', () => {
++    expect(traceInkReport(GREY, { ...preset('Line Art'), sketchTrace: true })).toEqual({
++      path: 'sketch',
++      cut: null,
++      colourDetail: null,
++    });
++    const cutout = paint([[BLOCK, [0, 0, 0, 0]]]);
++    expect(traceInkReport(cutout, { ...preset('Line Art'), traceTransparency: true })).toEqual({
++      path: 'alpha',
++      cut: LINE_ART_BAND,
++      colourDetail: null,
++    });
++  });
++
++  it('follows the full source verdicts a region re-trace carries', () => {
++    const region = { ...preset('Line Art'), sourceAutoSketch: true };
++    expect(traceInkReport(GREY, region)?.path).toBe('automatic-detail');
++    const threshold = { ...preset('Smooth'), sourceOtsuThreshold: 90 };
++    expect(traceInkReport(GREY, threshold)?.cut).toEqual({
++      kind: 'below',
++      threshold: 90,
++      automatic: true,
++    });
++  });
++
++  it('has no report for traces without one binary ink mask', () => {
++    expect(traceInkReport(GREY, preset('Edge Detection'))).toBeNull();
++    expect(traceInkReport(GREY, { ...preset('Line Art'), photoDetail: 60 })).toBeNull();
++    expect(traceInkReport(GREY, { ...preset('Line Art'), numberOfColors: 4 })).toBeNull();
++  });
++});
+diff --git a/src/core/trace/trace-ink-report.ts b/src/core/trace/trace-ink-report.ts
+new file mode 100644
+index 000000000..e84274f2e
+--- /dev/null
++++ b/src/core/trace/trace-ink-report.ts
+@@ -0,0 +1,101 @@
++// Which path decides ink for a binary trace, and the numbers it uses, for the
++// dialog's Detection note. The operator could not tell whether Line Art's
++// automatic recovery ran: it needs colour, and greyscale art gets the
++// brightness band alone (settings audit finding 5). The branch order is
++// prepareTraceForContour's (trace-image.ts), and the gate and threshold are
++// the functions the trace itself calls.
++
++import { resolveAutoSketchSource, shouldUseSketchTrace } from './auto-sketch-trace';
++import { automaticThresholdForTrace } from './automatic-threshold';
++import { isBinaryContourPreset } from './contour-trace';
++import { shouldTraceAlphaMask, resolveTraceSourceOptions } from './trace-alpha';
++import { isValidRawImageData, type RawImageData, type TraceOptions } from './trace-image';
++
++export type TraceInkPath =
++  /** Trace alpha mask: transparency decides ink. */
++  | 'alpha'
++  /** Sketch: local contrast alone decides ink. */
++  | 'sketch'
++  /** Line Art's automatic recovery found colour: the brightness band plus
++   *  every pixel darker than its local mean. */
++  | 'automatic-detail'
++  /** Faint lines: the brightness cut plus coherent faint strokes. */
++  | 'faint-lines'
++  /** The brightness cut alone. */
++  | 'brightness';
++
++export type TraceInkCut =
++  /** Ink is every pixel whose luma (on the alpha path, 255 − alpha) lies in
++   *  low..high, both included. */
++  | { readonly kind: 'band'; readonly low: number; readonly high: number }
++  /** Ink is every pixel whose luma is below `threshold`. `automatic` when the
++   *  trace picked it (Otsu) for this image. */
++  | { readonly kind: 'below'; readonly threshold: number; readonly automatic: boolean };
++
++export type TraceInkReport = {
++  readonly path: TraceInkPath;
++  /** The solid-ink cut the path uses; null for Sketch, and when the options
++   *  set no cut at all. */
++  readonly cut: TraceInkCut | null;
++  /** Line Art's colour gate, when it chose the path: 'found' ran the
++   *  automatic recovery, 'not-found' left the brightness cut alone. */
++  readonly colourDetail: 'found' | 'not-found' | null;
++};
++
++const DEFAULT_CUTOFF_LUMA = 0;
++const DEFAULT_THRESHOLD_LUMA = 128;
++
++/** The ink path a trace of `image` (the full source) with `options` takes.
++ *  Null for traces without a single binary ink mask: Edge Detection, photo
++ *  shading and the multi-colour tracer. A trace on a resampled working grid
++ *  decides on that grid, so near the gate's edge (0.2% coloured pixels) or on
++ *  Otsu's value it can differ slightly from this report. */
++export function traceInkReport(image: RawImageData, options: TraceOptions): TraceInkReport | null {
++  if (!isValidRawImageData(image) || !hasBinaryInkMask(options)) return null;
++  const resolved = resolveAutoSketchSource(image, resolveTraceSourceOptions(image, options));
++  if (shouldTraceAlphaMask(image, resolved)) {
++    return { path: 'alpha', cut: bandCut(resolved), colourDetail: null };
++  }
++  const faintLines = resolved.faintLineRecovery === true;
++  if (!faintLines && shouldUseSketchTrace(image, resolved)) {
++    return resolved.sketchTrace === true
++      ? { path: 'sketch', cut: null, colourDetail: null }
++      : { path: 'automatic-detail', cut: bandCut(resolved), colourDetail: 'found' };
++  }
++  const gated = !faintLines && resolved.autoSketchTrace === true && resolved.sketchTrace !== true;
++  return {
++    path: faintLines ? 'faint-lines' : 'brightness',
++    cut: brightnessCut(image, resolved),
++    colourDetail: gated ? 'not-found' : null,
++  };
++}
++
++function hasBinaryInkMask(options: TraceOptions): boolean {
++  if (options.photoDetail !== undefined) return false;
++  return options.traceMode === 'centerline' || isBinaryContourPreset(options);
++}
++
++function bandCut(options: TraceOptions): TraceInkCut {
++  const cutoff = options.cutoffLuma ?? DEFAULT_CUTOFF_LUMA;
++  const threshold = options.thresholdLuma ?? DEFAULT_THRESHOLD_LUMA;
++  return {
++    kind: 'band',
++    low: clampLuma(Math.min(cutoff, threshold)),
++    high: clampLuma(Math.max(cutoff, threshold)),
++  };
++}
++
++// The same precedence as the trace's threshold step: a band, then a manual
++// threshold, then the automatic one.
++function brightnessCut(image: RawImageData, options: TraceOptions): TraceInkCut | null {
++  if (options.cutoffLuma !== undefined) return bandCut(options);
++  if (options.thresholdLuma !== undefined) {
++    return { kind: 'below', threshold: clampLuma(options.thresholdLuma), automatic: false };
++  }
++  const automatic = options.sourceOtsuThreshold ?? automaticThresholdForTrace(image, options);
++  return automatic === undefined ? null : { kind: 'below', threshold: automatic, automatic: true };
++}
++
++function clampLuma(value: number): number {
++  return Math.max(0, Math.min(255, value));
++}
+diff --git a/src/core/trace/trace-option-types.ts b/src/core/trace/trace-option-types.ts
+index 1a5544ee9..ea516a6d5 100644
+--- a/src/core/trace/trace-option-types.ts
++++ b/src/core/trace/trace-option-types.ts
+@@ -18,26 +18,26 @@ export type TraceOptions = {
+   // suitable for most laser engraving. Higher values produce more
+   // layers and (usually) more visual fidelity. Range 2-16.
+   readonly numberOfColors: number;
+-  // Path-omit: minimum number of points in a path for it to be
+-  // kept. Higher values drop small noise blobs.
+-  readonly pathOmit: number;
+-  // Line/curve fit tolerances. Higher = smoother curves, fewer
+-  // segments. ltres = straight-line tolerance, qtres = quadratic.
++  // The fields marked "imagetracerjs only" feed the multi-colour
++  // imagetracerjs path (a palette-free option bundle with more than two
++  // colours). No preset reaches it: the binary contour, edge, centerline and
++  // photo backends never read these fields, so presets leave them out and
++  // imagetracerjs's own defaults apply if an option bundle does reach it.
++  // imagetracerjs only. Path-omit: minimum number of points in a path for it
++  // to be kept.
++  readonly pathOmit?: number;
++  // Line fit tolerance. The contour backends scale their simplification
++  // tolerance by it (higher = smoother curves, fewer segments); on the
++  // imagetracerjs path it is ltres.
+   readonly lineTolerance: number;
+-  readonly quadraticTolerance: number;
+-  // Gaussian blur radius applied BEFORE tracing — pre-smoothing
+-  // suppresses small pixel-level noise that would otherwise become
+-  // jagged edges in the output. 0 = no blur (sharp / detailed),
+-  // 1-5 = progressively smoother. The Phase E v1 ship omitted
+-  // this, which is why traces looked jagged on photo-like input.
+-  readonly blurRadius: number;
+-  // After-blur threshold: pixels whose delta to neighbors is
+-  // below this value are smoothed. Pairs with blurRadius.
+-  readonly blurDelta: number;
+-  // Smooths line angles in the final paths. Boolean. The default
+-  // imagetracerjs setting is false; we ship it true for cleaner
+-  // output on hand-drawn / photo-like inputs.
+-  readonly lineFilter: boolean;
++  // imagetracerjs only (qtres): quadratic spline fit tolerance.
++  readonly quadraticTolerance?: number;
++  // imagetracerjs only: selective Gaussian blur radius before tracing, and
++  // the delta below which blurred pixels are kept.
++  readonly blurRadius?: number;
++  readonly blurDelta?: number;
++  // imagetracerjs only: smooths line angles in the final paths.
++  readonly lineFilter?: boolean;
+   // When set, forces a fixed palette instead of color-quantizing the
+   // input. Use ['#ffffff', '#000000'] for line art — guarantees the
+   // output is two layers (background + ink) with no banding from
+@@ -60,6 +60,14 @@ export type TraceOptions = {
+   readonly sourceHasTransparency?: boolean;
+   readonly sketchTrace?: boolean;
+   readonly autoSketchTrace?: boolean;
++  // INTERNAL full-source verdicts for a region re-trace, resolved the same
++  // way (region-enhance.ts): the automatic sketch gate's answer
++  // (auto-sketch-trace.ts) and the automatic (Otsu) threshold. A crop can
++  // lack the colour that switched the full trace to local contrast, or have
++  // a different histogram; with these it splits ink from background the way
++  // the full trace did.
++  readonly sourceAutoSketch?: boolean;
++  readonly sourceOtsuThreshold?: number;
+   // Explicit faint-line detection adds coherent narrow local-contrast strokes
+   // to this preset's actual brightness/Otsu mask, retaining its solid areas.
+   // Alpha tracing takes precedence; UI manual/sketch detection clears this flag.
+diff --git a/src/core/trace/trace-preset-fields.test.ts b/src/core/trace/trace-preset-fields.test.ts
+new file mode 100644
+index 000000000..7331f15bf
+--- /dev/null
++++ b/src/core/trace/trace-preset-fields.test.ts
+@@ -0,0 +1,41 @@
++// Presets carry only settings their backend reads. The imagetracerjs-only
++// fields (pathOmit, quadraticTolerance, blurRadius, blurDelta, lineFilter)
++// feed the multi-colour imagetracerjs path, which no preset reaches, so they
++// are left out and imagetracerjs's own defaults apply there.
++
++import { describe, expect, it } from 'vitest';
++import { isBinaryContourPreset } from './contour-trace';
++import { buildImageTracerOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++
++const IMAGETRACER_ONLY = [
++  'pathOmit',
++  'quadraticTolerance',
++  'blurRadius',
++  'blurDelta',
++  'lineFilter',
++] as const;
++
++describe('trace preset fields', () => {
++  it.each(Object.entries(TRACE_PRESETS))('%s never reaches imagetracerjs', (_name, preset) => {
++    const ownBackend =
++      preset.photoDetail !== undefined ||
++      preset.traceMode === 'centerline' ||
++      preset.traceMode === 'edge' ||
++      isBinaryContourPreset(preset);
++    expect(ownBackend).toBe(true);
++    for (const field of IMAGETRACER_ONLY) expect(preset).not.toHaveProperty(field);
++  });
++
++  it('leaves absent imagetracerjs fields to its own defaults', () => {
++    const built = buildImageTracerOptions({ numberOfColors: 4, lineTolerance: 1 });
++    // imagetracerjs applies a default only to a key that is absent.
++    for (const key of ['pathomit', 'qtres', 'blurradius', 'blurdelta', 'linefilter']) {
++      expect(built).not.toHaveProperty(key);
++    }
++    expect(built['ltres']).toBe(1);
++    expect(
++      buildImageTracerOptions({ numberOfColors: 4, lineTolerance: 1, pathOmit: 3 }),
++    ).toHaveProperty('pathomit', 3);
++  });
++});
+diff --git a/src/core/trace/trace-presets.ts b/src/core/trace/trace-presets.ts
+index ae92d4bc7..6ccc9ea64 100644
+--- a/src/core/trace/trace-presets.ts
++++ b/src/core/trace/trace-presets.ts
+@@ -24,19 +24,14 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     //   * despeckleMinPixels 12 — removes connected ink blobs under
+     //     12 pixels. Kills JPEG dot artefacts that survived the
+     //     threshold.
+-    //   * pathOmit 16 — second-line defence: drops short paths the
+-    //     tracer might still emit at edges.
+     numberOfColors: 2,
+-    pathOmit: 16,
+     lineTolerance: 1,
+-    quadraticTolerance: 1,
+-    blurRadius: 0,
+-    blurDelta: 0,
+-    lineFilter: true,
+     fixedPalette: ['#ffffff', '#000000'],
+     cutoffLuma: 0,
+     thresholdLuma: 128,
+-    autoSketchTrace: true, // Add local detail without removing brightness-selected solid ink.
++    // Only on images with colour (auto-sketch-trace.ts): add locally darker
++    // detail to the brightness band. Greyscale art gets the band alone.
++    autoSketchTrace: true,
+     ignoreLessThanPixels: 2,
+     smoothness: 1,
+     optimize: 0.2,
+@@ -60,12 +55,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     brightness: 0,
+     contrast: 0,
+     numberOfColors: 2,
+-    pathOmit: 0,
+     lineTolerance: 1,
+-    quadraticTolerance: 1,
+-    blurRadius: 0,
+-    blurDelta: 0,
+-    lineFilter: false,
+   },
+   Centerline: {
+     // For black strokes that should engrave as one path down the
+@@ -73,12 +63,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     // binarisation as Line Art, then skeletonizes the ink mask.
+     traceMode: 'centerline',
+     numberOfColors: 2,
+-    pathOmit: 0,
+     lineTolerance: 1,
+-    quadraticTolerance: 1,
+-    blurRadius: 0,
+-    blurDelta: 0,
+-    lineFilter: true,
+     fixedPalette: ['#ffffff', '#000000'],
+     useOtsuThreshold: true,
+     despeckleMinPixels: 12,
+@@ -101,12 +86,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     // finisher produces closed outlines around the detected ink.
+     traceMode: 'edge',
+     numberOfColors: 2,
+-    pathOmit: 0,
+     lineTolerance: 1,
+-    quadraticTolerance: 1,
+-    blurRadius: 0,
+-    blurDelta: 0,
+-    lineFilter: true,
+     fixedPalette: ['#ffffff', '#000000'],
+     useOtsuThreshold: true,
+     despeckleMinPixels: 12,
+@@ -130,8 +110,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+   Smooth: {
+     // For slightly noisy / hand-drawn line art. The median kills
+     // salt-and-pepper noise before threshold; despeckle catches what
+-    // survives. Blur slider remains for compatibility but the median
+-    // does most of the work.
++    // survives.
+     //
+     // medianFilter is 'auto', NOT true: forcing the median on every input
+     // melts clean small glyphs (the LANGEBAAN defect — 4-6 px letters trace
+@@ -139,12 +118,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     // art. 'auto' runs the median only when impulse noise is actually
+     // present, matching the Edge Detection tracer's policy.
+     numberOfColors: 2,
+-    pathOmit: 16,
+     lineTolerance: 2,
+-    quadraticTolerance: 2,
+-    blurRadius: 1,
+-    blurDelta: 20,
+-    lineFilter: true,
+     fixedPalette: ['#ffffff', '#000000'],
+     medianFilter: 'auto',
+     useOtsuThreshold: true,
+@@ -167,21 +141,15 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     // Keep single-pixel marks and diagonal fragments. Four-connected cleanup
+     // at area 4 erased intentional fine hatching before the contour walk.
+     numberOfColors: 2,
+-    pathOmit: 16,
+     lineTolerance: 0.5,
+-    quadraticTolerance: 0.5,
+-    blurRadius: 0,
+-    blurDelta: 0,
+-    lineFilter: false,
+     fixedPalette: ['#ffffff', '#000000'],
+     useOtsuThreshold: true,
+     despeckleMinPixels: 1,
+-    // Curve params that drive the contour backend (the imagetracerjs fields
+-    // above are inert there). smoothness at or below 5/6 switches the wobble
+-    // flattener and arc evening off, so pixel-art notches and square dots
+-    // keep their exact corners instead of rounding to pills or circles. As
+-    // the corner control (potrace's alphamax, contour-smoothness.ts) 0.55
+-    // also makes every boundary bend whose alpha reaches 0.73 a corner.
++    // smoothness at or below 5/6 switches the wobble flattener and arc
++    // evening off, so pixel-art notches and square dots keep their exact
++    // corners instead of rounding to pills or circles. As the corner control
++    // (potrace's alphamax, contour-smoothness.ts) 0.55 also makes every
++    // boundary bend whose alpha reaches 0.73 a corner.
+     smoothness: 0.55,
+     optimize: 0.15,
+     // NO auto-upscale of any kind (neither autoUpscaleSmallSources nor
+diff --git a/src/ui/trace/trace-options.test.ts b/src/ui/trace/trace-options.test.ts
+index 88598601c..fa93c75b7 100644
+--- a/src/ui/trace/trace-options.test.ts
++++ b/src/ui/trace/trace-options.test.ts
+@@ -212,8 +212,7 @@ describe('relaxAggressivePreprocessing', () => {
+   });
+ 
+   it('forces pathOmit to 0 so the retry keeps every path imagetracerjs emits', () => {
+-    expect(LINE_ART.pathOmit).toBe(16);
+-    const relaxed = relaxAggressivePreprocessing(LINE_ART);
++    const relaxed = relaxAggressivePreprocessing({ ...LINE_ART, pathOmit: 16 });
+     expect(relaxed.pathOmit).toBe(0);
+   });
+ 

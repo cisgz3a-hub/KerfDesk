@@ -1,0 +1,284 @@
+From 0e8a42d4d47bbfa84c7981658f1816d5ff66bfe8 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 15:35:47 +0000
+Subject: [PATCH 1/2] fix(trace): Optimize 0 keeps every traced point (ADR-395)
+
+LightBurn documents Optimize 0 as "no merging", but here 0 meant a 0.85x
+merge tolerance, so the low end of the slider still merged boundary
+points into fewer vertices and curves (settings audit finding 17). Now:
+
+- Optimize 0 switches merging off. Every mid-crack boundary point stays
+  a vertex: no Douglas-Peucker merge, no spline resample, no cubic fit.
+  The Smoothness-driven straight-run flattener still runs.
+- Between 0 and the neutral 0.2 the tolerance rises from 0.25x (the
+  floor the old code declared but never reached) to 1x. Below 0.25x the
+  fitted curves' sampling emits more points than "no merging" does.
+- 0.2 and above are unchanged.
+
+Measured with the audit bench (12 exact-answer images) and the logo
+and dragon fixtures:
+- Line Art, Smooth and Edge Detection defaults: byte-identical.
+- Corpus point totals at Optimize 0 / 0.01 / 0.1 / 0.2 / 2:
+  Line Art 25787 / 18213 / 13811 / 11941 / 10362,
+  Smooth 26213 / 14577 / 11196 / 9789 / 11059,
+  Edge 29017 / 21531 / 15777 / 13650 / 10806.
+- A 1-bit disc at 0 has exactly one vertex per boundary crack in every
+  outline preset (385 points vs 129 at 0.2 in Line Art).
+
+Sharp keeps its preset 0.15, which now means 0.8125x instead of
+0.9625x. Corpus: IoU 0.9343 -> 0.9370, mean edge error 0.122 -> 0.116
+px, p95 0.287 -> 0.263 px, nodes 15879 -> 17064. Logo 13063 -> 13442
+points, dragon 306477 -> 326951. Sharp's half-width line tolerance
+makes its 0.01-0.14 range emit more points than 0 on the corpus
+(25225 at 0.01 vs 17705); the shapes stay within the tolerance.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/contour-optimize.test.ts | 147 ++++++++++++++++++++++++
+ src/core/trace/contour-trace.ts         |  41 ++++---
+ 2 files changed, 175 insertions(+), 13 deletions(-)
+ create mode 100644 src/core/trace/contour-optimize.test.ts
+
+diff --git a/src/core/trace/contour-optimize.test.ts b/src/core/trace/contour-optimize.test.ts
+new file mode 100644
+index 000000000..9e7e86fe4
+--- /dev/null
++++ b/src/core/trace/contour-optimize.test.ts
+@@ -0,0 +1,147 @@
++// Optimize is the node-merging control. LightBurn documents its zero as "no
++// merging" (https://docs.lightburnsoftware.com/legacy/Tools/TracingImages),
++// so at 0 every traced boundary point must stay a vertex, while the neutral
++// 0.2 keeps the established tolerances.
++
++import { describe, expect, it } from 'vitest';
++import { PERCEPTUAL_FIXTURES } from '../../__fixtures__/perceptual/shapes';
++import {
++  contourPolylinesFromMask,
++  optimizationToleranceScaleFromOptimize,
++  traceImageToContourColoredPaths,
++} from './contour-trace';
++import type { RawImageData, TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++
++const OUTLINE_PRESETS = ['Line Art', 'Smooth', 'Sharp'] as const;
++const RGBA_CHANNELS = 4;
++const INK_LEVEL = 128;
++
++function preset(name: string, optimize: number): TraceOptions {
++  return { ...(TRACE_PRESETS[name] as TraceOptions), optimize };
++}
++
++function tracedPoints(image: RawImageData, options: TraceOptions): ReadonlyArray<number> {
++  return traceImageToContourColoredPaths(image, options)
++    .flatMap((path) => path.polylines)
++    .map((polyline) => polyline.points.length);
++}
++
++function sum(values: ReadonlyArray<number>): number {
++  return values.reduce((total, value) => total + value, 0);
++}
++
++// One mid-crack vertex per ink/paper pixel edge of a binary source.
++function boundaryCracks(image: RawImageData): number {
++  const inkAt = (x: number, y: number): boolean =>
++    x >= 0 &&
++    y >= 0 &&
++    x < image.width &&
++    y < image.height &&
++    (image.data[(y * image.width + x) * RGBA_CHANNELS] ?? 255) < INK_LEVEL;
++  let cracks = 0;
++  for (let y = 0; y < image.height; y += 1) {
++    for (let x = 0; x < image.width; x += 1) {
++      if (!inkAt(x, y)) continue;
++      for (const [dx, dy] of [
++        [1, 0],
++        [-1, 0],
++        [0, 1],
++        [0, -1],
++      ] as const) {
++        if (!inkAt(x + dx, y + dy)) cracks += 1;
++      }
++    }
++  }
++  return cracks;
++}
++
++// 4x4 coverage-sampled disc: every boundary crack carries a sub-pixel
++// measurement, so the loop takes the measured (cubic-fit) tail.
++function antiAliasedDisc(size: number, radius: number): RawImageData {
++  const data = new Uint8ClampedArray(size * size * RGBA_CHANNELS);
++  const centre = size / 2;
++  for (let y = 0; y < size; y += 1) {
++    for (let x = 0; x < size; x += 1) {
++      let covered = 0;
++      for (let sy = 0; sy < 4; sy += 1) {
++        for (let sx = 0; sx < 4; sx += 1) {
++          const dx = x + (sx + 0.5) / 4 - centre;
++          const dy = y + (sy + 0.5) / 4 - centre;
++          if (Math.hypot(dx, dy) <= radius) covered += 1;
++        }
++      }
++      const value = Math.round(255 * (1 - covered / 16));
++      const base = (y * size + x) * RGBA_CHANNELS;
++      data.fill(value, base, base + 3);
++      data[base + 3] = 255;
++    }
++  }
++  return { width: size, height: size, data };
++}
++
++describe('Optimize', () => {
++  it('maps 0 to no merging and 0.2 to the neutral tolerance, rising in between', () => {
++    expect(optimizationToleranceScaleFromOptimize(0)).toBe(0);
++    expect(optimizationToleranceScaleFromOptimize(-1)).toBe(0);
++    expect(optimizationToleranceScaleFromOptimize(0.1)).toBeCloseTo(0.625, 12);
++    expect(optimizationToleranceScaleFromOptimize(0.2)).toBe(1);
++    expect(optimizationToleranceScaleFromOptimize(undefined)).toBe(1);
++    expect(optimizationToleranceScaleFromOptimize(Number.NaN)).toBe(1);
++    expect(optimizationToleranceScaleFromOptimize(2)).toBeCloseTo(2.35, 12);
++    // Any merging at all starts at the floor where fitted outlines still
++    // carry fewer points than the boundary they replace.
++    expect(optimizationToleranceScaleFromOptimize(0.01)).toBeGreaterThanOrEqual(0.25);
++    const sweep = Array.from({ length: 201 }, (_, step) =>
++      optimizationToleranceScaleFromOptimize(step / 100),
++    );
++    sweep.slice(1).forEach((scale, step) => {
++      expect(scale).toBeGreaterThan(sweep[step] as number);
++    });
++  });
++
++  it.each(OUTLINE_PRESETS)(
++    '%s keeps one vertex per boundary crack of a curved 1-bit outline at 0',
++    (name) => {
++      const disc = PERCEPTUAL_FIXTURES.find((fixture) => fixture.name === 'filled-disc');
++      expect(disc).toBeDefined();
++      const noMerging = tracedPoints(disc!.image, preset(name, 0));
++      // A closed ring repeats its start point.
++      expect(noMerging).toEqual([boundaryCracks(disc!.image) + 1]);
++      expect(sum(noMerging)).toBeGreaterThan(sum(tracedPoints(disc!.image, preset(name, 0.2))));
++    },
++  );
++
++  it.each(OUTLINE_PRESETS)(
++    '%s keeps every measured point of an anti-aliased outline at 0',
++    (name) => {
++      const radius = 60;
++      const noMerging = sum(tracedPoints(antiAliasedDisc(160, radius), preset(name, 0)));
++      const merged = sum(tracedPoints(antiAliasedDisc(160, radius), preset(name, 0.2)));
++      // Mid-crack points of a disc sit at most one pixel apart; the default
++      // fit merges them into cubics sampled more sparsely.
++      expect((2 * Math.PI * radius) / noMerging).toBeLessThan(1);
++      expect(noMerging).toBeGreaterThan(merged * 1.4);
++    },
++  );
++
++  it('keeps holes and one-pixel loops the area gate admitted', () => {
++    const size = 32;
++    const ink = new Uint8Array(size * size);
++    const fill = (x0: number, y0: number, side: number, value: number): void => {
++      for (let y = y0; y < y0 + side; y += 1) ink.fill(value, y * size + x0, y * size + x0 + side);
++    };
++    fill(4, 4, 1, 1);
++    fill(12, 12, 12, 1);
++    fill(17, 17, 1, 0);
++    const loops = contourPolylinesFromMask(
++      { width: size, height: size, ink },
++      { minAreaPx: 0, epsilonPx: 0, fitToleranceScale: 0, flattenStrength: 0 },
++    );
++    expect(loops).toHaveLength(3);
++    for (const loop of loops) {
++      expect(loop.closed).toBe(true);
++      expect(loop.points.length).toBeGreaterThanOrEqual(4);
++    }
++  });
++});
+diff --git a/src/core/trace/contour-trace.ts b/src/core/trace/contour-trace.ts
+index fcb8b6699..55bec876c 100644
+--- a/src/core/trace/contour-trace.ts
++++ b/src/core/trace/contour-trace.ts
+@@ -99,6 +99,7 @@ const FIT_TOLERANCE_ORGANIC_PX = 0.55;
+ const DEFAULT_SMOOTHNESS = 1;
+ const DEFAULT_OPTIMIZE = 0.2;
+ const OPTIMIZE_TOLERANCE_SLOPE = 0.75;
++const OPTIMIZE_TOLERANCE_FLOOR = 0.25;
+ 
+ /** The dialog's Smoothness knob doubles as the wobble-flattening / arc-
+  *  evening strength. Default ON at the conservative 1px amplitude cap — the
+@@ -116,11 +117,22 @@ export function flattenStrengthFromSmoothness(smoothness: number | undefined): n
+   return Math.max(0, 6 * s - 5);
+ }
+ 
+-/** Optimize scales geometry tolerances around the established neutral 0.2. */
++/** Optimize scales geometry tolerances around the established neutral 0.2.
++ *  LightBurn documents 0 as "no merging": the scale is 0 there, and the
++ *  finisher keeps every measured boundary point instead of merging points
++ *  into fewer vertices or curves. Between 0 and 0.2 the scale rises from the
++ *  floor to 1. The floor is where the fitted outline still carries fewer
++ *  points than the boundary it replaces; below it the fit's per-curve
++ *  sampling would emit more points than "no merging" does. Above 0.2 the
++ *  original slope applies unchanged. */
+ export function optimizationToleranceScaleFromOptimize(optimize: number | undefined): number {
+   const value = Number.isFinite(optimize) ? (optimize as number) : DEFAULT_OPTIMIZE;
+   const bounded = Math.min(2, Math.max(0, value));
+-  return Math.max(0.25, 1 + (bounded - DEFAULT_OPTIMIZE) * OPTIMIZE_TOLERANCE_SLOPE);
++  if (bounded === 0) return 0;
++  if (bounded < DEFAULT_OPTIMIZE) {
++    return OPTIMIZE_TOLERANCE_FLOOR + (1 - OPTIMIZE_TOLERANCE_FLOOR) * (bounded / DEFAULT_OPTIMIZE);
++  }
++  return 1 + (bounded - DEFAULT_OPTIMIZE) * OPTIMIZE_TOLERANCE_SLOPE;
+ }
+ 
+ /** Trace filled ink regions as smooth closed outlines (holes stay hollow
+@@ -357,7 +369,12 @@ function finishLegacyLoop(
+   finish: LoopFinish,
+   featureAnchors: ReadonlySet<Polyline['points'][number]>,
+ ): ContourRefinement | null {
+-  const simplified = simplifyChain(arcSmoothed, true, finish.epsilonPx, featureAnchors);
++  // A zero tolerance is Optimize's "no merging": every boundary point stays a
++  // vertex, and no spline resamples between them.
++  const merging = finish.epsilonPx > 0;
++  const simplified = merging
++    ? simplifyChain(arcSmoothed, true, finish.epsilonPx, featureAnchors)
++    : arcSmoothed;
+   if (simplified.length < MIN_LOOP_POINTS) return null;
+   // Rough source edges leave long-wavelength waviness that survives both
+   // evening and simplification (nominally straight stems trace wobbly);
+@@ -374,7 +391,9 @@ function finishLegacyLoop(
+   // renderers and emitters draw points as given and never synthesise the
+   // closing edge, so a ring left "open" engraves with a seam gap.
+   return contourRefinement(straightened, (amount) =>
+-    refineChainForOutput(straightened, true, corners, finish.epsilonPx * amount),
++    merging
++      ? refineChainForOutput(straightened, true, corners, finish.epsilonPx * amount)
++      : straightened,
+   );
+ }
+ 
+@@ -386,16 +405,12 @@ function fitLoopTail(
+   finish: LoopFinish,
+   tolerancePx: number,
+ ): ContourRefinement | null {
++  const tolerance = tolerancePx * finish.pixelScale * finish.fitToleranceScale;
++  // Zero is Optimize's "no merging": keep every measured point, no cubics.
+   const refine = (amount: number): Polyline['points'] =>
+-    sampleCubics(
+-      fitCubicsThroughPoints(
+-        chain,
+-        true,
+-        corners,
+-        tolerancePx * finish.pixelScale * finish.fitToleranceScale * amount,
+-      ),
+-      true,
+-    );
++    tolerance > 0
++      ? sampleCubics(fitCubicsThroughPoints(chain, true, corners, tolerance * amount), true)
++      : chain;
+   const candidate = contourRefinement(chain, refine);
+   return candidate.polyline.points.length < MIN_LOOP_POINTS ? null : candidate;
+ }
+
+base-commit: 85ee406d4cad071916958354a13c57977811ec1f
+-- 
+2.43.0
+

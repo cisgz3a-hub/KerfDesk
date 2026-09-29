@@ -1,0 +1,907 @@
+From 15d20ae1d2f0d6aba6e798566670ba07ece56acf Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 19:54:02 +0000
+Subject: [PATCH 07/14] fix(trace): Manual starts at the automatic threshold;
+ Automatic shows its band (ADR-396)
+
+Switching Smooth, Sharp or Centerline from automatic detection to Manual
+brightness band used to start the band at 0-128, which could empty the
+preview (light ink at brightness 150 with an automatic threshold of 197).
+The first manual band now ends one level below the automatic threshold
+the finished preview reported, so the same pixels stay ink. A band the
+operator already set is kept, and without a matching preview report the
+band still starts at 0-128.
+
+In automatic and Faint lines modes the Detection section shows the band
+in use, read-only: Line Art's fixed Cutoff 0, Threshold 128, or the
+automatic band once the preview has chosen it. Line Art also says which
+route ran: "No colour detail found: using brightness band 0-128 only", or
+that pale marks darker than their surroundings were added because the
+image has colour detail. The Detection label reads "Automatic (band +
+pale colour detail)" and the Line Art description no longer promises
+pale details on grey artwork.
+
+The report comes from the latest finished preview. It stays while only
+finishing controls change (Smoothness, Optimize, Ignore Less Than, the
+Centerline gap) and is withdrawn when the image, region or detection
+settings differ from what was traced (use-trace-preview-facts.ts).
+
+Expectations updated: the workflow and semantic tests read the new
+Detection label and band line, because the old label claimed pale
+details were kept on every image. e2e/production-workflows.spec.ts now
+expects Sharp's Manual band to start at the automatic band it displayed
+instead of 128. The settings-control test harness moved to
+trace-controls.test-support.tsx so the new detection tests can share it.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ e2e/production-workflows.spec.ts              |   6 +-
+ .../ImportImageDialog.trace-dialog.test.ts    |  41 ++++-
+ src/ui/trace/ImportImageDialog.tsx            |   3 +
+ .../trace/ImportImageDialog.workflow.test.ts  |   4 +-
+ src/ui/trace/TraceDetectionControls.test.tsx  |  45 ++++++
+ src/ui/trace/TraceDetectionControls.tsx       |  85 ++++++++--
+ .../TraceSettingsControls.semantic.test.tsx   | 130 +--------------
+ src/ui/trace/TraceSettingsControls.tsx        |   8 +-
+ src/ui/trace/dialog-parts.tsx                 |   2 +-
+ src/ui/trace/prepared-trace.ts                |   2 +-
+ src/ui/trace/trace-controls.test-support.tsx  | 152 ++++++++++++++++++
+ src/ui/trace/trace-options.ts                 |  26 ++-
+ src/ui/trace/use-trace-preview-facts.test.ts  |  42 +++++
+ src/ui/trace/use-trace-preview-facts.ts       |  75 +++++++++
+ 14 files changed, 471 insertions(+), 150 deletions(-)
+ create mode 100644 src/ui/trace/TraceDetectionControls.test.tsx
+ create mode 100644 src/ui/trace/trace-controls.test-support.tsx
+ create mode 100644 src/ui/trace/use-trace-preview-facts.test.ts
+ create mode 100644 src/ui/trace/use-trace-preview-facts.ts
+
+diff --git a/e2e/production-workflows.spec.ts b/e2e/production-workflows.spec.ts
+index 4d6f2e8df..d1ed9a6a7 100644
+--- a/e2e/production-workflows.spec.ts
++++ b/e2e/production-workflows.spec.ts
+@@ -500,8 +500,12 @@ test('imports a generated bitmap and traces it through the production worker wor
+   await expect(threshold).toHaveCount(0);
+   await expect(dialog.getByRole('spinbutton', { name: 'Remove ink specks' })).toHaveValue('1');
+   await expect(dialog.getByRole('spinbutton', { name: 'Ignore Less Than' })).toHaveValue('0');
++  // Manual starts from the band Sharp's automatic threshold used on this image.
++  const band = dialog.getByText(/^Band in use: Cutoff 0, Threshold \d+, set from this image\.$/);
++  await expect(band).toBeVisible();
++  const automaticThreshold = /Threshold (\d+)/.exec((await band.textContent()) ?? '')?.[1];
+   await detection.selectOption('manual');
+-  await expect(threshold).toHaveValue('128');
++  await expect(threshold).toHaveValue(automaticThreshold ?? 'not reported');
+   await threshold.fill('137');
+   await expect(threshold).toHaveValue('137');
+   await dialog.screenshot({ path: testInfo.outputPath('trace-manual.png') });
+diff --git a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+index bfc2c8770..ea2f61862 100644
+--- a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
++++ b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+@@ -11,17 +11,32 @@ vi.mock('./image-loader', () => ({
+       255, 255, 255, 255, 0, 0, 0, 255, 255, 255, 255, 255, 0, 0, 0, 255,
+     ]),
+   })),
++  dataUrlToFile: vi.fn(async () => new File(['image'], 'logo.png', { type: 'image/png' })),
+ }));
+ vi.mock('./use-trace-worker-client', () => ({
+-  traceImageWithFallback: vi.fn(async () => ({
+-    paths: [{ color: '#000000', polylines: [] }],
+-    bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
+-    width: 2,
+-    height: 2,
+-  })),
++  // Otsu presets report their threshold; Line Art on this grey image reports
++  // that its colour check found nothing to add.
++  traceImageWithFallback: vi.fn(
++    async (_image: unknown, options: { useOtsuThreshold?: boolean }) => ({
++      paths: [{ color: '#000000', polylines: [] }],
++      bounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
++      width: 2,
++      height: 2,
++      report:
++        options.useOtsuThreshold === true
++          ? { automaticThresholdLuma: 118 }
++          : { localDetailAdded: false },
++    }),
++  ),
+ }));
+ 
+-import { changeSelect, selectByLabel, withTraceDialog } from './trace-dialog.test-support';
++import {
++  changeSelect,
++  inputByLabel,
++  selectByLabel,
++  waitForText,
++  withTraceDialog,
++} from './trace-dialog.test-support';
+ 
+ describe('Trace dialog describes what each style engraves', () => {
+   it('calls Edge Detection line outlines in the style label and both output hints', async () => {
+@@ -39,3 +54,15 @@ describe('Trace dialog describes what each style engraves', () => {
+     });
+   });
+ });
++
++describe('Trace dialog shows what automatic detection chose', () => {
++  it('names the Line Art route and starts Manual at the automatic threshold', async () => {
++    await withTraceDialog(async (host) => {
++      await waitForText(host, 'No colour detail found: using brightness band 0–128 only.');
++      await changeSelect(selectByLabel(host, 'Trace preset'), 'Sharp');
++      await waitForText(host, 'Band in use: Cutoff 0, Threshold 117, set from this image.');
++      await changeSelect(selectByLabel(host, 'Trace detection'), 'manual');
++      expect(inputByLabel(host, 'Trace Threshold')?.value).toBe('117');
++    });
++  });
++});
+diff --git a/src/ui/trace/ImportImageDialog.tsx b/src/ui/trace/ImportImageDialog.tsx
+index 402c1cb9e..15309aa3b 100644
+--- a/src/ui/trace/ImportImageDialog.tsx
++++ b/src/ui/trace/ImportImageDialog.tsx
+@@ -47,6 +47,7 @@ import {
+ import { isTraceRequestSuperseded } from './use-trace-worker-client';
+ import { isTraceAbort, traceAbortError } from './trace-cancellation';
+ import { useTraceSourceFile } from './use-trace-source-file';
++import { useTracePreviewFacts } from './use-trace-preview-facts';
+ import {
+   isFilledContourTraceOptions,
+   traceSourceHasTransparency,
+@@ -131,6 +132,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+   const options = useTraceOptions(presetOptions, traceSettings);
+   const output = useTraceOutputChoice(machineKind, options);
+   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
++  const facts = useTracePreviewFacts(preview, file, options, boundarySelection);
+ 
+   const onSubmit = (): void =>
+     submitTraceDialog({
+@@ -166,6 +168,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+         preset: presetOptions,
+         overrides: traceSettings,
+         sourceHasTransparency: traceSourceHasTransparency(preview),
++        report: facts.report,
+         onChange: setTraceSettings,
+       }}
+       output={output.fields}
+diff --git a/src/ui/trace/ImportImageDialog.workflow.test.ts b/src/ui/trace/ImportImageDialog.workflow.test.ts
+index f6931c54c..efd3b057b 100644
+--- a/src/ui/trace/ImportImageDialog.workflow.test.ts
++++ b/src/ui/trace/ImportImageDialog.workflow.test.ts
+@@ -217,13 +217,13 @@ describe('Trace Image workflow controls', () => {
+       for (const label of [
+         'Refine detail',
+         'Detection',
+-        'Automatic (preserve pale details)',
++        'Automatic (band + pale colour detail)',
+         'Ignore Less Than',
+         'Remove ink specks',
+         'Smoothness',
+         'Optimize',
+         'Trace alpha mask',
+-        'Line Art automatically preserves pale logo details.',
++        'Band in use: Cutoff 0, Threshold 128.',
+         'Fade Image',
+         'Delete Image After trace',
+       ]) {
+diff --git a/src/ui/trace/TraceDetectionControls.test.tsx b/src/ui/trace/TraceDetectionControls.test.tsx
+new file mode 100644
+index 000000000..784114443
+--- /dev/null
++++ b/src/ui/trace/TraceDetectionControls.test.tsx
+@@ -0,0 +1,45 @@
++// Automatic detection shows the band it uses and which route it took, and the
++// first manual band starts where the automatic threshold was (ADR-396).
++
++import { describe, expect, it } from 'vitest';
++import { prepareTraceForContour, preprocessForTrace } from '../../core/trace/trace-image';
++import { fill, ink, paper, withControls } from './trace-controls.test-support';
++
++describe('automatic detection tells the operator what it used', () => {
++  it('shows the band Line Art uses when the image has no colour detail', async () => {
++    const image = paper();
++    fill(image, 10, 10, 20, 20, [0, 0, 0]);
++    fill(image, 40, 10, 30, 10, [172, 172, 172]);
++    await withControls('Line Art', async (controls) => {
++      const automatic = ink(preprocessForTrace(image, controls.options()));
++      await controls.setReport(prepareTraceForContour(image, controls.options()).report);
++      expect(controls.host.textContent).toContain('Band in use: Cutoff 0, Threshold 128.');
++      expect(controls.host.textContent).toContain(
++        'No colour detail found: using brightness band 0–128 only.',
++      );
++      await controls.detect('manual');
++      expect(ink(preprocessForTrace(image, controls.options()))).toBe(automatic);
++    });
++  });
++
++  it.each(['Smooth', 'Sharp', 'Centerline'])(
++    '%s starts the manual band where its automatic threshold was',
++    async (name) => {
++      const image = paper(240);
++      fill(image, 20, 15, 30, 30, [150, 150, 150]);
++      await withControls(name, async (controls) => {
++        const report = prepareTraceForContour(image, controls.options()).report;
++        const automatic = report?.automaticThresholdLuma;
++        if (automatic === undefined) throw new Error('No automatic threshold reported');
++        await controls.setReport(report);
++        expect(controls.host.textContent).toContain(
++          `Band in use: Cutoff 0, Threshold ${automatic - 1}, set from this image.`,
++        );
++        expect(ink(preprocessForTrace(image, controls.options()))).toBe(900);
++        await controls.detect('manual');
++        expect(controls.number('Threshold').value).toBe(String(automatic - 1));
++        expect(ink(preprocessForTrace(image, controls.options()))).toBe(900);
++      });
++    },
++  );
++});
+diff --git a/src/ui/trace/TraceDetectionControls.tsx b/src/ui/trace/TraceDetectionControls.tsx
+index c7fc4d417..2181b66a1 100644
+--- a/src/ui/trace/TraceDetectionControls.tsx
++++ b/src/ui/trace/TraceDetectionControls.tsx
+@@ -1,6 +1,8 @@
+ import type { ReactNode } from 'react';
+-import type { TraceOptions } from '../../core/trace';
++import type { TraceOptions, TraceReport } from '../../core/trace';
+ import {
++  automaticBandThreshold,
++  overridesForDetectionMode,
+   traceDetectionMode,
+   type LightBurnTraceSettingOverrides,
+   type TraceDetectionMode,
+@@ -10,6 +12,8 @@ export function TraceDetectionControls(props: {
+   readonly preset: TraceOptions;
+   readonly overrides: LightBurnTraceSettingOverrides;
+   readonly alphaMask: boolean;
++  /** What the matching finished preview chose; undefined until one exists. */
++  readonly report?: TraceReport | undefined;
+   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
+   readonly children: ReactNode;
+ }): JSX.Element {
+@@ -37,10 +41,14 @@ export function TraceDetectionControls(props: {
+           className="lf-select"
+           value={mode}
+           onChange={(event) =>
+-            props.onChange({
+-              ...props.overrides,
+-              detectionMode: parseDetectionMode(event.target.value),
+-            })
++            props.onChange(
++              overridesForDetectionMode(
++                props.preset,
++                props.overrides,
++                parseDetectionMode(event.target.value),
++                props.report,
++              ),
++            )
+           }
+           title="Choose automatic detection, faint-line recovery, a manual brightness band, or sketch tracing."
+         >
+@@ -50,25 +58,80 @@ export function TraceDetectionControls(props: {
+           <option value="sketch">Sketch (local contrast)</option>
+         </select>
+       </label>
+-      {manual ? props.children : <p style={noteStyle}>{detectionNote(mode, props.preset)}</p>}
++      {manual ? (
++        props.children
++      ) : (
++        <AutomaticDetectionNotes mode={mode} preset={props.preset} report={props.report} />
++      )}
+     </>
+   );
+ }
+ 
++// Automatic detection still keeps a brightness band as its solid ink (except
++// Sketch), so show that band read-only and say which route the trace took.
++function AutomaticDetectionNotes(props: {
++  readonly mode: TraceDetectionMode;
++  readonly preset: TraceOptions;
++  readonly report: TraceReport | undefined;
++}): JSX.Element {
++  const band = props.mode === 'sketch' ? null : automaticBandNote(props.preset, props.report);
++  return (
++    <>
++      {band === null ? null : <p style={noteStyle}>{band}</p>}
++      <p style={noteStyle}>{detectionNote(props.mode, props.preset, props.report)}</p>
++    </>
++  );
++}
++
++function automaticBandNote(preset: TraceOptions, report: TraceReport | undefined): string | null {
++  if (preset.autoSketchTrace === true) {
++    const [cutoff, threshold] = presetBand(preset);
++    return `Band in use: Cutoff ${cutoff}, Threshold ${threshold}.`;
++  }
++  if (preset.useOtsuThreshold !== true) return null;
++  const automatic = report?.automaticThresholdLuma;
++  return automatic === undefined
++    ? 'Band in use: set from this image when the preview finishes.'
++    : `Band in use: Cutoff 0, Threshold ${automaticBandThreshold(automatic)}, set from this image.`;
++}
++
+ function presetDetectionLabel(preset: TraceOptions): string {
+-  if (preset.autoSketchTrace === true) return 'Automatic (preserve pale details)';
++  if (preset.autoSketchTrace === true) return 'Automatic (band + pale colour detail)';
+   return preset.useOtsuThreshold === true ? 'Automatic threshold (Otsu)' : 'Preset brightness band';
+ }
+ 
+-function detectionNote(mode: TraceDetectionMode, preset: TraceOptions): string {
++const MANUAL_BAND_TIP = 'Choose Manual brightness band to set Cutoff and Threshold.';
++
++function detectionNote(
++  mode: TraceDetectionMode,
++  preset: TraceOptions,
++  report: TraceReport | undefined,
++): string {
+   if (mode === 'faint-lines')
+     return 'Adds continuous pale strokes while keeping solid ink. Small isolated pale specks are ignored.';
+   if (mode === 'sketch')
+     return 'Local contrast detects the artwork; a brightness band is not used.';
+-  if (preset.autoSketchTrace === true) {
+-    return 'Line Art automatically preserves pale logo details. Choose Manual brightness band to set Cutoff and Threshold.';
++  if (preset.autoSketchTrace === true)
++    return `${lineArtRouteNote(preset, report)} ${MANUAL_BAND_TIP}`;
++  return report?.automaticThresholdLuma === undefined
++    ? MANUAL_BAND_TIP
++    : 'Choose Manual brightness band to set Cutoff and Threshold; it starts from the band in use.';
++}
++
++// Line Art adds local-contrast marks only when the image has enough colour
++// (auto-sketch-trace.ts); the report says which way this image went.
++function lineArtRouteNote(preset: TraceOptions, report: TraceReport | undefined): string {
++  if (report?.localDetailAdded === true)
++    return 'Colour detail found: pale marks darker than their surroundings are added to the band.';
++  if (report?.localDetailAdded === false) {
++    const [cutoff, threshold] = presetBand(preset);
++    return `No colour detail found: using brightness band ${cutoff}–${threshold} only.`;
+   }
+-  return 'The image determines the threshold automatically. Choose Manual brightness band to set Cutoff and Threshold.';
++  return 'In colour artwork, pale marks darker than their surroundings are added to the band.';
++}
++
++function presetBand(preset: TraceOptions): readonly [number, number] {
++  return [preset.cutoffLuma ?? 0, preset.thresholdLuma ?? 128];
+ }
+ 
+ function parseDetectionMode(value: string): TraceDetectionMode {
+diff --git a/src/ui/trace/TraceSettingsControls.semantic.test.tsx b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+index aafe4e23c..9ac26ffaa 100644
+--- a/src/ui/trace/TraceSettingsControls.semantic.test.tsx
++++ b/src/ui/trace/TraceSettingsControls.semantic.test.tsx
+@@ -1,19 +1,13 @@
+ import { act } from 'react';
+-import { createRoot } from 'react-dom/client';
+ import { describe, expect, it } from 'vitest';
+ import { TRACE_PRESETS, type RawImageData, type TraceOptions } from '../../core/trace';
+ import {
+   flattenStrengthFromSmoothness,
+   optimizationToleranceScaleFromOptimize,
+ } from '../../core/trace/contour-trace';
+-import { preprocessForTrace } from '../../core/trace/trace-image';
++import { prepareTraceForContour, preprocessForTrace } from '../../core/trace/trace-image';
+ import { traceImageToColoredPaths } from '../../core/trace/trace-to-paths';
+-import { TraceSettingsControls } from './TraceSettingsControls';
+-import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
+-
+-(
+-  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
+-).IS_REACT_ACT_ENVIRONMENT = true;
++import { fill, ink, paper, withControls } from './trace-controls.test-support';
+ 
+ describe('trace controls describe the options the engine actually receives', () => {
+   it('recovers grayscale strokes, persists the choice across styles, and restores defaults on reset', async () => {
+@@ -97,7 +91,9 @@ describe('trace controls describe the options the engine actually receives', ()
+     fill(image, 20, 20, 30, 10, [220, 180, 80]);
+     await withControls('Line Art', async (controls) => {
+       expect(controls.host.querySelector('[aria-label="Trace Threshold"]')).toBeNull();
+-      expect(controls.host.textContent).toContain('Automatic (preserve pale details)');
++      expect(controls.host.textContent).toContain('Automatic (band + pale colour detail)');
++      await controls.setReport(prepareTraceForContour(image, controls.options()).report);
++      expect(controls.host.textContent).toContain('Colour detail found');
+       expect(ink(preprocessForTrace(image, controls.options()))).toBe(300);
+       await controls.detect('manual');
+       expect(ink(preprocessForTrace(image, controls.options()))).toBe(0);
+@@ -251,122 +247,6 @@ describe('trace controls describe the options the engine actually receives', ()
+   });
+ });
+ 
+-type Controls = {
+-  readonly host: HTMLDivElement;
+-  readonly options: () => TraceOptions;
+-  readonly number: (label: string) => HTMLInputElement;
+-  readonly change: (label: string, value: number) => Promise<void>;
+-  readonly detect: (mode: string) => Promise<void>;
+-  readonly check: (label: string, checked: boolean) => Promise<void>;
+-  readonly selectPreset: (name: string) => Promise<void>;
+-  readonly reset: () => Promise<void>;
+-};
+-
+-async function withControls(
+-  name: string,
+-  run: (controls: Controls) => Promise<void>,
+-  sourceHasTransparency = false,
+-): Promise<void> {
+-  const initialPreset = TRACE_PRESETS[name];
+-  if (initialPreset === undefined) throw new Error(`Missing preset ${name}`);
+-  let preset = initialPreset;
+-  const host = document.createElement('div');
+-  document.body.append(host);
+-  const root = createRoot(host);
+-  let settings: LightBurnTraceSettingOverrides = {};
+-  const render = (): void =>
+-    root.render(
+-      <TraceSettingsControls
+-        preset={preset}
+-        overrides={settings}
+-        sourceHasTransparency={sourceHasTransparency}
+-        onChange={(next) => {
+-          settings = next;
+-          render();
+-        }}
+-      />,
+-    );
+-  const number = (label: string): HTMLInputElement => {
+-    const input = host.querySelector(`[aria-label="Trace ${label}"]`);
+-    if (!(input instanceof HTMLInputElement)) throw new Error(`Missing number ${label}`);
+-    return input;
+-  };
+-  await act(async () => render());
+-  try {
+-    await run({
+-      host,
+-      options: () => mergeLightBurnTraceSettings(preset, settings),
+-      number,
+-      check: async (label, checked) => {
+-        const input = host.querySelector(`[aria-label="${label}"]`);
+-        if (!(input instanceof HTMLInputElement)) throw new Error(`Missing checkbox ${label}`);
+-        if (input.checked !== checked) await act(async () => input.click());
+-      },
+-      selectPreset: async (nextName) => {
+-        const next = TRACE_PRESETS[nextName];
+-        if (next === undefined) throw new Error(`Missing preset ${nextName}`);
+-        preset = next;
+-        await act(async () => render());
+-      },
+-      reset: async () => {
+-        const button = [...host.querySelectorAll('button')].find(
+-          (node) => node.textContent === 'Reset trace settings',
+-        );
+-        if (button === undefined) throw new Error('Missing reset button');
+-        await act(async () => button.click());
+-      },
+-      change: async (label, value) => {
+-        await act(async () => {
+-          const input = number(label);
+-          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+-            input,
+-            String(value),
+-          );
+-          input.dispatchEvent(new Event('input', { bubbles: true }));
+-        });
+-      },
+-      detect: async (mode) => {
+-        await act(async () => {
+-          const select = host.querySelector('[aria-label="Trace detection"]');
+-          if (!(select instanceof HTMLSelectElement)) throw new Error('Missing detection selector');
+-          select.value = mode;
+-          select.dispatchEvent(new Event('change', { bubbles: true }));
+-        });
+-      },
+-    });
+-  } finally {
+-    await act(async () => root.unmount());
+-    host.remove();
+-  }
+-}
+-
+-function paper(gray = 255): RawImageData {
+-  const data = new Uint8ClampedArray(80 * 60 * 4);
+-  for (let i = 0; i < data.length; i += 4) data.set([gray, gray, gray, 255], i);
+-  return { width: 80, height: 60, data };
+-}
+-
+-function fill(
+-  image: RawImageData,
+-  x0: number,
+-  y0: number,
+-  width: number,
+-  height: number,
+-  rgb: readonly [number, number, number],
+-): void {
+-  for (let y = y0; y < y0 + height; y += 1) {
+-    for (let x = x0; x < x0 + width; x += 1) {
+-      image.data.set([...rgb, 255], (y * image.width + x) * 4);
+-    }
+-  }
+-}
+-
+-function ink(image: RawImageData): number {
+-  let count = 0;
+-  for (let i = 0; i < image.data.length; i += 4) if (image.data[i] === 0) count += 1;
+-  return count;
+-}
+-
+ async function loopCount(image: RawImageData, options: TraceOptions): Promise<number> {
+   const paths = await traceImageToColoredPaths(image, options);
+   return paths.reduce((count, path) => count + path.polylines.length, 0);
+diff --git a/src/ui/trace/TraceSettingsControls.tsx b/src/ui/trace/TraceSettingsControls.tsx
+index 825a1d6f7..f9fcca49e 100644
+--- a/src/ui/trace/TraceSettingsControls.tsx
++++ b/src/ui/trace/TraceSettingsControls.tsx
+@@ -1,4 +1,8 @@
+-import { DEFAULT_LIGHTBURN_TRACE_SETTINGS, type TraceOptions } from '../../core/trace';
++import {
++  DEFAULT_LIGHTBURN_TRACE_SETTINGS,
++  type TraceOptions,
++  type TraceReport,
++} from '../../core/trace';
+ import {
+   DEFAULT_EDGE_MINIMUM_LINE_PX,
+   edgeDetailFromOptions,
+@@ -16,6 +20,8 @@ type TraceSettingsControlsProps = {
+   readonly preset: TraceOptions;
+   readonly overrides: LightBurnTraceSettingOverrides;
+   readonly sourceHasTransparency?: boolean | undefined;
++  /** The matching finished preview's report of its automatic choices. */
++  readonly report?: TraceReport | undefined;
+   readonly onChange: (next: LightBurnTraceSettingOverrides) => void;
+ };
+ 
+diff --git a/src/ui/trace/dialog-parts.tsx b/src/ui/trace/dialog-parts.tsx
+index c6c3205ae..ded149538 100644
+--- a/src/ui/trace/dialog-parts.tsx
++++ b/src/ui/trace/dialog-parts.tsx
+@@ -22,7 +22,7 @@ const PRESET_DESCRIPTIONS: Readonly<Record<string, string>> = {
+   'Photo shading':
+     'For portraits and real photographs. Fine filled lines vary in width to keep highlights, midtones and shadows.',
+   'Line Art':
+-    'A balanced start for logos, lettering and drawings. Automatic detection keeps pale details.',
++    'A balanced start for logos, lettering and drawings. Traces brightness 0–128 as ink and, in colour artwork, adds pale details.',
+   Smooth: 'Clean curves and quieter outlines for rough or noisy artwork. Very fine gaps may close.',
+   Sharp:
+     'Crisp corners, fine lines and tiny marks. Keeps more detail, including small source specks.',
+diff --git a/src/ui/trace/prepared-trace.ts b/src/ui/trace/prepared-trace.ts
+index aff27d509..acfcf45ba 100644
+--- a/src/ui/trace/prepared-trace.ts
++++ b/src/ui/trace/prepared-trace.ts
+@@ -43,7 +43,7 @@ export function sameTracePreparationRequest(
+   );
+ }
+ 
+-function sameBoundary(a: TraceBoundary | null, b: TraceBoundary | null): boolean {
++export function sameBoundary(a: TraceBoundary | null, b: TraceBoundary | null): boolean {
+   if (a === null || b === null) return a === b;
+   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+ }
+diff --git a/src/ui/trace/trace-controls.test-support.tsx b/src/ui/trace/trace-controls.test-support.tsx
+new file mode 100644
+index 000000000..33fc209eb
+--- /dev/null
++++ b/src/ui/trace/trace-controls.test-support.tsx
+@@ -0,0 +1,152 @@
++// Render harness for trace settings control tests. It mounts the controls on a
++// preset, keeps their overrides the way the dialog does, and exposes the
++// options the tracer would receive.
++
++import { act } from 'react';
++import { createRoot } from 'react-dom/client';
++import {
++  TRACE_PRESETS,
++  type RawImageData,
++  type TraceOptions,
++  type TraceReport,
++} from '../../core/trace';
++import { TraceSettingsControls } from './TraceSettingsControls';
++import { mergeLightBurnTraceSettings, type LightBurnTraceSettingOverrides } from './trace-options';
++
++(
++  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++export type Controls = {
++  readonly host: HTMLDivElement;
++  readonly options: () => TraceOptions;
++  readonly number: (label: string) => HTMLInputElement;
++  readonly change: (label: string, value: number) => Promise<void>;
++  readonly detect: (mode: string) => Promise<void>;
++  readonly check: (label: string, checked: boolean) => Promise<void>;
++  readonly selectPreset: (name: string) => Promise<void>;
++  readonly reset: () => Promise<void>;
++  readonly setReport: (report: TraceReport | undefined) => Promise<void>;
++};
++
++type ControlsState = {
++  preset: TraceOptions;
++  settings: LightBurnTraceSettingOverrides;
++  report: TraceReport | undefined;
++};
++
++export async function withControls(
++  name: string,
++  run: (controls: Controls) => Promise<void>,
++  sourceHasTransparency = false,
++): Promise<void> {
++  const state: ControlsState = { preset: presetNamed(name), settings: {}, report: undefined };
++  const host = document.createElement('div');
++  document.body.append(host);
++  const root = createRoot(host);
++  const render = (): void =>
++    root.render(
++      <TraceSettingsControls
++        preset={state.preset}
++        overrides={state.settings}
++        sourceHasTransparency={sourceHasTransparency}
++        report={state.report}
++        onChange={(next) => {
++          state.settings = next;
++          render();
++        }}
++      />,
++    );
++  await act(async () => render());
++  try {
++    await run(controlsFor(host, state, render));
++  } finally {
++    await act(async () => root.unmount());
++    host.remove();
++  }
++}
++
++function controlsFor(host: HTMLDivElement, state: ControlsState, render: () => void): Controls {
++  const number = (label: string): HTMLInputElement => {
++    const input = host.querySelector(`[aria-label="Trace ${label}"]`);
++    if (!(input instanceof HTMLInputElement)) throw new Error(`Missing number ${label}`);
++    return input;
++  };
++  return {
++    host,
++    options: () => mergeLightBurnTraceSettings(state.preset, state.settings),
++    number,
++    check: async (label, checked) => {
++      const input = host.querySelector(`[aria-label="${label}"]`);
++      if (!(input instanceof HTMLInputElement)) throw new Error(`Missing checkbox ${label}`);
++      if (input.checked !== checked) await act(async () => input.click());
++    },
++    setReport: async (next) => {
++      state.report = next;
++      await act(async () => render());
++    },
++    selectPreset: async (nextName) => {
++      state.preset = presetNamed(nextName);
++      await act(async () => render());
++    },
++    reset: async () => {
++      const button = [...host.querySelectorAll('button')].find(
++        (node) => node.textContent === 'Reset trace settings',
++      );
++      if (button === undefined) throw new Error('Missing reset button');
++      await act(async () => button.click());
++    },
++    change: async (label, value) => {
++      await act(async () => {
++        const input = number(label);
++        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
++          input,
++          String(value),
++        );
++        input.dispatchEvent(new Event('input', { bubbles: true }));
++      });
++    },
++    detect: async (mode) => {
++      await act(async () => {
++        const select = host.querySelector('[aria-label="Trace detection"]');
++        if (!(select instanceof HTMLSelectElement)) throw new Error('Missing detection selector');
++        select.value = mode;
++        select.dispatchEvent(new Event('change', { bubbles: true }));
++      });
++    },
++  };
++}
++
++function presetNamed(name: string): TraceOptions {
++  const preset = TRACE_PRESETS[name];
++  if (preset === undefined) throw new Error(`Missing preset ${name}`);
++  return preset;
++}
++
++export function paper(gray = 255): RawImageData {
++  const data = new Uint8ClampedArray(80 * 60 * 4);
++  for (let i = 0; i < data.length; i += 4) data.set([gray, gray, gray, 255], i);
++  return { width: 80, height: 60, data };
++}
++
++export function fill(
++  image: RawImageData,
++  x0: number,
++  y0: number,
++  width: number,
++  height: number,
++  rgb: readonly [number, number, number],
++): void {
++  for (let y = y0; y < y0 + height; y += 1) {
++    for (let x = x0; x < x0 + width; x += 1) {
++      image.data.set([...rgb, 255], (y * image.width + x) * 4);
++    }
++  }
++}
++
++/** Ink pixels of a prepared black-and-white mask. */
++export function ink(image: RawImageData): number {
++  let count = 0;
++  for (let i = 0; i < image.data.length; i += 4) if (image.data[i] === 0) count += 1;
++  return count;
++}
+diff --git a/src/ui/trace/trace-options.ts b/src/ui/trace/trace-options.ts
+index 7c4b65e69..078e949e2 100644
+--- a/src/ui/trace/trace-options.ts
++++ b/src/ui/trace/trace-options.ts
+@@ -7,7 +7,7 @@
+ // cutoff, threshold, ignore-small-shapes, smoothness, and optimize.
+ // Image-level tone edits stay in Adjust Image.
+ 
+-import type { TraceOptions } from '../../core/trace';
++import type { TraceOptions, TraceReport } from '../../core/trace';
+ 
+ export type LightBurnTraceSettingOverrides = {
+   readonly photoDetail?: number;
+@@ -94,6 +94,30 @@ export function traceDetectionMode(
+     : 'preset';
+ }
+ 
++/** The overrides after the operator picks a Detection mode. The first manual
++ * band on an automatic-threshold preset starts at the band the preview's
++ * automatic threshold used, so switching to Manual keeps the same ink. */
++export function overridesForDetectionMode(
++  preset: TraceOptions,
++  settings: LightBurnTraceSettingOverrides,
++  detectionMode: TraceDetectionMode,
++  report: TraceReport | undefined,
++): LightBurnTraceSettingOverrides {
++  const next = { ...settings, detectionMode };
++  const automatic = report?.automaticThresholdLuma;
++  if (detectionMode !== 'manual' || automatic === undefined) return next;
++  const firstBand = settings.cutoffLuma === undefined && settings.thresholdLuma === undefined;
++  return firstBand && preset.useOtsuThreshold === true
++    ? { ...next, thresholdLuma: automaticBandThreshold(automatic) }
++    : next;
++}
++
++/** The automatic threshold inks brightness below it, while the manual band
++ * includes its Threshold, so the matching band ends one level lower. */
++export function automaticBandThreshold(automaticThresholdLuma: number): number {
++  return clampByte(automaticThresholdLuma - 1);
++}
++
+ function applyDetectionSettings(
+   out: Record<string, unknown>,
+   preset: TraceOptions,
+diff --git a/src/ui/trace/use-trace-preview-facts.test.ts b/src/ui/trace/use-trace-preview-facts.test.ts
+new file mode 100644
+index 000000000..d143d6f5a
+--- /dev/null
++++ b/src/ui/trace/use-trace-preview-facts.test.ts
+@@ -0,0 +1,42 @@
++import { describe, expect, it } from 'vitest';
++import { TRACE_PRESETS } from '../../core/trace';
++import { tracePreviewFacts, type TraceDetectionRequest } from './use-trace-preview-facts';
++
++const SHARP = TRACE_PRESETS['Sharp']!;
++const traced: TraceDetectionRequest = {
++  file: new File(['image'], 'logo.png'),
++  options: SHARP,
++  boundary: { x: 0, y: 0, width: 8, height: 8 },
++  boundaryMode: 'crop',
++};
++const report = { automaticThresholdLuma: 118 };
++
++describe('what the settings panel may say about the finished preview', () => {
++  it('keeps the report while only finishing controls change', () => {
++    for (const change of [
++      { smoothness: 0.3 },
++      { optimize: 1 },
++      { ignoreLessThanPixels: 9 },
++      { centerlineJoinGapPx: 0 },
++    ]) {
++      const current = {
++        ...traced,
++        options: { ...SHARP, ...change },
++        boundary: { ...traced.boundary! },
++      };
++      expect(tracePreviewFacts({ request: traced, report }, current)).toEqual({ report });
++    }
++  });
++
++  it('withdraws the report when detection, the region or the image changes', () => {
++    for (const current of [
++      { ...traced, options: { ...SHARP, despeckleMinPixels: 5 } },
++      { ...traced, options: { ...SHARP, useOtsuThreshold: false, thresholdLuma: 90 } },
++      { ...traced, boundary: { x: 0, y: 0, width: 4, height: 8 } },
++      { ...traced, boundaryMode: 'enhance' as const },
++      { ...traced, file: new File(['image'], 'logo.png') },
++    ]) {
++      expect(tracePreviewFacts({ request: traced, report }, current)).toEqual({});
++    }
++  });
++});
+diff --git a/src/ui/trace/use-trace-preview-facts.ts b/src/ui/trace/use-trace-preview-facts.ts
+new file mode 100644
+index 000000000..ab0f9ba7f
+--- /dev/null
++++ b/src/ui/trace/use-trace-preview-facts.ts
+@@ -0,0 +1,75 @@
++// What the settings panel may say about the latest finished preview. Its
++// report (the automatic threshold, whether Line Art added pale detail) belongs
++// to one detection: it stays while only finishing controls change, so the
++// panel does not flicker on every curve tweak, and it is withdrawn as soon as
++// anything that decides detection differs from the traced request.
++
++import { useRef } from 'react';
++import type { TraceOptions, TraceReport } from '../../core/trace';
++import { sameBoundary, type TracePreparationRequest } from './prepared-trace';
++import type { TracePreviewState } from './use-trace-preview';
++
++export type TracePreviewFacts = {
++  readonly report?: TraceReport;
++};
++
++export type TraceDetectionRequest = Pick<
++  TracePreparationRequest,
++  'file' | 'options' | 'boundary' | 'boundaryMode'
++>;
++
++export type FinishedTracePreview = {
++  readonly request: TraceDetectionRequest;
++  readonly report?: TraceReport | undefined;
++};
++
++export function useTracePreviewFacts(
++  preview: TracePreviewState,
++  file: File | null,
++  options: TraceOptions,
++  selection: Pick<TraceDetectionRequest, 'boundary' | 'boundaryMode'>,
++): TracePreviewFacts {
++  const finished = useRef<FinishedTracePreview | null>(null);
++  if (preview.kind === 'ready' && preview.preparedTrace !== undefined) {
++    finished.current = { request: preview.preparedTrace.request, report: preview.report };
++  }
++  const current =
++    file === null
++      ? null
++      : { file, options, boundary: selection.boundary, boundaryMode: selection.boundaryMode };
++  return tracePreviewFacts(finished.current, current);
++}
++
++export function tracePreviewFacts(
++  finished: FinishedTracePreview | null,
++  current: TraceDetectionRequest | null,
++): TracePreviewFacts {
++  if (finished?.report === undefined || current === null) return {};
++  return sameDetection(finished.request, current) ? { report: finished.report } : {};
++}
++
++function sameDetection(a: TraceDetectionRequest, b: TraceDetectionRequest): boolean {
++  return (
++    a.file === b.file &&
++    sameBoundary(a.boundary, b.boundary) &&
++    a.boundaryMode === b.boundaryMode &&
++    (a.options === b.options || detectionKey(a.options) === detectionKey(b.options))
++  );
++}
++
++// Curve finishing, the traced-shape area filter and Centerline's gap joining
++// act on ink that detection has already chosen.
++const FINISHING_OPTION_KEYS: ReadonlySet<string> = new Set([
++  'smoothness',
++  'optimize',
++  'ignoreLessThanPixels',
++  'centerlineJoinGapPx',
++]);
++
++function detectionKey(options: TraceOptions): string {
++  const entries = Object.entries(options).filter(
++    ([key, value]) => value !== undefined && !FINISHING_OPTION_KEYS.has(key),
++  );
++  entries.sort(([a], [b]) => (a < b ? -1 : 1));
++  return JSON.stringify(entries);
++}
+-- 
+2.43.0
+

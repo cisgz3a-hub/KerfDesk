@@ -1,0 +1,454 @@
+From 776f41cddc3a99d417bf7b9fa43c05451ecc0898 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 20:00:32 +0000
+Subject: [PATCH 09/14] fix(trace): say which kept adjustments a style uses,
+ and keep the boundary mode (ADR-396)
+
+Adjustments are kept in one set across trace styles, but each style uses
+only the controls it shows. "Settings edited" now appears only when the
+used adjustments change what the selected style traces, so re-selecting
+the default Detection, or keeping a manual band while automatic
+detection runs, no longer marks the style as edited. The hint under the
+preset says adjustments carry over to styles with the same control and
+names the kept ones the style ignores, for example "Not used by Line
+Art: Sensitivity." Reset trace settings still clears all of them.
+
+Selecting Photo shading traces a boxed region with Crop, as before, but
+no longer overwrites the operator's choice: switching back to another
+style restores Enhance region if it was chosen.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../ImportImageDialog.trace-dialog.test.ts    |  30 +++++
+ src/ui/trace/ImportImageDialog.tsx            |   4 +-
+ src/ui/trace/TraceDialogView.tsx              |   7 +-
+ src/ui/trace/dialog-parts.tsx                 |  14 ++-
+ src/ui/trace/trace-dialog.test-support.ts     |  18 +++
+ src/ui/trace/trace-setting-edits.test.ts      |  69 +++++++++++
+ src/ui/trace/trace-setting-edits.ts           | 114 ++++++++++++++++++
+ src/ui/trace/use-boundary-selection.ts        |   8 +-
+ src/ui/trace/use-trace-preset.ts              |  21 +---
+ 9 files changed, 260 insertions(+), 25 deletions(-)
+ create mode 100644 src/ui/trace/trace-setting-edits.test.ts
+ create mode 100644 src/ui/trace/trace-setting-edits.ts
+
+diff --git a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+index e16654983..c39ae684d 100644
+--- a/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
++++ b/src/ui/trace/ImportImageDialog.trace-dialog.test.ts
+@@ -32,9 +32,11 @@ vi.mock('./use-trace-worker-client', () => ({
+ 
+ import {
+   changeSelect,
++  drawTraceBoundary,
+   inputByLabel,
+   selectByLabel,
+   traceDialogSeed,
++  typeNumber,
+   waitForText,
+   withTraceDialog,
+ } from './trace-dialog.test-support';
+@@ -82,3 +84,31 @@ describe('Trace dialog names the grid pixel settings count on', () => {
+     );
+   });
+ });
++
++describe('Trace dialog keeps honest state across style changes', () => {
++  it('restores Enhance region after a visit to Photo shading', async () => {
++    await withTraceDialog(async (host) => {
++      await drawTraceBoundary(host);
++      await changeSelect(selectByLabel(host, 'Trace boundary mode'), 'enhance');
++      await changeSelect(selectByLabel(host, 'Trace preset'), 'Photo shading');
++      expect(selectByLabel(host, 'Trace boundary mode').value).toBe('crop');
++      await changeSelect(selectByLabel(host, 'Trace preset'), 'Line Art');
++      expect(selectByLabel(host, 'Trace boundary mode').value).toBe('enhance');
++    });
++  });
++
++  it('marks edits only when they change the trace, and names kept ones a style ignores', async () => {
++    await withTraceDialog(async (host) => {
++      const text = (): string => host.textContent ?? '';
++      await changeSelect(selectByLabel(host, 'Trace detection'), 'faint-lines');
++      expect(text()).toContain('Settings edited');
++      await changeSelect(selectByLabel(host, 'Trace detection'), 'preset');
++      expect(text()).not.toContain('Settings edited');
++      await changeSelect(selectByLabel(host, 'Trace preset'), 'Edge Detection');
++      await typeNumber(inputByLabel(host, 'Trace Sensitivity'), '80');
++      await changeSelect(selectByLabel(host, 'Trace preset'), 'Line Art');
++      expect(text()).not.toContain('Settings edited');
++      expect(text()).toContain('Not used by Line Art: Sensitivity.');
++    });
++  });
++});
+diff --git a/src/ui/trace/ImportImageDialog.tsx b/src/ui/trace/ImportImageDialog.tsx
+index 7abe80381..c6b1e3874 100644
+--- a/src/ui/trace/ImportImageDialog.tsx
++++ b/src/ui/trace/ImportImageDialog.tsx
+@@ -110,8 +110,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+   const file = useTraceSourceFile(seed, pushToast);
+   // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
+   // starting selection, not a restriction — every preset stays selectable.
+-  const boundarySelection = useBoundarySelection();
+-  const { preset, selectPreset } = useTracePreset(machineKind, boundarySelection.setBoundaryMode);
++  const { preset, selectPreset } = useTracePreset(machineKind);
+   const [traceSettings, setTraceSettings] = useState<LightBurnTraceSettingOverrides>({});
+   const [deleteSourceAfterTrace, setDeleteSourceAfterTrace] = useState(true);
+   const [busy, setBusy] = useState(false);
+@@ -130,6 +129,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
+   // otherwise be ref-unstable too.
+   const presetOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
+   const options = useTraceOptions(presetOptions, traceSettings);
++  const boundarySelection = useBoundarySelection(options.photoDetail !== undefined);
+   const output = useTraceOutputChoice(machineKind, options);
+   const preview = useSelectedTracePreview(file, options, boundarySelection, seed, previewControl);
+   const facts = useTracePreviewFacts(preview, file, options, boundarySelection);
+diff --git a/src/ui/trace/TraceDialogView.tsx b/src/ui/trace/TraceDialogView.tsx
+index a3f1dd63c..d947522e4 100644
+--- a/src/ui/trace/TraceDialogView.tsx
++++ b/src/ui/trace/TraceDialogView.tsx
+@@ -10,6 +10,7 @@ import {
+ } from './dialog-parts';
+ import { TraceSettingsControls } from './TraceSettingsControls';
+ import { PhotoOutputGuidance } from './PhotoOutputGuidance';
++import { traceSettingEdits } from './trace-setting-edits';
+ import './tracer-dialog.css';
+ 
+ // Slots keep this layout independent of worker state and commit ownership.
+@@ -50,7 +51,11 @@ export function TraceDialogView(props: {
+               machineKind={props.output.machineKind}
+               value={props.presetName}
+               onChange={props.onPresetChange}
+-              hasOverrides={Object.keys(props.settings.overrides).length > 0}
++              edits={traceSettingEdits(
++                props.settings.preset,
++                props.settings.overrides,
++                props.settings.sourceHasTransparency,
++              )}
+             />
+             <TraceSettingsControls {...props.settings} />
+             <section className="lf-trace-output" aria-label="Trace output options">
+diff --git a/src/ui/trace/dialog-parts.tsx b/src/ui/trace/dialog-parts.tsx
+index ded149538..4fe420614 100644
+--- a/src/ui/trace/dialog-parts.tsx
++++ b/src/ui/trace/dialog-parts.tsx
+@@ -3,6 +3,7 @@ import type { RasterImage } from '../../core/scene';
+ import { TRACE_PRESETS, type TraceOptions } from '../../core/trace';
+ import { Button, DialogActions as KitDialogActions } from '../kit';
+ import { TutorialButton } from '../tutorials/TutorialButton';
++import type { TraceSettingEdits } from './trace-setting-edits';
+ 
+ export const VISIBLE_TRACE_PRESET_NAMES = [
+   'Line Art',
+@@ -65,13 +66,15 @@ export function PresetPicker(props: {
+   readonly machineKind: 'laser' | 'cnc';
+   readonly value: string;
+   readonly onChange: (next: string) => void;
+-  readonly hasOverrides?: boolean;
++  readonly edits?: TraceSettingEdits;
+ }): JSX.Element {
++  const edited = props.edits?.edited === true;
++  const unused = props.edits?.unused ?? [];
+   return (
+     <section className="lf-trace-preset" aria-label="Trace style">
+       <div className="lf-trace-section-heading">
+         <h3>Trace style</h3>
+-        {props.hasOverrides ? <span className="lf-trace-edited">Settings edited</span> : null}
++        {edited ? <span className="lf-trace-edited">Settings edited</span> : null}
+       </div>
+       <label className="lf-trace-preset-select">
+         <span>Preset</span>
+@@ -100,10 +103,11 @@ export function PresetPicker(props: {
+           Smooth is the CNC starting preset. All styles are available.
+         </p>
+       ) : null}
+-      {props.hasOverrides ? (
++      {edited || unused.length > 0 ? (
+         <p className="lf-trace-hint">
+-          Your adjustments stay when you switch styles. Reset trace settings to use the selected
+-          preset’s defaults.
++          Adjustments carry over to other styles that have the same control. Reset trace settings
++          restores the selected preset’s defaults.
++          {unused.length > 0 ? ` Not used by ${props.value}: ${unused.join(', ')}.` : null}
+         </p>
+       ) : null}
+     </section>
+diff --git a/src/ui/trace/trace-dialog.test-support.ts b/src/ui/trace/trace-dialog.test-support.ts
+index 011014900..6069c3700 100644
+--- a/src/ui/trace/trace-dialog.test-support.ts
++++ b/src/ui/trace/trace-dialog.test-support.ts
+@@ -98,3 +98,21 @@ export async function waitFor(assertion: () => void): Promise<void> {
+   }
+   throw lastError;
+ }
++
++/** Drag a boundary box over the preview, as the operator does. */
++export async function drawTraceBoundary(host: HTMLElement): Promise<void> {
++  const frame = host.querySelector<HTMLDivElement>('[aria-label="Trace preview"]');
++  expect(frame).toBeInstanceOf(HTMLDivElement);
++  if (frame === null) return;
++  frame.getBoundingClientRect = () =>
++    ({ left: 0, top: 0, width: 100, height: 80, right: 100, bottom: 80, x: 0, y: 0 }) as DOMRect;
++  await act(async () => {
++    for (const [type, x, y] of [
++      ['mousedown', 10, 10],
++      ['mousemove', 60, 50],
++      ['mouseup', 60, 50],
++    ] as const) {
++      frame.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, bubbles: true }));
++    }
++  });
++}
+diff --git a/src/ui/trace/trace-setting-edits.test.ts b/src/ui/trace/trace-setting-edits.test.ts
+new file mode 100644
+index 000000000..730f50374
+--- /dev/null
++++ b/src/ui/trace/trace-setting-edits.test.ts
+@@ -0,0 +1,69 @@
++import { describe, expect, it } from 'vitest';
++import { TRACE_PRESETS } from '../../core/trace';
++import { traceSettingEdits } from './trace-setting-edits';
++
++const LINE_ART = TRACE_PRESETS['Line Art']!;
++const SMOOTH = TRACE_PRESETS['Smooth']!;
++const SHARP = TRACE_PRESETS['Sharp']!;
++const EDGE = TRACE_PRESETS['Edge Detection']!;
++const CENTERLINE = TRACE_PRESETS['Centerline']!;
++const PHOTO = TRACE_PRESETS['Photo shading']!;
++
++describe('which kept adjustments the selected style uses', () => {
++  it('does not call re-selecting the default detection an edit', () => {
++    expect(traceSettingEdits(LINE_ART, { detectionMode: 'preset' }, false)).toEqual({
++      edited: false,
++      unused: [],
++    });
++  });
++
++  it('keeps a manual band for later without counting it while automatic detection runs', () => {
++    const band = { cutoffLuma: 0, thresholdLuma: 150 };
++    expect(traceSettingEdits(SMOOTH, { ...band, detectionMode: 'manual' }, false)).toEqual({
++      edited: true,
++      unused: [],
++    });
++    expect(traceSettingEdits(SMOOTH, { ...band, detectionMode: 'preset' }, false)).toEqual({
++      edited: false,
++      unused: ['Cutoff', 'Threshold'],
++    });
++  });
++
++  it('counts a kept value that matches the preset as unedited until another preset differs', () => {
++    const kept = { despeckleMinPixels: LINE_ART.despeckleMinPixels! };
++    expect(traceSettingEdits(LINE_ART, kept, false).edited).toBe(false);
++    expect(traceSettingEdits(SHARP, kept, false).edited).toBe(true);
++  });
++
++  it('lists the kept adjustments a style ignores', () => {
++    expect(traceSettingEdits(EDGE, { edgeSensitivity: 80, despeckleMinPixels: 30 }, false)).toEqual(
++      { edited: true, unused: ['Remove ink specks'] },
++    );
++    expect(traceSettingEdits(LINE_ART, { edgeSensitivity: 80 }, false)).toEqual({
++      edited: false,
++      unused: ['Sensitivity'],
++    });
++    expect(
++      traceSettingEdits(CENTERLINE, { smoothness: 0.4, ignoreLessThanPixels: 9 }, false),
++    ).toEqual({ edited: false, unused: ['Ignore Less Than', 'Smoothness'] });
++    expect(
++      traceSettingEdits(PHOTO, { photoGamma: 1.4, detectionMode: 'faint-lines' }, false),
++    ).toEqual({ edited: true, unused: ['Detection'] });
++    expect(traceSettingEdits(LINE_ART, { photoInvert: true }, false)).toEqual({
++      edited: false,
++      unused: ['Invert'],
++    });
++  });
++
++  it('uses the alpha mask and its band only on an image with transparency', () => {
++    const alpha = { traceTransparency: true };
++    expect(traceSettingEdits(LINE_ART, alpha, false)).toEqual({
++      edited: false,
++      unused: ['Trace alpha mask'],
++    });
++    expect(traceSettingEdits(LINE_ART, { ...alpha, thresholdLuma: 90 }, true)).toEqual({
++      edited: true,
++      unused: [],
++    });
++  });
++});
+diff --git a/src/ui/trace/trace-setting-edits.ts b/src/ui/trace/trace-setting-edits.ts
+new file mode 100644
+index 000000000..29822ed68
+--- /dev/null
++++ b/src/ui/trace/trace-setting-edits.ts
+@@ -0,0 +1,114 @@
++// Which of the kept trace adjustments the selected style uses. The dialog keeps
++// one set of overrides across style changes, but each style reads only the
++// controls it shows; the rest stay unused until a style with those controls
++// is selected again.
++
++import type { TraceOptions } from '../../core/trace';
++import {
++  mergeLightBurnTraceSettings,
++  traceDetectionMode,
++  type LightBurnTraceSettingOverrides,
++} from './trace-options';
++
++type OverrideKey = keyof LightBurnTraceSettingOverrides;
++
++export type TraceSettingEdits = {
++  /** The used adjustments change what this style traces. */
++  readonly edited: boolean;
++  /** Labels of kept adjustments this style does not use. */
++  readonly unused: ReadonlyArray<string>;
++};
++
++// Listed in panel order; both sketch keys belong to the Detection control.
++const OVERRIDE_LABELS: Readonly<Record<OverrideKey, string>> = {
++  photoDetail: 'Detail',
++  photoBrightness: 'Brightness',
++  photoContrast: 'Contrast',
++  photoGamma: 'Midtones',
++  photoInvert: 'Invert',
++  edgeSensitivity: 'Sensitivity',
++  edgeDetail: 'Detail',
++  edgeMinimumLinePx: 'Minimum line',
++  detectionMode: 'Detection',
++  sketchTrace: 'Detection',
++  cutoffLuma: 'Cutoff',
++  thresholdLuma: 'Threshold',
++  despeckleMinPixels: 'Remove ink specks',
++  ignoreLessThanPixels: 'Ignore Less Than',
++  fillPinholeCracks: 'Fill tiny holes',
++  smoothness: 'Smoothness',
++  optimize: 'Optimize',
++  traceTransparency: 'Trace alpha mask',
++};
++
++const PHOTO_KEYS: ReadonlyArray<OverrideKey> = [
++  'photoDetail',
++  'photoBrightness',
++  'photoContrast',
++  'photoGamma',
++  'photoInvert',
++];
++const EDGE_KEYS: ReadonlyArray<OverrideKey> = [
++  'edgeSensitivity',
++  'edgeDetail',
++  'edgeMinimumLinePx',
++  'smoothness',
++  'optimize',
++];
++// Mask controls shared by the filled styles and Centerline.
++const MASK_KEYS: ReadonlyArray<OverrideKey> = [
++  'detectionMode',
++  'sketchTrace',
++  'despeckleMinPixels',
++  'fillPinholeCracks',
++  'traceTransparency',
++];
++const CONTOUR_KEYS: ReadonlyArray<OverrideKey> = ['ignoreLessThanPixels', 'smoothness', 'optimize'];
++
++export function traceSettingEdits(
++  preset: TraceOptions,
++  overrides: LightBurnTraceSettingOverrides,
++  sourceHasTransparency: boolean | undefined,
++): TraceSettingEdits {
++  const used = usedOverrideKeys(preset, overrides, sourceHasTransparency);
++  const active: Partial<Record<OverrideKey, unknown>> = {};
++  const unused = new Set<string>();
++  for (const key of Object.keys(OVERRIDE_LABELS) as OverrideKey[]) {
++    const value = overrides[key];
++    if (value === undefined) continue;
++    if (used.has(key)) active[key] = value;
++    else if (!(key === 'detectionMode' && value === 'preset')) unused.add(OVERRIDE_LABELS[key]);
++  }
++  const edited =
++    optionsKey(mergeLightBurnTraceSettings(preset, active as LightBurnTraceSettingOverrides)) !==
++    optionsKey(mergeLightBurnTraceSettings(preset, {}));
++  return { edited, unused: [...unused] };
++}
++
++function usedOverrideKeys(
++  preset: TraceOptions,
++  overrides: LightBurnTraceSettingOverrides,
++  sourceHasTransparency: boolean | undefined,
++): ReadonlySet<OverrideKey> {
++  if (preset.photoDetail !== undefined) return new Set(PHOTO_KEYS);
++  if (preset.traceMode === 'edge') return new Set(EDGE_KEYS);
++  const used = new Set<OverrideKey>(MASK_KEYS);
++  if (preset.traceMode !== 'centerline') for (const key of CONTOUR_KEYS) used.add(key);
++  // An opaque image ignores the alpha mask (trace-alpha.ts), and the band is
++  // read only by Manual detection or by the alpha mask.
++  const alphaMask =
++    sourceHasTransparency === true &&
++    (overrides.traceTransparency ?? preset.traceTransparency) === true;
++  if (!alphaMask) used.delete('traceTransparency');
++  if (alphaMask || traceDetectionMode(preset, overrides) === 'manual') {
++    used.add('cutoffLuma');
++    used.add('thresholdLuma');
++  }
++  return used;
++}
++
++function optionsKey(options: TraceOptions): string {
++  const entries = Object.entries(options).filter(([, value]) => value !== undefined);
++  entries.sort(([a], [b]) => (a < b ? -1 : 1));
++  return JSON.stringify(entries);
++}
+diff --git a/src/ui/trace/use-boundary-selection.ts b/src/ui/trace/use-boundary-selection.ts
+index 643600d42..e6d99ca67 100644
+--- a/src/ui/trace/use-boundary-selection.ts
++++ b/src/ui/trace/use-boundary-selection.ts
+@@ -17,12 +17,16 @@ export type BoundarySelection = {
+   readonly clearBoundary: () => void;
+ };
+ 
+-export function useBoundarySelection(): BoundarySelection {
++export function useBoundarySelection(photoShading = false): BoundarySelection {
+   const [boundary, setBoundary] = useState<TraceBoundary | null>(null);
+-  const [boundaryMode, setBoundaryMode] = useState<BoundaryMode>('crop');
++  const [chosenMode, setBoundaryMode] = useState<BoundaryMode>('crop');
+   const clearBoundary = (): void => {
+     setBoundary(null);
+     setBoundaryMode('crop');
+   };
++  // Enhance replaces whole contours, and ribbons spanning a photo need Crop.
++  // The operator's choice is kept, so it applies again after leaving Photo
++  // shading instead of being lost.
++  const boundaryMode = photoShading ? 'crop' : chosenMode;
+   return { boundary, setBoundary, boundaryMode, setBoundaryMode, clearBoundary };
+ }
+diff --git a/src/ui/trace/use-trace-preset.ts b/src/ui/trace/use-trace-preset.ts
+index d41a34844..d21367ed6 100644
+--- a/src/ui/trace/use-trace-preset.ts
++++ b/src/ui/trace/use-trace-preset.ts
+@@ -1,21 +1,12 @@
+ import { useState } from 'react';
+-import { TRACE_PRESETS } from '../../core/trace';
+ import { CNC_TRACE_PRESET_NAME, DEFAULT_TRACE_PRESET_NAME } from './dialog-parts';
+-import type { BoundaryMode } from './region-enhance-trace';
+ 
+-export function useTracePreset(
+-  machineKind: 'laser' | 'cnc',
+-  setBoundaryMode: (mode: BoundaryMode) => void,
+-): { readonly preset: string; readonly selectPreset: (next: string) => void } {
+-  const [preset, setPreset] = useState<string>(
++export function useTracePreset(machineKind: 'laser' | 'cnc'): {
++  readonly preset: string;
++  readonly selectPreset: (next: string) => void;
++} {
++  const [preset, selectPreset] = useState<string>(
+     machineKind === 'cnc' ? CNC_TRACE_PRESET_NAME : DEFAULT_TRACE_PRESET_NAME,
+   );
+-  return {
+-    preset,
+-    selectPreset: (next) => {
+-      setPreset(next);
+-      // Enhance replaces whole contours; ribbons spanning a photo need Crop.
+-      if (TRACE_PRESETS[next]?.photoDetail !== undefined) setBoundaryMode('crop');
+-    },
+-  };
++  return { preset, selectPreset };
+ }
+-- 
+2.43.0
+

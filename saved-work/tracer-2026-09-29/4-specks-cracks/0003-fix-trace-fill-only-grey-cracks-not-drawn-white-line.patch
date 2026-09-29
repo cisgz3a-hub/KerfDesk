@@ -1,0 +1,550 @@
+From 637deced104a7d7e1aed83ff4e718303e6ee5f4e Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:18:02 +0000
+Subject: [PATCH 3/8] fix(trace): fill only grey cracks, not drawn white lines
+ (ADR-392)
+
+Operator change: with Fill tiny holes on, the tracer still closes
+hairline slivers that thresholding cut into solid ink, but only when
+every pixel of the sliver was nearer the cut than the paper level in the
+image before the cut (luma - threshold <= paper - luma, paper = median
+luma of the mask's paper pixels). A white line the artist drew has pixels
+at paper level, so it now stays open. Masks that carry no luma before the
+cut (alpha masks, two-sided brightness bands) keep the shape tests only.
+The checkbox still turns filling on or off and the preset defaults are
+unchanged. Slivers are now grouped the way the outline walker traces
+them: paper pixels that touch at a corner belong to one sliver where the
+walker joins paper there, so a diagonal white line is judged whole.
+
+Measured on the dragon (1254 px) with the whole package applied: of the
+1,461 slivers that pass the shape tests in Line Art, 718 grey ones still
+fill and 743 bright ones stay open (Smooth: 1,021 of 2,154 fill). At the
+old speck sizes, leaving them open adds 730 Line Art and 1,158 Smooth
+outlines compared with filling them all; in the crops checked they are
+white gaps between hatch strokes. On the Arch House logo every sliver is grey (at most 39
+luma above the cut), so filling is unchanged there: 6 slivers in Line Art
+and 35 in Smooth.
+
+TraceSettingsControls.semantic.test.tsx's tiny-hole test assumed pure
+white slits fill; the next commit adapts it, so land the two together.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/fill-pinholes.test.ts          | 100 +++++++++++++
+ src/core/trace/fill-pinholes.ts               | 141 ++++++++++++++----
+ .../trace/trace-diagonal-connectivity.test.ts |  38 ++++-
+ src/core/trace/trace-image.ts                 |  43 +++---
+ src/core/trace/trace-presets.ts               |   3 +-
+ 5 files changed, 270 insertions(+), 55 deletions(-)
+
+diff --git a/src/core/trace/fill-pinholes.test.ts b/src/core/trace/fill-pinholes.test.ts
+index e59ffa8c9..ce1ea9df4 100644
+--- a/src/core/trace/fill-pinholes.test.ts
++++ b/src/core/trace/fill-pinholes.test.ts
+@@ -7,6 +7,7 @@
+ // Sizes come from the arch-house pinhole audit, not guesses.
+ 
+ import { describe, expect, it } from 'vitest';
++import type { CrackSubPixelField } from './contour-boundary';
+ import type { RawImageData } from './trace-image';
+ import { fillPinholes } from './fill-pinholes';
+ 
+@@ -137,3 +138,102 @@ describe('fillPinholes', () => {
+     expect(rowsFromImage(fillPinholes(imageFromRows(rows), 2))).toEqual(rows);
+   });
+ });
++
++const THRESHOLD = 128;
++const MARGIN = 3;
++
++// A paper margin around the rows, so the image has paper to measure.
++function padded(rows: ReadonlyArray<string>): string[] {
++  const blank = '.'.repeat((rows[0]?.length ?? 0) + 2 * MARGIN);
++  const side = '.'.repeat(MARGIN);
++  const edge = Array.from({ length: MARGIN }, () => blank);
++  return [...edge, ...rows.map((row) => side + row + side), ...edge];
++}
++
++// The mask a threshold cut leaves, plus the luma it was cut from. '#' is ink
++// and '.' is paper; any other character is a sliver pixel whose luma comes
++// from `shades`. Sliver pixels are lighter than the threshold, so the mask
++// shows them as paper.
++function cutFromLuma(
++  rows: ReadonlyArray<string>,
++  shades: Readonly<Record<string, number>>,
++  paperLuma = WHITE,
++): { readonly image: RawImageData; readonly field: CrackSubPixelField } {
++  const framed = padded(rows);
++  const width = framed[0]?.length ?? 0;
++  const height = framed.length;
++  const lumaOf = (cell: string): number => {
++    if (cell === '#') return BLACK;
++    return shades[cell] ?? paperLuma;
++  };
++  const luma = framed.flatMap((row) => Array.from(row, lumaOf));
++  const field: CrackSubPixelField = {
++    lumaAt: (x, y) => {
++      if (x < 0 || y < 0 || x >= width || y >= height) return WHITE;
++      return luma[y * width + x] ?? WHITE;
++    },
++    thresholdAt: () => THRESHOLD,
++  };
++  const mask = framed.map((row) => row.replace(/[^#]/g, '.'));
++  return { image: imageFromRows(mask), field };
++}
++
++// The H-stem crack with its pixels marked 'c'.
++function crackRows(): string[] {
++  return withVerticalSlit(solidBlock(20, 40), 9, 2, 5, 35).map((row) => row.replaceAll('.', 'c'));
++}
++
++// A 1-px diagonal of 'c' pixels inside solid ink; its pixels touch only at
++// corners.
++function diagonalCrackRows(size: number, length: number): string[] {
++  return solidBlock(size, size).map((row, y) => {
++    if (y < MARGIN || y >= MARGIN + length) return row;
++    return `${row.slice(0, y)}c${row.slice(y + 1)}`;
++  });
++}
++
++function filledRows(
++  cut: { readonly image: RawImageData; readonly field: CrackSubPixelField },
++  withField = true,
++): string[] {
++  return rowsFromImage(fillPinholes(cut.image, 1, withField ? cut.field : undefined));
++}
++
++describe('fillPinholes with the luma before the cut (ADR-392)', () => {
++  it('fills a crack whose pixels were grey, just lighter than the threshold', () => {
++    expect(filledRows(cutFromLuma(crackRows(), { c: 150 }))).toEqual(padded(solidBlock(20, 40)));
++  });
++
++  it('keeps a white line drawn through the ink open', () => {
++    const cut = cutFromLuma(crackRows(), { c: 250 });
++    expect(filledRows(cut)).toEqual(rowsFromImage(cut.image));
++    // Without the luma (alpha masks, brightness bands) it fills, as before.
++    expect(filledRows(cut, false)).toEqual(padded(solidBlock(20, 40)));
++  });
++
++  it('keeps a sliver open when any of its pixels was paper', () => {
++    const rows = crackRows().map((row, y) => (y === 20 ? row.replaceAll('c', 'w') : row));
++    const cut = cutFromLuma(rows, { c: 150, w: 250 });
++    expect(filledRows(cut)).toEqual(rowsFromImage(cut.image));
++  });
++
++  it('measures paper from the image, so off-white paper keeps the same meaning', () => {
++    // 185 is nearer the threshold (128) than white paper (255) but nearer the
++    // paper than the threshold when the paper itself is 205.
++    expect(filledRows(cutFromLuma(crackRows(), { c: 185 }))).toEqual(padded(solidBlock(20, 40)));
++    const offWhite = cutFromLuma(crackRows(), { c: 185 }, 205);
++    expect(filledRows(offWhite)).toEqual(rowsFromImage(offWhite.image));
++  });
++
++  it('judges a diagonal white line as one sliver, not one pixel at a time', () => {
++    // 130 px long, so one sliver over the 120 px area cap: it stays open even
++    // without the luma, though each pixel alone would pass every guard.
++    const long = cutFromLuma(diagonalCrackRows(140, 130), { c: 150 });
++    expect(filledRows(long, false)).toEqual(rowsFromImage(long.image));
++    // A short one is judged by its luma: grey fills, bright stays open.
++    const grey = cutFromLuma(diagonalCrackRows(20, 12), { c: 150 });
++    expect(filledRows(grey)).toEqual(padded(solidBlock(20, 20)));
++    const bright = cutFromLuma(diagonalCrackRows(20, 12), { c: 250 });
++    expect(filledRows(bright)).toEqual(rowsFromImage(bright.image));
++  });
++});
+diff --git a/src/core/trace/fill-pinholes.ts b/src/core/trace/fill-pinholes.ts
+index 68059286e..735453062 100644
+--- a/src/core/trace/fill-pinholes.ts
++++ b/src/core/trace/fill-pinholes.ts
+@@ -5,67 +5,134 @@
+ // crack down its middle, tick-holes inside the 'O'). A faithful contour
+ // tracer then reproduces the damage as spurious inner contours.
+ //
+-// A pinhole is filled only when ALL THREE hold — each guard protects a real
+-// feature class measured in the arch-house pinhole audit:
++// A pinhole is filled only when ALL FOUR hold — each guard protects a real
++// feature class:
+ //   1. ENCLOSED: unreachable from the border background. Letter-spacing gaps
+ //      connect to the outside and are never touched.
+ //   2. THIN: max inscribed radius ≤ 1px (a sliver ≤ ~2px wide). Letter
+ //      counters ('A', 'O' bowls, 70-151px) are fat and survive.
+ //   3. SMALL: area ≤ 120px. Long thin white highlights that are intended art
+ //      (water ripple gleams, 186-258px) survive even though they are thin.
++//   4. GREY: when the luma before the cut is known, every pixel of the
++//      sliver is nearer the threshold than the paper level. A crack from
++//      anti-aliasing or shading is only slightly lighter than the threshold
++//      (every Arch House crack measured at most 39 luma above it). A white
++//      line the artist drew has pixels that reach paper, so it stays open
++//      (ADR-392).
++// Guards 1-3 were measured in the arch-house pinhole audit.
+ //
+ // Same I/O contract as despeckle: near-binary monochrome RGBA in, new
+ // buffer out, input never mutated. Pure core — no I/O, no globals.
+ 
++import type { InkMask } from './centerline';
++import { paperJoinsDiagonally, type CrackSubPixelField } from './contour-boundary';
+ import type { RawImageData } from './trace-image';
+ 
+ const INK_LUMA_MAX = 128;
+ const RGBA_CHANNELS = 4;
++const LUMA_LEVELS = 256;
+ // Audit-derived caps (see fill-pinholes.test.ts header): cracks measured
+ // 1-2px wide and 2-82px area; the nearest real features are 8px-wide
+ // counters (radius ≥ 4) and 186px ripples.
+ const PINHOLE_MAX_RADIUS_PX = 1;
+ const PINHOLE_MAX_AREA_PX = 120;
++const DIAGONAL_STEPS = [
++  [-1, -1],
++  [1, -1],
++  [-1, 1],
++  [1, 1],
++] as const;
+ 
+ /** pixelScale: supersampling factor of the mask relative to the source
+  *  image. The caps are calibrated in SOURCE pixels (from the arch-house
+  *  audit), so a 2x-supersampled trace scales the radius cap by 2 and the
+- *  area cap by 4 to keep the same real-space semantics. */
+-export function fillPinholes(image: RawImageData, pixelScale = 1): RawImageData {
++ *  area cap by 4 to keep the same real-space semantics.
++ *  field: the pre-threshold luma and threshold on the mask's grid. Without
++ *  it (alpha masks, two-sided brightness bands) every sliver that passes the
++ *  shape guards fills. */
++export function fillPinholes(
++  image: RawImageData,
++  pixelScale = 1,
++  field?: CrackSubPixelField,
++): RawImageData {
+   if (!isValidMonochrome(image)) return image;
+   const scale = Number.isFinite(pixelScale) && pixelScale >= 1 ? pixelScale : 1;
+   const { width, height } = image;
+-  const ink = inkMap(image);
+-  const outside = floodOutsideBackground(ink, width, height);
++  const mask: InkMask = { width, height, ink: inkMap(image) };
++  const outside = floodOutsideBackground(mask.ink, width, height);
+   const data = new Uint8ClampedArray(image.data);
+-  fillEnclosedPinholes(data, ink, outside, width, height, {
++  fillEnclosedPinholes(data, mask, outside, {
+     maxAreaPx: PINHOLE_MAX_AREA_PX * scale * scale,
+     maxRadiusPx: PINHOLE_MAX_RADIUS_PX * scale,
++    isGreyCrack: field === undefined ? () => true : greyCrackTest(field, mask),
+   });
+   return { width, height, data };
+ }
+ 
+-type PinholeCaps = { readonly maxAreaPx: number; readonly maxRadiusPx: number };
++type PinholeGuards = {
++  readonly maxAreaPx: number;
++  readonly maxRadiusPx: number;
++  readonly isGreyCrack: (component: ReadonlyArray<number>) => boolean;
++};
+ 
+-// Scan every enclosed white component once; fill those under both caps.
++// Scan every enclosed white component once; fill those that pass every guard.
+ function fillEnclosedPinholes(
+   data: Uint8ClampedArray,
+-  ink: Uint8Array,
++  mask: InkMask,
+   outside: Uint8Array,
+-  width: number,
+-  height: number,
+-  caps: PinholeCaps,
++  guards: PinholeGuards,
+ ): void {
++  const { width, height, ink } = mask;
+   const seen = new Uint8Array(width * height);
+   for (let start = 0; start < ink.length; start += 1) {
+     if (!isUnvisitedEnclosedWhite(ink, outside, seen, start)) continue;
+-    const component = collectComponent(ink, outside, seen, width, height, start);
+-    if (component.length > caps.maxAreaPx) continue;
+-    if (!isHairlineThin(component, ink, width, height, caps.maxRadiusPx)) continue;
++    const component = collectComponent(mask, outside, seen, start);
++    if (component.length > guards.maxAreaPx) continue;
++    if (!isHairlineThin(component, ink, width, height, guards.maxRadiusPx)) continue;
++    if (!guards.isGreyCrack(component)) continue;
+     paintComponentInk(data, component);
+   }
+ }
+ 
++// Nearer the threshold than the paper level means luma − threshold ≤
++// paper − luma at every pixel. The paper level is the median luma of the
++// mask's paper pixels, so off-white paper and scans keep the same meaning.
++function greyCrackTest(
++  field: CrackSubPixelField,
++  mask: InkMask,
++): (component: ReadonlyArray<number>) => boolean {
++  let paper: number | undefined;
++  return (component) => {
++    paper ??= paperLevel(field, mask);
++    const level = paper;
++    return component.every((pixel) => {
++      const x = pixel % mask.width;
++      const y = (pixel - x) / mask.width;
++      const luma = field.lumaAt(x, y);
++      return luma - field.thresholdAt(x, y) <= level - luma;
++    });
++  };
++}
++
++function paperLevel(field: CrackSubPixelField, mask: InkMask): number {
++  const histogram = new Uint32Array(LUMA_LEVELS);
++  let count = 0;
++  for (let pixel = 0; pixel < mask.ink.length; pixel += 1) {
++    if (mask.ink[pixel] === 1) continue;
++    const x = pixel % mask.width;
++    const luma = Math.round(field.lumaAt(x, (pixel - x) / mask.width));
++    const bin = Math.min(LUMA_LEVELS - 1, Math.max(0, luma));
++    histogram[bin] = (histogram[bin] ?? 0) + 1;
++    count += 1;
++  }
++  let below = 0;
++  for (let luma = 0; luma < LUMA_LEVELS; luma += 1) {
++    below += histogram[luma] ?? 0;
++    if (count > 0 && 2 * below >= count) return luma;
++  }
++  return LUMA_LEVELS - 1;
++}
++
+ function isUnvisitedEnclosedWhite(
+   ink: Uint8Array,
+   outside: Uint8Array,
+@@ -104,7 +171,8 @@ function inkMap(image: RawImageData): Uint8Array {
+ }
+ 
+ // Flood the background reachable from any border pixel (4-connected).
+-// Everything white that this flood cannot reach is enclosed by ink.
++// Everything white that this flood cannot reach is enclosed by ink, so a
++// crack that meets the open paper only at a corner still counts as enclosed.
+ function floodOutsideBackground(ink: Uint8Array, width: number, height: number): Uint8Array {
+   const outside = new Uint8Array(width * height);
+   const stack: number[] = [];
+@@ -125,11 +193,9 @@ function floodOutsideBackground(ink: Uint8Array, width: number, height: number):
+ }
+ 
+ function collectComponent(
+-  ink: Uint8Array,
++  mask: InkMask,
+   outside: Uint8Array,
+   seen: Uint8Array,
+-  width: number,
+-  height: number,
+   start: number,
+ ): number[] {
+   const component: number[] = [];
+@@ -139,25 +205,34 @@ function collectComponent(
+     const pixel = stack.pop();
+     if (pixel === undefined) break;
+     component.push(pixel);
+-    const before = stack.length;
+-    pushNeighbours(stack, pixel, width, height);
+-    for (let i = stack.length - 1; i >= before; i -= 1) {
+-      const neighbour = stack[i];
+-      if (
+-        neighbour === undefined ||
+-        (seen[neighbour] ?? 1) === 1 ||
+-        (ink[neighbour] ?? 1) === 1 ||
+-        (outside[neighbour] ?? 1) === 1
+-      ) {
+-        stack.splice(i, 1);
+-        continue;
+-      }
++    for (const neighbour of sliverNeighbours(mask, pixel)) {
++      if ((seen[neighbour] ?? 1) === 1) continue;
++      if ((mask.ink[neighbour] ?? 1) === 1 || (outside[neighbour] ?? 1) === 1) continue;
+       seen[neighbour] = 1;
++      stack.push(neighbour);
+     }
+   }
+   return component;
+ }
+ 
++// Paper pixels that touch only at a corner belong to one sliver wherever the
++// contour walk joins paper at that corner (contour-boundary.ts), so a
++// diagonal white line is judged whole: by its full area and every pixel.
++function sliverNeighbours(mask: InkMask, pixel: number): number[] {
++  const { width, height } = mask;
++  const neighbours: number[] = [];
++  pushNeighbours(neighbours, pixel, width, height);
++  const x = pixel % width;
++  const y = (pixel - x) / width;
++  for (const [dx, dy] of DIAGONAL_STEPS) {
++    const nx = x + dx;
++    const ny = y + dy;
++    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
++    if (paperJoinsDiagonally(mask, x, y, dx, dy)) neighbours.push(ny * width + nx);
++  }
++  return neighbours;
++}
++
+ // Max inscribed radius via multi-source BFS from the ink-adjacent rim
+ // inward. A sliver ≤ ~2px wide never gets past depth 1 (at pixelScale 1).
+ function isHairlineThin(
+diff --git a/src/core/trace/trace-diagonal-connectivity.test.ts b/src/core/trace/trace-diagonal-connectivity.test.ts
+index a1e9c4922..fc082be09 100644
+--- a/src/core/trace/trace-diagonal-connectivity.test.ts
++++ b/src/core/trace/trace-diagonal-connectivity.test.ts
+@@ -1,6 +1,7 @@
+ // Pixels that touch only at a corner are one mark in every outline mode
+ // (ADR-392). Before, Line Art and Smooth erased a 1-px diagonal as a row of
+-// 1-px specks, and Sharp traced it as one square per pixel.
++// 1-px specks, Sharp traced it as one square per pixel, and crack filling
++// closed a white diagonal line pixel by pixel.
+ 
+ import { describe, expect, it } from 'vitest';
+ import type { Polyline } from '../scene';
+@@ -26,6 +27,21 @@ function diagonalHairline(): RawImageData {
+   return image;
+ }
+ 
++// A black square with a 1-px diagonal line of the given luma through it. The
++// square's edge ramps to paper over two pixels (luma 85, then 170), as
++// anti-aliased art does, which puts Smooth's Otsu cut at 86 rather than 1.
++function squareWithDiagonal(lineLuma: number): RawImageData {
++  const image = canvas(80, 255);
++  for (let y = 8; y < 72; y += 1) {
++    for (let x = 8; x < 72; x += 1) {
++      const outside = Math.max(10 - x, x - 69, 10 - y, y - 69, 0);
++      paint(image, x, y, Math.round((255 * outside) / 3));
++    }
++  }
++  for (let i = 0; i < 40; i += 1) paint(image, 20 + i, 20 + i, lineLuma);
++  return image;
++}
++
+ // A black block and a pale X of two 1-px diagonals (luma 175), the kind of
+ // stroke Faint lines adds to the mask.
+ function paleCross(): RawImageData {
+@@ -96,4 +112,24 @@ describe('corner-touching pixels are one mark (ADR-392)', () => {
+       expect(onCross).toHaveLength(1);
+     },
+   );
++
++  it.each(['Line Art', 'Smooth'])(
++    '%s keeps a white diagonal line through ink as one hole',
++    async (preset) => {
++      const traced = await outlines(squareWithDiagonal(255), preset);
++      expect(traced).toHaveLength(2);
++      const hole = traced.find((polyline) => span(polyline).max < 65);
++      expect(hole).toBeDefined();
++      const { min, max } = span(hole!);
++      expect(min).toBeLessThan(22);
++      expect(max).toBeGreaterThan(58);
++    },
++  );
++
++  it.each(['Line Art', 'Smooth'])(
++    '%s still closes a grey diagonal crack through ink',
++    async (preset) => {
++      expect(await outlines(squareWithDiagonal(150), preset)).toHaveLength(1);
++    },
++  );
+ });
+diff --git a/src/core/trace/trace-image.ts b/src/core/trace/trace-image.ts
+index d1d210e89..c95c592ea 100644
+--- a/src/core/trace/trace-image.ts
++++ b/src/core/trace/trace-image.ts
+@@ -129,10 +129,13 @@ export function preprocessForTrace(image: RawImageData, options: TraceOptions):
+   return prepareTraceForContour(image, options).prepared;
+ }
+ 
+-export function prepareTraceForContour(
+-  image: RawImageData,
+-  options: TraceOptions,
+-): { readonly prepared: RawImageData; readonly crackField: CrackSubPixelField | null } {
++/** A binary contour mask and, where known, the luma and threshold it was cut from. */
++type ContourMask = {
++  readonly prepared: RawImageData;
++  readonly crackField: CrackSubPixelField | null;
++};
++
++export function prepareTraceForContour(image: RawImageData, options: TraceOptions): ContourMask {
+   // Fail closed on a malformed buffer: every downstream stage indexes
+   // data[i..i+3] assuming length === width*height*4, so a short/oversized
+   // buffer or non-integer dims would read past the array or size a wrong-shape
+@@ -146,7 +149,7 @@ export function prepareTraceForContour(
+       options.cutoffLuma ?? 0,
+       options.thresholdLuma ?? 128,
+     );
+-    return { prepared: cleanBinaryMask(prepared, options), crackField: null };
++    return cleanBinaryMask({ prepared, crackField: null }, options);
+   }
+   const adjusted = applyImageAdjustments(image, options);
+   if (options.faintLineRecovery !== true && shouldUseSketchTrace(image, options)) {
+@@ -157,7 +160,7 @@ export function prepareTraceForContour(
+         sketchCrackField(adjusted, radiusPx),
+         options,
+       );
+-      return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
++      return cleanBinaryMask(recovered, options);
+     }
+     const prepared = sketchTraceToMonochrome(
+       adjusted,
+@@ -167,10 +170,8 @@ export function prepareTraceForContour(
+       // failure mode: recall 0.93 -> 0.66 measured at 2x).
+       radiusPx,
+     );
+-    return {
+-      prepared: cleanBinaryMask(prepared, options),
+-      crackField: sketchCrackField(adjusted, radiusPx),
+-    };
++    const crackField = sketchCrackField(adjusted, radiusPx);
++    return cleanBinaryMask({ prepared, crackField }, options);
+   }
+   const prepared = applyMedian(adjusted, options.medianFilter);
+   const thresholded = applyThresholdWithIso(prepared, options);
+@@ -183,26 +184,28 @@ export function prepareTraceForContour(
+       sketchCrackField(prepared, SKETCH_RADIUS_PX * effectivePixelScale(options)),
+       effectivePixelScale(options),
+     );
+-    return { ...recovered, prepared: cleanBinaryMask(recovered.prepared, options) };
++    return cleanBinaryMask(recovered, options);
+   }
+-  return {
+-    prepared: cleanBinaryMask(thresholded.prepared, options),
+-    crackField: field,
+-  };
++  return cleanBinaryMask({ prepared: thresholded.prepared, crackField: field }, options);
+ }
+ 
+ // Mask cleanup is the shared tail of every preprocessing branch: despeckle
+ // (ink specks → white), then pinhole-crack fill (enclosed hairline white
+ // slivers → ink). Extracting it keeps preprocessForTrace under the
+-// complexity cap.
+-function cleanBinaryMask(image: RawImageData, options: TraceOptions): RawImageData {
++// complexity cap. The branch's crack field carries the luma each sliver had
++// before the cut, so only grey cracks fill (ADR-392).
++function cleanBinaryMask(mask: ContourMask, options: TraceOptions): ContourMask {
+   // Area-denominated caps scale by pixelScale² on supersampled traces so
+   // their SOURCE-pixel semantics hold (a 12px speck at 2x covers 48px).
+   const scale = effectivePixelScale(options);
+   const despeckled = shouldDespeckle(options)
+-    ? despeckle(image, (options.despeckleMinPixels ?? 0) * scale * scale)
+-    : image;
+-  return options.fillPinholeCracks === true ? fillPinholes(despeckled, scale) : despeckled;
++    ? despeckle(mask.prepared, (options.despeckleMinPixels ?? 0) * scale * scale)
++    : mask.prepared;
++  const prepared =
++    options.fillPinholeCracks === true
++      ? fillPinholes(despeckled, scale, mask.crackField ?? undefined)
++      : despeckled;
++  return { ...mask, prepared };
+ }
+ 
+ /** Sanitized supersampling factor (see TraceOptions.pixelScale). */
+diff --git a/src/core/trace/trace-presets.ts b/src/core/trace/trace-presets.ts
+index c6e437287..a0ec515ba 100644
+--- a/src/core/trace/trace-presets.ts
++++ b/src/core/trace/trace-presets.ts
+@@ -42,7 +42,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     optimize: 0.2,
+     despeckleMinPixels: 12,
+     // Fill hairline threshold cracks enclosed in solid ink (letter-stem
+-    // slivers) so they don't trace as spurious inner contours.
++    // slivers) so they don't trace as spurious inner contours. Slivers of
++    // bright paper, such as drawn white lines, stay open (ADR-392).
+     fillPinholeCracks: true,
+     // Feature-aware quality path: coherent thin details (hooked apex tips,
+     // pale subtitle strokes) supersample; broad art stays native and large
+-- 
+2.43.0
+

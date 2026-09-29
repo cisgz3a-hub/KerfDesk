@@ -1,0 +1,1167 @@
+From 0d75f76fec14da318db705854f94a2fac9533621 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:36:34 +0000
+Subject: [PATCH 2/2] fix(trace): Smoothness sets how many corners the outline
+ keeps (ADR-395)
+
+Smoothness now behaves like LightBurn's control and potrace's alphamax on
+every kind of source: 0 draws only straight segments, 1.33 draws no
+corners, and the default 1 leaves today's outline untouched. Before, it
+only set the wobble flattener, which never runs on anti-aliased sources,
+so on most images the slider did nothing, and above 1 it could not remove
+a corner.
+
+Below 1, contour-smoothness.ts measures potrace's corner alpha on a 1 px
+polygon of each loop and makes every bend whose alpha reaches
+4/3 x Smoothness a corner; at 0 the outline is that polygon. Above 1,
+contour-corner-rounding.ts rounds the corners the finisher kept, weakest
+first, all of them at 1.33. A rounding reaches 0.45 of the shorter
+neighbouring polygon side, at most 8 source px, so a 12-point star keeps
+its points and a large square keeps its sides. Edge Detection gets the
+same control.
+
+Presets: Sharp keeps 0.55 ("crisp corners"); it now also makes every bend
+with alpha 0.73 or more a corner. Smooth keeps 1: every step above 1
+scored worse (AA corpus IoU 0.8849 at 1, 0.8846 at 1.1, 0.8836 at 1.2,
+0.8814 at 1.33; 1-bit 0.8710, 0.8694, 0.8673, 0.8659).
+
+Measured with the bench runner on the 12-image AA corpus, its 12-image
+1-bit version, and the logo and dragon (arch-house-langebaan-source,
+centerline-stress-test-20260909):
+- At default, Line Art, Smooth and Edge Detection are byte-identical to
+  85ee406 on all 26 images. Sharp changes as intended.
+- Drawn corners (vertices turning 10 degrees or more that carry at least
+  half the turning within 2 px), Line Art, at Smoothness
+  0 / 0.3 / 0.6 / 0.83 / 1 / 1.33:
+    AA corpus    1838 / 712 / 371 / 260 / 243 / 76
+    logo+dragon  24484 / 12381 / 8695 / 7274 / 7189 / 1276
+  potrace 1.16 (-t 2 -O 0.2, luma <= 128) at the same alphamax values on
+  the AA corpus: 1510 / 1151 / 859 / 699 / 553 / 455.
+  Every step changes at least 4 of the 12 AA images and both real ones.
+- Sharp before -> after (IoU, mean deviation px, nodes):
+    AA corpus  0.9343 -> 0.9373, 0.1217 -> 0.1152, 15879 -> 16495
+    1-bit      0.9107 -> 0.9129, 0.1865 -> 0.1821, 15420 -> 16804
+
+Known limit, unchanged from 85ee406: at 1.33 the wobble flattener runs at
+strength 2.98 and the 1-bit 12-point star crosses itself, so the topology
+repair falls back to its pixel staircase.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ .../trace/contour-corner-rounding.test.ts     | 144 ++++++++
+ src/core/trace/contour-corner-rounding.ts     | 332 ++++++++++++++++++
+ src/core/trace/contour-smoothness.test.ts     | 224 ++++++++++++
+ src/core/trace/contour-smoothness.ts          | 102 ++++++
+ src/core/trace/contour-trace.ts               | 104 ++++--
+ src/core/trace/edge-trace.ts                  |   4 +-
+ src/core/trace/trace-option-types.ts          |   6 +
+ src/core/trace/trace-presets.ts               |   9 +-
+ 8 files changed, 895 insertions(+), 30 deletions(-)
+ create mode 100644 src/core/trace/contour-corner-rounding.test.ts
+ create mode 100644 src/core/trace/contour-corner-rounding.ts
+ create mode 100644 src/core/trace/contour-smoothness.test.ts
+ create mode 100644 src/core/trace/contour-smoothness.ts
+
+diff --git a/src/core/trace/contour-corner-rounding.test.ts b/src/core/trace/contour-corner-rounding.test.ts
+new file mode 100644
+index 000000000..837c37796
+--- /dev/null
++++ b/src/core/trace/contour-corner-rounding.test.ts
+@@ -0,0 +1,144 @@
++// Above 1, Smoothness rounds the corners it releases on the finished outline,
++// the way potrace draws a curve vertex, and leaves the rest of the outline as
++// the finisher drew it.
++
++import { describe, expect, it } from 'vitest';
++import type { Vec2 } from '../scene';
++import { roundReleasedCorners } from './contour-corner-rounding';
++
++type Outline = { readonly ring: Vec2[]; readonly corners: Set<Vec2> };
++
++// A finished outline through `vertices`: a point about every pixel, with each
++// vertex pinned as a corner the way the finishing tail pins its corners.
++function outlineThrough(vertices: ReadonlyArray<Vec2>): Outline {
++  const ring: Vec2[] = [];
++  const corners = new Set<Vec2>();
++  vertices.forEach((from, index) => {
++    const to = vertices[(index + 1) % vertices.length] as Vec2;
++    const steps = Math.round(Math.hypot(to.x - from.x, to.y - from.y));
++    for (let step = 0; step < steps; step += 1) {
++      const t = step / steps;
++      const point = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
++      if (step === 0) corners.add(point);
++      ring.push(point);
++    }
++  });
++  return { ring, corners };
++}
++
++const SQUARE = [
++  { x: 20, y: 20 },
++  { x: 100, y: 20 },
++  { x: 100, y: 100 },
++  { x: 20, y: 100 },
++];
++
++// The square with a shallow bend in its top side: potrace's alpha is about
++// 0.86 at the bend and about 1.28 at the square's corners.
++const BENT_SQUARE = [
++  { x: 20, y: 20 },
++  { x: 60, y: 20 },
++  { x: 100, y: 26 },
++  { x: 100, y: 100 },
++  { x: 20, y: 100 },
++];
++
++function largestTurnDeg(ring: ReadonlyArray<Vec2>): number {
++  let largest = 0;
++  ring.forEach((point, index) => {
++    const prev = ring[(index - 1 + ring.length) % ring.length] as Vec2;
++    const next = ring[(index + 1) % ring.length] as Vec2;
++    const inX = point.x - prev.x;
++    const inY = point.y - prev.y;
++    const outX = next.x - point.x;
++    const outY = next.y - point.y;
++    const turn = Math.abs(Math.atan2(inX * outY - inY * outX, inX * outX + inY * outY));
++    largest = Math.max(largest, (turn * 180) / Math.PI);
++  });
++  return largest;
++}
++
++// How far the outline passes from a point, over its segments.
++function distanceToOutline(ring: ReadonlyArray<Vec2>, target: Vec2): number {
++  let best = Infinity;
++  ring.forEach((from, index) => {
++    const to = ring[(index + 1) % ring.length] as Vec2;
++    const dx = to.x - from.x;
++    const dy = to.y - from.y;
++    const lengthSq = dx * dx + dy * dy;
++    const raw =
++      lengthSq === 0 ? 0 : ((target.x - from.x) * dx + (target.y - from.y) * dy) / lengthSq;
++    const t = Math.min(1, Math.max(0, raw));
++    best = Math.min(best, Math.hypot(from.x + dx * t - target.x, from.y + dy * t - target.y));
++  });
++  return best;
++}
++
++describe('roundReleasedCorners', () => {
++  it('returns the same outline at and below 1', () => {
++    const { ring, corners } = outlineThrough(SQUARE);
++    for (const smoothness of [0, 0.55, 1]) {
++      expect(roundReleasedCorners(ring, corners, smoothness, 1)).toBe(ring);
++    }
++  });
++
++  it('draws every corner of a square as one curve at the maximum', () => {
++    const { ring, corners } = outlineThrough(SQUARE);
++    const rounded = roundReleasedCorners(ring, corners, 1.33, 1);
++    expect(largestTurnDeg(ring)).toBe(90);
++    // Each drawn step of a curve turns at most 10°.
++    expect(largestTurnDeg(rounded)).toBeLessThanOrEqual(10 + 1e-9);
++    // alpha clamps to 1, so both controls sit on the corner and the curve
++    // over the 8 px reach passes 8 * sqrt(2) / 8 px inside it.
++    for (const corner of SQUARE) {
++      expect(distanceToOutline(rounded, corner)).toBeCloseTo(Math.SQRT2, 6);
++    }
++    // The middle of each side is not touched.
++    expect(rounded).toContain(ring[40]);
++    expect(rounded).toContain(ring[120]);
++  });
++
++  it('releases weak corners before strong ones', () => {
++    const { ring, corners } = outlineThrough(BENT_SQUARE);
++    const bend = BENT_SQUARE[1] as Vec2;
++    const squareCorner = BENT_SQUARE[0] as Vec2;
++    // 1.2 releases alpha below 0.81: neither corner.
++    expect(roundReleasedCorners(ring, corners, 1.2, 1)).toBe(ring);
++    // 1.25 releases alpha below 1.01: the bend, not the square's corners.
++    const some = roundReleasedCorners(ring, corners, 1.25, 1);
++    expect(distanceToOutline(some, bend)).toBeGreaterThan(0.05);
++    expect(distanceToOutline(some, squareCorner)).toBe(0);
++    // The maximum releases every corner.
++    const all = roundReleasedCorners(ring, corners, 1.33, 1);
++    expect(distanceToOutline(all, squareCorner)).toBeGreaterThan(1);
++  });
++
++  it('finds pinned corners by position when the tail resampled them', () => {
++    const { ring, corners } = outlineThrough(BENT_SQUARE);
++    const copies = new Set([...corners].map((corner) => ({ x: corner.x, y: corner.y })));
++    expect(roundReleasedCorners(ring, copies, 1.25, 1)).toEqual(
++      roundReleasedCorners(ring, corners, 1.25, 1),
++    );
++  });
++
++  it('rounds less when the topology repair backs the tolerance off', () => {
++    const { ring, corners } = outlineThrough(SQUARE);
++    const half = roundReleasedCorners(ring, corners, 1.33, 1, 0.5);
++    expect(distanceToOutline(half, SQUARE[0] as Vec2)).toBeCloseTo(Math.SQRT2 / 2, 6);
++  });
++
++  it('accepts a ring that repeats its first point', () => {
++    const { ring, corners } = outlineThrough(SQUARE);
++    const closed = [...ring, { x: (ring[0] as Vec2).x, y: (ring[0] as Vec2).y }];
++    expect(roundReleasedCorners(closed, corners, 1.33, 1)).toEqual(
++      roundReleasedCorners(ring, corners, 1.33, 1),
++    );
++    expect(roundReleasedCorners(closed, corners, 1, 1)).toBe(closed);
++  });
++
++  it('keeps the curve in source pixels on a supersampled outline', () => {
++    const scaled = outlineThrough(SQUARE.map((vertex) => ({ x: vertex.x * 2, y: vertex.y * 2 })));
++    const rounded = roundReleasedCorners(scaled.ring, scaled.corners, 1.33, 2);
++    expect(distanceToOutline(rounded, { x: 40, y: 40 })).toBeCloseTo(2 * Math.SQRT2, 6);
++  });
++});
+diff --git a/src/core/trace/contour-corner-rounding.ts b/src/core/trace/contour-corner-rounding.ts
+new file mode 100644
+index 000000000..ee57cb1f1
+--- /dev/null
++++ b/src/core/trace/contour-corner-rounding.ts
+@@ -0,0 +1,332 @@
++// Smoothness above 1 releases corners (contour-smoothness.ts) and draws each
++// one the way potrace draws a curve vertex
++// (https://potrace.sourceforge.net/potrace.pdf, section 2.3.3): one cubic from
++// a point on the edge before the vertex to a point on the edge after it, its
++// controls pulled toward the vertex by the vertex's alpha. The rounding runs on
++// the finished outline, after every fitting stage, so a released corner comes
++// out as that curve and the rest of the outline does not move.
++
++import type { Vec2 } from '../scene';
++import { simplifyChain } from './centerline';
++import { POLYGON_TOLERANCE_PX, cornerAlpha, cornerReleaseLimit } from './contour-smoothness';
++
++// How far along each polygon edge the curve reaches. potrace starts it at the
++// middle of the edge; stopping a little short keeps two neighbouring curves
++// from meeting, so each keeps a piece of the edge between them.
++const ROUNDING_REACH = 0.45;
++// potrace's polygon follows the pixel staircase, so beside a diagonal edge its
++// edges are a few pixels long and the curves stay small, while an upright
++// square's edge is its whole side and the square comes out as a squircle. This
++// polygon follows the drawn edge at any angle, and without a bound a 12-point
++// star's straight sides turned into petals. At 8 source px a star keeps its
++// points (rounded) and a large square keeps its sides.
++const MAX_ROUNDING_REACH_PX = 8;
++// A curve shorter than this would not change the drawing.
++const MIN_ROUNDING_REACH_PX = 0.05;
++// The finisher's own corner tests (curve refine, chain evening and the
++// dense-loop corner detector) all start at a 60° turn.
++const HARD_TURN_RAD = (60 * Math.PI) / 180;
++// potrace clamps alpha to this range when it places a curve vertex's controls.
++const MIN_CONTROL_ALPHA = 0.55;
++const MAX_CONTROL_ALPHA = 1;
++// Each drawn step of a curve turns at most this much and runs at most this
++// far (in source px), so the curve reads as a curve at any size. Steps halve
++// the curve's parameter, so its middle is always drawn.
++const MAX_STEP_TURN_RAD = (10 * Math.PI) / 180;
++const MAX_STEP_PX = 1.5;
++const MAX_STEP_HALVINGS = 8;
++const MIN_RING_POINTS = 3;
++const SAME_POINT_PX = 1e-9;
++
++/** A point on the outline: on the segment from ring[segment] to the next. */
++type Stop = { readonly point: Vec2; readonly segment: number };
++
++type Zone = {
++  readonly vertex: number;
++  readonly start: Stop;
++  readonly end: Stop;
++  readonly alpha: number;
++};
++
++/** A ring point that remembers its index, so the polygon's vertices map back
++ *  to the ring even where the ring holds one object twice. */
++type IndexedPoint = Vec2 & { readonly index: number };
++
++/** Round the corners of a finished closed outline that `smoothness`
++ *  releases. `corners` are the corners the finishing tail pinned, matched by
++ *  position; any other vertex that turns 60° or more is a corner too.
++ *  `amount` scales the curves with the topology repair's backed-off
++ *  tolerance. The ring may repeat its first point at the end; a rounded ring
++ *  comes back without it, and a ring with nothing to round comes back as the
++ *  same array. */
++export function roundReleasedCorners(
++  ring: ReadonlyArray<Vec2>,
++  corners: ReadonlySet<Vec2>,
++  smoothness: number,
++  pixelScale: number,
++  amount = 1,
++): ReadonlyArray<Vec2> {
++  const limit = cornerReleaseLimit(smoothness);
++  if (limit === -Infinity || ring.length <= MIN_RING_POINTS) return ring;
++  const open = repeatsFirstPoint(ring) ? ring.slice(0, -1) : ring;
++  const zones = releasedZones(open, corners, limit, pixelScale, amount);
++  if (zones.length === 0) return ring;
++  const rounded = withZonesRounded(open, zones, MAX_STEP_PX * pixelScale);
++  return rounded.length < MIN_RING_POINTS ? ring : rounded;
++}
++
++function repeatsFirstPoint(ring: ReadonlyArray<Vec2>): boolean {
++  const first = ring[0] as Vec2;
++  const last = ring[ring.length - 1] as Vec2;
++  return Math.hypot(last.x - first.x, last.y - first.y) < SAME_POINT_PX;
++}
++
++function releasedZones(
++  ring: ReadonlyArray<Vec2>,
++  corners: ReadonlySet<Vec2>,
++  limit: number,
++  pixelScale: number,
++  amount: number,
++): Zone[] {
++  const candidates = cornerCandidates(ring, corners);
++  if (candidates.size === 0) return [];
++  // The polygon keeps every candidate, so each is a vertex with its own alpha
++  // and neighbours. simplifyChain returns its input objects, starting at
++  // index 0 and in ring order, so the zones come out in ring order.
++  const nodes: IndexedPoint[] = ring.map((point, index) => ({ x: point.x, y: point.y, index }));
++  const pins = new Set<Vec2>([...candidates].map((index) => nodes[index] as IndexedPoint));
++  const tolerance = POLYGON_TOLERANCE_PX * pixelScale;
++  const polygon = simplifyChain(nodes, true, tolerance, pins) as IndexedPoint[];
++  if (polygon.length < MIN_RING_POINTS) return [];
++  const arc = cumulativeLengths(ring);
++  const maxReach = MAX_ROUNDING_REACH_PX * pixelScale * amount;
++  const minReach = MIN_ROUNDING_REACH_PX * pixelScale;
++  const count = polygon.length;
++  const zones: Zone[] = [];
++  polygon.forEach((vertex, index) => {
++    if (!candidates.has(vertex.index)) return;
++    const alpha = cornerAlpha(polygon, index, pixelScale);
++    if (alpha >= limit) return;
++    const prev = (polygon[(index - 1 + count) % count] as IndexedPoint).index;
++    const next = (polygon[(index + 1) % count] as IndexedPoint).index;
++    const reachBefore = Math.min(
++      maxReach,
++      ROUNDING_REACH * amount * arcBetween(arc, prev, vertex.index),
++    );
++    const reachAfter = Math.min(
++      maxReach,
++      ROUNDING_REACH * amount * arcBetween(arc, vertex.index, next),
++    );
++    if (Math.min(reachBefore, reachAfter) < minReach) return;
++    zones.push({
++      vertex: vertex.index,
++      start: stopBefore(ring, vertex.index, reachBefore),
++      end: stopAfter(ring, vertex.index, reachAfter),
++      alpha: Math.min(MAX_CONTROL_ALPHA, Math.max(MIN_CONTROL_ALPHA, alpha)),
++    });
++  });
++  return zones;
++}
++
++// Indices of the ring's corners: the ones the tail pinned, and any other
++// vertex that turns as hard as the finisher's own corner tests.
++function cornerCandidates(ring: ReadonlyArray<Vec2>, corners: ReadonlySet<Vec2>): Set<number> {
++  const keys = new Set([...corners].map(positionKey));
++  const candidates = new Set<number>();
++  ring.forEach((point, index) => {
++    const pinned = corners.has(point) || keys.has(positionKey(point));
++    if (pinned || turnAt(ring, index) >= HARD_TURN_RAD) candidates.add(index);
++  });
++  return candidates;
++}
++
++// The measured tail resamples its cubics into new points, so pinned corners
++// come back as equal coordinates rather than the same objects.
++function positionKey(point: Vec2): string {
++  return `${point.x},${point.y}`;
++}
++
++function turnAt(ring: ReadonlyArray<Vec2>, index: number): number {
++  const count = ring.length;
++  const prev = ring[(index - 1 + count) % count] as Vec2;
++  const point = ring[index] as Vec2;
++  const next = ring[(index + 1) % count] as Vec2;
++  const inX = point.x - prev.x;
++  const inY = point.y - prev.y;
++  const outX = next.x - point.x;
++  const outY = next.y - point.y;
++  return Math.abs(Math.atan2(inX * outY - inY * outX, inX * outX + inY * outY));
++}
++
++// arc[i] is the outline length from ring[0] to ring[i]; the last entry is
++// the whole ring.
++function cumulativeLengths(ring: ReadonlyArray<Vec2>): number[] {
++  const arc = [0];
++  ring.forEach((point, index) => {
++    const next = ring[(index + 1) % ring.length] as Vec2;
++    arc.push((arc[index] as number) + Math.hypot(next.x - point.x, next.y - point.y));
++  });
++  return arc;
++}
++
++function arcBetween(arc: ReadonlyArray<number>, from: number, to: number): number {
++  const total = arc[arc.length - 1] as number;
++  const length = (arc[to] as number) - (arc[from] as number);
++  return length > 0 ? length : length + total;
++}
++
++function stopBefore(ring: ReadonlyArray<Vec2>, vertex: number, reach: number): Stop {
++  const count = ring.length;
++  let index = vertex;
++  let remaining = reach;
++  for (let step = 0; step < count; step += 1) {
++    const prev = (index - 1 + count) % count;
++    const from = ring[index] as Vec2;
++    const to = ring[prev] as Vec2;
++    const length = Math.hypot(to.x - from.x, to.y - from.y);
++    if (length >= remaining) return { point: lerp(from, to, remaining / length), segment: prev };
++    remaining -= length;
++    index = prev;
++  }
++  return { point: ring[vertex] as Vec2, segment: (vertex - 1 + count) % count };
++}
++
++function stopAfter(ring: ReadonlyArray<Vec2>, vertex: number, reach: number): Stop {
++  const count = ring.length;
++  let index = vertex;
++  let remaining = reach;
++  for (let step = 0; step < count; step += 1) {
++    const next = (index + 1) % count;
++    const from = ring[index] as Vec2;
++    const to = ring[next] as Vec2;
++    const length = Math.hypot(to.x - from.x, to.y - from.y);
++    if (length >= remaining) return { point: lerp(from, to, remaining / length), segment: index };
++    remaining -= length;
++    index = next;
++  }
++  return { point: ring[vertex] as Vec2, segment: vertex };
++}
++
++function lerp(from: Vec2, to: Vec2, t: number): Vec2 {
++  return { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
++}
++
++// Each zone's curve replaces the ring points between its two stops; the ring
++// points between one zone's end and the next zone's start stay as they are.
++function withZonesRounded(
++  ring: ReadonlyArray<Vec2>,
++  zones: ReadonlyArray<Zone>,
++  maxStep: number,
++): Vec2[] {
++  const count = ring.length;
++  const out: Vec2[] = [];
++  zones.forEach((zone, index) => {
++    appendCurve(out, ring, zone, maxStep);
++    const next = zones[(index + 1) % zones.length] as Zone;
++    const kept = (next.start.segment - zone.end.segment + count) % count;
++    for (let step = 1; step <= kept; step += 1) {
++      out.push(ring[(zone.end.segment + step) % count] as Vec2);
++    }
++  });
++  return withoutRepeats(out);
++}
++
++// potrace's curve vertex: the controls sit alpha of the way from each end
++// toward the vertex (potrace measures from the neighbouring vertex, 0.5 +
++// alpha / 2 of the way, which is the same point from the edge's middle). Here
++// they run along the outline's own direction at each end, so the curve leaves
++// the kept outline without a kink even where that outline bends.
++function appendCurve(out: Vec2[], ring: ReadonlyArray<Vec2>, zone: Zone, maxStep: number): void {
++  const count = ring.length;
++  const { start, end, alpha } = zone;
++  const vertex = ring[zone.vertex] as Vec2;
++  const into = direction(ring[start.segment] as Vec2, ring[(start.segment + 1) % count] as Vec2);
++  const away = direction(ring[end.segment] as Vec2, ring[(end.segment + 1) % count] as Vec2);
++  const reachIn = alpha * Math.hypot(vertex.x - start.point.x, vertex.y - start.point.y);
++  const reachOut = alpha * Math.hypot(vertex.x - end.point.x, vertex.y - end.point.y);
++  const curve: Cubic = [
++    start.point,
++    { x: start.point.x + into.x * reachIn, y: start.point.y + into.y * reachIn },
++    { x: end.point.x - away.x * reachOut, y: end.point.y - away.y * reachOut },
++    end.point,
++  ];
++  out.push(start.point);
++  appendSteps(out, curve, 0, 1, maxStep, 0);
++  out.push(end.point);
++}
++
++type Cubic = readonly [Vec2, Vec2, Vec2, Vec2];
++
++// The inner points of the span t0..t1, halving it until each step is short
++// and turns little.
++function appendSteps(
++  out: Vec2[],
++  curve: Cubic,
++  t0: number,
++  t1: number,
++  maxStep: number,
++  halvings: number,
++): void {
++  if (halvings >= MAX_STEP_HALVINGS) return;
++  const from = cubicPoint(curve, t0);
++  const to = cubicPoint(curve, t1);
++  const long = Math.hypot(to.x - from.x, to.y - from.y) > maxStep;
++  if (!long && tangentTurn(curve, t0, t1) <= MAX_STEP_TURN_RAD) return;
++  const middle = (t0 + t1) / 2;
++  appendSteps(out, curve, t0, middle, maxStep, halvings + 1);
++  out.push(cubicPoint(curve, middle));
++  appendSteps(out, curve, middle, t1, maxStep, halvings + 1);
++}
++
++function tangentTurn(curve: Cubic, t0: number, t1: number): number {
++  const a = cubicTangent(curve, t0);
++  const b = cubicTangent(curve, t1);
++  return Math.abs(Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y));
++}
++
++function cubicTangent([p0, p1, p2, p3]: Cubic, t: number): Vec2 {
++  const u = 1 - t;
++  const a = 3 * u * u;
++  const b = 6 * u * t;
++  const c = 3 * t * t;
++  return {
++    x: a * (p1.x - p0.x) + b * (p2.x - p1.x) + c * (p3.x - p2.x),
++    y: a * (p1.y - p0.y) + b * (p2.y - p1.y) + c * (p3.y - p2.y),
++  };
++}
++
++function direction(from: Vec2, to: Vec2): Vec2 {
++  const length = Math.hypot(to.x - from.x, to.y - from.y);
++  return length === 0
++    ? { x: 0, y: 0 }
++    : { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
++}
++
++function cubicPoint([p0, p1, p2, p3]: Cubic, t: number): Vec2 {
++  const u = 1 - t;
++  const a = u * u * u;
++  const b = 3 * u * u * t;
++  const c = 3 * u * t * t;
++  const d = t * t * t;
++  return {
++    x: a * p0.x + b * p1.x + c * p2.x + d * p3.x,
++    y: a * p0.y + b * p1.y + c * p2.y + d * p3.y,
++  };
++}
++
++function withoutRepeats(points: ReadonlyArray<Vec2>): Vec2[] {
++  const out: Vec2[] = [];
++  for (const point of points) {
++    const last = out[out.length - 1];
++    if (last !== undefined && Math.hypot(point.x - last.x, point.y - last.y) < SAME_POINT_PX) {
++      continue;
++    }
++    out.push(point);
++  }
++  const first = out[0];
++  const last = out[out.length - 1];
++  if (first !== undefined && last !== undefined && out.length > 1) {
++    if (Math.hypot(first.x - last.x, first.y - last.y) < SAME_POINT_PX) out.pop();
++  }
++  return out;
++}
+diff --git a/src/core/trace/contour-smoothness.test.ts b/src/core/trace/contour-smoothness.test.ts
+new file mode 100644
+index 000000000..c07c724f7
+--- /dev/null
++++ b/src/core/trace/contour-smoothness.test.ts
+@@ -0,0 +1,224 @@
++// Smoothness follows potrace's alphamax, as LightBurn documents it: 0 draws
++// only lines, 1.33 only curves, and 1 keeps the finisher's own corners. It
++// must act on 1-bit and anti-aliased art alike.
++
++import { describe, expect, it } from 'vitest';
++import type { Vec2 } from '../scene';
++import { boundedSmoothness, shapeCornersForSmoothness } from './contour-smoothness';
++import { traceImageToContourColoredPaths } from './contour-trace';
++import { traceImageToEdgePaths } from './edge-trace';
++import type { RawImageData, TraceOptions } from './trace-image';
++import { TRACE_PRESETS } from './trace-presets';
++
++const RGBA_CHANNELS = 4;
++const SWEEP = [0, 0.3, 0.6, 0.83, 1, 1.33] as const;
++// A drawn corner: a vertex that turns at least this much and carries at least
++// half of all the turning within this arc length on either side of it. A
++// polygon's vertices and a spline's corners qualify; the evenly turning
++// samples of a curve do not.
++const CORNER_TURN_RAD = (10 * Math.PI) / 180;
++const CORNER_SHARE = 0.5;
++const CORNER_WINDOW_PX = 2;
++
++type Inside = (x: number, y: number) => boolean;
++
++// Coverage-sampled render: 1 sample per pixel is 1-bit art, 4x4 is
++// anti-aliased art whose boundary takes the measured (cubic-fit) tail.
++function render(size: number, inside: Inside, samples: number): RawImageData {
++  const data = new Uint8ClampedArray(size * size * RGBA_CHANNELS);
++  for (let y = 0; y < size; y += 1) {
++    for (let x = 0; x < size; x += 1) {
++      let covered = 0;
++      for (let sy = 0; sy < samples; sy += 1) {
++        for (let sx = 0; sx < samples; sx += 1) {
++          if (inside(x + (sx + 0.5) / samples, y + (sy + 0.5) / samples)) covered += 1;
++        }
++      }
++      const value = Math.round(255 * (1 - covered / (samples * samples)));
++      const base = (y * size + x) * RGBA_CHANNELS;
++      data.fill(value, base, base + 3);
++      data[base + 3] = 255;
++    }
++  }
++  return { width: size, height: size, data };
++}
++
++const square =
++  (x0: number, y0: number, side: number): Inside =>
++  (x, y) =>
++    x >= x0 && x < x0 + side && y >= y0 && y < y0 + side;
++
++const disc =
++  (cx: number, cy: number, radius: number): Inside =>
++  (x, y) =>
++    Math.hypot(x - cx, y - cy) <= radius;
++
++function star(cx: number, cy: number, outer: number, inner: number, tips: number): Inside {
++  return (x, y) => {
++    const angle = Math.atan2(y - cy, x - cx);
++    const sector = (2 * Math.PI) / tips;
++    const phase = Math.abs((((angle % sector) + sector) % sector) / sector - 0.5) * 2;
++    // Radius along straight edges between tips (phase 1) and notches (0).
++    const tip = { x: outer, y: 0 };
++    const notch = { x: inner * Math.cos(sector / 2), y: inner * Math.sin(sector / 2) };
++    const t = 1 - phase;
++    const edgeX = tip.x + (notch.x - tip.x) * t;
++    const edgeY = tip.y + (notch.y - tip.y) * t;
++    return Math.hypot(x - cx, y - cy) <= Math.hypot(edgeX, edgeY);
++  };
++}
++
++function lineArt(smoothness: number): TraceOptions {
++  return { ...(TRACE_PRESETS['Line Art'] as TraceOptions), smoothness };
++}
++
++function outline(image: RawImageData, smoothness: number): ReadonlyArray<ReadonlyArray<Vec2>> {
++  return traceImageToContourColoredPaths(image, lineArt(smoothness))
++    .flatMap((path) => path.polylines)
++    .map((polyline) => polyline.points);
++}
++
++function drawnCorners(rings: ReadonlyArray<ReadonlyArray<Vec2>>): number {
++  let corners = 0;
++  for (const points of rings) {
++    const ring = points.slice(0, -1);
++    const turns = ring.map((_, index) => turnAt(ring, index));
++    turns.forEach((turn, index) => {
++      if (turn < CORNER_TURN_RAD) return;
++      const nearby =
++        turn + turningWithin(ring, turns, index, -1) + turningWithin(ring, turns, index, 1);
++      if (turn >= CORNER_SHARE * nearby) corners += 1;
++    });
++  }
++  return corners;
++}
++
++function turnAt(ring: ReadonlyArray<Vec2>, index: number): number {
++  const prev = ring[(index - 1 + ring.length) % ring.length] as Vec2;
++  const at = ring[index] as Vec2;
++  const next = ring[(index + 1) % ring.length] as Vec2;
++  const inX = at.x - prev.x;
++  const inY = at.y - prev.y;
++  const outX = next.x - at.x;
++  const outY = next.y - at.y;
++  return Math.abs(Math.atan2(inX * outY - inY * outX, inX * outX + inY * outY));
++}
++
++// The turning of the vertices within CORNER_WINDOW_PX of arc length of
++// `index`, walking one way round the ring.
++function turningWithin(
++  ring: ReadonlyArray<Vec2>,
++  turns: ReadonlyArray<number>,
++  index: number,
++  step: 1 | -1,
++): number {
++  const count = ring.length;
++  let total = 0;
++  let travelled = 0;
++  let at = index;
++  for (let visited = 1; visited < count; visited += 1) {
++    const next = (at + step + count) % count;
++    const a = ring[at] as Vec2;
++    const b = ring[next] as Vec2;
++    travelled += Math.hypot(b.x - a.x, b.y - a.y);
++    if (travelled > CORNER_WINDOW_PX) break;
++    total += turns[next] as number;
++    at = next;
++  }
++  return total;
++}
++
++function pointCount(rings: ReadonlyArray<ReadonlyArray<Vec2>>): number {
++  return rings.reduce((total, ring) => total + ring.length, 0);
++}
++
++function fingerprint(rings: ReadonlyArray<ReadonlyArray<Vec2>>): string {
++  return rings
++    .map((ring) => ring.map((p) => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(' '))
++    .join('|');
++}
++
++const ART = [
++  { name: '1-bit', samples: 1 },
++  { name: 'anti-aliased', samples: 4 },
++] as const;
++
++describe('Smoothness', () => {
++  it('clamps to the potrace range and treats a missing value as 1', () => {
++    expect(boundedSmoothness(undefined)).toBe(1);
++    expect(boundedSmoothness(Number.NaN)).toBe(1);
++    expect(boundedSmoothness(-0.5)).toBe(0);
++    expect(boundedSmoothness(0.3)).toBe(0.3);
++    expect(boundedSmoothness(2)).toBeCloseTo(4 / 3, 12);
++  });
++
++  it('hands the finisher its own corners back at 1', () => {
++    const points = Array.from({ length: 40 }, (_, index) => ({
++      x: 10 * Math.cos(index / 6),
++      y: 10 * Math.sin(index / 6),
++    }));
++    const corners = new Set([points[3] as Vec2]);
++    const shaped = shapeCornersForSmoothness(points, corners, new Set(), 1, 1);
++    expect(shaped.corners).toBe(corners);
++    expect(shaped.added.size).toBe(0);
++  });
++
++  it.each(ART)('draws only straight lines at 0 on $name art', ({ samples }) => {
++    const image = render(128, disc(64, 64, 44), samples);
++    const lines = outline(image, 0);
++    const curves = outline(image, 1);
++    // A polygon: one point per vertex, where the default spends several on
++    // each curved span.
++    expect(pointCount(lines) * 2).toBeLessThan(pointCount(curves));
++    for (const ring of lines) {
++      for (let index = 1; index < ring.length; index += 1) {
++        const a = ring[index - 1] as Vec2;
++        const b = ring[index] as Vec2;
++        expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeGreaterThan(1);
++      }
++    }
++  });
++
++  it.each(ART)('rounds every corner of a square at 1.33 on $name art', ({ samples }) => {
++    const image = render(128, square(24, 24, 80), samples);
++    expect(drawnCorners(outline(image, 1))).toBe(4);
++    const rounded = outline(image, 1.33);
++    expect(drawnCorners(rounded)).toBe(0);
++    // Visibly round: the outline passes about 1.4 px inside each corner.
++    const nearest = Math.min(
++      ...rounded.flat().map((point) => Math.hypot(point.x - 24, point.y - 24)),
++    );
++    expect(nearest).toBeGreaterThan(1);
++    expect(nearest).toBeLessThan(2);
++  });
++
++  it.each(ART)('draws fewer corners as Smoothness rises on $name art', ({ samples }) => {
++    const image = render(160, star(80, 80, 70, 30, 7), samples);
++    const corners = SWEEP.map((smoothness) => drawnCorners(outline(image, smoothness)));
++    corners.slice(1).forEach((count, index) => {
++      expect(count).toBeLessThanOrEqual(corners[index] as number);
++    });
++    expect(corners[SWEEP.length - 1]).toBe(0);
++    expect(corners[0]).toBeGreaterThan(corners[SWEEP.indexOf(1)] as number);
++  });
++
++  it.each(ART)('draws a different outline at every sampled value on $name art', ({ samples }) => {
++    const shapes = [star(60, 60, 50, 22, 5), disc(150, 60, 30), square(110, 120, 60)];
++    const image = render(200, (x, y) => shapes.some((inside) => inside(x, y)), samples);
++    const outlines = new Set(SWEEP.map((smoothness) => fingerprint(outline(image, smoothness))));
++    expect(outlines.size).toBe(SWEEP.length);
++  });
++
++  it('reaches the Edge Detection outlines', () => {
++    const image = render(128, square(24, 24, 80), 4);
++    const edge = (smoothness: number): ReadonlyArray<ReadonlyArray<Vec2>> =>
++      traceImageToEdgePaths(image, {
++        ...(TRACE_PRESETS['Edge Detection'] as TraceOptions),
++        smoothness,
++      })
++        .flatMap((path) => path.polylines)
++        .map((polyline) => polyline.points);
++    expect(drawnCorners(edge(1))).toBeGreaterThan(drawnCorners(edge(1.33)));
++    expect(fingerprint(edge(0))).not.toBe(fingerprint(edge(1)));
++  });
++});
+diff --git a/src/core/trace/contour-smoothness.ts b/src/core/trace/contour-smoothness.ts
+new file mode 100644
+index 000000000..69ea34f62
+--- /dev/null
++++ b/src/core/trace/contour-smoothness.ts
+@@ -0,0 +1,102 @@
++// Smoothness is the dialog's corner control. LightBurn's trace defaults come
++// from potrace, where the same knob is `alphamax`: 0 draws only straight
++// lines and 1.33 only curves
++// (https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/,
++// https://potrace.sourceforge.net/potrace.1.html). At 1 the finisher keeps
++// its own corner model (the bend sharpener's rebuilt corners and its 60°
++// hard turns), so the default draws exactly what it drew before this
++// control reached the corners.
++//
++// Corner strength is potrace's alpha (https://potrace.sourceforge.net/potrace.pdf,
++// section 2.3.3), read on a polygon of the boundary. It is 0 for a vertex
++// within a pixel of the chord between its neighbours and approaches 4/3 as the
++// vertex stands farther off that chord. Below 1 the slider adds corners where
++// alpha >= 4s/3, so 0 makes every polygon vertex a corner. Above 1 it
++// releases corners where alpha < 4/3 * (s - 1) / 0.33 and rounds them on the
++// finished outline (contour-corner-rounding.ts). Both ramps are empty at 1.
++
++import type { Vec2 } from '../scene';
++import { simplifyChain } from './centerline';
++
++export const DEFAULT_SMOOTHNESS = 1;
++/** The dialog's maximum, LightBurn's "only curves" value. */
++export const ALL_CURVES_SMOOTHNESS = 1.33;
++export const MAX_ALPHA = 4 / 3;
++// potrace's polygon keeps each edge within half a pixel (per axis) of the
++// staircase of pixel corners, which itself sits up to half a pixel off the
++// drawn edge. The chains here are already smoothed onto the drawn edge, so a
++// one pixel tolerance reproduces potrace's polygon and its alpha values:
++// arcs of any radius read 0.86 to 1, bends with long legs more.
++export const POLYGON_TOLERANCE_PX = 1;
++const MIN_POLYGON_VERTICES = 3;
++const NO_POINTS: ReadonlySet<Vec2> = new Set();
++
++export type SmoothnessCorners = {
++  /** Corners the finishing tail pins, by reference. */
++  readonly corners: ReadonlySet<Vec2>;
++  /** The corners this Smoothness added to the finisher's own. */
++  readonly added: ReadonlySet<Vec2>;
++  /** Smoothness 0: the outline is straight lines only. */
++  readonly linesOnly: boolean;
++};
++
++/** The dialog value clamped to potrace's range; absent or non-finite is 1. */
++export function boundedSmoothness(smoothness: number | undefined): number {
++  const value = Number.isFinite(smoothness) ? (smoothness as number) : DEFAULT_SMOOTHNESS;
++  return Math.min(MAX_ALPHA, Math.max(0, value));
++}
++
++/** The alpha below which Smoothness releases a corner: none at or below 1,
++ *  every corner at the dialog's maximum. */
++export function cornerReleaseLimit(smoothness: number): number {
++  if (smoothness <= DEFAULT_SMOOTHNESS) return -Infinity;
++  if (smoothness >= ALL_CURVES_SMOOTHNESS) return Infinity;
++  return (
++    (MAX_ALPHA * (smoothness - DEFAULT_SMOOTHNESS)) / (ALL_CURVES_SMOOTHNESS - DEFAULT_SMOOTHNESS)
++  );
++}
++
++/** The finisher's corners for a closed boundary chain at this Smoothness:
++ *  below 1 every vertex of the chain's polygon strong enough for the setting
++ *  joins them. `anchors` are extra points the polygon must keep. */
++export function shapeCornersForSmoothness(
++  points: ReadonlyArray<Vec2>,
++  corners: ReadonlySet<Vec2>,
++  anchors: ReadonlySet<Vec2>,
++  smoothness: number,
++  pixelScale: number,
++): SmoothnessCorners {
++  const unchanged: SmoothnessCorners = { corners, added: NO_POINTS, linesOnly: false };
++  if (smoothness >= DEFAULT_SMOOTHNESS) return unchanged;
++  const linesOnly = smoothness <= 0;
++  const pins = anchors.size === 0 ? corners : new Set([...corners, ...anchors]);
++  const polygon = simplifyChain(points, true, POLYGON_TOLERANCE_PX * pixelScale, pins);
++  if (polygon.length < MIN_POLYGON_VERTICES) return { ...unchanged, linesOnly };
++  const added = new Set<Vec2>();
++  polygon.forEach((vertex, index) => {
++    const alpha = cornerAlpha(polygon, index, pixelScale);
++    if (alpha >= MAX_ALPHA * smoothness && !corners.has(vertex)) added.add(vertex);
++  });
++  const all = added.size === 0 ? corners : new Set([...corners, ...added]);
++  return { corners: all, added, linesOnly };
++}
++
++/** potrace's alpha at polygon vertex `index` of a closed polygon, in source
++ *  pixels: the vertex's offset from its neighbours' chord (potrace's
++ *  dpara / ddenom, with the chord measured in L1 as potrace does), mapped so
++ *  offsets up to one pixel read 0. */
++export function cornerAlpha(
++  polygon: ReadonlyArray<Vec2>,
++  index: number,
++  pixelScale: number,
++): number {
++  const count = polygon.length;
++  const prev = polygon[(index - 1 + count) % count] as Vec2;
++  const vertex = polygon[index] as Vec2;
++  const next = polygon[(index + 1) % count] as Vec2;
++  const chordL1 = pixelScale * (Math.abs(next.x - prev.x) + Math.abs(next.y - prev.y));
++  if (chordL1 === 0) return MAX_ALPHA;
++  const cross = (vertex.x - prev.x) * (next.y - prev.y) - (vertex.y - prev.y) * (next.x - prev.x);
++  const offset = Math.abs(cross) / chordL1;
++  return offset > 1 ? MAX_ALPHA * (1 - 1 / offset) : 0;
++}
+diff --git a/src/core/trace/contour-trace.ts b/src/core/trace/contour-trace.ts
+index 55bec876c..321daba24 100644
+--- a/src/core/trace/contour-trace.ts
++++ b/src/core/trace/contour-trace.ts
+@@ -32,6 +32,13 @@ import { smoothArcNoise } from './smooth-arc-noise';
+ import { withCanonicalTraceCurves } from './trace-curves';
+ import { contourFeatureAnchors } from './contour-feature-anchors';
+ import { contourTraceInputMatches, type ContourTraceInput } from './contour-input';
++import {
++  DEFAULT_SMOOTHNESS,
++  boundedSmoothness,
++  shapeCornersForSmoothness,
++  type SmoothnessCorners,
++} from './contour-smoothness';
++import { roundReleasedCorners } from './contour-corner-rounding';
+ import {
+   closeContour,
+   contourRefinement,
+@@ -95,8 +102,6 @@ const FIT_TOLERANCE_PX = 0.35;
+ // texture-chasing error splits. Tolerance-based fairing was tried twice and
+ // still sawed — splitting on max error chases any bump above tolerance.
+ const FIT_TOLERANCE_ORGANIC_PX = 0.55;
+-// Neutral Smoothness when the dialog value is absent or non-finite.
+-const DEFAULT_SMOOTHNESS = 1;
+ const DEFAULT_OPTIMIZE = 0.2;
+ const OPTIMIZE_TOLERANCE_SLOPE = 0.75;
+ const OPTIMIZE_TOLERANCE_FLOOR = 0.25;
+@@ -170,6 +175,7 @@ export function* traceImageToContourColoredPathsSteps(
+       SIMPLIFY_EPSILON_PX * Math.max(0.1, options.lineTolerance ?? 1) * scale * toleranceScale,
+     fitToleranceScale: toleranceScale,
+     flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
++    smoothness: options.smoothness,
+     pixelScale: scale,
+     ...(crackField === null ? {} : { crackField }),
+   });
+@@ -185,6 +191,9 @@ export type ContourFinishOptions = {
+   readonly epsilonPx: number;
+   /** Wobble-flattening strength (see flatten-straight-runs.ts); 0 = off. */
+   readonly flattenStrength: number;
++  /** The dialog's Smoothness, the corner control (contour-smoothness.ts);
++   *  absent = 1, the finisher's own corners. */
++  readonly smoothness?: number | undefined;
+   readonly fitToleranceScale?: number;
+   /** Supersampling factor of the mask; scales the sharpener's chain-length
+    *  regime bounds so glyphs stay in the same regime they were tuned in. */
+@@ -216,6 +225,7 @@ export function* contourPolylinesFromMaskSteps(
+     width: mask.width,
+     epsilonPx: options.epsilonPx,
+     flattenStrength: options.flattenStrength,
++    smoothness: boundedSmoothness(options.smoothness),
+     fitToleranceScale: options.fitToleranceScale ?? 1,
+     pixelScale,
+     crackField: options.crackField,
+@@ -238,6 +248,7 @@ type LoopFinish = {
+   readonly width: number;
+   readonly epsilonPx: number;
+   readonly flattenStrength: number;
++  readonly smoothness: number;
+   readonly fitToleranceScale: number;
+   readonly pixelScale: number;
+   readonly crackField: CrackSubPixelField | undefined;
+@@ -294,8 +305,15 @@ function* finishLoopSteps(
+     ? yield* sharpenChainBendsSteps(dense, true, distSq, width, featureAnchors)
+     : { points: dense, corners: NO_CORNERS };
+   const finishFrom = (bends: typeof sharpened): ContourRefinement => {
++    const shaped = shapeCornersForSmoothness(
++      bends.points,
++      bends.corners,
++      featureAnchors,
++      finish.smoothness,
++      finish.pixelScale,
++    );
+     const fixedPoints =
+-      featureAnchors.size === 0 ? bends.corners : new Set([...bends.corners, ...featureAnchors]);
++      featureAnchors.size === 0 ? shaped.corners : new Set([...shaped.corners, ...featureAnchors]);
+     const evened = smoothChainCurvature(bends.points, true, fixedPoints);
+     // Mid-wavelength curvature noise (the "small wobble in the O") is evened
+     // on the DENSE chain, where a local moving circle fit has rich statistics
+@@ -306,7 +324,7 @@ function* finishLoopSteps(
+     // large fraction of such a feature.
+     const arcSmoothed =
+       dense.length >= sharpenMin
+-        ? smoothArcNoise(evened, true, bends.corners, arcStrengthEff, finish.pixelScale)
++        ? smoothArcNoise(evened, true, shaped.corners, arcStrengthEff, finish.pixelScale)
+         : evened;
+     // Measured loops with an evidence-based corner set (sharpener range) take
+     // the fairing-by-fitting tail: least-squares cubics THROUGH the measured
+@@ -316,8 +334,8 @@ function* finishLoopSteps(
+     // approved legacy tail until the fit path earns them.
+     const refined =
+       subPixelInformed && dense.length >= sharpenMin
+-        ? finishMeasuredLoop(arcSmoothed, bends, inSharpenRange, finish)
+-        : finishLegacyLoop(arcSmoothed, bends.corners, flattenStrengthEff, finish, featureAnchors);
++        ? finishMeasuredLoop(arcSmoothed, shaped, inSharpenRange, finish)
++        : finishLegacyLoop(arcSmoothed, shaped, flattenStrengthEff, finish, featureAnchors);
+     // The area policy has already admitted this boundary. A tolerance larger
+     // than the loop can collapse the finishing tail to two anchors; Optimize
+     // must not become another area-removal control. Retain the measured crack
+@@ -348,33 +366,38 @@ function* finishLoopSteps(
+ // faired between those pins before the tighter fit.
+ function finishMeasuredLoop(
+   arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
+-  sharpened: { readonly corners: ReadonlySet<Polyline['points'][number]> },
++  shaped: SmoothnessCorners,
+   inSharpenRange: boolean,
+   finish: LoopFinish,
+ ): ContourRefinement | null {
+   if (inSharpenRange) {
+-    return fitLoopTail(arcSmoothed, sharpened.corners, finish, FIT_TOLERANCE_PX);
++    return fitLoopTail(arcSmoothed, shaped.corners, finish, FIT_TOLERANCE_PX, shaped.linesOnly);
+   }
+-  const corners = denseHardTurnCorners(arcSmoothed, finish.pixelScale);
++  // Below 1, Smoothness's own corners join the detected ones.
++  const detected = denseHardTurnCorners(arcSmoothed, finish.pixelScale);
++  const corners = shaped.corners.size === 0 ? detected : new Set([...detected, ...shaped.corners]);
+   const faired = fairChainSegments(arcSmoothed, true, corners, finish.pixelScale);
+-  return fitLoopTail(faired, corners, finish, FIT_TOLERANCE_ORGANIC_PX);
++  return fitLoopTail(faired, corners, finish, FIT_TOLERANCE_ORGANIC_PX, shaped.linesOnly);
+ }
+ 
+ // The legacy tail (binary / pixel-fidelity sources): simplify → straight-run
+ // flatten → corner-aware spline resample → close the ring.
+ function finishLegacyLoop(
+   arcSmoothed: ReadonlyArray<Polyline['points'][number]>,
+-  corners: ReadonlySet<Polyline['points'][number]>,
++  shaped: SmoothnessCorners,
+   flattenStrength: number,
+   finish: LoopFinish,
+   featureAnchors: ReadonlySet<Polyline['points'][number]>,
+ ): ContourRefinement | null {
+   // A zero tolerance is Optimize's "no merging": every boundary point stays a
+-  // vertex, and no spline resamples between them.
+-  const merging = finish.epsilonPx > 0;
+-  const simplified = merging
+-    ? simplifyChain(arcSmoothed, true, finish.epsilonPx, featureAnchors)
+-    : arcSmoothed;
++  // vertex, and no spline resamples between them. Corners Smoothness added
++  // stay vertices through the simplification.
++  const anchors =
++    shaped.added.size === 0 ? featureAnchors : new Set([...featureAnchors, ...shaped.added]);
++  const simplified =
++    finish.epsilonPx > 0
++      ? simplifyChain(arcSmoothed, true, finish.epsilonPx, anchors)
++      : arcSmoothed;
+   if (simplified.length < MIN_LOOP_POINTS) return null;
+   // Rough source edges leave long-wavelength waviness that survives both
+   // evening and simplification (nominally straight stems trace wobbly);
+@@ -382,7 +405,7 @@ function finishLegacyLoop(
+   const straightened = flattenStraightRuns(
+     simplified,
+     true,
+-    corners,
++    shaped.corners,
+     flattenStrength,
+     finish.pixelScale,
+   );
+@@ -391,9 +414,30 @@ function finishLegacyLoop(
+   // renderers and emitters draw points as given and never synthesise the
+   // closing edge, so a ring left "open" engraves with a seam gap.
+   return contourRefinement(straightened, (amount) =>
+-    merging
+-      ? refineChainForOutput(straightened, true, corners, finish.epsilonPx * amount)
+-      : straightened,
++    legacyOutline(straightened, shaped, finish, amount),
++  );
++}
++
++// Smoothness 0 keeps the chords themselves, so the outline is only lines.
++// Above 1 the corners it releases are rounded on the finished outline.
++function legacyOutline(
++  points: ReadonlyArray<Polyline['points'][number]>,
++  shaped: SmoothnessCorners,
++  finish: LoopFinish,
++  amount: number,
++): Polyline['points'] {
++  if (shaped.linesOnly) return points;
++  const deviationCapPx = finish.epsilonPx * amount;
++  const outline =
++    deviationCapPx > 0
++      ? refineChainForOutput(points, true, shaped.corners, deviationCapPx)
++      : points;
++  return roundReleasedCorners(
++    outline,
++    shaped.corners,
++    finish.smoothness,
++    finish.pixelScale,
++    amount,
+   );
+ }
+ 
+@@ -404,13 +448,23 @@ function fitLoopTail(
+   corners: ReadonlySet<Polyline['points'][number]>,
+   finish: LoopFinish,
+   tolerancePx: number,
++  linesOnly: boolean,
+ ): ContourRefinement | null {
+   const tolerance = tolerancePx * finish.pixelScale * finish.fitToleranceScale;
+-  // Zero is Optimize's "no merging": keep every measured point, no cubics.
+-  const refine = (amount: number): Polyline['points'] =>
+-    tolerance > 0
+-      ? sampleCubics(fitCubicsThroughPoints(chain, true, corners, tolerance * amount), true)
+-      : chain;
++  const refine = (amount: number): Polyline['points'] => {
++    // Smoothness 0 draws only lines: the polygon through the corners, with a
++    // further vertex only where the chain leaves it by more than the fit
++    // tolerance.
++    if (linesOnly) {
++      return tolerance > 0 ? simplifyChain(chain, true, tolerance * amount, corners) : chain;
++    }
++    // Zero is Optimize's "no merging": keep every measured point, no cubics.
++    const outline =
++      tolerance > 0
++        ? sampleCubics(fitCubicsThroughPoints(chain, true, corners, tolerance * amount), true)
++        : chain;
++    return roundReleasedCorners(outline, corners, finish.smoothness, finish.pixelScale, amount);
++  };
+   const candidate = contourRefinement(chain, refine);
+   return candidate.polyline.points.length < MIN_LOOP_POINTS ? null : candidate;
+ }
+diff --git a/src/core/trace/edge-trace.ts b/src/core/trace/edge-trace.ts
+index 923140b3a..16e53ac7a 100644
+--- a/src/core/trace/edge-trace.ts
++++ b/src/core/trace/edge-trace.ts
+@@ -72,8 +72,10 @@ export function* traceImageToEdgePathsSteps(
+         scale *
+         toleranceScale,
+       fitToleranceScale: toleranceScale,
+-      // Same Smoothness → flatten-strength ramp as the contour lane.
++      // Same Smoothness → flatten-strength ramp and corner control as the
++      // contour lane.
+       flattenStrength: flattenStrengthFromSmoothness(options.smoothness),
++      smoothness: options.smoothness,
+       pixelScale: scale,
+       crackField,
+     },
+diff --git a/src/core/trace/trace-option-types.ts b/src/core/trace/trace-option-types.ts
+index 267bc73cd..1a5544ee9 100644
+--- a/src/core/trace/trace-option-types.ts
++++ b/src/core/trace/trace-option-types.ts
+@@ -115,7 +115,13 @@ export type TraceOptions = {
+   // Source-grid contour/hole area. Converted independently of despeckle;
+   // internal working thresholds may be fractional after downsampling.
+   readonly ignoreLessThanPixels?: number;
++  // LightBurn's Smoothness, 0 to 1.33 (contour-smoothness.ts): 0 draws only
++  // straight segments, 1.33 draws no corners, and the default 1 keeps the
++  // finisher's own corners. On binary sources it also sets the wobble
++  // flattener (flattenStrengthFromSmoothness), which is off at 5/6 and below.
+   readonly smoothness?: number;
++  // LightBurn's Optimize, default 0.2: scales how far traced points may merge
++  // into fewer vertices or curves. 0 keeps every traced point.
+   readonly optimize?: number;
+   // Edge Detection-only controls. UI exposes these as three simple
+   // operator knobs: Sensitivity, Detail, and Minimum line.
+diff --git a/src/core/trace/trace-presets.ts b/src/core/trace/trace-presets.ts
+index 77c2cb4e1..ae92d4bc7 100644
+--- a/src/core/trace/trace-presets.ts
++++ b/src/core/trace/trace-presets.ts
+@@ -177,10 +177,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+     useOtsuThreshold: true,
+     despeckleMinPixels: 1,
+     // Curve params that drive the contour backend (the imagetracerjs fields
+-    // above are inert there). smoothness scales the wobble flattener /
+-    // arc-evening strength: at 0.55 both are fully off, so pixel-art notches
+-    // and square dots keep their exact corners instead of rounding to pills
+-    // or circles.
++    // above are inert there). smoothness at or below 5/6 switches the wobble
++    // flattener and arc evening off, so pixel-art notches and square dots
++    // keep their exact corners instead of rounding to pills or circles. As
++    // the corner control (potrace's alphamax, contour-smoothness.ts) 0.55
++    // also makes every boundary bend whose alpha reaches 0.73 a corner.
+     smoothness: 0.55,
+     optimize: 0.15,
+     // NO auto-upscale of any kind (neither autoUpscaleSmallSources nor
+-- 
+2.43.0
+

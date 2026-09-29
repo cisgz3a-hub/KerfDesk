@@ -1,0 +1,558 @@
+From 1be25f24c5484db43afebfb11c7f5d3c43518e03 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:44:56 +0000
+Subject: [PATCH 1/4] fix(trace): Centerline keeps a bend drawn round in a
+ thick stroke (ADR-394)
+
+Centerline rebuilt any bend whose two straight legs pointed at a corner,
+so a thick stroke's rounded bend (the bottom of a wave, the shoulder of a
+letter) came out as a V. Before rebuilding a corner, the sharpener now
+reads the ink at the rebuilt vertex. On a drawn corner the vertex sits on
+the pen's path with the stroke's full width of ink around it. On a curve
+it stands off the path, and the ink there is thinner by about as much as
+it stands off. Where the vertex lost more than half its distance from the
+traced line (and more than 0.6 px), the bend keeps its curve. Drawn
+corners are still rebuilt. The contour tracer calls the same sharpener
+without the new option, so outlines are unchanged.
+
+Measured against the base (85ee406) with the audit's centreline bench:
+- 21-stroke corpus: mean distance from the true centre 0.254 -> 0.250 px,
+  mean 95th percentile 0.43 -> 0.39 px, share of the true centre covered
+  99.84% -> 100%. Only the three waves change: the 8 px wave's largest
+  gap 2.24 -> 0.43 px (95th percentile 1.02 -> 0.23 px, coverage 97.3% ->
+  100%), the 4 px wave's 1.27 -> 0.60 px, the 2 px wave's 0.81 -> 0.49 px.
+- 290 synthetic bends (3-12 px strokes, 45-150 degree turns; sharp,
+  mitred and filleted paths): mean local error 1.25 -> 0.85 px. 88 bends
+  improve by more than 0.1 px; one gets worse, a 3 px stroke's small
+  fillet (0.60 -> 0.89 px).
+- In-repo regression bar: unchanged.
+- Contour presets (Line Art, Smooth, Sharp, Edge Detection): identical
+  output, timing aside, on the 48 audit corpus traces and the 8 traces of
+  the dragon and logo.
+- Dragon: 2,518 paths either way, 66,690 -> 67,610 vertices. Logo: 74
+  paths, 2,552 -> 2,588 vertices.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/core/trace/centerline/bend-geometry.ts    |  14 +-
+ src/core/trace/centerline/distance-field.ts   |  24 +++
+ .../trace/centerline/round-bend-guard.test.ts | 164 ++++++++++++++++++
+ src/core/trace/centerline/round-bend-guard.ts |  75 ++++++++
+ src/core/trace/centerline/sharpen-bends.ts    |  68 ++++++--
+ src/core/trace/centerline/stroke-chains.ts    |   3 +-
+ 6 files changed, 332 insertions(+), 16 deletions(-)
+ create mode 100644 src/core/trace/centerline/round-bend-guard.test.ts
+ create mode 100644 src/core/trace/centerline/round-bend-guard.ts
+
+diff --git a/src/core/trace/centerline/bend-geometry.ts b/src/core/trace/centerline/bend-geometry.ts
+index 456bceaca..c64e72d8a 100644
+--- a/src/core/trace/centerline/bend-geometry.ts
++++ b/src/core/trace/centerline/bend-geometry.ts
+@@ -269,13 +269,25 @@ export function vertexHugsChain(
+   to: number,
+   maxOffsetPx: number,
+ ): boolean {
++  const nearest = vertexOffset(vertex, pts, from, to);
++  return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
++}
++
++/** How far a rebuilt vertex stands from the chain it replaces: its distance
++ *  to the nearest point of `pts[from - 1 .. to]`. */
++export function vertexOffset(
++  vertex: Vec2,
++  pts: ReadonlyArray<Vec2>,
++  from: number,
++  to: number,
++): number {
+   let nearest = Infinity;
+   for (let k = Math.max(0, from - 1); k <= Math.min(pts.length - 1, to); k += 1) {
+     const p = pts[k];
+     if (p === undefined) continue;
+     nearest = Math.min(nearest, Math.hypot(p.x - vertex.x, p.y - vertex.y));
+   }
+-  return nearest >= MIN_VERTEX_GAIN_PX && nearest <= maxOffsetPx;
++  return nearest;
+ }
+ 
+ // Ink-support gate for rebuilt apexes. The rebuilt corner claims "the drawn
+diff --git a/src/core/trace/centerline/distance-field.ts b/src/core/trace/centerline/distance-field.ts
+index 29230f141..9565247ae 100644
+--- a/src/core/trace/centerline/distance-field.ts
++++ b/src/core/trace/centerline/distance-field.ts
+@@ -145,3 +145,27 @@ function intersection(f: Float64Array, q: number, p: number): number {
+ export function radiusAt(distSq: Float64Array, index: number): number {
+   return Math.sqrt(distSq[index] ?? 0);
+ }
++
++/** Local stroke radius at a sub-pixel position, read bilinearly from the
++ *  four pixel centres around it. `x`/`y` are image coordinates (pixel i
++ *  covers [i, i + 1)), so a pixel centre reads exactly that pixel's radius.
++ *  Outside the image reads as background, as the field itself treats it. */
++export function interpolatedRadius(
++  distSq: Float64Array,
++  width: number,
++  x: number,
++  y: number,
++): number {
++  const height = width > 0 ? Math.floor(distSq.length / width) : 0;
++  const gx = x - 0.5;
++  const gy = y - 0.5;
++  const x0 = Math.floor(gx);
++  const y0 = Math.floor(gy);
++  const fx = gx - x0;
++  const fy = gy - y0;
++  const at = (px: number, py: number): number =>
++    px < 0 || py < 0 || px >= width || py >= height ? 0 : radiusAt(distSq, py * width + px);
++  const top = at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx;
++  const bottom = at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx;
++  return top * (1 - fy) + bottom * fy;
++}
+diff --git a/src/core/trace/centerline/round-bend-guard.test.ts b/src/core/trace/centerline/round-bend-guard.test.ts
+new file mode 100644
+index 000000000..e6d62f75d
+--- /dev/null
++++ b/src/core/trace/centerline/round-bend-guard.test.ts
+@@ -0,0 +1,164 @@
++// A thick stroke drawn round a curve must keep its curve; the same stroke
++// drawn round a sharp corner must keep its corner (ADR-394).
++
++import { describe, expect, it } from 'vitest';
++import type { Polyline, Vec2 } from '../../scene';
++import type { RawImageData, TraceOptions } from '../trace-image';
++import { squaredDistanceField, type InkMask } from './distance-field';
++import { sharpenChainBends } from './sharpen-bends';
++import { traceCenterlineStrokePaths } from './trace-centerline';
++
++const SIZE = 100;
++const RADIUS = 6; // a 12 px stroke
++const VERTEX: Vec2 = { x: 60, y: 40 };
++
++const CENTERLINE_OPTIONS: TraceOptions = {
++  traceMode: 'centerline',
++  numberOfColors: 2,
++  pathOmit: 0,
++  lineTolerance: 1,
++  quadraticTolerance: 1,
++  blurRadius: 0,
++  blurDelta: 0,
++  lineFilter: true,
++  fixedPalette: ['#ffffff', '#000000'],
++  useOtsuThreshold: true,
++  despeckleMinPixels: 4,
++  centerlineJoinGapPx: 3,
++};
++
++// The pen's path: in along +x to the vertex, out along +y, optionally
++// rounded with a circular fillet of the given radius.
++function penPath(fillet: number): Vec2[] {
++  const start = { x: 10, y: VERTEX.y };
++  const end = { x: VERTEX.x, y: 88 };
++  if (fillet <= 0) return [start, VERTEX, end];
++  const centre = { x: VERTEX.x - fillet, y: VERTEX.y + fillet };
++  const arc: Vec2[] = [];
++  for (let k = 0; k <= 64; k += 1) {
++    const angle = -Math.PI / 2 + (k / 64) * (Math.PI / 2);
++    arc.push({ x: centre.x + fillet * Math.cos(angle), y: centre.y + fillet * Math.sin(angle) });
++  }
++  return [start, ...arc, end];
++}
++
++function distanceToPath(p: Vec2, path: ReadonlyArray<Vec2>): number {
++  let best = Infinity;
++  for (let k = 1; k < path.length; k += 1) {
++    const a = path[k - 1]!;
++    const b = path[k]!;
++    const dx = b.x - a.x;
++    const dy = b.y - a.y;
++    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
++    best = Math.min(best, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
++  }
++  return best;
++}
++
++// Ink wherever a round nib of RADIUS following the path covers the pixel centre.
++function strokeMask(path: ReadonlyArray<Vec2>): InkMask {
++  const ink = new Uint8Array(SIZE * SIZE);
++  for (let y = 0; y < SIZE; y += 1) {
++    for (let x = 0; x < SIZE; x += 1) {
++      if (distanceToPath({ x: x + 0.5, y: y + 0.5 }, path) <= RADIUS) ink[y * SIZE + x] = 1;
++    }
++  }
++  return { width: SIZE, height: SIZE, ink };
++}
++
++function maskToImage(mask: InkMask): RawImageData {
++  const data = new Uint8ClampedArray(mask.width * mask.height * 4).fill(255);
++  for (let i = 0; i < mask.ink.length; i += 1) {
++    if (mask.ink[i] === 1) data.fill(0, i * 4, i * 4 + 3);
++  }
++  return { width: mask.width, height: mask.height, data };
++}
++
++function traceStroke(fillet: number): ReadonlyArray<Polyline> {
++  const image = maskToImage(strokeMask(penPath(fillet)));
++  return traceCenterlineStrokePaths(image, CENTERLINE_OPTIONS).flatMap((p) => p.polylines);
++}
++
++// Worst distance from the traced line to the pen's path around the bend.
++function bendError(polylines: ReadonlyArray<Polyline>, path: ReadonlyArray<Vec2>): number {
++  let worst = 0;
++  for (const polyline of polylines) {
++    for (let k = 1; k < polyline.points.length; k += 1) {
++      const a = polyline.points[k - 1]!;
++      const b = polyline.points[k]!;
++      for (let s = 0; s <= 10; s += 1) {
++        const p = { x: a.x + ((b.x - a.x) * s) / 10, y: a.y + ((b.y - a.y) * s) / 10 };
++        if (Math.hypot(p.x - VERTEX.x, p.y - VERTEX.y) > 20) continue;
++        worst = Math.max(worst, distanceToPath(p, path));
++      }
++    }
++  }
++  return worst;
++}
++
++describe('centreline bends keep the shape the pen drew', () => {
++  it('keeps a rounded bend in a thick stroke round', () => {
++    // Fillet of 1.5 stroke radii: its tangent corner stands 3.7 px outside
++    // the pen path, where the sharpener used to put a vertex.
++    const path = penPath(1.5 * RADIUS);
++    const traced = traceStroke(1.5 * RADIUS);
++    expect(traced).toHaveLength(1);
++    expect(bendError(traced, path)).toBeLessThan(1);
++  });
++
++  it('still rebuilds the sharp corner of the same stroke', () => {
++    const traced = traceStroke(0);
++    expect(traced).toHaveLength(1);
++    const nearest = Math.min(
++      ...traced[0]!.points.map((p) => Math.hypot(p.x - VERTEX.x, p.y - VERTEX.y)),
++    );
++    expect(nearest).toBeLessThan(1);
++    expect(bendError(traced, penPath(0))).toBeLessThan(1);
++  });
++});
++
++describe('keepRoundedBends', () => {
++  // One chamfered chain (the shape thinning leaves at any concentrated bend)
++  // laid over two inks: only the ink tells a drawn corner from a curve.
++  function chamferedChain(): Vec2[] {
++    const cut = 2;
++    const chain: Vec2[] = [];
++    for (let x = 10; x <= VERTEX.x - cut; x += 0.5) chain.push({ x, y: VERTEX.y });
++    for (let s = 0.5; s < cut; s += 0.5) chain.push({ x: VERTEX.x - cut + s, y: VERTEX.y + s });
++    for (let y = VERTEX.y + cut; y <= 88; y += 0.5) chain.push({ x: VERTEX.x, y });
++    return chain;
++  }
++
++  function cornerOffsets(corners: ReadonlySet<Vec2>): number[] {
++    return [...corners].map((c) => Math.hypot(c.x - VERTEX.x, c.y - VERTEX.y));
++  }
++
++  it('rebuilds a drawn corner with or without the guard', () => {
++    const distSq = squaredDistanceField(strokeMask(penPath(0)));
++    for (const options of [undefined, { keepRoundedBends: true }]) {
++      const sharpened = sharpenChainBends(
++        chamferedChain(),
++        false,
++        distSq,
++        SIZE,
++        undefined,
++        options,
++      );
++      expect(cornerOffsets(sharpened.corners)).toHaveLength(1);
++      expect(cornerOffsets(sharpened.corners)[0]).toBeLessThan(0.1);
++    }
++  });
++
++  it('keeps a curve round only when asked, so outline corners are untouched', () => {
++    // The same corner over the ink of a 1.5-radius fillet stands 3.7 px out
++    // on the curve's outside, where the ink is thin.
++    const distSq = squaredDistanceField(strokeMask(penPath(1.5 * RADIUS)));
++    const plain = sharpenChainBends(chamferedChain(), false, distSq, SIZE);
++    const guarded = sharpenChainBends(chamferedChain(), false, distSq, SIZE, undefined, {
++      keepRoundedBends: true,
++    });
++    expect(plain.corners.size).toBe(1);
++    expect(guarded.corners.size).toBe(0);
++    expect(guarded.points).toEqual(chamferedChain());
++  });
++});
+diff --git a/src/core/trace/centerline/round-bend-guard.ts b/src/core/trace/centerline/round-bend-guard.ts
+new file mode 100644
+index 000000000..0ff3b38ea
+--- /dev/null
++++ b/src/core/trace/centerline/round-bend-guard.ts
+@@ -0,0 +1,75 @@
++// Centreline-only guard that keeps a rounded bend round.
++//
++// The sharpener rebuilds a bend as the corner its two straight legs point
++// at. Where the stroke was drawn round a sharp corner, that corner is where
++// the pen went: thinning cut inside it, and the rebuilt vertex sits on the
++// pen's path with the stroke's full width of ink around it. Where the stroke
++// was drawn round a curve, the chain already follows the pen, so the rebuilt
++// vertex stands off the path toward the bend's outer edge, and the ink
++// around it is thinner by about as much as it stands off.
++// A thick stroke's gentle bend (a wave bottom, the shoulder of a letter) has
++// legs straight enough and a turn concentrated enough to pass every shape
++// gate, so this reads the ink instead of the shape.
++//
++// Outline corners from the contour tracer have no stroke width to read and
++// never use this guard.
++
++import type { Vec2 } from '../../scene';
++import { vertexOffset } from './bend-geometry';
++import { interpolatedRadius } from './distance-field';
++
++// Chain points read on each leg, just outside the bend window, for the radius
++// the stroke carries into the bend. The median ignores a stray pixel.
++const LEG_SAMPLE_POINTS = 12;
++// The pixel-centre distance field reads a drawn corner's own apex up to
++// ~0.6 px short of the legs' radius (measured on 3-4 px corners), so a
++// shortfall this small never counts against a corner.
++const INK_TOLERANCE_PX = 0.6;
++// Half is where the choice breaks even. The ink a vertex lost says how far it
++// stands off the pen's path; the rest of its offset is how far the chain
++// does. A vertex that lost less than half its offset is the nearer of the
++// two, so rebuilding it helps. Measured on 290 synthetic bends: where the
++// rebuilt vertex was the nearer, it lost at most 0.21 of its offset (4-12 px
++// strokes; 3 px ones stay under the tolerance above); where it was not, a
++// median 0.54-0.86. A lower cut caught more curves in that set but also
++// rounded the pointed tops of the capital A and N in a real logo.
++const MAX_OUTWARD_SHARE = 0.5;
++
++/**
++ * True when the corner rebuilt at `vertex` from the legs `pts[.. headEnd - 1]`
++ * and `pts[tailStart ..]` would stand outside a rounded bend rather than on a
++ * drawn corner: the ink there is thinner than the legs by more than the
++ * lattice tolerance and by more than half the vertex's offset from the chain.
++ */
++export function bendIsRounded(
++  pts: ReadonlyArray<Vec2>,
++  headEnd: number,
++  tailStart: number,
++  vertex: Vec2,
++  distSq: Float64Array,
++  width: number,
++): boolean {
++  const legRadius = Math.min(
++    medianLegRadius(pts, headEnd - 1, -1, distSq, width),
++    medianLegRadius(pts, tailStart, 1, distSq, width),
++  );
++  const shortfall = legRadius - interpolatedRadius(distSq, width, vertex.x, vertex.y);
++  const offset = vertexOffset(vertex, pts, headEnd, tailStart);
++  return shortfall > Math.max(INK_TOLERANCE_PX, MAX_OUTWARD_SHARE * offset);
++}
++
++function medianLegRadius(
++  pts: ReadonlyArray<Vec2>,
++  start: number,
++  step: -1 | 1,
++  distSq: Float64Array,
++  width: number,
++): number {
++  const radii: number[] = [];
++  for (let k = start; k >= 0 && k < pts.length && radii.length < LEG_SAMPLE_POINTS; k += step) {
++    const p = pts[k];
++    if (p !== undefined) radii.push(interpolatedRadius(distSq, width, p.x, p.y));
++  }
++  radii.sort((a, b) => a - b);
++  return radii[Math.floor(radii.length / 2)] ?? 0;
++}
+diff --git a/src/core/trace/centerline/sharpen-bends.ts b/src/core/trace/centerline/sharpen-bends.ts
+index 8baa3e065..3dbbef615 100644
+--- a/src/core/trace/centerline/sharpen-bends.ts
++++ b/src/core/trace/centerline/sharpen-bends.ts
+@@ -6,7 +6,8 @@
+ // intersection sits close to the chain (a chamfer hugs its vertex; a real
+ // arc's tangent intersection stands far off), replace the bend window with
+ // the intersection vertex. Deliberate fillets (roundings ≳ 2 stroke radii)
+-// keep their distance and stay round.
++// keep their distance and stay round; centreline strokes also keep tighter
++// roundings round unless the ink shows a drawn corner (round-bend-guard.ts).
+ //
+ // This file is the ORCHESTRATION (the scan, the per-candidate attempt, the
+ // closed-ring rotation); the pure geometric predicates it calls live in
+@@ -27,8 +28,10 @@ import {
+   quickTurnAt,
+   turnIsConcentrated,
+   vertexHugsChain,
++  type BendVertex,
+ } from './bend-geometry';
+ import { arcTrimIndex } from './polyline-window';
++import { bendIsRounded } from './round-bend-guard';
+ 
+ const QUICK_TURN_GATE_RAD = (20 * Math.PI) / 180;
+ // One corner per physical corner: after a rebuild, nearby candidates (the
+@@ -47,6 +50,14 @@ const CLOSED_ARM_LENGTH_DIVISOR = 6;
+ const GUARD_BASE_BUDGET = 64;
+ const MIN_REPLACEMENT_BUDGET = 8;
+ 
++export type SharpenOptions = {
++  /** Centreline strokes: rebuild a corner only where the ink holds the
++   *  stroke's full width at the rebuilt vertex, so a rounded bend in a
++   *  thick stroke keeps its curve. Outline chains have no stroke width to
++   *  read and leave this off. */
++  readonly keepRoundedBends?: boolean;
++};
++
+ export type SharpenedChain = {
+   readonly points: Vec2[];
+   /** The rebuilt drawn-corner vertices, by object reference. Output
+@@ -65,8 +76,9 @@ export function sharpenChainBends(
+   distSq: Float64Array,
+   width: number,
+   anchors?: ReadonlySet<Vec2>,
++  options?: SharpenOptions,
+ ): SharpenedChain {
+-  return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width, anchors));
++  return runTraceSteps(sharpenChainBendsSteps(points, closed, distSq, width, anchors, options));
+ }
+ 
+ export function* sharpenChainBendsSteps(
+@@ -75,8 +87,10 @@ export function* sharpenChainBendsSteps(
+   distSq: Float64Array,
+   width: number,
+   anchors?: ReadonlySet<Vec2>,
++  options?: SharpenOptions,
+ ): TraceSteps<SharpenedChain> {
+   const cooperate = yield;
++  const keepRounded = options?.keepRoundedBends === true;
+   let pts = [...points];
+   const corners = new Set<Vec2>();
+   let closedMaxArm: number | undefined;
+@@ -103,8 +117,9 @@ export function* sharpenChainBendsSteps(
+           distSq,
+           width,
+           (closedMaxArm ??= arcLengthOf(pts) / CLOSED_ARM_LENGTH_DIVISOR),
++          keepRounded,
+         )
+-      : trySharpenOpen(pts, i, distSq, width);
++      : trySharpenOpen(pts, i, distSq, width, Infinity, keepRounded);
+     if (!acceptableBend(bent, corners, anchors)) {
+       i += 1;
+       continue;
+@@ -177,10 +192,11 @@ function trySharpenOpen(
+   distSq: Float64Array,
+   width: number,
+   maxArm = Infinity,
++  keepRounded = false,
+ ): BendResult | null {
+   const window = bendWindow(pts, i, distSq, width);
+   const baseArm = Math.min(window.arm, maxArm);
+-  const base = attemptBend(pts, i, baseArm, window.maxRadius, distSq, width);
++  const base = attemptBend(pts, i, baseArm, window.maxRadius, distSq, width, keepRounded);
+   if (base !== null) return base;
+   const nearTurn = netTurnAcross(pts, i, RETRY_NEAR_SPAN_PX);
+   if (nearTurn === null || nearTurn < RETRY_MIN_NEAR_TURN_RAD) return null;
+@@ -188,7 +204,7 @@ function trySharpenOpen(
+     if (armPx <= baseArm || armPx > maxArm) continue;
+     const turn = netTurnAcross(pts, i, armPx);
+     if (turn === null || turn < RETRY_MIN_TURN_RAD) continue;
+-    const bent = attemptBend(pts, i, armPx, window.maxRadius, distSq, width);
++    const bent = attemptBend(pts, i, armPx, window.maxRadius, distSq, width, keepRounded);
+     if (bent !== null) return bent;
+   }
+   return null;
+@@ -201,6 +217,7 @@ function attemptBend(
+   maxRadius: number,
+   distSq: Float64Array,
+   width: number,
++  keepRounded: boolean,
+ ): BendResult | null {
+   const p = pts[i];
+   if (p === undefined) return null;
+@@ -218,14 +235,8 @@ function attemptBend(
+   if (!turnIsConcentrated(pts, i, arm)) return null;
+   const bend = bendVertexAt(pts, headEnd, tailStart);
+   if (bend === null) return null;
+-  const wedge = wedgeInkSupport(pts, headEnd, tailStart, bend.vertex, distSq, width);
+-  if (wedge === null) return null;
+-  const { legStart, legEnd } = wedge;
+-  const maxOffset = maxRadius * MAX_VERTEX_OFFSET_FACTOR * apexReachScale(bend.turnRad);
+-  if (!vertexHugsChain(bend.vertex, pts, headEnd, tailStart, maxOffset)) return null;
+-  if (
+-    !replacementCoversRemoved(pts, headEnd, tailStart, legStart, bend.vertex, legEnd, maxOffset)
+-  ) {
++  if (!wedgeFitsWindow(pts, headEnd, tailStart, bend, maxRadius, distSq, width)) return null;
++  if (keepRounded && bendIsRounded(pts, headEnd, tailStart, bend.vertex, distSq, width)) {
+     return null;
+   }
+   return {
+@@ -235,6 +246,34 @@ function attemptBend(
+   };
+ }
+ 
++// The wedge (leg, vertex, leg) may replace the bend window only where ink
++// carries both legs to the vertex, the vertex hugs the chain, and the wedge
++// passes near every point it drops.
++function wedgeFitsWindow(
++  pts: ReadonlyArray<Vec2>,
++  headEnd: number,
++  tailStart: number,
++  bend: BendVertex,
++  maxRadius: number,
++  distSq: Float64Array,
++  width: number,
++): boolean {
++  const wedge = wedgeInkSupport(pts, headEnd, tailStart, bend.vertex, distSq, width);
++  if (wedge === null) return false;
++  const { legStart, legEnd } = wedge;
++  const maxOffset = maxRadius * MAX_VERTEX_OFFSET_FACTOR * apexReachScale(bend.turnRad);
++  if (!vertexHugsChain(bend.vertex, pts, headEnd, tailStart, maxOffset)) return false;
++  return replacementCoversRemoved(
++    pts,
++    headEnd,
++    tailStart,
++    legStart,
++    bend.vertex,
++    legEnd,
++    maxOffset,
++  );
++}
++
+ // Physical gate: ink must accompany BOTH wedge legs to the apex. The
+ // reach-scaled hugs/coverage tolerances legitimately widen for needle-sharp
+ // turns (a real tip's apex stands ~radius past the rounded chain end), but
+@@ -290,13 +329,14 @@ function trySharpenClosed(
+   distSq: Float64Array,
+   width: number,
+   maxArm: number,
++  keepRounded: boolean,
+ ): BendResult | null {
+   const mid = Math.floor(pts.length / 2);
+   const shift = (i - mid + pts.length) % pts.length;
+   // Centre the candidate so the open-chain gates retain their exact boundary
+   // rules. This still copies one whole ring per admitted candidate; only the
+   // tangent legs below are read by index without copies.
+-  return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm);
++  return trySharpenOpen(rotateRing(pts, shift), mid, distSq, width, maxArm, keepRounded);
+ }
+ 
+ // One allocation and one pass. The scan rotates the ring once per candidate
+diff --git a/src/core/trace/centerline/stroke-chains.ts b/src/core/trace/centerline/stroke-chains.ts
+index 168925938..005bba2eb 100644
+--- a/src/core/trace/centerline/stroke-chains.ts
++++ b/src/core/trace/centerline/stroke-chains.ts
+@@ -176,7 +176,7 @@ function* finalizeChainsSteps(
+     if (chain.closed && isJunctionArtifactLoop(chain, distSq, mask.width)) continue;
+     // Thinning chamfers drawn corners and round nibs round them; rebuild the
+     // vertices before simplification eats the dense points the tangent
+-    // estimates need.
++    // estimates need. A bend the pen drew round keeps its curve.
+     const attached = attachments.get(chain);
+     const sharpened = yield* sharpenChainBendsSteps(
+       chain.points,
+@@ -184,6 +184,7 @@ function* finalizeChainsSteps(
+       distSq,
+       mask.width,
+       attached,
++      { keepRoundedBends: true },
+     );
+     const pinned =
+       attached === undefined ? sharpened.corners : new Set([...sharpened.corners, ...attached]);
+
+base-commit: e90d52822becac36ba494d37b01c6cc7eb56572a
+-- 
+2.43.0
+

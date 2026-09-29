@@ -1,0 +1,635 @@
+From d147f8306202af39e04df51979771302bb53c3c1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 24 Sep 2026 20:27:39 +0000
+Subject: [PATCH 12/14] feat(trace): Alt+T opens Trace Image for the selected
+ image (ADR-396)
+
+Alt+T (Option+T on macOS) opens Trace Image for the selected image, the
+same as Tools > Trace Image and LightBurn's binding. Like the menu item it
+does nothing unless the selected object is an image, and it waits while a
+dialog, the canvas text editor or a text field has the keyboard. The
+Tools menu and the top toolbar tooltip show Alt+T beside Trace Image,
+the Keyboard Shortcuts list has a row for it, and the tracing lesson names
+it.
+
+On macOS the Option key types a character instead of the letter
+(Option+T types a dagger, Option+M a micro sign), so the Alt chords now
+fall back to the physical key when no plain letter was typed. Alt+M
+(Measure) therefore starts working with Option+M too. AltGr, which
+Windows reports as Ctrl+Alt, does not trigger either chord.
+
+The Tools shortcut handler moved from shortcuts.ts, which was at the file
+size limit, to tool-shortcuts.ts. The shortcut-list completeness test now
+also expects Alt+T.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ src/ui/app/shortcut-contexts.ts               |  19 ++-
+ src/ui/app/shortcut-keys.ts                   |  16 ++
+ src/ui/app/shortcuts-docs.test.ts             |  17 +-
+ src/ui/app/shortcuts-tools.test.ts            |  73 ++++++++-
+ src/ui/app/shortcuts.ts                       |  60 +------
+ src/ui/app/tool-shortcuts.ts                  |  62 ++++++++
+ src/ui/app/use-shortcuts-trace-image.test.tsx | 146 ++++++++++++++++++
+ src/ui/app/use-shortcuts.ts                   |   2 +-
+ src/ui/commands/command-raster-family.ts      |   7 +-
+ src/ui/common/shortcut-list.ts                |   1 +
+ src/ui/tutorials/image-tutorials.ts           |   2 +-
+ 11 files changed, 335 insertions(+), 70 deletions(-)
+ create mode 100644 src/ui/app/shortcut-keys.ts
+ create mode 100644 src/ui/app/tool-shortcuts.ts
+ create mode 100644 src/ui/app/use-shortcuts-trace-image.test.tsx
+
+diff --git a/src/ui/app/shortcut-contexts.ts b/src/ui/app/shortcut-contexts.ts
+index 2d26f74c9..425eedc42 100644
+--- a/src/ui/app/shortcut-contexts.ts
++++ b/src/ui/app/shortcut-contexts.ts
+@@ -6,14 +6,20 @@
+ // keydown is also the freshest state a shortcut could act on.
+ 
+ import type { PlatformAdapter } from '../../platform/types';
+-import { selectedConvertibleVectors, selectedObjectIds } from '../commands/selection-command-state';
++import { traceImageAction } from '../commands/image-command-actions';
++import {
++  selectedConvertibleVectors,
++  selectedObject,
++  selectedObjectIds,
++} from '../commands/selection-command-state';
+ import { currentOutputScope, useStore } from '../state';
+ import { useLaserStore } from '../state/laser-store';
+ import { nativeBedEvidenceSnapshot } from '../state/native-bed-frame';
+ import { useToastStore } from '../state/toast-store';
+ import { useUiStore } from '../state/ui-store';
+ import { confirmDiscardAsync } from './confirm-discard';
+-import type { EditCtx, FileCtx, ToolCtx, TransformCtx, ViewCtx } from './shortcuts';
++import type { EditCtx, FileCtx, TransformCtx, ViewCtx } from './shortcuts';
++import type { ToolCtx } from './tool-shortcuts';
+ import { toggleWorkspaceSidePanels } from './workspace-panel-actions';
+ 
+ export function fileShortcutContext(platform: PlatformAdapter): FileCtx {
+@@ -91,6 +97,7 @@ export function transformShortcutContext(): TransformCtx {
+ export const TOOL_SHORTCUT_CONTEXT: ToolCtx = {
+   setToolMode: (mode) => useUiStore.getState().setToolMode(mode),
+   openConvertToBitmap,
++  openTraceImage,
+ };
+ 
+ export const VIEW_SHORTCUT_CONTEXT: ViewCtx = {
+@@ -110,3 +117,11 @@ function openConvertToBitmap(): void {
+   if (selectedConvertibleVectors(s.project, ids).length === 0) return;
+   useUiStore.getState().openConvertBitmapDialog();
+ }
++
++// Alt+T (Option+T on macOS), LightBurn's Trace Image binding. Same action as
++// the Tools command, so it opens only when the selected object is an image.
++function openTraceImage(): void {
++  const s = useStore.getState();
++  const selected = selectedObject(s.project, s.selectedObjectId);
++  traceImageAction(selected, useUiStore.getState().openImageDialog)();
++}
+diff --git a/src/ui/app/shortcut-keys.ts b/src/ui/app/shortcut-keys.ts
+new file mode 100644
+index 000000000..b7bf6cbf8
+--- /dev/null
++++ b/src/ui/app/shortcut-keys.ts
+@@ -0,0 +1,16 @@
++// Modifier and letter matching shared by the window-level shortcut handlers.
++
++export function hasMeta(e: KeyboardEvent): boolean {
++  return e.ctrlKey || e.metaKey;
++}
++
++// Alt+letter with no other modifier. macOS Option composes a character
++// instead of the letter (Option+T types "†", Option+M "µ"), so when the key
++// is not a plain letter the physical key decides. AltGr, which Windows
++// reports as Ctrl+Alt, never matches.
++export function isAltLetterChord(e: KeyboardEvent, letter: string): boolean {
++  if (!e.altKey || hasMeta(e) || e.shiftKey) return false;
++  const key = e.key.toLowerCase();
++  if (/^[a-z]$/.test(key)) return key === letter;
++  return e.code === `Key${letter.toUpperCase()}`;
++}
+diff --git a/src/ui/app/shortcuts-docs.test.ts b/src/ui/app/shortcuts-docs.test.ts
+index aa9e7011e..9fb26e60e 100644
+--- a/src/ui/app/shortcuts-docs.test.ts
++++ b/src/ui/app/shortcuts-docs.test.ts
+@@ -15,11 +15,20 @@ describe('WORKFLOW shortcut docs', () => {
+ });
+ 
+ describe('Shortcuts dialog completeness (UI-07)', () => {
+-  it('lists the shipped clipboard, group/ungroup, and convert-to-bitmap shortcuts', () => {
++  it('lists the shipped clipboard, group/ungroup, convert-to-bitmap and trace shortcuts', () => {
+     const keys = shortcutFamilies('laser').flatMap((family) => family.rows.map((row) => row.keys));
+-    // These are wired in shortcuts.ts but used to be missing from the dialog.
+-    // Ungroup is Ctrl+U (CNV-02, with Ctrl+Shift+G kept as an alias).
+-    for (const chord of ['Ctrl+C', 'Ctrl+X', 'Ctrl+V', 'Ctrl+G', 'Ctrl+U', 'Ctrl+Shift+B']) {
++    // These are wired in shortcuts.ts and tool-shortcuts.ts; the first six used
++    // to be missing from the dialog. Ungroup is Ctrl+U (CNV-02, with
++    // Ctrl+Shift+G kept as an alias).
++    for (const chord of [
++      'Ctrl+C',
++      'Ctrl+X',
++      'Ctrl+V',
++      'Ctrl+G',
++      'Ctrl+U',
++      'Ctrl+Shift+B',
++      'Alt+T',
++    ]) {
+       expect(keys).toContain(chord);
+     }
+   });
+diff --git a/src/ui/app/shortcuts-tools.test.ts b/src/ui/app/shortcuts-tools.test.ts
+index 045898b45..e49f9caee 100644
+--- a/src/ui/app/shortcuts-tools.test.ts
++++ b/src/ui/app/shortcuts-tools.test.ts
+@@ -1,8 +1,9 @@
+ import { describe, expect, it, vi } from 'vitest';
+-import { handleToolShortcut, type ToolCtx } from './shortcuts';
++import { handleToolShortcut, type ToolCtx } from './tool-shortcuts';
+ 
+ function fakeKeydown(opts: {
+   readonly key: string;
++  readonly code?: string;
+   readonly ctrlKey?: boolean;
+   readonly metaKey?: boolean;
+   readonly altKey?: boolean;
+@@ -11,6 +12,7 @@ function fakeKeydown(opts: {
+ }): KeyboardEvent {
+   const e = new KeyboardEvent('keydown', {
+     key: opts.key,
++    code: opts.code ?? '',
+     ctrlKey: opts.ctrlKey ?? false,
+     metaKey: opts.metaKey ?? false,
+     altKey: opts.altKey ?? false,
+@@ -29,8 +31,9 @@ function makeCtx(): ToolCtx & {
+   readonly openConvertToBitmap: ReturnType<
+     typeof vi.fn<NonNullable<ToolCtx['openConvertToBitmap']>>
+   >;
++  readonly openTraceImage: ReturnType<typeof vi.fn<ToolCtx['openTraceImage']>>;
+ } {
+-  return { setToolMode: vi.fn(), openConvertToBitmap: vi.fn() };
++  return { setToolMode: vi.fn(), openConvertToBitmap: vi.fn(), openTraceImage: vi.fn() };
+ }
+ 
+ describe('handleToolShortcut - Measure tool', () => {
+@@ -55,6 +58,72 @@ describe('handleToolShortcut - Measure tool', () => {
+   });
+ });
+ 
++describe('handleToolShortcut - Trace Image (Alt+T)', () => {
++  it('Alt+T opens Trace Image', () => {
++    const ctx = makeCtx();
++    const event = fakeKeydown({ key: 't', code: 'KeyT', altKey: true });
++
++    expect(handleToolShortcut(event, ctx)).toBe(true);
++    expect(event.defaultPrevented).toBe(true);
++    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
++    expect(ctx.setToolMode).not.toHaveBeenCalled();
++  });
++
++  it('Option+T on macOS opens Trace Image although the key types a dagger', () => {
++    const ctx = makeCtx();
++
++    expect(handleToolShortcut(fakeKeydown({ key: '†', code: 'KeyT', altKey: true }), ctx)).toBe(
++      true,
++    );
++    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
++  });
++
++  it('Option+M on macOS arms Measure although the key types a micro sign', () => {
++    const ctx = makeCtx();
++
++    expect(handleToolShortcut(fakeKeydown({ key: 'µ', code: 'KeyM', altKey: true }), ctx)).toBe(
++      true,
++    );
++    expect(ctx.setToolMode).toHaveBeenCalledWith({ kind: 'measure' });
++  });
++
++  it('follows the letter the layout types, not the key position', () => {
++    const ctx = makeCtx();
++
++    // Dvorak types "y" on the physical T key and "t" on the K key.
++    expect(handleToolShortcut(fakeKeydown({ key: 'y', code: 'KeyT', altKey: true }), ctx)).toBe(
++      false,
++    );
++    expect(handleToolShortcut(fakeKeydown({ key: 't', code: 'KeyK', altKey: true }), ctx)).toBe(
++      true,
++    );
++    expect(ctx.openTraceImage).toHaveBeenCalledTimes(1);
++  });
++
++  it.each([
++    ['AltGr (Ctrl+Alt)', { ctrlKey: true, altKey: true }],
++    ['Alt+Shift', { altKey: true, shiftKey: true }],
++    ['Cmd+Option', { metaKey: true, altKey: true }],
++  ])('leaves %s+T alone', (_name, modifiers) => {
++    const ctx = makeCtx();
++
++    expect(handleToolShortcut(fakeKeydown({ key: 't', code: 'KeyT', ...modifiers }), ctx)).toBe(
++      false,
++    );
++    expect(ctx.openTraceImage).not.toHaveBeenCalled();
++  });
++
++  it('Alt+T inside a text field leaves the keystroke to the field', () => {
++    const input = document.createElement('input');
++    const ctx = makeCtx();
++
++    expect(
++      handleToolShortcut(fakeKeydown({ key: '†', code: 'KeyT', altKey: true, target: input }), ctx),
++    ).toBe(false);
++    expect(ctx.openTraceImage).not.toHaveBeenCalled();
++  });
++});
++
+ describe('handleToolShortcut - canvas text', () => {
+   it('T arms text placement while preserving the document until the canvas click', () => {
+     const ctx = makeCtx();
+diff --git a/src/ui/app/shortcuts.ts b/src/ui/app/shortcuts.ts
+index afd6edf93..76647cc63 100644
+--- a/src/ui/app/shortcuts.ts
++++ b/src/ui/app/shortcuts.ts
+@@ -6,6 +6,7 @@
+ //   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
+ //   * Transform: arrow keys (nudge), H/V (flip)
+ //   * View: P (preview toggle)
++// The Tools handler lives in tool-shortcuts.ts.
+ 
+ import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
+ import type { ControllerSettingsSnapshot, ReadinessSettingsCapability } from '../../core/preflight';
+@@ -25,10 +26,11 @@ import type { ToastVariant } from '../state/toast-store';
+ import { handleOpenProject, handleSaveProject } from './file-actions';
+ import { handleUnifiedArtworkImport } from './import-dispatch';
+ import { useStore } from '../state';
+-import { useUiStore, type ToolMode } from '../state/ui-store';
++import { useUiStore } from '../state/ui-store';
+ import { finishPen } from '../workspace/pen-tool';
+ import { isEditableShortcutTarget } from '../common/keyboard-targets';
+ import { projectWithCurrentJobSetup } from '../state/project-job-setup';
++import { hasMeta } from './shortcut-keys';
+ 
+ const NUDGE_MM = 1;
+ const NUDGE_BIG_MM = 10;
+@@ -108,10 +110,6 @@ export type ViewCtx = {
+   readonly toggleSidePanels: () => void;
+ };
+ 
+-function hasMeta(e: KeyboardEvent): boolean {
+-  return e.ctrlKey || e.metaKey;
+-}
+-
+ function isEditableTarget(e: KeyboardEvent): boolean {
+   return isEditableShortcutTarget(e.target);
+ }
+@@ -340,58 +338,6 @@ export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
+   return false;
+ }
+ 
+-export type ToolCtx = {
+-  readonly setToolMode: (mode: ToolMode) => void;
+-  // Ctrl/Cmd+Shift+B — LightBurn's Convert to Bitmap binding (LIGHTBURN-STUDY
+-  // §7.4). The callback owns the gate (single convertible vector selected);
+-  // the matcher only routes the chord.
+-  readonly openConvertToBitmap: () => void;
+-};
+-
+-// Ctrl/Cmd + letter arms a drawing tool, matching LightBurn (ADR-051 B7):
+-// R = rectangle, E = ellipse, L = line/pen. Plain Ctrl+letter only — the Shift
+-// variants belong to Save-As (S) and export-G-code (E).
+-const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
+-  r: { kind: 'draw', shape: 'rect' },
+-  e: { kind: 'draw', shape: 'ellipse' },
+-  l: { kind: 'draw', shape: 'polyline' },
+-};
+-
+-// Alt+M — Measure (no meta, no shift).
+-function isMeasureChord(e: KeyboardEvent): boolean {
+-  return e.altKey && !hasMeta(e) && !e.shiftKey && e.key.toLowerCase() === 'm';
+-}
+-
+-// Ctrl/Cmd+Shift+B — Convert to Bitmap (LightBurn §7.4).
+-function isConvertToBitmapChord(e: KeyboardEvent): boolean {
+-  return hasMeta(e) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b';
+-}
+-
+-export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
+-  if (isEditableTarget(e)) return false;
+-  if (!hasMeta(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 't') {
+-    e.preventDefault();
+-    ctx.setToolMode({ kind: 'text' });
+-    return true;
+-  }
+-  if (isMeasureChord(e)) {
+-    e.preventDefault();
+-    ctx.setToolMode({ kind: 'measure' });
+-    return true;
+-  }
+-  if (isConvertToBitmapChord(e)) {
+-    e.preventDefault();
+-    ctx.openConvertToBitmap();
+-    return true;
+-  }
+-  if (!hasMeta(e) || e.shiftKey || e.altKey) return false;
+-  const mode = TOOL_BINDINGS[e.key.toLowerCase()];
+-  if (mode === undefined) return false;
+-  e.preventDefault();
+-  ctx.setToolMode(mode);
+-  return true;
+-}
+-
+ const ARROW_DELTAS: Readonly<Record<string, { dx: number; dy: number }>> = {
+   ArrowLeft: { dx: -1, dy: 0 },
+   ArrowRight: { dx: 1, dy: 0 },
+diff --git a/src/ui/app/tool-shortcuts.ts b/src/ui/app/tool-shortcuts.ts
+new file mode 100644
+index 000000000..e888cdf59
+--- /dev/null
++++ b/src/ui/app/tool-shortcuts.ts
+@@ -0,0 +1,62 @@
++// Tools shortcuts (WORKFLOW.md F-A15): T for canvas text, Ctrl/Cmd+R, E and L
++// for the drawing tools, Alt+M for Measure, Alt+T for Trace Image and
++// Ctrl/Cmd+Shift+B for Convert to Bitmap. Split from shortcuts.ts, which
++// keeps the File, Edit, Transform and View handlers.
++
++import type { ToolMode } from '../state/ui-store';
++import { isEditableShortcutTarget } from '../common/keyboard-targets';
++import { hasMeta, isAltLetterChord } from './shortcut-keys';
++
++export type ToolCtx = {
++  readonly setToolMode: (mode: ToolMode) => void;
++  // Ctrl/Cmd+Shift+B — LightBurn's Convert to Bitmap binding (LIGHTBURN-STUDY
++  // §7.4). The callback owns the gate (single convertible vector selected);
++  // the matcher only routes the chord.
++  readonly openConvertToBitmap: () => void;
++  // Alt+T (Option+T on macOS) — LightBurn's Trace Image binding. The callback
++  // owns the gate (a raster image selected), like the Tools command.
++  readonly openTraceImage: () => void;
++};
++
++// Ctrl/Cmd + letter arms a drawing tool, matching LightBurn (ADR-051 B7):
++// R = rectangle, E = ellipse, L = line/pen. Plain Ctrl+letter only — the Shift
++// variants belong to Save-As (S) and export-G-code (E).
++const TOOL_BINDINGS: Readonly<Record<string, ToolMode>> = {
++  r: { kind: 'draw', shape: 'rect' },
++  e: { kind: 'draw', shape: 'ellipse' },
++  l: { kind: 'draw', shape: 'polyline' },
++};
++
++// Ctrl/Cmd+Shift+B — Convert to Bitmap (LightBurn §7.4).
++function isConvertToBitmapChord(e: KeyboardEvent): boolean {
++  return hasMeta(e) && e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b';
++}
++
++function isPlainLetter(e: KeyboardEvent, letter: string): boolean {
++  return !hasMeta(e) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === letter;
++}
++
++// The chords that run one action; drawing tools follow in TOOL_BINDINGS.
++function chordAction(e: KeyboardEvent, ctx: ToolCtx): (() => void) | null {
++  if (isPlainLetter(e, 't')) return () => ctx.setToolMode({ kind: 'text' });
++  if (isAltLetterChord(e, 'm')) return () => ctx.setToolMode({ kind: 'measure' });
++  if (isAltLetterChord(e, 't')) return ctx.openTraceImage;
++  if (isConvertToBitmapChord(e)) return ctx.openConvertToBitmap;
++  return null;
++}
++
++export function handleToolShortcut(e: KeyboardEvent, ctx: ToolCtx): boolean {
++  if (isEditableShortcutTarget(e.target)) return false;
++  const action = chordAction(e, ctx);
++  if (action !== null) {
++    e.preventDefault();
++    action();
++    return true;
++  }
++  if (!hasMeta(e) || e.shiftKey || e.altKey) return false;
++  const mode = TOOL_BINDINGS[e.key.toLowerCase()];
++  if (mode === undefined) return false;
++  e.preventDefault();
++  ctx.setToolMode(mode);
++  return true;
++}
+diff --git a/src/ui/app/use-shortcuts-trace-image.test.tsx b/src/ui/app/use-shortcuts-trace-image.test.tsx
+new file mode 100644
+index 000000000..4ecc5cecd
+--- /dev/null
++++ b/src/ui/app/use-shortcuts-trace-image.test.tsx
+@@ -0,0 +1,146 @@
++// Alt+T (Option+T on macOS) opens Trace Image for the selected image: the
++// chord the Tools menu shows, with the same gate as that command (ADR-396).
++
++import { act } from 'react';
++import { createRoot, type Root } from 'react-dom/client';
++import { afterEach, describe, expect, it, vi } from 'vitest';
++import {
++  createProject,
++  IDENTITY_TRANSFORM,
++  type RasterImage,
++  type SceneObject,
++} from '../../core/scene';
++import type { PlatformAdapter } from '../../platform/types';
++import { buildAppCommands, commandById } from '../commands/command-registry';
++import { baseCtx } from '../commands/command-registry-test-helpers';
++import { useStore } from '../state';
++import { useUiStore } from '../state/ui-store';
++import { PlatformProvider } from './platform-context';
++import { useShortcuts } from './use-shortcuts';
++
++(
++  globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
++).IS_REACT_ACT_ENVIRONMENT = true;
++
++const platform: PlatformAdapter = {
++  id: 'mock',
++  pickFilesForOpen: vi.fn(async () => []),
++  pickFileForSave: vi.fn(async () => null),
++  serial: { isSupported: () => false, requestPort: vi.fn(async () => null) },
++};
++
++const IMAGE: RasterImage = {
++  kind: 'raster-image',
++  id: 'photo',
++  source: 'photo.png',
++  dataUrl: 'data:image/png;base64,iVBORw0KGgo=',
++  lumaBase64: 'AAAAAA==',
++  pixelWidth: 2,
++  pixelHeight: 2,
++  bounds: { minX: 0, minY: 0, maxX: 2, maxY: 2 },
++  transform: IDENTITY_TRANSFORM,
++  color: '#000000',
++  dither: 'floyd-steinberg',
++  linesPerMm: 10,
++};
++
++const SHAPE: SceneObject = {
++  kind: 'shape',
++  id: 'box',
++  spec: { kind: 'rect', widthMm: 20, heightMm: 10, cornerRadiusMm: 0 },
++  color: '#000000',
++  bounds: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
++  transform: IDENTITY_TRANSFORM,
++  paths: [],
++};
++
++function Shortcuts(): null {
++  useShortcuts();
++  return null;
++}
++
++function select(id: string | null): void {
++  const project = createProject();
++  useStore.setState({
++    project: { ...project, scene: { ...project.scene, objects: [IMAGE, SHAPE] } },
++    selectedObjectId: id,
++    additionalSelectedIds: new Set(),
++  });
++}
++
++// The chord exactly as the Tools menu labels the command, e.g. "Alt+T".
++async function pressMenuChord(init: KeyboardEventInit = {}): Promise<void> {
++  const label = commandById(buildAppCommands(baseCtx()), 'tools.trace-image').shortcut ?? '';
++  const [modifier, letter = ''] = label.split('+');
++  expect(modifier).toBe('Alt');
++  await act(async () => {
++    document.body.dispatchEvent(
++      new KeyboardEvent('keydown', {
++        key: letter.toLowerCase(),
++        code: `Key${letter}`,
++        altKey: true,
++        bubbles: true,
++        cancelable: true,
++        ...init,
++      }),
++    );
++  });
++}
++
++async function withShortcuts(run: () => Promise<void>): Promise<void> {
++  const host = document.createElement('div');
++  document.body.append(host);
++  let root: Root | null = null;
++  await act(async () => {
++    root = createRoot(host);
++    root.render(
++      <PlatformProvider adapter={platform}>
++        <Shortcuts />
++      </PlatformProvider>,
++    );
++  });
++  try {
++    await run();
++  } finally {
++    await act(async () => root?.unmount());
++    host.remove();
++  }
++}
++
++afterEach(() => {
++  useStore.getState().newProject();
++  useUiStore.setState({ textDialog: null, imageDialog: null, modalDepth: 0 });
++});
++
++describe('Alt+T opens Trace Image', () => {
++  it('opens the dialog on the selected image, from Option+T on macOS too', async () => {
++    select('photo');
++    await withShortcuts(async () => {
++      await pressMenuChord();
++      expect(useUiStore.getState().imageDialog?.source.id).toBe('photo');
++      useUiStore.setState({ imageDialog: null });
++      await pressMenuChord({ key: '†' });
++      expect(useUiStore.getState().imageDialog?.source.id).toBe('photo');
++    });
++  });
++
++  it.each([
++    ['a shape is selected', 'box'],
++    ['nothing is selected', null],
++  ])('does nothing when %s, like the disabled menu item', async (_name, id) => {
++    select(id);
++    await withShortcuts(async () => {
++      await pressMenuChord();
++      expect(useUiStore.getState().imageDialog).toBeNull();
++    });
++  });
++
++  it('waits while another dialog owns the keyboard', async () => {
++    select('photo');
++    useUiStore.setState({ modalDepth: 1 });
++    await withShortcuts(async () => {
++      await pressMenuChord();
++      expect(useUiStore.getState().imageDialog).toBeNull();
++    });
++  });
++});
+diff --git a/src/ui/app/use-shortcuts.ts b/src/ui/app/use-shortcuts.ts
+index b2aaf688c..9cdf31ef1 100644
+--- a/src/ui/app/use-shortcuts.ts
++++ b/src/ui/app/use-shortcuts.ts
+@@ -25,10 +25,10 @@ import {
+ import {
+   handleEditShortcut,
+   handleFileShortcut,
+-  handleToolShortcut,
+   handleTransformShortcut,
+   handleViewShortcut,
+ } from './shortcuts';
++import { handleToolShortcut } from './tool-shortcuts';
+ 
+ export function useShortcuts(): void {
+   const platform = usePlatform();
+diff --git a/src/ui/commands/command-raster-family.ts b/src/ui/commands/command-raster-family.ts
+index da0d0e6b9..77e07d714 100644
+--- a/src/ui/commands/command-raster-family.ts
++++ b/src/ui/commands/command-raster-family.ts
+@@ -33,7 +33,7 @@ export function processedRasterToolCommands(ctx: AppCommandContext): ReadonlyArr
+       'Save Processed Bitmap...',
+       'Save selected image after layer processing',
+     ),
+-    rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image'),
++    rasterToolCommand(ctx, 'tools.trace-image', 'Trace Image...', 'Trace selected image', 'Alt+T'),
+     retraceOriginalCommand(ctx),
+   ];
+ }
+@@ -61,11 +61,12 @@ function rasterToolCommand(
+   id: RasterToolCommandId,
+   label: string,
+   title: string,
++  shortcut?: string,
+ ): AppCommand {
+   const invoke = rasterToolInvoke(ctx, id);
+   return ctx.hasRasterSelection
+-    ? enabled(id, 'tools', label, title, invoke)
+-    : disabled(id, 'tools', label, 'Select an image first.', invoke);
++    ? enabled(id, 'tools', label, title, invoke, shortcut)
++    : disabled(id, 'tools', label, 'Select an image first.', invoke, shortcut);
+ }
+ 
+ function rasterToolInvoke(ctx: AppCommandContext, id: RasterToolCommandId): () => void {
+diff --git a/src/ui/common/shortcut-list.ts b/src/ui/common/shortcut-list.ts
+index 9c439cb1c..792e4215b 100644
+--- a/src/ui/common/shortcut-list.ts
++++ b/src/ui/common/shortcut-list.ts
+@@ -39,6 +39,7 @@ export function shortcutFamilies(machineKind: MachineKind): ReadonlyArray<Shortc
+         { keys: 'Ctrl+E', action: 'ellipse' },
+         { keys: 'Ctrl+L', action: 'pen' },
+         { keys: 'Alt+M', action: 'measure' },
++        { keys: 'Alt+T', action: 'trace selected image' },
+         { keys: 'Ctrl+Shift+B', action: 'convert to bitmap' },
+         { keys: 'Enter or double-click', action: 'finish pen' },
+         { keys: 'Esc', action: 'cancel' },
+diff --git a/src/ui/tutorials/image-tutorials.ts b/src/ui/tutorials/image-tutorials.ts
+index bd7af21a3..61240032a 100644
+--- a/src/ui/tutorials/image-tutorials.ts
++++ b/src/ui/tutorials/image-tutorials.ts
+@@ -119,7 +119,7 @@ export const IMAGE_TUTORIALS: readonly Tutorial[] = [
+     category: 'Images & tracing',
+     machine: 'all',
+     minutes: 4,
+-    location: 'Tools → Trace Image, or top toolbar Trace Image',
++    location: 'Tools → Trace Image, top toolbar Trace Image, or Alt+T (Option+T on macOS)',
+     prerequisites: 'One selected bitmap. A clear, high-contrast source is easiest to learn with.',
+     visual: 'trace',
+     steps: [
+-- 
+2.43.0
+

@@ -1,0 +1,135 @@
+From 06e18f4388aff6ae1544c22c2e4396e9e4005a5a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:18:15 +0000
+Subject: [PATCH 13/14] docs(trace): record why the Trace dialog shows what the
+ tracer used (ADR-396)
+
+No change in the app. The decision record explains the Trace dialog
+changes in this package: the display-only trace report and how long the
+dialog trusts it, Manual starting one level below the automatic
+threshold, the band and route shown in automatic detection, the
+working-grid note, hints checked against the engine, Edge Detection
+previewed as the lines it engraves (ADR-235), named kept adjustments,
+Centerline Join gaps, the Smooth and Sharp descriptions and Alt+T. It
+also records which texts depend on engine changes from the same audit
+batch, and why Multi-File Trace still asks for one file at a time.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ ...-trace-dialog-says-what-the-tracer-uses.md | 103 ++++++++++++++++++
+ 1 file changed, 103 insertions(+)
+ create mode 100644 docs/decisions/ADR-396-trace-dialog-says-what-the-tracer-uses.md
+
+diff --git a/docs/decisions/ADR-396-trace-dialog-says-what-the-tracer-uses.md b/docs/decisions/ADR-396-trace-dialog-says-what-the-tracer-uses.md
+new file mode 100644
+index 000000000..7c980140c
+--- /dev/null
++++ b/docs/decisions/ADR-396-trace-dialog-says-what-the-tracer-uses.md
+@@ -0,0 +1,103 @@
++## ADR-396 - The Trace dialog says what the tracer uses (2026-09-25)
++
++**Status:** Accepted. | **Date:** 2026-09-25
++
++### Context
++
++The 2026-09-24 tracer audit compared the Trace Image dialog's controls, notes and previews with what
++the engine does. In the dialog it found:
++
++- Edge Detection results engrave as lines: a Line operation for vectors and Outlines for raster
++  scan (ADR-235, decision 2). The preview, Overlay and Multi-File Trace SVGs filled them, so the
++  operator saw solid letters that would burn only as outlines.
++- Switching Smooth, Sharp or Centerline from automatic detection to Manual brightness band started
++  the band at 0–128. The automatic (Otsu) threshold can be far from 128: in the audit's example,
++  light ink at brightness 150 got a threshold of 197, and the 0–128 band then traced nothing. The
++  tracing lesson tells operators to make exactly this switch.
++- Line Art's automatic detection is a fixed 0–128 band, plus marks darker than their surroundings
++  only when a colour check passes (`auto-sketch-trace.ts`). The dialog showed neither the band nor
++  which route ran, and its label and description promised pale details on every image.
++- Large images are traced on a decoded grid of at most 2048 px a side. Remove ink specks, Ignore
++  Less Than, Minimum line and Centerline's join gap count pixels of that grid, but the dialog showed
++  only the image's own size.
++- Hints disagreed with the engine. Edge Detail claimed to smooth noise; the detector reads it only as
++  the neighbourhood size (`edge-input.ts`, about 25 px at 0 to 6 px at 100). Sensitivity and Detail
++  also rewrote the high ratio and join gap, which nothing reads. Area fields accepted fractions the
++  tracer rounds.
++- Adjustments carry over between styles, but "Settings edited" appeared for kept values the
++  selected style ignores, and selecting Photo shading overwrote an Enhance region choice for good.
++- Centerline joins facing line ends closer than `centerlineJoinGapPx` (3 px in its preset,
++  `junction-pairing.ts`) with no control for it.
++- Smooth and Sharp promised curve styles that on anti-aliased art they did not deliver (audit
++  finding 9). They differ from Line Art in detection and cleanup.
++- LightBurn opens Trace Image with Alt/Option+T
++  (https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/). KerfDesk had no shortcut.
++
++### Decision
++
++1. **A trace reports what it chose; nothing reads it back.** Trace steps may yield a display-only
++   report (`TraceReport` in `trace-steps.ts`): the luma the automatic threshold picked, and whether
++   Line Art added local-contrast marks. The worker, the inline fallback, region crop and enhance
++   and the preview carry it. The options that key prepared and cached results are unchanged, and so
++   is trace output. The dialog uses the latest finished preview's report only while the image,
++   region and detection options match what was traced; finishing controls (Smoothness, Optimize,
++   Ignore Less Than, Join gaps) keep it (`use-trace-preview-facts.ts`).
++2. **Manual starts where automatic was.** Otsu inks luma below its threshold T, and the manual band
++   is inclusive, so the first switch to Manual on an automatic-threshold preset sets Threshold to
++   T − 1: the same pixels stay ink. A band the operator already set is kept. Without a matching
++   report the band still starts at 0–128.
++3. **Automatic shows its band.** In automatic and Faint lines modes the Detection section shows the
++   band in use, read-only, and Line Art says which route ran. Line Art's Detection label reads
++   "Automatic (band + pale colour detail)".
++4. **Pixel settings name their grid.** When the traced grid differs from the image, the settings
++   panel says "Tracing at W × H px; pixel settings use this grid."
++5. **Hints come from the engine.** Each numeric control has a unit and a hint checked against the
++   code; area fields step and round to whole pixels; a Cutoff above Threshold says which pixels the
++   band selects, since the engine orders the two ends. Edge Sensitivity is shown from, and writes,
++   only the low ratio the detector reads; Detail writes only the blur sigma. The Smoothness hint
++   uses potrace's corner semantics (https://potrace.sourceforge.net/potrace.1.html: alphamax 0
++   gives a polygon, above 4/3 no corners), matching LightBurn's 0 = lines, 1.33 = curves.
++6. **Edge Detection previews as strokes.** The preview, Overlay and Multi-File Trace SVGs draw Edge
++   results as lines, like Centerline, with one-screen-pixel preview strokes at any zoom. This
++   applies ADR-235's output semantics to the preview; the committed output is unchanged.
++7. **Kept adjustments are named.** "Settings edited" counts only adjustments the selected style
++   uses and that change its options. The preset hint names kept adjustments the style ignores
++   ("Not used by Line Art: Sensitivity."). Photo shading forces Crop while selected but keeps the
++   operator's boundary mode for the other styles.
++8. **Centerline gets Join gaps** (0–50 px; the preset's 3 by default). It maps to
++   `centerlineJoinGapPx`; 0 turns the end bridge off. It applies only to Centerline.
++9. **Smooth and Sharp describe what differs.** Smooth sets its threshold from the image and removes
++   isolated noise dots when there are many. Sharp sets its threshold from the image, keeps
++   single-pixel marks and tiny holes, and rounds fewer corners into curves.
++10. **Alt+T (Option+T on macOS) opens Trace Image** for the selected image with the Trace command's
++    gate, and not while a dialog, the canvas text editor or a text field owns the keyboard. Because
++    macOS Option composes a character (Option+T types "†"), Alt chords match the physical key when
++    no plain letter was typed; Alt+M gets the same fix. The command, Keyboard Shortcuts list and
++    tracing lesson show the chord.
++11. **Multi-File Trace keeps one Save dialog per SVG.** A one-folder export is left for a later
++    decision; see Consequences.
++
++### Consequences
++
++- A trace yields its report once. Runners that do not show reports treat it as one more
++  checkpoint.
++- The report is only as fresh as the last finished preview. Until the preview finishes, Automatic
++  says the band will be set from the image, and Manual starts at 0–128.
++- Some texts rely on engine changes made alongside this decision in the same audit batch: the
++  Smoothness and Optimize hints and Sharp's corner claim on Smoothness acting on every image with
++  potrace semantics; the speck hint on corner-touching pixels counting as one mark; and the Minimum
++  line hint on holes being kept. If one of those changes is withdrawn, its text must change too.
++- Pixel values still mean grid pixels, not source pixels; the note makes the grid visible rather
++  than converting settings between grids.
++- The Alt chords follow the typed letter when a letter is typed, so on Dvorak Alt+T is the key
++  labelled T. Where Option types a symbol, the physical key decides, so a Dvorak Mac user presses
++  Option on the key in the QWERTY T position. The chords were checked with synthetic key events,
++  not on real keyboards. The desktop menu policy defines no item of its own on Alt/Option+T
++  (`electron/application-menu-policy.ts`).
++- Multi-File Trace to one folder is not done, because it is not a desktop-only change and needs
++  its own design. The desktop app uses the web adapter (`src/ui/app/main.tsx`), so the folder flow
++  would change the web build too. Tiled G-code export reserves its folder before any work because
++  web pickers consume the click's user activation (`save-tiled-gcode.ts`); Multi-File Trace spends
++  that activation on the file-open picker, so a folder needs a second click. A write into a
++  reserved folder replaces a file with the same name (`web-adapter.ts`), so a batch export also
++  needs a collision policy.
+-- 
+2.43.0
+

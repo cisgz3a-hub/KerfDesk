@@ -1,0 +1,148 @@
+From 9f9e7b4486ae6d27694ddb200c68b6b6aee2b7b5 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Fri, 25 Sep 2026 00:44:56 +0000
+Subject: [PATCH 4/4] docs(decisions): ADR-394 Centerline centres strokes on
+ the sub-pixel ridge and keeps drawn curves round
+
+Records the decisions behind the three previous commits (tracer audit
+finding 7): ridge centring for even-width strokes, the round-bend guard,
+one rebuilt corner per bend, the tip walk reading between pixel centres,
+and the zero join gap. Also records why the 4 px maxDev values left on
+the 8 px strokes are the end convention (the traced line runs to the end
+of the ink, half a stroke width past the true centreline's end), with the
+measurements and the known limits left for later.
+
+Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01Sve7yAMGfoSkUWytefCLp2
+---
+ ...terline-sub-pixel-ridge-and-round-bends.md | 118 ++++++++++++++++++
+ 1 file changed, 118 insertions(+)
+ create mode 100644 docs/decisions/ADR-394-centerline-sub-pixel-ridge-and-round-bends.md
+
+diff --git a/docs/decisions/ADR-394-centerline-sub-pixel-ridge-and-round-bends.md b/docs/decisions/ADR-394-centerline-sub-pixel-ridge-and-round-bends.md
+new file mode 100644
+index 000000000..ade889f8b
+--- /dev/null
++++ b/docs/decisions/ADR-394-centerline-sub-pixel-ridge-and-round-bends.md
+@@ -0,0 +1,118 @@
++## ADR-394 - Centerline centres strokes on the sub-pixel ridge and keeps drawn curves round (2026-09-25)
++
++**Status:** Accepted. | **Date:** 2026-09-25
++
++### Context
++
++The 2026-09-24 tracer audit (finding 7) measured Centerline on 21 synthetic strokes with known
++centrelines: a mean distance of 0.25 px from the true centre, ahead of AutoTrace, with two errors.
++
++- **Rounded bends in thick strokes become sharp corners.** `centerline/sharpen-bends.ts` rebuilds a
++  bend as the corner its two straight legs point at, and keeps only roundings of about two stroke
++  radii or more. Thinning cuts inside a drawn corner and follows a rounded bend, and in a thick
++  stroke both leave a short, concentrated turn between straight legs, so the shape gates cannot
++  tell them apart. On the new base (85ee406) the 8 px
++  wave's rounded bottoms turned into V shapes, leaving the true centre up to 2.24 px from the trace.
++- **Strokes an even number of pixels wide sit 0.5 px off centre.** The ridge of the exact distance
++  transform (Felzenszwalb and Huttenlocher) lies between two pixel centres there. Distance-ordered
++  homotopic thinning (Pudney) keeps whole pixels, so the skeleton takes one of the two.
++
++Three more things came up while fixing these:
++
++- **The tip walk turned off the axis of round caps.** `extendTip` walks from the skeleton's end to
++  the ink tip and breaks ties by the radius of the nearest pixel. That radius jumps a whole lattice
++  step between neighbouring candidates and turned the walk 22.5° off a round cap's axis. Centring
++  changed the chain ends and pushed the in-repo regression bar's 9 px arc from 0.79 px to 1.25 px of
++  maximum deviation, over its 1 px limit.
++- **A rebuilt corner could be built again.** After a rebuild the sharpener's scan moves to the next
++  point along the chain. That point's window can take in the new corner, whose own leg is straight,
++  so the candidate passes every gate and builds a second corner beside the first from a tangent read
++  further down the other leg. The distance rule meant to stop this (2.5 px) misses when the second
++  corner lands further away. Centring straightens the legs, so it happened more: on a 12 px stroke's
++  45° corner the second corner stood 3 px past the first and 1.5 px off the pen's path.
++- **The separate-end gap bridge at zero.** WORKFLOW says "Zero disables that gap bridge", and a
++  trace-dialog control for the gap is being added in a separate change. `bridgeNearbyEnds` returns
++  before pairing any ends when the gap is zero or less, so the statement holds.
++
++### Decision
++
++1. **Centre chains on the sub-pixel ridge** (`centerline/ridge-centering.ts`, run after junction
++   condensation and before assembly). For each chain point that sits on a pixel centre, read the
++   distance field one pixel to either side along the chain's normal (taken from the points two
++   either side), with bilinear reads (`interpolatedRadius`). Fit a tent through the three values:
++   two lines of equal and opposite slope, which is the shape of the distance to the nearer edge
++   across a straight band. Move the point to the tent's apex, at most half a pixel. Junction nodes
++   and former junctions (`seamJunctions`) stay where they are, because pairing, seam repair and the
++   attachment pins find them by position. An open chain's own end moves with its endpoint node.
++2. **Keep a rounded bend round in centreline strokes** (`centerline/round-bend-guard.ts`, enabled
++   by `sharpenChainBends(..., { keepRoundedBends: true })` from `stroke-chains.ts` only). Before
++   accepting a rebuilt corner, compare the ink radius at the rebuilt vertex with the legs' radius:
++   the smaller of the two medians read on each leg just outside the bend. The ink the vertex lost
++   says how far it stands off the pen's path. The rest of its offset from the chain is how far the
++   chain stands off. Rebuild only when the loss is at most max(0.6 px, half the offset), which is
++   when the vertex is the nearer of the two.
++3. **Build one corner per bend in centreline strokes** (`oneCornerPerBend: true`, also from
++   `stroke-chains.ts` only). A candidate is skipped when the points its vertex would be built from,
++   the window it replaces and the 3 px tangent chords either side, include a corner already rebuilt
++   on the chain. The contour tracer passes neither option, so outlines are unchanged.
++4. **Read the ridge between pixel centres in the tip walk**: its tie-break uses
++   `interpolatedRadius` instead of the nearest pixel's radius.
++5. **The gap bridge's zero stays as it is.** A unit test now pins that a gap of zero or less
++   bridges no ends, even touching, aligned ones.
++
++### Consequences
++
++- 21-stroke centreline corpus from the audit, new base against this change: mean distance from the
++  true centre 0.254 to 0.102 px; mean 95th percentile 0.43 to 0.20 px; share of the true centreline
++  covered 99.84% to 100%; fragment counts unchanged. Every stroke improves or holds its mean except
++  cross-w4 (0.093 to 0.186 px). Its tip now ends 0.71 px off the axis instead of 1.28 px, which
++  changes the kink next to a 248 px chord. The output spline, shared with the contour tracer, then
++  bows that chord by up to its 0.45 px cap.
++- The 8 px wave's largest gap falls from 2.24 to 0.15 px. Centring alone or the guard alone also
++  removes the V shapes.
++- The largest deviation of every open stroke in that corpus sits at a stroke end. The true
++  centreline stops where the pen stopped; the traced line runs on to the end of the ink, half a
++  stroke width further, and the bench counts that reach. The 8 px corner and tee read 4.03 px
++  because their tips also sat 0.5 px off the axis, and now read 4.00 px. What remains across the
++  axis at a tip comes from the tip walk's 16 compass directions: the 8 px diagonal runs 9.3° from
++  the nearest one, and its tips end 0.65 and 0.83 px off the axis (4 px × sin 9.3° is 0.65 px).
++- A 290-bend corpus (3-12 px strokes, 45-150° turns, sharp, mitred and filleted paths; mean of each
++  bend's local maximum error): 1.25 to 0.57 px. 235 bends improve by more than 0.1 px and 20 get
++  worse, by at most 0.79 px, 14 of them at 3-4 px widths. At those widths the ink cannot reliably
++  tell a fillet of about one stroke radius from a drawn corner. The guard alone improves 88 bends
++  and worsens one. The one-corner rule changes five bends, all for the better (a 12 px stroke's 45°
++  corners from 1.5-1.8 px to 0.6-0.7 px), and no stroke of the 21-stroke corpus.
++- The in-repo regression bar: maximum deviation 0.69 to 0.19 px for h-stroke, l-corner and cross,
++  and 0.79 to 0.10 px for the arc.
++- The contour presets (Line Art, Smooth, Sharp, Edge Detection) give identical output, timing field
++  aside: 48 of 48 audit corpus traces, and all 8 traces of the dragon and Arch House logo.
++- Dragon (`centerline-stress-test-20260909.png`): 2,518 to 2,522 paths, 66,690 to 65,986 vertices;
++  share of traced length on ink 0.820 to 0.835. Four more paths come from pairs of ends 2-3 px apart
++  that centring moves across the bridge's reach. Logo (`arch-house-langebaan-source.png`): 74 paths
++  either way, 2,552 to 2,665 vertices; the traced line's radius relative to the local ridge rises
++  from 0.906 to 0.917. On the two images the one-corner rule leaves out 36 of 752 rebuilt corners;
++  corners standing within 12 px of an earlier one fall from 43 to 10. Centring costs about 68 ms on
++  the dragon's 98,000 chain points.
++- The guard's half is the break-even point, not a tuned value. On the bend corpus, where rebuilding
++  helped, the vertex lost at most 0.21 of its offset (4-12 px strokes). Where it did not help, the
++  vertex lost a median 0.54-0.86. A lower cut of 0.35 caught more curves in that corpus but rounded
++  the pointed tops of the logo's capital A and N, so it was rejected.
++- Known limits, unchanged here: the tip walk still steps in 16 compass directions; the output
++  spline can bow a long chord next to a kinked end segment by up to its cap; flat-ended bars end
++  1/6 px off, at the junction centroid; 150° hairpins in thick strokes end up to half a stroke
++  width short; one tip of the 8 px X ends 1.41 px off its axis (1.86 px before).
++- Tests: `ridge-centering.test.ts` (tent apex, even and odd widths, fixed junctions, a 4 px ring
++  within 0.2 px of its centre circle), `round-bend-guard.test.ts` (a 12 px stroke's 9 px fillet
++  stays round, the same stroke's drawn corner is rebuilt, the option is off unless asked for),
++  `corner-rebuilt-once.test.ts` (a 12 px stroke's 45° corner is rebuilt once, within 1 px of the
++  pen's path), `tip-extension.test.ts` (the arc's round caps end within 0.5 px of their axes), and
++  `gap-distance.test.ts` (zero gap).
++
++### References
++
++- P. F. Felzenszwalb and D. P. Huttenlocher, "Distance Transforms of Sampled Functions", Theory of
++  Computing 8:415-428, 2012. doi:10.4086/toc.2012.v008a019,
++  <https://theoryofcomputing.org/articles/v008a019/>
++- C. Pudney, "Distance-Ordered Homotopic Thinning: A Skeletonization Algorithm for 3D Digital
++  Images", Computer Vision and Image Understanding 72(3):404-413, 1998.
++  <https://doi.org/10.1006/cviu.1998.0680>
+-- 
+2.43.0
+
