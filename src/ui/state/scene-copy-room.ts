@@ -3,11 +3,14 @@
 // amendment 1). A project holds at most PROJECT_SCENE_LIMITS.objects objects and
 // cannot be reopened above that (the loader refuses it), so that is the one limit
 // on how many copies such a command can make. Every request that fits is placed;
-// one that does not is explained and not applied, never clamped.
+// one that does not is explained and not applied, never clamped. The exact check
+// on a built scene also holds every other command that adds objects in one step
+// (Duplicate, Paste, Break Apart, ...) to the loader's limits.
 
 import type { Scene } from '../../core/scene/scene';
 import { PROJECT_SCENE_LIMITS } from '../../io/project/project-scene-integrity-validator';
 import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
+import { useToastStore } from './toast-store';
 
 const OBJECT_LIMIT = `project limit ${PROJECT_SCENE_LIMITS.objects} objects`;
 
@@ -77,14 +80,32 @@ const BUDGETS: ReadonlyArray<Budget> = [
  * over a limit it can be reopened with: a count that is over its limit and grew
  * is refused. The room worked out beforehand counts objects only, so this is the
  * exact check on the scene a command has built. A project that is already over
- * stays free to change in ways that add nothing.
+ * stays free to change in ways that add nothing. `ask` says what to change, in
+ * the words of the command that was refused.
  */
-export function sceneLimitOverrun(before: Scene, after: Scene): string | null {
+export function sceneLimitOverrun(
+  before: Scene,
+  after: Scene,
+  ask = 'Ask for fewer copies, or delete some objects first.',
+): string | null {
   for (const budget of BUDGETS) {
     const now = budget.count(after);
     if (now > budget.limit && now > budget.count(before)) {
-      return `This would take the project past its limit of ${budget.limit} ${budget.what}. Ask for fewer copies, or delete some objects first.`;
+      return `This would take the project past its limit of ${budget.limit} ${budget.what}. ${ask}`;
     }
   }
   return null;
+}
+
+/**
+ * The same check for a command that adds objects in one step: true, after a
+ * notice saying why and what to change, when `after` may not replace `before`.
+ * The command then leaves the project as it was; one that fits goes ahead
+ * unchanged. It refuses nothing but a limit overrun.
+ */
+export function refuseSceneLimitOverrun(before: Scene, after: Scene, ask: string): boolean {
+  const overrun = sceneLimitOverrun(before, after, ask);
+  if (overrun === null) return false;
+  useToastStore.getState().pushToast(overrun, 'warning');
+  return true;
 }

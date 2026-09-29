@@ -10,6 +10,7 @@ import {
 import { jobPlacementAfterDeviceChange, jobPlacementAfterProfileSelection } from '../job-placement';
 import { fitToSelection } from './viewport-actions';
 import { applyDuplicate, HISTORY_DEPTH, pushUndo } from './scene-mutations';
+import { refuseSceneLimitOverrun } from './scene-copy-room';
 import { selectionFromIds, toggleSelectionFromId } from './scene-group-actions';
 import {
   carriedSelectionReference,
@@ -124,12 +125,19 @@ function deviceProfileReplacementState(s: AppState, profile: DeviceProfile): Par
   };
 }
 
+const DUPLICATE_FEWER = 'Duplicate fewer objects, or delete some objects first.';
+
 export function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection'> {
   return {
     duplicateSelection: () =>
       set((s) => {
         const result = applyDuplicate(s, () => crypto.randomUUID());
-        return result ?? s;
+        if (result === null) return s;
+        // A project past its limits saves but cannot be opened again (ADR-307
+        // amendment 1): such a Duplicate is refused whole, never made in part.
+        return refuseSceneLimitOverrun(s.project.scene, result.project.scene, DUPLICATE_FEWER)
+          ? s
+          : result;
       }),
   };
 }

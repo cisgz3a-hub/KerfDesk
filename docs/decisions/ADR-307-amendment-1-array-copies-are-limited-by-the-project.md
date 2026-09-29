@@ -23,6 +23,9 @@ any kind (the 2026-09-28 weakness audit, found while fixing H-5, ADR-498 amendme
   was awaited for the whole count before any copy was placed.
 - **Find pieces reported success it had not had.** Place selection on each piece shares the store
   action (ADR-442) and said "Placed on N pieces" whether or not anything was placed.
+- **Other commands that add objects in one step had the same hole.** Duplicate made a project of
+  6,000 selected objects into 12,000, and the saved file reopened as "invalid `scene.objects`:
+  count 12000 exceeds 10000".
 
 ADR-307 decision 5 says every valid requested placement is materialized. This amendment says what
 valid means: one the project can hold. It is not the policy cap decision 5 removed, because the
@@ -69,6 +72,20 @@ figure is the loader's and not a judgement, and every request that fits is still
 6. **No small cap, and nothing is clamped.** A request that fits is placed whole. The largest a
    project can hold, one object made into 10,000, was applied in about a quarter of a second in
    the test run, saved, and opened again.
+7. **Every command that adds objects in one step keeps to the same limits.** Such a command
+   builds the scene it would make and holds it to the exact check of item 4
+   (`refuseSceneLimitOverrun`, which shows `sceneLimitOverrun`'s message as a warning notice). A
+   result that would take a count past its limit, and grow it, is refused whole and nothing
+   changes: no undo step, no change to the selection, and never a part of it made. Everything that
+   fits is made exactly as before. The notice names the limit and says what to change in the
+   command's own words:
+   - **Duplicate:** "This would take the project past its limit of 10000 objects. Duplicate fewer
+     objects, or delete some objects first."
+
+   These commands add what the selection or the clipboard holds, not a number the operator typed,
+   so no room is worked out in advance and there is nothing to lay out first. No cap below the
+   loader's limits is added, and a project that is already over one stays free to change in ways
+   that add nothing to it.
 
 ### Alternatives
 
@@ -83,15 +100,19 @@ figure is the loader's and not a judgement, and every request that fits is still
 - **Count the first placement's extra copies in the room.** Rejected: they depend on where the
   first copy lands, which needs the placements laid out. The exact check covers them, and they
   matter only within a few objects of the limit.
+- **One gate on every change to the project, instead of a check in each command (item 7).**
+  Rejected: it would see every write to the project, undo and redo included, so it could refuse
+  something other than a command adding objects, and its notice could not say what to change in
+  the command's own words. Each command asks the one shared check instead, so the counting is
+  still in one place and nothing else can be refused by it.
 
 ### Consequences
 
 - Array never takes a project over the limit it can be reopened with. A project that is already
   over it (Array could make one until now) gets "no room" until objects are deleted.
 - Applying a large array still costs what its copies cost, and no more. Typing one costs nothing.
-- Other commands that add objects in one step (Duplicate, Paste, Break Apart, Cut Shapes, Design
-  Studio, tiling into a board) do not check the limit and are not covered here; each is a
-  separate decision.
+- Duplicate keeps to the same limits (item 7). Paste, Break Apart, Cut Shapes, Design Studio
+  Apply and tiling into a board do not check them yet.
 - No schema change and no change to G-code.
 
 ### Verification
@@ -114,3 +135,8 @@ figure is the loader's and not a judgement, and every request that fits is still
 - `src/ui/camera/pieces/PiecesControl.test.tsx`: "Nothing was placed" with the reason in a notice.
 - `src/ui/state/copy-along-path-group-limits.test.ts`: Copy Along Path refuses group members past
   their limit.
+- `src/ui/state/duplicate-limits.test.ts`: 6,000 selected objects are not made into 12,000 (they
+  were before, and the file did not reopen); 5,000 duplicated to exactly 10,000 in one undo step,
+  saved and reopened; an image's mask counted, to the last object; group members past their limit
+  refused though the objects fit, and exactly 50,000 accepted; a project already over the limit
+  not grown.
