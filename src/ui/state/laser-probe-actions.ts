@@ -118,6 +118,9 @@ function reserveProbe(set: SetFn, affectsXy: boolean): number {
       affectsXy,
     },
     ...invalidProbeEvidence(affectsXy),
+    // The corner cycle rewrites the XY origin (G92.1, G10 L20), so nothing
+    // bound to the old one, such as a Place Board registration, outlives it.
+    ...(affectsXy ? { workOriginVersion: (state.workOriginVersion ?? 0) + 1 } : {}),
     workZReferenceEpoch: state.workZReferenceEpoch + 1,
     log: pushLog(state, `[lf2] Probe transaction ${transactionId} started.`),
   }));
@@ -149,12 +152,28 @@ function completeProbe(set: SetFn, transactionId: number, toolId: string | undef
           controllerOperation: null,
           probeBusy: false,
           workZZeroEvidence: captureWorkZZeroEvidence('probe', state.workZReferenceEpoch, toolId),
+          ...settledCornerOriginPatch(state),
           alarmCode: null,
           lastWriteError: null,
           log: pushLog(state, `[lf2] Probe transaction ${transactionId} settled at fresh Idle.`),
         }
       : {},
   );
+}
+
+// A settled corner cycle cleared G92 and stored the probed corner in G54
+// (buildCornerProbeLines), so the origin is a saved one, as Set persistent
+// origin leaves it, and no temporary G92 origin is left. Touching the plate
+// re-establishes where the head is, as Set origin here does, so reports are
+// trusted again (controller audit 2, ADR-375).
+function settledCornerOriginPatch(state: LaserState): Partial<LaserState> {
+  const operation = state.controllerOperation;
+  if (operation?.kind !== 'probe' || !operation.affectsXy) return {};
+  return {
+    workOriginActive: true,
+    workOriginSource: 'g54-persistent',
+    positionEvidenceSuppressed: false,
+  };
 }
 
 function assertCurrentProbe(

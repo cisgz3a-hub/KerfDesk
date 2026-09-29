@@ -13,6 +13,7 @@ import { createRectangle } from '../../core/shapes/primitives';
 import {
   LARGE_JOB_PREPARATION_WARNING,
   largeJobPreparationWarning,
+  preparedProgramIntegrityIssue,
 } from './start-job-readiness-policy';
 
 const OVER_BUDGET_COLOR = '#ff0000';
@@ -104,5 +105,29 @@ describe('largeJobPreparationWarning with an unknown fill estimate', () => {
     expect(largeJobPreparationWarning(denseSmallCircleFill(), jobWithFillSpans(20_001))).toBe(
       LARGE_JOB_PREPARATION_WARNING,
     );
+  });
+});
+
+// Controller audit S-3: Frame prepares the same program Start sends, so a line
+// the connected controller's parser cannot hold is refused there, before any
+// motion, rather than after a completed Frame. Stock GRBL keeps 79 significant
+// characters, grblHAL 256
+// (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.h#L31-L32,
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.h#L35-L36).
+describe('preparedProgramIntegrityIssue line buffer', () => {
+  const NO_PREFLIGHT = { issues: [] };
+  const program = `G21\nG1 X${'1'.repeat(77)}\nM5\n`;
+
+  it('refuses Frame for a line the connected GRBL parser cannot hold', () => {
+    expect(preparedProgramIntegrityIssue(program, 1024, NO_PREFLIGHT, 'grbl-v1.1')).toEqual([
+      'G-code line 2 has 80 significant characters — stock GRBL accepts at most 79 per line ' +
+        '(spaces and comments do not count) before error:11. Job not framed or started.',
+    ]);
+  });
+
+  it('keeps the line for a controller whose parser holds it or is not described', () => {
+    for (const kind of ['grblhal', 'fluidnc', 'marlin', undefined] as const) {
+      expect(preparedProgramIntegrityIssue(program, 1024, NO_PREFLIGHT, kind)).toBeNull();
+    }
   });
 });

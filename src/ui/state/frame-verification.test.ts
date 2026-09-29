@@ -41,6 +41,25 @@ describe('isVerifiedFrameValid', () => {
     expect(isVerifiedFrameValid(recorded, { ...matching, workOriginActive: false })).toBe(false);
   });
 
+  // GRBL reports WCO in the very next status after any offset change, so the
+  // first report equal to the assumed zero does not move the origin (ADR-375).
+  it('accepts a first reported zero WCO as the zero assumed without a custom origin', () => {
+    const assumed: FrameVerification = {
+      boundsSignature: '0,0,50,50',
+      wco: null,
+      workOriginActive: false,
+    };
+    expect(isVerifiedFrameValid(assumed, { ...assumed, wco: { x: 0, y: 0, z: 0 } })).toBe(true);
+    expect(isVerifiedFrameValid(assumed, { ...assumed, wco: { x: 0, y: 0, z: -5 } })).toBe(false);
+    expect(isVerifiedFrameValid(assumed, { ...assumed, wco: { x: 150, y: 100, z: 0 } })).toBe(
+      false,
+    );
+    const unresolved = { ...assumed, workOriginActive: true };
+    expect(isVerifiedFrameValid(unresolved, { ...unresolved, wco: { x: 0, y: 0, z: 0 } })).toBe(
+      false,
+    );
+  });
+
   it('treats two null WCOs as equal (no-position-feedback machine)', () => {
     const nullWco: FrameVerification = {
       boundsSignature: '0,0,50,50',

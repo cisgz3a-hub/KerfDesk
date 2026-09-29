@@ -50,6 +50,10 @@ describe('MachineSettingsPanel', () => {
     try {
       expect(detailsBySummary(host, 'Read / Backup Controller Settings').open).toBe(false);
       expect(host.textContent).toContain('Reads live controller settings with $$');
+      // Machine Setup's firmware step, which can queue writes, shows this panel
+      // too, so it describes itself rather than the whole app (audit C-8).
+      expect(host.textContent).toContain('This panel never writes firmware');
+      expect(host.textContent).not.toContain('Read-only in this version');
     } finally {
       await cleanup();
     }

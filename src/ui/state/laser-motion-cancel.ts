@@ -18,6 +18,10 @@ import { cancelPendingManualMotions } from './manual-motion-intent';
 
 const CANCEL_QUEUE_TIMEOUT_MS = 8_000;
 const CANCEL_QUEUE_POLL_MS = 10;
+// How long Cancel lets a controller whose jog-cancel byte drops unparsed lines
+// parse the line it was just sent, counted from when that line has left the
+// transport, before writing the byte anyway.
+const JOG_CANCEL_PARSE_GRACE_MS = 250;
 const CONTROLLER_STATE_TIMEOUT_MESSAGE = 'Timed out waiting for controller state after Cancel.';
 // Disconnect and Reconnect are disabled while a motion owner exists, so the
 // guidance names what the operator can actually do: KerfDesk settles and
@@ -49,6 +53,12 @@ export async function runCancelJog(
   }));
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
   try {
+    if (jogCancelDropsUnparsedLines(context)) {
+      // A line still being written has not reached the controller, so its
+      // parse grace starts only once it is out (ADR-375 re-audit).
+      await settledWithin(context, CANCEL_QUEUE_TIMEOUT_MS, transportWritesDone);
+      await owedRepliesSettled(context, JOG_CANCEL_PARSE_GRACE_MS);
+    }
     const cancelError = await writeJogCancel(context);
     try {
       await settleCancelledMotion(context, operationId);
@@ -149,21 +159,58 @@ async function waitForCancelledMotionQueue(
   operationId: LaserMotionOperationId | undefined,
 ): Promise<void> {
   if (operationId === undefined) return;
-  const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
-  while (Date.now() <= deadline) {
-    assertCancelContext(context);
-    const state = context.get();
-    if (motionQueueSettled(state)) return;
-    await sleep(CANCEL_QUEUE_POLL_MS);
-  }
+  if (await owedRepliesSettled(context, CANCEL_QUEUE_TIMEOUT_MS)) return;
   throw new Error(
     'Cancel is waiting for the previous motion command acknowledgement. Reconnect if the controller does not respond.',
   );
 }
 
+// grblHAL answers the jog-cancel byte, in any state, by discarding every line
+// it has received but not parsed, and never answers those lines. When the
+// jog's `$J=` was one of them its owed reply never came: Cancel timed out and
+// the jog kept Jog, Frame and Disconnect locked until ABORT MOTION (controller
+// audit M-6, ADR-375). Jog and Frame keep at most one line in flight, and an
+// idle main loop parses it within a serial round trip, so on such a driver
+// the byte first waits briefly for every owed reply. A reply still owed after
+// that grace belongs to a line already parsed, most likely one waiting for
+// planner room, which the flush cannot drop; waiting for it would only delay
+// the stop, and grblHAL builds with the kinematics API (CoreXY among them)
+// cancel a jog from the byte at once
+// (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L900-L903).
+// So the byte goes anyway: stopping motion comes first, and the settlement
+// then waits for that reply as before. A jog still running afterwards stops on
+// this byte or on the re-send after a fresh Jog report. Other drivers keep
+// writing the byte at once.
+function jogCancelDropsUnparsedLines(context: CancelContext): boolean {
+  const realtime = context.refs.driver.realtime;
+  return realtime.jogCancel !== null && realtime.jogCancelDropsUnparsedLines === true;
+}
+
+/** Polls until no reply is owed and no write is pending; false after `timeoutMs`. */
+function owedRepliesSettled(context: CancelContext, timeoutMs: number): Promise<boolean> {
+  return settledWithin(context, timeoutMs, motionQueueSettled);
+}
+
+async function settledWithin(
+  context: CancelContext,
+  timeoutMs: number,
+  settled: (state: LaserState) => boolean,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() <= deadline) {
+    assertCancelContext(context);
+    if (settled(context.get())) return true;
+    await sleep(CANCEL_QUEUE_POLL_MS);
+  }
+  return false;
+}
+
 function motionQueueSettled(state: LaserState): boolean {
+  return state.pendingUntrackedAcks === 0 && transportWritesDone(state);
+}
+
+function transportWritesDone(state: LaserState): boolean {
   return (
-    state.pendingUntrackedAcks === 0 &&
     pendingTransportWriteCount(state) === 0 &&
     (state.motionOperation?.pendingMotionTransportWrites ?? 0) === 0
   );

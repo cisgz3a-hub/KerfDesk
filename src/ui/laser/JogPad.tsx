@@ -20,6 +20,8 @@ import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { inferCurrentMachinePosition } from '../state/infer-machine-position';
 import { useLaserStore } from '../state/laser-store';
+import { withheldControllerMPos } from '../state/laser-status-position';
+import { firmwareJogCheckPosition, resolveManualMotionLimits } from '../state/manual-motion-limits';
 import { resolveNativeBedFrame, selectNativeBedEvidence } from '../state/native-bed-frame';
 import { FocusJogControls, focusJogReady } from './FocusJogControls';
 import { JogArrowGrid } from './JogArrowGrid';
@@ -130,18 +132,34 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
 // into negative numbers, and a machine without homing starts at MPos 0,0
 // wherever the head was at power-up. Clamping raw MPos against 0..bed made a
 // held arrow do nothing toward the origin and overshoot the other way (audit
-// jog-home-origin-3). Without a verified frame the hold asks for full travel
-// and relies on release plus the jog-cancel byte, as it does with no position.
+// jog-home-origin-3). With soft limits on, the controller checks the target in
+// MPos with or without a verified frame and refuses the whole line
+// (error:15), so this session's `$$` bounds the hold as well, and the homing
+// edge stays the pull-off clear of its switch (ADR-375). Stock GRBL checks from
+// its own MPos even after an Unlock without Home, when KerfDesk hides the
+// position, so that clamp alone aims from the controller's number then. With
+// neither a frame nor soft limits, the hold asks for full travel and relies on
+// release plus the jog-cancel byte, as it does with no position.
 function JogArrows(props: Omit<Parameters<typeof JogArrowGrid>[0], 'position'>): JSX.Element {
   const statusReport = useLaserStore((s) => (props.disabled ? null : s.statusReport));
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
   const nativeEvidence = useLaserStore(selectNativeBedEvidence);
   const device = useStore((s) => s.project.device);
-  const nativeFrame = resolveNativeBedFrame(device, nativeEvidence);
+  const limits = resolveManualMotionLimits(
+    resolveNativeBedFrame(device, nativeEvidence),
+    nativeEvidence,
+  );
   const position =
-    nativeFrame === null ? null : inferCurrentMachinePosition(statusReport, wcoCache, reportInches);
-  const bounds = nativeFrame === null ? props.bounds : nativeTravel(nativeFrame.nativeBounds);
+    limits === null
+      ? null
+      : (inferCurrentMachinePosition(statusReport, wcoCache, reportInches) ??
+        firmwareJogCheckPosition(
+          nativeEvidence,
+          withheldControllerMPos(statusReport),
+          reportInches,
+        ));
+  const bounds = limits === null ? props.bounds : nativeTravel(limits);
   return <JogArrowGrid {...props} bounds={bounds} position={position} />;
 }
 

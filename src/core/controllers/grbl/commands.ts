@@ -38,11 +38,12 @@ export const CMD_HOME = '$H';
 export const CMD_UNLOCK = '$X';
 
 /** Sleep — de-energizes the steppers so the gantry can be pushed by hand. GRBL
- *  stays asleep until a soft-reset (Ctrl-X), which also clears the G92 work
- *  origin, and wakes into ALARM, so the operator must unlock or home and then
- *  re-set the origin. Stock GRBL has no $MD / M18; apart from the $1 idle
- *  delay (anything but 255 releases the motors after each move), this is the
- *  portable way to release them. */
+ *  stays asleep until a soft-reset (Ctrl-X) and wakes into ALARM (so do
+ *  grblHAL and FluidNC), so the operator must unlock or home and then re-set
+ *  the origin: the reset clears the G92 work origin on stock GRBL and FluidNC,
+ *  and the one grblHAL keeps no longer matches the hand-moved head. Stock GRBL
+ *  has no $MD / M18; apart from the $1 idle delay (anything but 255 releases
+ *  the motors after each move), this is the portable way to release them. */
 export const CMD_SLEEP = '$SLP';
 
 /** Settings dump. */
@@ -59,20 +60,27 @@ export const CMD_SPINDLE_OFF = 'M5';
 
 // --- Work coordinate offset (Phase F.3 set-work-origin) ---
 // GRBL applies a machine-to-work offset on top of the active WCS (G54 by
-// default). G92 modifies that offset transiently — it's cleared on alarm,
-// soft reset, and `$RST=#`. Advanced persistent-origin controls use
-// G10 L20/L2 against G54 when the operator explicitly wants the origin
-// to survive reconnects.
+// default). G92 adds a further offset. Stock GRBL and FluidNC clear it at
+// every soft reset (a limit or homing alarm ends in one; a failed probe's
+// ALARM:4/5 does not) and power-up, and `$RST=#` clears it. grblHAL at its
+// default COMPATIBILITY_LEVEL keeps it through a soft reset and, unless
+// `$384=1`, saves it and restores it at power-up (ADR-375):
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/gcode.c#L42-L49
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L223-L237
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L787
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/gcode.c#L833-L838
+// Advanced persistent-origin controls use G10 L20/L2 against G54 when the
+// operator explicitly wants the origin to survive resets on every firmware.
 
 /** KerfDesk's canonical work coordinate system. Every app-controlled origin,
  * probe, and CNC program explicitly selects G54 so a prior G55-G59 modal
  * state or controller startup block cannot redirect coordinates. */
 export const CMD_SELECT_PRIMARY_WCS = 'G54';
 
-/** Set work origin to the current head position (transient, cleared on
- *  alarm/soft-reset). Maps to G92 X0 Y0 — declares the current MPos as the
- *  (0, 0) of the work coordinate system. The next G-code job runs relative
- *  to the workpiece corner the operator jogged to. */
+/** Set work origin to the current head position (G92: how long it lasts
+ *  depends on the firmware, see above). Maps to G92 X0 Y0 — declares the
+ *  current MPos as the (0, 0) of the work coordinate system. The next G-code
+ *  job runs relative to the workpiece corner the operator jogged to. */
 export const CMD_SET_ORIGIN_HERE = 'G92 X0 Y0';
 
 /** Clear the G92 offset, returning the work coordinate system to its

@@ -315,14 +315,20 @@ function homeFailureNotice(error: unknown, message: string): LaserSafetyNotice {
 
 // KD-HOME-03/04 hides status positions after a failed Home because the cycle
 // may have stopped anywhere. A Home line the controller refused with error:N
-// never started a cycle: GRBL-family firmware rejects $H/$HX at parse or
-// validation time (for example error:3 when HOMING_SINGLE_AXIS_COMMANDS is not
-// compiled in, error:5 with homing disabled), so the positions the controller
+// never moved the machine: GRBL-family firmware refuses $H before any motion
+// (for example error:5 with homing disabled), so the positions the controller
 // keeps reporting are its real ones. Blanking them left the DRO empty and
 // Frame unable to find a position until a reconnect, re-home or Set origin
-// (audit regressions-2). The homing proof stays void, the epoch advance keeps
-// any report from before the attempt from counting as fresh, and a suppression
-// that predates this Home (unlock, motor release) is left in place.
+// (audit regressions-2). One refusal does leave the controller changed: stock
+// GRBL enters its homing state before it checks a `$HX` suffix and, built
+// without HOMING_SINGLE_AXIS_COMMANDS (the default), answers error:3 without
+// leaving it, so it reports Home until a soft reset
+// (https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L179-L194).
+// Its positions are still real, and the Alarm banner offers that reset
+// (controller-reset-required.ts; controller audit A-7, ADR-375). The homing
+// proof stays void, the epoch advance keeps any report from before the attempt
+// from counting as fresh, and a suppression that predates this Home (unlock,
+// motor release) is left in place.
 function refusedHomePositionPatch(
   state: LaserState,
   operation: HomeOperation,

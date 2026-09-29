@@ -245,6 +245,17 @@
   border-radius: 8px;
   font-size: 12px;
 }
+/* "Use detected" lists what else changes on its own row, above Apply. */
+.lf-setup-find-changes {
+  display: grid;
+  flex-basis: 100%;
+  gap: 6px;
+}
+.lf-setup-find-changes ul {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.6;
+}
 .lf-setup-find-contract {
   margin-top: 10px;
   font-size: 12px;

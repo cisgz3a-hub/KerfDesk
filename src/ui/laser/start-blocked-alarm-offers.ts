@@ -11,6 +11,7 @@
 import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore, type LaserState } from '../state/laser-store';
+import { isProbeFailureAlarm } from '../state/probe-failure-alarm';
 import { useToastStore } from '../state/toast-store';
 import { repairFailed, settleThenRetry, type BlockedStartRepair } from './start-blocked-repair';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-input';
@@ -27,6 +28,16 @@ export const UNLOCK_OFFER_PROMPT =
 export const UNLOCKED_NEXT_STEP_MESSAGE =
   'Alarm cleared. Jog the head to where the job should start, click "Set origin here", then ' +
   'Frame again.';
+
+// A failed probe (ALARM:4/5) stopped only the probe move, so Unlock leaves the
+// machine position and the work origin standing (probe-failure-alarm.ts).
+export const PROBE_UNLOCK_OFFER_PROMPT =
+  'The controller is in Alarm because the last probe failed.\n\n' +
+  'Unlock clears the alarm. A failed probe keeps the machine position and the work ' +
+  'origin, so Frame can continue. Only continue if the head is safe where it is and the ' +
+  'touch plate is out of the way.\n\n' +
+  'OK: unlock now and continue when the controller is Idle.\n' +
+  'Cancel: leave it blocked.';
 
 export const HOME_OFFER_PROMPT =
   'The controller is in Alarm.\n\n' +
@@ -93,14 +104,28 @@ function isGrblHalEStopAlarm(laser: LaserState): boolean {
 
 // Unlock voids the reported position until Home or Set origin re-establishes
 // it (controllerUnlockedPatch), so no Frame or Start can continue straight
-// from here: hand the operator the one step that can.
+// from here: hand the operator the one step that can. After a failed probe,
+// Unlock leaves a trusted position and the origin as they were, so the Frame
+// goes on once the controller reports Idle.
 async function offerUnlock(): Promise<BlockedStartRepair> {
-  if (!useLaserStore.getState().capabilities.unlock) return 'unrepaired';
-  if (!jobAwareConfirm(UNLOCK_OFFER_PROMPT)) return 'unrepaired';
+  const laser = useLaserStore.getState();
+  if (!laser.capabilities.unlock) return 'unrepaired';
+  const keepsPosition =
+    isProbeFailureAlarm(laser.alarmCode) && laser.positionEvidenceSuppressed !== true;
+  if (!jobAwareConfirm(keepsPosition ? PROBE_UNLOCK_OFFER_PROMPT : UNLOCK_OFFER_PROMPT)) {
+    return 'unrepaired';
+  }
   try {
     await useLaserStore.getState().unlockAlarm();
   } catch (cause) {
     return repairFailed('Unlock failed', cause);
+  }
+  if (keepsPosition) {
+    return settleThenRetry(
+      (state) => state.alarmCode === null && state.statusReport?.state === 'Idle',
+      'Alarm cleared.',
+      'Alarm cleared. Try again once the controller reports Idle.',
+    );
   }
   useToastStore.getState().pushToast(UNLOCKED_NEXT_STEP_MESSAGE, 'info');
   return 'handled';

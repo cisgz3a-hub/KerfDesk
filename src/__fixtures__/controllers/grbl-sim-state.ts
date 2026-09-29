@@ -46,6 +46,11 @@ export type GrblSimState = {
   readonly overrides: GrblSimOverrides;
   /** A door input held open: the door state reports Door:1 and refuses cycle start. */
   readonly doorAjar?: boolean;
+  /** Stock GRBL left in its homing state by a refused `$H` suffix: no cycle
+   *  runs, yet it reports Home and reads lines until a reset (grbl-sim-lines.ts). */
+  readonly homingStuck?: boolean;
+  /** A `?` the homing loop left unanswered; the end of the cycle serves it. */
+  readonly homingStatusPending?: boolean;
 };
 
 export type GrblSimTimedEvent =
@@ -86,6 +91,9 @@ export type GrblSimOptions = {
   /** grblHAL only: "report when homing", bit 12 of `$10`, off by default
    *  (config.h:751-753). With it on grblHAL answers `?` while it homes. */
   readonly reportWhenHoming?: boolean;
+  /** Fail every G38.2 with ALARM:4 (probe already triggered) or ALARM:5 (no
+   *  contact within the travel); unset, a G38.2 touches at once (grbl-sim-lines). */
+  readonly probeFailure?: 4 | 5;
 };
 
 export function emit(line: string, opts: GrblSimOptions): GrblSimEffect {

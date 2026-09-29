@@ -14,6 +14,7 @@ import { originUnknownAfterControllerReset } from './laser-status-line';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { advanceStream } from './laser-stream-ack';
+import { isProbeFailureAlarm } from './probe-failure-alarm';
 import { probeAlarmKeepsToolChangeHold } from './tool-change-probe-alarm';
 
 type AlarmEvent = Extract<ControllerEvent, { readonly kind: 'alarm' }>;
@@ -33,8 +34,8 @@ export function handleAlarmLine(
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   // A hard-limit alarm that fires while a Verified Frame is tracing means the
   // job box runs past the travel from this origin — name the limit so the
-  // operator knows which way to move (ADR-053 P3). The alarm also clears the
-  // origin + frame verification.
+  // operator knows which way to move (ADR-053 P3). The alarm also clears frame
+  // verification and, unless a probe failed, the origin.
   const prev = get();
   // A missed touch-off probe stops the probe, not the held job; Continue waits
   // for a fresh Idle again (tool-change-probe-alarm.ts). A text alarm names no
@@ -51,7 +52,7 @@ export function handleAlarmLine(
     // ALARM:N is not a new transport session, so it cannot clear a latched
     // pendant owner. Only explicit MPG:0 or session replacement may do that.
     mpgActive: prev.mpgActive ?? null,
-    ...originUnknownAfterControllerReset(prev),
+    ...originAfterAlarm(prev, alarm.code),
     motionOperation: null,
     controllerOperation: null,
     fireActive: false,
@@ -70,6 +71,22 @@ export function handleAlarmLine(
   cancelControllerLifecycleRefs(refs, alarm.code === null ? alarm.raw : `ALARM:${alarm.code}`);
   if (alarm.code !== null) noteAlarmBeforeBanner(refs, alarm.code);
   if (!keepToolChangeHold) advanceStream(set, get, refs, safeWrite, 'alarm');
+}
+
+// A failed probe (ALARM:4/5) stopped only the probe move, so the controller
+// still applies its XY origin, a G92 included (probe-failure-alarm.ts); every
+// other alarm counts as a reset. Work Z is void either way.
+function originAfterAlarm(
+  prev: LaserState,
+  code: number | null,
+): ReturnType<typeof originUnknownAfterControllerReset> {
+  const afterReset = originUnknownAfterControllerReset(prev);
+  if (!isProbeFailureAlarm(code)) return afterReset;
+  return {
+    ...afterReset,
+    workOriginActive: prev.workOriginActive,
+    workOriginSource: prev.workOriginSource,
+  };
 }
 
 // A numbered alarm is recorded as its code; a text alarm has none, so its raw

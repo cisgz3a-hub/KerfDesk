@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createStreamer, step } from '../../core/controllers/grbl';
+import { createStreamer, step, type GrblState } from '../../core/controllers/grbl';
 import type { LaserState } from '../state/laser-store';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -14,6 +14,11 @@ function patchLaserStore(partial: Partial<LaserState>): void {
 
 function streamingState(): LaserState['streamer'] {
   return step(createStreamer('G1 X1 S100')).state;
+}
+
+function statusReport(state: GrblState): LaserState['statusReport'] {
+  const position = { x: 0, y: 0, z: 0 };
+  return { state, subState: null, mPos: position, wPos: null, feed: 0, spindle: 0, wco: null };
 }
 
 const realStopJob = useLaserStore.getState().stopJob;
@@ -46,6 +51,7 @@ afterEach(() => {
     fireActive: false,
     setFireActive: realSetFireActive,
     connection: { kind: 'disconnected' },
+    statusReport: null,
   });
   useUiStore.setState({ textDialog: null });
   useUiStore.setState({ imageDialog: null, modalDepth: 0 });
@@ -274,6 +280,38 @@ describe('Ctrl+. follows the Live Motion bar', () => {
     press('.');
 
     expect(setFireActive).toHaveBeenCalledWith(false);
+    expect(stopJob).not.toHaveBeenCalled();
+    uninstall();
+  });
+
+  // A Console G1, $J= or $H has no owner here. The controller's own report of
+  // motion, or of a hold it keeps, is enough for Ctrl+. to request the bar's
+  // Abort, which picks the stop for that state (ADR-375 C-2).
+  it.each(['Run', 'Jog', 'Home', 'Hold', 'Door'] as const)(
+    'aborts motion the controller reports as %s with no owner here',
+    (state) => {
+      const stopJob = vi.fn(async () => undefined);
+      patchLaserStore({
+        stopJob,
+        connection: { kind: 'connected' },
+        statusReport: statusReport(state),
+      });
+      const uninstall = installJobShortcuts(window);
+
+      press('.');
+
+      expect(stopJob).toHaveBeenCalledTimes(1);
+      uninstall();
+    },
+  );
+
+  it('ignores a motion report left from a closed port', () => {
+    const stopJob = vi.fn(async () => undefined);
+    patchLaserStore({ stopJob, statusReport: statusReport('Run') });
+    const uninstall = installJobShortcuts(window);
+
+    press('.');
+
     expect(stopJob).not.toHaveBeenCalled();
     uninstall();
   });

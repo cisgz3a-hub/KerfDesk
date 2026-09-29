@@ -37,7 +37,6 @@ import {
 import type { HomingState } from '../state/laser-store';
 import type { SessionObservationStamp } from '../state/laser-controller-observation';
 import type { NativeBedEvidence } from '../state/native-bed-frame';
-import { UNKNOWN_NATIVE_BED_MESSAGE } from '../state/native-bed-frame';
 import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
@@ -65,6 +64,8 @@ import type { PreparedJobMetrics } from './prepared-job-metrics';
 import { controllerIdentityWarnings } from './controller-identity-warnings';
 import { detectCompiledVCarveDepthWarningsForJob } from './cnc-compiled-depth-warnings';
 import { findMachineStartIssues, prepareStartInput } from './start-job-input';
+import { workOffsetAssumptionWarnings } from './work-offset-assumption';
+import { unknownNativeBedWarning } from './restored-origin-warning';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 
@@ -109,6 +110,9 @@ export type MachineStartSnapshot = {
   readonly controllerOperationActive?: boolean;
   readonly autofocusBusy?: boolean;
   readonly workOriginActive?: boolean;
+  // The origin in effect was already on the controller when KerfDesk
+  // connected (work-origin-state.ts); Job Review says so (ADR-375).
+  readonly workOriginRestored?: boolean;
   readonly workZZeroEvidence?: WorkZZeroEvidence | null;
   readonly workZReferenceEpoch?: number;
   readonly controllerSessionEpoch?: number;
@@ -146,6 +150,9 @@ export type MachineStartSnapshot = {
   readonly homingState?: HomingState;
   readonly trustedPositionEpoch?: number;
   readonly statusQuery?: StatusQueryCapability;
+  // The connected driver's status reports carry WCO (work-offset-assumption),
+  // so a missing offset is one not reported yet and Job Review says so.
+  readonly reportsWorkOffset?: boolean;
   readonly reportInches?: boolean;
   readonly controllerBuildInfo?: GrblBuildInfo | null;
   readonly controllerBuildInfoObservation?: SessionObservationStamp | null;
@@ -307,6 +314,7 @@ export function finalizeStartPreparation(
     gcode,
     options.project.device.rxBufferBytes,
     preflight,
+    options.machine.activeControllerKind,
   );
   if (programIssue !== null) return { ok: false, messages: programIssue };
   if (options.requireFrame) {
@@ -332,6 +340,7 @@ export function finalizeStartPreparation(
     options.controllerSettings,
     [
       ...coordinates.warnings,
+      ...workOffsetAssumptionWarnings(options.placement, options.machineWithReportUnits),
       ...(largeJobWarning === null ? [] : [largeJobWarning]),
       ...(largeRasterWarning === null ? [] : [largeRasterWarning]),
       ...compiledWorkAdvisories(prepared.job),
@@ -396,7 +405,7 @@ function coordinatePreflightContext(options: FinalizeStartPreparationOptions) {
   if (options.motionOffset === undefined)
     return {
       emitOptions: { preflightCoordinateMode: 'relative-origin' as const },
-      warnings: [UNKNOWN_NATIVE_BED_MESSAGE],
+      warnings: [unknownNativeBedWarning(options.placement.jobOrigin, options.machine)],
     };
   return {
     emitOptions: {

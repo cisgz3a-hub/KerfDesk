@@ -95,6 +95,8 @@ describe('worker-hosted transport: UART line errors (audit connect-1)', () => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const port = new SerialPortDouble();
       const session = await connectHosted(port);
+      const lineErrors: string[] = [];
+      session.connection.onLineError?.((error) => lineErrors.push(error));
 
       port.readError(name);
       port.emit('<Idle|MPos:0.000,0.000,0.000|FS:0,0>\r\nok\r\n');
@@ -104,6 +106,9 @@ describe('worker-hosted transport: UART line errors (audit connect-1)', () => {
 
       expect(session.lines).toEqual(['ok', '<Idle|MPos:0.000,0.000,0.000|FS:0,0>', 'ok']);
       expect(session.closes()).toBe(0);
+      // The worker read on by itself; the store still hears that bytes were
+      // lost (controller audit T-3, ADR-375).
+      expect(lineErrors).toEqual([name]);
       expect(workers[0]?.terminated).toBe(false);
       await session.connection.close();
       expect(port.opened).toBe(false);

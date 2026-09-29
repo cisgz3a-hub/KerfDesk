@@ -45,6 +45,9 @@ export function autofocusActions(
       // `error:N` (a door still open, a locked-out build) rejects with its
       // reason instead of clearing the alarm on the bytes alone (controller
       // audit gap-start-11).
+      // The alarm it clears is read first: a report showing the controller out
+      // of Alarm clears alarmCode and can be handled before the reply is.
+      const unlockedAlarm = get().alarmCode;
       await startControllerCommand(refs, write, {
         kind: 'interactive-command',
         label: 'Unlock (clear alarm)',
@@ -53,7 +56,7 @@ export function autofocusActions(
         source: 'console',
       });
       // Shared with a Console `$X`, so both unlock paths leave the same state.
-      set(controllerUnlockedPatch);
+      set((state) => controllerUnlockedPatch(state, unlockedAlarm));
     },
   };
 }

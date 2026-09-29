@@ -300,6 +300,10 @@ describe('recovery placement and work origin', () => {
     expect(host?.querySelector('[role="note"]')?.textContent).toContain(
       'The controller has no work origin set now',
     );
+    // Not every reset clears it: grblHAL keeps G92 (ADR-375).
+    expect(host?.querySelector('[role="note"]')?.textContent).toContain(
+      'grblHAL keeps it through a reset',
+    );
     expect(host?.textContent).toContain('Restore saved origin');
   });
 

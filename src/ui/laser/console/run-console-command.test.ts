@@ -63,6 +63,22 @@ describe('runConsoleCommand', () => {
     expect(send).toHaveBeenCalledWith('$120=250', { confirmed: true, provenance });
   });
 
+  // Controller audit 2 (ADR-375), C-4: stock GRBL would store 0.5 as 0 and turn
+  // homing and soft limits off (grbl/settings.c#L229, #L275-L280), so the value
+  // is refused before the operator is asked to confirm it.
+  it('refuses a setting value the Console will not send before asking to confirm it', async () => {
+    const send = vi.fn(async () => undefined);
+
+    await expect(runConsoleCommand(grblDriver, '$22=0.5', send)).resolves.toEqual({
+      status: 'rejected',
+      command: '$22=0.5',
+      reason:
+        '$22 is an on/off setting: enter 0 or 1. GRBL drops the fraction, so 0.5 would turn it off.',
+    });
+    expect(jobAwareConfirm).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('returns validation and asynchronous store failures without throwing', async () => {
     const validationSend = vi.fn(async () => undefined);
     const invalid = await runConsoleCommand(grblDriver, 'G0 X0\nG0 Y0', validationSend);

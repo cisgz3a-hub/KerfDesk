@@ -116,6 +116,8 @@ describe('runFrameNow FluidNC preparation route', () => {
         spindle: 0,
       },
       activeWcs: 'G54',
+      // Reported zero offset: Frame need not ask for WCO first (ADR-375).
+      wcoCache: { x: 0, y: 0, z: 0 },
       trustedPositionEpoch: 1,
       startJob: vi.fn(async () => undefined),
     });

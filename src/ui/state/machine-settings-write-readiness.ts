@@ -1,7 +1,7 @@
 // The authoritative gate for a guarded Machine Settings `$x=` write: the read
-// gate, a fresh Idle, a current settings backup, a known writable setting, the
-// machine-kind rules and a value the firmware can store as typed (controller
-// audit 2026-09-25 GP-5 for stock GRBL's integer settings).
+// gate, a fresh Idle, a settings read in this connection, a known writable
+// setting, the machine-kind rules and a value the firmware can store as typed
+// (controller audit 2026-09-25 GP-5 for stock GRBL's integer settings).
 
 import type { ControllerDriver } from '../../core/controllers';
 import type { GrblSettingRow } from '../../core/controllers/grbl';
@@ -30,8 +30,12 @@ export function machineSettingsWriteBlockReason(
   if (state.statusReport?.state !== 'Idle') {
     return 'Machine must report Idle before writing firmware settings.';
   }
+  // The write checks its row against, and verifies by re-reading, the settings
+  // read in this connection; that read is all this gate can see. Export
+  // records nothing, so the message must not claim a backup was required.
+  // Machine Setup asks the operator to confirm the export instead (ADR-375).
   if (state.grblSettingsRows.length === 0 || state.lastSettingsReadAt === null) {
-    return 'Read and export a controller settings backup before writing firmware settings.';
+    return 'Read the controller settings before writing firmware settings.';
   }
   const row = state.grblSettingsRows.find((candidate) => candidate.id === id);
   if (row === undefined || row.writeRisk === 'unknown' || row.writeRisk === 'read-only') {

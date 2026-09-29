@@ -9,7 +9,9 @@
 // https://github.com/gnea/grbl/wiki/Grbl-v1.1-Commands), and grblHAL raises
 // motion cancel only in STATE_JOG (https://github.com/grblHAL/core/blob/master/protocol.c).
 // The pending jog then wrote its boundary-length $J= after the operator let go
-// (audit jog-home-origin-2).
+// (audit jog-home-origin-2). In every state grblHAL's 0x85 also discards input
+// not parsed yet, unanswered, so Cancel waits for owed replies before writing
+// it there (laser-motion-cancel.ts, controller audit M-6).
 //
 // Every Cancel advances a per-store cancel generation. A manual motion captures
 // the generation before its readiness await and refuses to install its owner

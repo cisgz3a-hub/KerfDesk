@@ -64,6 +64,25 @@ describe('console command availability', () => {
       consoleCommandDisabledReason(grblDriver, '$$', state({ autofocusBusy: true })),
     ).toContain('Auto-focus');
   });
+
+  // Controller audit 2 (ADR-375), C-5: GRBL answers lines in order
+  // (grbl/protocol.c#L88-L104), so an owned `$$` or `$n=` must not go out while
+  // an earlier line owes its ok; it would take that ok as its own.
+  it('explains the wait for an owed acknowledgement before an owned exchange', () => {
+    const owed = state({ pendingUntrackedAcks: 1 });
+    expect(consoleCommandDisabledReason(grblDriver, '$$', owed)).toBe(
+      'Wait for the previous controller write and acknowledgement before reading controller settings.',
+    );
+    expect(consoleCommandDisabledReason(grblDriver, '$30=1000', owed)).toBe(
+      'Wait for the previous controller write and acknowledgement before writing a controller setting.',
+    );
+    expect(consoleCommandDisabledReason(marlinDriver, 'M115', owed)).toBe(
+      'Wait for the previous controller write and acknowledgement before reading controller firmware identity.',
+    );
+    expect(consoleCommandDisabledReason(grblDriver, '$X', owed)).toBeNull();
+    expect(consoleCommandDisabledReason(grblDriver, 'G4 P1', owed)).toBeNull();
+    expect(consoleCommandDisabledReason(grblDriver, '$$', state())).toBeNull();
+  });
 });
 
 type StateOverrides = {
@@ -74,6 +93,7 @@ type StateOverrides = {
   readonly controllerOperation?: { readonly kind: 'interactive-command' } | null;
   readonly autofocusBusy?: boolean;
   readonly machineState?: string | null;
+  readonly pendingUntrackedAcks?: number;
 };
 
 function state(overrides: StateOverrides = {}): ConsoleCommandAvailabilityState {
@@ -97,6 +117,7 @@ function state(overrides: StateOverrides = {}): ConsoleCommandAvailabilityState 
             label: 'test operation',
           },
     autofocusBusy: overrides.autofocusBusy ?? false,
+    pendingUntrackedAcks: overrides.pendingUntrackedAcks ?? 0,
   };
 }
 

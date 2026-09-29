@@ -188,7 +188,7 @@ export function resumeQualificationInSession(
   scheduleControllerQualification(set, get, refs, epoch);
 }
 
-/** How long a queued-poll controller may stay silent after connecting. */
+/** How long a controller may stay silent once the status poll has started. */
 export const POLLED_RESPONSE_TIMEOUT_MS = 8_000;
 
 /**
@@ -197,9 +197,11 @@ export const POLLED_RESPONSE_TIMEOUT_MS = 8_000;
  * not reboot on open, such as native-USB 32-bit Marlin, prints no banner, and
  * every connect used to end in "No controller response … check the cable"
  * while the first M114 poll moments later answered normally (controller audit
- * connect-5). The ordinary status poll starts when the handshake returns and
- * its first fresh Idle runs qualification. `onSilent` reports a controller
- * that never answers a poll; a late banner re-schedules qualification itself.
+ * connect-5). A GRBL-family board silent through that window may still be
+ * starting up (controller audit T-4, ADR-375). The ordinary status poll starts
+ * when the handshake returns and its first fresh Idle runs qualification.
+ * `onSilent` reports a controller that never answers a poll; a late banner
+ * re-schedules qualification itself.
  */
 export function awaitPolledQualification(
   set: SetFn,
@@ -212,10 +214,12 @@ export function awaitPolledQualification(
   if (refs.connection !== connection || get().controllerSessionEpoch !== epoch) return;
   set({ controllerQualification: qualifyingController(epoch, 'controller-response') });
   scheduleControllerQualification(set, get, refs, epoch);
+  const reportsBefore = get().statusSequence;
   setTimeout(() => {
     const state = get();
     if (refs.connection !== connection || state.controllerSessionEpoch !== epoch) return;
-    if (state.statusObservation?.sessionEpoch === epoch) return;
+    // Any report answers, an Alarm or Sleep too, though those clear statusObservation.
+    if (state.statusSequence !== reportsBefore) return;
     const qualification = state.controllerQualification;
     if (qualification.kind !== 'qualifying' || qualification.epoch !== epoch) return;
     cancelScheduledControllerQualification(refs);

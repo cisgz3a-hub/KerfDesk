@@ -11,7 +11,7 @@ import type { LaserModeStartEvidence } from './laser-mode-start-evidence';
 import type { WorkCoordinateOffset } from './origin-actions';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { JobOriginPlacement } from '../../core/job';
-import type { FrameVerification } from './frame-verification';
+import { effectiveWorkOffset, type FrameVerification } from './frame-verification';
 import type { JobReviewModel } from '../laser/job-review/job-review-model';
 import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 import type { ControllerKind } from '../../core/devices';
@@ -278,7 +278,7 @@ function sameControllerSetup(
     // at zero, where normalized coordinates alone cannot reveal a unit change.
     (before.controllerSettings?.reportInches === true) ===
       (completed.controllerSettings?.reportInches === true) &&
-    sameAxes(before.wcoCache, completed.wcoCache) &&
+    sameEffectiveOffset(before, completed) &&
     before.workOriginActive === completed.workOriginActive &&
     before.workOriginSource === completed.workOriginSource &&
     before.trustedPositionEpoch === completed.trustedPositionEpoch &&
@@ -292,10 +292,24 @@ function sameStartOrigin(
   current: FramedRunControllerSnapshot,
 ): boolean {
   return (
-    sameAxes(framed.wcoCache, current.wcoCache) &&
+    sameEffectiveOffset(framed, current) &&
     framed.workOriginActive === current.workOriginActive &&
     framed.workOriginSource === current.workOriginSource &&
     framed.trustedPositionEpoch === current.trustedPositionEpoch
+  );
+}
+
+// A first WCO report equal to the zero the Frame was placed with is not an
+// origin change (ADR-375); any other first report, Z-only included, still
+// refuses the permit, because the traced placement no longer matches the
+// controller: exact-handoff inconsistency (PROJECT.md non-negotiable 21).
+function sameEffectiveOffset(
+  left: FramedRunControllerSnapshot,
+  right: FramedRunControllerSnapshot,
+): boolean {
+  return sameAxes(
+    effectiveWorkOffset(left.wcoCache, left.workOriginActive),
+    effectiveWorkOffset(right.wcoCache, right.workOriginActive),
   );
 }
 

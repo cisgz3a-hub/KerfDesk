@@ -6,6 +6,8 @@ import type { useCameraStore } from '../state/camera-store';
 import type { useLaserStore } from '../state/laser-store';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { connectedLaserModuleEvidence } from '../state/laser-module-probe';
+import { isRestoredWorkOrigin } from '../state/work-origin-state';
+import { controllerReportsWorkOffset } from './work-offset-assumption';
 
 /** Every controller and camera fact a Start preparation compiles against, as
  * one by-value snapshot. It is what the request carries into the preparation
@@ -25,6 +27,7 @@ export function machineSnapshot(
     controllerOperationActive: laser.controllerOperation !== null,
     autofocusBusy: laser.autofocusBusy,
     workOriginActive: laser.workOriginActive,
+    workOriginRestored: isRestoredWorkOrigin(laser),
     workZZeroEvidence: laser.workZZeroEvidence,
     workZReferenceEpoch: laser.workZReferenceEpoch,
     controllerSessionEpoch: laser.controllerSessionEpoch,
@@ -52,6 +55,7 @@ export function machineSnapshot(
       laser.activeControllerKind,
       laser.capabilities.statusQuery,
     ),
+    reportsWorkOffset: controllerReportsWorkOffset(laser.capabilities),
   };
 }
 

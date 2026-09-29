@@ -80,24 +80,30 @@ export type SerialWorkerResponse =
    *  the main thread can reach `port.readable`; the worker waits for
    *  `reattach-readable`, still holding the writer (audit connect-1). */
   | { readonly kind: 'read-error'; readonly name: string }
+  /** A native worker, which owns its port, read on after such a line error by
+   *  itself. Reported so the store can say that bytes were lost (controller
+   *  audit T-3, ADR-375); nothing is asked of the main thread. */
+  | { readonly kind: 'line-error'; readonly name: string }
   /** The session is over: the device dropped, a read failed for good, or
    *  `close` was honoured. Either way the worker has already let go of both
    *  streams, so the port can be closed once they finish (audit transport-3). */
   | { readonly kind: 'closed' };
 
+const RESPONSE_KINDS: ReadonlySet<unknown> = new Set<SerialWorkerResponse['kind']>([
+  'line',
+  'ready',
+  'armed',
+  'released',
+  'refill-stopped',
+  'write-ack',
+  'write-error',
+  'stream-write-error',
+  'read-error',
+  'line-error',
+  'closed',
+]);
+
 export function isSerialWorkerResponse(value: unknown): value is SerialWorkerResponse {
   if (typeof value !== 'object' || value === null) return false;
-  const kind = (value as { readonly kind?: unknown }).kind;
-  return (
-    kind === 'line' ||
-    kind === 'ready' ||
-    kind === 'armed' ||
-    kind === 'released' ||
-    kind === 'refill-stopped' ||
-    kind === 'write-ack' ||
-    kind === 'write-error' ||
-    kind === 'stream-write-error' ||
-    kind === 'read-error' ||
-    kind === 'closed'
-  );
+  return RESPONSE_KINDS.has((value as { readonly kind?: unknown }).kind);
 }

@@ -22,6 +22,7 @@ import { startPagedAssetReconciliation } from '../import/paged-asset-startup';
 import { watchPagedRasterOwnership } from '../import/paged-raster-ownership-watch';
 import { isActiveJob } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
+import { unownedControllerMotion } from '../state/unowned-controller-motion';
 // Design tokens + shared chrome classes (ADR-047). Imported exactly once,
 // here — jsdom tests never load main.tsx, so styling stays out of unit tests.
 import '../theme/tokens.css';
@@ -85,7 +86,8 @@ const softwareAbort: SoftwareAbort = {
       isActiveJob(s.streamer) ||
       s.controllerOperation !== null ||
       s.motionOperation !== null ||
-      s.fireActive
+      s.fireActive ||
+      unownedControllerMotion(s) !== null
     );
   },
   trigger: () =>

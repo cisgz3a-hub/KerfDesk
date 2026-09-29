@@ -161,7 +161,10 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     expect(sim.state().machine).toBe('Alarm');
   });
 
-  it('answers no status query while homing and parses nothing until homing ends (limits.c:320)', async () => {
+  // The `?` is not lost: the realtime check after the cycle answers it, still as
+  // Home, before the `$H` ok (motion_control.c:239). The simulator used to drop
+  // it (controller audit A-7, ADR-375).
+  it('answers a status query during homing only when the cycle ends, and parses nothing until then (limits.c:320)', async () => {
     const { conn, lines } = await openSim({ homingMs: 500 });
     await conn.write('$H\nG0 X1\n');
     await pump(50);
@@ -169,7 +172,42 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     await pump(50);
     expect(lines).toEqual([]);
     await pump(500);
-    expect(lines).toEqual(['ok', 'ok']);
+    expect(lines).toEqual([
+      '<Home|MPos:0.000,0.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>',
+      'ok',
+      'ok',
+    ]);
+  });
+
+  it('stays in its homing state after refusing a `$HX` until a reset (system.c:182-194)', async () => {
+    const { sim, conn, lines } = await openSim();
+    await conn.write('G0 X5\n');
+    await pump(50);
+    lines.length = 0;
+    await conn.write('$HX\n');
+    await pump(5);
+    expect(lines).toEqual(['error:3']);
+    lines.length = 0;
+    // `$H` and `$J=` need Idle or Alarm (system.c:132, :173); `$X` unlocks only
+    // an Alarm (system.c:160-167); G-code is taken but no cycle starts outside
+    // Idle (protocol.c:346).
+    await conn.write('?');
+    await conn.write('$H\n$J=G91 X1 F100\n$X\nG0 X9\n');
+    await pump(50);
+    expect(lines).toEqual([
+      '<Home|MPos:5.000,0.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>',
+      'error:8',
+      'error:8',
+      'ok',
+      'ok',
+    ]);
+    expect(sim.state().mpos.x).toBe(5);
+    lines.length = 0;
+    // A reset in the homing state is ALARM:6 (motion_control.c:380-384).
+    await conn.write('\x18');
+    await pump(5);
+    expect(lines).toEqual(['ALARM:6', "Grbl 1.1f ['$' for help]", "[MSG:'$H'|'$X' to unlock]"]);
+    expect(sim.state()).toMatchObject({ machine: 'Alarm', homingStuck: false });
   });
 
   it('takes every byte above 0x7F off the stream as a realtime command (serial.c:150-196)', async () => {
@@ -189,6 +227,49 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     expect(oks(lines)).toBe(2);
     await pump(250);
     expect(oks(lines)).toBe(3);
+  });
+
+  it('boots locked in Alarm with homing on and reports the lock after the banner (main.c:65-67, protocol.c:49-54)', async () => {
+    const sim = createGrblSimulator({ homingInitLock: true });
+    const portRef = await sim.adapter.serial.requestPort();
+    if (portRef === null) throw new Error('requestPort returned null');
+    const conn = await portRef.open({ baudRate: 115200 });
+    const lines: string[] = [];
+    conn.onLine((line) => lines.push(line));
+    await pump(5);
+    await conn.write('$J=G91 G21 X-1.000 F600\n');
+    await pump(5);
+    await conn.write('$X\n');
+    await pump(5);
+    expect(lines).toEqual([
+      "Grbl 1.1f ['$' for help]",
+      "[MSG:'$H'|'$X' to unlock]",
+      'error:9',
+      '[MSG:Caution: Unlocked]',
+      'ok',
+    ]);
+    expect(sim.state().machine).toBe('Idle');
+  });
+
+  it('boots unlocked with homing off even with the homing lock modelled (main.c:65-67)', async () => {
+    const { sim } = await openSim({ homingInitLock: true, settings: [[22, '0']] });
+    expect(sim.state().machine).toBe('Idle');
+  });
+
+  it('refuses a whole $J= line whose target leaves [-$13x, 0] with $20=1, homed or not (jog.c:35-37, system.c:346-349)', async () => {
+    const { sim, conn, lines } = await openSim({ settings: [[20, '1']] });
+    await conn.write('$J=G91 G21 X-10.000 F600\n');
+    await pump(5);
+    await conn.write('$J=G91 G21 X-390.001 Y-5.000 F600\n');
+    await conn.write('$J=G91 G21 X10.001 F600\n');
+    await pump(5);
+    expect(lines).toEqual(['ok', 'error:15', 'error:15']);
+    expect(sim.state().mpos).toEqual({ x: -10, y: 0, z: 0 });
+    // A target on the edge itself is inside.
+    await conn.write('$J=G91 G21 X-390.000 F600\n');
+    await pump(5);
+    expect(lines.at(-1)).toBe('ok');
+    expect(sim.state().mpos.x).toBe(-400);
   });
 });
 

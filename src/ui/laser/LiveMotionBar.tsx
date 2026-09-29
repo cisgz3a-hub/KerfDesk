@@ -12,6 +12,10 @@ import { useStore } from '../state';
 import { describeStreamHold, streamHoldHeading, type StreamHold } from '../state/laser-stream-hold';
 import { isActiveJobStatus, toolChangeContinueBlockMessage } from '../state/laser-store-helpers';
 import {
+  unownedControllerMotion,
+  type UnownedControllerMotion,
+} from '../state/unowned-controller-motion';
+import {
   streamProgressPercent,
   useLiveStreamProgress,
   type LiveStreamProgress,
@@ -23,6 +27,7 @@ import {
   PendingPauseResumeAction,
 } from './LiveMotionActionButton';
 import { pauseControlMessage, resumeControlTitle } from './job-control-copy';
+import { describeUnownedMotion } from './live-motion-unowned';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 
 const MAXIMUM_STACKING_ORDER = 2_147_483_647;
@@ -51,6 +56,8 @@ export function LiveMotionBar(): JSX.Element | null {
   const pauseResumeTransition = useLaserStore((state) => state.pauseResumeTransition);
   const controllerHold = useLaserStore(selectControllerHold);
   const streamHold = useLaserStore((state) => state.streamHold ?? null);
+  const unownedMotion = useLaserStore(unownedControllerMotion);
+  const homingStateStuck = useLaserStore((state) => state.resetRequired === 'homing-state');
   const falconAirTimerHint = useStore(
     (state) => state.project.device.machineFamily === 'creality-falcon',
   );
@@ -65,6 +72,8 @@ export function LiveMotionBar(): JSX.Element | null {
     controllerHold,
     streamHold,
     falconAirTimerHint,
+    unownedMotion,
+    homingStateStuck,
   );
   if (description === null) return null;
   const abort = description.abortLabel === 'LASER OFF' ? () => setFireActive(false) : stopJob;
@@ -191,6 +200,8 @@ function describeLiveMotion(
   controllerHold: ControllerHold,
   streamHold: StreamHold | null = null,
   falconAirTimerHint = false,
+  unownedMotion: UnownedControllerMotion | null = null,
+  homingStateStuck = false,
 ): MotionDescription | null {
   if (isActiveJobStatus(streamProgress.status)) {
     return describeActiveJob(
@@ -222,7 +233,11 @@ function describeLiveMotion(
       abortLabel: 'LASER OFF',
     };
   }
-  return null;
+  // Motion the controller reports and nothing here owns, such as a Console
+  // G1, $J= or $H: Disconnect used to be its only stop (ADR-375 C-2).
+  return unownedMotion === null
+    ? null
+    : describeUnownedMotion(unownedMotion, controllerHold, homingStateStuck);
 }
 
 // A hold the controller entered by itself — its own feed-hold input, a lid

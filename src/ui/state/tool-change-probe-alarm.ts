@@ -15,8 +15,7 @@
 
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { LaserState } from './laser-store';
-
-const PROBE_ALARM_CODES: ReadonlySet<number> = new Set([4, 5]);
+import { isProbeFailureAlarm } from './probe-failure-alarm';
 
 function isDrainedToolChangeHold(streamer: StreamerState | null): boolean {
   return streamer?.status === 'tool-change' && streamer.inFlight.length === 0;
@@ -28,9 +27,7 @@ export function probeAlarmKeepsToolChangeHold(
   code: number,
 ): boolean {
   return (
-    PROBE_ALARM_CODES.has(code) &&
-    isDrainedToolChangeHold(state.streamer) &&
-    state.toolChangeIdleSeen
+    isProbeFailureAlarm(code) && isDrainedToolChangeHold(state.streamer) && state.toolChangeIdleSeen
   );
 }
 
@@ -39,9 +36,5 @@ export function probeAlarmKeepsToolChangeHold(
 export function isProbeAlarmedToolChangeHold(
   state: Pick<LaserState, 'streamer' | 'alarmCode'>,
 ): boolean {
-  return (
-    state.alarmCode !== null &&
-    PROBE_ALARM_CODES.has(state.alarmCode) &&
-    isDrainedToolChangeHold(state.streamer)
-  );
+  return isProbeFailureAlarm(state.alarmCode) && isDrainedToolChangeHold(state.streamer);
 }

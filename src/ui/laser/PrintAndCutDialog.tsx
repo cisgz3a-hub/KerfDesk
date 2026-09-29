@@ -22,6 +22,8 @@ type PrintAndCutDialogProps = {
   readonly firstSource?: CaptureSource | null;
   readonly secondSource?: CaptureSource | null;
   readonly captureEnabled: boolean;
+  /** Why Capture head is off while the controller is Idle; null when it is on. */
+  readonly captureUnavailableReason?: string | null;
   readonly captureFrameNotice?: string | null;
   readonly captureBasisError?: string | null;
   /** The centres of the two selected objects, when exactly two are selected. */
@@ -88,6 +90,9 @@ export function PrintAndCutDialog(props: PrintAndCutDialogProps): JSX.Element {
           onCapture={() => props.onCapture('second')}
         />
       </div>
+      {props.captureUnavailableReason != null ? (
+        <p style={warningStyle}>{props.captureUnavailableReason}</p>
+      ) : null}
       {props.camera?.offered === true ? (
         <CameraMarksRow camera={props.camera} onFind={() => props.camera?.onFind(targets)} />
       ) : null}

@@ -1,4 +1,6 @@
 import type { GrblSettingRow } from '../../../core/controllers/grbl';
+// Deep import: kept out of the grbl barrel's public exports.
+import { grblEnableBit } from '../../../core/controllers/grbl/parse-settings';
 import type { DeviceProfile } from '../../../core/devices';
 import { numbersClose } from '../../../core/util';
 import {
@@ -59,6 +61,8 @@ type DiagnosticSpec =
       readonly id: number;
       readonly section: SuperConsoleDiagnosticSection;
       readonly reference: (profile: DeviceProfile) => number;
+      /** Maps the live value onto the reference's scale; `null` is not comparable. */
+      readonly comparableLiveValue?: (liveValue: number) => number | null;
       readonly referenceLabel: string;
       readonly comparisonKind: ReferenceComparisonKind;
       readonly note: string;
@@ -129,9 +133,12 @@ const DIAGNOSTIC_SPECS: ReadonlyArray<DiagnosticSpec> = [
     id: 22,
     section: 'machine',
     reference: (profile) => (profile.homing.enabled ? 1 : 0),
+    // grblHAL packs further homing options above bit 0, so `$22=5` is homing
+    // enabled; only the Enable bit compares with the profile (grblEnableBit).
+    comparableLiveValue: enableBitValue,
     referenceLabel: 'Profile homing workflow reference',
     comparisonKind: 'profile-reference',
-    note: 'Controller homing support is compared with the profile workflow setting for visibility only.',
+    note: 'Controller homing support (the Enable bit of $22) is compared with the profile workflow setting for visibility only.',
   },
   {
     kind: 'reference',
@@ -229,19 +236,35 @@ function referenceDiagnostic(
   spec: Extract<DiagnosticSpec, { readonly kind: 'reference' }>,
   reference: number,
 ): SuperConsoleSettingDiagnostic {
+  const live = comparableLiveValue(row, spec);
   return {
     ...diagnosticBase(row, row.name, spec.section),
     comparisonKind: spec.comparisonKind,
     status:
-      row.numericValue === null
+      live === null
         ? 'not-comparable'
-        : numbersClose(row.numericValue, reference)
+        : numbersClose(live, reference)
           ? 'same-as-reference'
           : 'different-from-reference',
     reference: String(reference),
     referenceLabel: spec.referenceLabel,
     note: spec.note,
   };
+}
+
+function comparableLiveValue(
+  row: GrblSettingRow,
+  spec: Extract<DiagnosticSpec, { readonly kind: 'reference' }>,
+): number | null {
+  if (row.numericValue === null) return null;
+  return spec.comparableLiveValue === undefined
+    ? row.numericValue
+    : spec.comparableLiveValue(row.numericValue);
+}
+
+function enableBitValue(liveValue: number): number | null {
+  const enabled = grblEnableBit(liveValue);
+  return enabled === undefined ? null : Number(enabled);
 }
 
 function liveDiagnostic(

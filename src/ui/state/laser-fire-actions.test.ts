@@ -11,6 +11,7 @@ const originalProject = useStore.getState().project;
 // M3; F defines the feed an explicit G1 needs (laser-fire-modal-state.test.ts
 // checks these bytes against a port of GRBL's laser-mode parser).
 const FIRE_ON = 'G1 F1000 M3 S20\n';
+const SPINDLE_OV_RESET = '\x99';
 
 function readyState(): LaserState {
   return {
@@ -34,6 +35,9 @@ function readyState(): LaserState {
     autofocusBusy: false,
     probeBusy: false,
     pendingUntrackedAcks: 0,
+    // A controller known to be at 100% power override, so Fire needs no reset
+    // first; the reset cases below set their own override state.
+    ovCache: { feed: 100, rapid: 100, spindle: 100 },
     fireActive: false,
     accessoryCache: {
       spindleCw: false,
@@ -191,6 +195,112 @@ describe('momentary low-power Fire action', () => {
     expect(test.get().fireActive).toBe(true);
     await test.setFireActive(false);
     expect(write).toHaveBeenLastCalledWith('M5\n', 'fire', 'console');
+    expect(test.get().fireActive).toBe(false);
+  });
+
+  // The controller scales S by its power override (GRBL spindle_control.c#L195,
+  // grblHAL spindle_control.c#L867-L868), so an override left at 200% by a job
+  // doubled Fire's capped S (controller audit P-2).
+  it('resets a leftover power override before Fire-on', async () => {
+    const test = harness();
+    Object.assign(test.get(), { ovCache: { feed: 100, rapid: 100, spindle: 200 } });
+
+    await test.setFireActive(true);
+
+    expect(test.write.mock.calls).toEqual([
+      [SPINDLE_OV_RESET, 'fire', 'console'],
+      [FIRE_ON, 'fire', 'console'],
+    ]);
+    expect(test.get().fireActive).toBe(true);
+    expect(test.get().log).toContain(
+      '[lf2] Reset the power override to 100% before Fire (was 200%).',
+    );
+  });
+
+  it('resets an override not reported yet this session, like Start does', async () => {
+    const test = harness();
+    Object.assign(test.get(), { ovCache: null });
+
+    await test.setFireActive(true);
+
+    expect(test.write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET, FIRE_ON]);
+  });
+
+  it('leaves feed and rapid alone and sends nothing extra at 100% power', async () => {
+    const test = harness();
+    Object.assign(test.get(), { ovCache: { feed: 50, rapid: 25, spindle: 100 } });
+
+    await test.setFireActive(true);
+
+    expect(test.write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON]);
+  });
+
+  it('sends no override byte to a controller without realtime overrides', async () => {
+    const test = harness();
+    const current = test.get();
+    Object.assign(current, {
+      ovCache: null,
+      capabilities: { ...current.capabilities, overrides: false },
+    });
+
+    await test.setFireActive(true);
+
+    expect(test.write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON]);
+  });
+
+  it('never writes Fire-on when release wins the override reset', async () => {
+    let resolveReset: (() => void) | undefined;
+    const write = vi.fn((line: string) =>
+      line === SPINDLE_OV_RESET
+        ? new Promise<void>((resolve) => {
+            resolveReset = resolve;
+          })
+        : Promise.resolve(),
+    );
+    const test = harness(write);
+    Object.assign(test.get(), { ovCache: null });
+
+    const starting = test.setFireActive(true);
+    await test.setFireActive(false);
+    resolveReset?.();
+    await starting;
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET, 'M5\n']);
+    expect(test.get().fireActive).toBe(false);
+  });
+
+  it('never writes Fire-on when the controller leaves Idle during the reset', async () => {
+    let resolveReset: (() => void) | undefined;
+    const write = vi.fn((line: string) =>
+      line === SPINDLE_OV_RESET
+        ? new Promise<void>((resolve) => {
+            resolveReset = resolve;
+          })
+        : Promise.resolve(),
+    );
+    const test = harness(write);
+    const current = test.get();
+    Object.assign(current, { ovCache: null });
+
+    const starting = test.setFireActive(true);
+    Object.assign(test.get(), { statusReport: { ...current.statusReport, state: 'Alarm' } });
+    resolveReset?.();
+    await starting;
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET]);
+    expect(test.get().fireActive).toBe(false);
+  });
+
+  it('drops the latch without M5 when the reset write fails before Fire-on', async () => {
+    const write = vi.fn(async (line: string) => {
+      if (line === SPINDLE_OV_RESET) throw new Error('Port write failed.');
+    });
+    const test = harness(write);
+    Object.assign(test.get(), { ovCache: null });
+
+    await expect(test.setFireActive(true)).rejects.toThrow('Port write failed.');
+
+    expect(write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET]);
     expect(test.get().fireActive).toBe(false);
   });
 

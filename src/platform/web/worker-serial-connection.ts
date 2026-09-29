@@ -63,6 +63,7 @@ type Session = {
   readonly lineSubs: Set<(line: string) => void>;
   readonly closeSubs: Set<() => void>;
   readonly writeErrorSubs: Set<(message: string) => void>;
+  readonly lineErrorSubs: Set<(name: string) => void>;
   readonly pendingWrites: Map<number, PendingWrite>;
 };
 
@@ -156,6 +157,7 @@ function connectionApi(
     },
     onLine: (handler) => subscribe(session.lineSubs, handler),
     onClose: (handler) => subscribe(session.closeSubs, handler),
+    onLineError: (handler) => subscribe(session.lineErrorSubs, handler),
     // Still stops the worker and closes the port after the worker ended the
     // session itself: returning early there leaked the worker and left the
     // port open for the next Connect (audit transport-3).
@@ -182,6 +184,7 @@ function createSession(): Session {
     lineSubs: new Set(),
     closeSubs: new Set(),
     writeErrorSubs: new Set(),
+    lineErrorSubs: new Set(),
     pendingWrites: new Map(),
   };
 }
@@ -285,6 +288,7 @@ function routeResponse(link: Link, message: SerialWorkerResponse): void {
     return;
   }
   if (message.kind === 'read-error') reattachReadable(link, message.name);
+  if (message.kind === 'line-error') reportLineError(session, message.name);
 }
 
 // The worker has let go of both streams. Either a teardown asked it to, or its
@@ -319,6 +323,7 @@ function reattachReadable(link: Link, errorName: string): void {
       console.warn(
         `Serial line error (${errorName}); the port is still open, so reading continues.`,
       );
+      reportLineError(link.session, errorName);
       return;
     } catch (error) {
       console.warn("The serial worker could not take the port's fresh readable:", error);
@@ -350,6 +355,19 @@ function deliverLine(session: Session, line: string): void {
       handler(line);
     } catch (err) {
       console.error('Serial line handler threw; continuing with remaining lines:', err);
+    }
+  }
+}
+
+// The bytes at the error are gone, and with them any reply they carried; the
+// store explains that (controller audit T-3, ADR-375). Isolated like line
+// delivery.
+function reportLineError(session: Session, name: string): void {
+  for (const handler of session.lineErrorSubs) {
+    try {
+      handler(name);
+    } catch (err) {
+      console.error('Serial line-error handler threw; reading continues:', err);
     }
   }
 }

@@ -9,7 +9,11 @@
 // and the Falcon vendor contract forbids `$I` anyway — and the Start boundary
 // bounds the character-counting window by it (ADR-331). A stock GRBL 1.1
 // controller idles at `Bf:15,128`; a maintainer's Falcon A1 Pro (profiled as
-// grblHAL, firmware build unconfirmed) reported `Bf:512,65535`.
+// grblHAL, firmware build unconfirmed) reported `Bf:512,65535`. The latch keeps
+// the raw value. 65535 is simply the largest number grblHAL's uint16 field can
+// print, so the window derivation counts any report above a usable ring as
+// grblHAL's default 1024-byte ring, not 4096 bytes (core/grbl-streaming.ts;
+// controller audit P-3/S-2).
 
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { GrblBuildInfo } from '../../core/controllers/grbl/build-info';

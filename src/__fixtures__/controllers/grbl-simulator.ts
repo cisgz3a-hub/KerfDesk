@@ -18,8 +18,11 @@
 
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { createBackpressureFeeder } from './grbl-sim-backpressure';
+import { createDelayedParseFeeder, flushInputOnJogCancel } from './grbl-sim-jog-cancel-flush';
+import type { SimVec3 } from './grbl-sim-gcode';
 import {
   DEFAULT_GRBL_SIM_OPTIONS,
+  UNLOCK_MESSAGE,
   grblSimParsesLines,
   initialGrblSimState,
   reduceGrblSim,
@@ -45,12 +48,20 @@ import type { PlatformAdapter } from '../../platform/types';
 // never stored in the RX ring (serial.c:150-196).
 const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', '\x18']);
 const SOFT_RESET_BYTE = '\x18';
+const JOG_CANCEL_BYTE = '\x85';
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   /** Override or extend the default $$ settings table. */
   readonly settings?: ReadonlyArray<readonly [number, string]>;
   /** Emit the welcome banner when the port opens (default true). */
   readonly emitBannerOnOpen?: boolean;
+  /**
+   * Boot as stock GRBL 1.1h does with homing on ($22=1): HOMING_INIT_LOCK is
+   * defined by default and puts the power-up state into Alarm (config.h:88,
+   * main.c:65-67), and the main loop then reports the lock after the banner
+   * (protocol.c:49-54). Unset keeps the unlocked, vendor-typical boot.
+   */
+  readonly homingInitLock?: boolean;
   /**
    * Model GRBL's bounded planner with this many motion blocks (stock grbl 1.1
    * has 15 usable, GRBL_PLANNER_BLOCKS). Unset means acks stay immediate — the
@@ -61,6 +72,20 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   readonly blockRetireMs?: number;
   /** Usable RX ring bytes. Defaults to grbl's 128. */
   readonly rxBufferBytes?: number;
+  /**
+   * Discard every received line not parsed yet when 0x85 arrives, in any
+   * state, as grblHAL does; lines are parsed a moment after they arrive so
+   * there is something to discard (`grbl-sim-jog-cancel-flush.ts`). Default
+   * false: stock GRBL. Not modelled together with `plannerBlocks`.
+   */
+  readonly jogCancelFlushesInput?: boolean;
+  /**
+   * Work offsets an earlier session left in non-volatile storage. Power-up
+   * loads G54 on every firmware, and G92 only as grblHAL with `$384` off, its
+   * default; machine position still starts at zero (grblHAL gcode.c:833-838,
+   * grbllib.c:358; ADR-375).
+   */
+  readonly storedOffsets?: { readonly g54?: SimVec3; readonly g92?: SimVec3 };
 };
 
 export type GrblSimulator = {
@@ -155,17 +180,23 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
   const {
     settings: settingOverrides,
     emitBannerOnOpen,
+    homingInitLock,
     plannerBlocks,
     blockRetireMs,
     rxBufferBytes,
+    jogCancelFlushesInput,
+    storedOffsets,
     ...optionOverrides
   } = options;
+  if (jogCancelFlushesInput === true && plannerBlocks !== undefined) {
+    throw new Error('jogCancelFlushesInput is not modelled together with plannerBlocks.');
+  }
   const opts: GrblSimOptions = { ...DEFAULT_GRBL_SIM_OPTIONS, ...optionOverrides };
   const settings = defaultGrblSimSettings();
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
 
   const port = createFakeSerialPort();
-  let state = initialGrblSimState(settings);
+  let state = powerUpState(settings, homingInitLock === true, storedOffsets, opts.firmware);
 
   const runEffect = (effect: GrblSimEffect): void => {
     if (effect.kind === 'emit') {
@@ -212,11 +243,16 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
           // main loop, after it releases the withheld ack.
           { ...deps, retireMotion: () => apply({ kind: 'motion-finished' }) },
         );
-  const feeder: HostByteFeeder = backpressure ?? createImmediateFeeder(deps);
+  const feeder: HostByteFeeder =
+    backpressure ??
+    (jogCancelFlushesInput === true ? createDelayedParseFeeder(deps) : createImmediateFeeder(deps));
   const inertRxWindow = createRxWindow(0);
   const inertPlanner = createPlanner(0);
 
   const onRealtime = (byte: string): void => {
+    if (jogCancelFlushesInput === true && byte === JOG_CANCEL_BYTE) {
+      state = flushInputOnJogCancel(state, feeder);
+    }
     apply({ kind: 'rx-realtime', byte });
     // A soft reset flushes the receive buffer and the planner on real hardware.
     if (byte === SOFT_RESET_BYTE) feeder.reset();
@@ -227,6 +263,9 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     feeder.reset();
     if (emitBannerOnOpen !== false) {
       setTimeout(() => port.emitLine(opts.firmwareBanner), opts.responseDelayMs);
+      if (homingInitLock === true && state.machine === 'Alarm') {
+        setTimeout(() => port.emitLine(UNLOCK_MESSAGE), opts.responseDelayMs);
+      }
     }
   });
 
@@ -251,4 +290,21 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     rxWindow: () => backpressure?.rxWindow() ?? inertRxWindow,
     planner: () => backpressure?.planner() ?? inertPlanner,
   };
+}
+
+function powerUpState(
+  settings: ReadonlyMap<number, string>,
+  homingInitLock: boolean,
+  stored: CreateGrblSimulatorOptions['storedOffsets'],
+  firmware: GrblSimOptions['firmware'],
+): GrblSimState {
+  const restoresG92 = firmware === 'grblhal' && settings.get(384) !== '1';
+  const booted: GrblSimState = {
+    ...initialGrblSimState(settings),
+    g54: stored?.g54 ?? null,
+    g92: restoresG92 ? (stored?.g92 ?? null) : null,
+  };
+  return homingInitLock && settings.get(22) === '1'
+    ? { ...booted, machine: 'Alarm', locked: true }
+    : booted;
 }

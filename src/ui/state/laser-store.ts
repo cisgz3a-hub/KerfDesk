@@ -64,6 +64,7 @@ import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { FramedRunPermit, FramedRunStartClaim, FrameTrace } from './framed-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
+import type { WorkOriginState } from './work-origin-state';
 import type { LiveCanvasRun } from './canvas-motion-plan';
 import type {
   ControllerObservationStamp,
@@ -108,6 +109,7 @@ export type { ConnectControllerOptions } from './laser-store-action-types';
 export type LaserState = LaserStoreActions &
   ControllerBuildInfoState &
   CncPauseLiftStoreState &
+  WorkOriginState &
   ConnectionAttemptState & {
     readonly connection: ConnectionState;
     readonly serialPortInfo?: SerialPortIdentity | null;
@@ -118,7 +120,9 @@ export type LaserState = LaserStoreActions &
     readonly alarmCode: number | null;
     // The firmware printed "Reset to continue" after a critical event: only a
     // soft reset is accepted until the reboot banner (controller-reset-required.ts).
-    readonly resetRequired?: boolean;
+    // 'homing-state': stock GRBL stays in its homing state after refusing a
+    // `$HX`; the banner offers the same reset and nothing is held (audit A-7).
+    readonly resetRequired?: boolean | 'homing-state';
     readonly lastError: number | null;
     readonly lastWriteError: string | null;
     // Operator-requested coolant/air state for the manual jog-panel control.
@@ -257,11 +261,6 @@ export type LaserState = LaserStoreActions &
      * logged once per episode; null while acknowledgements flow or no job
      * streams. Optional only so older hand-built test states remain valid. */
     readonly streamHold?: StreamHold | null;
-    readonly workOriginActive: boolean;
-    readonly workOriginSource: WorkOriginSource;
-    // Monotonic identity for XY work-origin mutations. Place Board registration
-    // binds to this so a later G92/G92.1/G10 cannot silently reuse stale targets.
-    readonly workOriginVersion?: number;
     // Qualified evidence for the CNC stock-top contract. Separate from
     // workOriginActive (XY origin): Set Origin (G92 X0 Y0) does not establish Z.
     // The record is bound to workZReferenceEpoch so reconnect/reset/home and

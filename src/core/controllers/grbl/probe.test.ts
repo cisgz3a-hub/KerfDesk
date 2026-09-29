@@ -70,6 +70,20 @@ describe('buildCornerProbeLines', () => {
     expect(commitIndex).toBeGreaterThan(lastProbeIndex);
   });
 
+  // G10 L20 stores G54 = MPos - G92 - WPos, so a G92 left active would move the
+  // stored corner by that offset at the next reset (grbl gcode.c L550-L553,
+  // controller audit 2 M-2). A failed contact never reaches the G92.1, so the
+  // old origin stands.
+  it('drops a temporary G92 origin immediately before the commit, and only there', () => {
+    const lines = buildCornerProbeLines(CORNER);
+    const commitIndex = lines.findIndex((line) => line.startsWith('G10 L20'));
+    expect(lines[commitIndex - 1]).toBe('G92.1');
+    expect(lines.filter((line) => line.startsWith('G92'))).toEqual(['G92.1']);
+    expect(commitIndex - 1).toBeGreaterThan(
+      lines.findLastIndex((line) => line.startsWith('G38.2')),
+    );
+  });
+
   it('side probes descend to plate-flank height, not below the stock', () => {
     const lines = buildCornerProbeLines(CORNER);
     // The bit starts each side leg at work Z20 and drops 11 mm to flank Z9,

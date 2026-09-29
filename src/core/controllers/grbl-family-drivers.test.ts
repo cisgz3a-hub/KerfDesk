@@ -23,7 +23,12 @@ describe('GRBL-family variant drivers', () => {
   it('grblHAL shares GRBL operations except the stock-only build-info proof', () => {
     expect(grblHalDriver.kind).toBe('grblhal');
     expect(grblHalDriver.label).toBe('grblHAL');
-    expect(grblHalDriver.realtime).toEqual(grblDriver.realtime);
+    // Same realtime bytes; grblHAL's 0x85 also flushes unparsed input in every
+    // state (controller audit M-6, see the next test).
+    expect(grblHalDriver.realtime).toEqual({
+      ...grblDriver.realtime,
+      jogCancelDropsUnparsedLines: true,
+    });
     expect(grblHalDriver.commands).toEqual(nonStockGrblCommands);
     // Neither stock GRBL's homing loop nor grblHAL's at its default settings
     // serves `?`; FluidNC's does (audit ST-4). grblHAL latches a refused
@@ -49,6 +54,19 @@ describe('GRBL-family variant drivers', () => {
     expect(fluidncDriver.capabilities.firmwareSetupPanel).toBe('none');
     expect(fluidncDriver.capabilities.jog).toBe('native-jog');
     expect(fluidncDriver.capabilities.realtimePause).toBe(true);
+  });
+
+  it('marks only grblHAL 0x85 as discarding lines it has not parsed yet', () => {
+    // grblHAL flushes its input on 0x85 in every state
+    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L896-L899);
+    // stock GRBL and FluidNC act on it only while jogging and flush nothing,
+    // and the Falcon command set never sends 0x85 (controller audit M-6).
+    expect(grblHalDriver.realtime.jogCancelDropsUnparsedLines).toBe(true);
+    expect(grblDriver.realtime.jogCancelDropsUnparsedLines).toBeUndefined();
+    expect(fluidncDriver.realtime.jogCancelDropsUnparsedLines).toBeUndefined();
+    expect(
+      selectControllerDriver('grblhal', 'creality-falcon-a1-pro').realtime.jogCancel,
+    ).toBeNull();
   });
 
   it('selectControllerDriver resolves every ControllerKind', () => {

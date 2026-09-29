@@ -25,11 +25,13 @@ export type SerialReadTarget = {
 
 type ReadFailure = { readonly error: unknown };
 
-/** Reads until the stream ends or fails for good, then runs `onEnd` once. */
+/** Reads until the stream ends or fails for good, then runs `onEnd` once.
+ *  `lineErrorSubs` hear the name of each line error the loop read on after. */
 export async function runSerialReadLoop(
   target: SerialReadTarget,
   lineSubs: LineSubscribers,
   onEnd: () => void,
+  lineErrorSubs: LineSubscribers,
 ): Promise<void> {
   let reader = target.reader;
   if (reader === undefined) return;
@@ -39,15 +41,30 @@ export async function runSerialReadLoop(
     while (reader !== undefined) {
       const failure = await readUntilEnd(reader, lineSubs, slice, target.isOpen, budget);
       if (failure === null) return;
-      if (!replaceFailedReader(target, reader, failure.error, budget)) {
+      const recovered = replaceFailedReader(target, reader, failure.error, budget);
+      if (recovered === null) {
         console.error('Serial read loop terminated:', failure.error);
         return;
       }
+      reportLineError(lineErrorSubs, recovered);
       reader = target.reader;
     }
   } finally {
     slice.close();
     onEnd();
+  }
+}
+
+// The bytes at the error are gone, and with them any reply they carried; the
+// store explains that (controller audit T-3, ADR-375). A throwing subscriber
+// must not end the read loop, exactly as for lines (dispatchLine).
+function reportLineError(lineErrorSubs: LineSubscribers, name: string): void {
+  for (const h of lineErrorSubs) {
+    try {
+      h(name);
+    } catch (err) {
+      console.error('Serial line-error handler threw; reading continues:', err);
+    }
   }
 }
 
@@ -84,24 +101,25 @@ async function readUntilEnd(
 
 // After a recoverable line error the port is still open and `port.readable` is
 // already a fresh stream (Web Serial spec). Reading on keeps the session, and
-// the writer, alive. Returns false when the error must end the session.
+// the writer, alive. Returns the error's name, or null when it must end the
+// session.
 function replaceFailedReader(
   target: SerialReadTarget,
   failed: ReadableStreamDefaultReader<Uint8Array>,
   error: unknown,
   budget: ReadRecoveryBudget,
-): boolean {
+): string | null {
   const name = recoverableReadErrorName(error);
-  if (name === null || !target.isOpen() || !budget.admit()) return false;
+  if (name === null || !target.isOpen() || !budget.admit()) return null;
   releaseReaderLock(failed);
   // Synchronous from the open check to the assignment, so a Close that starts
   // meanwhile either sees the new reader or stops the loop before it exists.
   const readable = target.port.readable;
   target.reader = undefined;
-  if (readable === null || readable.locked) return false;
+  if (readable === null || readable.locked) return null;
   target.reader = readable.getReader();
   console.warn(`Serial line error (${name}); the port is still open, so reading continues.`);
-  return true;
+  return name;
 }
 
 function releaseReaderLock(reader: ReadableStreamDefaultReader<Uint8Array>): void {

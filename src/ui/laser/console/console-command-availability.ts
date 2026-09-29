@@ -1,4 +1,5 @@
 import type { ControllerDriver } from '../../../core/controllers';
+import { consoleOwnedExchangeWaitReason } from '../../state/console-command-ownership';
 import { consoleAllowedStateReason } from '../../state/console-command-readiness';
 import { controllerOperationCommandBlockMessage } from '../../state/laser-controller-operation';
 import type { LaserState } from '../../state/laser-store';
@@ -19,6 +20,7 @@ export type ConsoleCommandAvailabilityState = Pick<
   | 'motionOperation'
   | 'controllerOperation'
   | 'autofocusBusy'
+  | 'pendingUntrackedAcks'
 >;
 
 /**
@@ -42,6 +44,14 @@ export function consoleCommandDisabledReason(
     const operationReason = consoleActiveOperationReason(state);
     if (operationReason !== null) return operationReason;
   }
+  // Owed acknowledgements only: a write still in transport is too brief to
+  // show, and the store checks both before it writes (ADR-375, C-5).
+  const ownershipReason = consoleOwnedExchangeWaitReason(
+    driver,
+    prepared.command,
+    state.pendingUntrackedAcks > 0,
+  );
+  if (ownershipReason !== null) return ownershipReason;
 
   if (prepared.command.allowedStates !== undefined) {
     return consoleAllowedStateReason(state.statusReport, prepared.command.allowedStates);

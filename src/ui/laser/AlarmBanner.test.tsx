@@ -60,6 +60,19 @@ describe('AlarmBanner', () => {
     expect(props.onReset).toHaveBeenCalledOnce();
   });
 
+  // Controller audit A-7 (ADR-375): stock GRBL refused a `$HX` with error:3 and
+  // stayed in its homing state; it reports Home, not Alarm, until the reset.
+  it('offers only Reset, and says why, while stock GRBL stays in its homing state', async () => {
+    const { host, props } = await render({ code: null, resetRequired: 'homing-state' });
+    expect(buttons(host)).toEqual(['Reset (Ctrl-X)']);
+    expect(host.textContent).toContain('Controller is stuck in its homing state');
+    expect(host.textContent).toContain('$HX');
+    expect(host.textContent).not.toContain('critical event');
+    expect(host.textContent).not.toContain('until the machine is homed or unlocked');
+    await act(async () => (host.querySelector('button') as HTMLButtonElement).click());
+    expect(props.onReset).toHaveBeenCalledOnce();
+  });
+
   it('offers Home and Unlock for an ordinary alarm', async () => {
     const { host } = await render({ code: 9 });
     expect(buttons(host)).toEqual(['Home ($H)', '$X — Unlock']);

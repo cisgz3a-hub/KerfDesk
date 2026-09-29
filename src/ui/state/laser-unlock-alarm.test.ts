@@ -54,4 +54,43 @@ describe('Alarm banner Unlock', () => {
     await flushConnect();
     expect(useLaserStore.getState().alarmCode).toBeNull();
   });
+
+  // Controller audit 2, M-1: a failed probe stops only the probe move, so the
+  // Unlock after it keeps the Set origin and the reported position
+  // (probe-failure-alarm.ts). The first report out of Alarm clears alarmCode
+  // and can be handled before the Unlock's ok, so the alarm is read first.
+  it('keeps the Set origin after a failed probe when Idle beats the Unlock ok', async () => {
+    const idle = '<Idle|MPos:37.000,27.000,0.000|FS:0,0|WCO:25.000,15.000,0.000>';
+    const connection = makeConnection(async (data) => {
+      if (data !== '$X\n') return;
+      queueMicrotask(() => {
+        for (const line of ['[MSG:Caution: Unlocked]', idle, 'ok']) connection.emitLine(line);
+      });
+    });
+    await connectWith(connection);
+    // Set origin here left a trusted position and a G92 origin.
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 25, y: 15, z: 0 },
+      positionEvidenceSuppressed: false,
+    });
+    connection.emitLine('ALARM:5');
+    connection.emitLine(ALARM);
+    await flushConnect();
+    expect(useLaserStore.getState()).toMatchObject({ alarmCode: 5, workOriginSource: 'g92' });
+
+    await useLaserStore.getState().unlockAlarm();
+
+    expect(useLaserStore.getState()).toMatchObject({
+      alarmCode: null,
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      positionEvidenceSuppressed: false,
+      wcoCache: { x: 25, y: 15, z: 0 },
+    });
+    connection.emitLine(idle);
+    await flushConnect();
+    expect(useLaserStore.getState().statusReport?.mPos).toEqual({ x: 37, y: 27, z: 0 });
+  });
 });

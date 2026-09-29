@@ -111,7 +111,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the Machine panel groups the existing placement and output settings in a disclosure. Mouse, Space, and Enter open it without activating canvas or job shortcuts.
 - **Job actions dock**: **Frame job** and the primary **Start** action (greyed out until a clean Frame of the exact job completes) sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
-- **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
+- **Live Motion popup**: hidden while idle. During a job, frame, jog, probe, home, or other owned controller operation, and while the controller reports motion or a hold that nothing in KerfDesk started (a Console move, `$J=` or `$H`: Run, Jog, Home, Hold or Door; ADR-375), it appears as a floating popup — `position: fixed`, bottom-centre, above the status bar, sized by its content — so its arrival never resizes the workspace or moves the rails (ADR-207 amendment, 2026-09-19, revised 2026-09-20). It shows state/progress plus the only visible Pause, Resume, Continue, and software Abort actions on a wrapping line. Targets are at least 48 px high; Abort is labelled **ABORT JOB** or **ABORT MOTION** and remains above dialogs; a hold KerfDesk did not request never gets a Resume. While active it covers a band above the status bar, which at typical widths includes the canvas zoom buttons.
 - **Workspace layout**: the toolbar offers **Auto layout**, **Compact**, and **Spacious**, saved locally across reloads. Auto uses Compact when the viewport is at most 1439 px wide **or** 719 px high; otherwise it uses Spacious. Compact has one scrolling sidebar with keyboard-accessible **Artwork** and **Machine** tabs. Spacious shows the two independent panels. These are viewport CSS pixels, so browser zoom and display scaling affect the available space.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
@@ -1509,8 +1509,9 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 #### Phase B+ shortcuts
 - `Cmd/Ctrl+Return` — Start job (Phase B)
 - `Cmd/Ctrl+.` — Request the controller-specific software Abort (Phase B). With no job running
-  it aborts a running Home, Probe or Auto-focus the same way, and turns a latched Fire off
-  (ADR-362).
+  it aborts a running Home, Probe or Auto-focus the same way, turns a latched Fire off
+  (ADR-362), and stops motion or a hold the controller reports that nothing in KerfDesk started,
+  as **ABORT MOTION** does (ADR-375).
 - `PageUp` / `PageDown` — Jog Z. When a scrolling list, tab panel or the Artwork panel has focus,
   the keys scroll it instead (ADR-362).
 - `Cmd/Ctrl+Shift+]` / `Cmd/Ctrl+Shift+[` — Jog up / down one step; `Cmd/Ctrl+Alt+[` /
@@ -1660,8 +1661,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    G55-G59 offsets.
 4. App compiles one exact executable artifact through the shared
    `prepareOutput` pipeline, and computes its generated motion bounds (including overscan).
-   Unstreamable/empty output refuses; homing, camera, accessory, override, dialect, tool, and other
-   non-Frame-validity policy findings remain warnings.
+   Unstreamable or empty output refuses: no sendable line, a line longer than the RX window, or a
+   line longer than the connected controller's line buffer (stock GRBL keeps 79 significant
+   characters and grblHAL 256, and either answers a longer line with `error:11`; ADR-375). Homing,
+   camera, accessory, override, dialect, tool, and other non-Frame-validity policy findings remain
+   warnings.
    Dense programs above the optional analysis budget keep their complete G-code and motion route
    while omitting duplicate executable-plan analysis. Frame bounds and Start authorization are
    unchanged. GRBL-compatible position reports with extra axes retain their reported XYZ values;
@@ -1738,7 +1742,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Edge — cancel mid-frame
 1. **Cancel** records permanent cancel intent and writes real-time jog-cancel (`0x85`); pending Frame
-   lines are dropped immediately. After the old command handoff settles, the app queries state. If
+   lines are dropped immediately. On grblHAL, whose `0x85` also discards any line it has not parsed
+   yet without answering it, Cancel first waits for the last line to leave the transport, then at
+   most 250 ms for the replies owed to lines already sent, then writes `0x85` (ADR-375). After the old command handoff settles, the app queries state. If
    GRBL reports `Jog`, the first byte lost the Idle-to-Jog race, so `0x85` is sent again. No queued
    settlement marker is written until a fresh `Idle`; a second post-marker `Idle` releases ownership.
 2. An owned G54 selection remains active after cancellation; the stored G55-G59 offsets remain
@@ -1753,6 +1759,18 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 
 #### Edge — jog target exceeds travel
 1. Controller replies `error:15`. UI logs the rejected line.
+
+#### Edge — press-and-hold
+1. Holding an arrow sends one jog toward the travel edge and cancels it (`0x85`) on release.
+2. With a verified bed frame, or with soft limits on in this session's `$$` (`$20=1`), the jog
+   stops inside the travel the controller accepts, so GRBL does not refuse it with `error:15`. The
+   homing-side edge stays the homing pull-off (`$27`, 1 mm if unread) clear of the switch. With
+   soft limits on, every edge keeps a further margin of at least 0.01 mm (half a step on a coarse
+   axis), since the reported position is rounded and can sit up to half a step from the
+   controller's own (ADR-375).
+3. After Unlock without Home, stock GRBL's own reported MPos aims the hold, while the rest of the
+   app still treats the position as unknown (ADR-375).
+4. Otherwise the jog asks for full travel and relies on the release.
 
 ### F-B6. Start job
 
@@ -1814,10 +1832,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    window is the profile's `rxBufferBytes` request (stock GRBL 120 bytes; grblHAL profiles 1024)
    bounded by the receive capacity the controller proved this session — a stock `$I` ring size
    or the free bytes of a status `Bf:` report taken while nothing was in flight — and falls back
-   to the stock 120 bytes when a GRBL-family controller proved nothing (ADR-331). Job Review
-   warns, never refuses, when that window buffers too little motion for ordinary host latency
-   or the program outruns the serial link. Every `ok` advances one line and progress reflects
-   `completed / total`.
+   to the stock 120 bytes when a GRBL-family controller proved nothing (ADR-331). A `Bf:` report
+   above 4104 bytes, such as the Falcon A1 Pro's `65535`, proves only grblHAL's default 1024-byte
+   ring (1016 usable bytes), and Job Review never suggests raising the window on its strength
+   (ADR-375). Job Review warns, never refuses, when that window buffers too little motion for
+   ordinary host latency or the program outruns the serial link. Every `ok` advances one line and
+   progress reflects `completed / total`.
 11. While the job is active the app holds a screen wake lock so OS
    display-sleep can't suspend the stream (ADR-117; re-acquired on tab
    visibility changes, released when the job ends). If the platform
@@ -2024,8 +2044,14 @@ minimum target size.
 #### Success
 1. User clicks the single **ABORT JOB** or **ABORT MOTION** action in the Live Motion bar. The control explicitly says it is a controller reset request, not a safety-rated E-stop, and directs the operator to the machine's physical E-stop or power isolation for danger.
 2. The app sends the active driver's controller-specific abort/reset path: GRBL-family drivers may use realtime `\x18`; drivers without realtime reset use their queued best-effort de-energize commands.
+   For motion the controller reports that nothing in KerfDesk started (a Console move, `$J=` or
+   `$H`), Abort first takes the stop that keeps position: a jog gets jog cancel (`0x85`; feed hold
+   `!` where the driver has none) and no reset; a run gets feed hold `!`, then `\x18` once a fresh
+   report shows `Hold:0` (at most 2 s later); Hold and Door get `\x18` once the hold has settled;
+   Home gets `\x18` at once (ADR-375).
 3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
-4. A GRBL controller enters `Alarm` after reset; the user clears with `$X` (F-B9).
+4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
+   `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.
 
 ### F-B9. Alarm
 
@@ -2182,6 +2208,11 @@ authorization, Frame proof, controller command, or safety boundary.
    and Frame evidence are discarded until fresh position arrives in the verified units.
    During an owned `$13` write and verification, status and accessories remain visible,
    but coordinate numbers cannot be reused under an unconfirmed unit interpretation.
+   `$` (help) and `$N` (startup lines), and on grblHAL its enumeration, help, pin, limit,
+   homing-switch, spindle, port and extended build-info reports, are read-only queries too:
+   they keep the completed Frame and the position evidence (ADR-375).
+5. `$$`, a `$n=` write and the M115 identity read wait until every earlier Console line has
+   been acknowledged, because the controller answers lines in order (ADR-375).
 
 #### Success — unlock alarm
 1. When the controller is in `Alarm`, user can send `$X` from the console or the alarm banner after confirming the head is safe.
@@ -2197,8 +2228,12 @@ authorization, Frame proof, controller command, or safety boundary.
 3. Blocked commands are recorded as local diagnostics and no bytes are sent.
 
 #### Error — unsafe persistent command
-1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, and `$I=...` are blocked in Lane 2.
-2. `$number=value` settings writes require connected, idle controller state and explicit confirmation.
+1. `$RST=*`, `$RST=$`, `$RST=#`, `$N=...`, `$I=...` and grblHAL's `$DWNGRD` are blocked in Lane 2.
+2. `$number=value` settings writes require connected, idle controller state and explicit
+   confirmation. On stock GRBL a value the firmware would store differently (anything but 0 or 1
+   for an on/off setting, a fraction or a value outside 0-255 for its other 8-bit settings) is
+   refused before the prompt. Every acknowledged write is read back with `$$`, so the settings
+   table shows what the controller stored (ADR-375).
 
 #### Edge — arbitrary G-code
 1. Single-line G-code commands are allowed only when connected, no operation is active, and GRBL reports `Idle`.
@@ -2462,7 +2497,8 @@ authorization, Frame proof, controller command, or safety boundary.
 - **Placement and work origin** in the review shows the saved placement, the work origin the
   job ran with and the controller's current one (in mm from machine zero). When they differ by
   more than 0.05 mm it warns that the rest of the job would land that far from the finished part
-  (a controller reset clears a temporary origin; home first where the machine homes). **Frame
+  (stock GRBL and FluidNC clear a Set origin here origin at a reset or power loss; grblHAL keeps
+  it, through a power loss too unless `$384=1`; home first where the machine homes). **Frame
   remaining area** traces everything still to engrave from the chosen line, from the current
   origin, through the ordinary Frame preparation; it issues no Start permit. Both inform only.
 - When the origin differs, is not reported, or (for a User or Verified Origin job) is no longer
@@ -2539,6 +2575,10 @@ authorization, Frame proof, controller command, or safety boundary.
   unacknowledged-lines notice count only time the page was running. After a poll gap of two
   seconds or more the wait restarts from the resumed tick, so a page stall is not reported
   as the controller holding the program (ADR-356).
+- When the serial link reports a line error (break, buffer overrun, framing or parity), the
+  Console says that bytes from the controller were lost, at most once every 5 s with a count of
+  the rest. If it happened during the job, the "controller holding program" state, its log line
+  and the notice add that an acknowledgement lost with it never arrives (ADR-375).
 - After any page stall, the controller output that queued up meanwhile is handed to the app
   in slices of about 8 ms, with input, drawing and the status poll running in between,
   instead of in one uninterruptible task. Order and content are unchanged (ADR-356). This
@@ -2803,6 +2843,8 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    stream). Frame offers Home (homing enabled) or Unlock in place before refusing an
    Alarm (ADR-367), except a grblHAL E-stop alarm, which must be released first; after Unlock
    the operator sets the origin again, since Unlock does not restore the machine position.
+   After a failed probe (ALARM:4 or 5) nothing was lost, so the Frame unlocks and continues
+   once the controller reports Idle (ADR-375).
    A job placed at the head's current position does not frame on after Home, because the cycle
    parks the head at the switches: the Frame stops and asks the operator to jog the head back
    into place and Frame again (ADR-367 Amendment 1).
@@ -2918,8 +2960,9 @@ saving an ordinary software profile disconnects the controller.
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
    and reads the controller's identity and settings; nothing moves and no controller setting is
    written. Its heading follows the connection: **Find your machine**, **Connecting…**,
-   **Reading your controller…**, **Found your <firmware> controller**, **Your machine didn’t
-   answer**, **Couldn’t connect**, or **No answer at any common speed**. When found it lists the
+   **Reading your controller…**, **Waiting for the controller…**, **Found your <firmware>
+   controller**, **Your machine didn’t answer**, **Couldn’t connect**, or **No answer at any
+   common speed**. When found it lists the
    reported travel, max speed, power range, laser mode and Z travel.
    - For a machine not set up before in this browser, or after the operator presses **Find my
      machine**, the reported values are filled into the draft by themselves: the firmware the
@@ -2930,7 +2973,9 @@ saving an ordinary software profile disconnects the controller.
      that the operator only opens setup for keeps its values and offers **Use detected values**
      for the ones that differ (ADR-347). When the adopted firmware differs from the one it
      connected with, Find reconnects once with it.
-   - **Your machine didn’t answer** offers **Try other speeds**, which reconnects at 115200,
+   - **Your machine didn’t answer** appears when nothing came back within 10 s of connecting (a
+     board that restarts when the port opens can take several seconds to answer, ADR-375). It
+     offers **Try other speeds**, which reconnects at 115200,
      230400, 250000, 921600, 57600, 38400, 19200 and 9600 baud in turn and stops at the first that
      answers; **Stop** ends it. **Use a different port…** always shows the picker.
    - **Set up without connecting** keeps the whole stage usable offline; a browser without
@@ -2948,7 +2993,11 @@ saving an ordinary software profile disconnects the controller.
    holds a value a correction replaced (the xTool D1 Pro's front-left origin, the Sculpfun S30's
    410 x 400 mm bed), Job Review names the old and corrected values as an advisory (ADR-322
    Amendment 1), and Machine Setup shows a **Preset correction** row under Origin with one click
-   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A preset's
+   to use the corrected value (ADR-322 Amendment 2). Nothing is applied on its own. A saved copy
+   of the Creality Falcon A1 Pro preset made before the preset had its vendor command set connects
+   with the generic grblHAL commands: Machine Setup shows its card unselected at the head of the
+   preview with a notice, one click re-applies the preset into the draft, and Job Review names the
+   copy and why it matters, since Frame then sends `M9` just before Start (ADR-375). A preset's
    content is pinned to its `catalogVersion`, so a preset change has to bump the version. Detected
    matches are
    prioritised among the remaining profiles and explain their evidence under **Profile details**,
@@ -2959,8 +3008,15 @@ saving an ordinary software profile disconnects the controller.
    controller choice unchanged. Controller notes and sources remain visible beside the selected
    preset. Onefinity entries require an external controller/postprocessor integration and do not
    claim compatible KerfDesk output.
-   A connection that does not match the draft's controller shows the driver-mismatch resolution
-   inside the Find card. Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
+   A connection whose driver or command set differs from the draft's shows **The connection does
+   not match this setup** with **Reconnect using selected profile**, and **Read again** waits for
+   the reconnect. When only the banner names other firmware, the card reads **The firmware banner
+   differs from this setup**: reconnecting cannot change a banner, so there is no Reconnect and
+   **Read again** stays available. Either card offers **Use detected** (for example **Use detected
+   GRBL v1.1 in draft**). When that choice changes anything else (RX window, streaming, output
+   dialect, vendor commands, baud, power range, or a scan-offset calibration it clears), the card
+   lists each change as old → new and applies them only on **Apply to draft** (ADR-375).
+   Ruida remains file-only. CNC readback labels `$30` as a configured S maximum. Copying it into spindle RPM requires
    **Use S maximum as spindle RPM** and a reported CNC mode; otherwise the spindle ceiling stays
    unchanged. Configured travel is not measured usable travel.
 2. **Essentials** — review the name, usable work area, max/frame feed, origin, homing policy, and
@@ -3579,8 +3635,9 @@ streaming controls. Two buttons:
 - **Set origin here** — on GRBL-family controllers sends `G54 G92 X0 Y0`. Declares the current head
   position as work-coord (0, 0). Toast confirms the controller's `ok`
   acknowledgement (not merely USB write completion); the status
-  bar's `Origin:` row flips from "machine 0,0" (muted) to
-  "X… Y… (custom)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
+  bar's `Origin:` row flips from "machine 0,0" (muted; "not reported yet"
+  until the controller's first WCO report) to
+  "X… Y… (G92, set this session)" (accent-red, bold) within ~0.25–7.5 s as GRBL's
   next WCO-bearing status frame arrives. Set Origin upgrades an Absolute
   Coordinates placement to User Origin after that `ok` and its bounded
   work-offset wait finish; an explicit User, Verified, or Current Position
@@ -3590,10 +3647,18 @@ streaming controls. Two buttons:
   coordinates do not necessarily return to machine zero. Disabled when no custom
   origin is active; a persistent or unknown origin uses the explicit persistent controls.
 
+The `Origin:` row names which origin is active: "G92, set this session", "persistent G54",
+"restored by controller" (it was already on the controller when KerfDesk connected) or
+"reported by controller" (KerfDesk cannot attribute it, for example after a reset or a Console
+command). A Z-only offset reads "custom" (ADR-375).
+
 The profile's **Recorded home** corner documents the setup. It does not write controller
 homing direction or change work zero. Home uses the selected controller's command contract
 (for example, generic GRBL `$H`, or the Falcon A1 Pro's `$HX` then `$HY`); firmware determines
-the physical direction. **Go to work zero** is a separate movement to the workpiece reference.
+the physical direction. Stock GRBL built without single-axis homing refuses `$HX` with `error:3`
+and then stays in its homing state, reporting Home, until a soft reset; the Alarm banner says so
+and offers **Reset (Ctrl-X)**, after which the controller is in Alarm and can be unlocked or homed
+with `$H` (ADR-375). **Go to work zero** is a separate movement to the workpiece reference.
 
 **Move to position** (under the jog pad, ADR-493) moves the head, beam off, to typed X and Y.
 **Coordinates** picks the frame: **Canvas** is the numbers on the rulers, the spot where an
@@ -3633,10 +3698,14 @@ Absolute Coordinates compensates a reported G54/G92 work offset instead of requi
 origin after Home. The program, Preview and Frame use the same offset; no offset-clearing command
 is sent. Home invalidates old coordinate observations and waits for the controller to establish
 its machine reference. Frame allows the fresh Idle/work-offset report to arrive before compiling
-an unresolved Absolute placement. A missing report is described as missing coordinate data,
-not as a requirement to erase the work origin. Equivalent MPos/WPos reports and the first zero
-WCO report do not cancel unchanged preparation; actual movement, changed offsets, report units,
-controller sessions and output edits still invalidate it.
+an unresolved Absolute placement. Before the controller has reported any WCO, Frame also asks for
+it (a bounded burst of status queries, at most 3 s), homed or not, whenever Absolute or Current
+Position would otherwise assume a zero offset; if none arrives the Frame proceeds at that assumed
+zero and Job Review says so (ADR-375). A missing report is described as missing coordinate data,
+not as a requirement to erase the work origin. Equivalent MPos/WPos reports and a first WCO
+report equal to the assumed zero do not cancel unchanged preparation, a Frame in progress, its
+permit or the Start handoff. Actual movement, changed offsets (a first non-zero WCO, Z-only
+included), report units, controller sessions and output edits still invalidate them.
 
 Contour entry moves use the prepared program's explicit physical envelope, including centred
 origins and translated work origins. If that envelope is unknown, the optional contour entry is
@@ -3668,7 +3737,7 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
 
 1. **Success.** Connected, idle, head jogged to a workpiece corner.
    Click Set origin here → toast "Origin set to current head position
-   (G92)." → status row updates to "Origin: X… Y… (custom)". Click
+   (G92)." → status row updates to "Origin: X… Y… (G92, set this session)". Click
    Frame → head traces the job's front-left anchored bounding box
    around the workpiece corner. Click Start → job runs at the
    workpiece corner.
@@ -3684,10 +3753,15 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    resets it. Reset/disconnect or replacement operation state remains intact
    when an older transaction completes or fails later.
 4. **Alarm clears origin mid-session.** Operator sets origin, then a
-   limit switch triggers (or `\x18` is sent). GRBL clears G92
-   internally; the alarm branch in `laser-line-handler.ts` clears
-   `wcoCache`; the status row reverts to "Origin: machine 0,0". User
-   re-jogs and re-sets if they want the offset back.
+   limit switch triggers (or `\x18` is sent). Stock GRBL clears G92
+   on the reset (grblHAL keeps it); the alarm handling
+   (`laser-alarm-line.ts`, and the reset branch in `laser-line-handler.ts`)
+   clears `wcoCache`; the status row reads "Origin: not reported yet" until
+   the next WCO-bearing report shows what remains ("machine 0,0" unless a
+   G54 offset is stored or grblHAL kept the G92, which then reads "reported
+   by controller"). A failed probe
+   (ALARM:4 or 5) keeps the origin (ADR-375). User re-jogs and re-sets if
+   they want the offset back.
 5. **Off-bed risk.** Operator sets origin near the bed edge, then
    runs a job whose scene-mm bounds *fit the bed* but extend off the
    *machine* once the offset is applied. When WCO is known, the Start-time
@@ -3698,14 +3772,23 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    unresolved placement remains a factual compile input and cannot
    produce the exact candidate.
 
+**Origin found at connect.** grblHAL keeps Set origin here through a power cycle unless
+`$384=1`, and a saved G54 survives everywhere, while machine position restarts at zero. When a
+User or Verified Origin job would run from an origin the first report of the connection showed,
+with no origin action since and the machine not homed in this session, Job Review's unverified
+bed-mapping warning adds that the origin was already on the controller when KerfDesk connected,
+what this firmware keeps (from `$384` when the `$$` read reported it), and to check the Frame or
+Set origin here again. It is a warning; Frame and Start are not refused (ADR-375).
+
 **Hardware verification checklist (Falcon A1 Pro — user-driven).**
 
 1. Connect and wait for fresh controller position and WCO. Record any existing G54 offset;
    reconnecting does not erase persistent coordinates or prove that work zero equals machine zero.
 2. Jog the head to a workpiece corner. If positioning by hand instead, use the documented
-   Release → move → Wake → Set origin order; stale MPos is not physical position evidence.
+   Release → move → Wake → Unlock (or Home) → Set origin order; Wake leaves the controller
+   locked in Alarm, and stale MPos is not physical position evidence.
 3. Click **Set origin here**. Within ~5 s the readout flips to
-   `Origin: X… Y… (custom)` (red/bold), values matching the previous
+   `Origin: X… Y… (G92, set this session)` (red/bold), values matching the previous
    MPos. Toast confirms.
 4. Click **Frame**. Head sweeps the job's front-left anchored bounding
    box *around the workpiece corner*, not around machine origin or the
@@ -3719,8 +3802,10 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
    authorization are invalidated. A real alarm or `$X` acknowledgement alone does not prove
    that stored offsets were erased or that the physical machine reference is still valid.
 8. **Abort-clear path.** Set origin, start a job, press **ABORT**
-   (the GRBL path requests Ctrl-X plus accessory-off cleanup). Temporary G92 is cleared by
-   reset; persistent G54 remains. Check the fresh controller readback rather than assuming zero.
+   (the GRBL path requests Ctrl-X plus accessory-off cleanup). Stock GRBL and FluidNC clear a
+   temporary G92 at that reset and grblHAL keeps it (the row then reads "reported by
+   controller"); persistent G54 remains. Check the fresh controller readback rather than assuming
+   zero.
 9. **Reconnect path.** Disconnect and reconnect invalidate cached origin/Frame evidence.
    Verify fresh controller data; local cache clearing does not erase persistent controller offsets.
 10. **Status-format fixtures.** For stock GRBL, test both `$10=1` (MPos) and `$10=0`
@@ -3731,7 +3816,12 @@ work-Z evidence, but it cannot enable User Origin or Verified Origin.
     Air output `M8` and "Air restart" ticked. A Falcon A1 Pro profile
     saved before the preset gained `M8` (2026-09-19) still reads
     Disabled and sends no air command at all; the Air output row then
-    offers **Use preset air settings** (ADR-370), which sets both. With
+    offers **Use preset air settings** (ADR-370), which sets both. A
+    copy saved before the preset had its vendor command set also
+    connects with the generic grblHAL commands, so its Frame still
+    sends `M9` just before Start; Job Review names it. Choose the
+    Falcon A1 Pro card in Machine Setup to re-apply the preset, save,
+    then reconnect (ADR-375). With
     an operation's Air on, Frame
     then Start: the pump must be running at the first burn line. Frame
     no longer sends `M9` on the Falcon command set, so a pump the
@@ -3794,8 +3884,8 @@ on the rail, below the job actions, as the hand-placement fallback):
    removed as redundant with the Start from dropdown — ADR-225.)
 2. **Move head by hand.** The operator selects **Release motors to move by hand**,
    confirms Release motors, and physically moves the head. The guide then exposes
-   **Use this position**, which sends Wake and waits for controller recovery.
-   If GRBL reports Alarm, the guide names the state and requires the operator
+   **Use this position**, which sends Wake. GRBL, grblHAL and FluidNC come back from it
+   locked in Alarm, so the guide names the state and requires the operator
    to press **Unlock and continue** after confirming the head is safe. Only
    after fresh Idle does the app send Set origin, select Verified Origin, and
    report that the hand position is ready. Frame is mandatory before Start.
@@ -3820,8 +3910,10 @@ completed job guarantees, so the Origin row carries **Release motors** whenever
 the card is not showing it (either homing is enabled, or an origin is settled).
 Release is refused until the controller reports Idle, so it stays blocked
 through the "Machine finishing" window while the postamble park rapid is still
-running. `$SLP` clears the work origin and invalidates any Verified Frame; the
-top-level **Controller is asleep** banner offers Wake (Ctrl-X), and on a
+running. Release motors drops KerfDesk's work origin (moving the head by hand invalidates it;
+the Wake reset also clears G92 on stock GRBL and FluidNC, while grblHAL keeps it) and
+invalidates any Verified Frame; the top-level **Controller is asleep** banner offers Wake
+(Ctrl-X), after which the controller is locked in Alarm until Unlock or Home, and on a
 no-homing profile the Position job card returns to guide the re-set.
 grblHAL refuses `$SLP` unless its `$62` Sleep enable is on: when a `$$` read reported
 `$62=0`, Release motors is disabled with that reason, and a controller that refuses `$SLP`
@@ -3872,7 +3964,7 @@ jog controls.
 
 1. **Success.** Connected, Idle, board on the bed. Jog to the bottom-left
    corner → Capture (sends `G92 X0 Y0`; the `Origin:` row flips to
-   custom). Jog to the remaining three corners — **in any order/direction** —
+   `(G92, set this session)`). Jog to the remaining three corners — **in any order/direction** —
    → Capture each (width/height come from the bounding box, so the outline's
    size and orientation don't depend on which way you go around). Create board
    outline → a dashed rectangle appears centered on the canvas at the
@@ -3905,7 +3997,7 @@ fails, the panel shows an inline error instead of leaving the operator on
 
 1. Connect → Idle. Click the **Place Board** toolbar button to open the panel.
 2. Jog to the board's bottom-left corner; Capture. The `Origin:` row flips
-   to `X… Y… (custom)` within a few seconds; the step advances to corner 2.
+   to `X… Y… (G92, set this session)` within a few seconds; the step advances to corner 2.
 3. Capture the other three corners in any order. The measured size should
    match the board (both dimensions and orientation) within eyeball
    tolerance (±~1 mm).
@@ -6874,6 +6966,14 @@ as the pane's design record.
 #### Edge — banner disagrees with the profile
 1. Log line: "Controller banner looks like X, but the profile selected Y.
    Check the device profile's controller setting." Nothing switches silently.
+2. Job Review warns (advisory). The banner is identity evidence that a
+   reconnect with the same profile hears again, so the advice is to choose X
+   as the machine's controller in Machine Setup if the machine runs X, then
+   reconnect. A "Grbl 1.1f" banner on the grblHAL driver is grblHAL's
+   compatibility banner and raises nothing (#923).
+3. A profile whose command set differs from the one the connection bound
+   (for example a Falcon A1 Pro profile on a generic grblHAL connection) gets
+   its own Job Review warning with reconnect advice (ADR-375).
 
 ### F-H2. Run a job on Marlin (no realtime bytes)
 
@@ -7553,8 +7653,11 @@ as the pane's design record.
 
 - **Success / head under the click.** The operator selects **Move laser here**
   and clicks a point on the workspace. The click maps through the same origin
-  transform used by emitted G-code, clamps inside the machine bed, and sends
-  one absolute beam-off jog through the normal jog safety gates.
+  transform used by emitted G-code and clamps inside the machine bed. When this
+  session read the controller's settings, it also clamps inside the travel the
+  firmware accepts, keeping the homing-side edge the homing pull-off (`$27`,
+  1 mm if unread) clear of the switch (ADR-375). It then sends one absolute
+  beam-off jog through the normal jog safety gates.
 - **Error / machine not ready.** If the machine is disconnected, busy, alarmed,
   or otherwise blocked for jogging, no command is sent and the operator sees
   the same block reason as the Jog Pad.
@@ -7614,6 +7717,10 @@ as the pane's design record.
   registration** registers the design on the sheet. The head never moves.
 - **Success / mixed.** **Capture head** still works on either target, so a camera point can be
   replaced by jogging onto that mark. Head captures report the same spacing, print scale and turn.
+- **Edge / work-position reports.** A controller set to report its work position (`$10`) is
+  captured at WPos plus the reported work offset (WCO), the position the status panel shows.
+  Until a WCO arrives, or while KerfDesk hides the position after Unlock, Release motors or an
+  unfinished Home, **Capture head** is disabled and the dialog says why (ADR-375).
 - **Edge / unusual registration.** When the targets or the captures are closer than 10 mm, the
   print scale is more than 2 % off, or the turn is near 180°, the dialog says why and applies it
   only once **Use this registration anyway** is ticked. Job Review repeats the note at Start and
@@ -8208,16 +8315,22 @@ desktop artifact stays **CLAIMED** under `PROJECT.md` Desktop Preview acceptance
    evidence, sends `M5` and `M9`, expands the audited GRBL probe builder, and
    owns every terminal response before awaiting transport completion.
 5. A corner request leaves the previous WCS unchanged through all six contacts,
-   then commits X, Y, and Z together in one `G10 L20 P0` block before parking.
+   then clears any temporary G92 origin with `G92.1` and commits X, Y, and Z together
+   in one `G10 L20 P0` block before parking, so the stored corner does not move when a
+   reset later drops G92. The probed corner is then a saved G54 origin, and status
+   reports are trusted again, as after Set origin here. A Z-only probe keeps any G92
+   (ADR-375).
 6. Success requires the complete sequence, a FIFO dwell marker, two fresh Idle
    reports, and unchanged connection/transaction identity. Plate-removal state
    is then shown as a Job Review warning; it does not block ordinary Frame/Start.
 
 #### Error — alarm or partial probe failure
 
-1. A probe alarm enters global GRBL alarm handling and clears affected setup
-   evidence. It never establishes work zero from a partial response sequence;
-   a corner failure before the combined commit leaves the prior WCS unchanged.
+1. A probe alarm (ALARM:4 or 5) enters global GRBL alarm handling and clears work-Z,
+   Home and Frame evidence. It keeps the XY origin and, after Unlock, the reported
+   position, because the firmware resets nothing and `$X` only returns to Idle
+   (ADR-375). It never establishes work zero from a partial response sequence; a
+   corner failure before the combined commit leaves the prior WCS unchanged.
 2. Any uncertain non-alarm failure sends soft reset and keeps the controller
    operation locked until a reboot banner and two subsequent Idle reports are
    observed. Missing proof remains locked until disconnect.

@@ -4,10 +4,13 @@ import { marlinDriver } from '../../core/controllers';
 import { initialLaserState } from './laser-store-helpers';
 import { detectStreamStall, type StallProbe } from './laser-stream-stall';
 import { programmedDwellSeconds } from './laser-stream-dwell';
+import type { SerialConnection } from '../../platform/types';
 import type { LaserState } from './laser-store';
+import { observeSerialLineErrors } from './laser-serial-line-errors';
 import {
   controllerUnresponsiveNotice,
   describeStreamHold,
+  observeStreamHoldTick,
   sameStreamHoldEpisode,
   STREAM_DWELL_MARGIN_MS,
   STREAM_HOLD_NOTICE_MS,
@@ -171,6 +174,57 @@ describe('sameStreamHoldEpisode / copy', () => {
     );
     expect(describeStreamHold(hold, true)).toContain('$152=100');
     expect(controllerUnresponsiveNotice(hold).message).toContain('$152');
+  });
+
+  // A reply lost to a UART line error never arrives, so the controller may not
+  // be holding anything (controller audit T-3, ADR-375).
+  it('names a serial line error of the same job, and only of that job', () => {
+    const handlers: Array<(name: string) => void> = [];
+    const connection: SerialConnection = {
+      write: async () => undefined,
+      onLine: () => () => undefined,
+      onClose: () => () => undefined,
+      onLineError: (handler) => {
+        handlers.push(handler);
+        return () => undefined;
+      },
+      close: async () => undefined,
+    };
+    const state = streamingState({ controllerSessionEpoch: 3, streamerEpoch: 2 });
+    // The last tick ran 250 ms ago; the lines have waited since 1 000.
+    const stalled = (source: LaserState): StallProbe => ({
+      ...(probeAt(1_000, source) as NonNullable<StallProbe>),
+      checkedAt: 12_750,
+    });
+    const tickRefs = { connection, stallProbe: stalled(state) };
+    observeSerialLineErrors(
+      () => undefined,
+      () => state,
+      tickRefs,
+      connection,
+    );
+    handlers.forEach((handler) => handler('FramingError'));
+
+    const patches: Array<Partial<LaserState>> = [];
+    observeStreamHoldTick((patch) => patches.push(patch), state, tickRefs, 13_000);
+    const hold = patches.at(-1)?.streamHold;
+    expect(hold?.serialLineError).toBe('FramingError');
+    const named = hold as StreamHold;
+    expect(describeStreamHold(named, false)).toBe(
+      'The controller reports Idle and has not acknowledged the last 4 sent lines for 12 s. ' +
+        'KerfDesk is connected and waiting; nothing was reset. The serial link reported a line ' +
+        'error (FramingError) during this job, and an acknowledgement lost with it never arrives',
+    );
+    expect(describeStreamHold(named, true)).toMatch(
+      /\$152=100 from the Console after the job\. The serial link/,
+    );
+    expect(controllerUnresponsiveNotice(named).message).toMatch(/line error \(FramingError\).*\.$/);
+    expect(patches.at(-1)?.log?.at(-1)).toContain('line error (FramingError)');
+
+    const nextJob = streamingState({ controllerSessionEpoch: 3, streamerEpoch: 3 });
+    tickRefs.stallProbe = stalled(nextJob);
+    observeStreamHoldTick((patch) => patches.push(patch), nextJob, tickRefs, 13_000);
+    expect(patches.at(-1)?.streamHold).not.toHaveProperty('serialLineError');
   });
 });
 

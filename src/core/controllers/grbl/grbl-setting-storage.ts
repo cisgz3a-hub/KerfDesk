@@ -17,7 +17,7 @@ const STOCK_GRBL_FLAG_SETTING_IDS: ReadonlySet<number> = new Set([4, 5, 6, 13, 2
 /** Why stock GRBL would store a different value than the one typed, or null. */
 export function stockGrblSettingStorageIssue(id: number, value: number): string | null {
   if (STOCK_GRBL_FLAG_SETTING_IDS.has(id) && value !== 0 && value !== 1) {
-    return `$${id} is an on/off setting: enter 0 or 1. GRBL would store any other number as 1.`;
+    return `$${id} is an on/off setting: enter 0 or 1. ${flagStorageOutcome(value)}`;
   }
   if (
     STOCK_GRBL_UINT8_SETTING_IDS.has(id) &&
@@ -26,6 +26,16 @@ export function stockGrblSettingStorageIssue(id: number, value: number): string 
     return `GRBL stores $${id} as a whole number from 0 to 255, so ${value} would be stored as a different value.`;
   }
   return null;
+}
+
+// An on/off id keeps `if (int_value)` of the truncated value, so a fraction
+// below 1 turns the setting off rather than on: `$22=0.5` disables homing and
+// soft limits (settings.c#L275-L280, ADR-375 C-4). A negative value GRBL
+// refuses (error:4) and one above 255 does not fit in 8 bits.
+function flagStorageOutcome(value: number): string {
+  if (value > 0 && value < 1) return `GRBL drops the fraction, so ${value} would turn it off.`;
+  if (value > 1 && value < 256) return `GRBL would store ${value} as 1.`;
+  return `GRBL would not store ${value} as typed.`;
 }
 
 /** True when the value the controller printed is the requested value at the

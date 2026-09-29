@@ -18,6 +18,7 @@ import { webSerial } from './web-serial';
 type Session = {
   readonly connection: SerialConnection;
   readonly lines: string[];
+  readonly lineErrors: string[];
   readonly closes: () => number;
 };
 
@@ -29,14 +30,16 @@ async function connect(port: SerialPortDouble): Promise<Session> {
   if (ref === null) throw new Error('expected a port');
   const connection = await ref.open({ baudRate: 115200 });
   const lines: string[] = [];
+  const lineErrors: string[] = [];
   let closes = 0;
   connection.onLine((line) => lines.push(line));
+  connection.onLineError?.((name) => lineErrors.push(name));
   connection.onClose(() => {
     closes += 1;
   });
   port.emit('ok\r\n');
   await waitFor(() => lines.length === 1, 'the first line');
-  return { connection, lines, closes: () => closes };
+  return { connection, lines, lineErrors, closes: () => closes };
 }
 
 async function settle(): Promise<void> {
@@ -66,8 +69,31 @@ describe('main-thread serial transport: UART line errors (audit connect-1)', () 
       expect(session.closes()).toBe(0);
       expect(port.streamsCreated).toBe(2);
       expect(warn).toHaveBeenCalledWith(expect.stringContaining(name));
+      // The store hears of it too: the bytes at the error are gone (controller
+      // audit T-3, ADR-375).
+      expect(session.lineErrors).toEqual([name]);
     },
   );
+
+  it('keeps reading when a line-error subscriber throws', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const port = new SerialPortDouble();
+    const session = await connect(port);
+    session.connection.onLineError?.(() => {
+      throw new Error('subscriber failed');
+    });
+
+    port.readError('ParityError');
+    port.emit('ok\r\n');
+    await waitFor(() => session.lines.length === 2, 'the line after the error');
+
+    expect(session.closes()).toBe(0);
+    expect(logged).toHaveBeenCalledWith(
+      'Serial line-error handler threw; reading continues:',
+      expect.any(Error),
+    );
+  });
 
   it('drops the record a line error cut short instead of gluing it to the next stream', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);

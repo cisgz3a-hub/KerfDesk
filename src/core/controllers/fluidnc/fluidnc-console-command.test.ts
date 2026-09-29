@@ -13,7 +13,7 @@ function prepare(input: string) {
 }
 
 describe('FluidNC Console report commands', () => {
-  it.each(['$CD', '$cd', '$Config/Dump', '$S', '$SC', '$L', '$CMD', '$SS'])(
+  it.each(['$CD', '$cd', '$Config/Dump', '$S', '$SC', '$L', '$CMD', '$SS', '$'])(
     'prepares %s as a read-only report',
     (input) => {
       const prepared = fluidncDriver.prepareConsoleCommand(input);
