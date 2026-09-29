@@ -311,6 +311,7 @@ export function finalizeStartPreparation(
     gcode,
     options.project.device.rxBufferBytes,
     preflight,
+    options.machine.activeControllerKind,
   );
   if (programIssue !== null) return { ok: false, messages: programIssue };
   if (options.requireFrame) {

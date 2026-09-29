@@ -57,6 +57,45 @@ describe('laser start program assertions', () => {
         /FluidNC accepts at most 127 bytes.*error:14/i,
       );
     });
+
+    // Controller audit S-3: the RX window was the only limit, so a line within
+    // it but past the parser's line buffer started and then stopped the job on
+    // error:11. Stock GRBL keeps 79 significant characters (protocol.h#L31-L32,
+    // protocol.c#L141-L143); grblHAL keeps 256 (protocol.h#L35-L36).
+    it("applies stock GRBL's 79 significant characters within a larger RX window", () => {
+      const spaced = `G1 ${'X1 '.repeat(38)}; ${'c'.repeat(20)}`;
+      const accepted = `G1 X${'1'.repeat(76)}`;
+      const rejected = `G1 X${'1'.repeat(77)}`;
+      expect(spaced.length).toBeGreaterThan(79);
+      expect(() =>
+        assertGcodeFitsController(`${spaced}\n${accepted}`, { rxBufferBytes: 1024 }, 'grbl-v1.1'),
+      ).not.toThrow();
+      expect(() =>
+        assertGcodeFitsController(`G21\n${rejected}`, { rxBufferBytes: 1024 }, 'grbl-v1.1'),
+      ).toThrow(/G-code line 2 has 80 significant characters.*at most 79.*error:11.*not started/);
+    });
+
+    it("applies grblHAL's 256 characters, spaces and comments included", () => {
+      const accepted = `G1 X${'1'.repeat(252)}`;
+      const commented = `G1 X1 ; ${'c'.repeat(250)}`;
+      expect(accepted).toHaveLength(256);
+      expect(() =>
+        assertGcodeFitsController(accepted, { rxBufferBytes: 1024 }, 'grblhal'),
+      ).not.toThrow();
+      expect(() =>
+        assertGcodeFitsController(commented, { rxBufferBytes: 1024 }, 'grbl-v1.1'),
+      ).not.toThrow();
+      expect(() =>
+        assertGcodeFitsController(commented, { rxBufferBytes: 1024 }, 'grblhal'),
+      ).toThrow(/G-code line 1 has 258 characters.*grblHAL accepts at most 256.*error:11/);
+    });
+
+    it('leaves the parser limit alone for firmwares it does not describe', () => {
+      const long = `G1 X${'1'.repeat(200)}`;
+      for (const kind of [undefined, 'marlin', 'smoothieware'] as const) {
+        expect(() => assertGcodeFitsController(long, { rxBufferBytes: 1024 }, kind)).not.toThrow();
+      }
+    });
   });
 
   describe('assertActiveDriverAcceptsMachineKind', () => {

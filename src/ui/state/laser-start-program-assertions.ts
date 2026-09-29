@@ -11,6 +11,10 @@
 // streamed, or the reviewed evidence does not bind to these bytes.
 
 import { findOversizedLine, isSendableGcodeLine } from '../../core/controllers/grbl';
+import {
+  findLineBufferOverflow,
+  lineBufferOverflowMessage,
+} from '../../core/controllers/grbl/line-buffer-limit';
 import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
@@ -49,7 +53,8 @@ export function assertStartControllerEvidence(
   if (issue !== null) throw new Error(issue);
 }
 
-/** Throws when a single line exceeds the controller's RX buffer, so it could never be streamed. */
+/** Throws when a single line exceeds the controller's RX buffer or its parser's
+ * line buffer, so it could never be streamed or never run. */
 export function assertGcodeFitsController(
   gcode: string,
   options: StartJobOptions,
@@ -63,6 +68,11 @@ export function assertGcodeFitsController(
         `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
     );
   }
+  // PROJECT.md non-negotiable 21, refusal (a): stock GRBL and grblHAL answer a
+  // line past their line buffer with error:11 and never run it, so the job
+  // would stop there (controller audit S-3, ADR-375).
+  const overflow = findLineBufferOverflow(gcode, activeControllerKind);
+  if (overflow !== null) throw new Error(`${lineBufferOverflowMessage(overflow)} Job not started.`);
   if (activeControllerKind !== 'fluidnc') return;
   const rejected = findFluidncNonExecutableLines(gcode)[0];
   if (rejected === undefined) return;
