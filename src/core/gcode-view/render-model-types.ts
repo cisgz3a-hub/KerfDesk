@@ -32,6 +32,8 @@ export const LINE_CATEGORY = {
   event: 5,
   unsupported: 6,
   junk: 7,
+  /** No longer produced: GRBL runs the lines after M2/M30, so they are
+   * classified like any other line and Program Health notes them. */
   afterEnd: 8,
 } as const;
 export type LineCategoryName = keyof typeof LINE_CATEGORY;

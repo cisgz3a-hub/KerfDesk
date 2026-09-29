@@ -1,6 +1,7 @@
 import { IDBFactory as FakeIDBFactory } from 'fake-indexeddb';
 import { describe, expect, it } from 'vitest';
 
+import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { IndexedDbAutosaveRepository, type AutosaveIndexedDbRecord } from './autosave-indexeddb';
 import {
   AUTOSAVE_MANIFEST_STORE,
@@ -93,6 +94,21 @@ describe('IndexedDbAutosaveRepository', () => {
       epoch: 3,
     });
     expect((await repository.readSlot(STORAGE_A))?.current?.projectJson).toBe('new edit');
+  });
+
+  it('reports whether a slot holds a snapshot a commit or clear would replace', async () => {
+    const repository = testRepository();
+    expect(await repository.holdsReplaceableSnapshot(STORAGE_A)).toBe(false);
+
+    await repository.commit(record('first', 100), 0);
+    expect(await repository.holdsReplaceableSnapshot(STORAGE_A)).toBe(true);
+    await repository.clear(clearInput(STORAGE_A, SESSION_A, 1));
+    expect(await repository.holdsReplaceableSnapshot(STORAGE_A)).toBe(false);
+
+    // Every mutation refuses a newer app version, so it is not replaceable.
+    const newer = JSON.stringify({ schemaVersion: PROJECT_SCHEMA_VERSION + 1 });
+    await repository.commit(record(newer, 300), 2);
+    expect(await repository.holdsReplaceableSnapshot(STORAGE_A)).toBe(false);
   });
 
   it('preserves both snapshots when a clear transaction aborts', async () => {

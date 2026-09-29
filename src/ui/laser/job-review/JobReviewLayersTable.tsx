@@ -234,6 +234,7 @@ function CncLayersTable(props: {
                   effective?.plungingReliefStages,
                   effective?.relief,
                   effective?.unrampedShapes,
+                  effective === undefined ? undefined : effective.tabbedShapes === true,
                 )}
               />
               <JobReviewEffectiveOperationRow

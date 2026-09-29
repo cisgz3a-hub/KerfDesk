@@ -9,8 +9,16 @@ import {
   type StoredAutosaveManifest,
   type StoredAutosaveSnapshotReference,
 } from './autosave-indexeddb-schema';
-import { clearAutosaveManifest, replaceAutosaveSnapshot } from './autosave-indexeddb-mutations';
-import { hasUnsupportedAutosaveEnvelope, requireSupportedAutosaveVersion } from './autosave-record';
+import {
+  clearAutosaveManifest,
+  replaceAutosaveSnapshot,
+  requireSupportedAutosaveSnapshots,
+} from './autosave-indexeddb-mutations';
+import {
+  hasUnsupportedAutosaveEnvelope,
+  requireSupportedAutosaveVersion,
+  UnsupportedAutosaveVersionError,
+} from './autosave-record';
 import {
   abortAutosaveTransaction,
   AUTOSAVE_MANIFEST_STORE,
@@ -145,6 +153,23 @@ export class IndexedDbAutosaveRepository {
     return value === undefined ? 0 : parseAutosaveManifest(value).epoch;
   }
 
+  // Whether this slot still holds a snapshot that a commit or clear here would
+  // replace. It runs the same version check those mutations run, so a slot they
+  // would refuse to touch (a newer app version) does not count.
+  async holdsReplaceableSnapshot(storageKey: string): Promise<boolean> {
+    const database = await this.database();
+    const transaction = database.transaction(
+      [AUTOSAVE_MANIFEST_STORE, AUTOSAVE_SNAPSHOT_STORE],
+      'readonly',
+    );
+    const value = await autosaveRequest<unknown>(
+      transaction.objectStore(AUTOSAVE_MANIFEST_STORE).get(storageKey),
+    );
+    const replaceable = await manifestHoldsReplaceableSnapshot(transaction, value);
+    await autosaveTransactionFinished(transaction);
+    return replaceable;
+  }
+
   async readAllSlots(): Promise<ReadonlyArray<AutosaveIndexedDbSlot>> {
     const database = await this.database();
     const transaction = database.transaction(
@@ -202,6 +227,29 @@ function corruptManifestSlot(value: unknown, index: number): AutosaveIndexedDbSl
     previous: null,
     ...(hasUnsupportedAutosaveEnvelope(value) ? { unsupportedVersion: true } : {}),
   };
+}
+
+async function manifestHoldsReplaceableSnapshot(
+  transaction: IDBTransaction,
+  value: unknown,
+): Promise<boolean> {
+  if (value === undefined || hasUnsupportedAutosaveEnvelope(value)) return false;
+  let manifest: StoredAutosaveManifest;
+  try {
+    manifest = parseAutosaveManifest(value);
+  } catch {
+    // A manifest that no longer parses resolves to no snapshot; recovery
+    // reports it and retires it like any other unreadable slot.
+    return false;
+  }
+  if (manifest.current === null && manifest.previous === null) return false;
+  try {
+    await requireSupportedAutosaveSnapshots(transaction, manifest);
+    return true;
+  } catch (error) {
+    if (error instanceof UnsupportedAutosaveVersionError) return false;
+    throw error;
+  }
 }
 
 async function readManifest(

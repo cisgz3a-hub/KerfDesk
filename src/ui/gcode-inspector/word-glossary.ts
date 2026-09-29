@@ -3,7 +3,9 @@
 // scanner, so the glossary can never disagree with the parser about what a
 // word IS — only about how to describe it.
 
-import { stripInlineComments, type GcodeWordMatch } from '../../core/gcode';
+import type { GcodeWordMatch } from '../../core/gcode';
+// Deep import: the core/gcode barrel is at its export cap (index contract).
+import { stripControllerComments } from '../../core/gcode/word-scan';
 import { scanControllerRenderWords } from '../../core/gcode-view/native-laser-render-words';
 import type { GcodeInspectionContext } from './gcode-inspection-source';
 
@@ -81,7 +83,8 @@ export function explainLine(
   rawLine: string,
   context: GcodeInspectionContext = {},
 ): ReadonlyArray<WordExplanation> {
-  const stripped = stripInlineComments(rawLine);
+  // As GRBL and the viewers read it: an unclosed "(" hides only what follows.
+  const stripped = stripControllerComments(rawLine);
   if (stripped === '' || stripped === '%') return [];
   const isSmoothie =
     context.machineKind === 'laser' && context.laserPowerControl === 'smoothieware';

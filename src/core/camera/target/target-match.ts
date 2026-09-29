@@ -71,7 +71,8 @@ export function matchBedTarget(
 
 // Plausible Ls, best first: origin, the one-step x arm and the two-step y
 // arm, roughly square, with the one-step arm as long as the distance to the
-// nearest ring.
+// nearest ring. A tilted camera shortens the steps along one axis, so an L
+// that fails that is also scored by the rings its arms predict (latticeScore).
 function anchorCandidates(
   discs: ReadonlyArray<RingMark>,
   rings: ReadonlyArray<RingMark>,
@@ -83,7 +84,8 @@ function anchorCandidates(
     for (const x of discs) {
       for (const y of discs) {
         if (x === origin || y === origin || x === y) continue;
-        const score = lScore(origin, x, y) + Math.abs(distance(x, origin) / step - 1);
+        let score = lScore(origin, x, y) + Math.abs(distance(x, origin) / step - 1);
+        if (score >= MAX_L_SCORE) score = latticeScore(rings, origin, x, y);
         if (score < MAX_L_SCORE) scored.push({ score, anchors: { origin, x, y } });
       }
     }
@@ -102,6 +104,21 @@ function nearestDistance(rings: ReadonlyArray<RingMark>, from: Vec2): number {
 
 function distance(a: Vec2, b: Vec2): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+// How far the rings the arms predict are from where the arms put them, in
+// steps: the ring one short arm behind the origin and the ring halfway along
+// the long arm. Every target has both (bed-target.ts), and the prediction
+// holds at any camera tilt, where the arms' lengths and angle do not.
+function latticeScore(rings: ReadonlyArray<RingMark>, origin: Vec2, x: Vec2, y: Vec2): number {
+  const arm = sub(x, origin);
+  const half = scale(sub(y, origin), 0.5);
+  const behind = sub(origin, arm);
+  const middle = { x: origin.x + half.x, y: origin.y + half.y };
+  const armLength = Math.hypot(arm.x, arm.y);
+  const halfLength = Math.hypot(half.x, half.y);
+  if (armLength === 0 || halfLength === 0) return Number.POSITIVE_INFINITY;
+  return nearestDistance(rings, behind) / armLength + nearestDistance(rings, middle) / halfLength;
 }
 
 function lScore(origin: Vec2, x: Vec2, y: Vec2): number {

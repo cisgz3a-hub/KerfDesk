@@ -18,7 +18,7 @@
     "kerfdesk-trace": "scripts/trace-cli.mjs"
   },
   "scripts": {
-    "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js .",
+    "lint": "node --max-old-space-size=5120 node_modules/eslint/bin/eslint.js .",
     "lint:electron": "eslint --config eslint.electron.config.mjs electron/**/*.ts",
     "lint:fix": "pnpm lint --fix",
     "typecheck": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit",

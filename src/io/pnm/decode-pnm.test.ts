@@ -31,6 +31,19 @@ describe('decodePnm', () => {
     expect(Array.from(decodePnm(raw).rgba)).toEqual([1, 2, 3, 255]);
   });
 
+  it('skips a comment right after the header; the CR or LF ending it delimits the raster', () => {
+    const grey = new Uint8Array([...ascii('P5\n2 1\n255# made by scanner\n'), 0, 200]);
+    expect(reds(decodePnm(grey).rgba)).toEqual([0, 200]);
+    // The comment stops before a carriage return, so a following LF is raster.
+    const crEnded = new Uint8Array([...ascii('P5 2 1 255#note\r'), 10, 200]);
+    expect(reds(decodePnm(crEnded).rgba)).toEqual([10, 200]);
+    const bitmap = new Uint8Array([...ascii('P4 3 1#x\n'), 0b10100000]);
+    expect(reds(decodePnm(bitmap).rgba)).toEqual([0, 255, 0]);
+    // After the delimiter a "#" byte is a sample, not a comment.
+    const hash = new Uint8Array([...ascii('P5 2 1 255\n'), 0x23, 7]);
+    expect(reds(decodePnm(hash).rgba)).toEqual([35, 7]);
+  });
+
   it('refuses other formats and truncated rasters', () => {
     expect(() => decodePnm(ascii('P7 1 1'))).toThrow('not a PBM, PGM or PPM');
     expect(() => decodePnm(new Uint8Array([...ascii('P6 2 2 255\n'), 1, 2]))).toThrow('truncated');

@@ -7,11 +7,13 @@ import {
   type Project,
   type TextObject,
   type Transform,
+  type Vec2,
 } from '../../core/scene';
 import { evaluateVariableTemplate, type VariableEvaluationContext } from '../../core/variables';
 import { applySimilarityProject, type SimilarityTransform } from '../../core/registration';
 import { prepareOutput, type PreparedOutput, type PrepareOutputOptions } from './prepare-output';
 import { materializeVariableBarcode } from './materialize-variable-barcode';
+import { anchoredVariableTextTransform } from './variable-text-anchor';
 
 export type VariableTextRenderInput = {
   readonly text: TextObject;
@@ -22,6 +24,9 @@ export type VariableTextRenderResult = {
   readonly bounds: Bounds;
   readonly paths: readonly ColoredPath[];
   readonly transform?: Transform;
+  // The render's alignment anchor (see TextRenderResult); output keeps it
+  // where the placed text had its anchor. Unused when a transform is given.
+  readonly anchor?: Vec2;
 };
 export type VariableTextRenderer = (
   input: VariableTextRenderInput,
@@ -155,13 +160,24 @@ async function materializeObject(
   if (!evaluated.ok) return { ...evaluated, fallback: object };
   try {
     const rendered = await renderer({ text: object, content: evaluated.value, project });
+    const transform =
+      rendered.transform ??
+      (await anchoredVariableTextTransform(
+        object,
+        { content: evaluated.value, anchor: rendered.anchor, bounds: rendered.bounds },
+        project,
+        renderer,
+      ));
     const { variableTemplate: _template, ...plainText } = object;
     return {
       ok: true,
+      // Only geometry crosses over: render notes such as the anchor stay off
+      // the scene object, which array copies persist.
       object: {
         ...plainText,
         content: evaluated.value,
-        ...rendered,
+        bounds: rendered.bounds,
+        transform,
         paths: rendered.paths.map((path, index) => {
           // Legacy text and copied text can own operations on their render batch.
           const operationIds = object.paths[index]?.operationIds;

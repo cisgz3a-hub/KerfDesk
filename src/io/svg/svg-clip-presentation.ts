@@ -125,8 +125,9 @@ function normalizedDeclaration(value: string | null | undefined): string | undef
     .trim();
 }
 
-const NUMBER = String.raw`[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?`;
-const NUMBER_LIST = new RegExp(String.raw`^\s*${NUMBER}(?:[\s,]+${NUMBER})*\s*$`);
+// The number scan of svg-transform-attribute.ts, so a clip reads its
+// arguments exactly as the general transform reader does.
+const NUMBER = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 const TRANSFORM_ARITIES: Readonly<Record<string, ReadonlyArray<number>>> = {
   matrix: [6],
   translate: [1, 2],
@@ -150,10 +151,24 @@ function validatedAttributeTransform(input: string | null): SvgMatrix | null {
 }
 
 function validTransformArguments(name: string, text: string): boolean {
-  if (!NUMBER_LIST.test(text)) return false;
-  const values = text
-    .trim()
-    .split(/[\s,]+/)
-    .map(Number);
-  return values.every(Number.isFinite) && TRANSFORM_ARITIES[name]?.includes(values.length) === true;
+  const values = transformArguments(text);
+  const arities = Object.hasOwn(TRANSFORM_ARITIES, name) ? TRANSFORM_ARITIES[name] : undefined;
+  return (
+    values !== null && values.every(Number.isFinite) && arities?.includes(values.length) === true
+  );
+}
+
+// CSS Transforms 1 makes the separator between numbers optional
+// ("comma-wsp?"), so "translate(0-.5)" and "matrix(1 0 0 1-5-3)" are complete.
+// Anything but whitespace and commas around the numbers still refuses.
+function transformArguments(text: string): number[] | null {
+  const values: number[] = [];
+  let end = 0;
+  for (const match of text.matchAll(NUMBER)) {
+    const separator = values.length === 0 ? /^\s*$/ : /^[\s,]*$/;
+    if (!separator.test(text.slice(end, match.index))) return null;
+    values.push(Number(match[0]));
+    end = match.index + match[0].length;
+  }
+  return values.length > 0 && /^\s*$/.test(text.slice(end)) ? values : null;
 }

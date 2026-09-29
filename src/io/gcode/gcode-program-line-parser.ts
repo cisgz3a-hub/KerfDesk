@@ -17,8 +17,9 @@ import {
   rArcGeometry,
   resolveAxisTarget,
   scanGcodeWords,
-  stripInlineComments,
 } from '../../core/gcode';
+// Deep import: the core/gcode barrel is at its public-export cap (ADR-015).
+import { stripControllerComments } from '../../core/gcode/word-scan';
 import { sampleArcPoints } from '../../core/geometry';
 import type { Toolpath, ToolpathStep } from '../../core/job';
 import type { Vec2 } from '../../core/scene';
@@ -54,7 +55,6 @@ type ModalState = {
   x: number;
   y: number;
   z: number;
-  ended: boolean;
 };
 
 type LineWords = ReadonlyMap<string, number>;
@@ -78,7 +78,6 @@ export function createGcodeProgramLineParser(): GcodeProgramLineParser {
     x: 0,
     y: 0,
     z: 0,
-    ended: false,
   };
   const steps: ToolpathStep[] = [];
   const unsupported = new Map<string, number>();
@@ -90,8 +89,8 @@ export function createGcodeProgramLineParser(): GcodeProgramLineParser {
 
   const pushLine = (line: string): void => {
     lineCount += 1;
-    if (terminalError !== null || state.ended) return;
-    const stripped = stripInlineComments(line);
+    if (terminalError !== null) return;
+    const stripped = stripControllerComments(line);
     if (stripped === '' || stripped === '%') return;
     const words = readWords(stripped);
     if (words === null) {
@@ -157,7 +156,22 @@ function executeLine(
     const issue = applyModalWord(state, key, value, unsupported, lineNumber);
     if (issue !== null) return issue;
   }
-  if (state.ended) return null;
+  const issue = emitLineMotion(state, words, steps, lineNumber);
+  // GRBL runs M2/M30 after the block's motion, resets G1 and G90 among the
+  // modes that matter here, and keeps running the lines that follow.
+  if (words.has('M2') || words.has('M30')) {
+    state.motion = 1;
+    state.absolute = true;
+  }
+  return issue;
+}
+
+function emitLineMotion(
+  state: ModalState,
+  words: LineWords,
+  steps: ToolpathStep[],
+  lineNumber: number,
+): string | null {
   const hasTarget = ['X', 'Y', 'Z', 'I', 'J', 'R'].some((axis) => words.has(axis));
   if (!hasTarget) return null;
   const target = resolveTarget(state, words);
@@ -168,17 +182,14 @@ function executeLine(
   return null;
 }
 
-// Parser-specific modal effects: program end plus recognized no-ops (G17 and
-// the spindle/coolant M words — no geometric effect). The shared motion /
-// units / distance words route through applySharedGCode first.
+// Parser-specific recognized no-ops: G17, the program end (whose resets
+// executeLine applies after the motion) and the spindle/coolant M words — no
+// geometric effect. The shared motion / units / distance words route through
+// applySharedGCode first.
 const MODAL_EFFECTS: Readonly<Record<string, (state: ModalState) => void>> = {
   G17: () => undefined,
-  M2: (s) => {
-    s.ended = true;
-  },
-  M30: (s) => {
-    s.ended = true;
-  },
+  M2: () => undefined,
+  M30: () => undefined,
   M3: () => undefined,
   M4: () => undefined,
   M5: () => undefined,

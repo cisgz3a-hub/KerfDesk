@@ -40,9 +40,16 @@ describe('parseGcodeProgram linear motion', () => {
     expect(result.toolpath.steps.map((s) => s.kind)).toEqual(['cut', 'cut', 'cut']);
   });
 
-  it('stops at M2 and ignores later motion', () => {
-    const result = ok(['G21 G90', 'G1 X5 F100', 'M2', 'G1 X50'].join('\n'));
-    expect(result.summary.cutMm).toBeCloseTo(5, 9);
+  // GRBL runs a block's motion before its program end, resets G1 and G90,
+  // and keeps running the lines after it (gcode.c, "[21. Program flow ]").
+  it.each([
+    ['on its own line', ['G21 G91', 'G0 X5', 'M2', 'X20']],
+    ['with a move', ['G21 G91', 'G0 X5 M30', 'X20']],
+  ])('runs on past M2/M30 %s, back in G1 and G90', (_, lines) => {
+    const result = ok(lines.join('\n'));
+    expect(result.toolpath.steps.map((step) => step.kind)).toEqual(['travel', 'cut']);
+    expect(result.summary.travelMm).toBeCloseTo(5, 9);
+    expect(result.summary.cutMm).toBeCloseTo(15, 9);
   });
 });
 
@@ -129,6 +136,13 @@ describe('parseGcodeProgram rejection and notes', () => {
   it('ignores comments, percent markers, and N numbers', () => {
     const result = ok(['%', 'N10 G21 G90 (metric)', 'N20 G1 X5 F100 ; move', '%'].join('\n'));
     expect(result.summary.cutMm).toBeCloseTo(5, 9);
+  });
+
+  // GRBL runs the words before an unclosed "(" and ignores the rest of the line.
+  it('runs the words before an unclosed comment and ignores what follows it', () => {
+    const result = ok(['G21 G90', 'G1 X5 F100 (to X9 Y9', 'G1 X10'].join('\n'));
+    expect(result.toolpath.steps.map((step) => step.kind)).toEqual(['cut', 'cut']);
+    expect(result.summary.cutMm).toBeCloseTo(10, 9);
   });
 
   it('parses an empty-motion program as ok with an empty toolpath', () => {

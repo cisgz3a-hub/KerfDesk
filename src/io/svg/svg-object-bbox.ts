@@ -9,6 +9,7 @@
 import { curveSubpathBounds, type Bounds, type Vec2 } from '../../core/scene';
 import { elementToSubPaths } from './shape-to-polylines';
 import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
+import { svgRenderedChildren } from './svg-conditional-processing';
 import type { SvgIdResolver } from './svg-id-resolver';
 import { numAttr, svgPresentationStyles } from './svg-presentation';
 import type { SvgStyleCascade } from './svg-stylesheet';
@@ -18,6 +19,18 @@ import {
   translateSvgMatrix,
 } from './svg-transform-attribute';
 import { parseSvgLengthUserUnitsOrNull } from './svg-units';
+import {
+  createSvgUseBudget,
+  spendSvgUseElement,
+  svgUseTarget,
+  type SvgUseBudget,
+} from './svg-use-expansion';
+import {
+  svgViewportAt,
+  svgViewportTransform,
+  viewportLength,
+  type SvgViewportSize,
+} from './svg-viewport';
 import { linearScaleMagnitude } from './transform-scale';
 
 const IDENTITY: SvgMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -26,8 +39,17 @@ const SHAPES = new Set(['path', 'rect', 'circle', 'ellipse', 'line', 'polyline',
 const NOT_RENDERED = new Set(['defs', 'symbol', 'clippath', 'mask', 'marker', 'pattern']);
 const MAX_DEPTH = 256;
 
-type Context = { readonly resolveId: SvgIdResolver; readonly cascade: SvgStyleCascade };
+type Context = {
+  readonly resolveId: SvgIdResolver;
+  readonly cascade: SvgStyleCascade;
+  /** Elements being measured through, so a circular <use> is left out as in the walk. */
+  readonly active: Set<Element>;
+  readonly budget: SvgUseBudget;
+};
 type Box = { minX: number; minY: number; maxX: number; maxY: number };
+/** A user space: its matrix, and the viewport its percentages resolve against. */
+type Space = { readonly matrix: SvgMatrix; readonly viewport: SvgViewportSize };
+type UseSize = { readonly width: number | null; readonly height: number | null };
 
 export function svgObjectBoundingBox(
   element: Element,
@@ -35,65 +57,114 @@ export function svgObjectBoundingBox(
   cascade: SvgStyleCascade,
 ): Bounds | null {
   const box: Box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-  contentBounds(element, IDENTITY, { resolveId, cascade }, box, 0);
+  const active = new Set<Element>();
+  for (let at = element.parentElement; at !== null; at = at.parentElement) active.add(at);
+  const budget = createSvgUseBudget(element.ownerDocument.documentElement);
+  const space = { matrix: IDENTITY, viewport: svgViewportAt(element) };
+  contentBounds(element, space, { resolveId, cascade, active, budget }, box, 0);
   return Number.isFinite(box.minX) && Number.isFinite(box.minY) ? box : null;
 }
 
-// The element's own content under `matrix`; its own transform is the caller's.
+// The element's own content in `space`; its own transform is the caller's.
 function contentBounds(
   element: Element,
-  matrix: SvgMatrix,
+  space: Space,
   context: Context,
   box: Box,
   depth: number,
 ): void {
   if (depth > MAX_DEPTH) return;
+  if (context.budget.nesting > 0) spendSvgUseElement(context.budget);
   const tag = element.tagName.toLowerCase();
-  if (SHAPES.has(tag)) shapeBounds(element, matrix, box);
-  else if (tag === 'image') imageBounds(element, matrix, box);
-  else if (tag === 'use') boundsOfUse(element, matrix, context, box, depth);
-  else if (tag !== 'text') {
-    for (const child of Array.from(element.children)) {
-      childBounds(child, matrix, context, box, depth + 1);
-    }
+  if (SHAPES.has(tag)) shapeBounds(element, space.matrix, box);
+  else if (tag === 'image') imageBounds(element, space.matrix, box);
+  else if (tag === 'use') boundsOfUse(element, space, context, box, depth);
+  else if (tag === 'svg' && element !== element.ownerDocument.documentElement) {
+    viewportBounds(element, space, context, box, depth, { width: null, height: null });
+  } else if (tag !== 'text') childrenBounds(element, space, context, box, depth);
+}
+
+function childrenBounds(
+  element: Element,
+  space: Space,
+  context: Context,
+  box: Box,
+  depth: number,
+): void {
+  context.active.add(element);
+  for (const child of svgRenderedChildren(element)) {
+    if (NOT_RENDERED.has(child.tagName.toLowerCase())) continue;
+    const placed = elementSpace(child, space, context);
+    if (placed !== null) contentBounds(child, placed, context, box, depth + 1);
   }
+  context.active.delete(element);
 }
 
-function childBounds(
-  child: Element,
-  matrix: SvgMatrix,
+// `space` with the element's transform applied; null when it is not displayed.
+function elementSpace(element: Element, space: Space, context: Context): Space | null {
+  const styles = svgPresentationStyles(element, context.cascade);
+  if ((styles.get('display') ?? element.getAttribute('display'))?.trim() === 'none') return null;
+  const transform = parseSvgTransform(styles.get('transform') ?? element.getAttribute('transform'));
+  return { ...space, matrix: multiplySvgMatrix(space.matrix, transform) };
+}
+
+// A nested <svg>, or the <symbol> or <svg> a <use> instantiates, maps its
+// content into its viewport (the importer's walk does the same).
+function viewportBounds(
+  element: Element,
+  space: Space,
   context: Context,
   box: Box,
   depth: number,
+  size: UseSize,
 ): void {
-  if (NOT_RENDERED.has(child.tagName.toLowerCase())) return;
-  const styles = svgPresentationStyles(child, context.cascade);
-  if ((styles.get('display') ?? child.getAttribute('display'))?.trim() === 'none') return;
-  const transform = parseSvgTransform(styles.get('transform') ?? child.getAttribute('transform'));
-  contentBounds(child, multiplySvgMatrix(matrix, transform), context, box, depth);
+  const viewport = svgViewportTransform(element, space.viewport, size);
+  if (viewport === null) return;
+  const content = {
+    matrix: multiplySvgMatrix(space.matrix, viewport.matrix),
+    viewport: viewport.viewport,
+  };
+  childrenBounds(element, content, context, box, depth);
 }
 
-function boundsOfUse(
-  use: Element,
-  matrix: SvgMatrix,
+function boundsOfUse(use: Element, space: Space, context: Context, box: Box, depth: number): void {
+  const target = svgUseTarget(use, context.resolveId, context.active);
+  if (target === null || target === 'circular') return;
+  const placed = {
+    ...space,
+    matrix: multiplySvgMatrix(
+      space.matrix,
+      translateSvgMatrix(numAttr(use, 'x'), numAttr(use, 'y')),
+    ),
+  };
+  const size = {
+    width: viewportLength(use, 'width', space.viewport.width),
+    height: viewportLength(use, 'height', space.viewport.height),
+  };
+  context.active.add(use);
+  context.budget.nesting += 1;
+  instanceBounds(target, placed, context, box, { depth: depth + 1, size });
+  context.budget.nesting -= 1;
+  context.active.delete(use);
+}
+
+function instanceBounds(
+  target: Element,
+  placed: Space,
   context: Context,
   box: Box,
-  depth: number,
+  at: { readonly depth: number; readonly size: UseSize },
 ): void {
-  const href = use.getAttribute('href') ?? use.getAttribute('xlink:href');
-  const target = href?.startsWith('#') === true ? context.resolveId(href.slice(1)) : null;
-  if (target === null || target === use) return;
-  const placed = multiplySvgMatrix(
-    matrix,
-    translateSvgMatrix(numAttr(use, 'x'), numAttr(use, 'y')),
-  );
   const tag = target.tagName.toLowerCase();
-  if (tag !== 'symbol' && tag !== 'defs') {
-    childBounds(target, placed, context, box, depth + 1);
-    return;
-  }
-  for (const child of Array.from(target.children)) {
-    childBounds(child, placed, context, box, depth + 1);
+  if (tag === 'defs' || tag === 'symbol' || tag === 'svg') {
+    spendSvgUseElement(context.budget);
+    const own = tag === 'svg' ? elementSpace(target, placed, context) : placed;
+    if (own === null) return;
+    if (tag === 'defs') childrenBounds(target, own, context, box, at.depth);
+    else viewportBounds(target, own, context, box, at.depth, at.size);
+  } else if (!NOT_RENDERED.has(tag)) {
+    const own = elementSpace(target, placed, context);
+    if (own !== null) contentBounds(target, own, context, box, at.depth);
   }
 }
 

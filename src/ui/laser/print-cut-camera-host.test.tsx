@@ -181,6 +181,8 @@ describe('Print and Cut with the camera', () => {
     session.capture('first', { x: 75, y: 62 }, 0, key, 'camera', 'bed');
     session.capture('second', { x: -300, y: 570 }, 0, key, 'head', 'controller-relative');
     const host = await mountControl(<PrintAndCutDialogHost onClose={() => undefined} />);
+    // Targets on the two marks, so the consistent pair is at its printed size.
+    await clickControl(host, 'Use selected marks');
     expect(control(host, 'Apply registration').disabled).toBe(true);
     expect(host.textContent).toContain('different coordinate bases');
     expect(host.textContent).not.toContain('Registration uses controller-relative positions');

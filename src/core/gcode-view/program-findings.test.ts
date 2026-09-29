@@ -66,6 +66,19 @@ describe('findProgramIssues', () => {
     expect(never).toContain('cut-before-spindle');
   });
 
+  // Weakness audit WA-5: a G0, or a feed that stops above the work, is not a cut.
+  it('does not count rapids or moves above the work as cutting before the spindle', () => {
+    const approach = ['G21 G90', 'G0 Z10', 'G0 Z5', 'G1 Z1 F300', 'M3 S600'];
+    expect(idsOf([...approach, 'G1 Z-1 F300', 'G1 X10 F800', 'M5', 'M2'].join('\n'))).not.toContain(
+      'cut-before-spindle',
+    );
+
+    const early = findProgramIssues(
+      model(['G21 G90', 'G0 Z5', 'G1 Z-1 F300', 'M3 S600', 'G1 X10 F800', 'M2'].join('\n')),
+    ).find((entry) => entry.id === 'cut-before-spindle');
+    expect(early?.detail).toContain('line 3');
+  });
+
   it('flags cutting moves with no feed rate', () => {
     const finding = findProgramIssues(
       model(['G21 G90', 'M3 S600', 'G1 X10', 'G1 X20', 'M2'].join('\n')),
@@ -82,6 +95,17 @@ describe('findProgramIssues', () => {
     const ids = idsOf(['G21 G90', 'M3 S1', 'G1 X10 F100', '!!!???', 'M2', 'G1 X20'].join('\n'));
     expect(ids).toContain('junk-line');
     expect(ids).toContain('lines-after-end');
+  });
+
+  it('says lines after M2/M30 still run, counting only lines a controller acts on', () => {
+    const after = findProgramIssues(
+      model(['G21 G90', 'M3 S1', 'G1 X10 F100', 'M30', '', '(next)', 'G0 X0', 'M3 S1'].join('\n')),
+    ).find((finding) => finding.id === 'lines-after-end');
+    expect(after).toMatchObject({ severity: 'notice', line: 6, count: 2 });
+    expect(after?.detail).toContain('still run on GRBL');
+    expect(idsOf([...CLEAN.split('\n'), '', '(end)', '%'].join('\n'))).not.toContain(
+      'lines-after-end',
+    );
   });
 
   it('reports unsupported words and undrawable moves', () => {

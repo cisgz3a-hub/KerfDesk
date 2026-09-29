@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { containmentDepths, type ContainmentSegment } from './containment-depth';
 
 // The exhaustive comparison this module replaces, copied from optimize-paths as
-// it stood before the index landed. It is the oracle: if the indexed version
-// ever disagrees with it, "inside first" ordering has silently changed and cut
-// order along with it.
+// it stood before the index landed. It is the oracle for the grid: if the
+// indexed version ever disagrees with it, "inside first" ordering has silently
+// changed and cut order along with it. It probes with the centre of the
+// target's bounds, which the module no longer does (see the concave cases
+// below), but for the axis-aligned rectangles it is fed here that centre and
+// the target's own vertices always agree.
 function referenceDepths(segments: ReadonlyArray<ContainmentSegment>): number[] {
   const bounds = segments.map((segment) => {
     if (segment.polyline.length === 0) return null;
@@ -165,5 +168,75 @@ describe('containmentDepths', () => {
       rect(10, 10, 10, 10),
     ];
     expect(containmentDepths(segments)).toEqual(referenceDepths(segments));
+  });
+});
+
+function ring(...points: ReadonlyArray<readonly [number, number]>): ContainmentSegment {
+  const polyline = points.map(([x, y]) => ({ x, y }));
+  return { closed: true, polyline: [...polyline, ...polyline.slice(0, 1)] };
+}
+
+// A 100 x 100 plate with a 40 x 60 notch cut into its top edge.
+const U_PLATE = ring(
+  [0, 0],
+  [100, 0],
+  [100, 100],
+  [70, 100],
+  [70, 40],
+  [30, 40],
+  [30, 100],
+  [0, 100],
+);
+// The same U inset by 3 mm: inside the plate everywhere, yet the centre of its
+// bounds, (50, 50), is in the plate's notch.
+const U_HOLE = ring([3, 3], [97, 3], [97, 97], [73, 97], [73, 37], [27, 37], [27, 97], [3, 97]);
+
+describe('containmentDepths with a concave container', () => {
+  it('counts a shape that is inside the material though its bounds centre is not', () => {
+    expect(containmentDepths([U_PLATE, U_HOLE])).toEqual([0, 1]);
+    expect(containmentDepths([U_PLATE, U_HOLE], { strict: true })).toEqual([0, 1]);
+  });
+
+  it('does not count a shape that sits in the notch', () => {
+    const inNotch = rect(35, 50, 30, 40);
+    expect(containmentDepths([U_PLATE, inNotch])).toEqual([0, 0]);
+  });
+
+  it('does not count a shape that wraps a tooth of the container', () => {
+    // A plate whose wide notch has a tooth rising in its middle, and an arch
+    // standing in the notch over the tooth. The arch's bounds centre, (50, 70),
+    // is inside the tooth, but no part of the arch is.
+    const comb = ring(
+      [0, 0],
+      [100, 0],
+      [100, 100],
+      [80, 100],
+      [80, 40],
+      [60, 40],
+      [60, 75],
+      [40, 75],
+      [40, 40],
+      [20, 40],
+      [20, 100],
+      [0, 100],
+    );
+    const arch = ring(
+      [25, 45],
+      [35, 45],
+      [35, 85],
+      [65, 85],
+      [65, 45],
+      [75, 45],
+      [75, 95],
+      [25, 95],
+    );
+    expect(containmentDepths([comb, arch])).toEqual([0, 0]);
+  });
+
+  it('probes past a vertex that lies on the container outline', () => {
+    // The first vertex sits on the square's right edge, where a ray cast reads
+    // "outside"; the rest of the triangle is inside.
+    const touching = ring([100, 50], [60, 40], [60, 60]);
+    expect(containmentDepths([rect(0, 0, 100, 100), touching])).toEqual([0, 1]);
   });
 });

@@ -29,8 +29,13 @@ export function lineIntervalMmToLinesPerMm(intervalMm: number): number {
   return normalizeLinesPerMm(1 / Math.max(Number.EPSILON, finite));
 }
 
+/**
+ * DPI of a stored density, resolved through the compiler's floor exactly like
+ * linesPerMmToLineIntervalMm, so the DPI and Line interval fields beside each
+ * other always describe the one density that burns (DPI = 25.4 / interval).
+ */
 export function linesPerMmToDpi(linesPerMm: number): number {
-  return normalizeLinesPerMm(linesPerMm) * MM_PER_INCH;
+  return compiledLinesPerMm(linesPerMm) * MM_PER_INCH;
 }
 
 export function dpiToLinesPerMm(dpi: number): number {

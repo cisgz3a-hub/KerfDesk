@@ -136,6 +136,14 @@ export default defineConfig({
         // Their query strings (?_ptxn=, ?version=) never match the precache, and
         // the app-shell fallback would otherwise answer them with the workspace.
         navigateFallbackDenylist: [/^[/](?:buy|download|support)(?:[.]html)?(?:[?#]|$)/],
+        // The plugin's navigateFallback answers a navigation the precache
+        // cannot with index.html. Only the entry at the deploy root, with or
+        // without a query string, may get it, as on the server, which has no SPA
+        // fallback either (public/404.html). index.html fetches its chunks
+        // through relative URLs (base './'), so served at a nested path, such as
+        // a mistyped deep link, it asked for them under that path and hung on a
+        // blank splash; the server now answers those with its 404 page.
+        navigateFallbackAllowlist: [/^\/(?:index\.html)?(?:\?.*)?$/],
         runtimeCaching: [
           {
             urlPattern: ({ request, url, sameOrigin }) =>

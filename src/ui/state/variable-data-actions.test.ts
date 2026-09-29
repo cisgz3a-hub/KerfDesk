@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createProject } from '../../core/scene';
+import { createProject, DEFAULT_PROJECT_VARIABLE_DATA, type Project } from '../../core/scene';
 import { useStore } from './store';
+import { useToastStore } from './toast-store';
 import { fixtureState } from './variable-array-test-fixture';
 
 describe('variable data advancement', () => {
   beforeEach(() => {
     useStore.setState({ project: createProject(), undoStack: [], redoStack: [], dirty: false });
+    useToastStore.setState({ toasts: [] });
   });
 
   it('advances CSV and serial after the configured successful export', () => {
@@ -30,23 +32,45 @@ describe('variable data advancement', () => {
     expect(useStore.getState().dirty).toBe(true);
   });
 
-  it('does not advance for the wrong policy or a stale async project', () => {
-    const project = {
-      ...createProject(),
-      variables: {
-        advancement: 'after-successful-stream' as const,
-        recordIndex: 2,
-        serialValue: 9,
-      },
-    };
+  it('does not advance for the wrong policy', () => {
+    const project = streamProject();
     useStore.setState({ project });
-    useStore.getState().advanceVariablesAfter(project, 'successful-export');
-    expect(useStore.getState().project).toBe(project);
 
-    const edited = { ...project, notes: 'edited while exporting' };
+    useStore.getState().advanceVariablesAfter(project, 'successful-export');
+
+    expect(useStore.getState().project).toBe(project);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  it('advances the current project when only the design changed during the job', () => {
+    const started = streamProject();
+    const edited = { ...started, notes: 'next design prepared during the job' };
     useStore.setState({ project: edited });
-    useStore.getState().advanceVariablesAfter(project, 'successful-stream');
-    expect(useStore.getState().project).toBe(edited);
+
+    useStore.getState().advanceVariablesAfter(started, 'successful-stream');
+
+    const current = useStore.getState().project;
+    expect(current.notes).toBe('next design prepared during the job');
+    expect(current.variables).toMatchObject({ recordIndex: 1, serialValue: 11 });
+    expect(useStore.getState().undoStack).toEqual([edited]);
+    expect(useToastStore.getState().toasts).toEqual([]);
+  });
+
+  it('skips the advance with a notice when the values changed during the job', () => {
+    const started = streamProject();
+    useStore.setState({ project: started });
+    useStore.getState().advanceVariablesManually();
+    const advancedByHand = useStore.getState().project;
+
+    useStore.getState().advanceVariablesAfter(started, 'successful-stream');
+
+    expect(useStore.getState().project).toBe(advancedByHand);
+    expect(useToastStore.getState().toasts).toEqual([
+      expect.objectContaining({
+        variant: 'warning',
+        message: expect.stringContaining('were not advanced after this job'),
+      }),
+    ]);
   });
 
   it('embeds and clears CSV while manual advancement remains undoable', () => {
@@ -107,3 +131,9 @@ describe('variable data advancement', () => {
     });
   });
 });
+
+function streamProject(): Project {
+  const { project } = fixtureState();
+  const variables = project.variables ?? DEFAULT_PROJECT_VARIABLE_DATA;
+  return { ...project, variables: { ...variables, advancement: 'after-successful-stream' } };
+}

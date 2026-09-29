@@ -167,6 +167,28 @@ describe('AdjustImageDialog', () => {
     }
   });
 
+  // C-6: a LightBurn recipe at a 0.5 mm interval stores 2 lines/mm, and that is
+  // what compiles, so an unrelated edit must neither block OK nor clamp it.
+  it('keeps a stored density outside the recommended range until a new one is entered', async () => {
+    const onApply = vi.fn();
+    const { host, root } = await renderDialog({ onApply, layer: { ...layer, linesPerMm: 2 } });
+    try {
+      const interval = host.querySelector('input[name="lineIntervalMm"]') as HTMLInputElement;
+      expect(interval.value).toBe('0.5');
+      expect(host.querySelector('form')?.checkValidity()).toBe(true);
+      change(host, 'input[name="brightness"]', '10');
+      await submit(host);
+      expect(onApply.mock.calls[0]?.[0]?.layerPatch.linesPerMm).toBe(2);
+
+      change(host, 'input[name="imageDpi"]', '50');
+      await submit(host);
+      expect(onApply.mock.calls[1]?.[0]?.layerPatch.linesPerMm).toBe(5);
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
   it('preserves image density when interval or DPI edits are blank', async () => {
     const onApply = vi.fn();
     const { host, root } = await renderDialog({ onApply });
@@ -290,6 +312,7 @@ describe('AdjustImageDialog', () => {
 async function renderDialog(opts: {
   readonly onApply?: Parameters<typeof AdjustImageDialog>[0]['onApply'];
   readonly onCancel?: () => void;
+  readonly layer?: typeof layer;
 }): Promise<{ readonly host: HTMLDivElement; readonly root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -299,7 +322,7 @@ async function renderDialog(opts: {
     root.render(
       <AdjustImageDialog
         image={image}
-        layer={layer}
+        layer={opts.layer ?? layer}
         onApply={opts.onApply ?? vi.fn()}
         onCancel={opts.onCancel ?? vi.fn()}
       />,

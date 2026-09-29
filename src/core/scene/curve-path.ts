@@ -147,7 +147,9 @@ export function flattenCurveSubpath(
     if (additions === null) {
       return { kind: 'segment-budget-exceeded', segmentBudget: budget };
     }
-    points.push(...additions);
+    // A loop, not a spread push: a spread passes every point as an argument
+    // and overflows the call stack on a very long flattening.
+    for (const point of additions) points.push(point);
     current = segment.to;
   }
   return { kind: 'ok', polyline: { points, closed: path.closed }, segmentCount: points.length - 1 };

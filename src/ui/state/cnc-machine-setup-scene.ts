@@ -1,7 +1,13 @@
-import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
+import { cncMachineWithOwnFeeds, cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
 import type { CncMachineStarterLiveCaps } from '../../core/cnc/machine-starters';
 import type { DeviceProfile } from '../../core/devices';
-import type { CncMachineParams, MachineConfig, Project, Scene } from '../../core/scene';
+import type {
+  CncMachineConfig,
+  CncMachineParams,
+  MachineConfig,
+  Project,
+  Scene,
+} from '../../core/scene';
 import { refreshAutomaticCncFeeds, seedCncModeSwitchLayers } from './cnc-auto-seeding';
 import { applyCncTextDefaultsForScene } from './cnc-text-defaults';
 
@@ -72,15 +78,48 @@ export function projectAfterDeviceProfileChange(
     project.machine,
     liveCaps,
   );
+  return projectWithProfile(project, scene, nextProfile);
+}
+
+// Replacing the whole profile (ADR-500 "Use <last machine>", a machine-profile
+// import) picks another machine. Machine Setup saves its router values on the
+// profile, so they replace the safe Z, spindle, feeds and park of the CNC
+// machine that compiles the job, and of the cached one the next Laser/CNC
+// switch restores. Keeping the old params ran the saved machine's jobs at the
+// generic 3.81 mm safe Z. A profile without CNC values leaves them as they are.
+export function cncMachineForProfile(
+  machine: CncMachineConfig,
+  profile: DeviceProfile,
+): CncMachineConfig {
+  const params = profile.cncSubProfile;
+  if (params === undefined) return machine;
+  return cncMachineWithOwnFeeds({ ...machine, params: { ...params } }, profile);
+}
+
+export function projectAfterDeviceProfileReplacement(
+  project: Project,
+  nextProfile: DeviceProfile,
+  liveCaps: CncMachineStarterLiveCaps | null,
+): Project {
+  const machine = project.machine;
+  if (machine?.kind !== 'cnc' || nextProfile.cncSubProfile === undefined) {
+    return projectAfterDeviceProfileChange(project, nextProfile, liveCaps);
+  }
+  const nextMachine = cncMachineForProfile(machine, nextProfile);
+  const scene = refreshAutomaticCncFeeds(project.scene, {
+    device: nextProfile,
+    machine: nextMachine,
+    liveCaps,
+  });
+  return { ...projectWithProfile(project, scene, nextProfile), machine: nextMachine };
+}
+
+function projectWithProfile(project: Project, scene: Scene, profile: DeviceProfile): Project {
   return {
     ...project,
     scene,
-    device: nextProfile,
-    workspace: {
-      ...project.workspace,
-      width: nextProfile.bedWidth,
-      height: nextProfile.bedHeight,
-    },
+    device: profile,
+    workspace: { ...project.workspace, width: profile.bedWidth, height: profile.bedHeight },
   };
 }
 

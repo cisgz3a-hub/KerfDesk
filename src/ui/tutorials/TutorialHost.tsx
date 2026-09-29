@@ -1,11 +1,15 @@
 import { lazy, Suspense, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { rejectAsLoadFailure } from '../common/lazy-load-failure';
+import { LazyOverlayBoundary } from '../common/LazyOverlayBoundary';
 import { useDialogA11y } from '../common/use-dialog-a11y';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useTutorialStore } from './tutorial-store';
 import './tutorials.css';
 
-const TutorialCentre = lazy(() => import('./TutorialCentre'));
+// A window left on the previous build can find this chunk gone; the boundary
+// below then shows a notice inside the dialog instead of crashing the app.
+const TutorialCentre = lazy(() => import('./TutorialCentre').catch(rejectAsLoadFailure));
 
 export function TutorialHost(): JSX.Element | null {
   const isOpen = useTutorialStore((state) => state.isOpen);
@@ -53,15 +57,17 @@ function TutorialShell(): JSX.Element {
             Close
           </button>
         </header>
-        <Suspense
-          fallback={
-            <p className="lf-learn-loading" role="status">
-              Opening visual tutorials…
-            </p>
-          }
-        >
-          <TutorialCentre />
-        </Suspense>
+        <LazyOverlayBoundary toolName="The visual tutorials" presentation="inline" onClose={close}>
+          <Suspense
+            fallback={
+              <p className="lf-learn-loading" role="status">
+                Opening visual tutorials…
+              </p>
+            }
+          >
+            <TutorialCentre />
+          </Suspense>
+        </LazyOverlayBoundary>
       </section>
     </div>
   );

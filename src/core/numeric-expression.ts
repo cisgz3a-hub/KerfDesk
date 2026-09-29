@@ -21,6 +21,12 @@
 //   group   := '(' sum ')'
 // Numbers use a decimal point (12, 12.5, 12., .5, 1e3); a comma is refused
 // rather than guessed at. Words are case-insensitive.
+//
+// A unit on the last factor of a product, with none on the factors before it,
+// applies to the whole product: `1/2in` is half an inch and `3/4"` three
+// quarters of one, as a woodworker means them, not 1 mm over 2 inches. A unit
+// on any other factor stays on its own number (`10mm/2` is 5 mm), and a
+// product of multiplications comes out the same either way.
 
 const MM_PER_INCH = 25.4;
 // A cap on what is parsed at all keeps a pasted wall of brackets from
@@ -175,42 +181,64 @@ function parseSum(cursor: Cursor): number {
   return value;
 }
 
+// A factor of a product: its number and the scale of the unit written right
+// after it, kept apart until the product knows whether the unit is its last.
+type Factor = { readonly value: number; readonly scale: number | null };
+
+// `value` reads every unit on its own number. `unitless` is the product read
+// without units while no factor has carried one; when the last factor brings
+// the only unit, `whole` applies it to that product instead (see the header).
 function parseProduct(cursor: Cursor): number {
-  let value = parseUnary(cursor);
+  const first = parseUnary(cursor);
+  let value = scaled(first);
+  let unitless = first.scale === null ? first.value : null;
+  let whole: number | null = null;
   let op = takeSymbol(cursor, PRODUCT_OPERATORS);
   while (op !== null) {
     const right = parseUnary(cursor);
-    if (op === '/' && right === 0) return fail(cursor, 'it divides by zero');
-    value = op === '*' ? value * right : value / right;
+    if (op === '/' && scaled(right) === 0) return fail(cursor, 'it divides by zero');
+    value = applyProductOperator(op, value, scaled(right));
+    const combined = unitless === null ? null : applyProductOperator(op, unitless, right.value);
+    whole = combined === null || right.scale === null ? null : combined * right.scale;
+    unitless = right.scale === null ? combined : null;
     op = takeSymbol(cursor, PRODUCT_OPERATORS);
   }
-  return value;
+  return whole ?? value;
 }
 
-function parseUnary(cursor: Cursor): number {
+function applyProductOperator(op: string, left: number, right: number): number {
+  return op === '*' ? left * right : left / right;
+}
+
+function scaled(factor: Factor): number {
+  return factor.scale === null ? factor.value : factor.value * factor.scale;
+}
+
+// A sign keeps the unit of what it signs, so 1/-2in is minus half an inch.
+function parseUnary(cursor: Cursor): Factor {
   const sign = takeSymbol(cursor, SUM_OPERATORS);
-  if (sign === '-') return -parseUnary(cursor);
-  if (sign === '+') return parseUnary(cursor);
-  return parsePower(cursor);
+  if (sign === null) return parsePower(cursor);
+  const factor = parseUnary(cursor);
+  return sign === '-' ? { value: -factor.value, scale: factor.scale } : factor;
 }
 
 // The exponent is a `unary`, so it may carry a sign (2^-1) and recurses back
 // into `power` for right-associativity; a leading minus stays outside the
-// power, so -2^2 is -(2^2) as on paper.
-function parsePower(cursor: Cursor): number {
+// power, so -2^2 is -(2^2) as on paper. A power's units are applied inside it.
+function parsePower(cursor: Cursor): Factor {
   const base = parsePostfix(cursor);
   if (takeSymbol(cursor, POWER_OPERATOR) === null) return base;
-  return base ** parseUnary(cursor);
+  return { value: scaled(base) ** scaled(parseUnary(cursor)), scale: null };
 }
 
-function parsePostfix(cursor: Cursor): number {
+function parsePostfix(cursor: Cursor): Factor {
   const value = parsePrimary(cursor);
   const token = cursor.tokens[cursor.index];
-  if (cursor.failure !== null || token === undefined) return value;
+  if (cursor.failure !== null || token === undefined) return { value, scale: null };
   const scale = unitScale(cursor, token);
-  if (scale === null) return value;
+  if (scale === null) return { value, scale: null };
   cursor.index += 1;
-  return value * scale;
+  return { value, scale };
 }
 
 function parsePrimary(cursor: Cursor): number {

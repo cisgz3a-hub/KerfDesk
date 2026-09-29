@@ -187,7 +187,8 @@ describe('decodeIncrementalPngToLuma', () => {
     );
 
     expect(result).toMatchObject({ kind: 'ok', bitDepth: 8, colorType: 0 });
-    expect(rows).toEqual([[7, 127, 200]]);
+    // The keyed grey 127 is transparent, so its display luma is paper.
+    expect(rows).toEqual([[7, 255, 200]]);
     expect(onTransparency).toHaveBeenCalledOnce();
     expect(onTransparency).toHaveBeenCalledWith({ kind: 'grayscale-sample', sample: 127 });
   });

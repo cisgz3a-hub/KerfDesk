@@ -1,5 +1,10 @@
 import type { DeviceProfile } from '../../core/devices';
 import {
+  effectiveObjectMinPowerPercent,
+  effectiveObjectPowerPercent,
+  effectiveOperationForObject,
+} from '../../core/effective-output';
+import {
   applyImageMaskToLuma,
   dither,
   evaluateRasterBudget,
@@ -8,6 +13,7 @@ import {
   resampleLuma,
   whiteLuma,
 } from '../../core/raster';
+import { rasterCompilationPowerScale } from '../../core/raster/controller-power-scale';
 import { imageDitherAlgorithm, prepareImageLuma } from '../../core/raster/image-processing';
 import { burnGridKernel } from '../../core/raster/luma-resample';
 import type { Layer, RasterImage, SceneObject } from '../../core/scene';
@@ -33,12 +39,18 @@ export type ProcessedRasterBitmapOptions = {
   readonly maxEdge?: number;
 };
 
+/**
+ * The bitmap `image` burns as on `operation`, the layer it is assigned to. The
+ * image's own settings and power scale are resolved here exactly as compile
+ * resolves them, so a caller cannot export the operation's raw settings.
+ */
 export function buildProcessedRasterBitmap(
   image: RasterImage,
-  layer: Layer,
+  operation: Layer,
   device: DeviceProfile,
   options: ProcessedRasterBitmapOptions = {},
 ): ProcessedRasterBitmap {
+  const layer = effectiveOperationForObject(operation, image);
   const outputDimensions = processedRasterDimensions(image, layer);
   const { width, height } = capRasterDimensions(outputDimensions, options.maxEdge);
   const budget = evaluateRasterBudget(width, height, {
@@ -69,8 +81,15 @@ export function buildProcessedRasterBitmap(
     width,
     height,
   });
-  const sMax = powerToSMax(layer.power, device.maxPowerS);
-  const sMin = minPowerToSMin(layer.minPower, layer.power, device.maxPowerS);
+  // Compile's own power range: the image's power scale and the controller's
+  // dithering units (a 0..1 controller would otherwise round 30% down to 0).
+  const compilationMaxS = rasterCompilationPowerScale(device);
+  const sMax = Math.round(
+    (effectiveObjectPowerPercent(layer, image) / PERCENT_MAX) * compilationMaxS,
+  );
+  const sMin = Math.round(
+    (effectiveObjectMinPowerPercent(layer, image) / PERCENT_MAX) * compilationMaxS,
+  );
   const sValues = dither(
     { luma: maskedLuma, width, height },
     { algorithm: imageDitherAlgorithm(layer), sMax, sMin },
@@ -88,8 +107,9 @@ export function processedRasterPreviewDimensions(
 
 export function processedRasterDimensions(
   image: RasterImage,
-  layer: Layer,
+  operation: Layer,
 ): { readonly width: number; readonly height: number } {
+  const layer = effectiveOperationForObject(operation, image);
   if (layer.passThrough) {
     return {
       width: Math.max(1, Math.floor(image.pixelWidth)),
@@ -120,17 +140,6 @@ function capRasterDimensions(
     width: Math.max(1, Math.round(dimensions.width * scale)),
     height: Math.max(1, Math.round(dimensions.height * scale)),
   };
-}
-
-function powerToSMax(powerPercent: number, maxPowerS: number): number {
-  const clamped = Math.max(0, Math.min(PERCENT_MAX, powerPercent));
-  return Math.round((clamped / PERCENT_MAX) * maxPowerS);
-}
-
-function minPowerToSMin(minPowerPercent: number, powerPercent: number, maxPowerS: number): number {
-  const maxPercent = Math.max(0, Math.min(PERCENT_MAX, powerPercent));
-  const minPercent = Math.max(0, Math.min(maxPercent, minPowerPercent));
-  return Math.round((minPercent / PERCENT_MAX) * maxPowerS);
 }
 
 function decodeLuma(base64: string | undefined, expectedLength: number): Uint8Array {

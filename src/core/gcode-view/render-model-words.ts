@@ -3,7 +3,7 @@
 // our own emitters write), events, and unsupported-word accounting. Geometry
 // emission lives in gcode-render-model.ts.
 
-import { applySharedGCode } from '../gcode';
+import { applySharedGCode, INCH_TO_MM } from '../gcode';
 import type { GcodeWordMatch } from '../gcode';
 import { CANNED_CYCLES, type CannedCycle, type RetractMode } from './canned-cycle';
 import type { ProgramEvent } from './render-model-types';
@@ -21,7 +21,8 @@ export type RenderModal = {
   coolantMist: boolean;
   coolantFlood: boolean;
   plane: 17 | 18 | 19;
-  ended: boolean;
+  /** The last block held M2/M30, whose resets wait until its motion is done. */
+  endingProgram: boolean;
   /** Active canned drilling cycle; G80 and ordinary motion cancel it. */
   cycle: CannedCycle | null;
   /** G98 (retract to initial Z) or G99 (retract to R plane). */
@@ -54,7 +55,7 @@ export function freshRenderModal(initialPosition?: {
     coolantMist: false,
     coolantFlood: false,
     plane: 17,
-    ended: false,
+    endingProgram: false,
     cycle: null,
     // LinuxCNC's default retract mode is G98 (back to the initial Z).
     retractMode: 98,
@@ -107,6 +108,8 @@ type WordEffectContext = {
 
 type WordApplicationContext = WordEffectContext & {
   readonly tally: LineTally;
+  /** mm per program unit once this block's own G20/G21 applies. */
+  readonly blockUnitScale: number;
 };
 
 type LineMotionPresence = 'with-motion-words' | 'without-motion-words';
@@ -131,6 +134,7 @@ export function applyLineWords(
   line: number,
   accounting: WordAccounting,
 ): LineWordOutcome {
+  if (modal.endingProgram) resetAtProgramEnd(modal);
   const before = controllerState(modal);
   const linePower = lastWordValue(words, 'S') ?? modal.power;
   const tally: LineTally = {
@@ -143,7 +147,14 @@ export function applyLineWords(
     sawDwell: false,
     sawHome: false,
   };
-  const context: WordApplicationContext = { modal, linePower, line, accounting, tally };
+  const context: WordApplicationContext = {
+    modal,
+    linePower,
+    line,
+    accounting,
+    tally,
+    blockUnitScale: blockUnitScale(words, modal.unitScale),
+  };
   for (const word of words) applyOneWord(word, context);
   resolveDwell(tally, line, accounting);
   if (modal.cycle === 82 && !tally.sawDwell && tally.dwellSeconds !== null) {
@@ -172,9 +183,10 @@ function applyOneWord(word: GcodeWordMatch, context: WordApplicationContext): vo
     return;
   }
   if (word.letter === 'F') {
-    // F is interpreted in the units in force when the word executes
-    // (RS274 order: feed before a same-line units change). Stored in mm/min.
-    modal.feed = word.value * modal.unitScale;
+    // GRBL reads the whole block before converting any value, so F takes the
+    // block's own G20/G21 wherever it stands on the line (gcode.c converts F
+    // with gc_block.modal.units). Stored in mm/min.
+    modal.feed = word.value * context.blockUnitScale;
     tally.sawModal = true;
     return;
   }
@@ -209,6 +221,15 @@ function applyOneWord(word: GcodeWordMatch, context: WordApplicationContext): vo
   }
   accounting.countUnsupported(word.letter, line);
   tally.sawUnsupported = true;
+}
+
+function blockUnitScale(words: ReadonlyArray<GcodeWordMatch>, current: number): number {
+  let scale = current;
+  for (const word of words) {
+    if (word.letter === 'G' && word.value === 20) scale = INCH_TO_MM;
+    if (word.letter === 'G' && word.value === 21) scale = 1;
+  }
+  return scale;
 }
 
 function noteOutcome(tally: LineTally, outcome: WordOutcome): void {
@@ -323,7 +344,7 @@ function isCannedCycle(code: number): boolean {
 function applyMWord(code: number, context: WordEffectContext): WordOutcome {
   const { modal, linePower, line, accounting } = context;
   if (code === 2 || code === 30) {
-    modal.ended = true;
+    modal.endingProgram = true;
     accounting.pushEvent({ kind: 'program-end', line });
     return 'event';
   }
@@ -366,6 +387,22 @@ function spindleOrCoolantEventFor(code: number, line: number, power: number): Pr
   }
   if (code === 9) return { kind: 'coolant-off', line };
   return null;
+}
+
+// GRBL treats M2/M30 as a program end but not a stop (gcode.c, "[21. Program
+// flow ]"): after the block's motion it drains the planner, resets G1, G17,
+// G90, G94 and G54, switches the spindle and coolant off, and sets program flow
+// back to running, so the lines after it still execute. Units, F and S keep
+// their values. The viewer has no G93 or work offsets to reset.
+function resetAtProgramEnd(modal: RenderModal): void {
+  modal.endingProgram = false;
+  modal.motion = 1;
+  modal.plane = 17;
+  modal.absolute = true;
+  modal.cycle = null;
+  modal.spindleMode = 'off';
+  modal.coolantMist = false;
+  modal.coolantFlood = false;
 }
 
 type ControllerState = Pick<RenderModal, 'spindleMode' | 'power' | 'coolantMist' | 'coolantFlood'>;

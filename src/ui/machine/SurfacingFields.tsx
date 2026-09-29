@@ -2,33 +2,22 @@ import { useState } from 'react';
 import {
   SURFACING_DEFAULT_STEPOVER_PCT,
   SURFACING_DEFAULT_TOTAL_DEPTH_MM,
-  surfacingStarterValues,
+  SURFACING_MAX_STEPOVER_PCT,
 } from '../../core/cnc/surfacing';
-import { cncMaxFeedMmPerMin } from '../../core/cnc/cnc-head-feeds';
-import { activeCncTool, type CncMachineConfig, type Project } from '../../core/scene';
+import type { CncMachineConfig, Project } from '../../core/scene';
 import { NumberField as ClearableNumberField } from '../common/NumberField';
 import { useSourceTrackedState } from '../common/use-source-tracked-state';
-import { materialFeedsPatch } from '../state/cnc-project-material';
 import { useStore } from '../state/store';
+import { surfacingSeed } from './surfacing-seed';
 export function useSurfacingValues(
   machine: CncMachineConfig,
   project: Project,
   projectDocumentEpoch: number,
 ) {
   const liveCaps = useStore((s) => s.cncLiveCaps);
-  const tool = activeCncTool(machine);
-  const starter =
-    machine.stock.materialKey === undefined
-      ? null
-      : materialFeedsPatch({
-          materialKey: machine.stock.materialKey,
-          tool,
-          spindleRpm: machine.params.spindleMaxRpm,
-          profile: project.device,
-          machineParams: machine.params,
-          liveCaps,
-        });
-  const maxFeed = cncMaxFeedMmPerMin(project.device, machine.params);
+  // The calculator may lower a surfacing starter value but never raise it past
+  // the conservative surfacing defaults (ADR-457 Amd 1).
+  const { tool, starter, maxFeed, seed } = surfacingSeed(machine, project, liveCaps);
   const recipeKey = JSON.stringify([
     projectDocumentEpoch,
     tool,
@@ -37,9 +26,6 @@ export function useSurfacingValues(
     maxFeed,
     machine.params.spindleMaxRpm,
   ]);
-  // The calculator may lower a surfacing starter value but never raise it past
-  // the conservative surfacing defaults (ADR-457 Amd 1).
-  const seed = surfacingStarterValues(starter, maxFeed);
   const [feedMmPerMin, setFeed] = useSourceTrackedState(seed.feedMmPerMin, recipeKey);
   const [plungeMmPerMin, setPlunge] = useSourceTrackedState(seed.plungeMmPerMin, recipeKey);
   const [spindleRpm, setRpm] = useSourceTrackedState(
@@ -135,7 +121,8 @@ function surfacingFields(v: Values): ReadonlyArray<NumProps> {
       label: 'Stepover %',
       value: v.inputs.stepoverPct,
       onCommit: v.setStepoverPct,
-      title: "Row spacing as a percentage of the active bit's diameter.",
+      title: `Row spacing as a percentage of the active bit's diameter, at most ${String(SURFACING_MAX_STEPOVER_PCT)}%. Wider rows leave uncut strips.`,
+      range: { min: 1, max: SURFACING_MAX_STEPOVER_PCT },
     },
     {
       label: 'Total depth',
@@ -174,6 +161,8 @@ type NumProps = {
   readonly value: number;
   readonly title: string;
   readonly onCommit: (value: number) => void;
+  /** Clamp to this range; without one the field only has to be positive. */
+  readonly range?: { readonly min: number; readonly max: number };
 };
 function Num(props: NumProps): JSX.Element {
   return (
@@ -183,7 +172,9 @@ function Num(props: NumProps): JSX.Element {
         ariaLabel={`Surfacing ${props.label.toLowerCase()}`}
         title={props.title}
         value={props.value}
-        positiveOnly
+        {...(props.range === undefined
+          ? { positiveOnly: true as const }
+          : { min: props.range.min, max: props.range.max })}
         step={0.1}
         onCommit={props.onCommit}
         style={{ width: 76 }}

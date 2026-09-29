@@ -202,18 +202,16 @@ describe('AutosaveDurableService', () => {
     const second = testService({ repository: repository(), locks, initialSessionId: 'window-b' });
     const recovered = (await second.readLatest()).snapshot;
     expect(recovered?.ownership).toBe('abandoned');
-    const reactivated = testService({
-      repository: repository(),
-      locks,
-      initialSessionId: 'window-a',
-    });
-    await reactivated.session();
+    // A page that starts with 'window-a' now moves off a slot holding work,
+    // so hold the session lock directly to model its owner coming back.
+    const reactivated = await locks.claim('window-a');
+    expect(reactivated.kind).toBe('owned');
 
     await expect(second.clearRecovered(recovered!)).resolves.toEqual({
       kind: 'retained',
       reason: 'live',
     });
-    await reactivated.stop();
+    if (reactivated.kind === 'owned') await reactivated.guard.release();
     expect((await second.readLatest()).snapshot?.project.notes).toBe('reactivated project');
     await second.stop();
   });
@@ -305,6 +303,12 @@ class DeferredCommitRepository implements AutosaveDurableRepository {
     return this.delegate.readEpoch(...args);
   }
 
+  holdsReplaceableSnapshot(
+    ...args: Parameters<AutosaveDurableRepository['holdsReplaceableSnapshot']>
+  ) {
+    return this.delegate.holdsReplaceableSnapshot(...args);
+  }
+
   readAllSlots(...args: Parameters<AutosaveDurableRepository['readAllSlots']>) {
     return this.delegate.readAllSlots(...args);
   }
@@ -341,6 +345,12 @@ class RejectingCommitRepository implements AutosaveDurableRepository {
 
   readEpoch(...args: Parameters<AutosaveDurableRepository['readEpoch']>) {
     return this.delegate.readEpoch(...args);
+  }
+
+  holdsReplaceableSnapshot(
+    ...args: Parameters<AutosaveDurableRepository['holdsReplaceableSnapshot']>
+  ) {
+    return this.delegate.holdsReplaceableSnapshot(...args);
   }
 
   readAllSlots(...args: Parameters<AutosaveDurableRepository['readAllSlots']>) {

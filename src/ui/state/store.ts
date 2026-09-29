@@ -219,7 +219,9 @@ export type AppState = ObjectPropertiesActions &
     // selection is selectedObjectId; additionalSelectedIds is everything
     // shift+clicked or marquee-added after that. Combined-bbox scale and
     // rotate are intentionally Phase C — Phase A's transform pipeline only
-    // operates on the primary selection. Move + Delete are multi-aware.
+    // operates on the primary selection. Move + Delete are multi-aware. The
+    // object last clicked into the selection, Align's reference, comes in with
+    // SelectionTransformActions (selection-reference.ts).
     readonly additionalSelectedIds: ReadonlySet<string>;
     readonly previewMode: boolean;
     // External .nc program shown in the simulator instead of the compiled

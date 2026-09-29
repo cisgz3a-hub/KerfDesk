@@ -6,6 +6,7 @@
 
 import type { RgbaBuffer } from '../../core/image-edit';
 import type { RasterImage } from '../../core/scene';
+import type { RawImageData } from '../../core/trace';
 import { readRasterSourceFile } from '../import/paged-raster-source';
 import {
   extractLumaBase64,
@@ -16,6 +17,7 @@ import {
 import type { BitmapFields } from './image-editor-types';
 
 const EDITOR_DECODE_FILENAME = 'image-studio-source';
+const MAX_BYTE = 255;
 
 export async function decodeRasterToBuffer(image: RasterImage): Promise<RgbaBuffer> {
   // Production CSP intentionally excludes data: from connect-src. Decode the
@@ -26,7 +28,44 @@ export async function decodeRasterToBuffer(image: RasterImage): Promise<RgbaBuff
   // also holds for a turned JPEG saved before ADR-404 honoured EXIF.
   const maxEdge = Math.max(image.pixelWidth, image.pixelHeight, 1);
   const decoded = await loadImageAsRawData(file, maxEdge);
-  return fitDecodeToStoredGrid(decoded, image.pixelWidth, image.pixelHeight);
+  return straightColourForEditor(
+    fitDecodeToStoredGrid(decoded, image.pixelWidth, image.pixelHeight),
+  );
+}
+
+// The loader's RGB is already composited over white (the tone import burns),
+// with alpha kept. The editor's Background layer is straight colour that its
+// one composite path blends over white, so passing those bytes through applied
+// alpha twice: black at 50% baked as luma 191 instead of 127. Undoing the white
+// composite (W3C Compositing 5.1 over white: c = 255 - a(255 - s)) lets Apply
+// reproduce the imported tone while tools that read alpha still see it. A fully
+// transparent pixel has no colour of its own, so it becomes paper white.
+function straightColourForEditor(pixels: RawImageData): RgbaBuffer {
+  if (pixels.rgbCompositedOnWhite !== true) return pixels;
+  const { width, height, data } = pixels;
+  if (isFullyOpaque(data)) return { width, height, data };
+  const straight = new Uint8ClampedArray(data.length);
+  for (let i = 0; i < data.length; i += 4) {
+    const alpha = data[i + 3] ?? MAX_BYTE;
+    straight[i] = straightChannel(data[i] ?? MAX_BYTE, alpha);
+    straight[i + 1] = straightChannel(data[i + 1] ?? MAX_BYTE, alpha);
+    straight[i + 2] = straightChannel(data[i + 2] ?? MAX_BYTE, alpha);
+    straight[i + 3] = alpha;
+  }
+  return { width, height, data: straight };
+}
+
+function isFullyOpaque(data: Uint8ClampedArray): boolean {
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== MAX_BYTE) return false;
+  }
+  return true;
+}
+
+function straightChannel(composited: number, alpha: number): number {
+  if (alpha === 0) return MAX_BYTE;
+  const value = Math.round(MAX_BYTE - ((MAX_BYTE - composited) * MAX_BYTE) / alpha);
+  return Math.min(MAX_BYTE, Math.max(0, value));
 }
 
 export async function bakeBufferToBitmapFields(doc: RgbaBuffer): Promise<BitmapFields> {

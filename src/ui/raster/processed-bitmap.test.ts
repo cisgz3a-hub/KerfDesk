@@ -51,6 +51,38 @@ describe('processed raster bitmap', () => {
     ]);
   });
 
+  it('keeps greys on a controller whose full power is S1', () => {
+    // Smoothieware takes S0..1; 30% power must not round to S0 and export blank.
+    const smoothie = {
+      ...DEFAULT_DEVICE_PROFILE,
+      controllerKind: 'smoothieware' as const,
+      maxPowerS: 1,
+    };
+    const image = rasterImage({ pixelWidth: 3, pixelHeight: 1, luma: [0, 128, 255] });
+    const layer = imageLayer({ ditherAlgorithm: 'grayscale', power: 30, passThrough: true });
+
+    const result = buildProcessedRasterBitmap(image, layer, smoothie);
+
+    expect(result).toEqual(buildProcessedRasterBitmap(image, layer, DEFAULT_DEVICE_PROFILE));
+    expect(result.kind === 'ok' ? result.rgba[0] : null).toBe(0);
+  });
+
+  it("uses the image's own settings over its layer's", () => {
+    const layer = imageLayer({ ditherAlgorithm: 'threshold', passThrough: false, linesPerMm: 1 });
+    const image = rasterImage({
+      pixelWidth: 2,
+      pixelHeight: 1,
+      luma: [0, 255],
+      operationOverride: { negativeImage: true },
+    });
+
+    const result = buildProcessedRasterBitmap(image, layer, DEFAULT_DEVICE_PROFILE);
+
+    expect(result.kind === 'ok' ? Array.from(result.rgba) : []).toEqual([
+      255, 255, 255, 255, 0, 0, 0, 255,
+    ]);
+  });
+
   it('applies negative image before threshold processing', () => {
     const layer = imageLayer({
       ditherAlgorithm: 'threshold',

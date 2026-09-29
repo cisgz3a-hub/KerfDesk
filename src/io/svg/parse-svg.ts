@@ -4,11 +4,15 @@
 //    external xlink:href, non-image data URIs.
 // 2. Parse the cleaned markup with the native DOMParser into a Document.
 // 3. Walk every geometry-bearing element (shape-to-polylines.ts) in document
-//    order — deterministic for snapshot tests.
+//    order — deterministic for snapshot tests. Nested <svg> and <symbol>
+//    viewports map their content (not clipped to the viewport), a <switch>
+//    renders one child, and <use> expansion skips circular references and has
+//    a budget (ADR-268 Amendment 1).
 // 4. Attribute each element to stroke color, falling back to visible fill
 //    color for fill-only logo artwork. Colors cascade from presentation
 //    attributes, <style> rules and the style attribute; an unset fill is
-//    SVG's initial black. Elements that paint neither are skipped.
+//    SVG's initial black. Elements that paint neither are skipped. A gradient
+//    paints its first visible stop's colour; a pattern paint is skipped.
 // 5. Keep only what each element's clip paths keep (svg-vector-clip-geometry.ts);
 //    masks and filters are left out and disclosed (ADR-358 Amendment 2).
 // 6. Bundle into an ImportedSvg with the SVG's viewBox as the natural bounds.
@@ -20,6 +24,7 @@ import {
   type ImportedSvg,
   type Polyline,
 } from '../../core/scene';
+import { expandInternalSubset } from '../xml/internal-subset-entities';
 import { type SvgStripCounts, sanitizeSvg } from './sanitize';
 import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
 import { elementToSubPaths } from './shape-to-polylines';
@@ -31,20 +36,35 @@ import {
   assertSvgImportPoints,
   createSvgImportBudget,
   reserveSvgPolyline,
-  svgImportSizeNote,
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
 import {
   INITIAL_PRESENTATION_STATE,
-  normalizeColor,
   numAttr,
   presentationStateFor,
   type PresentationState,
 } from './svg-presentation';
-import type { ParsedSvgFragment, SvgImportEntry } from './svg-import-fragment';
+import { BLACK_PAINT, NO_PAINT } from './svg-paint';
+import {
+  createSvgPaintResolver,
+  type ResolvedSvgPaint,
+  type SvgPaintResolver,
+} from './svg-paint-server';
+import { createSvgImportCounts, svgImportNotes, type SvgImportCounts } from './svg-import-notes';
+import type { ParsedSvgFragment } from './svg-import-fragment';
+import { appendVectorEntry, createSvgEntryList, type SvgEntryList } from './svg-import-entries';
 import { svgImageElement } from './svg-image-element';
 import { createSvgStyleCascade, type SvgStyleCascade } from './svg-stylesheet';
+import { svgRenderedChildren } from './svg-conditional-processing';
+import { hasSvgMarkers } from './svg-markers';
+import { rootViewportSize, svgViewportTransform, viewportLength } from './svg-viewport';
+import {
+  createSvgUseBudget,
+  spendSvgUseElement,
+  svgUseTarget,
+  type SvgUseBudget,
+} from './svg-use-expansion';
 
 export { SVG_IMPORT_LIMITS } from './svg-import-budget';
 
@@ -69,22 +89,17 @@ type PathBucket = {
 // recursive walkers past the project's parameter-count limit.
 type WalkContext = {
   readonly byColor: Map<string, PathBucket>;
-  readonly entries: SvgImportEntry[];
-  readonly identity: { readonly id: string; readonly source: string };
-  readonly counts: WalkCounts;
+  readonly fragment: SvgEntryList;
+  readonly counts: SvgImportCounts;
   readonly budget: SvgImportBudget;
   readonly resolveId: SvgIdResolver;
   readonly cascadeStyles: SvgStyleCascade;
   readonly clipResolver: SvgClipResolver;
   readonly clipVector: SvgVectorClipper;
-};
-
-type WalkCounts = {
-  text: number;
-  image: number;
-  fillAndStroke: number;
-  masked: number;
-  filtered: number;
+  readonly resolvePaint: SvgPaintResolver;
+  /** Elements the walk is inside, through the document or through <use>. */
+  readonly active: Set<Element>;
+  readonly useBudget: SvgUseBudget;
 };
 
 function walkGeometry(
@@ -97,9 +112,11 @@ function walkGeometry(
   const transform = { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 };
   const rootState = presentationStateFor(
     svgEl,
-    { ...INITIAL_PRESENTATION_STATE, transform },
+    { ...INITIAL_PRESENTATION_STATE, transform, viewport: rootViewportSize(svgEl) },
     context.cascadeStyles,
   );
+  // The root is an ancestor of everything, so a <use> of it is circular.
+  context.active.add(svgEl);
   for (const child of Array.from(svgEl.children)) {
     walkElement(child, rootState, context, 0);
   }
@@ -124,28 +141,76 @@ function walkElement(
   depth: number,
 ): void {
   if (depth > MAX_WALK_DEPTH) return;
+  if (context.useBudget.nesting > 0) spendSvgUseElement(context.useBudget);
   const state = presentationStateFor(el, parent, context.cascadeStyles);
   const tag = el.tagName.toLowerCase();
-  if (['text', 'tspan'].includes(tag)) {
-    context.counts.text += 1;
-  } else if (tag === 'image' && !state.hidden) {
-    const image = svgImageElement(el, state, context.clipResolver, {
-      id: context.identity.id + '-' + context.entries.length,
-      source: context.identity.source,
-    });
-    if (image === null) context.counts.image += 1;
-    else context.entries.push(image);
-  } else if (NEVER_RENDERED.has(tag)) {
-    return;
-  } else if (tag === 'use' && !state.hidden) {
-    appendUseGeometry(el, state, context, depth);
-  } else if (!state.hidden) {
-    appendElementGeometry(el, state, context);
-  }
+  // Text is not imported; a <text> counts once, however many <tspan>s it holds.
+  if (tag === 'text') context.counts.text += 1;
+  if (tag === 'text' || NEVER_RENDERED.has(tag)) return;
+  appendElement(el, state, context, depth);
+  const content = tag === 'svg' ? viewportState(el, state, AUTO_SIZE) : state;
+  if (content !== null) walkChildren(el, content, context, depth);
+}
 
-  for (const child of Array.from(el.children)) {
+function appendElement(
+  el: Element,
+  state: PresentationState,
+  context: WalkContext,
+  depth: number,
+): void {
+  const tag = el.tagName.toLowerCase();
+  // A <use> paints nothing itself; visibility reaches its instance only by
+  // inheritance, which the instance's own elements can override.
+  if (tag === 'use') {
+    if (!state.hiddenSubtree) appendUseGeometry(el, state, context, depth);
+  } else if (!state.hidden) {
+    if (tag === 'image') appendImage(el, state, context);
+    else appendElementGeometry(el, state, context);
+  }
+}
+
+function walkChildren(
+  el: Element,
+  state: PresentationState,
+  context: WalkContext,
+  depth: number,
+): void {
+  context.active.add(el);
+  for (const child of svgRenderedChildren(el)) {
     walkElement(child, state, context, depth + 1);
   }
+  context.active.delete(el);
+}
+
+type UseSize = { readonly width: number | null; readonly height: number | null };
+const AUTO_SIZE: UseSize = { width: null, height: null };
+
+// A nested <svg>, or the <svg> a <use> makes of a <symbol>, maps its content
+// into its viewport; null when a zero size disables rendering. Content that
+// overflows the viewport is not clipped to it.
+function viewportState(
+  el: Element,
+  state: PresentationState,
+  size: UseSize,
+): PresentationState | null {
+  const viewport = svgViewportTransform(el, state.viewport, size);
+  if (viewport === null) return null;
+  return {
+    ...state,
+    transform: multiplySvgMatrix(state.transform, viewport.matrix),
+    viewport: viewport.viewport,
+  };
+}
+
+function appendImage(el: Element, state: PresentationState, context: WalkContext): void {
+  const { entries, identity } = context.fragment;
+  const image = svgImageElement(el, state, context.clipResolver, {
+    id: identity.id + '-' + entries.length,
+    source: identity.source,
+  });
+  if (image.kind === 'svg-image') entries.push(image);
+  else if (image.reason === 'no-data') context.counts.image += 1;
+  else context.counts.skippedImages[image.reason] += 1;
 }
 
 function appendUseGeometry(
@@ -154,10 +219,9 @@ function appendUseGeometry(
   context: WalkContext,
   depth: number,
 ): void {
-  const href = el.getAttribute('href') ?? el.getAttribute('xlink:href');
-  if (href === null || !href.startsWith('#') || href.length <= 1) return;
-  const referenced = context.resolveId(href.slice(1));
-  if (referenced === null || referenced === el) return;
+  const referenced = svgUseTarget(el, context.resolveId, context.active);
+  if (referenced === 'circular') context.counts.circularUse += 1;
+  if (referenced === null || referenced === 'circular') return;
   const placedState = {
     ...state,
     transform: multiplySvgMatrix(
@@ -165,19 +229,41 @@ function appendUseGeometry(
       translateSvgMatrix(numAttr(el, 'x'), numAttr(el, 'y')),
     ),
   };
-  if (isDefinitionContainer(referenced)) {
-    walkReferencedDefinition(referenced, placedState, context, depth + 1);
-    return;
+  context.active.add(el);
+  context.useBudget.nesting += 1;
+  if (['defs', 'symbol', 'svg'].includes(referenced.tagName.toLowerCase())) {
+    // The <use> element's width and height size the viewport of the <symbol>
+    // or <svg> it instantiates.
+    const size = {
+      width: viewportLength(el, 'width', state.viewport.width),
+      height: viewportLength(el, 'height', state.viewport.height),
+    };
+    walkReferencedDefinition(referenced, placedState, context, depth + 1, size);
+  } else {
+    walkElement(referenced, placedState, context, depth + 1);
   }
-  walkElement(referenced, placedState, context, depth + 1);
+  context.useBudget.nesting -= 1;
+  context.active.delete(el);
 }
+
+const UNPAINTED: ResolvedSvgPaint = { color: '', server: null };
 
 // SVG's initial fill is black, so a shape that nothing styles still paints and
 // imports exactly as an explicit fill="#000000" does. A <line> has no interior
 // and is never filled (SVG 1.1 §9.5), so it still needs a stroke.
-function visibleFillColor(el: Element, state: PresentationState): string {
-  const initial = el.tagName.toLowerCase() === 'line' ? null : '#000000';
-  return state.fillOpacity > 0 ? normalizeColor(state.fill ?? initial) : '';
+function visibleFill(
+  el: Element,
+  state: PresentationState,
+  context: WalkContext,
+): ResolvedSvgPaint {
+  if (state.fillOpacity <= 0) return UNPAINTED;
+  const initial = el.tagName.toLowerCase() === 'line' ? NO_PAINT : BLACK_PAINT;
+  return context.resolvePaint(state.fill ?? initial, state.color);
+}
+
+function visibleStroke(state: PresentationState, context: WalkContext): ResolvedSvgPaint {
+  if (state.strokeOpacity <= 0 || state.strokeWidthZero) return UNPAINTED;
+  return context.resolvePaint(state.stroke ?? NO_PAINT, state.color);
 }
 
 function appendElementGeometry(el: Element, state: PresentationState, context: WalkContext): void {
@@ -186,14 +272,18 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   const t = state.transform;
   const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d));
   if (subs.length === 0) return;
-  const strokeColor = state.strokeOpacity > 0 ? normalizeColor(state.stroke) : '';
-  const fillColor = visibleFillColor(el, state);
+  const stroke = visibleStroke(state, context);
+  const fill = visibleFill(el, state, context);
+  // A pattern paint is lost whichever paint the element imports with.
+  if (stroke.server === 'pattern' || fill.server === 'pattern') context.counts.pattern += 1;
+  const strokeColor = stroke.color;
+  const fillColor = fill.color;
   const color = strokeColor !== '' ? strokeColor : fillColor;
   if (color === '') return;
   // Stroked artwork is cut as lines, so its clip trims lines; fills clip as areas.
   const geometry = context.clipVector(subs, state, strokeColor === '' ? 'fill' : 'line');
   if (geometry.polylines.length === 0) return;
-  recordVectorPresentation(state, context, strokeColor, fillColor);
+  recordVectorPresentation(el, state, context, { stroke, fill });
   // Explicit SVG rules apply to each element's compound path. Different
   // elements paint independently even when their colours/rules match.
   const key = state.fillRule === undefined ? color : `${color}:${context.byColor.size}`;
@@ -216,7 +306,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
     entryCurves.push(curve);
   });
   appendVectorEntry(
-    context,
+    context.fragment,
     {
       color,
       ...(state.fillRule === undefined ? {} : { fillRule: state.fillRule }),
@@ -228,23 +318,23 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   context.byColor.set(key, bucket);
 }
 
-// Masks and filters are imported without their effect and disclosed: the
-// geometry they apply to is exact, and what they hide or soften is not cut
-// geometry KerfDesk can derive (ADR-358 Amendment 2).
+// Masks, filters, gradients and markers are imported without their effect
+// and disclosed: the geometry they apply to is exact, and what they hide,
+// soften, shade or add is not cut geometry KerfDesk can derive (ADR-358
+// Amendment 2).
 function recordVectorPresentation(
+  el: Element,
   state: PresentationState,
   context: WalkContext,
-  strokeColor: string,
-  fillColor: string,
+  paint: { readonly stroke: ResolvedSvgPaint; readonly fill: ResolvedSvgPaint },
 ): void {
-  if (state.unsupportedEffects.includes('mask')) context.counts.masked += 1;
-  if (state.unsupportedEffects.includes('filter')) context.counts.filtered += 1;
-  if (strokeColor !== '' && fillColor !== '') context.counts.fillAndStroke += 1;
-}
-
-function isDefinitionContainer(el: Element): boolean {
-  const tag = el.tagName.toLowerCase();
-  return tag === 'defs' || tag === 'symbol';
+  const { counts } = context;
+  if (state.unsupportedEffects.includes('mask')) counts.masked += 1;
+  if (state.unsupportedEffects.includes('filter')) counts.filtered += 1;
+  if (paint.stroke.color !== '' && paint.fill.color !== '') counts.fillAndStroke += 1;
+  const imported = paint.stroke.color !== '' ? paint.stroke : paint.fill;
+  if (imported.server === 'gradient') counts.gradient += 1;
+  if (hasSvgMarkers(el, state.markers, context.resolveId)) counts.markers += 1;
 }
 
 function walkReferencedDefinition(
@@ -252,15 +342,17 @@ function walkReferencedDefinition(
   parent: PresentationState,
   context: WalkContext,
   depth: number,
+  size: UseSize,
 ): void {
+  spendSvgUseElement(context.useBudget);
   const state = presentationStateFor(el, parent, context.cascadeStyles);
-  for (const child of Array.from(el.children)) {
-    walkElement(child, state, context, depth + 1);
-  }
+  const content = el.tagName.toLowerCase() === 'defs' ? state : viewportState(el, state, size);
+  if (content !== null) walkChildren(el, content, context, depth);
 }
 
 export function parseSvg(args: { svgText: string; id: string; source: string }): ParseSvgResult {
-  const { clean, stripped } = sanitizeSvg(args.svgText);
+  // DOMPurify parses as HTML, which cannot read a DOCTYPE's internal subset.
+  const { clean, stripped } = sanitizeSvg(expandInternalSubset(args.svgText));
 
   const doc = new DOMParser().parseFromString(clean, 'image/svg+xml');
   return parseSvgDocument(doc, args, stripped);
@@ -289,9 +381,9 @@ export function parseSvgDocument(
     { x: bounds.maxX, y: bounds.maxY },
   ]);
   const byColor = new Map<string, PathBucket>();
-  const counts = { text: 0, image: 0, fillAndStroke: 0, masked: 0, filtered: 0 };
+  const counts = createSvgImportCounts();
   const budget = createSvgImportBudget();
-  const entries: SvgImportEntry[] = [];
+  const fragment = createSvgEntryList(args);
   const cascadeStyles = createSvgStyleCascade(svgEl);
   const resolveId = createSvgIdResolver(svgEl);
   const clipResolver = createSvgClipResolver(resolveId, cascadeStyles);
@@ -301,12 +393,14 @@ export function parseSvgDocument(
       byColor,
       counts,
       budget,
-      entries,
-      identity: args,
+      fragment,
       resolveId,
       cascadeStyles,
       clipResolver,
       clipVector: createSvgVectorClipper(clipResolver),
+      resolvePaint: createSvgPaintResolver(resolveId, cascadeStyles),
+      active: new Set(),
+      useBudget: createSvgUseBudget(svgEl),
     },
     unitScale,
   );
@@ -317,7 +411,8 @@ export function parseSvgDocument(
     polylines: bucket.polylines,
     curves: bucket.curves,
   }));
-  const notes = importNotes(entries, budget, counts);
+  const { entries } = fragment;
+  const notes = svgImportNotes(entries.length, budget, counts);
 
   return {
     object:
@@ -336,98 +431,5 @@ export function parseSvgDocument(
     notes,
     ignoredTextElements: counts.text,
     ignoredImageElements: counts.image,
-  };
-}
-
-function importNotes(
-  entries: ReadonlyArray<SvgImportEntry>,
-  budget: SvgImportBudget,
-  counts: WalkCounts,
-): string[] {
-  const notes: string[] = [];
-  if (entries.length === 0) notes.push('SVG has no drawable geometry');
-  // Rule 7 / ADR-268: this used to THROW mid-walk once the polyline/point/color
-  // ceilings were crossed. It now reports the same measurement and imports.
-  const sizeNote = svgImportSizeNote(budget);
-  if (sizeNote !== null) notes.push(sizeNote);
-  if (counts.text > 0) {
-    notes.push(`Ignored ${counts.text} text element(s) — convert to paths or wait for Phase D`);
-  }
-  if (counts.image > 0) {
-    notes.push(`Ignored ${counts.image} image element(s) — Phase E adds raster tracing`);
-  }
-  if (counts.fillAndStroke > 0) {
-    notes.push(
-      `SVG presentation: Imported ${counts.fillAndStroke} SVG element(s) as strokes only; their fills were omitted.`,
-    );
-  }
-  if (counts.masked > 0) {
-    notes.push(
-      `SVG presentation: Imported ${counts.masked} SVG element(s) without their masks; areas the masks hide are included.`,
-    );
-  }
-  if (counts.filtered > 0) {
-    notes.push(
-      `SVG presentation: Imported ${counts.filtered} SVG element(s) without their filter effects.`,
-    );
-  }
-  return notes;
-}
-
-function boundsForPolylines(polylines: readonly Polyline[]): ImportedSvg['bounds'] {
-  let minX = Infinity,
-    minY = Infinity,
-    maxX = -Infinity,
-    maxY = -Infinity;
-  for (const line of polylines)
-    for (const point of line.points) {
-      minX = Math.min(minX, point.x);
-      minY = Math.min(minY, point.y);
-      maxX = Math.max(maxX, point.x);
-      maxY = Math.max(maxY, point.y);
-    }
-  return { minX, minY, maxX, maxY };
-}
-
-function appendVectorEntry(context: WalkContext, path: ColoredPath, filled: boolean): void {
-  const mode = filled ? 'fill' : 'line';
-  const entryPath = filled ? svgFillPath(path) : path;
-  const bounds = boundsForPolylines(path.polylines);
-  const previous = context.entries.at(-1);
-  if (previous?.kind === 'imported-svg' && previous.operationOverride?.mode === mode) {
-    context.entries[context.entries.length - 1] = {
-      ...previous,
-      paths: [...previous.paths, entryPath],
-      bounds: {
-        minX: Math.min(previous.bounds.minX, bounds.minX),
-        minY: Math.min(previous.bounds.minY, bounds.minY),
-        maxX: Math.max(previous.bounds.maxX, bounds.maxX),
-        maxY: Math.max(previous.bounds.maxY, bounds.maxY),
-      },
-    };
-    return;
-  }
-  context.entries.push({
-    kind: 'imported-svg',
-    id: context.identity.id + '-' + context.entries.length,
-    source: context.identity.source,
-    bounds,
-    transform: IDENTITY_TRANSFORM,
-    operationOverride: { mode },
-    paths: [entryPath],
-  });
-}
-
-function svgFillPath(path: ColoredPath): ColoredPath {
-  // SVG fills implicitly close every subpath and default to nonzero winding.
-  // Materialize both meanings only in the new Fill fragment, keeping stroke
-  // geometry and the legacy aggregate (including its saved-project defaults).
-  return {
-    ...path,
-    fillRule: path.fillRule ?? 'nonzero',
-    polylines: path.polylines.map((line) => ({ ...line, closed: true })),
-    ...(path.curves === undefined
-      ? {}
-      : { curves: path.curves.map((curve) => ({ ...curve, closed: true })) }),
   };
 }

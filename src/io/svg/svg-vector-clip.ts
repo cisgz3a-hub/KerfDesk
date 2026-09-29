@@ -49,9 +49,10 @@ export function convexClipOutline(clip: ResolvedSvgClip): ConvexClipOutline | nu
 function supportedClipSubpath(subpaths: ReadonlyArray<SubPath>): SubPath | null {
   const ring = subpaths.length === 1 ? subpaths[0] : undefined;
   if (ring === undefined) return null;
-  // Flattening can hide a concave curve between its sampled vertices. Rounded
-  // rectangles, circles and ellipses yield inscribed convex polygons directly;
-  // a path with native nonlinear segments needs an exact convexity proof first.
+  // Flattening can hide a concave curve between its sampled vertices, so a
+  // ring with native nonlinear segments needs an exact convexity proof first.
+  // Circles, ellipses and rounded rectangles carry native arcs (A-12), so they
+  // take the general clip route, which gives the same result more slowly.
   if (ring.curve?.segments.some((segment) => segment.kind !== 'line')) return null;
   return ring;
 }

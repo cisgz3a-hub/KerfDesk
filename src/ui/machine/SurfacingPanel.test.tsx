@@ -168,6 +168,13 @@ it('saves explicit surfacing feeds, RPM and bounded depth passes from the visibl
   expect(new Set(depths)).toEqual(new Set([-0.2, -0.4, -0.45]));
 });
 
+it('clamps the stepover to 100% so the rows never leave uncut strips', async () => {
+  const { platform, write } = mockPlatform();
+  await clickSave(platform, [], undefined, { 'stepover %': 150 });
+  const output = String(write.mock.calls[0]?.[0]);
+  expect(output).toContain('stepover 100%');
+});
+
 describe('SurfacingPanel stock tracking', () => {
   // The panel prefills the facing area from the stock footprint. Seeded once
   // with useState, it kept the mount-time numbers after the operator changed

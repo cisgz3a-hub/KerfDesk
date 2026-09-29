@@ -71,7 +71,13 @@ export function resolveUnitScale(svgEl: Element): UnitScale {
 function parseViewBoxRect(svgEl: Element): Bounds | null {
   const vb = svgEl.getAttribute('viewBox');
   if (vb === null) return null;
-  const parts = vb.split(/[\s,]+/).map(Number);
+  // Whitespace around the four numbers is not a separator: splitting it would
+  // add an empty fifth part and drop the viewBox, importing the file 3.78x
+  // too small under the no-viewBox px rule.
+  const parts = vb
+    .trim()
+    .split(/[\s,]+/)
+    .map(Number);
   if (parts.length !== 4 || !parts.every(Number.isFinite)) return null;
   const [x, y, w, h] = parts as [number, number, number, number];
   return { minX: x, minY: y, maxX: x + w, maxY: y + h };

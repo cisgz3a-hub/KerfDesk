@@ -31,6 +31,10 @@ it.each(['current', 'recovered'] as const)(
   'does not clear a reclaimed old session after rotating while %s cleanup waits',
   async (cleanup) => {
     const { repository, locks, service } = await fixture();
+    // Claim before the compatible backup lands: a page that starts on a slot
+    // already holding one moves to a fresh slot at once, and this test is about
+    // the later, write-time rotation that the newer-version record forces.
+    await service.session();
     writeLocalAutosave({ ...createProject(), notes: 'prior compatible backup' }, 0);
     const recovered = (await service.readLatest()).snapshot;
     if (recovered === null) throw new Error('Expected the compatible local backup.');

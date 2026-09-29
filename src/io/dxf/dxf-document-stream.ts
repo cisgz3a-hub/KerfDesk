@@ -14,6 +14,7 @@ import type { DxfTag } from './dxf-tags';
 export type DxfMetadata = {
   readonly scale: number;
   readonly layerColors: ReadonlyMap<string, string>;
+  readonly hiddenLayers: ReadonlySet<string>;
   readonly blocks: ReadonlyMap<string, DxfBlock>;
   readonly notes: ReadonlyArray<string>;
 };
@@ -36,9 +37,12 @@ const INSUNITS_TO_MM: Readonly<Record<number, number>> = {
   14: 100,
 };
 
+const LAYER_FROZEN_FLAG = 1; // LAYER table group 70
+
 export function createDxfMetadataCollector(): DxfTagCollector<DxfMetadata> {
   const units = createUnitCollector();
   const layerColors = new Map<string, string>();
+  const hiddenLayers = new Set<string>();
   const blocks = new Map<string, DxfBlock>();
   const blockCollector = createBlockCollector(blocks);
   let entityStream: RawEntityStream | null = null;
@@ -50,7 +54,10 @@ export function createDxfMetadataCollector(): DxfTagCollector<DxfMetadata> {
       if (section === 'HEADER') units.reset();
       else if (section === 'TABLES') {
         layerColors.clear();
-        entityStream = createRawEntityStream((entity) => readLayer(layerColors, entity));
+        hiddenLayers.clear();
+        entityStream = createRawEntityStream((entity) =>
+          readLayer(layerColors, hiddenLayers, entity),
+        );
       } else if (section === 'BLOCKS') {
         blocks.clear();
         blockCollector.reset();
@@ -74,6 +81,7 @@ export function createDxfMetadataCollector(): DxfTagCollector<DxfMetadata> {
       return {
         scale: units.scale(),
         layerColors,
+        hiddenLayers,
         blocks,
         notes: units.notes(),
       };
@@ -118,12 +126,19 @@ function createUnitCollector(): {
   return { reset, push, scale: () => scale, notes };
 }
 
-function readLayer(colors: Map<string, string>, entity: RawEntity): void {
+function readLayer(colors: Map<string, string>, hidden: Set<string>, entity: RawEntity): void {
   if (entity.type !== 'LAYER') return;
   const name = firstString(entity.tags, 2);
   if (name === null) return;
-  const aci = Math.abs(Math.trunc(firstNumber(entity.tags, 62, 7)));
-  colors.set(name.toUpperCase(), aci > 0 ? aciToHex(aci) : DXF_DEFAULT_COLOR);
+  const key = name.toUpperCase();
+  const signedAci = Math.trunc(firstNumber(entity.tags, 62, 7));
+  const aci = Math.abs(signedAci);
+  colors.set(key, aci > 0 ? aciToHex(aci) : DXF_DEFAULT_COLOR);
+  // A negative color turns the layer off and flag 1 freezes it; CAD shows
+  // nothing on either (ezdxf: visible = is_on() and not is_frozen()).
+  const frozen = (Math.trunc(firstNumber(entity.tags, 70)) & LAYER_FROZEN_FLAG) !== 0;
+  if (signedAci < 0 || frozen) hidden.add(key);
+  else hidden.delete(key);
 }
 
 function createBlockCollector(blocks: Map<string, DxfBlock>): {

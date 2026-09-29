@@ -10,16 +10,53 @@ export type PlanEntry = { entryV: number; exitV: number };
 // physics holds (accel/decel reachable) AND cornering doesn't exceed
 // junction-deviation limits. Exported for white-box invariant tests
 // (alongside junctionVelocity/blockTime).
+//
+// `plannerBlocks` is how many blocks the controller's planner holds, counting
+// the one executing (ADR-525). Without it the whole span is planned at once,
+// as if the controller could see every later move.
 export function planVelocities(
   blocks: ReadonlyArray<Block>,
   accel: number,
   jd: number,
+  plannerBlocks?: number,
 ): PlanEntry[] {
   const plan: PlanEntry[] = blocks.map(() => ({ entryV: 0, exitV: 0 }));
   capJunctionEntries(blocks, plan, accel, jd);
+  if (isPlannerWindow(plannerBlocks)) capPlannerWindowEntries(blocks, plan, accel, plannerBlocks);
   backwardPass(blocks, plan, accel);
   forwardPass(blocks, plan, accel);
   return plan;
+}
+
+function isPlannerWindow(plannerBlocks: number | undefined): plannerBlocks is number {
+  return plannerBlocks !== undefined && Number.isInteger(plannerBlocks) && plannerBlocks >= 1;
+}
+
+// A streaming controller plans only the blocks in its buffer, and it always
+// plans the newest one to end at rest (GRBL planner.c, planner_recalculate),
+// so the machine can stop by the end of whatever it holds. A block's entry
+// speed is the exit of the block before it, which is still executing and
+// still takes one of the slots, so the entry must be able to fall to zero
+// within the block itself and the next plannerBlocks - 2. On short moves,
+// such as raster pixels, this cap is the one that sets the speed.
+function capPlannerWindowEntries(
+  blocks: ReadonlyArray<Block>,
+  plan: PlanEntry[],
+  accel: number,
+  plannerBlocks: number,
+): void {
+  const stoppingBlocks = plannerBlocks - 1;
+  const distanceBefore = new Float64Array(blocks.length + 1);
+  for (let i = 0; i < blocks.length; i += 1) {
+    distanceBefore[i + 1] = (distanceBefore[i] ?? 0) + (blocks[i]?.distance ?? 0);
+  }
+  for (let i = 1; i < blocks.length; i += 1) {
+    const p = plan[i];
+    if (p === undefined) continue;
+    const windowEnd = Math.min(blocks.length, i + stoppingBlocks);
+    const roomMm = Math.max(0, (distanceBefore[windowEnd] ?? 0) - (distanceBefore[i] ?? 0));
+    p.entryV = Math.min(p.entryV, Math.sqrt(2 * accel * roomMm));
+  }
 }
 
 // Tentative junction-cap entry velocities (max corner speed entering

@@ -7,12 +7,14 @@
 
 import { RGBA_CHANNELS, type PixelRect, type RgbaBuffer } from '../image-edit';
 import type { SelectionMask } from '../image-select';
+import { boxBlurredRect } from './box-blur';
 import { clampRectToDoc, MAX_BYTE } from './lut';
 
 const RGB_CHANNELS = 3;
 // Beyond three sigmas the Gaussian tail is visually zero.
 const KERNEL_SIGMAS = 3;
 export const MAX_BLUR_SIGMA = 100;
+const BOX_BLUR_MIN_SIGMA = 2;
 
 /** Blur RGB inside the rect (null = whole doc), writing only masked pixels. */
 export function gaussianBlurInPlace(
@@ -32,6 +34,9 @@ export function gaussianBlurInPlace(
  * Shared by Unsharp Mask and High Pass, which combine rather than replace.
  */
 export function blurredRect(doc: RgbaBuffer, sigma: number, rect: PixelRect): Float32Array {
+  // Filter Effects 1 (feGaussianBlur) lets three box blurs stand in from a
+  // standard deviation of 2. Below that the exact kernel is at most 11 taps.
+  if (sigma >= BOX_BLUR_MIN_SIGMA) return boxBlurredRect(doc, sigma, rect);
   const kernel = buildKernel(sigma);
   const radius = (kernel.length - 1) / 2;
   // Horizontal pass covers extra rows above/below so the vertical pass has
