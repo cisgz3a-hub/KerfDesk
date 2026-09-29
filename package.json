@@ -2,11 +2,11 @@
   "name": "laserforge",
   "version": "0.1.0",
   "private": true,
-  "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase. MIT licensed.",
+  "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.",
   "author": {
     "name": "Johann Stolk"
   },
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "engines": {
     "node": ">=22.13.0",
     "pnpm": ">=11.3.0 <12"

@@ -126,7 +126,8 @@ export function buildCycloneDx({
         'bom-ref': rootRef,
         name: 'KerfDesk',
         version,
-        licenses: [{ expression: 'MIT' }],
+        // All rights reserved from ADR-543; no SPDX identifier names that.
+        licenses: [{ license: { name: 'KerfDesk licence, all rights reserved (see LICENSE)' } }],
       },
       properties: [
         { name: 'org.kerfdesk.source.commit', value: sourceSha },
