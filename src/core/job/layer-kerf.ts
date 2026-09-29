@@ -22,6 +22,9 @@
 // Tabs placed by hand on a source contour follow it to the offset contour that
 // lies closest (ADR-494's rule, unchanged), and each offset contour starts at
 // its vertex nearest its source contour's start (kerf-ring-start.ts).
+//
+// A hole narrower than twice the offset closes up and leaves no contour behind.
+// Those are counted (kerf-closed-up.ts) so Job Review can say what is missing.
 
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
@@ -37,7 +40,8 @@ import {
 import { compilationPolylines } from './compilation-polylines';
 import { containmentDepths } from './containment-depth';
 import { laserArcFitForMachineChords } from './cut-arc-moves';
-import type { CutSegment } from './job';
+import type { CutSegment, JobDiagnostic } from './job';
+import { countClosedUpRegions, kerfShrinksContour } from './kerf-closed-up';
 import { startKerfRingsAtSources } from './kerf-ring-start';
 import { placedTabPointsForKerfContours } from './laser-tab-anchors';
 import { perforationPatternFor } from './operation-cut-extras';
@@ -64,7 +68,21 @@ export type LineSegmentsWithTabs = {
 export type LayerKerfResult = LineSegmentsWithTabs & {
   /** True when the offset engine failed for any path, whose contours are then missing. */
   readonly failed: boolean;
+  /** Holes or slots (parts, when the offset is negative) the offset closed up
+   * entirely, so they are missing although the engine succeeded. */
+  readonly closedUp: number;
 };
+
+// For each ring of a path: how many rings of other paths enclose it, and how
+// many rings on the layer enclose it in all.
+type RingDepths = {
+  readonly outside: ReadonlyArray<number>;
+  readonly total: ReadonlyArray<number>;
+};
+
+type GroupOffset = { readonly rings: ReadonlyArray<Polyline>; readonly closedUp: number };
+
+const NO_DEPTHS: RingDepths = { outside: [], total: [] };
 
 type OffsetContours = {
   readonly segments: ReadonlyArray<CutSegment>;
@@ -104,34 +122,54 @@ export function withLayerKerf(
   device: DeviceProfile,
 ): LayerKerfResult {
   const pending = collected.kerf;
-  if (pending.length === 0) return { ...collected, failed: false };
+  if (pending.length === 0) return { ...collected, failed: false, closedUp: 0 };
   const rings = pending.map((group) => group.sources.map((source) => source.polyline));
-  const outside = enclosingOtherPaths(rings);
+  const depths = ringDepths(rings);
   const fit = kerfContoursTakeArcs(layer, device)
     ? laserArcFitForMachineChords(device, KERF_ARC_SOURCE_TOLERANCE_MM)
     : (segment: CutSegment) => segment;
   let failed = false;
+  let closedUp = 0;
   const offsets = pending.map((group, index): OffsetContours => {
-    const offset = offsetGroup(rings[index] ?? [], outside[index] ?? [], layer.kerfOffsetMm);
+    const sources = rings[index] ?? [];
+    const offset = offsetGroup(sources, depths[index] ?? NO_DEPTHS, layer.kerfOffsetMm);
     if (offset === null) failed = true;
-    const started = startKerfRingsAtSources(offset ?? [], rings[index] ?? [], layer.kerfOffsetMm);
+    closedUp += offset?.closedUp ?? 0;
+    const started = startKerfRingsAtSources(offset?.rings ?? [], sources, layer.kerfOffsetMm);
     return {
       segments: started.map((ring) => fit({ polyline: ring.points, closed: true })),
       tabs: placedTabPointsForKerfContours(started, group.sources),
     };
   });
-  return { ...interleave(collected, pending, offsets), failed };
+  return { ...interleave(collected, pending, offsets), failed, closedUp };
 }
 
-// For every ring of every group: how many rings of OTHER groups enclose it.
-function enclosingOtherPaths(groups: ReadonlyArray<ReadonlyArray<Polyline>>): number[][] {
+/** What the offset lost, for Job Review: a failure, or holes it closed up. */
+export function layerKerfDiagnostics(
+  result: LayerKerfResult,
+  layer: Layer,
+): ReadonlyArray<JobDiagnostic> {
+  const diagnostics: JobDiagnostic[] = [];
+  if (result.failed) diagnostics.push({ kind: 'kerf-offset-failed', layerName: layer.name });
+  if (result.closedUp > 0) {
+    diagnostics.push({
+      kind: 'kerf-offset-closed-up',
+      layerName: layer.name,
+      count: result.closedUp,
+      kerfOffsetMm: layer.kerfOffsetMm,
+    });
+  }
+  return diagnostics;
+}
+
+function ringDepths(groups: ReadonlyArray<ReadonlyArray<Polyline>>): RingDepths[] {
   const all = containmentDepths(groups.flat().map(asContainer), { strict: true });
   let cursor = 0;
   return groups.map((rings) => {
     const own = rings.length > 1 ? containmentDepths(rings.map(asContainer), { strict: true }) : [];
-    const outside = rings.map((_, index) => (all[cursor + index] ?? 0) - (own[index] ?? 0));
+    const total = rings.map((_, index) => all[cursor + index] ?? 0);
     cursor += rings.length;
-    return outside;
+    return { outside: total.map((depth, index) => depth - (own[index] ?? 0)), total };
   });
 }
 
@@ -148,22 +186,30 @@ function asContainer(ring: Polyline): {
 // a time, each by its own depth.
 function offsetGroup(
   rings: ReadonlyArray<Polyline>,
-  outside: ReadonlyArray<number>,
+  depths: RingDepths,
   kerfOffsetMm: number,
-): ReadonlyArray<Polyline> | null {
-  const parity = (outside[0] ?? 0) % 2;
-  if (outside.every((depth) => depth % 2 === parity)) {
-    return offsetOrNull(rings, parity === 0 ? kerfOffsetMm : -kerfOffsetMm);
+): GroupOffset | null {
+  const shrinking = depths.total.map((depth) => kerfShrinksContour(depth, kerfOffsetMm));
+  const parity = (depths.outside[0] ?? 0) % 2;
+  if (depths.outside.every((depth) => depth % 2 === parity)) {
+    const offset = offsetOrNull(rings, parity === 0 ? kerfOffsetMm : -kerfOffsetMm);
+    if (offset === null) return null;
+    return {
+      rings: offset,
+      closedUp: countClosedUpRegions(rings, depths.total, shrinking, offset),
+    };
   }
-  const own = containmentDepths(rings.map(asContainer), { strict: true });
   const out: Polyline[] = [];
+  let closedUp = 0;
   for (const [index, ring] of rings.entries()) {
-    const depth = (own[index] ?? 0) + (outside[index] ?? 0);
+    const depth = depths.total[index] ?? 0;
     const offset = offsetOrNull([ring], depth % 2 === 0 ? kerfOffsetMm : -kerfOffsetMm);
     if (offset === null) return null;
+    // Offset alone, a shrinking ring leaves nothing only when it closed up.
+    if (offset.length === 0 && shrinking[index] === true) closedUp += 1;
     out.push(...offset);
   }
-  return out;
+  return { rings: out, closedUp };
 }
 
 function offsetOrNull(

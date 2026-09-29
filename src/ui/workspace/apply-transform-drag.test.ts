@@ -6,6 +6,7 @@ import {
   type SceneObject,
   type Transform,
 } from '../../core/scene';
+import { useToastStore } from '../state/toast-store';
 import { applyTransformDrag } from './apply-transform-drag';
 import type { DragState } from './drag-state';
 import { DEFAULT_SNAP_SETTINGS, type SnapGuide } from './snapping';
@@ -70,6 +71,65 @@ describe('applyTransformDrag', () => {
     expect(byId.get('a')?.y).toBeCloseTo(0);
     expect(byId.get('b')?.x).toBeCloseTo(60);
     expect(byId.get('b')?.scaleX).toBeCloseTo(2);
+  });
+
+  // Weakness audit H-7: a side handle cannot stretch an object turned 30
+  // degrees without shear, and the handle used to do nothing without a word.
+  it('says once why a side handle cannot stretch a selection with an obliquely turned object', () => {
+    useToastStore.setState({ toasts: [] });
+    const a = objectAt('a', 0, 0);
+    const b = { ...objectAt('b', 30, 0), transform: { ...transformAt(30, 0), rotationDeg: 30 } };
+    const updates: Array<{ readonly id: string; readonly transform: Transform }> = [];
+    const drag = (x: number): void =>
+      applyTransformDrag({
+        drag: { kind: 'selection-scale', handle: 'e', selectionIds: ['a', 'b'] },
+        point: { x, y: 5 },
+        e: event,
+        project: projectWithObjects([a, b]),
+        selectionAnchor: 'c',
+        snapSettings,
+        pxToMm,
+        setSnapMarker: () => undefined,
+        setObjectTransform: (id, transform) => updates.push({ id, transform }),
+        setSnapGuides: () => undefined,
+      });
+
+    drag(60);
+    drag(70);
+
+    expect(updates).toEqual([]);
+    const toasts = useToastStore.getState().toasts;
+    expect(toasts).toHaveLength(1);
+    expect(toasts[0]?.message).toContain('scaled evenly');
+    useToastStore.setState({ toasts: [] });
+  });
+
+  it('stretches a quarter-turned object with a side handle', () => {
+    useToastStore.setState({ toasts: [] });
+    const turned = {
+      ...objectAt('t', 0, 0),
+      transform: { ...transformAt(10, 0), rotationDeg: 90 },
+    };
+    const updates: Array<{ readonly id: string; readonly transform: Transform }> = [];
+
+    // The 10 x 10 box spans X 0..10; drag its east handle to X 30.
+    applyTransformDrag({
+      drag: { kind: 'selection-scale', handle: 'e', selectionIds: ['t'] },
+      point: { x: 30, y: 5 },
+      e: event,
+      project: projectWithObjects([turned]),
+      selectionAnchor: 'c',
+      snapSettings,
+      pxToMm,
+      setSnapMarker: () => undefined,
+      setObjectTransform: (id, transform) => updates.push({ id, transform }),
+      setSnapGuides: () => undefined,
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]?.transform.scaleX).toBeCloseTo(1);
+    expect(updates[0]?.transform.scaleY).toBeCloseTo(3);
+    expect(useToastStore.getState().toasts).toEqual([]);
   });
 });
 

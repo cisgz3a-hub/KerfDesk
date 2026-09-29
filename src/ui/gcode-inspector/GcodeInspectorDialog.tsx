@@ -109,7 +109,7 @@ function inspectionProgressLabel(
 
 export function StatsStrip(props: { readonly model: InspectorRenderModel }): JSX.Element {
   const { stats, segmentCount, events, unsupportedWords, skippedMotions } = props.model;
-  const bounds = stats.motionBounds;
+  const bounds = stats.programBounds;
   const size =
     bounds === null
       ? '—'

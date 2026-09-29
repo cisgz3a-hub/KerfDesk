@@ -30,6 +30,50 @@ describe('compileDiagnosticWarnings', () => {
     expect(warning).not.toContain('outline still cuts');
   });
 
+  // ADR-486 amendment 1 (weakness audit E-4).
+  it('says a hole the kerf offset closed up is missing and will not be cut', () => {
+    const [warning] = compileDiagnosticWarnings({
+      groups: [],
+      diagnostics: [
+        { kind: 'kerf-offset-closed-up', layerName: 'Cut', count: 1, kerfOffsetMm: 0.15 },
+      ],
+    });
+
+    expect(warning).toBe(
+      'Kerf offset on layer "Cut" closed up 1 hole or slot narrower than the 0.3 mm kerf (twice its Kerf Offset), so it is missing from the job and will NOT be cut. Check the preview before running, and widen it or use a smaller kerf offset.',
+    );
+  });
+
+  it('names parts when a negative kerf offset shrinks them to nothing', () => {
+    const [warning] = compileDiagnosticWarnings({
+      groups: [],
+      diagnostics: [
+        { kind: 'kerf-offset-closed-up', layerName: 'Inlay', count: 2, kerfOffsetMm: -0.1 },
+      ],
+    });
+
+    expect(warning).toContain('shrank 2 parts narrower than the 0.2 mm kerf');
+    expect(warning).toContain('they are missing from the job');
+    expect(warning).toContain('a kerf offset closer to 0');
+  });
+
+  it('gives one line per layer for holes closed up in objects compiled apart', () => {
+    const warnings = compileDiagnosticWarnings({
+      groups: [],
+      diagnostics: [
+        { kind: 'kerf-offset-closed-up', layerName: 'Cut', count: 1, kerfOffsetMm: 0.15 },
+        { kind: 'kerf-offset-failed', layerName: 'Cut' },
+        { kind: 'kerf-offset-closed-up', layerName: 'Cut', count: 2, kerfOffsetMm: 0.15 },
+        { kind: 'kerf-offset-closed-up', layerName: 'Score', count: 1, kerfOffsetMm: 0.15 },
+      ],
+    });
+
+    expect(warnings).toHaveLength(3);
+    expect(warnings[0]).toContain('layer "Cut" closed up 3 holes or slots');
+    expect(warnings[1]).toContain('could not be generated');
+    expect(warnings[2]).toContain('layer "Score" closed up 1 hole or slot narrower');
+  });
+
   it('adds no warning when compilation has no diagnostic', () => {
     expect(compileDiagnosticWarnings({ groups: [] })).toEqual([]);
   });
