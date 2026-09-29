@@ -31,21 +31,35 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
    distance from that corner, and text and asymmetric parts read the same way round as in
    LightBurn. The corpus files (`MirrorX="True" MirrorY="True"`) come out matching their embedded
    thumbnails: the backplane's notch along the top edge, its tall slot on the right.
+3. **Run order.** LightBurn's default Cut Planner runs a project layer by layer in its Cuts /
+   Layers list order, which each `<CutSetting>` records as `priority`. The importer lists the
+   operations in that order (priority, then index; a layer written without a priority keeps its
+   index's place) and sets `Scene.artworkOrder` so each layer's artwork follows the one before
+   (ADR-211: artwork order decides which operation runs first). Drawing order is kept inside a
+   layer and for canvas stacking. A part is no longer cut free before it is engraved because its
+   outline was drawn first.
 
 ### Limits
 
 - The saving machine's bed size is not in the file. A project saved on a larger bed can land
   partly off a smaller one, as it would on that machine in LightBurn. It is not moved or scaled.
+- Only the layer order is mapped. A project whose Cut Planner (`UIPrefs`) does not rank layer
+  ordering first (`Optimize_ByLayer` other than 0) still runs layer by layer here, and the import
+  report says so. The rest of `UIPrefs` (inner shapes first, travel, direction) is not read;
+  the project takes KerfDesk's optimization defaults, which match LightBurn's.
 - Code and test evidence only. The corpus is five LightBurn 2.0.05 projects from one machine
   (rear-right origin); the front-left rule is the same mapping with no flags set.
 
 ### Consequences
 
-- LightBurn projects open right way up, at LightBurn's position, with curves intact.
+- LightBurn projects open right way up, at LightBurn's position, with curves intact, and run
+  layer by layer in LightBurn's order. The Run order view shows one run per layer.
 - Existing `.lf2` files are unaffected; only opening a LightBurn file changes.
 
 ### Tests
 
 `lbrn-vertex-list.test.ts` (handle forms; the keypad fixture's circles and eight fillets are
 arcs along their whole length); `lbrn-frame.test.ts` (each MirrorX/MirrorY corner, rotated groups
-and text through the same frame, the backplane fixture laid out as its thumbnail shows).
+and text through the same frame, the backplane fixture laid out as its thumbnail shows);
+`lbrn-run-order.test.ts` (engrave before cut whatever the drawing order, interleaved shapes run
+once per layer, priority over index, the Cut Planner warning).

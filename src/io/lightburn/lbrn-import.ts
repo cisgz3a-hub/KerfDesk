@@ -1,4 +1,4 @@
-import { createLayer, type Layer, type Project } from '../../core/scene';
+import { createLayer, type ImportedSvg, type Layer, type Project } from '../../core/scene';
 import { createProject } from '../../core/scene/project';
 import { lightBurnSceneFrame } from './lbrn-frame';
 import { colorForCutIndex, importLbrnGeometry } from './lbrn-geometry';
@@ -77,7 +77,12 @@ export function importLightBurnProjectDocument(
   }));
   const project: Project = {
     ...base,
-    scene: { ...base.scene, objects, layers },
+    scene: {
+      ...base.scene,
+      objects,
+      layers,
+      artworkOrder: layerByLayerArtworkOrder(objects, layers),
+    },
   };
   return {
     ok: true,
@@ -89,7 +94,7 @@ export function importLightBurnProjectDocument(
       importedObjects: geometry.objects.length,
       importedLayers: layers.length,
       unsupportedShapeTypes: geometry.unsupportedShapeTypes,
-      warnings: [...geometry.warnings, ...layerImport.warnings],
+      warnings: [...geometry.warnings, ...layerImport.warnings, ...cutPlannerWarnings(root)],
     },
   };
 }
@@ -104,10 +109,55 @@ function importedLayers(
     const index = numericField(element, ['index']);
     if (index !== null) settings.set(Math.trunc(index), element);
   }
-  const colors = [...new Set(usedColors)];
+  const colors = [...new Set(usedColors)]
+    .map((color) => ({ color, rank: lightBurnLayerRank(color, settings) }))
+    .sort((left, right) => left.rank[0] - right.rank[0] || left.rank[1] - right.rank[1])
+    .map((entry) => entry.color);
   const warnings: string[] = [];
   const layers = colors.map((color) => importedLayer(color, settings, warnings));
   return { layers, warnings: [...new Set(warnings)].sort() };
+}
+
+// LightBurn runs a project layer by layer in its Cuts / Layers list order,
+// which each CutSetting records as `priority`, then by index. A layer written
+// without a priority keeps its index's place (ADR-388).
+function lightBurnLayerRank(
+  color: string,
+  settings: ReadonlyMap<number, Element>,
+): readonly [number, number] {
+  const index = findColorIndex(color);
+  const setting = settings.get(index);
+  const priority = setting === undefined ? null : numericField(setting, ['priority']);
+  return [priority ?? index, index];
+}
+
+// The Cut Planner in LightBurn's Optimization Settings ranks its orderings,
+// 0 first; KerfDesk always runs a LightBurn project layer by layer.
+function cutPlannerWarnings(root: Element): ReadonlyArray<string> {
+  const prefs = [...root.children].find((child) => normalized(child.tagName) === 'uiprefs');
+  const byLayer = prefs === undefined ? '' : textField(prefs, ['optimizebylayer']).trim();
+  if (byLayer === '' || byLayer === '0') return [];
+  return [
+    `LightBurn's Cut Planner for this project does not run layers first (Optimize_ByLayer ${byLayer}); KerfDesk runs it layer by layer in the Cuts / Layers order. Check the Run order view.`,
+  ];
+}
+
+// Artwork priority decides which operation runs first (ADR-211), so artwork
+// is ordered by its layer's place in the list, drawing order within a layer.
+// The canvas stacking (`objects`) keeps LightBurn's drawing order.
+function layerByLayerArtworkOrder(
+  objects: ReadonlyArray<ImportedSvg>,
+  layers: ReadonlyArray<Layer>,
+): string[] {
+  const position = new Map(layers.map((layer, index) => [layer.id, index]));
+  return objects
+    .map((object, drawn) => ({
+      id: object.id,
+      drawn,
+      layer: position.get(object.paths[0]?.operationIds?.[0] ?? '') ?? layers.length,
+    }))
+    .sort((left, right) => left.layer - right.layer || left.drawn - right.drawn)
+    .map((entry) => entry.id);
 }
 
 function importedLayer(
