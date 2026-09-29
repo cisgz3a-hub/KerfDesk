@@ -18,6 +18,7 @@
 
 import { createFakeSerialPort, type FakeSerialPort } from './fake-serial-port';
 import { createBackpressureFeeder } from './grbl-sim-backpressure';
+import { createDelayedParseFeeder, flushInputOnJogCancel } from './grbl-sim-jog-cancel-flush';
 import {
   DEFAULT_GRBL_SIM_OPTIONS,
   UNLOCK_MESSAGE,
@@ -46,6 +47,7 @@ import type { PlatformAdapter } from '../../platform/types';
 // never stored in the RX ring (serial.c:150-196).
 const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', '\x18']);
 const SOFT_RESET_BYTE = '\x18';
+const JOG_CANCEL_BYTE = '\x85';
 
 export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   /** Override or extend the default $$ settings table. */
@@ -69,6 +71,13 @@ export type CreateGrblSimulatorOptions = Partial<GrblSimOptions> & {
   readonly blockRetireMs?: number;
   /** Usable RX ring bytes. Defaults to grbl's 128. */
   readonly rxBufferBytes?: number;
+  /**
+   * Discard every received line not parsed yet when 0x85 arrives, in any
+   * state, as grblHAL does; lines are parsed a moment after they arrive so
+   * there is something to discard (`grbl-sim-jog-cancel-flush.ts`). Default
+   * false: stock GRBL. Not modelled together with `plannerBlocks`.
+   */
+  readonly jogCancelFlushesInput?: boolean;
 };
 
 export type GrblSimulator = {
@@ -167,8 +176,12 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
     plannerBlocks,
     blockRetireMs,
     rxBufferBytes,
+    jogCancelFlushesInput,
     ...optionOverrides
   } = options;
+  if (jogCancelFlushesInput === true && plannerBlocks !== undefined) {
+    throw new Error('jogCancelFlushesInput is not modelled together with plannerBlocks.');
+  }
   const opts: GrblSimOptions = { ...DEFAULT_GRBL_SIM_OPTIONS, ...optionOverrides };
   const settings = defaultGrblSimSettings();
   for (const [id, value] of settingOverrides ?? []) settings.set(id, value);
@@ -221,11 +234,16 @@ export function createGrblSimulator(options: CreateGrblSimulatorOptions = {}): G
           // main loop, after it releases the withheld ack.
           { ...deps, retireMotion: () => apply({ kind: 'motion-finished' }) },
         );
-  const feeder: HostByteFeeder = backpressure ?? createImmediateFeeder(deps);
+  const feeder: HostByteFeeder =
+    backpressure ??
+    (jogCancelFlushesInput === true ? createDelayedParseFeeder(deps) : createImmediateFeeder(deps));
   const inertRxWindow = createRxWindow(0);
   const inertPlanner = createPlanner(0);
 
   const onRealtime = (byte: string): void => {
+    if (jogCancelFlushesInput === true && byte === JOG_CANCEL_BYTE) {
+      state = flushInputOnJogCancel(state, feeder);
+    }
     apply({ kind: 'rx-realtime', byte });
     // A soft reset flushes the receive buffer and the planner on real hardware.
     if (byte === SOFT_RESET_BYTE) feeder.reset();

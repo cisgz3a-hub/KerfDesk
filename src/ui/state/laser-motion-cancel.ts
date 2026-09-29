@@ -49,6 +49,7 @@ export async function runCancelJog(
   }));
   if (operationId !== undefined) markMotionOperationCancelling(context, operationId);
   try {
+    if (jogCancelDropsUnparsedLines(context)) await owedRepliesSettled(context);
     const cancelError = await writeJogCancel(context);
     try {
       await settleCancelledMotion(context, operationId);
@@ -149,16 +150,35 @@ async function waitForCancelledMotionQueue(
   operationId: LaserMotionOperationId | undefined,
 ): Promise<void> {
   if (operationId === undefined) return;
-  const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
-  while (Date.now() <= deadline) {
-    assertCancelContext(context);
-    const state = context.get();
-    if (motionQueueSettled(state)) return;
-    await sleep(CANCEL_QUEUE_POLL_MS);
-  }
+  if (await owedRepliesSettled(context)) return;
   throw new Error(
     'Cancel is waiting for the previous motion command acknowledgement. Reconnect if the controller does not respond.',
   );
+}
+
+// grblHAL answers the jog-cancel byte, in any state, by discarding every line
+// it has received but not parsed, and never answers those lines. When the
+// jog's `$J=` was one of them its owed reply never came: Cancel timed out and
+// the jog kept Jog, Frame and Disconnect locked until ABORT MOTION (controller
+// audit M-6, ADR-375). So on such a driver the byte waits for every owed reply
+// first; a reply still owed at the deadline no longer holds it back, since
+// stopping motion comes first and the settlement then reports that reply. A
+// jog still running afterwards stops on this byte or on the re-send after a
+// fresh Jog report. Other drivers keep writing the byte at once.
+function jogCancelDropsUnparsedLines(context: CancelContext): boolean {
+  const realtime = context.refs.driver.realtime;
+  return realtime.jogCancel !== null && realtime.jogCancelDropsUnparsedLines === true;
+}
+
+/** Polls until no reply is owed and no write is pending; false at the deadline. */
+async function owedRepliesSettled(context: CancelContext): Promise<boolean> {
+  const deadline = Date.now() + CANCEL_QUEUE_TIMEOUT_MS;
+  while (Date.now() <= deadline) {
+    assertCancelContext(context);
+    if (motionQueueSettled(context.get())) return true;
+    await sleep(CANCEL_QUEUE_POLL_MS);
+  }
+  return false;
 }
 
 function motionQueueSettled(state: LaserState): boolean {
