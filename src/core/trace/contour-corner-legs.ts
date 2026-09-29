@@ -2,6 +2,7 @@
 // turn, their intersection as the apex, and the rounding cost of that corner.
 
 import type { Vec2 } from '../scene';
+import { hypot2 } from '../geometry/fast-hypot';
 import { fitCircle } from './contour-corner-circle';
 import { fieldConfirmsWedge, wedgeFieldFit } from './contour-corner-field';
 import { latticeBarriers } from './contour-corner-lattice';
@@ -226,7 +227,7 @@ function isStraight(
   const ny = leg.dx;
   const first = pts[((i % n) + n) % n] as Vec2;
   const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
-  const allowed = tolerance.base + tolerance.slope * Math.hypot(last.x - first.x, last.y - first.y);
+  const allowed = tolerance.base + tolerance.slope * hypot2(last.x - first.x, last.y - first.y);
   for (let k = 0, j = ((i % n) + n) % n; k < count; k += 1, j = wrapStep(j, step, n)) {
     const p = pts[j] as Vec2;
     if (Math.abs((p.x - leg.cx) * nx + (p.y - leg.cy) * ny) > allowed) return false;
@@ -247,7 +248,7 @@ function wrapStep(j: number, step: 1 | -1, n: number): number {
 export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): Leg {
   const { cx, cy, dx, dy, sxx, sxy, syy } = legLine(pts, i, count, step);
   // Smallest eigenvalue of the scatter matrix = residual sum of squares.
-  const residualSq = Math.max(0, (sxx + syy - Math.hypot(sxx - syy, 2 * sxy)) / 2);
+  const residualSq = Math.max(0, (sxx + syy - hypot2(sxx - syy, 2 * sxy)) / 2);
   return { count, cx, cy, dx, dy, residualSq };
 }
 
@@ -481,7 +482,7 @@ function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   const len2 = dx * dx + dy * dy;
   const t =
     len2 < 1e-12 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2));
-  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+  return hypot2(p.x - a.x - t * dx, p.y - a.y - t * dy);
 }
 
 // RMS radial residual of the one-circle model through `count` consecutive

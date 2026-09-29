@@ -27,6 +27,7 @@
 // Own design from standard Bézier properties (convex hull, subdivision).
 
 import type { Vec2 } from '../scene';
+import { hypot2 } from '../geometry/fast-hypot';
 
 export type CurvePiece = {
   readonly p0: Vec2;
@@ -233,5 +234,5 @@ function pointSegmentDistance(p: Vec2, a: Vec2, b: Vec2): number {
     lengthSquared === 0
       ? 0
       : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared));
-  return Math.hypot(a.x + t * dx - p.x, a.y + t * dy - p.y);
+  return hypot2(a.x + t * dx - p.x, a.y + t * dy - p.y);
 }

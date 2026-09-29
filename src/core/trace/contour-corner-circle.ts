@@ -4,6 +4,7 @@
 // digitization steps from drawn pixel detail (contour-corner-lattice.ts).
 
 import type { Vec2 } from '../scene';
+import { hypot2 } from '../geometry/fast-hypot';
 
 export type FittedCircle = {
   readonly x: number;
@@ -57,7 +58,7 @@ export function fitCircle(
   const radius = Math.sqrt(uc * uc + vc * vc + (suu + svv) / count);
   let sumSq = 0;
   for (let k = 0; k < count; k += 1) {
-    const d = Math.hypot(at(k).x - mx - uc, at(k).y - my - vc);
+    const d = hypot2(at(k).x - mx - uc, at(k).y - my - vc);
     sumSq += (d - radius) ** 2;
   }
   return { x: mx + uc, y: my + vc, radius, rms: Math.sqrt(sumSq / count) };
