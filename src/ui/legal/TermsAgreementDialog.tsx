@@ -54,6 +54,7 @@ export function FirstUseAgreementDialog({
             type="checkbox"
             checked={termsTicked}
             onChange={(event) => setTermsTicked(event.target.checked)}
+            title="Tick to agree to the Terms of Service. Agree and continue needs both boxes ticked."
           />
           <span>
             I have read and agree to the Terms of Service, and I have read the Privacy Notice.
@@ -64,6 +65,7 @@ export function FirstUseAgreementDialog({
             type="checkbox"
             checked={safetyTicked}
             onChange={(event) => setSafetyTicked(event.target.checked)}
+            title="Tick to confirm you have read section 2, machine safety, shown above. Agree and continue needs both boxes ticked."
           />
           <span>
             I have read the machine-safety section of the terms (section 2), understand the risks,
