@@ -8,13 +8,18 @@
 //   * useUiStoreFlag — drives the F-A3 dragenter overlay via the
 //     toast-store-adjacent UI store; counts enter/leave nesting because the
 //     browser fires dragenter/leave on every nested element.
+//   * A dropped project (.lf2, .lbrn, .lbrn2) opens like one the operating
+//     system hands over instead (ADR-378 Amendment 1).
 
 import { useEffect, useRef } from 'react';
+import type { PlatformAdapter } from '../../platform/types';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import type { GcodeInspectionSource } from '../gcode-inspector';
+import { appProjectOpenDeps, openDroppedProject } from '../recent-projects/dropped-project-open';
 import { useUiStore } from '../state/ui-store';
 import { dispatchImportFilesInOrder } from './import-dispatch';
+import { usePlatformOptional } from './platform-context';
 
 export function useImportDragDrop(
   openGcodeInspector: (name: string, source: GcodeInspectionSource) => void,
@@ -24,6 +29,7 @@ export function useImportDragDrop(
   const importRasterImage = useStore((s) => s.importRasterImage);
   const pushToast = useToastStore((s) => s.pushToast);
   const setDragOverlay = useUiStore((s) => s.setDragOverlay);
+  const platform = usePlatformOptional();
   // useUiStore was originally useDragOverlay — the rename is mechanical;
   // the action names below didn't change.
   // Browsers fire dragenter/leave once per nested element, so a naive
@@ -50,7 +56,7 @@ export function useImportDragDrop(
       depth.current = 0;
       setDragOverlay(false);
       if (e.dataTransfer === null) return;
-      routeDroppedFiles(e.dataTransfer, {
+      routeDroppedFiles(e.dataTransfer, platform, {
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
         importSvgObject,
         importSvgFragment,
@@ -74,6 +80,7 @@ export function useImportDragDrop(
     importSvgObject,
     importRasterImage,
     openGcodeInspector,
+    platform,
     pushToast,
     setDragOverlay,
   ]);
@@ -83,8 +90,14 @@ type DropImportActions = Parameters<typeof dispatchImportFilesInOrder>[1] & {
   readonly openGcodeInspector: (name: string, source: GcodeInspectionSource) => void;
 };
 
-function routeDroppedFiles(dt: DataTransfer, actions: DropImportActions): void {
-  void dispatchImportFilesInOrder([...dt.files], actions, { sourceLabel: 'Drop' });
+function routeDroppedFiles(
+  dt: DataTransfer,
+  platform: PlatformAdapter | null,
+  actions: DropImportActions,
+): void {
+  const files = [...dt.files];
+  if (platform !== null && openDroppedProject(files, appProjectOpenDeps(platform))) return;
+  void dispatchImportFilesInOrder(files, actions, { sourceLabel: 'Drop' });
 }
 
 function hasFiles(e: DragEvent): boolean {

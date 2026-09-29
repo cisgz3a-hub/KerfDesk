@@ -1,28 +1,41 @@
 import type { Project } from '../../core/scene';
 import type { importLightBurnProject } from '../../io/lightburn';
 import type { deserializeProject } from '../../io/project';
+import type { PlatformAdapter, RecentFileRef, SaveTarget } from '../../platform/types';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
+import type { MarkLoadedOptions } from '../state/store-save-tracking-actions';
 import type { ToastVariant } from '../state/toast-store';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 import { describeOpenResult } from './file-action-formatters';
 
 export type ProjectOpenCompletionContext = {
   readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
-  readonly markLoaded: (filename: string, options?: { readonly dirty?: boolean }) => void;
+  readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
 };
 
-/** True when the file replaced the document. */
+/** Where Save writes a KerfDesk project opened from `ref` (ADR-550), when the
+ * platform can write it back. */
+export function openedProjectSaveTarget(
+  platform: PlatformAdapter,
+  ref: RecentFileRef | undefined,
+): SaveTarget | null {
+  return ref === undefined ? null : (platform.openedProjectSaveTarget?.(ref) ?? null);
+}
+
+/** True when the file replaced the document. `saveTarget` is where Save then
+ * writes: the opened file itself (ADR-550). */
 export function completeNativeProjectOpen(
   ctx: ProjectOpenCompletionContext,
   fileName: string,
   result: ReturnType<typeof deserializeProject>,
+  saveTarget: SaveTarget | null = null,
 ): boolean {
   if (result.kind === 'ok') {
     const loadResult = ctx.setProject(result.project);
-    markCapabilityAwareLoad(ctx, fileName, loadResult);
+    markCapabilityAwareLoad(ctx, fileName, loadResult, saveTarget);
     clearAutosaveAfterFileHandoff(ctx.pushToast);
     const migration =
       result.migratedFrom === undefined ? '' : ` — migrated from schema v${result.migratedFrom}`;
@@ -86,7 +99,10 @@ function markCapabilityAwareLoad(
   ctx: ProjectOpenCompletionContext,
   filename: string,
   result: ProjectMachineCapabilityLoadResult,
+  saveTarget: SaveTarget | null,
 ): void {
-  if (result.projectBedReconciled === true) ctx.markLoaded(filename, { dirty: true });
+  const dirty = result.projectBedReconciled === true;
+  if (saveTarget !== null) ctx.markLoaded(filename, dirty ? { dirty, saveTarget } : { saveTarget });
+  else if (dirty) ctx.markLoaded(filename, { dirty: true });
   else ctx.markLoaded(filename);
 }

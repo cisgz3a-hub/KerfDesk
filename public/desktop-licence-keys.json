@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "keys": [
+    {
+      "keyId": "entitlement-2026-09",
+      "algorithm": "Ed25519",
+      "publicKeySpki": "MCowBQYDK2VwAyEA5rmBrgu40h5iB+ZT12dps6U7EAXClEVAxo6dJJl/Qa4="
+    }
+  ]
+}

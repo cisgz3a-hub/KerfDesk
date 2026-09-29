@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "keys": [
+    {
+      "keyId": "preview-2026-09",
+      "algorithm": "Ed25519",
+      "publicKeySpki": "MCowBQYDK2VwAyEA1jnyUAW+Ps5FMEPAm6OLqV7hAUcjVmkCWW8GOxx0SNQ=",
+      "channel": "preview"
+    },
+    {
+      "keyId": "stable-2026-09",
+      "algorithm": "Ed25519",
+      "publicKeySpki": "MCowBQYDK2VwAyEAz3WdOhlC0VV0+uOjCyB3Toc6PpV67gO5JtRTE3ncOJY=",
+      "channel": "stable"
+    }
+  ]
+}

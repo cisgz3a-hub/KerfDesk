@@ -325,11 +325,19 @@ describe('Electron main-process security wiring', () => {
   // and one that trusts the origin grants every attached serial adapter. The
   // background-streaming worker (ADR-354) then cannot tell the picked adapter
   // from an identical twin, and Forget revokes nothing. Serial grants must come
-  // from the operator's pick alone.
-  it('leaves serial grants to the port the operator picks', () => {
+  // from the operator's pick alone: the one handler is the Windows record of
+  // those picks (ADR-552, desktop-serial-ports.test.ts).
+  it('leaves serial grants to the ports the operator picks', () => {
     const main = readMainProcessSource();
+    const serialPorts = readFileSync(
+      join(process.cwd(), 'electron', 'desktop-serial-ports.ts'),
+      'utf8',
+    );
 
-    expect(main).toContain("'select-serial-port'");
+    expect(main).toContain('installDesktopSerialPorts(ses, {');
     expect(main).not.toMatch(/\.setDevicePermissionHandler\(/);
+    expect(serialPorts).toContain("'select-serial-port'");
+    expect(serialPorts.match(/\.setDevicePermissionHandler\(/g)).toHaveLength(1);
+    expect(serialPorts).toContain('grants.allows(details.device)');
   });
 });

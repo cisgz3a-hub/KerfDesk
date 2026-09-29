@@ -16,6 +16,32 @@ import { clientToCanvasPx, zoomAtCursorPx } from './view-transform';
 // Matches the 1.25× keyboard/Ctrl-wheel notch feel used elsewhere is 1.1 per
 // wheel tick here — one physical notch is a smaller step than a button click.
 const WHEEL_ZOOM_IN_FACTOR = 1.1;
+// One notch as Chromium reports it in pixel mode and Firefox in line mode.
+const PIXELS_PER_NOTCH = 100;
+const LINES_PER_NOTCH = 3;
+const DOM_DELTA_LINE = 1;
+const DOM_DELTA_PAGE = 2;
+const MAX_STEPS_PER_EVENT = 10;
+
+/**
+ * Zoom steps one wheel event carries. Chromium merges the wheel events that
+ * queue while a frame paints into one event with their summed delta, so one
+ * event can hold several notches. Counting only its sign dropped them: ten
+ * notches spun over a canvas busy with a large picture zoomed six steps, so
+ * the zoom speed depended on paint time. A delta smaller than a notch (a
+ * trackpad, a high-resolution wheel) still zooms one step, as before.
+ */
+export function wheelZoomSteps(event: Pick<WheelEvent, 'deltaY' | 'deltaMode'>): number {
+  const perNotch =
+    event.deltaMode === DOM_DELTA_LINE
+      ? LINES_PER_NOTCH
+      : event.deltaMode === DOM_DELTA_PAGE
+        ? 1
+        : PIXELS_PER_NOTCH;
+  const notches = Math.round(Math.abs(event.deltaY) / perNotch);
+  if (!Number.isFinite(notches)) return 1;
+  return Math.min(MAX_STEPS_PER_EVENT, Math.max(1, notches));
+}
 
 export function useWorkspaceWheelZoom(ref: React.RefObject<HTMLCanvasElement | null>): void {
   useEffect(() => {
@@ -29,7 +55,8 @@ export function useWorkspaceWheelZoom(ref: React.RefObject<HTMLCanvasElement | n
       const cursorPx = clientToCanvasPx(e, canvas);
       if (cursorPx === null) return;
       const project = useStore.getState().project;
-      const factor = e.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
+      const notch = e.deltaY < 0 ? WHEEL_ZOOM_IN_FACTOR : 1 / WHEEL_ZOOM_IN_FACTOR;
+      const factor = notch ** wheelZoomSteps(e);
       const next = zoomAtCursorPx({
         cursorPx,
         factor,

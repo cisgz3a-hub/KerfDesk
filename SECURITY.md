@@ -10,13 +10,11 @@ maintained separately; upgrade to the newest fixed release when one is published
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting for this repository:
+Email <support@kerfdesk.com> with "Security" in the subject. The source repository may be private,
+so GitHub issues and GitHub's private vulnerability reporting are not a reliable channel.
 
-<https://github.com/cisgz3a-hub/KerfDesk/security/advisories/new>
-
-Do not open a public issue with exploit details, machine identifiers, private project files, camera
-credentials, or access tokens. If private reporting is unavailable, open a minimal public issue that
-asks the maintainers to establish a private channel without describing the vulnerability.
+Do not post exploit details, machine identifiers, private project files, camera credentials, or
+access tokens anywhere public.
 
 Include the affected version or commit, platform, controller or device family when relevant, steps
 to reproduce without moving real hardware where possible, impact, and any proposed mitigation.

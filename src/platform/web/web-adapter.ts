@@ -10,6 +10,7 @@ import type {
   FileOpenRequest,
   FileSaveRequest,
   PlatformAdapter,
+  RecentFileRef,
   SaveDirectoryTarget,
   SaveTarget,
 } from '../types';
@@ -144,7 +145,10 @@ type WebSaveDestination =
       readonly displayName: string;
     };
 
-function fileHandleTarget(handle: FileSystemFileHandle): SaveTarget {
+function fileHandleTarget(
+  handle: FileSystemFileHandle,
+  beforeWrite: () => Promise<void> = async () => undefined,
+): SaveTarget {
   const identity: WebSaveDestination = { kind: 'file', handle };
   return {
     displayName: handle.name,
@@ -152,14 +156,43 @@ function fileHandleTarget(handle: FileSystemFileHandle): SaveTarget {
     destinationIdentity: identity,
     isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
     write: async (data) => {
+      await beforeWrite();
       const writable = await handle.createWritable();
       await writeAndClose(writable, data);
     },
     writeChunks: async (chunks, signal, onFinalizing) => {
       signal?.throwIfAborted();
+      await beforeWrite();
       await writeSaveChunks(await handle.createWritable(), chunks, signal, onFinalizing);
     },
   };
+}
+
+/** Save over a KerfDesk project opened from a handle (ADR-550). Open grants
+ * only reading, so the first write asks to change the file, from the Save
+ * click; Chromium shows its prompt in the browser, and the desktop app's
+ * permission handler answers it. */
+function openedProjectSaveTarget(ref: RecentFileRef): SaveTarget | null {
+  if (ref.kind !== 'handle' || !/\.lf2$/i.test(ref.handle.name)) return null;
+  return fileHandleTarget(ref.handle, () => requestWritePermission(ref.handle));
+}
+
+type WritePermissionHandle = {
+  readonly queryPermission?: (descriptor: { mode: 'readwrite' }) => Promise<PermissionState>;
+  readonly requestPermission?: (descriptor: { mode: 'readwrite' }) => Promise<PermissionState>;
+};
+
+async function requestWritePermission(handle: FileSystemFileHandle): Promise<void> {
+  const permissions = handle as unknown as WritePermissionHandle;
+  // No permission model (older engines): the write reports any refusal itself.
+  if (typeof permissions.queryPermission !== 'function') return;
+  try {
+    if ((await permissions.queryPermission({ mode: 'readwrite' })) === 'granted') return;
+    if ((await permissions.requestPermission?.({ mode: 'readwrite' })) === 'granted') return;
+  } catch {
+    // A request without a user gesture throws; it is a refusal like any other.
+  }
+  throw new Error(`KerfDesk may not change ${handle.name}. Use Save As to save a copy.`);
 }
 
 async function sameWebSaveDestination(left: WebSaveDestination, right: unknown): Promise<boolean> {
@@ -222,4 +255,5 @@ export const webAdapter: PlatformAdapter = {
   cameraBridge: createHttpCameraBridge(),
   recentFiles: webRecentFiles,
   externalFileOpens: createLaunchQueueFileOpens(),
+  openedProjectSaveTarget,
 };

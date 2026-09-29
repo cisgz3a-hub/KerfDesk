@@ -16,10 +16,15 @@
 // they must not reset the controller twice during one pending close.
 
 import { useEffect } from 'react';
+import { saveProjectNow } from './confirm-discard';
 import { desktopCloseController, installDesktopCloseReceiver } from './desktop-close-runtime';
+import { usePlatformOptional } from './platform-context';
 
-export function installUnloadStop(target: Window): () => void {
-  const removeReceiver = installDesktopCloseReceiver(target);
+export function installUnloadStop(
+  target: Window,
+  saveProject?: () => Promise<boolean>,
+): () => void {
+  const removeReceiver = installDesktopCloseReceiver(target, saveProject);
   const onBeforeUnload = (event: BeforeUnloadEvent): void => {
     if (!desktopCloseController.handleBeforeUnload(event)) {
       desktopCloseController.bestEffortStop();
@@ -38,5 +43,14 @@ export function installUnloadStop(target: Window): () => void {
 }
 
 export function useUnloadStop(): void {
-  useEffect(() => installUnloadStop(window), []);
+  const platform = usePlatformOptional();
+  useEffect(
+    () =>
+      installUnloadStop(
+        window,
+        // The desktop close question's Save (ADR-549) is the project's own Save.
+        platform === null ? undefined : async () => (await saveProjectNow(platform)) === 'saved',
+      ),
+    [platform],
+  );
 }

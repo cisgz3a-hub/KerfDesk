@@ -6,6 +6,7 @@
 import { spawn } from 'node:child_process';
 import type { ServerResponse } from 'node:http';
 import { writeJson } from './bridge-json.js';
+import { FFMPEG_MISSING_REASON, installedFfmpeg } from './ffmpeg-path.js';
 
 // Bound concurrent ffmpeg transcodes so a burst of stream requests cannot
 // exhaust the machine (S03-001 DoS hardening).
@@ -48,24 +49,29 @@ function createPreviewActivityWatch(onTimeout: () => void): PreviewActivityWatch
   };
 }
 
-function spawnPreviewFfmpeg(url: URL) {
-  return spawn('ffmpeg', [
-    '-hide_banner',
-    '-loglevel',
-    'error',
-    '-rtsp_transport',
-    'tcp',
-    '-i',
-    url.toString(),
-    '-an',
-    '-vf',
-    'fps=10',
-    '-f',
-    'mpjpeg',
-    '-q:v',
-    '5',
-    'pipe:1',
-  ]);
+// Always the full path of the installed FFmpeg, never a bare name (ADR-551).
+function spawnPreviewFfmpeg(executable: string, url: URL) {
+  return spawn(
+    executable,
+    [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-rtsp_transport',
+      'tcp',
+      '-i',
+      url.toString(),
+      '-an',
+      '-vf',
+      'fps=10',
+      '-f',
+      'mpjpeg',
+      '-q:v',
+      '5',
+      'pipe:1',
+    ],
+    { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+  );
 }
 
 export type RtspPreviewLifecycleObserver = {
@@ -79,9 +85,10 @@ export function streamWithFfmpeg(
   res: ServerResponse,
   lifecycle?: RtspPreviewLifecycleObserver,
 ): void {
-  const ffmpeg = spawnPreviewFfmpeg(url);
+  const executable = installedFfmpeg();
+  if (executable === null) return refuseWithoutFfmpeg(res, lifecycle);
+  const ffmpeg = spawnPreviewFfmpeg(executable, url);
   const releaseSlot = acquireFfmpegSlot();
-  const stderrChunks: Buffer[] = [];
   let clientClosed = false;
   let responseStarted = false;
   let settled = false;
@@ -111,9 +118,6 @@ export function streamWithFfmpeg(
     );
   });
 
-  ffmpeg.stderr.on('data', (chunk: Buffer) => {
-    appendLimitedStderrChunk(stderrChunks, chunk);
-  });
   ffmpeg.stdout.on('data', (chunk: Buffer) => {
     if (settled || clientClosed) return;
     responseStarted = writePreviewChunk(
@@ -127,9 +131,7 @@ export function streamWithFfmpeg(
   });
   ffmpeg.stdout.on('end', () => {
     if (!settled && !clientClosed) {
-      failStream(
-        new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
-      );
+      failStream(new Error('FFmpeg camera preview ended unexpectedly.'));
     }
   });
   res.on('drain', () => {
@@ -145,17 +147,22 @@ export function streamWithFfmpeg(
     ffmpeg.kill('SIGTERM');
     if (closedWhileActive) lifecycle?.onClosed();
   });
-  ffmpeg.on('error', (err) => {
+  ffmpeg.on('error', () => {
     releaseSlot();
-    failStream(err);
+    // Spawn errors and decoder output may echo the input URL, including login
+    // or query credentials. Only app-owned diagnostic text crosses the bridge.
+    failStream(new Error('FFmpeg camera preview could not start.'));
   });
   ffmpeg.on('exit', () => {
     releaseSlot();
     if (settled) return;
-    failStream(
-      new Error(ffmpegFailureReason(stderrChunks, 'FFmpeg camera preview ended unexpectedly.')),
-    );
+    failStream(new Error('FFmpeg camera preview ended unexpectedly.'));
   });
+}
+
+function refuseWithoutFfmpeg(res: ServerResponse, lifecycle?: RtspPreviewLifecycleObserver): void {
+  lifecycle?.onFailure(FFMPEG_MISSING_REASON);
+  writeJson(res, { kind: 'unavailable', reason: FFMPEG_MISSING_REASON });
 }
 
 function writePreviewChunk(
@@ -178,20 +185,11 @@ function writePreviewChunk(
   return true;
 }
 
-function appendLimitedStderrChunk(chunks: Buffer[], chunk: Buffer): void {
-  if (Buffer.concat(chunks).length < 8192) chunks.push(Buffer.from(chunk));
-}
-
 function writeMjpegResponseHeaders(res: ServerResponse): void {
   res.writeHead(200, {
     'Content-Type': 'multipart/x-mixed-replace; boundary=ffmpeg',
     'Cache-Control': 'no-store',
   });
-}
-
-export function ffmpegFailureReason(chunks: ReadonlyArray<Buffer>, fallback: string): string {
-  const stderr = Buffer.concat(chunks).toString('utf8').trim();
-  return stderr.length > 0 ? `${fallback}: ${stderr}` : fallback;
 }
 
 const SINGLE_FRAME_TIMEOUT_MS = 10000;
@@ -207,37 +205,42 @@ export type RtspFrameCaptureResult =
  * so the /frame.jpg route asks ffmpeg for a single image instead.
  */
 export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> {
+  const executable = installedFfmpeg();
+  if (executable === null)
+    return Promise.resolve({ kind: 'failed', reason: FFMPEG_MISSING_REASON });
   if (!hasFreeFfmpegSlot()) {
     return Promise.resolve({ kind: 'failed', reason: 'Too many concurrent camera streams.' });
   }
   const releaseSlot = acquireFfmpegSlot();
   return new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', [
-      '-hide_banner',
-      '-loglevel',
-      'error',
-      '-rtsp_transport',
-      'tcp',
-      '-i',
-      url.toString(),
-      '-an',
-      '-frames:v',
-      '1',
-      '-f',
-      'image2',
-      '-q:v',
-      '4',
-      'pipe:1',
-    ]);
+    const ffmpeg = spawn(
+      executable,
+      [
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-rtsp_transport',
+        'tcp',
+        '-i',
+        url.toString(),
+        '-an',
+        '-frames:v',
+        '1',
+        '-f',
+        'image2',
+        '-q:v',
+        '4',
+        'pipe:1',
+      ],
+      { stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true },
+    );
     const out: Buffer[] = [];
-    const stderrChunks: Buffer[] = [];
     let outBytes = 0;
     let settled = false;
     const finish = (result: RtspFrameCaptureResult): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      releaseSlot();
       resolve(result);
     };
     const timer = setTimeout(() => {
@@ -245,6 +248,7 @@ export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> 
       finish({ kind: 'failed', reason: 'FFmpeg did not produce a camera frame in time.' });
     }, SINGLE_FRAME_TIMEOUT_MS);
     ffmpeg.stdout.on('data', (chunk: Buffer) => {
+      if (settled) return;
       outBytes += chunk.length;
       if (outBytes > MAX_SINGLE_FRAME_BYTES) {
         ffmpeg.kill('SIGTERM');
@@ -253,20 +257,20 @@ export function captureRtspFrameJpeg(url: URL): Promise<RtspFrameCaptureResult> 
       }
       out.push(Buffer.from(chunk));
     });
-    ffmpeg.stderr.on('data', (chunk: Buffer) => {
-      appendLimitedStderrChunk(stderrChunks, chunk);
+    ffmpeg.on('error', () => {
+      finish({ kind: 'failed', reason: 'FFmpeg camera frame capture could not start.' });
     });
-    ffmpeg.on('error', (err) => {
-      finish({ kind: 'failed', reason: err.message });
-    });
-    ffmpeg.on('exit', (code) => {
+    // Child 'exit' can precede the last stdout data. 'close' proves every pipe
+    // has closed, so both the JPEG and the process concurrency count are final.
+    ffmpeg.on('close', (code) => {
+      releaseSlot();
       if (code === 0 && out.length > 0) {
         finish({ kind: 'ok', jpeg: Buffer.concat(out) });
         return;
       }
       finish({
         kind: 'failed',
-        reason: ffmpegFailureReason(stderrChunks, 'FFmpeg could not capture a camera frame.'),
+        reason: 'FFmpeg could not capture a camera frame.',
       });
     });
   });
@@ -276,7 +280,12 @@ let ffmpegAvailable: Promise<boolean> | null = null;
 
 export function hasFfmpeg(): Promise<boolean> {
   ffmpegAvailable ??= new Promise((resolve) => {
-    const ffmpeg = spawn('ffmpeg', ['-version'], { stdio: 'ignore' });
+    const executable = installedFfmpeg();
+    if (executable === null) {
+      resolve(false);
+      return;
+    }
+    const ffmpeg = spawn(executable, ['-version'], { stdio: 'ignore', windowsHide: true });
     ffmpeg.on('error', () => resolve(false));
     ffmpeg.on('exit', (code) => resolve(code === 0));
   });

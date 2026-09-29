@@ -172,11 +172,10 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
     throw 'Expected desktop and Start Menu shortcuts to the installed executable.'
   }
   $association = Get-ProjectAssociation
-  # electron-builder 26.16.1 writes the executable path unquoted (NsisTarget.js:
-  # '"$appExe $\"%1$\""'); Windows still resolves it. Either form must name
-  # the installed executable.
-  $openCommands = @("`"$executable`" `"%1`"", "$executable `"%1`"")
-  if ($association.extensionClass -ne 'KerfDesk.Project' -or $association.openCommand -notin $openCommands) {
+  # Both the executable and document must be quoted; a custom NSIS hook fixes
+  # electron-builder's unquoted executable when the install path contains spaces.
+  $openCommand = "`"$executable`" `"%1`""
+  if ($association.extensionClass -ne 'KerfDesk.Project' -or $association.openCommand -ne $openCommand) {
     throw "Expected .lf2 projects to open in the installed executable: $($association | ConvertTo-Json -Compress)"
   }
   return [pscustomobject]@{
@@ -232,6 +231,50 @@ function Assert-DataRetained([string]$ExpectedProjectHash, [string]$ExpectedSent
   if ((Get-FileEvidence $project).sha256 -ne $ExpectedProjectHash -or
       (Get-FileEvidence $sentinel).sha256 -ne $ExpectedSentinelHash) {
     throw 'Saved project or profile sentinel changed during install/uninstall.'
+  }
+}
+
+function Invoke-AssociatedProject {
+  # Full qualification only: the saved project and normal profile belong to this
+  # disposable hosted VM. Exercise Windows' open verb, not a direct exe launch.
+  $ownedProject = Assert-ChildPath $project $ownedRoot
+  if (-not (Test-Path -LiteralPath $ownedProject -PathType Leaf)) { throw 'Saved association fixture is missing.' }
+  $projectBefore = Get-FileEvidence $ownedProject
+  $startInfo = [Diagnostics.ProcessStartInfo]::new($ownedProject)
+  $startInfo.UseShellExecute = $true
+  $startInfo.Verb = 'open'
+  $startInfo.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden
+  $associated = [Diagnostics.Process]::Start($startInfo)
+  if ($null -eq $associated) { throw 'The project open verb returned no owned process.' }
+  $owned = $false
+  try {
+    if ($associated.MainModule.FileName -ne $executable) { throw 'The project association launched a different executable.' }
+    $owned = $true
+    $expectedTitle = 'KerfDesk — ' + [IO.Path]::GetFileName($ownedProject)
+    $deadline = [DateTime]::UtcNow.AddSeconds(45)
+    do {
+      $associated.Refresh()
+      if ($associated.HasExited) { throw 'The associated app exited before opening the saved project.' }
+      if ($associated.MainWindowTitle -eq $expectedTitle) { break }
+      Start-Sleep -Milliseconds 150
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($associated.MainWindowTitle -ne $expectedTitle) { throw 'The associated app did not open the saved project.' }
+    if (-not $associated.CloseMainWindow() -or -not $associated.WaitForExit(30000)) {
+      throw 'The associated app did not close normally.'
+    }
+    if ($associated.ExitCode -ne 0) { throw "The associated app exited with $($associated.ExitCode)." }
+    if ((Get-FileEvidence $ownedProject).sha256 -ne $projectBefore.sha256) { throw 'Opening by association changed the saved project.' }
+    $steps.Add([pscustomobject]@{
+      name = 'shell-open-saved-project'; executable = $executable
+      project = $projectBefore; windowTitle = $expectedTitle; exitCode = $associated.ExitCode
+    })
+    Write-Receipt
+  } finally {
+    if ($owned -and -not $associated.HasExited) {
+      $associated.Kill($true)
+      if (-not $associated.WaitForExit(10000)) { throw 'Owned association process did not terminate.' }
+    }
+    $associated.Dispose()
   }
 }
 
@@ -300,6 +343,7 @@ try {
   }
   Install-Candidate 'fresh-install' $Installer $Version
   Invoke-FileRoundtrip 'create-real-project' 'create' $Version
+  Invoke-AssociatedProject
   if (-not (Test-Path -LiteralPath $profile -PathType Container)) { throw 'Normal app profile was not created.' }
   @{ sourceCommit = $SourceCommit; marker = [Guid]::NewGuid().ToString() } | ConvertTo-Json | Set-Content -LiteralPath $sentinel -Encoding utf8
   $projectHash = (Get-FileEvidence $project).sha256

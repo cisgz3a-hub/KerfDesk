@@ -58,6 +58,26 @@ export type LaserControllerOperation =
       readonly phase: 'modal-state' | 'offsets';
     };
 
+// Operation records are immutable snapshots. A phase/status update continues
+// the same owner; a newly started operation, even of the same kind, does not.
+// Keep this identity outside the public state/persistence schema.
+const operationOwners = new WeakMap<LaserControllerOperation, object>();
+
+export function controllerOperationOwner(operation: LaserControllerOperation): object {
+  return operationOwners.get(operation) ?? operation;
+}
+
+/** Only use at an existing owner's phase/status continuation, never at start. */
+export function continueControllerOperation<T extends LaserControllerOperation>(
+  previous: LaserControllerOperation | null,
+  next: T,
+): T {
+  if (previous !== null && previous.kind === next.kind) {
+    operationOwners.set(next, controllerOperationOwner(previous));
+  }
+  return next;
+}
+
 export const CONTROLLER_OPERATION_ACTIVE_MESSAGE =
   'A controller operation is active. Wait for it to finish before sending another command.';
 
