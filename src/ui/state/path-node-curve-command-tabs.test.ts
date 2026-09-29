@@ -113,6 +113,45 @@ describe('node tool Break re-measures tabs placed by hand from the break', () =>
     expect(reclosed.paths[0]?.polylines[0]?.points[0]).toEqual(p(40, 20));
     expectTabsInPlace(before, reclosed);
   });
+
+  it('puts every tab back when the open path is reversed before it is closed again', () => {
+    const before = part(
+      [{ color: COLOR, polylines: [closed(PART), closed(HOLE)] }],
+      [...tabs(0, 0, 0.1, 0.6, 0), ...tabs(0, 1, 0.3)],
+      tabs(0, 0, 0.9, 0.45),
+    );
+    load(before, { pathIndex: 0, polylineIndex: 0, pointIndex: 2 });
+
+    useStore.getState().breakSelectedCurve();
+    useStore.getState().reverseSelectedPaths();
+    useStore.getState().closeSelectedPaths();
+
+    // Broken at (40, 20), reversed and closed, the outline now starts at (40, 0).
+    const reclosed = current();
+    expect(reclosed.paths[0]?.polylines[0]?.points[0]).toEqual(p(40, 0));
+    expectTabsInPlace(before, reclosed);
+  });
+
+  it('puts every tab back on a curved part reversed and closed again after Break', () => {
+    const curve = dPart();
+    const flattened = flattenCurveSubpath(curve, { toleranceMm: 0.05 });
+    if (flattened.kind !== 'ok') throw new Error('the outline did not flatten');
+    const before = part(
+      [{ color: COLOR, curves: [curve], polylines: [flattened.polyline] }],
+      tabs(0, 0, 0.05, 0.3, 0.55, 0.8, 0.95),
+      tabs(0, 0, 0.2, 0.7),
+    );
+    // Break at the start drops the last segment, the straight edge back to it.
+    load(before, { pathIndex: 0, polylineIndex: 0, pointIndex: 0, geometry: 'curve' });
+
+    useStore.getState().breakSelectedCurve();
+    useStore.getState().reverseSelectedPaths();
+    useStore.getState().closeSelectedPaths();
+
+    const reclosed = current();
+    expect(reclosed.paths[0]?.curves?.[0]?.start).toEqual(p(0, 40));
+    expectTabsInPlace(before, reclosed);
+  });
 });
 
 function p(x: number, y: number): Vec2 {
@@ -148,6 +187,19 @@ function roundedPart(): CurveSubpath {
       quarter(b, c, p(5, 0)),
       quarter(c, d, p(0, 6)),
       quarter(d, a, p(-5, 0)),
+    ],
+  };
+}
+
+// A "D": two cubic bulges from (0, 0) round to (0, 40), then a straight edge back.
+function dPart(): CurveSubpath {
+  return {
+    start: p(0, 0),
+    closed: true,
+    segments: [
+      { kind: 'cubic', control1: p(20, 0), control2: p(30, 10), to: p(30, 20) },
+      { kind: 'cubic', control1: p(30, 30), control2: p(20, 40), to: p(0, 40) },
+      { kind: 'line', to: p(0, 0) },
     ],
   };
 }

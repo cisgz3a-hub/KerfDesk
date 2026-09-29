@@ -11,6 +11,7 @@ import {
   isCloseablePolyline,
   reversePaths,
 } from '../../core/geometry/path-direction-edits';
+import { closingLineFraction } from '../../core/cnc/cnc-tab-anchors';
 import type { CncTabAnchor, ColoredPath, Scene, SceneObject } from '../../core/scene';
 import { formatDisplayMillimetres } from '../format-display-millimetres';
 import { removeSceneObjectsFromState } from './object-delete-actions';
@@ -160,11 +161,12 @@ function reversedTabAnchors(
 ): Pick<SceneObject, 'cncTabAnchors' | 'laserTabAnchors'> {
   const follow = <A extends CncTabAnchor>(anchors: ReadonlyArray<A>): ReadonlyArray<A> =>
     anchors.map((anchor) => {
-      const before = object.paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
+      const source = object.paths[anchor.pathIndex];
+      const before = source?.polylines[anchor.polylineIndex];
       const after = paths[anchor.pathIndex]?.polylines[anchor.polylineIndex];
-      return before !== undefined && after !== undefined && before !== after
-        ? reverseAnchor(anchor)
-        : anchor;
+      if (source === undefined || before === undefined || after === undefined) return anchor;
+      if (before === after) return anchor;
+      return reverseAnchor(anchor, closingLineFraction(source, anchor.polylineIndex) ?? 0);
     });
   return {
     ...(object.cncTabAnchors === undefined ? {} : { cncTabAnchors: follow(object.cncTabAnchors) }),
@@ -175,9 +177,15 @@ function reversedTabAnchors(
 }
 
 // A placed tab sits at a fraction of its contour's length from the start.
-// Reversing a contour (a closed one keeps its start) moves t to 1 - t.
-function reverseAnchor<A extends CncTabAnchor>(anchor: A): A {
-  return { ...anchor, pathT: anchor.pathT === 0 ? 0 : 1 - anchor.pathT };
+// Reversing a closed contour keeps its start and moves t to 1 - t. An open
+// contour holds its tabs until a straight line from its end closes it, taking
+// the fraction `closing` of its length; reversed, it starts at its old end,
+// so a tab at t lies 1 - closing - t along it (ADR-494 Amendment 1).
+function reverseAnchor<A extends CncTabAnchor>(anchor: A, closing: number): A {
+  if (closing === 0) return { ...anchor, pathT: anchor.pathT === 0 ? 0 : 1 - anchor.pathT };
+  const turned = 1 - closing - Math.max(0, Math.min(1, anchor.pathT));
+  const pathT = turned - Math.floor(turned);
+  return { ...anchor, pathT: pathT >= 1 ? 0 : pathT };
 }
 
 function skippedOpenObjects(state: AppState): number {

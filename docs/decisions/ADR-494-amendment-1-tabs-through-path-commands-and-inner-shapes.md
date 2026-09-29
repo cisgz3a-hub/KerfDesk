@@ -47,7 +47,10 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
    When a copy is deleted, the kept copy has the same tabs at the same places.
 2. **Reverse Direction.** Laser tabs follow each reversed contour exactly as CNC tabs do: `t`
    becomes `1 − t` (0, the start, stays 0), and anchors on contours the command leaves unchanged
-   keep their fraction.
+   keep their fraction. An open contour (after Break, item 3) holds its tabs for the straight line
+   that closes it again; reversed, it starts at its old end, so `t` becomes `1 − g − t`, wrapped
+   into 0 to 1, where `g` is that closing line's share of the closed length. Before, laser and CNC
+   tabs of a broken contour that was reversed and closed again moved by the closing line's length.
 3. **Start and Break (Edit nodes).** Start moves each placed tab on the restarted contour, laser
    and CNC, back by the new start's fraction `f` of that contour (`t` becomes `t − f`, wrapped into
    0 to 1), measured on the same flattened outline that places the tabs, so every tab stays where
@@ -72,11 +75,17 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
 
 - Delete Duplicates deletes fewer objects only where copies differ in placed laser tabs, or where
   tabbed copies start or run differently.
-- Reverse Direction changes only the cutting direction of a tabbed part; its laser tabs stay put.
+- Reverse Direction changes only the cutting direction of a tabbed part; its laser tabs stay put,
+  and so do the laser and CNC tabs of a broken contour that is reversed and then closed again.
 - Start changes only where a tabbed contour starts; its laser and CNC tabs stay put. This changes
   CNC output as well as laser output: CNC tabs placed by hand no longer move when the start does.
 - Start and Break keep every corner of a contour closed by an implied line, on laser and CNC
   artwork alike; contours whose last segment returns to the start are unchanged.
+- Unchanged: Smooth, Corner, and Curve or Line on a segment (Edit nodes), like dragging a node or a
+  handle, keep each tab's fraction of the reshaped outline, so a tab on an untouched edge shifts by
+  its fraction of the change in length; Join of two open paths keeps the first path's fractions
+  and drops the second's. These reshape a contour rather than restart it, and are left to a
+  deliberate remap (ADR-156).
 - Skip inner shapes gives the same answer as before for every layout, and the tab output is
   unchanged. A sheet of 3000 separate parts runs the exact test no times instead of 8,997,000 and
   decides in well under a second; a part with a hole runs it once. Layouts of deeply nested
@@ -94,9 +103,11 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
 - `src/ui/state/path-node-curve-command-tabs.test.ts`: after Start on a polyline part, a curved
   part and a part closed by an implied line, every laser and CNC tab is at its old place (rotated,
   scaled and moved artwork) and a hole's tabs keep their fractions; after Break the open contour
-  has no tab, and after Close Path every tab is back at its old place.
+  has no tab, and after Close Path, or Reverse Direction and then Close Path (on a polyline part
+  and on a curved one), every tab is back at its old place.
 - `src/core/cnc/cnc-tab-anchors.test.ts`: the node fraction on straight and implied closing lines,
-  through a contour that passes back through its start, and the wrap of the moved fractions.
+  through a contour that passes back through its start, the wrap of the moved fractions, and the
+  closing line's share of an open contour.
 - `src/core/scene/curve-edit.test.ts`: Start and Break keep every corner of a rectangle closed by
   an implied line.
 - `src/core/geometry/tab-inner-shapes.test.ts`: the one-pass rule and the tab output equal a frozen

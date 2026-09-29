@@ -9,6 +9,7 @@ import {
 } from '../scene';
 import {
   closedCurveNodeFraction,
+  closingLineFraction,
   cncTabAnchorPosition,
   projectCncTabAnchor,
   redistributeCncTabAnchors,
@@ -188,6 +189,19 @@ describe('tab anchors on a contour restarted at a node', () => {
     expect(moved[6]).toBe(otherPath);
     // A place a rounding step short of a whole turn is the start, not 1.
     expect(restartedTabAnchors([anchor(0.1)], 0, 0, 0.1 + 1e-17)[0]?.pathT).toBe(0);
+  });
+
+  it('measures the straight line that would close an open contour as a share of its length', () => {
+    const path = (closed: boolean, points: ReadonlyArray<Vec2>) => ({
+      color: '#ff0000',
+      polylines: [{ closed, points }],
+    });
+    // Broken at c: c, d, a, b runs 100 mm and the line from b back to c is 20 mm.
+    expect(closingLineFraction(path(false, [c, d, a, b]), 0)).toBeCloseTo(1 / 6, 12);
+    expect(closingLineFraction(path(false, [a, b, c, d, a]), 0)).toBe(0);
+    expect(closingLineFraction(path(true, [a, b, c, d]), 0)).toBe(0);
+    expect(closingLineFraction(path(false, [a, a]), 0)).toBeNull();
+    expect(closingLineFraction(path(false, [a, b]), 1)).toBeNull();
   });
 });
 

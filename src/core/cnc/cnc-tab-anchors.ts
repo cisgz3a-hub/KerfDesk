@@ -148,6 +148,23 @@ export function restartedTabAnchors<A extends CncTabAnchor>(
   });
 }
 
+/** How much of an open contour's length, once closed, the straight line from
+ * its end back to its start takes: Close Path and Join close it that way, and
+ * its tabs placed by hand wait for that. 0 for a closed contour; null for a
+ * missing contour or one without length. */
+export function closingLineFraction(path: ColoredPath, polylineIndex: number): number | null {
+  const polyline = resolvedPolylines(path)[polylineIndex];
+  if (polyline === undefined) return null;
+  if (polyline.closed) return 0;
+  const first = polyline.points[0];
+  const last = polyline.points.at(-1);
+  if (first === undefined || last === undefined) return null;
+  const gap = Math.hypot(first.x - last.x, first.y - last.y);
+  const closing = gap > EPS ? gap : 0;
+  const total = openLength(polyline.points) + closing;
+  return total <= EPS ? null : closing / total;
+}
+
 export function projectCncTabAnchor(
   object: SceneObject,
   layerColor: string,
