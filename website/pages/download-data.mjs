@@ -150,9 +150,9 @@ export function downloadFaq(site, commerce) {
       id: 'report-problem',
       question: 'Where do I report a problem?',
       answer: html`<p>
-        On the <a href="${site.reportUrl}">KerfDesk support page</a>. It lists what to include in a
-        report, and a support email address will be listed there once it’s set up. If you find a
-        security problem, please don’t post the details anywhere public.
+        Email <a href="mailto:${site.supportEmail}">${site.supportEmail}</a>. The
+        <a href="${site.reportUrl}">KerfDesk support page</a> lists what to include in a report. If
+        you find a security problem, please don’t post the details anywhere public.
       </p>`,
     },
   ];

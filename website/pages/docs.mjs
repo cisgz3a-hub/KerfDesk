@@ -191,9 +191,10 @@ function helpSection(site) {
 
       <h3>Report a problem</h3>
       <p>
-        Use the <a href="${site.reportUrl}">KerfDesk support page</a>. A support email address is
-        being set up and will be listed there. Say which machine, controller and firmware you use,
-        and what you tried. Never include your license key, passwords or payment details.
+        Email <a href="mailto:${site.supportEmail}">${site.supportEmail}</a>, or see the
+        <a href="${site.reportUrl}">KerfDesk support page</a> for what to include. Say which
+        machine, controller and firmware you use, and what you tried. Never include your license
+        key, passwords or payment details.
       </p>
       <p>
         For a connection problem, a diagnostic file helps. Under

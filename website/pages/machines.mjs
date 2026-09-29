@@ -201,9 +201,9 @@ function verifySection(site) {
           It stays on your computer until you choose to share it.
         </p>
         <p>
-          A support email address is being set up and will be listed on the support page. Look
-          through any file or photo before you send it, and leave out anything private. Found a
-          security problem? Please don’t post the details anywhere public.
+          Send it to <a href="mailto:${site.supportEmail}">${site.supportEmail}</a>. Look through
+          any file or photo before you send it, and leave out anything private. Found a security
+          problem? Please don’t post the details anywhere public.
         </p>
       </div>
       ${actions(

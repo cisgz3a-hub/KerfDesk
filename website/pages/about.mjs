@@ -169,7 +169,7 @@ function reporting(site) {
     id: 'report',
     eyebrow: 'Report a problem',
     title: 'Found a bug or a security issue?',
-    lead: 'Bug reports and security reports both go through the KerfDesk support page. A support email address is being set up and will be listed there.',
+    lead: `Email bug reports and security reports to ${site.supportEmail}. The KerfDesk support page lists what to include.`,
     content: html`${featureGrid(reportLinks(site), { columns: 2 })}
     ${callout({
       tone: 'safety',

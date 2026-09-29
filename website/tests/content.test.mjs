@@ -124,12 +124,19 @@ describe('website copy', () => {
     }
   });
 
-  // No support email address exists yet; the support page will list one.
-  it('writes no email address', () => {
+  // support@kerfdesk.com is live (29 September 2026); no page names any other address.
+  it('writes no email address but the support address', () => {
+    assert.equal(site.supportEmail, 'support@kerfdesk.com');
     for (const { file, html } of built) {
-      assert.doesNotMatch(html, /mailto:/i, file);
-      assert.doesNotMatch(textContent(html), /[\w.+-]+@[\w-]+\.[\w.]+/, file);
+      for (const href of attrValues(html, 'a', 'href').filter((value) => /^mailto:/i.test(value)))
+        assert.equal(href, `mailto:${site.supportEmail}`, file);
+      for (const address of textContent(html).match(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g) ?? [])
+        assert.equal(address, site.supportEmail, file);
     }
+    assert.match(
+      pageText('about/index.html'),
+      /Email bug reports and security reports to support@kerfdesk\.com/,
+    );
   });
 
   // Owner direction 2026-09-29: the Free and Pro editions and the Pro price are

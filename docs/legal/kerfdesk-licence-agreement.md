@@ -478,5 +478,5 @@ providers.
   Africa]
 - **Telephone:** [PLACEHOLDER: telephone number]
 - **Support and general contact:** https://kerfdesk.com/support.html
-- **Email:** [PLACEHOLDER: support email address, once it exists]
+- **Email:** support@kerfdesk.com
 - **Website:** https://kerfdesk.com

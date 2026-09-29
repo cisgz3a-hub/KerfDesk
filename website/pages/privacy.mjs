@@ -251,10 +251,10 @@ function appPart(site) {
 function questions(site) {
   return html`<div class="prose">
     <p>
-      Have a question about privacy, or think something on this page is wrong? Use the
-      <a href="${site.supportUrl}">KerfDesk support page</a>. A support email address is being set
-      up and will be listed there. If you’ve found a security problem, please don’t post the details
-      anywhere public.
+      Have a question about privacy, or think something on this page is wrong? Email
+      <a href="mailto:${site.supportEmail}">${site.supportEmail}</a> or use the
+      <a href="${site.supportUrl}">KerfDesk support page</a>. If you’ve found a security problem,
+      please don’t post the details anywhere public.
     </p>
     <p>The date at the top of this page shows when it last changed.</p>
   </div>`;

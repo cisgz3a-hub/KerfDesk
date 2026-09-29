@@ -62,5 +62,5 @@ KerfDesk is sold by Johann Stolk, trading as KerfDesk [PLACEHOLDER: legal status
 and registration number if different], [PLACEHOLDER: physical address], South Africa.
 
 - Support: https://kerfdesk.com/support.html
-- Email: [PLACEHOLDER: support email address, once it exists]
+- Email: support@kerfdesk.com
 - Full terms: https://kerfdesk.com/terms/ (section 8 covers refunds)

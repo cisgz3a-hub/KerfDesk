@@ -231,9 +231,9 @@ function reportSection(site) {
     content: html`<div class="prose">
         <p>
           If you find a problem that could change what the machine does, get past a safety check,
-          expose files or devices on your computer, or run untrusted code, report it through the
-          <a href="${site.reportUrl}">KerfDesk support page</a>. A support email address is being
-          set up and will be listed there. Please don’t post the details anywhere public.
+          expose files or devices on your computer, or run untrusted code, email it to
+          <a href="mailto:${site.supportEmail}">${site.supportEmail}</a> with “Security” in the
+          subject. Please don’t post the details anywhere public.
         </p>
         <p>
           Include the KerfDesk version, your platform, your controller family and the steps to

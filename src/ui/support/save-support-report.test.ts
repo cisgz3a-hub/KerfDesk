@@ -72,7 +72,7 @@ describe('saving a support report', () => {
     expect(toasts()).toEqual([
       {
         message:
-          'Saved kerfdesk-support-report-2026-09-29-0712.txt. Read it, then attach it to your message to KerfDesk support.',
+          'Saved kerfdesk-support-report-2026-09-29-0712.txt. Read it, then email it to support@kerfdesk.com.',
         variant: 'success',
       },
     ]);

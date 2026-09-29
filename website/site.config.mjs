@@ -25,8 +25,10 @@ export const site = {
   downloadPageUrl: `${APP_URL}/download.html`,
   downloadHost: 'dl.kerfdesk.com',
   // Help > Get Help and Help > Report a Problem in the app open this page. It
-  // names the current contact route; a support email address is still being set up.
+  // names the current contact route, including the support email address.
   supportUrl: SUPPORT_URL,
+  // Cloudflare Email Routing forwards it to the owner (live 29 September 2026).
+  supportEmail: 'support@kerfdesk.com',
   reportUrl: `${SUPPORT_URL}#report`,
   // The full third-party notices file that ships with the app.
   noticesUrl: `${APP_URL}/third-party-notices.txt`,

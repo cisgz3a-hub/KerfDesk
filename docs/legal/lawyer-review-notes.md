@@ -67,7 +67,7 @@ as §), `kerfdesk-refund-policy.md` and `kerfdesk-privacy-notice.md`. Prepared 2
     service of legal documents; the main characteristics of the product; the full price including
     taxes; payment method; the terms and how to access and store them; delivery time; the return,
     exchange and refund policy; and security procedures and privacy policy. The telephone number
-    and email address do not exist yet (placeholders in §24). s43(2) requires a chance to review,
+    does not exist yet (a placeholder in §24); the email address is support@kerfdesk.com. s43(2) requires a chance to review,
     correct and withdraw before ordering (check Paddle's checkout). Under s43(3), if these are
     missing, the consumer may cancel within 14 days. Check whether John or Paddle is the "supplier"
     for s43; the safest course is for kerfdesk.com to show everything anyway.
@@ -368,7 +368,6 @@ for a paid product.
 - Physical address, which is also the address for legal documents: §1.1, §24, refund policy,
   privacy notice.
 - Telephone number, required by ECTA s43: §24.
-- Support email address, once it exists: §24, refund policy, privacy notice.
 - The Information Officer's registration number with the Information Regulator: privacy notice.
 - The date sales open: all three documents.
 

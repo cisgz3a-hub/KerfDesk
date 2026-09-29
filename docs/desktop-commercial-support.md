@@ -5,6 +5,10 @@ lists what the customer sees, what the software guarantees, and the operator
 action for each situation. It is not customer-facing text, and it does not
 authorize enabling payments; see `desktop-commercial-business-decisions.md`.
 
+Customers write to support@kerfdesk.com, which Cloudflare Email Routing forwards
+to the owner's inbox; the support page (`public/support.html`) and the website
+name that address and no other.
+
 Operator actions use the private administration and licence APIs described in
 `services/desktop-licensing/README.md`. Keep the administrator token, licence
 keys and claim tokens out of chat, email threads, tickets, screenshots and shell

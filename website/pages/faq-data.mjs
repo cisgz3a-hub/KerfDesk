@@ -310,10 +310,10 @@ function privacyAndData(site) {
       id: 'report-bug',
       question: 'How do I report a bug?',
       answer: html`<p>
-          Use the <a href="${site.reportUrl}">KerfDesk support page</a>. It lists what to include,
-          and a support email address will be listed there once it’s set up. Describe what happened
-          and the steps that cause it, and include the KerfDesk version from Help → About KerfDesk.
-          A project file or exported G-code helps a lot.
+          Email <a href="mailto:${site.supportEmail}">${site.supportEmail}</a>. The
+          <a href="${site.reportUrl}">KerfDesk support page</a> lists what to include. Describe what
+          happened and the steps that cause it, and include the KerfDesk version from Help → About
+          KerfDesk. A project file or exported G-code helps a lot.
         </p>
         <p>
           For machine problems, a copy of your controller settings helps too. With a GRBL-family

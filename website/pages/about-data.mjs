@@ -85,8 +85,8 @@ export function reportLinks(site) {
     {
       icon: 'shield-alert',
       title: 'Report a security issue',
-      body: 'Report it through the support page, and don’t post the details anywhere public. Include the version, platform, controller family and steps to reproduce, without moving real hardware where you can.',
-      href: site.supportUrl,
+      body: `Email it to ${site.supportEmail} with “Security” in the subject, and don’t post the details anywhere public. Include the version, platform, controller family and steps to reproduce, without moving real hardware where you can.`,
+      href: `mailto:${site.supportEmail}`,
     },
   ];
 }

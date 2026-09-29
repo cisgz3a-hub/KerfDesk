@@ -43,7 +43,7 @@ export async function saveSupportReport(
   try {
     await target.write(formatSupportReport(await gatherSupportReportFacts(platform, savedAt)));
     pushToast(
-      `Saved ${target.displayName}. Read it, then attach it to your message to KerfDesk support.`,
+      `Saved ${target.displayName}. Read it, then email it to support@kerfdesk.com.`,
       'success',
     );
   } catch (error) {

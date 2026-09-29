@@ -40,7 +40,7 @@ an emergency stop.
 Nothing links to GitHub: the source repository is private, so a visitor can't open it (ADR-524
 Amendment 1). Desktop downloads go to the KerfDesk download page (`site.downloadPageUrl`, which
 serves installers from `dl.kerfdesk.com`); help, bug and security reports go to the support page
-(`site.supportUrl`). Don't write a support email address until the support page lists one. Mark a
+(`site.supportUrl`) or to `site.supportEmail`; write no other email address. Mark a
 tool with `proPill()` (or `pro: true` on a card) only when the owner listed it as Pro.
 
 ## Deploying

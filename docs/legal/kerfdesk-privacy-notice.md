@@ -17,7 +17,7 @@ Johann Stolk, trading as KerfDesk [PLACEHOLDER: legal status, and company name a
 number if different], of [PLACEHOLDER: physical address], South Africa, is responsible for your
 information ("we", "us"). Johann Stolk is our Information Officer [PLACEHOLDER: Information
 Regulator registration number]. Contact us through https://kerfdesk.com/support.html or at
-[PLACEHOLDER: email address, once it exists].
+support@kerfdesk.com.
 
 ## What we never collect
 
