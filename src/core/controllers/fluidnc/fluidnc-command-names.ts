@@ -12,7 +12,8 @@ import { normalizeConsoleSpaces } from '../console-text';
 
 /** [Grbl name, long name] for each command in the pinned v4.0.3 table. The
  * help command (Grbl name "", long name "Help") is left out: its Grbl form is
- * a bare `$`, which the shared classifier already treats conservatively. */
+ * a bare `$`, which the shared classifier takes as a read-only report, and
+ * `$Help` stays a cautious unknown command. */
 const FLUIDNC_V403_COMMAND_NAMES: ReadonlyArray<readonly [string, string]> = [
   ['GD', 'GPIO/Dump'],
   ['GI', 'GPIO/Input'],

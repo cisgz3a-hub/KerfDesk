@@ -7,8 +7,57 @@
 // not inferred from this family.
 
 import type { ControllerDriver } from '../controller-driver';
+import { prepareConsoleCommand, type ConsoleCommandResult } from '../grbl/console-command';
 import { grblDriver } from '../grbl/driver';
 import { GRBLHAL_HOMING_CYCLE } from '../grbl/grbl-homing-duration';
+
+// grblHAL report commands that only print: the enumerations, help, pin, limit,
+// homing-switch, spindle, serial-port and extended build-info reports of the
+// core dispatch table, each handled by a report function. Stock GRBL has no
+// such commands, so the shared classifier took them for an unknown
+// machine-state change and voided the completed Frame (ADR-375, C-6). Exact
+// matches only: `$HELP <topic>` and anything with an '=' keep the cautious
+// G-code classification.
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L1013-L1047
+const GRBLHAL_READ_ONLY_REPORTS: ReadonlySet<string> = new Set([
+  '$HELP',
+  '$ES',
+  '$ESG',
+  '$ESH',
+  '$EA',
+  '$EAG',
+  '$EE',
+  '$EEG',
+  '$EG',
+  '$E*',
+  '$PINS',
+  '$PINSTATE',
+  '$PORTS',
+  '$LEV',
+  '$LIM',
+  '$HSS',
+  '$SPINDLES',
+  '$SPINDLESH',
+  '$I+',
+]);
+
+function prepareGrblHalConsoleCommand(input: string): ConsoleCommandResult {
+  const prepared = prepareConsoleCommand(input);
+  if (!prepared.ok || !GRBLHAL_READ_ONLY_REPORTS.has(prepared.command.normalized.toUpperCase())) {
+    return prepared;
+  }
+  return {
+    ok: true,
+    command: {
+      ...prepared.command,
+      kind: 'report-query',
+      requiresIdle: false,
+      requiresNoActiveOperation: true,
+      requiresConfirmation: false,
+      stateEffect: 'read-only',
+    },
+  };
+}
 
 export const grblHalDriver: ControllerDriver = {
   ...grblDriver,
@@ -39,4 +88,5 @@ export const grblHalDriver: ControllerDriver = {
     buildInfoQuery: null,
   },
   homingCycle: GRBLHAL_HOMING_CYCLE,
+  prepareConsoleCommand: prepareGrblHalConsoleCommand,
 };

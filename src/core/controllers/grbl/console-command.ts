@@ -13,6 +13,7 @@ export type ConsoleCommandKind =
   | 'offset-query'
   | 'build-info-query'
   | 'modal-state-query'
+  | 'report-query'
   | 'unlock'
   | 'setting-write'
   | 'gcode';
@@ -52,6 +53,8 @@ const CYCLE_START_REASON =
 const STATUS_QUERY_REASON =
   '"?" is the controller\'s status query: it acts the moment it arrives, even inside a comment, and is removed from the line. Send "?" on its own, or remove it from the line.';
 const CMD_CHECK_MODE = '$C';
+const CMD_HELP = '$';
+const CMD_STARTUP_LINES = '$N';
 const HOME_OR_SLEEP_RE = /^\$(?:H[XYZABC]?|SLP)$/i;
 const IDLE_OR_ALARM: ReadonlyArray<string> = ['Idle', 'Alarm'];
 const IDLE_OR_CHECK: ReadonlyArray<string> = ['Idle', 'Check'];
@@ -59,6 +62,7 @@ const IDLE_OR_CHECK: ReadonlyArray<string> = ['Idle', 'Check'];
 const SETTING_WRITE_RE = /^\$\d+=\S.*$/;
 const STARTUP_WRITE_RE = /^\$N\d*=/i;
 const BUILD_INFO_WRITE_RE = /^\$I=/i;
+const DOWNGRADE_RE = /^\$DWNGRD(?:=|$)/;
 const POSITION_AFFECTING_SETTING_IDS: ReadonlyArray<number> = [
   2, 3, 20, 22, 23, 100, 101, 102, 130, 131, 132,
 ];
@@ -125,6 +129,16 @@ function prepareSystemCommand(upper: string): ConsoleCommandResult | null {
       return ok('build-info-query', CMD_BUILD_INFO, `${CMD_BUILD_INFO}\n`);
     case CMD_MODAL_STATE:
       return ok('modal-state-query', CMD_MODAL_STATE, `${CMD_MODAL_STATE}\n`);
+    // `$` prints the help line and `$N` the stored startup lines, nothing else,
+    // on GRBL and grblHAL; FluidNC registers `$` as its Help report. As G-code
+    // they voided the completed Frame as an unknown machine-state change
+    // (ADR-375, C-6).
+    // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L129
+    // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L237-L246
+    // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L1142-L1145
+    case CMD_HELP:
+    case CMD_STARTUP_LINES:
+      return ok('report-query', upper, `${upper}\n`);
     case CMD_UNLOCK:
       return ok('unlock', CMD_UNLOCK, `${CMD_UNLOCK}\n`, false, true, false, 'machine-state');
     case CMD_CHECK_MODE:
@@ -206,7 +220,15 @@ function ok(
 // Every `$RST=` form: GRBL's `*`, `$` and `#` restores, and grblHAL's `&`
 // (driver and plugin defaults, which on the Falcon covers the vendor's extended
 // settings), which grblHAL dispatches on the first character after '=' so
-// trailing text does not make it harmless (audit settings-console-8).
+// trailing text does not make it harmless (audit settings-console-8). grblHAL's
+// `$DWNGRD` toggles the settings-version flags and writes the settings to
+// non-volatile storage, so it is a persistent write too (ADR-375, C-6):
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/system.c#L659-L670
 function isBlockedPersistentCommand(upper: string): boolean {
-  return /^\$RST=/.test(upper) || STARTUP_WRITE_RE.test(upper) || BUILD_INFO_WRITE_RE.test(upper);
+  return (
+    /^\$RST=/.test(upper) ||
+    STARTUP_WRITE_RE.test(upper) ||
+    BUILD_INFO_WRITE_RE.test(upper) ||
+    DOWNGRADE_RE.test(upper)
+  );
 }
