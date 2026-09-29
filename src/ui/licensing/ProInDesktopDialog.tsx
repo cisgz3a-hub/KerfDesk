@@ -5,22 +5,33 @@ import { PRO_FEATURES, PRO_PRICE_LABEL, type ProFeature } from './pro-features';
 
 /**
  * A build that cannot take a licence runs KerfDesk Free once sales open
- * (ADR-544). Its Pro tools point to the desktop app, where Pro is unlocked.
+ * (ADR-544). Its Pro tools, its status bar notice and Help > Licence all point
+ * to the desktop app, where Pro is unlocked, and list every Pro feature.
  */
 export function ProInDesktopDialog({
   feature,
   onClose,
 }: {
-  readonly feature: ProFeature;
+  /** The Pro tool that was asked for, or 'all' for the notice itself. */
+  readonly feature: ProFeature | 'all';
   readonly onClose: () => void;
 }): JSX.Element {
-  const tool = PRO_FEATURES[feature];
+  const tool = feature === 'all' ? null : PRO_FEATURES[feature];
   return (
-    <Dialog size="sm" title={`${tool.name} is a Pro tool`} onClose={onClose}>
-      <p style={bodyStyle}>{tool.summary}</p>
+    <Dialog
+      size="sm"
+      title={tool === null ? 'Pro is in the desktop app' : `${tool.name} is a Pro tool`}
+      onClose={onClose}
+    >
+      {tool === null ? null : <p style={bodyStyle}>{tool.summary}</p>}
+      <p style={bodyStyle}>All Pro features are in the KerfDesk desktop app for Windows:</p>
+      <ul style={listStyle} aria-label="Pro features">
+        {Object.values(PRO_FEATURES).map((pro) => (
+          <li key={pro.name}>{pro.name}</li>
+        ))}
+      </ul>
       <p style={bodyStyle}>
-        Pro tools come with KerfDesk Pro in the desktop app for Windows. Try every Pro tool free for
-        30 days there, or buy Pro for {PRO_PRICE_LABEL} once.
+        Try every Pro tool free for 30 days there, or buy Pro for {PRO_PRICE_LABEL} once.
       </p>
       <DialogActions>
         <a
@@ -43,4 +54,11 @@ export function ProInDesktopDialog({
 }
 
 const bodyStyle: React.CSSProperties = { margin: '0 0 10px', fontSize: 13, lineHeight: 1.5 };
+const listStyle: React.CSSProperties = {
+  margin: '0 0 10px',
+  paddingLeft: 20,
+  columns: 2,
+  fontSize: 13,
+  lineHeight: 1.6,
+};
 const linkStyle: React.CSSProperties = { textDecoration: 'none' };

@@ -121,6 +121,10 @@ describe('commerce configuration', () => {
     assert.match(text, /Up to 3 devices at a time/);
     assert.match(text, /Each installation of the desktop app counts as one device/);
     assert.match(text, /In the Windows desktop app\./);
+    assert.match(
+      text,
+      /All Pro features are in the desktop app V-carve, 3D relief, Adaptive clearing, Advanced tracing, Camera alignment, Box generator, Design Studio and G-code Inspector are in KerfDesk Pro, which comes with the Windows desktop app\. KerfDesk in the browser is the Free edition/,
+    );
     assert.match(text, /Can I use Pro in the browser\? No\. Pro works in the Windows desktop app/);
     assert.doesNotMatch(text, /browser counts as (?:one|a) device/);
     assert.match(text, /free 30-day Pro trial\. No card needed/);

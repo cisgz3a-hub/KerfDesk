@@ -7,7 +7,7 @@
 // sales open. The hero lead, the terms line and the FAQ follow `salesOpen`, but
 // reread all of them in the change that opens checkout.
 
-import { button, faqList, featureGrid, pageHero, section } from '../lib/components.mjs';
+import { button, callout, faqList, featureGrid, pageHero, section } from '../lib/components.mjs';
 import { checkoutUrlFor, formatPrice } from '../lib/commerce.mjs';
 import { html } from '../lib/html.mjs';
 import { icon } from '../lib/icons.mjs';
@@ -54,6 +54,21 @@ function paidPlan(plan, commerce) {
   </article>`;
 }
 
+// The owner's choice of 2026-09-29: every Pro feature is in the desktop app,
+// and KerfDesk in the browser is Free (ADR-540 item 7).
+function proInDesktopNotice(plan) {
+  if (!plan?.where) return null;
+  const tools = `${plan.includes.slice(0, -1).join(', ')} and ${plan.includes.at(-1)}`;
+  return callout({
+    iconName: 'monitor',
+    title: `All ${plan.name} features are in the desktop app`,
+    body: html`<p>
+      ${tools} are in KerfDesk ${plan.name}, which comes with ${plan.where}. KerfDesk in the browser
+      is the Free edition, with no time limit. <a href="/download/">Get the desktop app</a>.
+    </p>`,
+  });
+}
+
 function termsLine(commerce) {
   const tax = html`Prices are in ${commerce.currency === 'USD' ? 'US dollars' : commerce.currency}
   and exclude any sales tax or VAT the payment provider adds at checkout.`;
@@ -87,11 +102,6 @@ function licenseTerms(plan, currency) {
       icon: 'calendar-plus',
       title: 'More updates only if you want them',
       body: `After the year, ${formatPrice(plan.updateYearPrice, currency)} adds another year of updates. It’s optional, it isn’t a subscription and it never renews automatically.`,
-    },
-    plan.where && {
-      icon: 'monitor',
-      title: `${plan.name} is in the desktop app`,
-      body: `${plan.name} works in ${plan.where}. KerfDesk in the browser is the Free edition.`,
     },
     plan.deviceLimit && {
       icon: 'monitor-smartphone',
@@ -206,7 +216,7 @@ export const page = {
       content: html`<div class="plans">
           ${freePlan(commerce, site)} ${commerce.plans.map((item) => paidPlan(item, commerce))}
         </div>
-        ${termsLine(commerce)}`,
+        ${proInDesktopNotice(plan)} ${termsLine(commerce)}`,
     })}
     ${plan && licenseTerms(plan, commerce.currency)}
     ${section({

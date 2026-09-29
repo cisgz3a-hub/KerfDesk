@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
-import { EditionContext, setActiveEdition, type EditionValue } from './edition';
+import {
+  EditionContext,
+  LICENCE_SETTINGS_EVENT,
+  setActiveEdition,
+  type EditionValue,
+} from './edition';
 import { UNLICENSED_BUILDS_RUN_FREE } from './edition-policy';
-import { FreeOnlyEdition, useProInDesktop } from './FreeOnlyEdition';
+import { FreeOnlyEdition, useLicenceSettingsEvent, useProInDesktop } from './FreeOnlyEdition';
 import { LicencePanel } from './LicencePanel';
 import { ProFeatureDialog } from './ProFeatureDialog';
 import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
 
-export const LICENCE_SETTINGS_EVENT = 'kerfdesk:licence-settings';
+export { LICENCE_SETTINGS_EVENT };
 
 type PendingPro = { readonly feature: ProFeature; readonly onAllowed?: (() => void) | undefined };
 
@@ -49,18 +54,9 @@ function LicensedEdition({
   const desktop = useProInDesktop();
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
-  const [managing, setManaging] = useState(false);
   const { load } = session;
-  useEffect(() => {
-    const manage = (): void => {
-      setManaging(true);
-      void load();
-    };
-    window.addEventListener(LICENCE_SETTINGS_EVENT, manage);
-    return () => window.removeEventListener(LICENCE_SETTINGS_EVENT, manage);
-  }, [load]);
-  const closeManager = useCallback(() => setManaging(false), []);
-  useDismissOnEscape(managing, closeManager);
+  const { showAll } = desktop;
+  const { managing, closeManager } = useLicenceManager(freeBuild, load, showAll);
   const openLicence = useCallback((): void => {
     window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT));
   }, []);
@@ -69,10 +65,11 @@ function LicensedEdition({
       status: session.status,
       licensed: session.status?.channel === 'commercial',
       pro: session.status?.edition === 'pro',
+      proInDesktop: freeBuild,
       requestPro: freeBuild ? desktop.request : session.requestPro,
-      openLicence,
+      openLicence: freeBuild ? showAll : openLicence,
     }),
-    [desktop.request, freeBuild, openLicence, session.requestPro, session.status],
+    [desktop.request, freeBuild, openLicence, session.requestPro, session.status, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);
@@ -109,11 +106,32 @@ function LicensedEdition({
           />
         )
       ) : null}
-      {desktop.feature === null ? null : (
-        <ProInDesktopDialog feature={desktop.feature} onClose={desktop.close} />
+      {desktop.shown === null ? null : (
+        <ProInDesktopDialog feature={desktop.shown} onClose={desktop.close} />
       )}
     </EditionContext.Provider>
   );
+}
+
+/** Help > Licence opens the Licence panel; a free build has none to manage. */
+function useLicenceManager(
+  freeBuild: boolean,
+  load: () => Promise<void>,
+  showProInDesktop: () => void,
+): { readonly managing: boolean; readonly closeManager: () => void } {
+  const [managing, setManaging] = useState(false);
+  const manage = useCallback((): void => {
+    if (freeBuild) {
+      showProInDesktop();
+      return;
+    }
+    setManaging(true);
+    void load();
+  }, [freeBuild, load, showProInDesktop]);
+  useLicenceSettingsEvent(manage);
+  const closeManager = useCallback(() => setManaging(false), []);
+  useDismissOnEscape(managing, closeManager);
+  return { managing, closeManager };
 }
 
 /** The saved licence, and the Pro request waiting on it, for one running app. */

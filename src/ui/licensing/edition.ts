@@ -20,7 +20,15 @@ export type EditionValue = {
    */
   readonly requestPro: (feature: ProFeature, onAllowed?: () => void) => boolean;
   readonly openLicence: () => void;
+  /**
+   * This build cannot take a licence and runs KerfDesk Free: its Pro tools are
+   * in the desktop app (ADR-544), and it says so in the status bar.
+   */
+  readonly proInDesktop?: boolean;
 };
+
+/** Help > Licence asks the edition provider to show the edition this way. */
+export const LICENCE_SETTINGS_EVENT = 'kerfdesk:licence-settings';
 
 export const UNRESTRICTED_EDITION: EditionValue = {
   status: null,

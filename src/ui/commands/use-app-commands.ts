@@ -96,7 +96,7 @@ export function useAppCommands(callbacks: CommandShellCallbacks): ReadonlyArray<
       appTheme,
       setAppTheme: setAppThemePreference,
       wireframeActive,
-      licensing: platform.id === 'electron' || edition.licensed,
+      licensing: platform.id === 'electron' || edition.licensed || edition.proInDesktop === true,
     }),
   );
   return edition.pro ? commands : labelProCommands(commands);
