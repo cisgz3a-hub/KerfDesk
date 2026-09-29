@@ -87,7 +87,7 @@ describe('painted second pass over an arc program (ADR-432)', () => {
     expect(laserSecondPassSupportsController(ARC_DEVICE.controllerKind)).toBe(true);
     const gcode = circleProgram(ARC_DEVICE);
     expect(gcode).toMatch(/^G[23] /m);
-    for (const writerVersion of [1, 2] as const) {
+    for (const writerVersion of [1, 2, 3] as const) {
       const result = buildLaserSecondPassProgram(gcode, PAINT_ALL, { writerVersion });
       if (result.kind !== 'ready') throw new Error(result.message);
       expect(result.burnLengthMm).toBeCloseTo(2 * Math.PI * RADIUS, 1);

@@ -14,6 +14,7 @@ export type SecondPassPreview = {
   prepared: PreparedStartProgram;
   drawing: SecondPassDrawing;
   burnLengthMm: number;
+  clamped: boolean;
 };
 
 /** One owner per workbench. Closing it terminates expensive verification/compilation. */

@@ -27,6 +27,23 @@ type SlotMutation<T> = (slots: PersistedRecoverySlots) => {
   readonly value: T;
 };
 
+type OwnedStart = {
+  readonly runId: RunId;
+  readonly armedAtIso: string;
+  readonly generation: number;
+};
+
+function ownsPendingStart(
+  snapshot: Pick<RecoveryRepositorySnapshot, 'generation' | 'pendingStart'>,
+  owned: OwnedStart,
+): boolean {
+  return (
+    snapshot.generation === owned.generation &&
+    snapshot.pendingStart?.runId === owned.runId &&
+    snapshot.pendingStart.armedAtIso === owned.armedAtIso
+  );
+}
+
 type HandoffHost = {
   readonly nowIso: () => string;
   readonly getSnapshot: () => RecoveryRepositorySnapshot;
@@ -54,6 +71,9 @@ type HandoffHost = {
 export class RecoveryStartHandoff {
   private reconcileTimer: ReturnType<typeof setTimeout> | null = null;
   private renewalTimer: ReturnType<typeof setInterval> | null = null;
+  private renewalOwner: OwnedStart | null = null;
+  private completionTimer: ReturnType<typeof setTimeout> | null = null;
+  private completedIntent: OwnedStart | null = null;
   private abandoned = false;
 
   constructor(private readonly host: HandoffHost) {}
@@ -97,7 +117,12 @@ export class RecoveryStartHandoff {
     const armed = await this.host.mutate('arm durable job Start intent', (slots) =>
       armFreshStartIntentMutation(slots, runId, intent, armedAtIso),
     );
-    if (armed.ok && armed.value) this.renewLeaseWhileOwned({ runId, armedAtIso });
+    if (armed.ok && armed.value)
+      this.renewLeaseWhileOwned({
+        runId,
+        armedAtIso,
+        generation: this.host.getSnapshot().generation,
+      });
     return armed;
   }
 
@@ -131,6 +156,58 @@ export class RecoveryStartHandoff {
     );
   }
 
+  /** An accepted run without an archive has a proven terminal outcome. End
+   * only its own lease. A clean finish retires its exact intent; a stop leaves
+   * that intent for normal uncertain-handoff reconciliation. */
+  async finishUnarchived(
+    runId: RunId,
+    completed: boolean,
+  ): Promise<RecoveryRepositoryResult<boolean>> {
+    const snapshot = this.host.getSnapshot();
+    const pending = snapshot.pendingStart;
+    if (pending?.runId !== runId) return ok(false);
+    const owned = { runId, armedAtIso: pending.armedAtIso, generation: snapshot.generation };
+    if (this.renewalOwner !== null && ownsPendingStart(snapshot, this.renewalOwner))
+      this.stopRenewing();
+    if (!completed) return this.reconcileUnarchivedInterruption(owned);
+    this.completedIntent = owned;
+    return this.retireCompletedIntent(owned);
+  }
+
+  private async reconcileUnarchivedInterruption(
+    owned: OwnedStart,
+  ): Promise<RecoveryRepositoryResult<boolean>> {
+    // Lease renewals deliberately skip snapshot hydration. Refresh before
+    // deciding whether this stopped owner's most recent lease has expired.
+    const refreshed = await this.host.refresh();
+    const snapshot = this.host.getSnapshot();
+    const pending = snapshot.pendingStart;
+    if (pending === null || !ownsPendingStart(snapshot, owned)) return ok(false);
+    if (!refreshed.ok) {
+      this.scheduleReconciliation(pending, PENDING_START_OWNER_LEASE_MS);
+      return refreshed;
+    }
+    return this.reconcile();
+  }
+
+  private async retireCompletedIntent(
+    owned: OwnedStart,
+  ): Promise<RecoveryRepositoryResult<boolean>> {
+    const retired = await this.host.mutate('retire completed unarchived Start intent', (slots) =>
+      ownsPendingStart(slots, owned)
+        ? cancelPendingStartMutation(slots, owned.runId)
+        : { slots, value: false },
+    );
+    if (!retired.ok && this.completedIntent === owned && !this.abandoned) {
+      if (this.completionTimer !== null) clearTimeout(this.completionTimer);
+      this.completionTimer = setTimeout(() => {
+        this.completionTimer = null;
+        if (this.completedIntent === owned) void this.retireCompletedIntent(owned);
+      }, PENDING_START_LEASE_RENEWAL_MS);
+    }
+    return retired;
+  }
+
   async reconcile(): Promise<RecoveryRepositoryResult<boolean>> {
     const pending = this.host.getSnapshot().pendingStart;
     if (pending === null) return ok(false);
@@ -145,13 +222,16 @@ export class RecoveryStartHandoff {
       );
       return ok(false);
     }
-    return this.reconcileNow();
+    return this.reconcileAndWatch();
   }
 
   /** Stop renewing this window's lease and watching another window's: the
    * handoff closed, or its record was purged. */
   clearTimer(): void {
     this.stopRenewing();
+    this.completedIntent = null;
+    if (this.completionTimer !== null) clearTimeout(this.completionTimer);
+    this.completionTimer = null;
     if (this.reconcileTimer === null) return;
     clearTimeout(this.reconcileTimer);
     this.reconcileTimer = null;
@@ -166,8 +246,12 @@ export class RecoveryStartHandoff {
       this.reconcileTimer = null;
       void this.host.refresh().then((refreshed) => {
         const pending = this.host.getSnapshot().pendingStart;
-        if (!refreshed.ok || pending === null) return;
-        if (sameStartLease(pending, observed)) void this.reconcileNow();
+        if (!refreshed.ok) {
+          this.scheduleReconciliation(observed, PENDING_START_OWNER_LEASE_MS);
+          return;
+        }
+        if (pending === null) return;
+        if (sameStartLease(pending, observed)) void this.reconcileAndWatch();
         else this.scheduleReconciliation(pending, PENDING_START_OWNER_LEASE_MS);
       });
     }, delayMs);
@@ -177,18 +261,20 @@ export class RecoveryStartHandoff {
    * the archive. Every stop condition is local: a closed or purged handoff
    * clears the timer, and a renewal that finds the record no longer this
    * window's ends it. A failed write is simply retried on the next beat. */
-  private renewLeaseWhileOwned(owned: {
-    readonly runId: RunId;
-    readonly armedAtIso: string;
-  }): void {
+  private renewLeaseWhileOwned(owned: OwnedStart): void {
     if (this.abandoned) return;
     this.clearTimer();
+    this.renewalOwner = owned;
     let renewing = false;
     const timer = setInterval(() => {
       if (renewing) return;
       renewing = true;
       void this.host
-        .renewLease((slots) => renewPendingStartLeaseMutation(slots, owned, this.host.nowIso()))
+        .renewLease((slots) =>
+          this.renewalOwner === owned && slots.generation === owned.generation
+            ? renewPendingStartLeaseMutation(slots, owned, this.host.nowIso())
+            : { slots, value: false },
+        )
         .then(
           (renewed) => {
             if (!renewed && this.renewalTimer === timer) this.stopRenewing();
@@ -205,6 +291,23 @@ export class RecoveryStartHandoff {
   private stopRenewing(): void {
     if (this.renewalTimer !== null) clearInterval(this.renewalTimer);
     this.renewalTimer = null;
+    this.renewalOwner = null;
+  }
+
+  private async reconcileAndWatch(): Promise<RecoveryRepositoryResult<boolean>> {
+    const before = this.host.getSnapshot();
+    const pending = before.pendingStart;
+    if (pending === null) return ok(false);
+    const owned = {
+      runId: pending.runId,
+      armedAtIso: pending.armedAtIso,
+      generation: before.generation,
+    };
+    const result = await this.reconcileNow();
+    const after = this.host.getSnapshot();
+    if (after.pendingStart !== null && ownsPendingStart(after, owned))
+      this.scheduleReconciliation(after.pendingStart, PENDING_START_OWNER_LEASE_MS);
+    return result;
   }
 
   private async reconcileNow(): Promise<RecoveryRepositoryResult<boolean>> {

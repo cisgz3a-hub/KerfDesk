@@ -18,6 +18,7 @@ import { Cnc3DFullPage } from '../ui/workspace/Cnc3DFullPage';
 import { PlatformProvider } from '../ui/app/platform-context';
 import { useShortcuts } from '../ui/app/use-shortcuts';
 import { useUiStore } from '../ui/state/ui-store';
+import { UNLOADED_RECOVERY_SNAPSHOT } from '../ui/state/recovery/recovery-model';
 
 const mocks = vi.hoisted(() => ({ activate: vi.fn() }));
 vi.mock('../ui/laser/start-job-execution-tracking', async (load) => ({
@@ -223,7 +224,7 @@ describe('feature controller and workspace regressions', () => {
       machineKind: 'laser',
       laser: {},
       completedReceipt: null,
-      repository: {},
+      repository: { getSnapshot: () => UNLOADED_RECOVERY_SNAPSHOT },
       reviewedAtIso: new Date().toISOString(),
       reviewModel: {},
     };

@@ -11,6 +11,7 @@ export type SecondPassCanvasProps = {
   preview: SecondPassDrawing | null;
   device: DeviceProfile;
   strokes: LaserSecondPassSelection['strokes'];
+  selected: string | null;
   tool: SecondPassTool;
   radiusMm: number;
   powerScale: number;
@@ -66,6 +67,7 @@ export function SecondPassCanvas(props: SecondPassCanvasProps): JSX.Element {
       >
         <canvas ref={canvases.background} />
         <canvas ref={canvases.overlay} style={{ opacity: 0.48 }} />
+        <canvas ref={canvases.highlight} aria-label="Selected stroke outline" />
         {gesture.cursor && props.tool !== 'pan' && !props.showPreview && !props.disabled ? (
           <span
             className={`second-pass-brush ${props.tool === 'erase' ? 'is-eraser' : ''}`}

@@ -26,6 +26,10 @@ import {
 import { reportStartBlockers } from './start-blocker-invalidation';
 import type { FramedRunStartClaim } from './framed-run-start-claim';
 import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
+import {
+  observeFreshExecutionRetention,
+  type FreshExecutionRetention,
+} from './start-job-retained-execution';
 
 export type PreparedStartArgs = {
   readonly outputScope: OutputScope;
@@ -61,6 +65,7 @@ export async function transmitPreparedStart(input: {
     input.runId,
     input.args.outputScope,
   );
+  const retention = observeFreshExecutionRetention(input.runId, input.args.repository);
   let startAccepted = false;
   try {
     // startJob repeats this synchronous gate after its final await and
@@ -75,7 +80,7 @@ export async function transmitPreparedStart(input: {
     // ADR-337: the archive is built and stored only now, off the path between
     // Start and motion. The handoff armed before the wire already carries the
     // operator-facing truth if this never completes.
-    await archiveAcceptedFreshRun(input.args, input.runId);
+    await archiveAcceptedFreshRun(input.args, input.runId, retention);
     return true;
   } catch (error) {
     if (!startAccepted) advancement.cancel();
@@ -83,7 +88,7 @@ export async function transmitPreparedStart(input: {
       // A rejected write can still have delivered a prefix. The pending intent
       // belongs to this attempted program until its exact archive takes over.
       handoffArmed = false;
-      await archiveAcceptedFreshRun(input.args, input.runId);
+      await archiveAcceptedFreshRun(input.args, input.runId, retention);
       await input.args.repository.interruptRun(input.runId, error.ackedLines, {
         kind: 'write-failed',
         message: error.message,
@@ -102,6 +107,8 @@ export async function transmitPreparedStart(input: {
     reportStartBlockers([message]);
     jobAwareAlert(`Could not start job:\n\n${message}`);
     return false;
+  } finally {
+    retention.stop();
   }
 }
 
@@ -113,6 +120,7 @@ export async function transmitPreparedStart(input: {
 async function archiveAcceptedFreshRun(
   args: PreparedStartArgs,
   runId: ReturnType<typeof createRunId>,
+  retention: FreshExecutionRetention,
 ): Promise<void> {
   const staged = await stageFreshExecutionArtifact({
     runId,
@@ -134,8 +142,8 @@ async function archiveAcceptedFreshRun(
   });
   // A painted second pass is not the project's own program, so a record of it
   // could never be continued from the project (ADR-341 Amendment 8).
-  const untracked =
-    staged || args.prepared.laserSecondPassChain !== undefined
+  const untracked = () =>
+    args.prepared.laserSecondPassChain !== undefined
       ? undefined
       : untrackedLaserRunRecord({
           runId,
@@ -145,7 +153,14 @@ async function archiveAcceptedFreshRun(
           jobOrigin: args.prepared.jobOrigin,
           laser: args.laser,
         });
-  await activateAcceptedFreshRun(runId, staged, args.repository, untracked);
+  await activateAcceptedFreshRun(
+    runId,
+    staged,
+    args.repository,
+    retention,
+    args.prepared,
+    untracked,
+  );
 }
 
 function preparedStartOptions(

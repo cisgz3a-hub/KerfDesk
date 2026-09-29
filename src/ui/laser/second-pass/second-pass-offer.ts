@@ -1,6 +1,3 @@
-import type { ControllerKind } from '../../../core/devices';
-import { laserSecondPassSupportsController } from '../../../core/laser-second-pass/source-family';
-import type { MachineKind } from '../../../core/scene';
 import type { LaserState } from '../../state/laser-store';
 import {
   selectCompletedUnarchivedRun,
@@ -12,21 +9,12 @@ import type {
   RecoveryRepositorySnapshot,
 } from '../../state/recovery';
 import { useRecoveryRepositorySelection } from '../../state/use-recovery-repository';
+import { secondPassProjectEligible } from './second-pass-eligibility';
 
 /** Only a flat laser run whose program the transformer can read is offered;
  * a CNC, Marlin or Smoothieware completion would lead straight to a refusal. */
 export function secondPassOfferable(artifact: ExecutionArtifactV1): boolean {
-  return secondPassOfferableFor(
-    artifact.machineKind,
-    artifact.prepared.project.device.controllerKind,
-  );
-}
-
-export function secondPassOfferableFor(
-  machineKind: MachineKind,
-  controllerKind: ControllerKind | undefined,
-): boolean {
-  return machineKind === 'laser' && laserSecondPassSupportsController(controllerKind);
+  return artifact.machineKind === 'laser' && secondPassProjectEligible(artifact.prepared.project);
 }
 
 /** The job that just finished, when a second pass can be offered for it: the

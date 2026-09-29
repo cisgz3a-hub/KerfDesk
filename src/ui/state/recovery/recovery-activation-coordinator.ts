@@ -27,18 +27,24 @@ export class RecoveryActivationCoordinator {
     },
   ) {}
 
-  async fresh(runId: RunId, acceptedAtIso: string): Promise<RecoveryRepositoryResult<boolean>> {
+  async fresh(
+    runId: RunId,
+    acceptedAtIso: string,
+    stillCurrent?: (slots: PersistedRecoverySlots) => boolean,
+  ): Promise<RecoveryRepositoryResult<boolean>> {
     const record = await this.options.artifactStore.exact(runId);
     if (!record.ok) return record;
     const activated = await this.options.mutate(
       'activate job recovery tracking',
       (slots) =>
-        activateFreshRunMutation(
-          slots,
-          record.value.artifact as ExecutionArtifactV1,
-          record.value.generation,
-          acceptedAtIso,
-        ),
+        stillCurrent !== undefined && !stillCurrent(slots)
+          ? { slots, value: false }
+          : activateFreshRunMutation(
+              slots,
+              record.value.artifact as ExecutionArtifactV1,
+              record.value.generation,
+              acceptedAtIso,
+            ),
       [record.value],
       runId,
     );
