@@ -100,6 +100,11 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
     LightBurn shows on opening (`ShowOnLoad="1"`) adds a report line saying where to read them.
     Before, the notes were dropped and the toast sent the rest of a long report to an "import
     report" nothing showed.
+13. **Tool layers.** LightBurn's tool layers T1 and T2 (`CutIndex` 30 and 31, cut settings of
+    type `Tool`) hold guides and registration shapes that LightBurn never cuts. Their shapes open
+    on an operation with Output off, named "LightBurn T1" / "LightBurn T2" unless the file names
+    them, and the report says why, so they show for alignment and are not cut. Before, they opened
+    as ordinary operations ("LightBurn C30") and were cut.
 
 ### Limits
 
@@ -133,6 +138,8 @@ and the thumbnail LightBurn embeds in each file, which is its own drawing of the
   overcut and tabs have KerfDesk equivalents (ADR-415, ADR-494) but are named rather than mapped:
   their LightBurn behaviour was not compared here, and KerfDesk's perforation deliberately differs
   at a closed shape's seam.
+- Tool layers rest on two third-party converters: one gives their indexes, 30 and 31, and says
+  they never output; the other reads their type, `Tool`. The corpus has none.
 - No corpus file has a rounded `Rect`, a `LineClosed` or `LineOpen` list, or a legacy `.lbrn`
   path. Decision 5 follows the audit's repro files and LightBurn files published with
   third-party converters (a LightBurn 1.7 text outline written as `LineClosed`, `Cr` written on
@@ -169,4 +176,5 @@ library); `lbrn-shape-report.test.ts` (each kind of shape left out is named with
 shapes with no geometry are counted); `project-open-completion-lightburn.test.ts` (a left-out
 shape is named when the project opens and counted once, and the toast says where the rest of a
 long report is); `lbrn-notes.test.ts` (LightBurn's notes, the report beneath them, and the line for
-notes LightBurn shows on opening).
+notes LightBurn shows on opening); `lbrn-tool-layers.test.ts` (T1 and T2, by index and by type,
+open with Output off and stay out of the job).

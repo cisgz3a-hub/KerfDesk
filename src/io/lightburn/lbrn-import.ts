@@ -28,6 +28,8 @@ const LIGHTBURN_LAYER_KINDS: ReadonlyMap<string, LayerKind> = new Map([
   ['scan', 'fill'],
   ['scan+cut', 'fill+line'],
 ]);
+// LightBurn's tool layers, T1 and T2, hold guides it never cuts (ADR-388).
+const TOOL_LAYER_INDEXES: ReadonlySet<number> = new Set([30, 31]);
 
 export type LbrnImportReport = {
   readonly sourceName: string;
@@ -221,10 +223,14 @@ function importedLayer(
   const index = findColorIndex(color);
   const setting = settings.get(index);
   const importedName = setting === undefined ? '' : textField(setting, ['name', 'label']).trim();
-  const name =
-    importedName ||
-    (index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`);
+  const name = importedName || defaultLayerName(index, color);
   const base = createLayer({ id: color, name, color });
+  if (isToolLayer(index, setting)) {
+    warnings.push(
+      `${name}: a LightBurn tool layer, which LightBurn never cuts, so it opened with Output off.`,
+    );
+    return { layer: { ...base, output: false }, outline: null };
+  }
   if (setting === undefined) return { layer: base, outline: null };
   const kind = lightBurnLayerKind(setting, name, warnings);
   warnings.push(...lightBurnSettingsNotImported(setting, name, kind));
@@ -240,6 +246,19 @@ function importedLayer(
     layer: { ...fill, ...importedScanSettings(setting, name, warnings) },
     outline: kind === 'fill+line' ? line() : null,
   };
+}
+
+function defaultLayerName(index: number, color: string): string {
+  if (TOOL_LAYER_INDEXES.has(index)) return `LightBurn T${index - 29}`;
+  return index >= 0 ? `LightBurn C${index.toString().padStart(2, '0')}` : `Imported ${color}`;
+}
+
+// T1 and T2 are CutIndex 30 and 31, and their cut settings are of type "Tool".
+function isToolLayer(index: number, setting: Element | undefined): boolean {
+  if (TOOL_LAYER_INDEXES.has(index)) return true;
+  return (
+    setting !== undefined && textField(setting, ['type', 'mode']).trim().toLowerCase() === 'tool'
+  );
 }
 
 // A setting without a type keeps LightBurn's default mode, Line. A type
