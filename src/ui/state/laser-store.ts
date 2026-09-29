@@ -120,7 +120,9 @@ export type LaserState = LaserStoreActions &
     readonly alarmCode: number | null;
     // The firmware printed "Reset to continue" after a critical event: only a
     // soft reset is accepted until the reboot banner (controller-reset-required.ts).
-    readonly resetRequired?: boolean;
+    // 'homing-state': stock GRBL stays in its homing state after refusing a
+    // `$HX`; the banner offers the same reset and nothing is held (audit A-7).
+    readonly resetRequired?: boolean | 'homing-state';
     readonly lastError: number | null;
     readonly lastWriteError: string | null;
     // Operator-requested coolant/air state for the manual jog-panel control.

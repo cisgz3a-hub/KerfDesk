@@ -45,6 +45,7 @@ function reduceStockLine(state: GrblSimState, line: string, opts: GrblSimOptions
   const reject = opts.rejectLines.find((rule) => rule.pattern.test(line));
   if (reject !== undefined) return { state, effects: [emit(`error:${reject.errorCode}`, opts)] };
   if (line === '') return { state, effects: [emit('ok', opts)] };
+  if (state.homingStuck === true) return reduceStuckHomingLine(state, line, opts);
   if (line.startsWith('$')) return reduceDollarLine(state, line, opts);
   if (state.locked || state.machine === 'Jog') {
     return { state, effects: [emit(`error:${STATUS_SYSTEM_GC_LOCK}`, opts)] };
@@ -113,6 +114,7 @@ function reduceDollarControl(
     const next: GrblSimState = { ...state, machine: 'Home', pendingMotions: 0 };
     return { state: next, effects: [schedule({ kind: 'homing-finished' }, opts.homingMs, next)] };
   }
+  if (opts.firmware === 'grbl' && line.startsWith('$H')) return refuseHomeSuffix(state, opts);
   if (line === '$X') {
     return {
       state: {
@@ -130,6 +132,38 @@ function reduceDollarControl(
     };
   }
   return null;
+}
+
+// Stock GRBL takes `$H` only in Idle or Alarm, checks `$22`, and enters its
+// homing state before it reads a suffix. Built without
+// HOMING_SINGLE_AXIS_COMMANDS (the default) it answers any suffix with error:3
+// and nothing restores the state (system.c:173-194, config.h:124).
+function refuseHomeSuffix(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
+  if (state.machine !== 'Idle' && state.machine !== 'Alarm') {
+    return { state, effects: [emit('error:8', opts)] };
+  }
+  if (state.settings.get(22) !== '1') return { state, effects: [emit('error:5', opts)] };
+  return {
+    state: { ...state, machine: 'Home', locked: false, homingStuck: true },
+    effects: [emit('error:3', opts)],
+  };
+}
+
+// In the homing state a refused `$H` suffix left, no cycle runs but the main
+// loop reads lines: `$$` and `$G` answer, `$X` unlocks only an Alarm and
+// otherwise answers ok, and every `$` command that needs Idle or Alarm (`$H`,
+// `$J=`, `$#`, `$I`, `$SLP`, setting writes) answers error:8 (system.c:130-173).
+// G-code is accepted, but cycle start runs only from Idle or a completed hold
+// (protocol.c:346), so nothing moves; the blocks it would queue are not modelled.
+function reduceStuckHomingLine(
+  state: GrblSimState,
+  line: string,
+  opts: GrblSimOptions,
+): GrblSimReaction {
+  const query = line === '$$' || line === '$G' ? reduceDollarQuery(state, line, opts) : null;
+  if (query !== null) return query;
+  if (line === '$X' || !line.startsWith('$')) return { state, effects: [emit('ok', opts)] };
+  return { state, effects: [emit('error:8', opts)] };
 }
 
 function reduceDollarQuery(

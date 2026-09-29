@@ -46,6 +46,11 @@ export type GrblSimState = {
   readonly overrides: GrblSimOverrides;
   /** A door input held open: the door state reports Door:1 and refuses cycle start. */
   readonly doorAjar?: boolean;
+  /** Stock GRBL left in its homing state by a refused `$H` suffix: no cycle
+   *  runs, yet it reports Home and reads lines until a reset (grbl-sim-lines.ts). */
+  readonly homingStuck?: boolean;
+  /** A `?` the homing loop left unanswered; the end of the cycle serves it. */
+  readonly homingStatusPending?: boolean;
 };
 
 export type GrblSimTimedEvent =

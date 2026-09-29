@@ -30,6 +30,14 @@
 //    (protocol.c:167-174) and FluidNC (Protocol.cpp:1158) do.
 //  * The planner holds 15 usable blocks (grbl-sim-planner.ts) and the RX ring
 //    128 bytes (grbl-sim-rx-window.ts); every byte above 0x7F is realtime.
+//  * A `?` during a homing cycle is answered once, when the cycle ends: the
+//    realtime check after it runs while the state is still Home, before the
+//    `$H` ok (motion_control.c:239; grblHAL motion_control.c:960).
+//  * `$H` with a suffix (`$HX`): stock GRBL enters its homing state before it
+//    reads the suffix, answers error:3 without HOMING_SINGLE_AXIS_COMMANDS (off
+//    by default) and stays there, reporting Home and reading lines, until a
+//    reset (system.c:182-194; grbl-sim-lines.ts).
+//  * A reset in the homing state raises ALARM:6 (motion_control.c:380-384).
 // `firmware: 'grblhal'` adds grblHAL behaviour: status reports in a critical
 // alarm (and while homing with `reportWhenHoming`, off by default:
 // machine_limits.c:336-337, :445-447), `$X`/`$H` answered error:79 in a
@@ -42,8 +50,8 @@
 //  * A feed hold or door completes at once (no Hold:1 / Door:2 deceleration,
 //    no Door:3 restore delays), `!` in Jog holds instead of cancelling the jog,
 //    `!` from Idle is ignored, and M3-M9 do not wait for the planner to drain.
-//  * A reset during homing raises ALARM:3 rather than ALARM:6.
-//  * `$$`, `$I`, `$#` and `$G` are answered immediately in every state.
+//  * `$$`, `$I`, `$#` and `$G` are answered immediately in every state but the
+//    homing state a refused `$H` suffix leaves.
 //  * Motion position is applied at command time; state stays Run/Jog until the
 //    scheduled motion-finished event, then reports Idle.
 //  * Boot is unlocked by default (vendor-typical); `homingInitLock` boots
@@ -141,6 +149,7 @@ export function reduceGrblSim(
 export function grblSimParsesLines(state: GrblSimState, opts: GrblSimOptions): boolean {
   if (state.pendingLine !== null) return false;
   if (state.critical) return opts.firmware === 'grblhal';
+  if (state.homingStuck === true) return true;
   return !LINE_BLOCKING_STATES.has(state.machine);
 }
 
@@ -194,16 +203,18 @@ function continueSyncedLine(state: GrblSimState): GrblSimReaction {
 
 function reduceHomingFinished(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
   if (state.machine !== 'Home') return { state, effects: [] };
+  const homed: GrblSimState = {
+    ...state,
+    mpos: SIM_ZERO_VEC3,
+    pendingMotions: 0,
+    homingStatusPending: false,
+  };
+  // A `?` from the cycle is answered here, still as Home, before the ok.
+  const pendingReport =
+    state.homingStatusPending === true ? [emit(statusReportLine(homed), opts)] : [];
   return {
-    state: {
-      ...state,
-      machine: 'Idle',
-      locked: false,
-      isHomed: true,
-      mpos: SIM_ZERO_VEC3,
-      pendingMotions: 0,
-    },
-    effects: [emit('ok', opts)],
+    state: { ...homed, machine: 'Idle', locked: false, isHomed: true },
+    effects: [...pendingReport, emit('ok', opts)],
   };
 }
 
@@ -218,6 +229,8 @@ function reduceAlarm(state: GrblSimState, code: number, opts: GrblSimOptions): G
       pendingMotions: 0,
       pendingLine: null,
       resetEpoch: state.resetEpoch + 1,
+      homingStuck: false,
+      homingStatusPending: false,
     },
     effects: [
       emit(`ALARM:${code}`, opts),
@@ -229,10 +242,7 @@ function reduceAlarm(state: GrblSimState, code: number, opts: GrblSimOptions): G
 function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions): GrblSimReaction {
   switch (byte) {
     case '?':
-      return {
-        state,
-        effects: reportsStatus(state, opts) ? [emit(statusReportLine(state), opts)] : [],
-      };
+      return reduceStatusQuery(state, opts);
     case '!': {
       const holds = state.machine === 'Run' || state.machine === 'Jog';
       return { state: holds ? { ...state, machine: 'Hold' } : state, effects: [] };
@@ -255,13 +265,25 @@ function reduceRealtime(state: GrblSimState, byte: string, opts: GrblSimOptions)
   }
 }
 
+function reduceStatusQuery(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
+  if (reportsStatus(state, opts)) return { state, effects: [emit(statusReportLine(state), opts)] };
+  // The request a homing loop leaves unanswered waits for the cycle's end.
+  if (state.machine === 'Home') {
+    return { state: { ...state, homingStatusPending: true }, effects: [] };
+  }
+  return { state, effects: [] };
+}
+
 // Stock GRBL answers no status query while homing (limits.c:320 "No time to run
 // protocol_execute_realtime() in this loop") or in the critical-alarm loop.
 // grblHAL answers in a critical alarm, and while homing only with "report when
-// homing" on (machine_limits.c:336-337, :445-447).
+// homing" on (machine_limits.c:336-337, :445-447). In the homing state a
+// refused `$H` suffix left, no cycle runs and the main loop answers.
 function reportsStatus(state: GrblSimState, opts: GrblSimOptions): boolean {
   const grblHal = opts.firmware === 'grblhal';
-  if (state.machine === 'Home') return grblHal && opts.reportWhenHoming === true;
+  if (state.machine === 'Home') {
+    return state.homingStuck === true || (grblHal && opts.reportWhenHoming === true);
+  }
   return grblHal || !state.critical;
 }
 
@@ -316,6 +338,8 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     lastError: null,
     resetEpoch: state.resetEpoch + 1,
     overrides: GRBL_SIM_BASELINE_OVERRIDES,
+    homingStuck: false,
+    homingStatusPending: false,
   };
   if (wasMoving && opts.alarmOnResetDuringMotion) {
     // Firmware order: protocol_exec_rt_system reports the abort alarm, then
@@ -323,7 +347,7 @@ function reduceSoftReset(state: GrblSimState, opts: GrblSimOptions): GrblSimReac
     // state is Alarm, protocol_main_loop adds the unlock message. Emitting the
     // banner first hid a store bug where the banner erased ALARM:3.
     const effects: GrblSimEffect[] = [
-      emit('ALARM:3', opts),
+      emit(state.machine === 'Home' ? 'ALARM:6' : 'ALARM:3', opts),
       emit(opts.firmwareBanner, opts),
       emit(UNLOCK_MESSAGE, opts),
     ];

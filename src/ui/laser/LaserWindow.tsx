@@ -58,7 +58,7 @@ export function LaserWindow({
   const machineOperationBusy = machineBusy(autofocusBusy, motionOperation, controllerOperation);
   // H6: mid-job jog acks corrupt RX accounting, so gate them like Home/Frame/Start.
   const jogBlocked = useJogBlocked();
-  const controllerDisplay = controllerDisplayState(controllerState, alarmCode);
+  const controllerDisplay = controllerDisplayState(controllerState, alarmCode, control);
   const connected = connection.kind === 'connected';
   const jogPadDisabled = isJogPadDisabled(
     connected,
@@ -160,7 +160,7 @@ function useControllerActions(): {
   readonly wakeController: ReturnType<typeof useLaserStore.getState>['wakeController'];
   readonly canUnlock: boolean;
   readonly homeFromAlarm: boolean;
-  readonly resetRequired: boolean;
+  readonly resetRequired: boolean | 'homing-state';
   // Banner click handlers: a refusal becomes a toast instead of silence.
   readonly runHome: () => void;
   readonly runUnlock: () => void;
@@ -178,7 +178,7 @@ function useControllerActions(): {
     wakeController,
     canUnlock: useLaserStore((s) => s.capabilities.unlock),
     homeFromAlarm: useLaserStore((s) => s.capabilities.homeFromAlarm !== false),
-    resetRequired: useLaserStore((s) => s.resetRequired === true),
+    resetRequired: useLaserStore((s) => s.resetRequired ?? false),
     runHome: () => void home().catch(controllerActionFailureHandler('Home')),
     runUnlock: () => void unlockAlarm().catch(controllerActionFailureHandler('Unlock')),
     runWake: () => void wakeController().catch(controllerActionFailureHandler('Wake')),
@@ -233,12 +233,16 @@ function hasAlarmRecovery(code: number | null, state: GrblState | null): boolean
 function controllerDisplayState(
   state: GrblState | null,
   alarmCode: number | null,
+  control: { readonly resetRequired: boolean | 'homing-state' },
 ): { readonly idle: boolean; readonly sleep: boolean; readonly showAlarmBanner: boolean } {
   const sleep = state === 'Sleep';
+  // Stock GRBL stuck in its homing state reports Home, not Alarm, but needs the
+  // Reset this banner offers (controller audit A-7, ADR-375).
+  const homingState = control.resetRequired === 'homing-state';
   return {
     idle: state === 'Idle',
     sleep,
-    showAlarmBanner: !sleep && hasAlarmRecovery(alarmCode, state),
+    showAlarmBanner: !sleep && (hasAlarmRecovery(alarmCode, state) || homingState),
   };
 }
 

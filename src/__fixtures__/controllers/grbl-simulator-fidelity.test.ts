@@ -161,7 +161,10 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     expect(sim.state().machine).toBe('Alarm');
   });
 
-  it('answers no status query while homing and parses nothing until homing ends (limits.c:320)', async () => {
+  // The `?` is not lost: the realtime check after the cycle answers it, still as
+  // Home, before the `$H` ok (motion_control.c:239). The simulator used to drop
+  // it (controller audit A-7, ADR-375).
+  it('answers a status query during homing only when the cycle ends, and parses nothing until then (limits.c:320)', async () => {
     const { conn, lines } = await openSim({ homingMs: 500 });
     await conn.write('$H\nG0 X1\n');
     await pump(50);
@@ -169,7 +172,42 @@ describe('GRBL simulator fidelity against GRBL 1.1h (audit ST-2)', () => {
     await pump(50);
     expect(lines).toEqual([]);
     await pump(500);
-    expect(lines).toEqual(['ok', 'ok']);
+    expect(lines).toEqual([
+      '<Home|MPos:0.000,0.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>',
+      'ok',
+      'ok',
+    ]);
+  });
+
+  it('stays in its homing state after refusing a `$HX` until a reset (system.c:182-194)', async () => {
+    const { sim, conn, lines } = await openSim();
+    await conn.write('G0 X5\n');
+    await pump(50);
+    lines.length = 0;
+    await conn.write('$HX\n');
+    await pump(5);
+    expect(lines).toEqual(['error:3']);
+    lines.length = 0;
+    // `$H` and `$J=` need Idle or Alarm (system.c:132, :173); `$X` unlocks only
+    // an Alarm (system.c:160-167); G-code is taken but no cycle starts outside
+    // Idle (protocol.c:346).
+    await conn.write('?');
+    await conn.write('$H\n$J=G91 X1 F100\n$X\nG0 X9\n');
+    await pump(50);
+    expect(lines).toEqual([
+      '<Home|MPos:5.000,0.000,0.000|FS:0,0|WCO:0.000,0.000,0.000>',
+      'error:8',
+      'error:8',
+      'ok',
+      'ok',
+    ]);
+    expect(sim.state().mpos.x).toBe(5);
+    lines.length = 0;
+    // A reset in the homing state is ALARM:6 (motion_control.c:380-384).
+    await conn.write('\x18');
+    await pump(5);
+    expect(lines).toEqual(['ALARM:6', "Grbl 1.1f ['$' for help]", "[MSG:'$H'|'$X' to unlock]"]);
+    expect(sim.state()).toMatchObject({ machine: 'Alarm', homingStuck: false });
   });
 
   it('takes every byte above 0x7F off the stream as a realtime command (serial.c:150-196)', async () => {
