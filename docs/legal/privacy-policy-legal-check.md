@@ -72,13 +72,41 @@ purchases), is checked separately; notes for it are in section 5.
 
 ## 4. Facts to confirm before the page goes live
 
-1. Cloudflare, Inc. and Google LLC are active participants in the EU-U.S. Data Privacy Framework
-   with the UK Extension (https://www.dataprivacyframework.gov/list). The policy says so.
-2. Cloudflare's data processing terms include the EU standard contractual clauses. The policy says
-   so.
+Another cloud session checked items 1, 2 and 4 on 29 September 2026 at about 15:35 UTC, from the
+companies' published terms and KerfDesk's code.
+
+1. **Data Privacy Framework: stated by both companies; the list entries are still to see.** Google's
+   "Data transfer frameworks" page (effective 23 August 2025,
+   https://policies.google.com/privacy/frameworks) says Google LLC and its wholly owned US
+   subsidiaries have certified under the EU-U.S. DPF, its UK Extension and the Swiss-U.S. DPF.
+   Cloudflare's privacy policy (effective 4 November 2025, https://www.cloudflare.com/privacypolicy/)
+   says Cloudflare, Inc. has certified under the same three. The official list
+   (https://www.dataprivacyframework.gov/list) only works in a browser with JavaScript, which the
+   cloud sessions cannot reach, so someone should search both names there and see "Active" before
+   the page goes live.
+2. **Cloudflare's standard contractual clauses: confirmed.** Cloudflare's customer data processing
+   addendum (version 6.4, effective 3 April 2026, https://www.cloudflare.com/cloudflare-customer-dpa/)
+   is part of the Self-Serve Subscription Agreement (§6.1, https://www.cloudflare.com/terms/), so it
+   covers a free or self-serve account. Its §6.2 applies the EU standard contractual clauses
+   (Modules Two and Three) to restricted transfers, with the UK Addendum for UK transfers and Swiss
+   references for Swiss ones. Its §6.4 says transfers made under the DPF are not restricted
+   transfers, so the DPF is Cloudflare's main safeguard and the clauses cover the rest. The policy
+   names the DPF first and the clauses, now with the UK addendum, as an addition, which matches.
 3. Cloudflare keeps connection details only as long as it needs them to deliver and protect the
    service, and its dashboard for this account shows only overall totals and security events. The
-   policy says both.
+   policy says both. Not yet checked: it needs the owner's Cloudflare dashboard.
+4. **Cookies.** KerfDesk's own code and configuration set none (checked on main at 2fd39bf46: no
+   `Set-Cookie` in `public/_headers`, no Pages Functions or middleware, no `document.cookie` in the
+   app). Cloudflare adds cookies of its own only when a zone feature is on: `__cf_bm` (bot
+   protection), `cf_clearance` (challenges), `_cfuvid` (rate limiting rules), `__cflb` (load
+   balancer), `__cfwaitingroom` (waiting room), and `cf_ob_info` and `cf_use_ob` (Always Online).
+   Cloudflare calls all of them strictly necessary
+   (https://developers.cloudflare.com/fundamentals/reference/policies-compliances/cloudflare-cookies/).
+   The policy's security cookie sentence covers the first two. If the zone's bot, rate limiting,
+   load balancing, waiting room or Always Online settings show another of them switched on, widen
+   that sentence. `curl -sI https://kerfdesk.com/` from an ordinary connection shows what a visitor
+   gets. Once payments are on, the checkout page loads Paddle.js, which the licensing and purchases
+   part covers.
 
 ## 5. Notes for the licensing and purchases notice (checked separately, not edited here)
 

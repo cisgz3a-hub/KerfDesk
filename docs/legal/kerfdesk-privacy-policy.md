@@ -102,7 +102,7 @@ information in many countries. Both take part in the EU-U.S. Data Privacy Framew
 extension, which the European Commission and the UK government recognise as protecting information
 sent to the United States (https://www.dataprivacyframework.gov). Cloudflare also handles our
 information under data processing terms that include the European Commission's standard
-contractual clauses. You can ask us for a copy of those terms.
+contractual clauses and the UK's addendum to them. You can ask us for a copy of those terms.
 
 ## Tracking signals and children
 
