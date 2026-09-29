@@ -27,11 +27,13 @@ import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
 import {
+  hasUnsettledStreamAcks,
   isActiveJob,
   MPG_ACTIVE_COMMAND_MESSAGE,
   pushLog,
   streamerCanPauseForMpg,
 } from './laser-store-helpers';
+import { HOMING_STATE_RESET_MESSAGE, reportsStuckHomingState } from './controller-reset-required';
 import { resumeJogSettlementAfterMpg } from './laser-motion-operation';
 import { releaseAbandonedMotionAtIdle } from './laser-motion-release';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
@@ -237,11 +239,30 @@ function observeStatusConsumers(
 function nonAlarmReportPatch(
   state: LaserState,
   report: StatusReport,
-): Partial<Pick<LaserState, 'controllerOperation' | 'alarmCode'>> {
+): Partial<Pick<LaserState, 'controllerOperation' | 'alarmCode' | 'resetRequired' | 'log'>> {
   return {
     ...homeAlarmReplyWindowPatch(state, report),
     ...(state.alarmCode === null ? {} : { alarmCode: null }),
+    ...homingStateResetPatch(state, report),
   };
+}
+
+// Stock GRBL left in its homing state by a refused `$HX` needs a soft reset,
+// which the Alarm banner offers; a report of another state ends the offer
+// (controller-reset-required.ts; controller audit A-7, ADR-375).
+function homingStateResetPatch(
+  state: LaserState,
+  report: StatusReport,
+): Partial<Pick<LaserState, 'resetRequired' | 'log'>> {
+  if (reportsStuckHomingState(state, report, hasUnsettledStreamAcks(state.streamer))) {
+    if (state.resetRequired === true || state.resetRequired === 'homing-state') return {};
+    return {
+      resetRequired: 'homing-state',
+      log: pushLog(state, `[lf2] ${HOMING_STATE_RESET_MESSAGE}`),
+    };
+  }
+  const ended = state.resetRequired === 'homing-state' && report.state !== 'Home';
+  return ended ? { resetRequired: false } : {};
 }
 
 function isInvalidatingStatusState(state: string): boolean {

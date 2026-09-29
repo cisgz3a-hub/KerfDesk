@@ -159,6 +159,26 @@ describe('buildSuperConsoleSettingsDiagnostics', () => {
     expect(diagnostics.find((item) => item.id === 130)?.note).toContain('can legitimately differ');
   });
 
+  // grblHAL $22 is a bitfield whose bit 0 is "Enable" (grblHAL core
+  // settings.c#L2385, #L473), so `$22=5` is homing enabled; only that bit
+  // compares with the profile's homing setting (ADR-375).
+  it('compares only the Enable bit of a grblHAL $22 bitfield with the profile homing', () => {
+    const homing = (enabled: boolean, value: string) =>
+      buildSuperConsoleSettingsDiagnostics(
+        { ...DEFAULT_DEVICE_PROFILE, homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled } },
+        rows({ 22: value }),
+      ).find((item) => item.id === 22);
+
+    expect(homing(true, '5')).toMatchObject({
+      current: '5',
+      status: 'same-as-reference',
+      reference: '1',
+    });
+    expect(homing(false, '4')).toMatchObject({ status: 'same-as-reference', reference: '0' });
+    expect(homing(true, '4')).toMatchObject({ status: 'different-from-reference' });
+    expect(homing(true, '-1')).toMatchObject({ status: 'not-comparable' });
+  });
+
   it('marks non-numeric values as not comparable instead of treating them as matches', () => {
     const diagnostics = buildSuperConsoleSettingsDiagnostics(
       DEFAULT_DEVICE_PROFILE,

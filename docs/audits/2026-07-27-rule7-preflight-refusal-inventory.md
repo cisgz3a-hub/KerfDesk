@@ -226,7 +226,7 @@ validation"* — **UNCHANGED (non-Start)**, explicitly inventoried and deliberat
 | 7 | `grbl-setting-write.ts:50-54` | `typedCommand !== command` for machine-critical | `$`-write | accepted |
 | 8 | `grbl-setting-write.ts:56` | fallthrough "not writable by the guarded writer" | `$`-write | accepted |
 | 9 | `grbl-settings-actions.ts:347-349` | `statusReport?.state !== 'Idle'` | `$`-write | **(a) TRANSPORT** |
-| 10 | `grbl-settings-actions.ts:350-358` | no backup / unknown row / machine-kind `$32` | `$`-write | accepted (duplicates #2, #3, #5 in the UI lane) |
+| 10 | `grbl-settings-actions.ts:350-358` | no settings read / unknown row / machine-kind `$32` | `$`-write | accepted (duplicates #3 and #5 in the UI lane). Corrected 2026-09-29 (controller audit C-8, ADR-375): this lane, now `machine-settings-write-readiness.ts`, checks only that settings were read in the connection, not #2's fresh backup. Export records nothing, and `buildGrblSettingWrite` (#1-#8) has no production caller. |
 | 11 | `laser-console-actions.ts:209-219` | `grblSettingCommandMachineKindIssue(...)`; non-`grbl-dollar` driver | console `$`-write | accepted (§5, both items) |
 
 **The `$32` rule covers both lanes.** A laser project cannot write `$32=0` from Machine Settings

@@ -6,10 +6,15 @@
 // would go unanswered, fail with error:79, or unlock nothing (controller audit
 // 2026-09-25 GP-2, HF-2, HF-3; ADR-393). After the reset the controller comes
 // back locked in Alarm and the ordinary Home / Unlock offer returns.
+//
+// Stock GRBL that refused a single-axis Home (`$HX`, error:3) stays in its
+// homing state and reports Home, not Alarm, until a reset; the banner offers
+// the same Reset for it (controller-reset-required.ts; controller audit A-7,
+// ADR-375).
 
 import { presentAlarm } from '../../core/controllers/grbl/response-presentation';
 import type { ControllerKind } from '../../core/devices';
-import { RESET_REQUIRED_MESSAGE } from '../state/controller-reset-required';
+import { resetOfferMessage } from '../state/controller-reset-required';
 import { AlarmRecoveryActions } from './AlarmRecoveryActions';
 import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 
@@ -19,30 +24,29 @@ export function AlarmBanner(props: {
   readonly homingEnabled: boolean;
   readonly homeFromAlarm: boolean;
   readonly canUnlock: boolean;
-  readonly resetRequired: boolean;
+  readonly resetRequired: boolean | 'homing-state';
   readonly onHome: () => void;
   readonly onConfigureHoming: () => void;
   readonly onUnlock: () => void;
   readonly onReset: () => void;
 }): JSX.Element {
   const alarm = props.code === null ? null : presentAlarm(props.controllerKind, props.code);
-  const alarmAction = props.resetRequired
-    ? RESET_REQUIRED_MESSAGE
-    : alarmRecoveryAction(props.controllerKind, props.code, alarm?.action);
+  const resetOffer = resetOfferMessage(props.resetRequired);
+  const alarmAction =
+    resetOffer ?? alarmRecoveryAction(props.controllerKind, props.code, alarm?.action);
+  const homingState = props.code === null && props.resetRequired === 'homing-state';
   return (
     <div style={alarmStyle} role="alert">
-      <strong>
-        {props.code === null
-          ? 'Controller reports Alarm'
-          : `Alarm ${props.code}: ${alarm?.title ?? 'unknown'}`}
-      </strong>
-      <p style={alarmDetailStyle}>
-        {props.code === null
-          ? 'GRBL has locked jog, frame, and start until the machine is homed or unlocked.'
-          : (alarm?.detail ?? '')}
-      </p>
+      <strong>{alarmTitle(props.code, alarm?.title, homingState)}</strong>
+      {!homingState && (
+        <p style={alarmDetailStyle}>
+          {props.code === null
+            ? 'GRBL has locked jog, frame, and start until the machine is homed or unlocked.'
+            : (alarm?.detail ?? '')}
+        </p>
+      )}
       {alarmAction !== undefined && <p style={alarmDetailStyle}>{alarmAction}</p>}
-      {props.resetRequired ? (
+      {resetOffer !== null ? (
         <button
           type="button"
           onClick={props.onReset}
@@ -62,6 +66,11 @@ export function AlarmBanner(props: {
       )}
     </div>
   );
+}
+
+function alarmTitle(code: number | null, title: string | undefined, homingState: boolean): string {
+  if (code !== null) return `Alarm ${code}: ${title ?? 'unknown'}`;
+  return homingState ? 'Controller is stuck in its homing state' : 'Controller reports Alarm';
 }
 
 function alarmRecoveryAction(

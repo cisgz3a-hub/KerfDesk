@@ -69,7 +69,11 @@ describe('laser status-line receive-capacity evidence (ADR-331)', () => {
     handleStatusLine(set, get, refs, async () => undefined, inFlight);
     expect(get().rxCapacityEvidence?.rxBytesFree).toBe(128);
 
-    // Quiescent again: the larger reading is accepted.
+    // Quiescent again: the larger reading is accepted. The latch keeps the raw
+    // 65535; the Start window counts it only as grblHAL's default 1024-byte
+    // ring, since a uint16 free count cannot print more
+    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/stream.h#L211-L214;
+    // core/grbl-streaming.ts, controller audit P-3/S-2).
     set({ pendingUntrackedAcks: 0 });
     handleStatusLine(set, get, refs, async () => undefined, inFlight);
     expect(get().rxCapacityEvidence?.rxBytesFree).toBe(65535);

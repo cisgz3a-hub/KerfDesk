@@ -31,6 +31,9 @@ export type ControllerRealtime = {
   readonly softReset: string | null;
   /** Cancel the in-flight jog only (GRBL \x85). */
   readonly jogCancel: string | null;
+  /** True when the jog-cancel byte also discards, unanswered, every line the
+   *  controller has received but not parsed yet (grblHAL, in every state). */
+  readonly jogCancelDropsUnparsedLines?: boolean;
 };
 
 export type ControllerCommands = {

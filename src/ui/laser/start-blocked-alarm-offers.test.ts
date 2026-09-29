@@ -12,6 +12,8 @@ import { STATUS_ALARM_START_MESSAGE } from './start-job-readiness';
 import { ALARM_ACTIVE_START_MESSAGE, machineNotIdleStartMessage } from './start-machine-refusals';
 import {
   offerAlarmFixForBlockedStart,
+  PROBE_UNLOCK_OFFER_PROMPT,
+  UNLOCK_OFFER_PROMPT,
   UNLOCKED_NEXT_STEP_MESSAGE,
 } from './start-blocked-alarm-offers';
 
@@ -43,7 +45,12 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  useLaserStore.setState({ ...original, statusReport: null, alarmCode: null });
+  useLaserStore.setState({
+    ...original,
+    statusReport: null,
+    alarmCode: null,
+    positionEvidenceSuppressed: false,
+  });
   useStore.setState({ project: createProject() });
   vi.restoreAllMocks();
 });
@@ -58,6 +65,34 @@ describe('alarm recovery offer', () => {
     );
     expect(vi.mocked(useLaserStore.getState().unlockAlarm)).toHaveBeenCalledTimes(1);
     expect(vi.mocked(useLaserStore.getState().home)).not.toHaveBeenCalled();
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
+  });
+
+  // Controller audit 2, M-1: a failed probe stops only the probe move, so the
+  // Unlock after it keeps the position and origin (probe-failure-alarm.ts) and
+  // the Frame can go on instead of asking for Set origin again.
+  it('unlocks after a failed probe and retries the Frame once Idle', async () => {
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true },
+      alarmCode: 5,
+      positionEvidenceSuppressed: false,
+      unlockAlarm: vi.fn(async () => useLaserStore.setState({ alarmCode: null })),
+    });
+    await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe('retry');
+    expect(jobAwareConfirm).toHaveBeenCalledWith(PROBE_UNLOCK_OFFER_PROMPT);
+    expect(useToastStore.getState().toasts.at(-1)?.message).toBe('Alarm cleared.');
+  });
+
+  it('asks for Set origin after a failed probe when the position was already untrusted', async () => {
+    useLaserStore.setState({
+      capabilities: { ...original.capabilities, unlock: true },
+      alarmCode: 5,
+      positionEvidenceSuppressed: true,
+    });
+    await expect(offerAlarmFixForBlockedStart([STATUS_ALARM_START_MESSAGE])).resolves.toBe(
+      'handled',
+    );
+    expect(jobAwareConfirm).toHaveBeenCalledWith(UNLOCK_OFFER_PROMPT);
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(UNLOCKED_NEXT_STEP_MESSAGE);
   });
 

@@ -111,6 +111,7 @@ afterEach(async () => {
     workZZeroEvidence: null,
     wcoCache: null,
     frameVerification: null,
+    positionEvidenceSuppressed: false,
     log: [],
   });
   vi.restoreAllMocks();
@@ -192,9 +193,53 @@ describe('atomic corner-probe controller transaction', () => {
 
       await expect(probe).resolves.toEqual({ kind: 'probe-failed', alarmCode: 5 });
       expect(writes.some((line) => line.startsWith('G10 L20'))).toBe(false);
+      // Nor does it drop the operator's temporary G92 origin.
+      expect(writes.some((line) => line.startsWith('G92'))).toBe(false);
       expectCornerEvidenceInvalid();
     },
   );
+
+  // Controller audit 2, M-2: the settled cycle cleared G92 and stored the corner
+  // in G54 (buildCornerProbeLines), so the origin is a saved one, and touching
+  // the plate re-established where the head is, as Set origin here does.
+  it('records a settled corner cycle as a saved G54 origin and trusts reports again', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(async (data) => {
+      writes.push(data);
+    });
+    await connectWith(connection);
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 12, y: 0, z: 0 },
+      positionEvidenceSuppressed: true,
+    });
+    const versionBefore = useLaserStore.getState().workOriginVersion ?? 0;
+    writes.length = 0;
+
+    const lines = buildCornerProbeLines(CORNER_REQUEST.params);
+    const probe = useLaserStore.getState().probe(CORNER_REQUEST);
+    await flush();
+    // A registration bound to the old origin is stale from the first line on.
+    expect(useLaserStore.getState().workOriginVersion).toBe(versionBefore + 1);
+    for (const line of ['M5', 'M9', ...lines, 'G4 P0.01']) {
+      expect(writes.at(-1)).toBe(`${line}\n`);
+      connection.emitLine('ok');
+      await flush();
+    }
+    connection.emitLine('<Idle|MPos:-5.000,-5.000,10.000|FS:0,0>');
+    connection.emitLine('<Idle|MPos:-5.000,-5.000,10.000|FS:0,0>');
+
+    await expect(probe).resolves.toEqual({ kind: 'ok' });
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: true,
+      workOriginSource: 'g54-persistent',
+      positionEvidenceSuppressed: false,
+      workOriginVersion: versionBefore + 1,
+    });
+    connection.emitLine('<Idle|MPos:-5.000,-5.000,10.000|FS:0,0|WCO:-20.000,-20.000,-10.000>');
+    expect(useLaserStore.getState().wcoCache).toEqual({ x: -20, y: -20, z: -10 });
+  });
 
   it.each(['combined G10', 'final park'] as const)(
     'keeps coordinate evidence invalid when an alarm occurs at the %s boundary',

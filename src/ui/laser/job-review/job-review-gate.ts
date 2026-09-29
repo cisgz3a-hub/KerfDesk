@@ -195,12 +195,8 @@ function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReview
       : { ...disclosed, warnings: [warning, ...disclosed.warnings] };
   const externalPreview = useStore.getState().externalGcodePreview;
   const model = appendExternalGcodePreviewWarning(framedModel, externalPreview?.name);
-  return refreshControllerIdentityWarnings(
-    model,
-    configured,
-    liveLaser.activeControllerKind,
-    liveLaser.detectedControllerKind,
-  );
+  // The live command set too: Connect binds it from the profile (ADR-375).
+  return refreshControllerIdentityWarnings(model, device, liveLaser);
 }
 
 // A Confirm click is the acknowledgement: the dialog showed the exact prompt

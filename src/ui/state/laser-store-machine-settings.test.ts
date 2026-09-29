@@ -322,7 +322,10 @@ describe('laser-store machine settings', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
   });
 
-  it('blocks guarded writes without a current settings backup', async () => {
+  // The gate proves a settings read in this connection, which the write checks
+  // against and re-reads to verify. Export records nothing, so the gate cannot
+  // see a backup and its message must not claim one (audit C-8, ADR-375).
+  it('blocks guarded writes until the controller settings are read', async () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     useLaserStore.setState({
@@ -332,7 +335,7 @@ describe('laser-store machine settings', () => {
     });
 
     await expect(useLaserStore.getState().writeGrblSetting(30, '1000')).rejects.toThrow(
-      /read and export/i,
+      'Read the controller settings before writing firmware settings.',
     );
   });
 
@@ -418,8 +421,11 @@ describe('laser-store machine settings', () => {
     const cncWrite = useLaserStore.getState().sendConsoleCommand('$32=0', { confirmed: true });
     await vi.waitFor(() => expect(writes).toEqual(['$32=0\n']));
     connection.emitLine('ok');
+    // The Console reads every setting write back (ADR-375, C-4).
+    await vi.waitFor(() => expect(writes).toEqual(['$32=0\n', '$$\n']));
+    connection.emitLine('ok');
     await cncWrite;
-    expect(writes).toEqual(['$32=0\n']);
+    expect(writes).toEqual(['$32=0\n', '$$\n']);
   });
 
   it('rejects every non-canonical laser $32 Console value before serial write', async () => {

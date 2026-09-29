@@ -17,6 +17,17 @@ describe('stockGrblSettingStorageIssue', () => {
     expect(stockGrblSettingStorageIssue(22, 2)).toMatch(/enter 0 or 1/);
   });
 
+  // `if (int_value)` after the truncation: a fraction below 1 turns the
+  // setting off, it is not stored as 1 (ADR-375, C-4).
+  it('says a fraction below 1 turns an on/off setting off', () => {
+    expect(stockGrblSettingStorageIssue(22, 0.5)).toBe(
+      '$22 is an on/off setting: enter 0 or 1. GRBL drops the fraction, so 0.5 would turn it off.',
+    );
+    expect(stockGrblSettingStorageIssue(22, 2)).toBe(
+      '$22 is an on/off setting: enter 0 or 1. GRBL would store 2 as 1.',
+    );
+  });
+
   it.each([
     [26, 250],
     [1, 255],

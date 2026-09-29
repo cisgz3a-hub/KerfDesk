@@ -324,7 +324,9 @@ describe('worker serial connection: line errors (audit connect-1)', () => {
   it('hands the fresh port readable to the worker and keeps the session', () => {
     const h = harness();
     const closed: number[] = [];
+    const lineErrors: string[] = [];
     h.connection.onClose(() => closed.push(1));
+    h.connection.onLineError?.((name) => lineErrors.push(name));
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fresh = new ReadableStream<Uint8Array>();
     h.port.readable = fresh;
@@ -337,16 +339,39 @@ describe('worker serial connection: line errors (audit connect-1)', () => {
     });
     expect(closed).toEqual([]);
     expect(h.terminated()).toBe(0);
+    // The bytes at the error are gone, so the store hears of it (controller
+    // audit T-3, ADR-375).
+    expect(lineErrors).toEqual(['FramingError']);
+  });
+
+  it('passes on a line error a native worker read on after by itself', () => {
+    const h = harness();
+    const lineErrors: string[] = [];
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    h.connection.onLineError?.(() => {
+      throw new Error('subscriber failed');
+    });
+    h.connection.onLineError?.((name) => lineErrors.push(name));
+
+    h.emit({ kind: 'line-error', name: 'BreakError' });
+
+    expect(lineErrors).toEqual(['BreakError']);
+    expect(h.sent.some((entry) => entry.message.kind === 'reattach-readable')).toBe(false);
+    expect(h.terminated()).toBe(0);
   });
 
   it('ends the session like a dropped cable when the port has no readable to give', async () => {
     const h = harness();
     const closed: number[] = [];
+    const lineErrors: string[] = [];
     h.connection.onClose(() => closed.push(1));
+    h.connection.onLineError?.((name) => lineErrors.push(name));
     h.port.readable = null;
 
     h.emit({ kind: 'read-error', name: 'ParityError' });
     expect(closed).toEqual([1]);
+    // The closed port explains itself; reading did not go on.
+    expect(lineErrors).toEqual([]);
     // The worker still holds the writer, so it is asked to let go first.
     expect(h.sent.at(-1)?.message).toEqual({ kind: 'close' });
     h.emit({ kind: 'closed' });

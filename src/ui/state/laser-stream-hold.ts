@@ -26,6 +26,7 @@ import {
 import { hostedRefillArmed } from './laser-hosted-refill';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import { programmedDwellSeconds } from './laser-stream-dwell';
+import { currentJobLineError } from './laser-serial-line-errors';
 
 type StallObservationRefs = Parameters<typeof hostedRefillArmed>[0] & {
   stallProbe: StallProbe;
@@ -48,7 +49,7 @@ export function observeStreamHoldTick(
     state.capabilities.statusQuery === 'queued-poll' ? (refs.controllerBusyAt ?? null) : null;
   const stall = detectStreamStall(state.streamer, state.statusReport, refs.stallProbe, now, busyAt);
   refs.stallProbe = stall.probe;
-  const hold = streamHoldFromProbe(state, stall.probe, now);
+  const hold = streamHoldFromProbe(state, stall.probe, now, currentJobLineError(refs, state));
   if (hold !== null || (state.streamHold ?? null) !== null) set(streamHoldPatch(state, refs, hold));
 }
 
@@ -77,6 +78,9 @@ export type StreamHold = {
    * inside its time plus a margin: the controller is dwelling, as told, not
    * holding the program (ST-5). */
   readonly dwellSeconds?: number;
+  /** A UART line error during this job, which can have swallowed an
+   * acknowledgement (laser-serial-line-errors.ts). Absent when none. */
+  readonly serialLineError?: string;
 };
 
 type HoldSource = Pick<
@@ -85,11 +89,13 @@ type HoldSource = Pick<
 >;
 
 /** The hold the current stall probe describes, or null when the stream is
- * being acknowledged (or is not streaming at all). */
+ * being acknowledged (or is not streaming at all). `lineError` names a UART
+ * line error of this job. */
 export function streamHoldFromProbe(
   state: HoldSource,
   probe: StallProbe,
   now: number,
+  lineError: string | null = null,
 ): StreamHold | null {
   const streamer: StreamerState | null = state.streamer;
   if (probe === null || streamer === null || streamer.status !== 'streaming') return null;
@@ -105,6 +111,7 @@ export function streamHoldFromProbe(
     controllerState: freshControllerState(state, probe.at),
     ...(state.capabilities.statusQuery === 'queued-poll' ? { statusNotPolled: true as const } : {}),
     ...(dwelling ? { dwellSeconds: dwell } : {}),
+    ...(lineError === null ? {} : { serialLineError: lineError }),
   };
 }
 
@@ -199,7 +206,8 @@ function holdBeganLine(
     `${streamer?.completed ?? 0} acknowledged, ${queued} queued; ${bufferText}; ` +
     `untracked acks owed ${state.pendingUntrackedAcks}, transport writes pending ` +
     `${pendingTransportWriteCount(state)}, refill ${hostedRefillArmed(refs) ? 'worker' : 'host'}. ` +
-    'KerfDesk is connected and waiting; it has not reset the controller.'
+    'KerfDesk is connected and waiting; it has not reset the controller.' +
+    lineErrorSentence(hold)
   );
 }
 
@@ -208,6 +216,21 @@ function holdStatusPhrase(hold: StreamHold): string {
   return hold.statusNotPolled === true
     ? 'no status is polled while it streams, with'
     : 'no fresh status report, with';
+}
+
+// A reply lost to a line error never arrives, so the wait may not be the
+// controller's at all (controller audit T-3, ADR-375).
+function lineErrorClause(hold: StreamHold): string | null {
+  if (hold.serialLineError === undefined) return null;
+  return (
+    `The serial link reported a line error (${hold.serialLineError}) during this job, ` +
+    'and an acknowledgement lost with it never arrives'
+  );
+}
+
+function lineErrorSentence(hold: StreamHold): string {
+  const clause = lineErrorClause(hold);
+  return clause === null ? '' : ` ${clause}.`;
 }
 
 function holdEndedLine(previous: StreamHold): string {
@@ -234,7 +257,8 @@ export function controllerUnresponsiveNotice(hold: StreamHold): LaserSafetyNotic
       'connected and waiting; it has not reset the controller and no job bytes were dropped. ' +
       'A machine holding its own program can continue on its own (on a Creality Falcon A1 the ' +
       "firmware's standby timer, $152, is a known cause); if it does not, abort the job, check " +
-      'the machine and the USB link, then re-run.',
+      'the machine and the USB link, then re-run.' +
+      lineErrorSentence(hold),
   };
 }
 
@@ -246,13 +270,19 @@ export function describeStreamHold(hold: StreamHold, falconAirTimerHint: boolean
       `(${streamHoldSeconds(hold)} s so far). KerfDesk is connected and waiting; nothing was reset`
     );
   }
-  const base =
+  const parts = [
     `${holdBarLead(hold)} has not acknowledged the last ` +
-    `${hold.unacknowledgedLines} sent lines for ${streamHoldSeconds(hold)} s. ` +
-    'KerfDesk is connected and waiting; nothing was reset';
-  return falconAirTimerHint
-    ? `${base}. On a Creality A1 this is usually the firmware's own standby timer — send $152=100 from the Console after the job`
-    : base;
+      `${hold.unacknowledgedLines} sent lines for ${streamHoldSeconds(hold)} s. ` +
+      'KerfDesk is connected and waiting; nothing was reset',
+  ];
+  if (falconAirTimerHint) {
+    parts.push(
+      "On a Creality A1 this is usually the firmware's own standby timer — send $152=100 from the Console after the job",
+    );
+  }
+  const lineError = lineErrorClause(hold);
+  if (lineError !== null) parts.push(lineError);
+  return parts.join('. ');
 }
 
 function holdBarLead(hold: StreamHold): string {

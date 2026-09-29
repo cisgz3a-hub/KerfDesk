@@ -238,3 +238,49 @@ describe('realtime characters and state-dependent $ commands', () => {
     });
   });
 });
+
+// Controller audit 2 (ADR-375), C-6: `$` (help) and `$N` (list startup lines)
+// only print (grbl/system.c#L129, #L237-L246), so they must not void Frame
+// evidence as an unknown machine-state change. grblHAL's `$DWNGRD` writes the
+// settings to non-volatile storage (grblHAL system.c#L659-L670), like the
+// restores above.
+describe('read-only report commands and $DWNGRD', () => {
+  it.each([
+    ['$', '$'],
+    ['$N', '$N'],
+    ['$n', '$N'],
+    [' $ N ', '$N'],
+  ])('prepares %j as a read-only report', (input, normalized) => {
+    expect(prepareConsoleCommand(input)).toEqual({
+      ok: true,
+      command: {
+        kind: 'report-query',
+        normalized,
+        wire: `${normalized}\n`,
+        requiresIdle: false,
+        requiresNoActiveOperation: true,
+        requiresConfirmation: false,
+        stateEffect: 'read-only',
+      },
+    });
+  });
+
+  it('keeps a startup-line store blocked and a malformed $N0 cautious', () => {
+    expect(prepareConsoleCommand('$N0=G21').ok).toBe(false);
+    expect(prepareConsoleCommand('$N0')).toMatchObject({
+      ok: true,
+      command: { kind: 'gcode', stateEffect: 'machine-state' },
+    });
+  });
+
+  it.each(['$DWNGRD', '$dwngrd', '$ DWNGRD', '$DWNGRD='])(
+    'blocks %j as a persistent write',
+    (input) => {
+      expect(prepareConsoleCommand(input)).toEqual({
+        ok: false,
+        reason:
+          'This persistent controller command is blocked in the Console. Back up settings and use Machine Settings in a later lane.',
+      });
+    },
+  );
+});

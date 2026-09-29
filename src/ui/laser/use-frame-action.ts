@@ -31,6 +31,7 @@ import {
 import {
   waitForAbsoluteFrameOffset,
   waitForFreshIdleFramePosition,
+  waitForUnreportedFrameWorkOffset,
 } from './frame-position-readiness';
 import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
 import { clearStartBlockers } from './start-blocker-invalidation';
@@ -209,6 +210,7 @@ async function prepareFrameContext(): Promise<FrameContext | null> {
     );
     return null;
   }
+  await waitForUnreportedFrameWorkOffset(useStore.getState().jobPlacement);
   const app = useStore.getState();
   const laser = await prepareFrameLaser(
     app.project.machine?.kind === 'cnc',

@@ -132,8 +132,8 @@ function MachineSettingsNotice(props: {
     <p style={noticeStyle}>
       {props.canRead ? (
         <>
-          Reads live controller settings with <code>$$</code>. Read-only in this version; export a
-          backup before changing firmware.
+          Reads live controller settings with <code>$$</code> and exports them as a backup. This
+          panel never writes firmware; export a backup before changing firmware settings.
         </>
       ) : (
         'The connected controller has no settings query, so there are no live settings to read here. Change its settings with the firmware’s own configuration tools.'

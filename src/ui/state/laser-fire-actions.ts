@@ -7,6 +7,10 @@ import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { isActiveJob, mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
+import {
+  firePowerOverrideReset,
+  firePowerOverrideResetLogLine,
+} from './laser-start-override-reset';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
 
@@ -102,7 +106,16 @@ async function activateFire(
     fireActive: true,
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
   }));
+  // Only a needed reset yields first. Without one, Fire-on is on its way before
+  // this call yields, as it always was.
+  const reset = firePowerOverrideReset(get().capabilities.overrides, get().ovCache);
   try {
+    if (
+      reset !== '' &&
+      !(await resetFirePowerOverride(runtime, token, reset, set, get, safeWrite))
+    ) {
+      return;
+    }
     await safeWrite(fireOnCommand(powerS, device.framingFeedMmPerMin), 'fire', 'console');
     if (token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null) {
       // Same latch rule as deactivateFire: this compensating M5 may race a
@@ -124,6 +137,40 @@ async function activateFire(
     // finally without clearing the uncertain-on fail-off latch.
     runtime.activationPending = false;
   }
+}
+
+// The controller scales Fire's S by its power override, so one left above 100%
+// by a job would multiply the capped power (laser-start-override-reset.ts).
+// The reset is a realtime byte written on its own: a queued line may not carry
+// a byte above 0x7F (ADR-361). It owes no acknowledgement, and both main loops
+// apply pending realtime commands before they execute the next line (GRBL
+// https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L81,
+// grblHAL
+// https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L235),
+// so Fire-on runs at 100%. False when Fire must not go on.
+async function resetFirePowerOverride(
+  runtime: FireRuntime,
+  token: number,
+  reset: string,
+  set: SetFn,
+  get: GetFn,
+  safeWrite: SafeWriteFn,
+): Promise<boolean> {
+  const before = get().ovCache;
+  // Fire-on has not been written yet, so the beam is off: a reset that fails
+  // or is overtaken leaves no uncertain-on latch and owes no M5 of its own.
+  try {
+    await safeWrite(reset, 'fire', 'console');
+  } catch (error) {
+    set({ fireActive: false });
+    throw error;
+  }
+  set({ log: pushLog(get(), firePowerOverrideResetLogLine(before)) });
+  // A release during this write owns the latch and its M5 (deactivateFire).
+  if (token !== runtime.requestToken) return false;
+  if (fireActivationBlockMessage(get(), true) === null) return true;
+  set({ fireActive: false });
+  return false;
 }
 
 function fireActivationBlockMessage(state: LaserState, ignorePendingAcks = false): string | null {

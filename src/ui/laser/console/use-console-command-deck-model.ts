@@ -55,6 +55,7 @@ function useConsoleCommandAvailabilityState(
     motionOperation: useLaserStore((state) => state.motionOperation),
     controllerOperation: useLaserStore((state) => state.controllerOperation),
     autofocusBusy: useLaserStore((state) => state.autofocusBusy),
+    pendingUntrackedAcks: useLaserStore((state) => state.pendingUntrackedAcks),
   };
 }
 

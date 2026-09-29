@@ -1,8 +1,9 @@
 // position-laser-click — the "Move laser here" tool's click handler (ADR-116
 // follow-up). A canvas click becomes an absolute, beam-off jog to that bed
 // point: scene mm → clamp inside the bed → the SAME origin transform G-code
-// emission uses (origin honesty, non-negotiable #2) → the laser store's
-// machine-position jog path, including work-offset conversion and CNC safe Z.
+// emission uses (origin honesty, non-negotiable #2) → the manual-motion
+// limits (ADR-375) → the laser store's machine-position jog path, including
+// work-offset conversion and CNC safe Z.
 // With the camera overlay visible this is
 // "click the object in the camera image, the head moves to it".
 
@@ -12,8 +13,9 @@ import type { Vec2 } from '../../core/scene';
 import { useLaserStore } from '../state/laser-store';
 import { jogFrameCommandBlockMessage } from '../state/laser-store-helpers';
 import { useToastStore } from '../state/toast-store';
+import { resolveManualMotionLimits } from '../state/manual-motion-limits';
 import { resolveNativeBedFrame } from '../state/native-bed-frame';
-import { bedPointToNative } from '../../core/devices/native-bed-frame';
+import { bedPointToNative, type NativeXyBounds } from '../../core/devices/native-bed-frame';
 
 // Same positioning feed policy as the JogPad: fast, capped by the device.
 const POSITION_FEED_CAP_MM_PER_MIN = 3000;
@@ -62,11 +64,23 @@ export function dispatchPositionLaser(scenePoint: Vec2, device: DeviceProfile): 
       );
     return;
   }
-  const target = bedPointToNative(positionLaserTarget(scenePoint, device), frame);
+  // On stock GRBL the bed edge on the homing side is where the homing switch
+  // trips; the limits keep the head the pull-off clear of it (ADR-375).
+  const target = clampToNative(
+    bedPointToNative(positionLaserTarget(scenePoint, device), frame),
+    resolveManualMotionLimits(frame, laser) ?? frame.nativeBounds,
+  );
   void laser
     .jogToMachinePosition(target.x, target.y, positionLaserFeed(device.maxFeed))
     .catch(() => {
       // The jog path surfaces write failures through the transcript/safety
       // notice; the click itself must never throw into React.
     });
+}
+
+function clampToNative(point: Vec2, bounds: NativeXyBounds): Vec2 {
+  return {
+    x: Math.min(Math.max(point.x, bounds.minX), bounds.maxX),
+    y: Math.min(Math.max(point.y, bounds.minY), bounds.maxY),
+  };
 }

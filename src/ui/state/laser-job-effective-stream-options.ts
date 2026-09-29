@@ -3,7 +3,9 @@
 //
 //   - a stock `$I` OPT response names the compiled RX ring size;
 //   - a status `Bf:` report observed while nothing was in flight names the free
-//     ring bytes, which is the ring's capacity at that moment.
+//     ring bytes, which is the ring's capacity at that moment. A report above
+//     any ring the streamer supports (grblHAL's uint16 field reads 65535)
+//     proves only grblHAL's default 1024-byte ring (core/grbl-streaming.ts).
 //
 // Both are current-session evidence only. Without any, the GRBL family falls
 // back to the stock 128-byte ring's 120 usable bytes — the safe direction for a
@@ -19,7 +21,10 @@ import {
   type GrblStreamingMode,
 } from '../../core/devices';
 // Deep import: the devices barrel is at its public-export ratchet.
-import { rxWindowFromReportedCapacity } from '../../core/grbl-streaming';
+import {
+  isOversizedRxCapacityReport,
+  rxWindowFromReportedCapacity,
+} from '../../core/grbl-streaming';
 import type { SessionObservationStamp } from './laser-controller-observation';
 import { normalizeStartJobOptions, type StartJobOptions } from './laser-job-options';
 import { currentRxCapacityEvidence, type RxCapacityEvidence } from './laser-rx-capacity-evidence';
@@ -34,6 +39,9 @@ export type StartStreamControllerEvidence = {
 export type StartStreamWindowSource =
   /** Bounded by a status `Bf:` receive-capacity report from this session. */
   | 'controller-reported'
+  /** A `Bf:` report from this session larger than any usable ring: it counts
+   *  only as grblHAL's default 1024-byte ring, so it never argues for more. */
+  | 'oversized-report'
   /** Bounded by a stock `$I` OPT receive-ring size from this session. */
   | 'build-info'
   /** The profile request, for firmwares that offer no ring evidence. */
@@ -76,7 +84,7 @@ export function resolveStartStreamWindow(
       streamingMode,
       bytes: Math.min(requestedBytes, provenBytes),
       requestedBytes,
-      source: provenBytes === buildInfoBytes ? 'build-info' : 'controller-reported',
+      source: provenBytes === buildInfoBytes ? 'build-info' : reportedSource(state),
       provenBytes,
     };
   }
@@ -122,6 +130,15 @@ function buildInfoWindowBytes(state: StartStreamControllerEvidence): number | nu
 
 function reportedWindowBytes(state: StartStreamControllerEvidence): number | null {
   return rxWindowFromReportedCapacity(currentRxCapacityEvidence(state)?.rxBytesFree);
+}
+
+function reportedSource(
+  state: StartStreamControllerEvidence,
+): Extract<StartStreamWindowSource, 'controller-reported' | 'oversized-report'> {
+  const reported = currentRxCapacityEvidence(state)?.rxBytesFree;
+  return reported !== undefined && isOversizedRxCapacityReport(reported)
+    ? 'oversized-report'
+    : 'controller-reported';
 }
 
 function smallerOf(left: number | null, right: number | null): number | null {

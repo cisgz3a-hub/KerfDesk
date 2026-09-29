@@ -49,6 +49,7 @@ import { isActiveJob, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { cancelPendingManualMotions } from './manual-motion-intent';
+import { stopUnownedControllerMotion } from './unowned-motion-stop';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -84,6 +85,12 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
   const { set, refs, driver } = context;
   cancelPendingManualMotions(refs);
   set((state) => ({ manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1 }));
+  // Motion nothing here owns (a Console G1, `$J=` or `$H`) first gets the stop
+  // that keeps position; a cancelled jog needs no reset (ADR-375 C-2). A page
+  // that is closing cannot wait for a hold to settle, so it resets at once.
+  if (reason !== 'app-closing' && (await stopUnownedControllerMotion(context)) === 'stopped') {
+    return;
+  }
   const softReset = driver().realtime.softReset;
   // Queued stop lines need a single writer, so a controller without a realtime
   // reset takes the hosted refill back first (ADR-334).

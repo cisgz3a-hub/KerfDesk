@@ -5,13 +5,13 @@
 // Setting up without connecting stays one click away.
 
 import { useState } from 'react';
-import type { ControllerKind } from '../../../core/devices';
 import { assertNever } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
 import { Button } from '../../kit';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupConnectionOptions } from './DeviceSetupConnectionOptions';
 import { DeviceSetupFoundMachine } from './DeviceSetupFoundMachine';
+import { DeviceSetupUseDetectedController } from './DeviceSetupUseDetectedController';
 import { findMachinePhase, type FindMachinePhase } from './find-machine-phase';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 import { useFindMachine, type FindMachineModel } from './use-find-machine';
@@ -39,7 +39,9 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
           automatic={props.automatic}
         />
       ) : null}
-      {model.mismatch ? <ConnectionMismatch model={model} dispatch={props.dispatch} /> : null}
+      {model.driverMismatch || model.bannerDiffers ? (
+        <ConnectionMismatch model={model} state={props.state} dispatch={props.dispatch} />
+      ) : null}
       <FindActions model={model} phase={phase} onOffline={setOffline} />
       <details className="lf-setup-disclosure lf-setup-disclosure--nested" open={props.openOptions}>
         <summary title="Choose the controller firmware, baud rate, output dialect and streaming used to connect.">
@@ -134,7 +136,7 @@ function FoundActions({ model }: { readonly model: FindMachineModel }): JSX.Elem
       <Button
         onClick={model.readAgain}
         disabled={
-          model.mismatch ||
+          model.driverMismatch ||
           model.laser.controllerOperation !== null ||
           (model.guide.identityCommands.length === 0 && model.guide.settingsCommands.length === 0)
         }
@@ -161,31 +163,52 @@ function ChoosePort({ model }: { readonly model: FindMachineModel }): JSX.Elemen
   );
 }
 
-function ConnectionMismatch(props: {
-  readonly model: FindMachineModel;
-  readonly dispatch: DeviceSetupStepProps['dispatch'];
-}): JSX.Element {
+// A driver that differs is fixed by a reconnect. A banner that differs is not
+// (the draft chose the driver), so that card offers only the draft change,
+// whose other effects are listed before they apply (ADR-375).
+function ConnectionMismatch(
+  props: DeviceSetupStepProps & { readonly model: FindMachineModel },
+): JSX.Element {
   const { model } = props;
   const detected = model.laser.detectedControllerKind;
-  const label = (kind: ControllerKind): string => machineSetupControllerGuide(kind).label;
+  const reported =
+    detected === null ? 'unknown firmware' : machineSetupControllerGuide(detected).label;
+  const active = machineSetupControllerGuide(
+    model.laser.activeControllerKind,
+    model.laser.activeControllerCommandSet ?? undefined,
+  ).label;
   return (
     <div role="alert" className="lf-setup-find-mismatch">
-      <strong>The connection does not match this setup.</strong>
-      <span>
-        Connected as {label(model.laser.activeControllerKind)}; the controller reports{' '}
-        {detected === null ? 'unknown firmware' : label(detected)}; this setup uses{' '}
-        {model.guide.label}.
-      </span>
+      {model.driverMismatch ? (
+        <>
+          <strong>The connection does not match this setup.</strong>
+          <span>
+            Connected as {active}; the controller reports {reported}; this setup uses{' '}
+            {model.guide.label}.
+          </span>
+        </>
+      ) : (
+        <>
+          <strong>The firmware banner differs from this setup.</strong>
+          <span>
+            Connected as {model.guide.label}, as this setup chose; the controller’s banner reports{' '}
+            {reported}. Reconnecting with this setup hears the same banner. If this machine runs{' '}
+            {reported}, use it in the draft.
+          </span>
+        </>
+      )}
       <div className="lf-setup-find-actions">
-        <Button variant="primary" onClick={model.reconnect}>
-          Reconnect using selected profile
-        </Button>
-        {detected !== null && detected !== model.controllerKind ? (
-          <Button
-            onClick={() => props.dispatch({ kind: 'select-controller', controllerKind: detected })}
-          >
-            Use detected {label(detected)} in draft
+        {model.driverMismatch ? (
+          <Button variant="primary" onClick={model.reconnect}>
+            Reconnect using selected profile
           </Button>
+        ) : null}
+        {detected !== null && detected !== model.controllerKind ? (
+          <DeviceSetupUseDetectedController
+            state={props.state}
+            dispatch={props.dispatch}
+            detected={detected}
+          />
         ) : null}
       </div>
     </div>

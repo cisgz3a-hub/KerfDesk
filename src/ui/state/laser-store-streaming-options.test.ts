@@ -175,7 +175,7 @@ describe('laser-store grblHAL receive-capacity evidence (ADR-331)', () => {
     };
   }
 
-  it('streams the profile window a Bf report proved, instead of the stock fallback', async () => {
+  it('streams the default-ring window an oversized Bf report proves, not the stock fallback', async () => {
     const writes: string[] = [];
     const connection = makeGrblHalConnection(writes);
     await useLaserStore.getState().connect(makeAdapter(connection), { controllerKind: 'grblhal' });
@@ -198,10 +198,14 @@ describe('laser-store grblHAL receive-capacity evidence (ADR-331)', () => {
       rxBufferBytes: 1024,
     });
 
-    // 1024 bytes holds the whole tiny program, so every line goes out at once —
+    // 65535 is the largest value grblHAL's uint16 free count can print, so it
+    // proves only the core's default 1024-byte ring less the 8-byte margin
+    // (https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/stream.h#L52-L53;
+    // controller audit P-3/S-2). This used to stream the full 1024 bytes.
+    // The window holds the whole tiny program, so every line goes out at once —
     // the stock 120-byte fallback would have sent the same five short lines,
     // so assert the window itself, not the write shape.
-    expect(useLaserStore.getState().streamer).toMatchObject({ rxBufferBytes: 1024 });
+    expect(useLaserStore.getState().streamer).toMatchObject({ rxBufferBytes: 1016 });
     expect(writes.join('')).toContain('G1 X1.000 S1000\n');
   });
 

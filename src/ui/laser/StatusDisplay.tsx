@@ -6,24 +6,29 @@
 // Work-origin row (F.3) reads `wcoCache` — the LAST-SEEN WCO across
 // frames — never `statusReport.wco`, which is null on most frames
 // because GRBL only emits WCO every Nth report. Reading raw `wco` here
-// would flicker between "machine 0,0" and "custom" 29 frames out of 30.
+// would flicker between "not reported yet" and the offset 29 frames out of 30.
+// The row names which origin it is (controller audit 2, M-8, ADR-375).
 //
 // The F/S row shows live values only. Smoothieware's resting report carries
 // the requested feed, which its classifier drops (controller audit SM-9), so
 // the row appears while it runs, with its `S:` value and live `L:` power.
 
-import { hasCustomOrigin, useLaserStore } from '../state/laser-store';
+import { hasCustomOrigin, useLaserStore, type LaserState } from '../state/laser-store';
 import {
   inferCurrentMachinePosition,
   reportedFeedMmPerMin,
   reportedWorkOffsetMm,
 } from '../state/infer-machine-position';
+import { isRestoredWorkOrigin } from '../state/work-origin-state';
+import { controllerReportsWorkOffset } from './work-offset-assumption';
 
 export function StatusDisplay(): JSX.Element {
   const report = useLaserStore((s) => s.statusReport);
   const wcoCache = useLaserStore((s) => s.wcoCache);
   const workOriginActive = useLaserStore((s) => s.workOriginActive);
+  const originName = useLaserStore(customOriginName);
   const reportInches = useLaserStore((s) => s.controllerSettings?.reportInches === true);
+  const reportsOffset = useLaserStore((s) => controllerReportsWorkOffset(s.capabilities));
   if (report === null) return <div style={dimStyle}>State: —</div>;
   const pos = inferCurrentMachinePosition(report, wcoCache, reportInches);
   const wcoMm = reportedWorkOffsetMm(wcoCache, reportInches);
@@ -44,10 +49,7 @@ export function StatusDisplay(): JSX.Element {
         </div>
       )}
       <div style={customOrigin ? originCustomStyle : originDefaultStyle}>
-        <strong>Origin:</strong>{' '}
-        {customOrigin && wcoMm !== null
-          ? `X ${wcoMm.x.toFixed(3)} Y ${wcoMm.y.toFixed(3)} (custom)`
-          : 'machine 0,0'}
+        <strong>Origin:</strong> {originLabel(customOrigin, wcoMm, reportsOffset, originName)}
       </div>
       {feedMmPerMin !== null && (
         <div style={feedRowStyle}>
@@ -62,6 +64,42 @@ export function StatusDisplay(): JSX.Element {
       )}
     </div>
   );
+}
+
+// Without a WCO the origin is unknown, not machine 0,0: the controller may hold
+// a persistent G54 or a kept G92 offset. GRBL sends WCO in only some status
+// reports, so it is "not reported yet"; a controller whose reports never carry
+// it says just "not reported" (ADR-375).
+function originLabel(
+  customOrigin: boolean,
+  wcoMm: ReturnType<typeof reportedWorkOffsetMm>,
+  reportsOffset: boolean,
+  originName: string,
+): string {
+  if (wcoMm === null) return reportsOffset ? 'not reported yet' : 'not reported';
+  return customOrigin
+    ? `X ${wcoMm.x.toFixed(3)} Y ${wcoMm.y.toFixed(3)} (${originName})`
+    : 'machine 0,0';
+}
+
+// Which XY origin is in effect, as each lasts differently: a G92 KerfDesk
+// wrote in this session (Set origin here, a board capture, a restored
+// recovery origin; grblHAL keeps G92 through resets, stock GRBL does not), a
+// persistent G54, one the controller already had when KerfDesk connected, or
+// one it reports that KerfDesk cannot attribute (after a reset or a Console
+// command). An offset without an XY origin (a Z zero) stays "custom".
+function customOriginName(state: LaserState): string {
+  if (!state.workOriginActive) return 'custom';
+  switch (state.workOriginSource) {
+    case 'g92':
+      return 'G92, set this session';
+    case 'g54-persistent':
+      return 'persistent G54';
+    case 'unknown':
+      return isRestoredWorkOrigin(state) ? 'restored by controller' : 'reported by controller';
+    case 'none':
+      return 'custom';
+  }
 }
 
 const panelStyle: React.CSSProperties = {

@@ -7,7 +7,12 @@ import {
   type OverrideValues,
   type StatusReport,
 } from '../../core/controllers/grbl';
+import {
+  findLineBufferOverflow,
+  lineBufferOverflowMessage,
+} from '../../core/controllers/grbl/line-buffer-limit';
 import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
+import type { ControllerKind } from '../../core/devices';
 import { PREPARATION_COMPILED_SEGMENT_BUDGET, type Job } from '../../core/job';
 import { scenePreparationSize } from '../../core/job/preparation-complexity';
 import { rasterPreparationTooComplex } from '../../core/job/raster-preparation-complexity';
@@ -125,23 +130,34 @@ function cncOverrideStartIssues(
   return issue === null ? [] : [issue];
 }
 
-/** The two program-text failures that can never stream: nothing sendable, or
- * one line longer than the controller's receive buffer. Everything else the
- * emitter reports is a Job Review warning (ADR-228). */
+/** The program-text failures that can never stream or run: nothing sendable,
+ * one line longer than the controller's receive buffer, or one longer than the
+ * connected controller's line buffer. Everything else the emitter reports is a
+ * Job Review warning (ADR-228). */
 export function preparedProgramIntegrityIssue(
   gcode: string,
   rxBufferBytes: number,
   preflight: { readonly issues: ReadonlyArray<{ readonly message: string }> },
+  activeControllerKind: ControllerKind | undefined,
 ): ReadonlyArray<string> | null {
   if (!hasSendableGcodeLine(gcode)) {
     return nonExecutableProgramMessages(preflight);
   }
   const oversized = findOversizedLine(gcode, rxBufferBytes);
-  if (oversized === null) return null;
-  return [
-    `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
-      `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not framed or started.`,
-  ];
+  if (oversized !== null) {
+    return [
+      `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
+        `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not framed or started.`,
+    ];
+  }
+  // Refusal (a) under PROJECT.md non-negotiable 21: the connected controller
+  // answers the line with error:11 and never runs it. Start refuses it too
+  // (assertGcodeFitsController); saying so here stops Frame first (controller
+  // audit S-3, ADR-375).
+  const overflow = findLineBufferOverflow(gcode, activeControllerKind);
+  return overflow === null
+    ? null
+    : [`${lineBufferOverflowMessage(overflow)} Job not framed or started.`];
 }
 
 function nonExecutableProgramMessages(preflight: {

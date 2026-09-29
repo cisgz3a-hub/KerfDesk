@@ -224,6 +224,47 @@ describe('grbl-simulator', () => {
     expect(lines.at(-1)).toContain('|WCO:0.000,0.000,0.000');
   });
 
+  // GRBL stores G10 L20 as WCS = MPos - G92 - TLO - WPos, so the named axis
+  // reads the word with G92 still applied (grbl gcode.c L550-L553).
+  it('G10 L20 keeps an active G92 applied, so the position reads the word', async () => {
+    const { sim, conn, lines } = await openSim({ motionMs: 1 });
+    await pump(5);
+    await conn.write('$J=G91 G21 X12.000 F1000\n');
+    await pump(10);
+    await conn.write('G54 G92 X0 Y0\n');
+    await pump(5);
+    await conn.write('$J=G91 G21 X10.000 F1000\n');
+    await pump(10);
+    await conn.write('G10 L20 P0 X0\n');
+    await pump(5);
+    expect(sim.state().g54?.x).toBe(10);
+    await conn.write('?');
+    await pump(2);
+    expect(lines.at(-1)).toContain('|MPos:22.000,0.000,0.000|');
+    expect(lines.at(-1)).toContain('|WCO:22.000,0.000,0.000');
+  });
+
+  // A failed probe raises its alarm without a reset: G92 stays, the G38.2 line
+  // is still acknowledged, and `$X` only unlocks (grbl motion_control.c
+  // L273-L298, gcode.c L1132, system.c L160-L165).
+  it.each([4, 5] as const)('fails G38.2 with ALARM:%i and ok, keeping G92', async (code) => {
+    const { sim, conn, lines } = await openSim({ motionMs: 1, probeFailure: code });
+    await pump(5);
+    await conn.write('$J=G91 G21 X12.000 F1000\n');
+    await pump(10);
+    await conn.write('G54 G92 X0 Y0\n');
+    await pump(5);
+    lines.length = 0;
+    await conn.write('G38.2 Z-10 F100\n');
+    await pump(5);
+    expect(lines).toEqual([`ALARM:${code}`, 'ok']);
+    expect(sim.state()).toMatchObject({ machine: 'Alarm', locked: true });
+    await conn.write('$X\n');
+    await pump(5);
+    expect(sim.state()).toMatchObject({ machine: 'Idle', locked: false });
+    expect(sim.state().g92).toEqual({ x: 12, y: 0, z: 0 });
+  });
+
   it('rejects configured lines with the given error code', async () => {
     const { conn, lines } = await openSim({
       rejectLines: [{ pattern: /X13\b/, errorCode: 20 }],

@@ -9,6 +9,7 @@ import {
   parseMotionWords,
   resolveTarget,
   SIM_ZERO_VEC3,
+  type SimVec3,
 } from './grbl-sim-gcode';
 import {
   emit,
@@ -22,6 +23,7 @@ import {
 } from './grbl-sim-state';
 
 const STATUS_SYSTEM_GC_LOCK = 9;
+const STATUS_TRAVEL_EXCEEDED = 15;
 const STATUS_CRITICAL_EVENT = 79;
 const PROGRAM_PAUSE_RE = /(?:^|\s)[Mm]0*0(?![\d.])/;
 const DWELL_SECONDS_RE = /[Pp](\d*\.?\d+)/;
@@ -43,6 +45,7 @@ function reduceStockLine(state: GrblSimState, line: string, opts: GrblSimOptions
   const reject = opts.rejectLines.find((rule) => rule.pattern.test(line));
   if (reject !== undefined) return { state, effects: [emit(`error:${reject.errorCode}`, opts)] };
   if (line === '') return { state, effects: [emit('ok', opts)] };
+  if (state.homingStuck === true) return reduceStuckHomingLine(state, line, opts);
   if (line.startsWith('$')) return reduceDollarLine(state, line, opts);
   if (state.locked || state.machine === 'Jog') {
     return { state, effects: [emit(`error:${STATUS_SYSTEM_GC_LOCK}`, opts)] };
@@ -111,6 +114,7 @@ function reduceDollarControl(
     const next: GrblSimState = { ...state, machine: 'Home', pendingMotions: 0 };
     return { state: next, effects: [schedule({ kind: 'homing-finished' }, opts.homingMs, next)] };
   }
+  if (opts.firmware === 'grbl' && line.startsWith('$H')) return refuseHomeSuffix(state, opts);
   if (line === '$X') {
     return {
       state: {
@@ -128,6 +132,38 @@ function reduceDollarControl(
     };
   }
   return null;
+}
+
+// Stock GRBL takes `$H` only in Idle or Alarm, checks `$22`, and enters its
+// homing state before it reads a suffix. Built without
+// HOMING_SINGLE_AXIS_COMMANDS (the default) it answers any suffix with error:3
+// and nothing restores the state (system.c:173-194, config.h:124).
+function refuseHomeSuffix(state: GrblSimState, opts: GrblSimOptions): GrblSimReaction {
+  if (state.machine !== 'Idle' && state.machine !== 'Alarm') {
+    return { state, effects: [emit('error:8', opts)] };
+  }
+  if (state.settings.get(22) !== '1') return { state, effects: [emit('error:5', opts)] };
+  return {
+    state: { ...state, machine: 'Home', locked: false, homingStuck: true },
+    effects: [emit('error:3', opts)],
+  };
+}
+
+// In the homing state a refused `$H` suffix left, no cycle runs but the main
+// loop reads lines: `$$` and `$G` answer, `$X` unlocks only an Alarm and
+// otherwise answers ok, and every `$` command that needs Idle or Alarm (`$H`,
+// `$J=`, `$#`, `$I`, `$SLP`, setting writes) answers error:8 (system.c:130-173).
+// G-code is accepted, but cycle start runs only from Idle or a completed hold
+// (protocol.c:346), so nothing moves; the blocks it would queue are not modelled.
+function reduceStuckHomingLine(
+  state: GrblSimState,
+  line: string,
+  opts: GrblSimOptions,
+): GrblSimReaction {
+  const query = line === '$$' || line === '$G' ? reduceDollarQuery(state, line, opts) : null;
+  if (query !== null) return query;
+  if (line === '$X' || !line.startsWith('$')) return { state, effects: [emit('ok', opts)] };
+  return { state, effects: [emit('error:8', opts)] };
 }
 
 function reduceDollarQuery(
@@ -198,6 +234,9 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
   if (!words.hasMotion || words.feed === null) return { state, effects: [emit('error:22', opts)] };
   const isAbsolute = words.setsAbsolute ?? false;
   const target = resolveTarget(state.mpos, totalWco(state), words, isAbsolute);
+  if (jogLeavesStockTravel(state, target, opts)) {
+    return { state, effects: [emit(`error:${STATUS_TRAVEL_EXCEEDED}`, opts)] };
+  }
   const next: GrblSimState = {
     ...state,
     machine: 'Jog',
@@ -211,6 +250,17 @@ function reduceJogLine(state: GrblSimState, line: string, opts: GrblSimOptions):
   };
 }
 
+// With soft limits on ($20=1) stock GRBL refuses a whole `$J=` line whose
+// machine target leaves [-$13x, 0] on any axis, homed or not (jog.c:35-37,
+// system.c:346-349; this build reports no HOMING_FORCE_SET_ORIGIN in $I).
+function jogLeavesStockTravel(state: GrblSimState, target: SimVec3, opts: GrblSimOptions): boolean {
+  if (opts.firmware !== 'grbl' || state.settings.get(20) !== '1') return false;
+  return (['x', 'y', 'z'] as const).some((axis, index) => {
+    const travel = Number(state.settings.get(130 + index));
+    return target[axis] > 0 || target[axis] < -travel;
+  });
+}
+
 function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions): GrblSimReaction {
   if (hasGWord(line, 92.1)) {
     return { state: { ...state, g92: null }, effects: [emit('ok', opts)] };
@@ -219,7 +269,27 @@ function reduceGcodeLine(state: GrblSimState, line: string, opts: GrblSimOptions
   if (hasGWord(line, 10)) return { state: applyG10(state, line), effects: [emit('ok', opts)] };
   if (PROGRAM_PAUSE_RE.test(line)) return beginProgramPause(state);
   if (hasGWord(line, 4)) return beginDwell(state, line);
+  if (opts.probeFailure !== undefined && hasGWord(line, 38.2)) {
+    return failProbe(state, opts.probeFailure, opts);
+  }
   return reduceMotionOrModalLine(state, line, opts);
+}
+
+// A failed G38.2 raises its alarm without a reset, so G92 and G54 stay, and the
+// line itself still answers ok (motion_control.c:273-298, gcode.c:1132). The
+// travel before ALARM:5 is not modeled.
+function failProbe(state: GrblSimState, code: 4 | 5, opts: GrblSimOptions): GrblSimReaction {
+  return {
+    state: {
+      ...state,
+      machine: 'Alarm',
+      locked: true,
+      pendingMotions: 0,
+      pendingLine: null,
+      resetEpoch: state.resetEpoch + 1,
+    },
+    effects: [emit(`ALARM:${code}`, opts), emit('ok', opts)],
+  };
 }
 
 function reduceMotionOrModalLine(
@@ -301,21 +371,24 @@ function applyG92(state: GrblSimState, line: string): GrblSimState {
 }
 
 function applyG10(state: GrblSimState, line: string): GrblSimState {
-  // G10 L20 P1 X<v>: set G54 so the current position reads <v>; G10 L2 P1
-  // X<v>: set the G54 offset to <v> directly. Only P1 (G54) is modeled.
+  // G10 L20 P1 X<v>: set G54 so the current position reads <v> with any G92
+  // still applied, G54 = MPos - G92 - v (gcode.c:550-553); G10 L2 P1 X<v>: set
+  // the G54 offset to <v> directly. Only G54 is modeled, so P0 (the active
+  // system) writes it too.
   const words = parseMotionWords(line);
   const isL20 = /[Ll]20/.test(line);
   const prior = state.g54 ?? SIM_ZERO_VEC3;
-  const axis = (mpos: number, prev: number, word: number | null): number => {
+  const g92 = state.g92 ?? SIM_ZERO_VEC3;
+  const axis = (mpos: number, g92Offset: number, prev: number, word: number | null): number => {
     if (word === null) return prev;
-    return isL20 ? mpos - word : word;
+    return isL20 ? mpos - g92Offset - word : word;
   };
   return {
     ...state,
     g54: {
-      x: axis(state.mpos.x, prior.x, words.x),
-      y: axis(state.mpos.y, prior.y, words.y),
-      z: axis(state.mpos.z, prior.z, words.z),
+      x: axis(state.mpos.x, g92.x, prior.x, words.x),
+      y: axis(state.mpos.y, g92.y, prior.y, words.y),
+      z: axis(state.mpos.z, g92.z, prior.z, words.z),
     },
   };
 }

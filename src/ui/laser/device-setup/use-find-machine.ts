@@ -45,11 +45,18 @@ export function useFindMachine(
   const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
   const baudRate = state.draft.baudRate ?? guide.defaultBaudRate;
   const connected = laser.connection.kind === 'connected';
-  const mismatch =
+  // A driver that differs from the draft's is one a reconnect replaces. A
+  // banner that differs is evidence only: Connect binds the driver from the
+  // draft and a banner never switches it, so a reconnect hears it again, and
+  // read-only checks still go out through the draft's own commands (ADR-375).
+  const driverMismatch =
     connected &&
     (laser.activeControllerKind !== controllerKind ||
-      (laser.activeControllerCommandSet ?? null) !== (driver.commandSet ?? null) ||
-      (laser.detectedControllerKind !== null && laser.detectedControllerKind !== controllerKind));
+      (laser.activeControllerCommandSet ?? null) !== (driver.commandSet ?? null));
+  const bannerDiffers =
+    connected &&
+    laser.detectedControllerKind !== null &&
+    laser.detectedControllerKind !== controllerKind;
   // The options the rail and menu Connect build from a profile, so the draft's
   // Background streaming choice travels as they send it, an explicit opt-out
   // included (2026-09-25 audit, SER-2). Setup keeps its controller and baud
@@ -76,22 +83,23 @@ export function useFindMachine(
     showError,
   });
   useAdoptDetectedFirmware(
-    mismatch,
+    driverMismatch,
     laser.detectedControllerKind,
     controllerKind,
     automatic,
     actions.reconnectForFind,
   );
   return {
+    bannerDiffers,
     baudRate,
     choosePort: actions.choosePort,
     connected,
     controllerKind,
     driver,
+    driverMismatch,
     find: actions.find,
     guide,
     laser,
-    mismatch,
     readAgain: () => void readController(guide, driver, laser).catch(showError),
     reconnect: () => void actions.reconnect().catch(showError),
     disconnect: actions.disconnect,

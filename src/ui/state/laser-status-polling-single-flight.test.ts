@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
+import { POLLED_RESPONSE_TIMEOUT_MS } from './laser-controller-qualification';
 import { useLaserStore } from './laser-store';
 
 const HANDSHAKE_TIMEOUT_MS = 2_000;
@@ -64,6 +65,13 @@ describe('background controller status polling', () => {
     expect(statusWrites).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(IDLE_POLL_CADENCE_MS);
+    expect(statusWrites).toHaveLength(2);
+
+    // A controller silent for the whole listening window fails qualification
+    // (ADR-375), so the report below does not start the settings read, which
+    // would own polling until it finished.
+    await vi.advanceTimersByTimeAsync(POLLED_RESPONSE_TIMEOUT_MS);
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
     expect(statusWrites).toHaveLength(2);
 
     connection.emitLine('<Idle|MPos:1.000,2.000,3.000|FS:0,0>');
