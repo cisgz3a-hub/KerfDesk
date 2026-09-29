@@ -82,7 +82,7 @@ export const MACHINE_SETUP_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Choose the device',
         instruction:
-          'Choose Connect. The first time, select the controller in the serial picker; after that Connect reuses the same port, and Connect automatically in the ⋯ menu connects when KerfDesk starts or the machine is plugged in. Use a different port… in that menu always shows the picker.',
+          'Choose Connect. The first time, select the controller in the serial picker; after that Connect reuses the same port, and Connect automatically in the ⋯ menu connects when the machine is plugged in and, in the browser, when KerfDesk starts. The desktop app asks for the port once after each start. Use a different port… in that menu always shows the picker.',
         focus: 'Connect',
         result: 'The connection status changes and controller replies become available.',
       },

@@ -73,6 +73,35 @@ describe('ConnectionBar device permission actions', () => {
     expect(onChoosePort).toHaveBeenCalledOnce();
   });
 
+  // Desktop picks end when KerfDesk closes (ADR-366), so the desktop app must
+  // not promise a connection at start (desktop gap audit item 7).
+  it('tells desktop users the port is chosen once after each start', async () => {
+    const web = await renderBar({
+      connection: { kind: 'disconnected' },
+      autoConnect: true,
+      onAutoConnectChange: vi.fn(),
+    });
+    expect(connectButton(web)?.title).toContain('on the USB port it used last time');
+    await openMenu(web);
+    expect(menuItem('Connect automatically')?.title).toContain('when KerfDesk starts');
+    await cleanup?.();
+
+    const desktop = await renderBar({
+      connection: { kind: 'disconnected' },
+      autoConnect: true,
+      onAutoConnectChange: vi.fn(),
+      portChoiceEndsOnRestart: true,
+    });
+    expect(connectButton(desktop)?.title).toBe(
+      'Connect to your laser controller. Choose its USB port the first time after KerfDesk starts; until KerfDesk closes, Connect uses that port.',
+    );
+    await openMenu(desktop);
+    const auto = menuItem('Connect automatically')?.title ?? '';
+    expect(auto).toContain('when the laser is plugged back in');
+    expect(auto).toContain('After each start, choose the port once with Connect.');
+    expect(auto).not.toContain('when KerfDesk starts');
+  });
+
   it('says a port another program holds is busy', async () => {
     const host = await renderBar({
       connection: {
@@ -176,4 +205,8 @@ function menuItem(label: string): HTMLButtonElement | undefined {
   return [
     ...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"], [role="menuitemcheckbox"]'),
   ].find((item) => item.querySelector('span')?.textContent === label);
+}
+
+function connectButton(host: HTMLElement): HTMLButtonElement | undefined {
+  return [...host.querySelectorAll('button')].find((button) => button.textContent === 'Connect');
 }
