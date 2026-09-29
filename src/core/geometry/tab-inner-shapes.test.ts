@@ -65,15 +65,18 @@ describe('skip inner shapes decides exactly as testing every pair did', () => {
   });
 });
 
+// Every layout holds at least one real hole, so a count of 0 would mean the
+// counter no longer sees the exact test, not that the pass is fast.
 describe('skip inner shapes tests only pairs whose boxes allow it', () => {
-  it('runs no exact test for a sheet of 3000 separate parts', () => {
-    // Testing every pair ran the exact test 3000 x 2999 = 8,997,000 times.
+  it('tests only the hole in a sheet of 3000 separate parts', () => {
+    // Testing every pair ran the exact test 3001 x 3000 = 9,003,000 times.
     const parts = Array.from({ length: 3000 }, (_, index) =>
       circle((index % 60) * 10, Math.floor(index / 60) * 10, 4, 64),
     );
-    expect(countExactChecks(() => automaticTabEligibility(parts, SKIP))).toEqual({
-      checks: 0,
-      result: parts.map(() => true),
+    const shapes = [...parts, circle(0, 0, 2, 16)];
+    expect(countExactChecks(() => automaticTabEligibility(shapes, SKIP))).toEqual({
+      checks: 1,
+      result: shapes.map((_, index) => index < parts.length),
     });
   }, 60_000);
 
@@ -88,11 +91,15 @@ describe('skip inner shapes tests only pairs whose boxes allow it', () => {
     expect(result).toEqual(shapes.map((_, index) => index % 2 === 0));
   }, 60_000);
 
-  it('runs no exact test for 3000 squares that share their edges', () => {
+  it('tests only the hole among 3000 squares that share their edges', () => {
     const squares = Array.from({ length: 3000 }, (_, index) =>
       rect((index % 60) * 5, Math.floor(index / 60) * 5, 5, 5),
     );
-    expect(countExactChecks(() => automaticTabEligibility(squares, SKIP)).checks).toBe(0);
+    const shapes = [...squares, rect(1, 1, 3, 3)];
+    expect(countExactChecks(() => automaticTabEligibility(shapes, SKIP))).toEqual({
+      checks: 1,
+      result: shapes.map((_, index) => index < squares.length),
+    });
   }, 60_000);
 });
 

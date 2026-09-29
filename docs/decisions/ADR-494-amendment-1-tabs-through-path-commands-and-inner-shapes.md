@@ -115,5 +115,7 @@ The 2026-09-28 weakness audit (finding E-3) found commands that did neither.
   islands and holes in islands), shapes whose boxes touch, match or share edges, concave, crossing
   and self-crossing shapes, open and degenerate contours, far and tiny shapes, shapes too large for
   the index, points that are not numbers and two random layouts of 400 shapes. Counting the exact
-  test: none for 3000 separate parts or 3000 squares sharing edges, and 1500 for 1500 parts with a
-  hole each, where the every-pair rule ran it 8,997,000 times.
+  test: once for 3000 separate parts and one hole, once for 3000 squares sharing edges and one
+  hole, and 1500 times for 1500 parts with a hole each, where the every-pair rule ran it 9,003,000,
+  9,003,000 and 8,997,000 times. Each layout holds a real hole, so a counter that stopped seeing
+  the exact test would fail rather than pass.

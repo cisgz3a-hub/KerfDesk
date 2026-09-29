@@ -15,7 +15,7 @@ type ShapeBox = ContourBox & { readonly index: number };
 
 // The exact test's even-odd crossing count puts every vertex of a shape inside
 // a container within the container's box, give or take the rounding of one
-// crossing (a few 1e-16 of the largest coordinate). Boxes grow by far more than
+// crossing (about 1e-15 of the largest coordinate). Boxes grow by far more than
 // that, so the box test never drops a pair the exact test would accept.
 const BOX_ALLOWANCE = 1e-9;
 // Beyond this size that rounding bound no longer holds, and a point that is not
