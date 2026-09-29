@@ -25,13 +25,13 @@ import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
 import { RecoveryRepository, type RecoveryCapsule } from '../state/recovery';
+import { holdHostDigests } from './host-sha256-testing';
 import { runLaserRecoveryCapsuleFlow } from './laser-recovery-flow';
 import {
   connectSimulator,
   drive,
   expectCapsuleFor,
   harness,
-  holdHostDigests,
   installRecoveryStressHooks,
   mulberry32,
   programLines,
