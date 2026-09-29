@@ -171,13 +171,33 @@ describe.each(phases)(
       ]) {
         expect(check(before, { ...before, ...patch })).toBe(originMessage);
       }
-      const unknown = {
-        ...before,
+    });
+
+    // GRBL reports WCO in the very next status after any offset change, so a
+    // first report equal to the zero the Frame was placed with is not an
+    // origin change (ADR-375). The old expectation here refused it.
+    // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/system.c#L280-L286
+    it('accepts a first WCO report equal to the zero assumed before it', () => {
+      const unreported = source('<Idle|MPos:1,2,3>', {
         wcoCache: null,
         workOriginActive: false,
-        workOriginSource: 'none' as const,
-      };
-      expect(check(unknown, { ...unknown, wcoCache: ZERO })).toBe(originMessage);
+        workOriginSource: 'none',
+      });
+      expect(check(unreported, { ...unreported, wcoCache: ZERO })).toBeNull();
+      expect(check(unreported, { ...unreported, wcoCache: { ...ZERO, z: -5 } })).toBe(
+        originMessage,
+      );
+      expect(
+        check(unreported, {
+          ...unreported,
+          wcoCache: { x: 150, y: 100, z: 0 },
+          workOriginActive: true,
+          workOriginSource: 'unknown',
+        }),
+      ).toBe(originMessage);
+      // A custom origin whose offset was never reported assumed no value.
+      const unresolved = { ...source('<Idle|MPos:1,2,3>'), wcoCache: null };
+      expect(check(unresolved, { ...unresolved, wcoCache: ZERO })).toBe(originMessage);
     });
 
     it('refuses missing coordinates or an unresolved offset needed for MPos', () => {
