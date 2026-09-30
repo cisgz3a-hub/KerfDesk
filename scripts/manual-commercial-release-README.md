@@ -2,6 +2,8 @@
 
 This lane publishes the production licensed app as an **unsigned Windows installer with manual updates**. The release identity and download manifest are authenticated with the existing stable Ed25519 trust anchors. This metadata signature is not Windows code signing. It does not remove Windows publisher warnings or authorize automatic installation.
 
+Preparation writes a UTF-8 BOM-marked `commercial-installer-terms.txt` beside the generated configuration. NSIS otherwise interprets an explicit unmarked licence file using the Windows ANSI code page. The copy preserves the approved text and line endings; the source terms and `public/eula.txt` stay unchanged. Both commercial lanes use this copy. The base, Preview and Sandbox profiles use `build/installer-terms.txt`, regenerated from `public/eula.txt` by `pnpm build:electron-main` (or directly with `node scripts/prepare-installer-terms.mjs` when packaging an existing compiled app).
+
 Prepare the package with the explicit unsigned commercial profile, then use:
 
 ```text

@@ -234,7 +234,7 @@ test('external preparation is idempotent, leaves root package unchanged, and req
   assert.deepEqual(await writeCommercialPreparation(input, paths.root), result);
   const config = JSON.parse(await readFile(result.configPath, 'utf8'));
   assert.equal(config.extends, join(paths.root, 'electron-builder.commercial.yml'));
-  assert.equal(config.nsis.license, paths.termsFile);
+  assert.equal(config.nsis.license, result.termsPath);
   assert.deepEqual(
     JSON.parse(await readFile(result.identityPath, 'utf8')),
     config.extraMetadata.kerfdeskCommercialLicense.release,
@@ -340,6 +340,27 @@ test('CLI sources private key only from explicit protected env or file and never
   );
 });
 
+for (const unsignedInstaller of [false, true])
+  test(`${unsignedInstaller ? 'unsigned' : 'signed'} preparation marks UTF-8 terms without changing approved text`, async () => {
+    const paths = await files();
+    const input = { ...fixture({ unsignedInstaller }), ...paths };
+    const original = Buffer.from('Safety — read carefully.\r\nLiability — café 中文.\n');
+    await writeFile(paths.termsFile, original);
+    const result = await writeCommercialPreparation(input, paths.root);
+    const encoded = await readFile(result.termsPath);
+    assert.deepEqual(encoded.subarray(0, 3), Buffer.from([0xef, 0xbb, 0xbf]));
+    assert.deepEqual(encoded.subarray(3), original);
+    assert.equal(
+      new TextDecoder('utf-8', { fatal: true }).decode(encoded),
+      original.toString('utf8'),
+    );
+    assert.deepEqual(await readFile(paths.termsFile), original);
+    assert.deepEqual(await writeCommercialPreparation(input, paths.root), result);
+    await writeFile(paths.termsFile, 'Different approved text.');
+    await assert.rejects(writeCommercialPreparation(input, paths.root), /different contents/u);
+    assert.deepEqual(await readFile(result.termsPath), encoded);
+  });
+
 test('afterPack verifies actual ASAR metadata and explicit external terms before code signing', async () => {
   const paths = await files();
   const input = fixture();
@@ -430,7 +451,7 @@ test('installed builder resolves commercial inheritance with mandatory signing a
   const effective = await getConfig(ROOT, generated.configPath, null);
   assert.equal(effective.extraMetadata.kerfdeskCommercialLicense.schema, 1);
   assert.equal(effective.extraMetadata.version, '1.2.3');
-  assert.equal(effective.nsis.license, paths.termsFile);
+  assert.equal(effective.nsis.license, generated.termsPath);
   assert.equal(effective.forceCodeSigning, true);
   assert.equal(effective.publish.url, 'https://dl.kerfdesk.com/desktop/commercial');
 });
@@ -527,7 +548,7 @@ test('unsigned generated config disables signing and feeds while preserving cust
   assert.equal(config.win.verifyUpdateCodeSignature, true);
   assert.equal(config.publish, null);
   assert.equal(config.nsis.differentialPackage, false);
-  assert.equal(config.nsis.license, paths.termsFile);
+  assert.equal(config.nsis.license, result.termsPath);
   assert.equal(config.extraMetadata.kerfdeskCommercialLicense.schema, 1);
   assert.equal(config.electronFuses.enableEmbeddedAsarIntegrityValidation, true);
   assert.ok(config.extraResources.some((entry) => entry.to === 'legal/THIRD_PARTY_NOTICES.md'));

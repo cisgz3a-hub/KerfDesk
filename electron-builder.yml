@@ -80,7 +80,7 @@ nsis:
   shortcutName: KerfDesk
   # NSIS displays the License & Safety Notice before installation: the free
   # use terms and safety warnings (ADR-543). It sets no commercial terms.
-  license: public/eula.txt
+  license: build/installer-terms.txt
 
 # Double-clicking a KerfDesk project opens it in KerfDesk (ADR-378). Only the
 # .lf2 type is claimed: registering .lbrn/.lbrn2 here would take LightBurn's
