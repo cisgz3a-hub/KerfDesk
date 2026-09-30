@@ -123,9 +123,8 @@ describe('desktop updates in the window (ADR-547)', () => {
     expect(host.querySelector('[aria-label="KerfDesk updates"]')).toBeNull();
   });
 
-  it('shows a build that does not update itself, and stops asking when the status is unreadable', async () => {
-    const adapter = client(status('idle'));
-    vi.mocked(adapter.updateStatus).mockRejectedValue(new Error('unavailable'));
+  it('shows an explicitly unsupported build without repeatedly asking', async () => {
+    const adapter = client(status('unavailable'));
     await mount(adapter);
     await wait(0);
     act(() => {
@@ -135,6 +134,29 @@ describe('desktop updates in the window (ADR-547)', () => {
     expect(button('Check now')).toBeUndefined();
     await wait(60_000);
     expect(adapter.updateStatus).toHaveBeenCalledOnce();
+  });
+
+  it('offers retry after a transient initial status failure without downloading or installing', async () => {
+    const adapter = {
+      ...client(manual('up-to-date', null)),
+      downloadUpdate: vi.fn(async () => manual('downloading')),
+      installUpdateOnQuit: vi.fn(async () => manual('ready', '2026.41.0', true)),
+    };
+    vi.mocked(adapter.updateStatus).mockRejectedValueOnce(new Error('temporary bridge failure'));
+    vi.mocked(adapter.checkForUpdates).mockResolvedValue(manual('checking', null));
+    await mount(adapter);
+    await wait(0);
+    act(() => {
+      window.dispatchEvent(new Event(CHECK_UPDATES_EVENT));
+    });
+    expect(button('Check now')?.disabled).toBe(false);
+    expect(host.textContent).not.toContain("This copy of KerfDesk doesn't update itself.");
+    await act(async () => button('Check now')?.click());
+    await wait(3_000);
+    expect(host.textContent).toContain('KerfDesk is up to date.');
+    expect(adapter.checkForUpdates).toHaveBeenCalledOnce();
+    expect(adapter.downloadUpdate).not.toHaveBeenCalled();
+    expect(adapter.installUpdateOnQuit).not.toHaveBeenCalled();
   });
 
   it('explains in the web app that the browser version updates itself', async () => {
@@ -189,7 +211,7 @@ describe('desktop updates in the window (ADR-547)', () => {
     vi.mocked(adapter.updateStatus).mockRejectedValueOnce(new Error('temporarily unavailable'));
     await wait(30_000);
     expect(useCommercialUpdateStore.getState().status).toMatchObject({
-      state: 'unavailable',
+      state: 'failed',
       mode: 'manual',
     });
     await wait(30_000);
