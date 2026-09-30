@@ -22,7 +22,7 @@ export function useCommercialUpdateStatus(client: LicenceAdapter) {
       try {
         setStatus(await action());
       } catch {
-        setStatus(unreadable(useCommercialUpdateStore.getState().status, 'failed'));
+        setStatus(unreadable(useCommercialUpdateStore.getState().status));
       } finally {
         pending.current = false;
         setBusy(false);
@@ -67,12 +67,9 @@ function useUpdatePolling(
   }, [busy, client, revision, setStatus, status]);
 }
 
-function unreadable(
-  status: CommercialUpdateStatus | null,
-  state: 'unavailable' | 'failed' = 'unavailable',
-): CommercialUpdateStatus {
+function unreadable(status: CommercialUpdateStatus | null): CommercialUpdateStatus {
   return {
-    state,
+    state: 'failed',
     currentVersion: status?.currentVersion ?? __APP_VERSION__,
     version: null,
     checkedAt: null,

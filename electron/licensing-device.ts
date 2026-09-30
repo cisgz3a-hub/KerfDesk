@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import { join } from 'node:path';
+import { windowsRegistryCommand } from './windows-registry-command.js';
 
 const exec = promisify(execFile);
 type DeviceDependencies = {
@@ -16,17 +16,11 @@ const dependencies: DeviceDependencies = {
   read: (path) => readFile(path, 'utf8'),
   execute: async (file, args) =>
     (
-      await exec(
-        file === 'reg.exe'
-          ? join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'reg.exe')
-          : file,
-        [...args],
-        {
-          windowsHide: true,
-          timeout: 5000,
-          maxBuffer: 64 * 1024,
-        },
-      )
+      await exec(file === 'reg.exe' ? windowsRegistryCommand() : file, [...args], {
+        windowsHide: true,
+        timeout: 5000,
+        maxBuffer: 64 * 1024,
+      })
     ).stdout,
 };
 

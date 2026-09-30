@@ -145,6 +145,52 @@ it('lets the operator decline without opening the tool', async () => {
   expect(open).not.toHaveBeenCalled();
   expect(document.body.textContent).not.toContain('is a Pro tool');
 });
+it.each(['timer', 'selection', 'rollback'] as const)(
+  'blocks new Pro choices after trial expiry through %s without unmounting existing work',
+  async (trigger) => {
+    vi.useFakeTimers();
+    let elapsed = 0;
+    const elapsedClock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+    const now = 2_000_000_000;
+    vi.setSystemTime(now * 1000);
+    const api = client({ ...trial, accessExpiresAt: now + 1, updatesUntil: now + 1 });
+    const open = vi.fn();
+    const unmount = vi.fn();
+    function Workspace() {
+      useEffect(() => unmount, []);
+      return <div data-workspace>existing work</div>;
+    }
+    try {
+      await act(async () =>
+        root.render(
+          <EditionProvider client={api}>
+            <Workspace />
+            <VcarveTool onOpen={open} />
+          </EditionProvider>,
+        ),
+      );
+      await act(async () => button('Open V-carve').click());
+      expect(open).toHaveBeenCalledOnce();
+      if (trigger === 'timer') await act(async () => vi.advanceTimersByTime(1000));
+      else if (trigger === 'rollback') {
+        vi.setSystemTime((now - 60) * 1000);
+        elapsed = 1000;
+      } else vi.setSystemTime((now + 1) * 1000); // Suspended timers cannot extend rights.
+      expect(proFeaturesUnlocked()).toBe(false);
+      vi.setSystemTime((now - 60) * 1000); // An observed expiry must also stay expired.
+      await act(async () => button('Open V-carve').click());
+      await act(async () => expect(requestProFeature('box-generator', open)).toBe(false));
+      expect(open).toHaveBeenCalledOnce();
+      expect(unmount).not.toHaveBeenCalled();
+      expect(host.querySelector('[data-workspace]')?.textContent).toBe('existing work');
+      expect(document.body.textContent).toContain('Pro trial on this device has ended');
+      expect(api.startTrial).not.toHaveBeenCalled();
+    } finally {
+      elapsedClock.mockRestore();
+      vi.useRealTimers();
+    }
+  },
+);
 it('keeps the workspace mounted while the licence is managed or deactivated', async () => {
   const api = client(trial);
   const unmount = vi.fn();

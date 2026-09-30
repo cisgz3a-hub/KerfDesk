@@ -16,6 +16,12 @@ function requireUsableStatus(license) {
   requireValue(license?.status === 'active', 403, 'license_inactive');
 }
 
+function requireCurrentKey(license, keyHash) {
+  requireValue(license?.keyHash === keyHash, 401, 'invalid_credentials');
+  requireUsableStatus(license);
+  return license;
+}
+
 export function nextUpdateYear(seconds) {
   const date = new Date(seconds * 1000);
   const month = date.getUTCMonth();
@@ -56,8 +62,9 @@ export class LicensingAuthority {
       401,
       'invalid_credentials',
     );
-    requireUsableStatus(license);
-    return license;
+    // HMAC verification yields. A completed rekey or revocation invalidates the
+    // earlier snapshot before it can authorise another key-based operation.
+    return requireCurrentKey(this.records.get(`license:${license.licenseId}`), license.keyHash);
   }
 
   async developerGrant(body, admin) {
@@ -232,18 +239,21 @@ export class LicensingAuthority {
 
   async releaseWithKey(body) {
     const license = await this.authenticateLicense(body.licenseKey);
-    return this.release(license.licenseId, identifier(body.activationId));
+    return this.release(license.licenseId, identifier(body.activationId), license.keyHash);
   }
 
-  release(licenseId, activationId) {
+  release(licenseId, activationId, authenticatedKeyHash) {
     const now = this.now();
     return this.records.transaction((tx) => {
+      const license = tx.get(`license:${licenseId}`);
+      // A key-authorised release must still own the current key at mutation.
+      // Device-token sign-out remains available for revoked/released seats.
+      if (authenticatedKeyHash !== undefined) requireCurrentKey(license, authenticatedKeyHash);
       const activation = tx.get(`activation:${activationId}`);
       requireValue(activation?.licenseId === licenseId, 404, 'activation_not_found');
       // A repeated deactivation (a retry after a lost response) frees nothing
       // and is not counted.
       if (!activation.active) return { deactivated: true };
-      const license = tx.get(`license:${licenseId}`);
       const releases = (license.releases ?? []).filter((at) => at > now - RELEASE_WINDOW);
       requireValue(
         license.tier !== 'paid' || releases.length < MAX_RELEASES,
@@ -261,16 +271,19 @@ export class LicensingAuthority {
 
   async listActivations(body) {
     const license = await this.authenticateLicense(body.licenseKey);
-    return {
-      activations: license.active.map((id) => {
-        const activation = this.records.get(`activation:${id}`);
-        return {
-          activationId: id,
-          deviceName: activation.deviceName,
-          createdAt: activation.createdAt,
-        };
-      }),
-    };
+    return this.records.transaction((tx) => {
+      const current = requireCurrentKey(tx.get(`license:${license.licenseId}`), license.keyHash);
+      return {
+        activations: current.active.map((id) => {
+          const activation = tx.get(`activation:${id}`);
+          return {
+            activationId: id,
+            deviceName: activation.deviceName,
+            createdAt: activation.createdAt,
+          };
+        }),
+      };
+    });
   }
 
   /**

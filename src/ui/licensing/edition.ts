@@ -6,6 +6,7 @@ import { createContext, useContext } from 'react';
 import { BROWSER_FREE_BUILD } from '../../platform/build-capabilities';
 import type { LicenceStatus } from '../../platform/types';
 import type { ProFeature } from './pro-features';
+import { trialHasExpired } from './trial-expiry';
 
 export type EditionValue = {
   readonly status: LicenceStatus | null;
@@ -75,5 +76,5 @@ export function requestProFeature(feature: ProFeature, onAllowed?: () => void): 
 }
 
 export function proFeaturesUnlocked(): boolean {
-  return active.pro;
+  return active.pro && !trialHasExpired(active.status);
 }

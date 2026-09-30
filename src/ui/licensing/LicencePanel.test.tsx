@@ -86,6 +86,91 @@ function checkbox(): HTMLInputElement | null {
   return label?.querySelector('input[type="checkbox"]') ?? null;
 }
 
+function activationInput(): HTMLInputElement {
+  return host.querySelector<HTMLInputElement>('#kerfdesk-licence-key')!;
+}
+function button(label: string): HTMLButtonElement {
+  return [...host.querySelectorAll('button')].find((item) => item.textContent === label)!;
+}
+async function enterKey(value: string): Promise<void> {
+  await act(async () => {
+    const input = activationInput();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+it.each([
+  { ...free, message: 'Enter a valid licence key.' },
+  { ...free, message: 'The licence service could not be reached. Try again.' },
+  {
+    ...free,
+    state: 'ready' as const,
+    tier: 'paid' as const,
+    edition: 'pro' as const,
+    licenseKey: 'synthetic-key-to-correct',
+    message: 'The licence service could not be reached. Try again.',
+  },
+  {
+    ...free,
+    state: 'ready' as const,
+    tier: 'paid' as const,
+    edition: 'pro' as const,
+    licenseKey: 'synthetic-previous-key',
+  },
+])('retains the activation draft after a rejected or offline response %#', async (answer) => {
+  const adapter = client(offered(false));
+  vi.mocked(adapter.activate).mockResolvedValue(answer);
+  await show(adapter);
+  await enterKey('  synthetic-key-to-correct  ');
+  await act(async () => button('Activate licence').click());
+  expect(adapter.activate).toHaveBeenCalledExactlyOnceWith('synthetic-key-to-correct');
+  expect(activationInput().value).toBe('  synthetic-key-to-correct  ');
+  expect(button('Activate licence').disabled).toBe(false);
+});
+
+it('retains the activation draft after a thrown transport failure and allows a corrected retry', async () => {
+  const adapter = client(offered(false));
+  vi.mocked(adapter.activate).mockRejectedValueOnce(new Error('bridge unavailable'));
+  await show(adapter);
+  await enterKey('synthetic-key-to-correct');
+  await act(async () => button('Activate licence').click());
+  expect(activationInput().value).toBe('synthetic-key-to-correct');
+  expect(host.textContent).toContain('This request could not be completed. Please try again.');
+  await enterKey('synthetic-corrected-key');
+  vi.mocked(adapter.activate).mockResolvedValue({
+    ...free,
+    state: 'ready',
+    tier: 'paid',
+    edition: 'pro',
+    licenseKey: 'synthetic-corrected-key',
+  });
+  await act(async () => button('Activate licence').click());
+  expect(adapter.activate).toHaveBeenLastCalledWith('synthetic-corrected-key');
+  expect(activationInput().value).toBe('');
+  expect(button('Activate licence').disabled).toBe(true);
+});
+
+it('does not erase a draft when an unrelated licence action completes', async () => {
+  const adapter = client(offered(false));
+  await show(adapter);
+  await enterKey('synthetic-key-to-correct');
+  await act(async () => button('Start free 30-day Pro trial').click());
+  expect(adapter.startTrial).toHaveBeenCalledOnce();
+  expect(activationInput().value).toBe('synthetic-key-to-correct');
+});
+
+it('does not submit blank or short activation keys', async () => {
+  const adapter = client(offered(false));
+  await show(adapter);
+  for (const value of ['', '   ', 'short']) {
+    await enterKey(value);
+    expect(button('Activate licence').disabled).toBe(true);
+    await act(async () => button('Activate licence').click());
+  }
+  expect(adapter.activate).not.toHaveBeenCalled();
+});
+
 it('offers new versions early in a commercial build and saves the choice (ADR-541)', async () => {
   const adapter = client(offered(false));
   await show(adapter);
