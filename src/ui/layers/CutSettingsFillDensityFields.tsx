@@ -1,3 +1,5 @@
+import { DraftNumberInput } from '../kit/DraftNumberInput';
+
 export function CutSettingsFillDensityFields(props: {
   readonly lineIntervalMm: number;
   readonly onChange: (lineIntervalMm: number) => void;
@@ -12,19 +14,16 @@ export function CutSettingsFillDensityFields(props: {
         title="Hidden synchronized fill line interval value used when saving cut settings."
       />
       <Field label="Line Interval">
-        <input
-          type="number"
+        <DraftNumberInput
           data-setting="hatchSpacingMm"
           min={0.05}
           max={10}
           step="any"
           className="lf-input"
-          value={displayNumber(props.lineIntervalMm, 4)}
-          onChange={(event) =>
-            props.onChange(
-              clampFillLineInterval(numericValue(event.target.value, props.lineIntervalMm)),
-            )
-          }
+          value={props.lineIntervalMm}
+          format={(value) => String(displayNumber(value, 4))}
+          normalize={clampFillLineInterval}
+          onValueChange={props.onChange}
           style={numberStyle}
           aria-label="Cut settings line interval"
           title="Distance between fill scan lines. Smaller values engrave denser fills."
@@ -32,24 +31,16 @@ export function CutSettingsFillDensityFields(props: {
         <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="Lines / Inch">
-        <input
-          type="number"
+        <DraftNumberInput
           data-setting="hatchSpacingMm"
           min={lineIntervalMmToLinesPerInch(10)}
           max={lineIntervalMmToLinesPerInch(0.05)}
           step="any"
           className="lf-input"
-          value={displayNumber(lineIntervalMmToLinesPerInch(props.lineIntervalMm), 2)}
-          onChange={(event) =>
-            props.onChange(
-              linesPerInchToLineIntervalMm(
-                numericValue(
-                  event.target.value,
-                  lineIntervalMmToLinesPerInch(props.lineIntervalMm),
-                ),
-              ),
-            )
-          }
+          value={lineIntervalMmToLinesPerInch(props.lineIntervalMm)}
+          format={(value) => String(displayNumber(value, 2))}
+          normalize={(value) => lineIntervalMmToLinesPerInch(linesPerInchToLineIntervalMm(value))}
+          onValueChange={(value) => props.onChange(linesPerInchToLineIntervalMm(value))}
           style={numberStyle}
           aria-label="Cut settings lines per inch"
           title="Fill scan density in lines per inch. Higher values engrave denser fills."
@@ -79,11 +70,6 @@ function linesPerInchToLineIntervalMm(linesPerInch: number): number {
 
 function clampFillLineInterval(lineIntervalMm: number): number {
   return Math.max(0.05, Math.min(10, lineIntervalMm));
-}
-
-function numericValue(s: string, fallback: number): number {
-  const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : fallback;
 }
 
 function displayNumber(value: number, decimals: number): number {

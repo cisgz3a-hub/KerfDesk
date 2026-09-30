@@ -7,6 +7,7 @@ import {
   type LayerSubLayer,
 } from '../../core/scene';
 import { useStore } from '../state';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { CutSettingsDialog } from './CutSettingsDialog';
 import type { LayerPatch } from './cut-settings-draft';
 
@@ -160,13 +161,12 @@ function PowerInput(props: {
 }): JSX.Element {
   const updateLayerSubLayer = useStore((state) => state.updateLayerSubLayer);
   return (
-    <input
-      type="number"
+    <DraftNumberInput
       min={0}
       max={100}
       value={props.subLayer.settings.power}
-      onChange={(event) => {
-        const power = clamp(Number.parseFloat(event.target.value), 0, 100);
+      normalize={(value) => clamp(value, 0, 100)}
+      onValueChange={(power) => {
         updateLayerSubLayer(props.layer.id, props.subLayer.id, {
           power,
           minPower: Math.min(props.subLayer.settings.minPower, power),

@@ -1,6 +1,8 @@
 import type { ScanOffsetPoint } from '../../core/devices';
 import { mergeScanOffsetTableBySpeed } from '../../core/devices';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
+import { useRef } from 'react';
 
 type ScanOffsetEditorProps = {
   readonly value: ReadonlyArray<ScanOffsetPoint>;
@@ -10,6 +12,25 @@ type ScanOffsetEditorProps = {
 
 export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
   const points = mergeScanOffsetTableBySpeed(props.value);
+  const keys = useRef(new Map<number, number>());
+  const nextKey = useRef(0);
+  keys.current = new Map(
+    points.map((point) => [
+      point.speedMmPerMin,
+      keys.current.get(point.speedMmPerMin) ?? nextKey.current++,
+    ]),
+  );
+  const changePoint = (index: number, patch: Partial<ScanOffsetPoint>): void => {
+    // Preserve each row while a speed edit sorts it. Like the canonical merge,
+    // later points win a duplicate speed, including the surviving row's key.
+    keys.current = new Map(
+      points.map((point, current) => [
+        current === index ? (patch.speedMmPerMin ?? point.speedMmPerMin) : point.speedMmPerMin,
+        keys.current.get(point.speedMmPerMin) ?? nextKey.current++,
+      ]),
+    );
+    props.onChange(updatePoint(points, index, patch));
+  };
   return (
     <Row label="Scan offset">
       <div
@@ -27,11 +48,11 @@ export function ScanOffsetEditor(props: ScanOffsetEditorProps): JSX.Element {
         ) : (
           points.map((point, index) => (
             <ScanOffsetRow
-              key={`${point.speedMmPerMin}:${index}`}
+              key={keys.current.get(point.speedMmPerMin)}
               point={point}
               index={index}
               maxOffsetMagnitudeMm={props.maxOffsetMagnitudeMm}
-              onChange={(patch) => props.onChange(updatePoint(points, index, patch))}
+              onChange={(patch) => changePoint(index, patch)}
               onRemove={() => props.onChange(removePoint(points, index))}
             />
           ))
@@ -58,36 +79,27 @@ function ScanOffsetRow(props: {
   const rowNumber = props.index + 1;
   return (
     <div style={rowEditorStyle}>
-      <input
-        type="number"
+      <DraftNumberInput
         min={1}
         step={100}
         value={props.point.speedMmPerMin}
-        onChange={(event) =>
-          props.onChange({
-            speedMmPerMin: parsePositiveFinite(event.target.value, props.point.speedMmPerMin),
-          })
-        }
+        commitOnBlur
+        normalize={(value) => (value > 0 ? value : props.point.speedMmPerMin)}
+        onValueChange={(speedMmPerMin) => props.onChange({ speedMmPerMin })}
         style={speedInputStyle}
         aria-label={`Scan offset speed ${rowNumber}`}
         title="Engraving speed this calibration point applies to."
       />
       <span style={unitStyle}>mm/min</span>
-      <input
-        type="number"
+      <DraftNumberInput
         min={-props.maxOffsetMagnitudeMm}
         max={props.maxOffsetMagnitudeMm}
         step={0.01}
         value={props.point.offsetMm}
-        onChange={(event) =>
-          props.onChange({
-            offsetMm: parseBoundedFinite(
-              event.target.value,
-              props.point.offsetMm,
-              props.maxOffsetMagnitudeMm,
-            ),
-          })
+        normalize={(value) =>
+          Math.abs(value) <= props.maxOffsetMagnitudeMm ? value : props.point.offsetMm
         }
+        onValueChange={(offsetMm) => props.onChange({ offsetMm })}
         style={numInputStyle}
         aria-label={`Scan offset value ${rowNumber}`}
         title="Offset in millimeters. Positive shifts reverse scanlines along their travel direction."
@@ -97,6 +109,11 @@ function ScanOffsetRow(props: {
         type="button"
         aria-label={`Remove scan offset ${rowNumber}`}
         title="Remove this calibrated scan-offset point."
+        onPointerDown={(event) => {
+          // Remove discards this row's draft. Do not first blur/reorder it out
+          // from under the pointer before the click can reach the button.
+          if (event.button === 0) event.preventDefault();
+        }}
         onClick={props.onRemove}
       >
         Remove
@@ -128,16 +145,6 @@ function removePoint(
   index: number,
 ): ReadonlyArray<ScanOffsetPoint> {
   return mergeScanOffsetTableBySpeed(points.filter((_, current) => current !== index));
-}
-
-function parsePositiveFinite(value: string, fallback: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function parseBoundedFinite(value: string, fallback: number, maxMagnitude: number): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && Math.abs(parsed) <= maxMagnitude ? parsed : fallback;
 }
 
 const editorStyle: React.CSSProperties = {

@@ -83,8 +83,11 @@ describe('photo shading trace controls', () => {
     expect(controls.settings().photoDetail).toBe(0);
     await controls.change('Midtones', 0.01);
     expect(controls.settings().photoGamma).toBe(0.1);
-    // A cleared Midtones entry returns to neutral, not to the darkest extreme.
+    // Clearing stays editable; leaving it blank restores neutral on blur.
     await controls.change('Midtones', '');
+    expect(controls.number('Midtones').value).toBe('');
+    expect(controls.settings().photoGamma).toBe(0.1);
+    await controls.blur('Midtones');
     expect(controls.settings().photoGamma).toBe(1);
   });
 
@@ -178,6 +181,11 @@ async function mountPhotoControls(
     },
     click: async (label: string): Promise<void> => {
       await act(async () => number(label).click());
+    },
+    blur: async (label: string): Promise<void> => {
+      await act(async () => {
+        number(label).dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+      });
     },
     selectPreset: async (next: TraceOptions): Promise<void> => {
       await act(async () => choosePreset(next));

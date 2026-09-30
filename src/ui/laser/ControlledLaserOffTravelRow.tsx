@@ -1,4 +1,5 @@
 import { Row, numInputStyle, unitStyle } from './device-settings-shared';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 
 export function ControlledLaserOffTravelRow(props: {
   readonly value: number | undefined;
@@ -22,21 +23,16 @@ export function ControlledLaserOffTravelRow(props: {
         />
         G1 S0
       </label>
-      <input
+      <DraftNumberInput
         aria-label="Controlled laser-off seek feed"
         title="Set the feed rate for laser-off G1 positioning moves when controlled seek is enabled."
-        type="number"
         value={props.value ?? 800}
         min={1}
         max={props.maxFeed}
         step={50}
         disabled={!enabled}
-        onChange={(event) => {
-          const value = Number(event.target.value);
-          if (Number.isFinite(value) && value > 0 && value <= props.maxFeed) {
-            props.onChange(value);
-          }
-        }}
+        normalize={(value) => (value > 0 && value <= props.maxFeed ? value : (props.value ?? 800))}
+        onValueChange={props.onChange}
         style={numInputStyle}
       />
       <span style={unitStyle}>mm/min</span>

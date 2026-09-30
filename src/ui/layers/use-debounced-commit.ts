@@ -19,6 +19,8 @@ export type UseDebouncedCommitArgs<T> = {
   readonly parse: (input: string) => T;
   readonly format?: (value: T) => string;
   readonly debounceMs?: number;
+  /** Keep edits local until blur/Enter when committing reorders the editor. */
+  readonly commitOnBlur?: boolean;
   // Extra reconciliation trigger for fields whose DISPLAY depends on more
   // than `value`: a shape field shows spec × transform scale, so a toolbar
   // resize changes what the box should read while `value` (the spec) stays
@@ -121,6 +123,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     draft,
     editedRef,
     debounceMs,
+    commitOnBlur: args.commitOnBlur === true,
     parse,
     format,
     validationError,
@@ -141,6 +144,7 @@ type DebouncedHandlerContext<T> = {
   readonly draft: string;
   readonly editedRef: { current: boolean };
   readonly debounceMs: number;
+  readonly commitOnBlur: boolean;
   readonly parse: (input: string) => T;
   readonly format: (value: T) => string;
   readonly validationError: (input: string) => string | null;
@@ -169,6 +173,10 @@ function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedC
       return;
     }
     const parsed = context.parse(nextText);
+    if (context.commitOnBlur) {
+      context.debouncer?.cancel();
+      return;
+    }
     if (context.debounceMs <= 0) context.debouncer?.flush(parsed);
     else context.debouncer?.schedule(parsed);
   };

@@ -4,6 +4,7 @@
 // can still pan/zoom the canvas to inspect the preview.
 
 import { useEffect } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { lumaHistogram } from '../../core/image-adjust';
 import { maskBounds } from '../../core/image-select';
 import {
@@ -138,16 +139,13 @@ function ParamSlider(props: {
         aria-label={param.label}
         title={param.label}
       />
-      <input
-        type="number"
+      <DraftNumberInput
         min={param.min}
         max={param.max}
         step={param.step}
         value={value}
-        onChange={(e) => {
-          const next = Number(e.target.value);
-          if (Number.isFinite(next)) onChange(Math.min(param.max, Math.max(param.min, next)));
-        }}
+        normalize={(next) => Math.min(param.max, Math.max(param.min, next))}
+        onValueChange={onChange}
         style={numberStyle}
         aria-label={`${param.label} value`}
         title={`${param.label} value`}

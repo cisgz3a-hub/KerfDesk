@@ -129,3 +129,33 @@ it('traces only the area, at the finer area density, from a live camera', async 
     },
   });
 });
+
+it('lets area dimensions clear and retype without zeroing the area or rounding typed coordinates', async () => {
+  camera.setState({
+    heightAreas: [{ id: 'lid', x: 150.1234, y: 170, width: 60, height: 40, surfaceHeightMm: 20 }],
+  });
+  const host = await mountControl(<HeightAreasControl />);
+  const width = field(host, 'Area 1 width');
+  await act(async () => width.focus());
+  await type(width, '');
+  expect(width.value).toBe('');
+  expect(camera.getState().heightAreas[0]?.width).toBe(60);
+  await type(width, '0.5');
+  expect(width.value).toBe('0.5');
+  expect(camera.getState().heightAreas[0]?.width).toBe(0.5);
+  await type(width, '-2');
+  expect(width.value).toBe('-2');
+  expect(camera.getState().heightAreas[0]?.width).toBe(0);
+  await act(async () => width.blur());
+  expect(width.value).toBe('0');
+
+  const x = field(host, 'Area 1 left edge');
+  expect(x.value).toBe('150.1');
+  await act(async () => x.focus());
+  await type(x, '-0.125');
+  expect(x.value).toBe('-0.125');
+  expect(camera.getState().heightAreas[0]?.x).toBe(-0.125);
+  await act(async () => x.blur());
+  expect(x.value).toBe('-0.1');
+  expect(camera.getState().heightAreas[0]?.x).toBe(-0.125);
+});

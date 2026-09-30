@@ -4,7 +4,8 @@ import type {
   VariableCsvDataset,
 } from '../../core/scene';
 import { variableTemplateToSource } from '../../core/variables';
-import { Button, NumberInput } from '../kit';
+import { Button } from '../kit';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
 import { VariableCsvImport } from './VariableCsvImport';
@@ -110,14 +111,13 @@ function Counter(props: {
   return (
     <label style={counterStyle}>
       <span>{props.label}</span>
-      <NumberInput
+      <DraftNumberInput
         aria-label={`Variable ${props.label.toLowerCase()}`}
         min={props.min}
         step={1}
         value={props.value}
-        onChange={(event) =>
-          props.onChange(Math.max(props.min, Math.floor(event.currentTarget.valueAsNumber)))
-        }
+        normalize={(next) => Math.max(props.min, Math.floor(next))}
+        onValueChange={props.onChange}
       />
     </label>
   );

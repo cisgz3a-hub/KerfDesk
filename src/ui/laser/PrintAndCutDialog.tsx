@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { checkTwoPointRegistration } from '../../core/registration/registration-check';
 import type { PrintAndCutDesignTargets, Vec2 } from '../../core/scene';
-import { Button, Dialog, DialogActions, NumberInput } from '../kit';
+import { Button, Dialog, DialogActions } from '../kit';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import type { CaptureSource } from '../state/print-cut-session-store';
 
 /** Finding both printed marks in one camera picture (ADR-443). */
@@ -50,10 +51,8 @@ export function PrintAndCutDialog(props: PrintAndCutDialogProps): JSX.Element {
     props.onTargetsChanged?.();
     setTargets(next);
   };
-  const setCoordinate = (which: 'first' | 'second', axis: 'x' | 'y', value: string): void => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return;
-    changeTargets({ ...targets, [which]: { ...targets[which], [axis]: parsed } });
+  const setCoordinate = (which: 'first' | 'second', axis: 'x' | 'y', value: number): void => {
+    changeTargets({ ...targets, [which]: { ...targets[which], [axis]: value } });
   };
   return (
     <Dialog
@@ -229,7 +228,7 @@ function TargetRow(props: {
   readonly machine: Vec2 | null;
   readonly source: CaptureSource | null;
   readonly captureEnabled: boolean;
-  readonly onChange: (axis: 'x' | 'y', value: string) => void;
+  readonly onChange: (axis: 'x' | 'y', value: number) => void;
   readonly onCapture: () => void;
 }): JSX.Element {
   return (
@@ -237,18 +236,18 @@ function TargetRow(props: {
       <legend>{props.label}</legend>
       <label style={fieldStyle}>
         <span>Design X</span>
-        <NumberInput
-          value={String(props.target.x)}
+        <DraftNumberInput
+          value={props.target.x}
           step={0.1}
-          onChange={(event) => props.onChange('x', event.currentTarget.value)}
+          onValueChange={(value) => props.onChange('x', value)}
         />
       </label>
       <label style={fieldStyle}>
         <span>Design Y</span>
-        <NumberInput
-          value={String(props.target.y)}
+        <DraftNumberInput
+          value={props.target.y}
           step={0.1}
-          onChange={(event) => props.onChange('y', event.currentTarget.value)}
+          onValueChange={(value) => props.onChange('y', value)}
         />
       </label>
       <div style={captureStyle}>

@@ -2,6 +2,7 @@
 // checkpoint-bound supervised recovery (ADR-103 H1, ADR-200).
 
 import { useMemo, useRef, useState } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { RecoveryCapsule, RecoveryRepositorySnapshot } from '../state/recovery';
 import { useRecoveryRepositorySelection } from '../state/use-recovery-repository';
@@ -50,8 +51,7 @@ export function StartFromLineControl(props: {
         Start from line…
       </summary>
       <div style={rowStyle}>
-        <input
-          type="number"
+        <DraftNumberInput
           aria-label="Resume from G-code line"
           title="1-based line number of the exported job to resume from."
           min={MIN_LINE}
@@ -59,10 +59,11 @@ export function StartFromLineControl(props: {
           step={1}
           disabled={blocked}
           value={line}
-          onChange={(e) => {
-            const v = Math.floor(Number(e.target.value));
-            if (Number.isFinite(v) && v >= MIN_LINE && v <= MAX_LINE) setLine(v);
+          normalize={(value) => {
+            const rounded = Math.floor(value);
+            return rounded >= MIN_LINE && rounded <= MAX_LINE ? rounded : line;
           }}
+          onValueChange={setLine}
           style={inputStyle}
         />
         <button

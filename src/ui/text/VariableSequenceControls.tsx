@@ -1,6 +1,7 @@
 import type { ProjectVariableData, VariableSequenceSettings } from '../../core/scene';
 import { resolveVariableSequence } from '../../core/variables';
-import { Button, NumberInput } from '../kit';
+import { Button } from '../kit';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import type { useStore } from '../state';
 
 type SetSettings = ReturnType<typeof useStore.getState>['setVariableSettings'];
@@ -134,19 +135,17 @@ function SequenceNumber(props: {
   return (
     <label style={rowStyle}>
       <span>{props.label}</span>
-      <NumberInput
+      <DraftNumberInput
         aria-label={`Variable ${props.label.toLowerCase()}`}
         value={props.value}
         min={props.min}
         {...(props.max === undefined ? {} : { max: props.max })}
         step={1}
         disabled={props.disabled}
-        onChange={(event) => {
-          const next = Number.isFinite(event.currentTarget.valueAsNumber)
-            ? Math.floor(event.currentTarget.valueAsNumber)
-            : props.value;
-          props.onChange(Math.min(props.max ?? Number.MAX_SAFE_INTEGER, Math.max(props.min, next)));
-        }}
+        normalize={(next) =>
+          Math.min(props.max ?? Number.MAX_SAFE_INTEGER, Math.max(props.min, Math.floor(next)))
+        }
+        onValueChange={props.onChange}
       />
     </label>
   );

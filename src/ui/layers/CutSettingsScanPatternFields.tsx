@@ -4,6 +4,7 @@
 // (cut-settings-draft.ts).
 
 import { useState } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { normalizedScanAngleDeg } from '../../core/raster/raster-scan-frame';
 import type { Layer } from '../../core/scene';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
@@ -22,15 +23,14 @@ export function ImageScanPatternFields(props: { readonly layer: Layer }): JSX.El
         ariaLabel="Image scan direction preview"
       />
       <Field label="Scan angle">
-        <input
+        <DraftNumberInput
           name="imageScanAngleDeg"
-          type="number"
           className="lf-input"
           min={0}
           max={180}
           step="any"
           value={angleDeg}
-          onChange={(event) => setAngleDeg(Number(event.currentTarget.value))}
+          onValueChange={setAngleDeg}
           style={numberStyle}
           aria-label="Cut settings image scan angle"
           title="Direction the image rows run, in degrees counter-clockwise from the X axis, as a Fill's scan angle. 0 scans along X; 90 scans along Y. Overscan and the bidirectional scan offset follow the rows."

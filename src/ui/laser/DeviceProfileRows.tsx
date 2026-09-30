@@ -4,6 +4,7 @@ import {
   type ProfileCapability,
 } from '../../core/devices';
 import { numInputStyle, Row, unitStyle } from './device-settings-shared';
+import { useDebouncedCommit } from '../layers/use-debounced-commit';
 
 type DeviceRowsProps = {
   readonly device: DeviceProfile;
@@ -38,23 +39,7 @@ export function ZRows(props: DeviceRowsProps): JSX.Element {
         </label>
       </Row>
       <Row label="Z travel">
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={device.zTravelMm ?? ''}
-          onChange={(e) => {
-            const value = Number(e.target.value);
-            const patch: Partial<DeviceProfile> = { zTravelConfirmed: false };
-            if (Number.isFinite(value) && value > 0) {
-              Object.assign(patch, { zTravelMm: value });
-            }
-            update(patch);
-          }}
-          style={numInputStyle}
-          aria-label="Z travel (mm)"
-          title="Informational Z travel from the machine profile or GRBL $132. Confirm this on the real machine before using Z workflows."
-        />
+        <ZTravelInput device={device} update={update} />
         <span style={unitStyle}>mm</span>
         <label style={inlineLabelStyle} title="Mark Z travel as checked against the machine.">
           <input
@@ -88,6 +73,37 @@ export function ZRows(props: DeviceRowsProps): JSX.Element {
         </label>
       </Row>
     </>
+  );
+}
+
+function ZTravelInput({ device, update }: DeviceRowsProps): JSX.Element {
+  const field = useDebouncedCommit<number | undefined>({
+    value: device.zTravelMm,
+    format: (value) => (value === undefined ? '' : String(value)),
+    parse: (text) => {
+      const value = Number(text);
+      return Number.isFinite(value) && value > 0 ? value : device.zTravelMm;
+    },
+    commit: (zTravelMm) => {
+      if (zTravelMm !== undefined) update({ zTravelMm, zTravelConfirmed: false });
+    },
+    debounceMs: 0,
+  });
+  return (
+    <input
+      type="number"
+      min={0}
+      step={1}
+      value={field.displayValue}
+      onChange={(event) => {
+        field.onChange(event);
+        if (device.zTravelConfirmed === true) update({ zTravelConfirmed: false });
+      }}
+      onBlur={field.onBlur}
+      style={numInputStyle}
+      aria-label="Z travel (mm)"
+      title="Informational Z travel from the machine profile or GRBL $132. Confirm this on the real machine before using Z workflows."
+    />
   );
 }
 
