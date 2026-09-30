@@ -67,3 +67,11 @@
   Cache-Control: no-store
 /desktop-checkout.mjs
   Cache-Control: no-cache
+/desktop-checkout-api.mjs
+  Cache-Control: no-cache
+/desktop-browser-order.mjs
+  Cache-Control: no-cache
+/desktop-browser-purchase.mjs
+  Cache-Control: no-cache
+/desktop-checkout.css
+  Cache-Control: no-cache
