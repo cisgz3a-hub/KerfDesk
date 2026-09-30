@@ -35,6 +35,8 @@ import { resolveFrozenTraceSourceOptions } from '../../core/trace/trace-source-d
 import { hasAggressivePreprocessing, relaxAggressivePreprocessing } from './trace-options';
 import type { TraceWorkerRequest, TraceWorkerResponse } from './trace-worker';
 import { createCooperativeTraceRunner } from './cooperative-trace-runner';
+import { collectTraceReports } from './trace-report-collector';
+import type { TraceReport } from '../../core/trace/trace-steps';
 import type { TraceNotice } from './trace-notices';
 import type { TraceProgress } from '../../core/trace/trace-progress';
 
@@ -54,6 +56,9 @@ export type TraceResult = {
   // decisions resolved into them. Present exactly when the request asked for
   // freezeSourceDecisions (ADR-435).
   readonly sourceOptions?: TraceOptions;
+  // What automatic detection chose on this grid, for display only (the
+  // automatic threshold, Line Art's route). A relaxed retry carries its own.
+  readonly report?: TraceReport;
 };
 
 /** Per-request switches that are not trace settings. */
@@ -167,6 +172,7 @@ function handleWorkerMessage(worker: Worker, e: MessageEvent<TraceWorkerResponse
       width: e.data.width,
       height: e.data.height,
       ...(e.data.sourceOptions === undefined ? {} : { sourceOptions: e.data.sourceOptions }),
+      ...(e.data.report === undefined ? {} : { report: e.data.report }),
     });
     return;
   }
@@ -339,10 +345,11 @@ async function traceInline(
     flags.freezeSourceDecisions === true
       ? resolveFrozenTraceSourceOptions(image, options)
       : options;
+  const reports = collectTraceReports();
   const paths = await traceImageToColoredPaths(
     image,
     traced,
-    createCooperativeTraceRunner(() => checkTraceEpoch(epoch)),
+    createCooperativeTraceRunner(() => checkTraceEpoch(epoch), reports.add),
     progress,
   );
   checkTraceEpoch(epoch);
@@ -352,6 +359,7 @@ async function traceInline(
     width: image.width,
     height: image.height,
     ...(flags.freezeSourceDecisions === true ? { sourceOptions: traced } : {}),
+    ...reports.entry(),
   };
 }
 

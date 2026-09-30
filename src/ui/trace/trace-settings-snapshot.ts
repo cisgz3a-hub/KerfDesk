@@ -96,6 +96,7 @@ export const TRACE_OVERRIDE_RULES = {
   colourLayerOutput: { kind: 'choice', values: COLOUR_LAYER_OUTPUTS },
   keepBackground: BOOLEAN,
   hybridMaxStrokeWidthMm: range(0.05, 3),
+  centerlineJoinGapPx: range(0, 50),
   turnPolicy: { kind: 'choice', values: TURN_POLICIES },
 } as const satisfies Record<PersistedOverrideKey, OverrideRule>;
 

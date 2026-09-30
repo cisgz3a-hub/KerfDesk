@@ -1,16 +1,13 @@
 import { useState } from 'react';
-import { TRACE_PRESETS } from '../../core/trace';
 import { useEdition } from '../licensing/edition';
 import {
   ADVANCED_TRACE_PRESET_NAMES,
   CNC_TRACE_PRESET_NAME,
   DEFAULT_TRACE_PRESET_NAME,
 } from './dialog-parts';
-import type { BoundaryMode } from './region-enhance-trace';
 
 export function useTracePreset(
   machineKind: 'laser' | 'cnc',
-  setBoundaryMode: (mode: BoundaryMode) => void,
   initialPreset?: string,
 ): { readonly preset: string; readonly selectPreset: (next: string) => void } {
   // A Re-trace opens on the preset recorded with the trace (ADR-408). Otherwise
@@ -25,16 +22,5 @@ export function useTracePreset(
         ? CNC_TRACE_PRESET_NAME
         : DEFAULT_TRACE_PRESET_NAME,
   );
-  return {
-    preset,
-    selectPreset: (next) => {
-      setPreset(next);
-      // Enhance replaces whole contours; ribbons spanning a photo and colour
-      // regions sharing boundaries need Crop.
-      const options = TRACE_PRESETS[next];
-      if (options?.photoDetail !== undefined || options?.colourLayers !== undefined) {
-        setBoundaryMode('crop');
-      }
-    },
-  };
+  return { preset, selectPreset: setPreset };
 }

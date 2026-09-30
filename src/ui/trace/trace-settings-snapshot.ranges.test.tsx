@@ -42,6 +42,7 @@ const FAMILIES: ReadonlyArray<{
       'Remove ink specks': 'despeckleMinPixels',
       'Ignore Less Than': 'ignoreLessThanPixels',
       'Max stroke width': 'hybridMaxStrokeWidthMm',
+      'Join gaps': 'centerlineJoinGapPx',
       Smoothness: 'smoothness',
       Optimize: 'optimize',
     },

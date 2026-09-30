@@ -75,6 +75,28 @@ describe('Centerline source-distance gap bridging', () => {
   );
 
   it.each([
+    [0, 1],
+    [0, 3],
+    [-1, 1],
+  ])('a join gap of %s (aligned factor %s) bridges no ends, even touching ones', (gap, factor) => {
+    // WORKFLOW: "Zero disables that gap bridge". Half a pixel apart and
+    // perfectly aligned is the easiest pair any positive gap would join.
+    const left = chain([
+      { x: -20, y: 0 },
+      { x: 0, y: 0 },
+    ]);
+    const right = chain([
+      { x: 0.5, y: 0 },
+      { x: 20.5, y: 0 },
+    ]);
+    bridgeNearbyEnds([left, right], gap, factor);
+    expect([left.alive, right.alive]).toEqual([true, true]);
+    expect([left.points.length, right.points.length]).toEqual([2, 2]);
+    bridgeNearbyEnds([left, right], 1, factor);
+    expect(left.alive !== right.alive).toBe(true);
+  });
+
+  it.each([
     [1, 3],
     [2, 3],
     [1, 2.5],

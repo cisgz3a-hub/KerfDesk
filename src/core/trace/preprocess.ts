@@ -319,15 +319,13 @@ export function despeckle(
   const out = new Uint8ClampedArray(image.data);
   const visited = new Uint8Array(w * h);
   const ink = binaryInk(image);
-  const diagonal = diagonalLinks(image, ink, connectivity);
+  const flood = new InkRegionFlood(ink, visited, w, h, diagonalLinks(image, ink, connectivity));
   for (let startIdx = 0; startIdx < w * h; startIdx += 1) {
     if (visited[startIdx] !== 0) continue;
     visited[startIdx] = 1;
     if (ink[startIdx] !== 1) continue; // background pixel — skip
-    const region = bfsInkRegion(ink, visited, w, h, startIdx, diagonal);
-    if (region.length < minPixels && judge?.(region, ink) !== true) {
-      eraseRegion(out, region);
-    }
+    const region = flood.smallRegion(startIdx, minPixels);
+    if (region !== null && judge?.(region, ink) !== true) eraseRegion(out, region);
   }
   return { width: w, height: h, data: out };
 }
@@ -367,41 +365,83 @@ function diagonalLinks(
   return { ink, saddles };
 }
 
-// BFS the connected ink region (luma < 128) starting at `startIdx`.
-// Marks every visited cell in `visited`.
-function bfsInkRegion(
-  ink: Uint8Array,
-  visited: Uint8Array,
-  w: number,
-  h: number,
-  startIdx: number,
-  diagonal: DiagonalLinks,
-): number[] {
-  const region: number[] = [startIdx];
-  const queue: number[] = [startIdx];
-  while (queue.length > 0) {
-    const cur = queue.pop() ?? 0;
-    const cx = cur % w;
-    const cy = (cur - cx) / w;
-    visitNeighbour(ink, visited, w, h, cx - 1, cy, region, queue);
-    visitNeighbour(ink, visited, w, h, cx + 1, cy, region, queue);
-    visitNeighbour(ink, visited, w, h, cx, cy - 1, region, queue);
-    visitNeighbour(ink, visited, w, h, cx, cy + 1, region, queue);
-    if (diagonal === 'none') continue;
-    for (const [sx, sy] of DIAGONAL_STEPS) {
-      if (!diagonalStepJoins(diagonal, w, cx, cy, sx, sy)) continue;
-      visitNeighbour(ink, visited, w, h, cx + sx, cy + sy, region, queue);
-    }
-  }
-  return region;
-}
+// Depth-first flood of the ink regions (luma < 128) on one index stack.
+// Every pixel it looks at is marked visited; ink pixels join the region.
+class InkRegionFlood {
+  private readonly stack: Int32Array;
+  private top = 0;
+  private size = 0;
+  private limit = 0;
+  private region: number[] = [];
 
-const DIAGONAL_STEPS: ReadonlyArray<readonly [number, number]> = [
-  [-1, -1],
-  [1, -1],
-  [-1, 1],
-  [1, 1],
-];
+  constructor(
+    private readonly ink: Uint8Array,
+    private readonly visited: Uint8Array,
+    private readonly w: number,
+    private readonly h: number,
+    private readonly diagonal: DiagonalLinks,
+  ) {
+    this.stack = new Int32Array(w * h);
+  }
+
+  /** The region holding `start` (ink, already visited) in the order its
+   *  pixels are reached, or null once it holds `limit` pixels: such a region
+   *  is kept whatever it holds, so the rest of it is flooded but not listed. */
+  smallRegion(start: number, limit: number): number[] | null {
+    this.region = [];
+    this.size = 0;
+    this.limit = limit;
+    this.take(start);
+    while (this.top > 0) {
+      this.top -= 1;
+      const cur = this.stack[this.top] as number;
+      const cx = cur % this.w;
+      const cy = (cur - cx) / this.w;
+      this.visit(cx - 1, cy);
+      this.visit(cx + 1, cy);
+      this.visit(cx, cy - 1);
+      this.visit(cx, cy + 1);
+      if (this.diagonal !== 'none') this.visitDiagonals(cx, cy);
+    }
+    return this.size < limit ? this.region : null;
+  }
+
+  private take(pixel: number): void {
+    this.size += 1;
+    if (this.size < this.limit) this.region.push(pixel);
+    this.stack[this.top] = pixel;
+    this.top += 1;
+  }
+
+  private visit(nx: number, ny: number): void {
+    if (nx < 0 || nx >= this.w || ny < 0 || ny >= this.h) return;
+    const ni = ny * this.w + nx;
+    if (this.visited[ni] !== 0) return;
+    this.visited[ni] = 1;
+    if (this.ink[ni] === 1) this.take(ni);
+  }
+
+  // Up-left, up-right, down-left, down-right, as they have always been taken.
+  private visitDiagonals(cx: number, cy: number): void {
+    this.visitDiagonal(cx, cy, -1, -1);
+    this.visitDiagonal(cx, cy, 1, -1);
+    this.visitDiagonal(cx, cy, -1, 1);
+    this.visitDiagonal(cx, cy, 1, 1);
+  }
+
+  // Only an unvisited ink pixel can join across a corner, so the saddle
+  // decision (pure) is asked only for those.
+  private visitDiagonal(cx: number, cy: number, sx: number, sy: number): void {
+    const nx = cx + sx;
+    const ny = cy + sy;
+    if (nx < 0 || nx >= this.w || ny < 0 || ny >= this.h) return;
+    const ni = ny * this.w + nx;
+    if (this.visited[ni] !== 0 || this.ink[ni] !== 1) return;
+    if (!diagonalStepJoins(this.diagonal, this.w, cx, cy, sx, sy)) return;
+    this.visited[ni] = 1;
+    this.take(ni);
+  }
+}
 
 function diagonalStepJoins(
   diagonal: DiagonalLinks,
@@ -415,31 +455,11 @@ function diagonalStepJoins(
   if (diagonal === 'none') return false;
   const nx = cx + sx;
   const ny = cy + sy;
-  // Out-of-image targets are rejected by visitNeighbour; the in-between
+  // Out-of-image targets are rejected by the flood; the in-between
   // pixels of an in-image target are always in the image.
   if (nx < 0 || nx >= w || ny < 0 || ny * w >= diagonal.ink.length) return false;
   if ((diagonal.ink[cy * w + nx] ?? 0) === 1 || (diagonal.ink[ny * w + cx] ?? 0) === 1) return true;
   return diagonal.saddles(Math.max(cx, nx), Math.max(cy, ny));
-}
-
-function visitNeighbour(
-  ink: Uint8Array,
-  visited: Uint8Array,
-  w: number,
-  h: number,
-  nx: number,
-  ny: number,
-  region: number[],
-  queue: number[],
-): void {
-  if (nx < 0 || nx >= w || ny < 0 || ny >= h) return;
-  const ni = ny * w + nx;
-  if (visited[ni] !== 0) return;
-  visited[ni] = 1;
-  if (ink[ni] === 1) {
-    region.push(ni);
-    queue.push(ni);
-  }
 }
 
 function eraseRegion(out: Uint8ClampedArray, region: ReadonlyArray<number>): void {

@@ -2,6 +2,9 @@
 // mode (crop vs enhance, ADR-113). Bundled into one hook so the dialog body
 // stays small and the "clearing the box resets the mode to crop" invariant
 // lives in one place instead of being re-implemented at each clear site.
+// A style that can only crop (Photo shading, Colour layers) traces with Crop
+// without replacing the operator's choice, which returns with the next style
+// that offers Enhance (ADR-560).
 
 import { useState } from 'react';
 import type { TraceBoundary } from '../../core/trace';
@@ -19,15 +22,17 @@ export type BoundarySelection = {
 
 export function useBoundarySelection(
   initial: { readonly boundary?: TraceBoundary | null; readonly boundaryMode?: BoundaryMode } = {},
+  cropOnly = false,
 ): BoundarySelection {
   // A Re-trace opens on the region recorded with the trace (ADR-408).
   const [boundary, setBoundary] = useState<TraceBoundary | null>(initial.boundary ?? null);
-  const [boundaryMode, setBoundaryMode] = useState<BoundaryMode>(
+  const [chosenMode, setBoundaryMode] = useState<BoundaryMode>(
     initial.boundary == null ? 'crop' : (initial.boundaryMode ?? 'crop'),
   );
   const clearBoundary = (): void => {
     setBoundary(null);
     setBoundaryMode('crop');
   };
+  const boundaryMode = cropOnly ? 'crop' : chosenMode;
   return { boundary, setBoundary, boundaryMode, setBoundaryMode, clearBoundary };
 }

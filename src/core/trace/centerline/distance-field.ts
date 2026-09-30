@@ -193,3 +193,27 @@ function intersection(f: Float64Array, q: number, p: number): number {
 export function radiusAt(distSq: Float64Array, index: number): number {
   return Math.sqrt(distSq[index] ?? 0);
 }
+
+/** Local stroke radius at a sub-pixel position, read bilinearly from the
+ *  four pixel centres around it. `x`/`y` are image coordinates (pixel i
+ *  covers [i, i + 1)), so a pixel centre reads exactly that pixel's radius.
+ *  Outside the image reads as background, as the field itself treats it. */
+export function interpolatedRadius(
+  distSq: Float64Array,
+  width: number,
+  x: number,
+  y: number,
+): number {
+  const height = width > 0 ? Math.floor(distSq.length / width) : 0;
+  const gx = x - 0.5;
+  const gy = y - 0.5;
+  const x0 = Math.floor(gx);
+  const y0 = Math.floor(gy);
+  const fx = gx - x0;
+  const fy = gy - y0;
+  const at = (px: number, py: number): number =>
+    px < 0 || py < 0 || px >= width || py >= height ? 0 : radiusAt(distSq, py * width + px);
+  const top = at(x0, y0) * (1 - fx) + at(x0 + 1, y0) * fx;
+  const bottom = at(x0, y0 + 1) * (1 - fx) + at(x0 + 1, y0 + 1) * fx;
+  return top * (1 - fy) + bottom * fy;
+}

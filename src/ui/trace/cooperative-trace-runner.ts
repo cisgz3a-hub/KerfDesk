@@ -1,10 +1,13 @@
-import type { TraceStepRunner, TraceSteps } from '../../core/trace/trace-steps';
+import type { TraceReport, TraceStepRunner, TraceSteps } from '../../core/trace/trace-steps';
 
 // Clock and browser task scheduling stay outside pure core. Checkpoints retain
 // the algorithm's exact order; only its execution is split across tasks.
 const SLICE_MS = 8;
 
-export function createCooperativeTraceRunner(checkCurrent: () => void): TraceStepRunner {
+export function createCooperativeTraceRunner(
+  checkCurrent: () => void,
+  onReport: (report: TraceReport) => void = () => undefined,
+): TraceStepRunner {
   // Count work before dispatch (including working-grid resampling) in the
   // first slice instead of appending a fresh slice to that same browser task.
   let deadline = performance.now() + SLICE_MS;
@@ -21,6 +24,7 @@ export function createCooperativeTraceRunner(checkCurrent: () => void): TraceSte
         }
         const step = steps.next(true);
         if (step.done) return step.value;
+        if (step.value !== undefined) onReport(step.value);
       }
     } finally {
       // Close suspended generator frames on supersession or failure.

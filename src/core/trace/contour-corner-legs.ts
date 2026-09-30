@@ -7,6 +7,12 @@ import { fitCircle } from './contour-corner-circle';
 import { fieldConfirmsWedge, wedgeFieldFit } from './contour-corner-field';
 import { latticeBarriers } from './contour-corner-lattice';
 import {
+  LEG_SLOPE_TOLERANCE,
+  straightLegs,
+  type Leg,
+  type LegTolerance,
+} from './contour-corner-leg-runs';
+import {
   KEPT_FEATURE,
   LEG_CAP_PX,
   MIN_LEG_POINTS,
@@ -23,13 +29,6 @@ import type { CrackSubPixelField } from './saddle-connectivity';
 // carry ~0.1 px noise.
 const LEG_TOLERANCE_BINARY_PX = 0.5;
 const LEG_TOLERANCE_MEASURED_PX = 0.2;
-// ...plus this fraction of the leg's length: a leg is straight while its
-// direction stays defined to ~2°, so threshold wobble on a long stem does not
-// cut it short, while a circle's chords of that straightness are only ~0.24 R
-// long and meet at under the 15° minimum turn.
-export const LEG_SLOPE_TOLERANCE = 0.03;
-
-export type LegTolerance = { readonly base: number; readonly slope: number };
 const MIN_LEG_PX = 1;
 // A leg corner may skip a few cracks of apex rounding (anti-aliasing,
 // supersampling) that fit neither leg.
@@ -64,53 +63,6 @@ const APEX_STANDOFF_MEASURED_LEVEL_PX = 0.1;
 // Weight of the one-circle model's excess RMS residual over the two-leg
 // model's in the cost cap (see header).
 const ARC_EXCESS_WEIGHT = 10;
-export type Leg = {
-  readonly count: number;
-  // Fitted line: centroid and unit direction ALONG travel.
-  readonly cx: number;
-  readonly cy: number;
-  readonly dx: number;
-  readonly dy: number;
-  /** Sum of squared perpendicular residuals about the line. */
-  readonly residualSq: number;
-};
-
-// Leg growth also stops where the chain turns hard over a few pixels: the
-// length-proportional tolerance would otherwise let a leg's far end wrap a
-// few cracks round the NEXT corner (a chamfered or anti-aliased corner has no
-// lattice barrier), tilting its fit. Marks a vertex stop at every peak of the
-// chord turn over ±TURN_WINDOW_PX above TURN_STOP_RAD; a leg ignores the
-// stops of its own corner (within its first cracks).
-const TURN_WINDOW_PX = 3;
-const TURN_STOP_RAD = Math.PI / 3;
-
-function turnStops(pts: ReadonlyArray<Vec2>, scale: number): Uint8Array {
-  const n = pts.length;
-  const stops = new Uint8Array(n);
-  const k = Math.max(2, Math.round(TURN_WINDOW_PX * scale));
-  if (n < 2 * k + 1) return stops;
-  const turns = new Float64Array(n);
-  for (let i = 0; i < n; i += 1) {
-    const prev = pts[(i - k + n) % n] as Vec2;
-    const at = pts[i] as Vec2;
-    const next = pts[(i + k) % n] as Vec2;
-    const inX = at.x - prev.x;
-    const inY = at.y - prev.y;
-    const outX = next.x - at.x;
-    const outY = next.y - at.y;
-    turns[i] = Math.abs(Math.atan2(inX * outY - inY * outX, inX * outX + inY * outY));
-  }
-  // One stop per turn peak, at the vertex on the side where the turn is
-  // sharper: legs end where the chain turns, not a crack short of it.
-  for (let i = 0; i < n; i += 1) {
-    const turn = turns[i] as number;
-    const before = turns[(i - 1 + n) % n] as number;
-    const after = turns[(i + 1) % n] as number;
-    if (turn <= TURN_STOP_RAD || turn < before || turn < after) continue;
-    stops[after >= before ? (i + 1) % n : i] = 1;
-  }
-  return stops;
-}
 
 export function legCandidates(
   input: CornerDialInput,
@@ -130,12 +82,7 @@ export function legCandidates(
     slope: LEG_SLOPE_TOLERANCE,
   };
   const barriers = latticeBarriers(input, lattice);
-  const stops = turnStops(pts, scale);
-  const grace = maxSkip + Math.max(2, Math.round(TURN_WINDOW_PX * scale));
-  const ahead = straightRuns(pts, 1, capPoints, tolerance, barriers, stops, grace);
-  const back = straightRuns(pts, -1, capPoints, tolerance, barriers, stops, grace);
-  const legsAhead = Array.from(ahead, (count, i) => fitLeg(pts, i, count, 1));
-  const legsBack = Array.from(back, (count, i) => fitLeg(pts, i, count, -1));
+  const legs = straightLegs(pts, { cap: capPoints, maxSkip, scale, tolerance, barriers });
   const out: Candidate[] = [];
   for (let a = 0; a < n; a += 1) {
     let best: Candidate | null = null;
@@ -154,8 +101,8 @@ export function legCandidates(
         pts,
         a,
         skip,
-        legsBack[a] as Leg,
-        legsAhead[b] as Leg,
+        legs.back[a] as Leg,
+        legs.ahead[b] as Leg,
         scale,
         input.thresholdPx,
         input.measured,
@@ -166,134 +113,6 @@ export function legCandidates(
     if (best !== null) out.push(best);
   }
   return out;
-}
-
-// Longest straight run of points starting (step 1) or ending (step −1) at each
-// index. Two pointers: a run from i+1 is at least the run from i minus one.
-// A barrier at vertex v (between cracks v−1 and v) ends every run there.
-function straightRuns(
-  pts: ReadonlyArray<Vec2>,
-  step: 1 | -1,
-  cap: number,
-  tolerance: LegTolerance,
-  barriers: Uint8Array,
-  stops: Uint8Array,
-  grace: number,
-): Int32Array {
-  const n = pts.length;
-  const runs = new Int32Array(n);
-  // Vertex crossed when a run from i grows from `count` to `count + 1` points.
-  const crossed = (i: number, count: number): number =>
-    step === 1 ? (i + count) % n : (((i - count + 1) % n) + n) % n;
-  // Lattice barriers always end a run; turn stops only past the leg's first
-  // `grace` cracks (its own corner's rounding lies within them).
-  const blocked = (i: number, count: number): boolean => {
-    const vertex = crossed(i, count);
-    return barriers[vertex] !== 0 || (count >= grace && stops[vertex] === 1);
-  };
-  let run = 1;
-  for (let k = 0; k < n; k += 1) {
-    const i = step === 1 ? k : n - 1 - k;
-    run = Math.max(1, Math.min(cap, run - 1));
-    // The carried run may now start across a barrier (it lost its first point).
-    for (let c = 1; c < run; c += 1) {
-      if (blocked(i, c)) {
-        run = c;
-        break;
-      }
-    }
-    while (
-      run < cap &&
-      !blocked(i, run) &&
-      (run < 2 || isStraight(pts, i, run + 1, step, tolerance))
-    ) {
-      run += 1;
-    }
-    runs[i] = run;
-  }
-  return runs;
-}
-
-function isStraight(
-  pts: ReadonlyArray<Vec2>,
-  i: number,
-  count: number,
-  step: 1 | -1,
-  tolerance: LegTolerance,
-): boolean {
-  const leg = legLine(pts, i, count, step);
-  const n = pts.length;
-  const nx = -leg.dy;
-  const ny = leg.dx;
-  const first = pts[((i % n) + n) % n] as Vec2;
-  const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
-  const allowed = tolerance.base + tolerance.slope * hypot2(last.x - first.x, last.y - first.y);
-  for (let k = 0, j = ((i % n) + n) % n; k < count; k += 1, j = wrapStep(j, step, n)) {
-    const p = pts[j] as Vec2;
-    if (Math.abs((p.x - leg.cx) * nx + (p.y - leg.cy) * ny) > allowed) return false;
-  }
-  return true;
-}
-
-// The ring index after `j` in direction `step`: the same index as reducing
-// the unrolled index modulo n, stepped instead of divided.
-function wrapStep(j: number, step: 1 | -1, n: number): number {
-  const next = j + step;
-  if (next === n) return 0;
-  return next < 0 ? n - 1 : next;
-}
-
-// Total-least-squares line through `count` points from i in direction `step`,
-// oriented along the chain's travel.
-export function fitLeg(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): Leg {
-  const { cx, cy, dx, dy, sxx, sxy, syy } = legLine(pts, i, count, step);
-  // Smallest eigenvalue of the scatter matrix = residual sum of squares.
-  const residualSq = Math.max(0, (sxx + syy - hypot2(sxx - syy, 2 * sxy)) / 2);
-  return { count, cx, cy, dx, dy, residualSq };
-}
-
-type LegLine = Omit<Leg, 'count' | 'residualSq'> & {
-  readonly sxx: number;
-  readonly sxy: number;
-  readonly syy: number;
-};
-
-// The leg's line and scatter sums (isStraight needs no residual).
-function legLine(pts: ReadonlyArray<Vec2>, i: number, count: number, step: 1 | -1): LegLine {
-  const n = pts.length;
-  const start = ((i % n) + n) % n;
-  let cx = 0;
-  let cy = 0;
-  for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
-    const p = pts[j] as Vec2;
-    cx += p.x;
-    cy += p.y;
-  }
-  cx /= count;
-  cy /= count;
-  let sxx = 0;
-  let sxy = 0;
-  let syy = 0;
-  for (let k = 0, j = start; k < count; k += 1, j = wrapStep(j, step, n)) {
-    const p = pts[j] as Vec2;
-    const ex = p.x - cx;
-    const ey = p.y - cy;
-    sxx += ex * ex;
-    sxy += ex * ey;
-    syy += ey * ey;
-  }
-  const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
-  let dx = Math.cos(angle);
-  let dy = Math.sin(angle);
-  const first = pts[start] as Vec2;
-  const last = pts[(((i + (count - 1) * step) % n) + n) % n] as Vec2;
-  const travelX = (last.x - first.x) * step;
-  const travelY = (last.y - first.y) * step;
-  if (dx * travelX + dy * travelY < 0) {
-    dx = -dx;
-    dy = -dy;
-  }
-  return { cx, cy, dx, dy, sxx, sxy, syy };
 }
 
 function legCorner(
@@ -490,18 +309,6 @@ function pointToSegment(p: Vec2, a: Vec2, b: Vec2): number {
 // equals the line residual (an exactly straight one, 0).
 function circleRms(pts: ReadonlyArray<Vec2>, start: number, count: number): number {
   return fitCircle(pts, start, count)?.rms ?? 0;
-}
-
-export function growLeg(
-  pts: ReadonlyArray<Vec2>,
-  start: number,
-  step: 1 | -1,
-  limit: number,
-  tolerance: LegTolerance,
-): number {
-  let count = Math.min(limit, 2);
-  while (count < limit && isStraight(pts, start, count + 1, step, tolerance)) count += 1;
-  return count;
 }
 
 export function legIntersection(back: Leg, ahead: Leg): Vec2 | null {
