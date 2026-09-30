@@ -247,14 +247,12 @@ it('reports committed collapsed replacement and dependency changes in Free', () 
     project: { ...project, scene: { ...project.scene, objects: [...project.scene.objects, text] } },
   });
   expect(
-    useStore
-      .getState()
-      .offsetShapesSelection({
-        ...offsetRequest,
-        direction: 'both',
-        distanceMm: 21,
-        deleteOriginals: true,
-      }),
+    useStore.getState().offsetShapesSelection({
+      ...offsetRequest,
+      direction: 'both',
+      distanceMm: 21,
+      deleteOriginals: true,
+    }),
   ).toBe(true);
   expect(request).not.toHaveBeenCalled();
   expect(
