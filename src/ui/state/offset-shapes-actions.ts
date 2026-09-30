@@ -42,21 +42,32 @@ type OffsetShapesSet = (
   fn: (state: OffsetShapesState) => OffsetShapesMutation | OffsetShapesState,
 ) => unknown;
 
-export function offsetShapesActions(set: OffsetShapesSet): OffsetShapesActions {
+export function offsetShapesActions(
+  set: OffsetShapesSet,
+  copySet: OffsetShapesSet,
+  get: () => OffsetShapesState,
+): OffsetShapesActions {
   return {
     offsetShapesSelection: (request) => {
-      let applied = false;
+      const state = get();
       // The guard evaluates a proposed edit before admitting it. Keep messages
       // about that edit out of the preview phase, just like the scene itself.
       const notifications: Array<() => void> = [];
-      const committed = set((state) => {
-        const next = offsetShapesMutation(state, request, (notify) => notifications.push(notify));
-        applied = next !== state;
-        return next;
-      });
+      const next = offsetShapesMutation(state, request, (notify) => notifications.push(notify));
+      if (next === state) {
+        notifications.forEach((notify) => notify());
+        return false;
+      }
+      // A single replacement edits existing work, even when Both was requested
+      // and its inward half collapsed. Retained originals or multiple results
+      // create copies. Decide from actual geometry before committing anything.
+      const previousIds = new Set(state.project.scene.objects.map((object) => object.id));
+      const created = next.project.scene.objects.filter((object) => !previousIds.has(object.id));
+      const commit = request.deleteOriginals && created.length === 1 ? set : copySet;
+      const committed = commit(() => next);
       if (committed === false) return false;
-      if (applied) notifications.forEach((notify) => notify());
-      return applied;
+      notifications.forEach((notify) => notify());
+      return true;
     },
   };
 }
@@ -85,7 +96,7 @@ function offsetShapesMutation(
     inward: uniqueObjectId(scene0, 'offset-inward'),
   });
   if (result.kind === 'error') {
-    useToastStore.getState().pushToast(result.error.message, 'warning');
+    afterCommit(() => useToastStore.getState().pushToast(result.error.message, 'warning'));
     return state;
   }
   const created = [result.value.outward, result.value.inward].filter(

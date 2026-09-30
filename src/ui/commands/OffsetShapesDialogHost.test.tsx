@@ -60,13 +60,18 @@ function square(size: number): ImportedSvg {
   };
 }
 
-function load(size: number): void {
+function load(size: number, proOperation = false): void {
+  const layer = createLayer({ id: 'cut', color: '#000000' });
   useStore.setState({
     project: {
       ...createProject(),
       scene: {
         objects: [square(size)],
-        layers: [createLayer({ id: 'cut', color: '#000000' })],
+        layers: [
+          proOperation
+            ? { ...layer, cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' } }
+            : layer,
+        ],
         groups: [],
       },
     },
@@ -103,18 +108,7 @@ async function setDistance(value: string): Promise<void> {
 
 describe('Offset Shapes dialog', () => {
   it.each([false, true])('keeps a Pro copy pending until admission (Pro=%s)', async (pro) => {
-    load(10);
-    const project = useStore.getState().project;
-    const layer = project.scene.layers[0]!;
-    useStore.setState({
-      project: {
-        ...project,
-        scene: {
-          ...project.scene,
-          layers: [{ ...layer, cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' } }],
-        },
-      },
-    });
+    load(10, true);
     const requestPro = vi.fn((_feature: string, _allowed?: () => void) => false);
     setActiveEdition({ status: null, licensed: true, pro, requestPro, openLicence: vi.fn() });
     const before = useStore.getState().project;
@@ -139,6 +133,33 @@ describe('Offset Shapes dialog', () => {
     }
     expect(useStore.getState().project.scene.objects).toHaveLength(2);
     expect(useStore.getState().project.scene.layers[1]?.cnc?.cutType).toBe('v-carve');
+  });
+
+  it('applies a single replacement of existing Pro artwork and closes in Free', async () => {
+    load(10, true);
+    const requestPro = vi.fn();
+    setActiveEdition({
+      status: null,
+      licensed: true,
+      pro: false,
+      requestPro,
+      openLicence: vi.fn(),
+    });
+    const onClose = await render();
+    const checkbox = [...host.ownerDocument.querySelectorAll('label')]
+      .find((label) => label.textContent?.includes('Delete original objects'))
+      ?.querySelector<HTMLInputElement>('input');
+    if (checkbox === null || checkbox === undefined) throw new Error('delete originals missing');
+    await act(async () => {
+      checkbox.checked = true;
+      Simulate.change(checkbox);
+    });
+    await act(async () => button('Offset').click());
+    expect(requestPro).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+    expect(useStore.getState().project.scene.objects[0]?.id).not.toBe('sq');
+    expect(useStore.getState().project.scene.layers[0]?.cnc?.cutType).toBe('v-carve');
   });
 
   it('previews the result size and adds both offsets on submit', async () => {
