@@ -71,7 +71,10 @@ export function licenceSummary(
     channel: free ? 'free' : 'commercial',
     // Free/Preview/source builds have no licence authority and remain Free
     // (ADR-540 Amendment 1). Only the commercial runtime may unlock Pro.
-    edition: config.channel === 'commercial' && pro ? 'pro' : 'free',
+    edition:
+      config.channel === 'commercial' && pro && (rights.tier !== 'trial' || state === 'ready')
+        ? 'pro'
+        : 'free',
     state,
     tier: rights.tier,
     accessExpiresAt: rights.accessExpiresAt,

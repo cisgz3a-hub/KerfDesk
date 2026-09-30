@@ -16,10 +16,16 @@ import { CHECK_UPDATES_EVENT } from './update-status-text';
 import { ProFeatureDialog } from './ProFeatureDialog';
 import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
+import { createTrialExpiryClock, expireTrialStatus } from './trial-expiry';
+import { useTrialExpiry } from './use-trial-expiry';
 
 export { LICENCE_SETTINGS_EVENT };
 
 type PendingPro = { readonly feature: ProFeature; readonly onAllowed?: (() => void) | undefined };
+
+function openLicence(): void {
+  window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT));
+}
 
 /**
  * Supplies the Free/Pro edition to the app (ADR-540). The workspace always
@@ -67,22 +73,22 @@ function LicensedEdition({
   const desktop = useProInDesktop();
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
-  const { load } = session;
+  const { load, isPro } = session;
   const { showAll } = desktop;
   const { managing, closeManager } = useLicenceManager(freeBuild, load, showAll);
-  const openLicence = useCallback((): void => {
-    window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT));
-  }, []);
   const value = useMemo<EditionValue>(
     () => ({
       status: session.status,
       licensed: session.status?.channel === 'commercial',
-      pro: session.status?.edition === 'pro',
+      // Store mutations must also check elapsed time when browser timers slept.
+      get pro() {
+        return isPro();
+      },
       proInDesktop: freeBuild,
       requestPro: freeBuild ? desktop.request : session.requestPro,
       openLicence: freeBuild ? showAll : openLicence,
     }),
-    [desktop.request, freeBuild, openLicence, session.requestPro, session.status, showAll],
+    [desktop.request, freeBuild, isPro, session.requestPro, session.status, showAll],
   );
   useEffect(() => {
     setActiveEdition(value);
@@ -161,12 +167,15 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   const statusRef = useRef<LicenceStatus | null>(null);
   const statusRequest = useRef(0);
   const pendingRef = useRef<PendingPro | null>(null);
+  const [trialClock] = useState(createTrialExpiryClock);
   const settle = useCallback((next: PendingPro | null) => {
     pendingRef.current = next;
     setPending(next);
   }, []);
   const accept = useCallback(
-    async (reported: LicenceStatus): Promise<void> => {
+    async (reported: LicenceStatus, expected?: LicenceStatus): Promise<void> => {
+      // A timer for an older trial cannot overwrite a completed paid activation.
+      if (expected !== undefined && statusRef.current !== expected) return;
       // A completed action owns the new status. A read started before an
       // activation/deactivation must never overwrite its result when it arrives.
       statusRequest.current += 1;
@@ -174,7 +183,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
       const result: LicenceStatus =
         unlicensedRunsFree && reported.channel === 'free'
           ? { ...reported, edition: 'free' }
-          : reported;
+          : expireTrialStatus(reported, trialClock);
       statusRef.current = result;
       setStatus(result);
       setFailure(null);
@@ -185,7 +194,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
         waiting.onAllowed?.();
       }
     },
-    [settle, unlicensedRunsFree],
+    [settle, trialClock, unlicensedRunsFree],
   );
   const load = useCallback(async (): Promise<void> => {
     const request = ++statusRequest.current;
@@ -200,8 +209,16 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   useEffect(() => {
     void load();
   }, [load]);
+  useTrialExpiry(status, accept, trialClock);
+  const isPro = useCallback(
+    () => statusRef.current?.edition === 'pro' && trialClock.remainingMs(statusRef.current) > 0,
+    [trialClock],
+  );
   const requestPro = useCallback(
     (feature: ProFeature, onAllowed?: () => void): boolean => {
+      const current = statusRef.current;
+      const next = current === null ? null : expireTrialStatus(current, trialClock);
+      if (next !== null && next !== current) void accept(next);
       if (statusRef.current?.edition === 'pro') {
         onAllowed?.();
         return true;
@@ -209,7 +226,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
       settle({ feature, onAllowed });
       return false;
     },
-    [settle],
+    [accept, settle, trialClock],
   );
-  return { status, failure, pending, settle, accept, load, requestPro };
+  return { status, failure, pending, settle, accept, load, requestPro, isPro };
 }
