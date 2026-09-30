@@ -178,7 +178,7 @@ it('discloses an unsigned commercial download and manual updates before the user
   await act(async () => root.render(<DesktopWelcomeDialog onClose={close} />));
   expect(host.querySelector('a')?.href).toContain('/commercial-manual/');
   expect(host.textContent).toContain('Unsigned installer');
-  expect(host.textContent).toContain('Manual updates');
+  expect(host.textContent).toContain('Updates need your approval');
   expect(host.textContent).toContain('unknown publisher warning');
   expect(close).not.toHaveBeenCalled();
 });

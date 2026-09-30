@@ -22,7 +22,7 @@ sales, change the approved prices, or assert that a signed installer is availabl
 3. `build:bundle` is browser Free. `build:bundle:desktop` and
    `build:renderer:desktop` explicitly build the complete desktop renderer. Every
    desktop packaging workflow uses that mode. The existing Playwright development
-   suite runs a deliberately unrestricted **test-mode development harness** for
+   suite runs a deliberately unrestricted **desktop-mode development harness** for
    complete renderer regressions. The production-bundle suite checks the actual
    browser Free artefact. That development override is not in a shipped build.
 4. Browser project admission detects V-carve, adaptive pocket, relief operations

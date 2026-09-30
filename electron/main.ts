@@ -72,11 +72,8 @@ import {
   isExactPreviewUpdateApiRequest,
   PREVIEW_UPDATE_API_PATH,
 } from './preview-update.js';
-import {
-  readDesktopPreviewUpdateEnabled,
-  readDesktopUpdateChannelTrust,
-  resolveDesktopUpdateModes,
-} from './update-channel-trust.js';
+import * as updateTrust from './update-channel-trust.js';
+import { createManualCloseApproval } from './manual-update-quit.js';
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
 import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
@@ -138,6 +135,7 @@ if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_I
 let desktopWindowReady = false;
 let quitRequested = false;
 let prepareLicenceQuit: (() => void) | null = null;
+const manualCloseApproval = createManualCloseApproval();
 const reopenDesktopWindow = createDesktopWindowReopener({
   isReady: () => desktopWindowReady,
   isQuitting: () => quitRequested,
@@ -180,9 +178,9 @@ const IS_DEV_SERVER_RENDERER = RENDERER_RUNTIME.rendererUrl !== PACKAGED_RENDERE
 const CAMERA_BRIDGE_ORIGIN = `http://127.0.0.1:${CAMERA_BRIDGE_PORT}`;
 // ADR-171: tag releases embed this flag only after forceCodeSigning succeeds.
 // Missing, malformed, and manual-build metadata all fail closed.
-const DESKTOP_UPDATE_MODES = resolveDesktopUpdateModes(
-  readDesktopUpdateChannelTrust(app.getAppPath()),
-  app.isPackaged && readDesktopPreviewUpdateEnabled(app.getAppPath()),
+const DESKTOP_UPDATE_MODES = updateTrust.resolveDesktopUpdateModes(
+  updateTrust.readDesktopUpdateChannelTrust(app.getAppPath()),
+  app.isPackaged && updateTrust.readDesktopPreviewUpdateEnabled(app.getAppPath()),
 );
 const IS_DESKTOP_UPDATE_CHANNEL_TRUSTED = DESKTOP_UPDATE_MODES.trustedUpdater;
 const IS_DESKTOP_PREVIEW_UPDATE_ENABLED = DESKTOP_UPDATE_MODES.previewNotification;
@@ -405,6 +403,7 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
+  manualCloseApproval.observe(window, closeGuard);
   // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548),
   // and the taskbar button shows the job's progress (ADR-553).
   installSessionEndGuard(window);
@@ -527,6 +526,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         packaged: app.isPackaged,
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
         updater: autoUpdater,
+        canInstallManualUpdate: manualCloseApproval.canInstall,
       });
       prepareLicenceQuit = licence.prepareQuit;
       // The workspace, projects, serial ports and camera never wait on a licence:

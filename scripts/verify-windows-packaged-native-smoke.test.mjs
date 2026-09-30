@@ -31,6 +31,15 @@ test('requires local licensing evidence without imposing sandbox policy on Previ
   }
 });
 
+test('accepts an observed available manual update without treating it as downloaded or armed', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const result = validResult(userData);
+  result.renderer.licensing.updateState = 'available';
+  assert.equal(validateNativeSmokeResult(result, userData), result);
+  result.renderer.licensing.updateState = 'installing';
+  assert.throws(() => validateNativeSmokeResult(result, userData), /local licensing status/);
+});
+
 test('fresh-sandbox expectation requires the commercial Free state and unavailable updates', () => {
   const userData = resolve('tmp', 'native-smoke');
   const result = validResult(userData);

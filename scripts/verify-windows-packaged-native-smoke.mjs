@@ -49,6 +49,7 @@ function nativeSmokeLicensingProblems(observed, expectFreshSandbox) {
     'unavailable',
     'idle',
     'checking',
+    'available',
     'downloading',
     'up-to-date',
     'ready',

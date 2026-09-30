@@ -94,7 +94,7 @@ test('manual commercial download is labelled unsigned and manual, separate from 
   );
   assert.match(
     document.querySelector('#commercial-installation').textContent,
-    /never downloads or installs unsigned updates automatically/u,
+    /never downloads or installs unsigned updates without your approval/u,
   );
   assert.equal(document.querySelector('#commercial-history').hidden, true);
   for (const link of document.querySelectorAll('[data-preview-suffix]'))

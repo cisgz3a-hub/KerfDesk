@@ -7,7 +7,8 @@ import {
 } from './commercial-release-manifest.mjs';
 import { readCommercialInput } from './commercial-release-package.mjs';
 import { requireCommercialSource } from './publish-commercial-release.mjs';
-import { createStableReleaseStore } from './stable-release-store.mjs';
+import { setTimeout } from 'node:timers/promises';
+import { createStableReleaseStore, ReleaseRateLimitError } from './stable-release-store.mjs';
 import { commercialArtifactNames } from '../public/desktop-commercial-catalog.mjs';
 import { publishManualCommercialRelease } from './manual-commercial-publisher.mjs';
 import {
@@ -102,8 +103,23 @@ async function main() {
   );
 }
 
+async function publishWithRateLimitRetry() {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await main();
+    } catch (error) {
+      if (!(error instanceof ReleaseRateLimitError) || attempt >= 3 || error.retryAfterMs > 600_000)
+        throw error;
+      console.log(
+        `Release storage rate limited; retrying the same verified publication in ${Math.ceil(error.retryAfterMs / 1000)} seconds.`,
+      );
+      await setTimeout(error.retryAfterMs);
+    }
+  }
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
-  main().catch((error) => {
+  publishWithRateLimitRetry().catch((error) => {
     console.error(
       printableRefusal(error) ??
         'Manual commercial publication failed. Check trusted release identity, unsigned package, source checkout and protected R2 configuration.',

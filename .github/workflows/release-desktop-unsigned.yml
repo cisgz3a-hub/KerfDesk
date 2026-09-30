@@ -1,0 +1,170 @@
+name: Release unsigned Windows desktop
+
+on:
+  workflow_run:
+    workflows: [CI, Browser smoke, Desktop package check]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+# This lane is the sole automatic writer of commercial-manual/latest.json.
+concurrency:
+  group: kerfdesk-commercial-manual-publication
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  qualify:
+    if: >-
+      vars.KERFDESK_UNSIGNED_RELEASES == 'on' && github.repository == 'cisgz3a-hub/KerfDesk' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    outputs:
+      eligible: ${{ steps.gate.outputs.eligible }}
+      source-sha: ${{ steps.gate.outputs.sourceSha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Require successful checks on the exact main push
+        id: gate
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/unsigned-release-plan.mjs gate
+
+  publish:
+    needs: qualify
+    if: needs.qualify.outputs.eligible == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    environment: desktop-commercial
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.qualify.outputs.source-sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Plan a new immutable version from the verified public release
+        id: plan
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot refresh main.' }
+          node scripts/unsigned-release-plan.mjs plan
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot plan an authenticated release.' }
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+        if: steps.plan.outputs.publish == 'true'
+      - name: Install the locked dependency graph
+        if: steps.plan.outputs.publish == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Require current packaged-runtime advisory evidence
+        if: steps.plan.outputs.publish == 'true'
+        shell: bash
+        run: |
+          audit_dir="${RUNNER_TEMP}/unsigned-dependency-audit"
+          mkdir -p "${audit_dir}"
+          set +e
+          pnpm audit --json > "${audit_dir}/full.json"
+          full_exit=$?
+          pnpm audit --prod --json > "${audit_dir}/runtime.json"
+          runtime_exit=$?
+          set -e
+          pnpm report:dependency-audit \
+            --full="${audit_dir}/full.json" --runtime="${audit_dir}/runtime.json" \
+            --full-exit="${full_exit}" --runtime-exit="${runtime_exit}" --output="${audit_dir}"
+          cat "${audit_dir}/report.md" >> "${GITHUB_STEP_SUMMARY}"
+          runtime_count=$(node -p "JSON.parse(require('fs').readFileSync(process.argv[1], 'utf8')).runtimeCount" "${audit_dir}/report.json")
+          test "${runtime_count}" = '0'
+      - name: Build the desktop source that passed the required checks
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          KERFDESK_DESKTOP_VERSION: ${{ steps.plan.outputs.version }}
+        shell: pwsh
+        run: |
+          pnpm guard:repo
+          if ($LASTEXITCODE -ne 0) { throw 'Repository check failed.' }
+          pnpm generate:notices
+          if ($LASTEXITCODE -ne 0) { throw 'Notice generation failed.' }
+          pnpm build:electron-main
+          if ($LASTEXITCODE -ne 0) { throw 'Electron build failed.' }
+          pnpm build:bundle:desktop
+          if ($LASTEXITCODE -ne 0) { throw 'Desktop renderer build failed.' }
+      - name: Prepare the production licence identity and unsigned installer
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          RELEASE_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+          RELEASE_SHA: ${{ steps.plan.outputs.sourceSha }}
+          RELEASE_TIME: ${{ steps.plan.outputs.publishedAt }}
+        shell: pwsh
+        run: |
+          $preparation = Join-Path $env:RUNNER_TEMP 'commercial-preparation'
+          $terms = Join-Path $env:RUNNER_TEMP 'kerfdesk-installer-terms.txt'
+          Copy-Item -LiteralPath public/eula.txt -Destination $terms
+          node scripts/prepare-commercial-desktop.mjs --unsigned-installer `
+            --output-dir $preparation --terms-file $terms --version $env:RELEASE_VERSION `
+            --source-sha $env:RELEASE_SHA --source-ref refs/heads/main `
+            --published-at $env:RELEASE_TIME --key-id $env:RELEASE_KEY_ID
+          if ($LASTEXITCODE -ne 0) { throw 'Production licence preparation failed.' }
+      - name: Package the verified unsigned Windows installer
+        if: steps.plan.outputs.publish == 'true'
+        shell: pwsh
+        run: |
+          $config = Join-Path $env:RUNNER_TEMP 'commercial-preparation/electron-builder.commercial-unsigned.generated.json'
+          pnpm exec electron-builder --config $config --win --x64 --publish never
+          if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed.' }
+      - name: Launch the packaged Windows app with an isolated disposable profile
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+        shell: pwsh
+        run: |
+          $executable = (Resolve-Path "release/commercial-unsigned/$env:RELEASE_VERSION/win-unpacked/KerfDesk.exe").Path
+          $evidence = Join-Path $env:RUNNER_TEMP 'unsigned-native-smoke'
+          node scripts/verify-windows-packaged-native-smoke.mjs $executable "--output=$evidence"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged Windows launch failed.' }
+      - name: Publish immutable installer and authenticated notification manifest
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
+          DESKTOP_STABLE_MANIFEST_KEY_ID: ${{ vars.DESKTOP_STABLE_MANIFEST_KEY_ID }}
+          COMMERCIAL_R2_API_TOKEN: ${{ secrets.COMMERCIAL_R2_API_TOKEN }}
+          COMMERCIAL_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.COMMERCIAL_CLOUDFLARE_ACCOUNT_ID }}
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+          EXPECTED_LATEST_SHA256: ${{ steps.plan.outputs.expectedLatestSha256 }}
+        shell: pwsh
+        run: |
+          git fetch --no-tags origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot refresh publication ancestry.' }
+          $identity = Join-Path $env:RUNNER_TEMP 'commercial-preparation/commercial-release-identity.json'
+          $release = "release/commercial-unsigned/$env:RELEASE_VERSION"
+          node scripts/publish-manual-commercial-release.mjs `
+            --expected-latest-sha256 $env:EXPECTED_LATEST_SHA256 $release $identity "$release/win-unpacked/resources"
+          if ($LASTEXITCODE -ne 0) { throw 'Unsigned publication was not confirmed.' }
+          "Published Windows $env:RELEASE_VERSION. Installed apps check at startup and every 30 minutes; download and installation require user choices." >> $env:GITHUB_STEP_SUMMARY
+      - name: Preserve a failed release for inspection
+        if: failure() && steps.plan.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: unsigned-release-${{ steps.plan.outputs.version }}-${{ github.run_attempt }}
+          path: |
+            release/commercial-unsigned/${{ steps.plan.outputs.version }}/*.exe
+            ${{ runner.temp }}/commercial-preparation/commercial-release-identity.json
+            ${{ runner.temp }}/unsigned-native-smoke/**
+            ${{ runner.temp }}/unsigned-dependency-audit/report.*
+          retention-days: 1
+          if-no-files-found: warn

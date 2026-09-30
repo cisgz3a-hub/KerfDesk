@@ -3,7 +3,7 @@ import type { CommercialUpdateStatus } from '../../platform/types';
 /** Help > Check for Updates and the status bar's Update ready button (ADR-547). */
 export const CHECK_UPDATES_EVENT = 'kerfdesk:check-updates';
 
-/** A status that will not change until the owner checks again. */
+/** No check or download is pending. Manual builds still poll for later checks. */
 export function updateStatusSettled(status: CommercialUpdateStatus): boolean {
   return !['idle', 'checking', 'downloading'].includes(status.state);
 }
@@ -22,21 +22,35 @@ type Describe = (
 const version = (status: CommercialUpdateStatus): string => status.version ?? 'a newer version';
 
 const DESCRIBE: Record<CommercialUpdateStatus['state'], Describe> = {
-  unavailable: () =>
-    "This copy of KerfDesk doesn't update itself. Get new versions from kerfdesk.com.",
+  unavailable: (status) =>
+    status.mode === 'manual'
+      ? 'The update status is unavailable. You can check for new versions at kerfdesk.com.'
+      : "This copy of KerfDesk doesn't update itself. Get new versions from kerfdesk.com.",
   idle: () => "KerfDesk hasn't checked for updates since it opened.",
   checking: () => 'Checking for updates...',
+  available: (status) =>
+    `KerfDesk ${version(status)} is available. Download it when you are ready.`,
   downloading: (status) => `Downloading KerfDesk ${version(status)}...`,
   'up-to-date': (status, _until, formatTime) =>
     `KerfDesk is up to date.${checked(status, formatTime)}`,
-  ready: (status) => `KerfDesk ${version(status)} is ready. It installs when you close KerfDesk.`,
+  ready: readyText,
   'not-covered': (status, updatesUntil) =>
     `KerfDesk ${version(status)} is out, but ${coverage(updatesUntil)} The version you have keeps working.`,
   failed: (status) =>
-    status.version === null
-      ? "KerfDesk couldn't check for updates. Check the internet connection, then try again."
-      : `KerfDesk ${status.version} couldn't be prepared. KerfDesk tries again next time it opens.`,
+    status.mode === 'manual'
+      ? 'The update could not be prepared. Check your connection and try Check now again. Your current version keeps working.'
+      : status.version === null
+        ? "KerfDesk couldn't check for updates. Check the internet connection, then try again."
+        : `KerfDesk ${status.version} couldn't be prepared. KerfDesk tries again next time it opens.`,
 };
+
+function readyText(status: CommercialUpdateStatus): string {
+  const start = `KerfDesk ${version(status)} is ready.`;
+  if (status.mode !== 'manual') return `${start} It installs when you close KerfDesk.`;
+  return status.installOnQuit === true
+    ? `${start} The installer will open after you close KerfDesk normally. Save your work and finish any running job first.`
+    : `${start} Choose Install when I close KerfDesk to open the installer after a normal close.`;
+}
 
 /**
  * One plain sentence for where updates stand. `updatesUntil` is the licence's

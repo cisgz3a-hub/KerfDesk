@@ -380,6 +380,15 @@ class LicensingService {
     });
   readonly isReleaseEligibleCached = (releaseEnvelope: unknown, expectedVersion: string): boolean =>
     this.updateCache.eligible(releaseEnvelope, expectedVersion);
+  readonly isManualReleaseEligible = (envelope: string, version: string): Promise<boolean> =>
+    this.serial(async () => {
+      try {
+        await this.load();
+        return await this.updateCache.manualEligible(envelope, version);
+      } catch {
+        return false;
+      }
+    });
   readonly proUnlocked = (): boolean => this.config.channel === 'free' || this.proLatched;
   private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
     operation === 'renewal' && saved.credential !== undefined

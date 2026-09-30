@@ -264,10 +264,17 @@ describe('archive activation fallback and second-pass eligibility', () => {
       expect(useUnarchivedRunStore.getState().runId).toBe(runId);
       if (ending === 'completed') {
         await vi.advanceTimersByTimeAsync(5_000);
-        expect(useUnarchivedRunStore.getState().completedRun?.runId ?? null).toBe(
-          rotary ? null : runId,
+        // Advancing the simulated controller does not await the repository's
+        // queued terminal writes or the completion offer that follows them.
+        await vi.waitFor(
+          () => {
+            expect(useUnarchivedRunStore.getState().completedRun?.runId ?? null).toBe(
+              rotary ? null : runId,
+            );
+            expect(repository.getSnapshot().pendingStart).toBeNull();
+          },
+          { timeout: 1_000, interval: 20 },
         );
-        expect(repository.getSnapshot().pendingStart).toBeNull();
         const framing = runFrameNow();
         await vi.advanceTimersByTimeAsync(12_000);
         expect(await framing).toBe(true);

@@ -105,7 +105,8 @@ createRoot(rootElement).render(
       <PlatformProvider adapter={adapter}>
         <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>
           <EditionProvider
-            {...(import.meta.env.DEV && import.meta.env.MODE === 'test'
+            {...(import.meta.env.DEV &&
+            (import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'test')
               ? { unlicensedRunsFree: false }
               : {})}
             {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}

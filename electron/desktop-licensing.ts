@@ -17,6 +17,8 @@ import {
   type UpdateRingStore,
 } from './update-ring-store.js';
 import { createDesktopUpdates, type DesktopUpdates } from './update-status.js';
+import { desktopManualUpdates } from './desktop-manual-updates.js';
+import { installManualUpdateQuit } from './manual-update-quit.js';
 
 // A plain label for the device list; the computer's own name is never sent.
 const DEVICE_NAMES: Readonly<Record<string, string>> = {
@@ -40,6 +42,7 @@ type Options = {
   readonly packaged: boolean;
   readonly trustedUpdates: boolean;
   readonly updater: CommercialUpdater;
+  readonly canInstallManualUpdate?: () => boolean;
 };
 
 export function createDesktopLicensing(options: Options) {
@@ -67,12 +70,28 @@ export function createDesktopLicensing(options: Options) {
     },
   });
   const rings = createUpdateRingStore(options.userDataPath);
-  /** Help > Licence's "Get new versions early (beta)" setting (ADR-541). */
-  const earlyUpdates = earlyUpdateSetting(config.channel === 'commercial', rings);
-  const updates = commercialUpdates(options, config, runtime, rings, (envelope, version) => {
-    pendingUpdate = { envelope, version };
-    announceDownloadedUpdate(version);
+  const manual = desktopManualUpdates(config, {
+    ...options,
+    fetch: (url, init) => net.fetch(url, init),
+    eligible: runtime.isManualReleaseEligible,
+    announce: announceManualUpdate,
   });
+  if (manual !== null)
+    installManualUpdateQuit(app, manual, {
+      canInstall: options.canInstallManualUpdate ?? (() => false),
+      reportFailure: (error) => console.warn('Manual update installation deferred:', error),
+    });
+  /** Beta remains exclusive to the trusted signed updater (ADR-541). */
+  const earlyUpdates = earlyUpdateSetting(
+    config.channel === 'commercial' && options.trustedUpdates,
+    rings,
+  );
+  const updates =
+    manual ??
+    commercialUpdates(options, config, runtime, rings, (envelope, version) => {
+      pendingUpdate = { envelope, version };
+      announceDownloadedUpdate(version);
+    });
   return {
     runtime,
     config,
@@ -82,8 +101,8 @@ export function createDesktopLicensing(options: Options) {
       withLicensingRoutes(fallback, runtime, earlyUpdates, updates),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
-     * the signed update check. The workspace never waits for either (ADR-540).
-     * The quiet check then repeats every 30 minutes until KerfDesk quits.
+     * the update check. The workspace never waits for either (ADR-540).
+     * Licence confirmation and manual release discovery repeat every 30 minutes.
      */
     start: (): void => {
       if (config.channel !== 'commercial' || stopChecks !== null) return;
@@ -93,16 +112,27 @@ export function createDesktopLicensing(options: Options) {
         .then(() => {
           updates.check();
         });
-      stopChecks = scheduleLicenceChecks(runtime.refreshInBackground);
+      stopChecks = scheduleLicenceChecks(async () => {
+        await runtime.refreshInBackground().catch(() => undefined);
+        manual?.check();
+      });
       app.once('will-quit', () => stopChecks?.());
     },
     prepareQuit: () => {
-      if (config.channel !== 'commercial') return;
+      if (config.channel !== 'commercial' || config.manualUpdates === true) return;
       options.updater.autoInstallOnAppQuit =
         pendingUpdate !== null &&
         runtime.isReleaseEligibleCached(pendingUpdate.envelope, pendingUpdate.version);
     },
   };
+}
+
+function announceManualUpdate(version: string): void {
+  if (Notification.isSupported())
+    new Notification({
+      title: 'KerfDesk update available',
+      body: `KerfDesk ${version} is available. Open Help > Check for Updates to download it. Installation starts only after you choose it and close KerfDesk.`,
+    }).show();
 }
 
 /**

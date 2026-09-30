@@ -474,7 +474,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...selectionTransformActions(set),
   ...registrationActions(set),
   ...boardCaptureActions(set),
-  ...boardTileActions(set),
+  ...boardTileActions(proOperationMutationSetter(set, get)),
   ...pathNodeEditActions(set),
   ...pathNodeCurveCommandActions(set),
   ...objectDeleteActions(set),

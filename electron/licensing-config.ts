@@ -13,6 +13,7 @@ export type LicensingConfig =
       readonly releaseKeys: PublicKeys;
       readonly release: unknown;
       readonly sandbox?: true;
+      readonly manualUpdates?: true;
     };
 
 function publicKeys(value: unknown): value is PublicKeys {
@@ -49,7 +50,22 @@ export function licensingConfigFromMetadata(metadata: unknown): LicensingConfig 
     releaseKeys: value.releaseKeys,
     release: value.release,
     ...(sandbox ? { sandbox: true as const } : {}),
+    ...manualMetadata(metadata, value.apiOrigin, sandbox),
   };
+}
+
+function manualMetadata(
+  metadata: Record<string, unknown>,
+  origin: string,
+  sandbox: boolean,
+): { readonly manualUpdates?: true } {
+  return !sandbox &&
+    origin === 'https://license.kerfdesk.com' &&
+    metadata.kerfdeskUnsignedInstaller === true &&
+    metadata.kerfdeskUpdateChannelTrusted === false &&
+    metadata.kerfdeskDesktopReleaseChannel === 'commercial-unsigned'
+    ? { manualUpdates: true }
+    : {};
 }
 
 function httpsOrigin(value: string): boolean {

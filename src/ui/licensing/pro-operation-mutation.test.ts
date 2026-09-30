@@ -133,6 +133,25 @@ it('requires Pro for arrays of existing Pro artwork and reports no copies placed
   expect(asked).toHaveBeenCalledExactlyOnceWith('vcarve', expect.any(Function));
 });
 
+it('requires Pro for board arrays and applies the copies only after unlock', () => {
+  useStore.getState().addCapturedBoardBox(100, 60);
+  useStore.setState({ selectedObjectId: 'Pro artwork', additionalSelectedIds: new Set() });
+  const before = useStore.getState().project;
+  const undo = useStore.getState().undoStack;
+  useStore
+    .getState()
+    .tileSelectionIntoBoard({ kind: 'grid', rows: 2, cols: 2, gapXMm: 0, gapYMm: 0 });
+
+  expect(useStore.getState().project).toBe(before);
+  expect(useStore.getState().undoStack).toBe(undo);
+  expect(asked).toHaveBeenCalledExactlyOnceWith('vcarve', expect.any(Function));
+
+  setActiveEdition(UNRESTRICTED_EDITION);
+  onAllowed?.();
+  expect(useStore.getState().project.scene.objects).toHaveLength(before.scene.objects.length + 3);
+  expect(useStore.getState().undoStack).toHaveLength(undo.length + 1);
+});
+
 it('requires Pro for recipe application through the store and reports it truthfully', () => {
   useStore.getState().createLibrary('Saved processes');
   const saved = useStore.getState().saveSelectedProcessRecipe('V-carve');

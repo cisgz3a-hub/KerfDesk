@@ -120,6 +120,7 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
           target="_blank"
           rel="noopener noreferrer"
           onClick={onClose}
+          title="Download the Windows app, which starts in Free until you unlock Pro"
         >
           <DownloadIcon /> Download for Windows <span aria-hidden="true">↗</span>
         </a>
@@ -144,7 +145,8 @@ function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardPr
             Windows 10 / 11 · 64-bit · v{download.version}
             {download.codeSigning === 'unsigned' ? (
               <p>
-                Unsigned installer · Manual updates. Windows may show an unknown publisher warning.
+                Unsigned installer · Updates need your approval. Windows may show an unknown
+                publisher warning.
               </p>
             ) : null}
           </>
