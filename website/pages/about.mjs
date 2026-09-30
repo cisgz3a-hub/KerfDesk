@@ -149,7 +149,7 @@ function maker(site) {
       <p>The app’s startup screen reads “Created by ${site.studio}”.</p>
       <p>
         KerfDesk comes in a Free edition with no time limit and a Pro edition with a one-time
-        license. Purchase opens soon. <a href="${site.pricingUrl}">See pricing</a>.
+        license. <a href="${site.pricingUrl}">See pricing</a>.
       </p>
       <h3>Why the code still says LaserForge</h3>
       <p>

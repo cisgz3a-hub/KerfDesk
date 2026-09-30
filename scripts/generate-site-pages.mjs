@@ -2,7 +2,8 @@
 // (ADR-524 Amendment 3) from the customer documents in docs/legal/, which the
 // sourced legal review of 29 September 2026 checked (ADR-247 Amendment 2), and
 // the machines and safety pages those documents link. It also writes the terms
-// the app shows when it asks for agreement on first use (ADR-564). Everything
+// the app shows when it asks for agreement on first use (ADR-564), and the
+// download page's launch line (ADR-524 Amendment 4). Everything
 // it writes is committed, so a review shows the exact published text, and
 // generate-site-pages.test.mjs and app-terms-module.test.mjs fail when a file is
 // out of date.
@@ -18,7 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as prettier from 'prettier';
 
 import { APP_TERMS_MODULE, TERMS_SOURCE, appTermsModule } from './app-terms-module.mjs';
-import { sitePage } from './site-pages-layout.mjs';
+import { launchNoteHtml, sitePage } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -29,7 +30,7 @@ export const POLICY_PAGES = [
     path: '/pricing/',
     title: 'Pricing',
     description:
-      'KerfDesk Free and Pro: what each edition includes, what Pro will cost, and how a Pro licence, the trial and refunds work.',
+      'KerfDesk Free and Pro: what each edition includes, what Pro costs, and how a Pro licence, the trial and refunds work.',
     sources: ['docs/legal/kerfdesk-pricing.md'],
   },
   {
@@ -118,6 +119,21 @@ export async function buildSitePages() {
   return built;
 }
 
+// The download page is written by hand. The generator keeps only its launch line,
+// between the two launch-note markers, in step with the other pages.
+export const DOWNLOAD_PAGE = 'public/download.html';
+const LAUNCH_BLOCK = /(<!-- launch-note:[^>]*-->)[\s\S]*?(<!-- \/launch-note -->)/;
+
+export async function buildDownloadPage() {
+  const current = await readFile(path.join(REPO_ROOT, DOWNLOAD_PAGE), 'utf8');
+  if (!LAUNCH_BLOCK.test(current)) throw new Error(`${DOWNLOAD_PAGE} lost its launch-note markers`);
+  const next = current.replace(
+    LAUNCH_BLOCK,
+    (_, open, close) => `${open}\n${launchNoteHtml()}${close}`,
+  );
+  return new Map([[DOWNLOAD_PAGE, await formatted(next, DOWNLOAD_PAGE)]]);
+}
+
 // The terms the app shows on first use (ADR-564), from the terms page's source.
 export async function buildAppTerms() {
   const source = await readFile(path.join(REPO_ROOT, TERMS_SOURCE), 'utf8');
@@ -127,7 +143,11 @@ export async function buildAppTerms() {
 async function main(args) {
   const check = args.includes('--check');
   const stale = [];
-  const outputs = new Map([...(await buildSitePages()), ...(await buildAppTerms())]);
+  const outputs = new Map([
+    ...(await buildSitePages()),
+    ...(await buildDownloadPage()),
+    ...(await buildAppTerms()),
+  ]);
   for (const [file, content] of outputs) {
     const target = path.join(REPO_ROOT, file);
     if (check) {

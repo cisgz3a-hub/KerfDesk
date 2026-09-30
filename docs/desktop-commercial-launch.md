@@ -143,9 +143,11 @@ Record the exact source, artifact and hosted identity. Only then enable customer
 checkout and advertise automatic commercial updates.
 
 The same change that enables checkout sets `UNLICENSED_BUILDS_RUN_FREE = true` in
-`src/ui/licensing/edition-policy.ts` (ADR-544) and drops "Once sales open," from
-`public/download.html`. The website's `trialOpen` and `salesOpen` are set as
-`website/commerce.config.mjs` describes; buyers purchase inside the app, never
+`src/ui/licensing/edition-policy.ts` (ADR-544). The website's `trialOpen` and
+`salesOpen` are set as `website/commerce.config.mjs` describes, and
+`pnpm generate:site-pages` then takes the "KerfDesk Pro launches soon" line off
+the website, the pricing and legal pages and `public/download.html` (ADR-524
+Amendment 4); buyers purchase inside the app, never
 through a checkout link on the website (ADR-524 Amendment 2). From that deploy, the web app and
 the free Preview builds run KerfDesk Free and send Pro tools to the desktop app.
 Before merging it, confirm the owner's own machines run the commercial build with

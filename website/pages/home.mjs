@@ -119,7 +119,7 @@ function promises(site, commerce) {
       icon: 'tag',
       title: 'Free, with Pro when you need it',
       body: plan
-        ? `KerfDesk Free has no time limit. ${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)} plus tax, paid once, and each device can try it free for ${plan.trialDays} days${commerce.trialOpen ? '' : ' once the desktop app is released'}. Purchase opens soon.`
+        ? `KerfDesk Free has no time limit. ${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)} plus tax, paid once, and each device can try it free for ${plan.trialDays} days.`
         : 'KerfDesk Free has no time limit.',
       href: site.pricingUrl,
     },

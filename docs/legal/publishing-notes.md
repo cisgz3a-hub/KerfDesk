@@ -79,8 +79,10 @@ done.
    can be closed before paying (ECTA s43(2)). EU and UK buyers are asked to consent to immediate
    supply. Which cookies Paddle.js sets on buy.html: a non-essential one needs a consent banner for
    EU and UK visitors.
-5. **When sales open.** Update every "not on sale yet" notice, give the 14 days' notice in terms
-   s5.3 before the web app and Preview builds lose the Pro tools, and publish the new dates.
+5. **When sales open.** Set `salesOpen` in `website/commerce.config.mjs` and run
+   `pnpm generate:site-pages`: the one "KerfDesk Pro launches soon" line leaves every page (ADR-524
+   Amendment 4). Give the 14 days' notice in terms s5.3 before the web app and Preview builds lose
+   the Pro tools, and publish the new dates.
 
 ## The owner's own steps
 
@@ -89,7 +91,8 @@ done.
 - Register with the Consumer Goods and Services Ombud (compulsory; free below R1 million turnover).
 - EU and UK GDPR representatives (Art 27): appoint them before trials or sales open there, don't
   offer there, or accept the risk. The notice no longer claims any.
-- Product-liability insurance covering software sold worldwide.
+- Product-liability insurance: not taken (the owner's decision, 29 September 2026); the terms'
+  machine-safety notice and use-at-your-own-risk wording stay.
 - Support mailbox: a free Gmail account has no data processing agreement (POPIA s21, GDPR Art 28).
   Move to Google Workspace, or accept the gap.
 - Paddle: verify the account as Johannes Stephanus Stolk, sole trader, trading as KerfDesk.

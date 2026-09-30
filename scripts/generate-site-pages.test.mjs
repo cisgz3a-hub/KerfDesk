@@ -4,7 +4,15 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { commerce } from '../website/commerce.config.mjs';
-import { POLICY_PAGES, REPO_ROOT, buildSitePages } from './generate-site-pages.mjs';
+import { LAUNCH_NOTE } from '../website/lib/commerce.mjs';
+import {
+  DOWNLOAD_PAGE,
+  POLICY_PAGES,
+  REPO_ROOT,
+  buildDownloadPage,
+  buildSitePages,
+} from './generate-site-pages.mjs';
+import { launchNoteHtml } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
 
 const pages = await buildSitePages();
@@ -28,6 +36,20 @@ test('the committed pages match their sources', async () => {
     const committed = await readFile(path.join(REPO_ROOT, file), 'utf8');
     assert.equal(committed, content, `${file} is out of date: run pnpm generate:site-pages`);
   }
+});
+
+// The pages read as if Pro is on sale, and until sales open each one, the download
+// page too, opens with the one launch line (ADR-524 Amendment 4).
+test('every page and the download page open with the one launch line until sales open', async () => {
+  assert.equal(commerce.salesOpen, false);
+  const download = await buildDownloadPage();
+  const committed = await readFile(path.join(REPO_ROOT, DOWNLOAD_PAGE), 'utf8');
+  assert.equal(committed, download.get(DOWNLOAD_PAGE), 'run pnpm generate:site-pages');
+  for (const [file, content] of [...pages, ...download]) {
+    assert.equal(content.split(LAUNCH_NOTE).length, 2, `${file} shows the launch line once`);
+  }
+  assert.doesNotMatch(committed, /once sales open/i);
+  assert.equal(launchNoteHtml(true), '');
 });
 
 test('every page links pricing, support and every legal page from its menus', () => {

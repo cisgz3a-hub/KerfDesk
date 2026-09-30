@@ -7,7 +7,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { commerce } from '../commerce.config.mjs';
-import { commerceErrors, formatPrice } from '../lib/commerce.mjs';
+import { commerceErrors, formatPrice, LAUNCH_NOTE } from '../lib/commerce.mjs';
 import { attrValues, buildToTemp, builtPages, textContent } from './helpers.mjs';
 
 const PRO = commerce.plans.find((plan) => plan.id === 'pro');
@@ -123,6 +123,20 @@ describe('commerce configuration', () => {
       commerceErrors({ ...commerce, trialOpen: undefined }).some((e) => e.includes('trialOpen')),
     );
     assert.deepEqual(commerceErrors(OPEN_STORE), []);
+  });
+
+  // The pages read as if Pro is on sale; until sales open, one line on each says
+  // Pro launches soon (ADR-524 Amendment 4).
+  it('opens every page with the one launch line and says nothing opens later', () => {
+    const { outDir } = buildToTemp();
+    for (const { file, html } of builtPages(outDir)) {
+      assert.equal(html.split(LAUNCH_NOTE).length, 2, file);
+      assert.doesNotMatch(
+        textContent(html),
+        /opens soon|once the desktop app is released|once sales open/i,
+        file,
+      );
+    }
   });
 
   it('links no checkout from any page', () => {

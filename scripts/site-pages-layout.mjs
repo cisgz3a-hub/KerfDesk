@@ -4,6 +4,8 @@
 // app-wide security policy in public/_headers: no scripts, and nothing loaded
 // from another site.
 
+import { commerce } from '../website/commerce.config.mjs';
+import { LAUNCH_NOTE } from '../website/lib/commerce.mjs';
 import { escapeText } from './site-pages-markdown.mjs';
 
 export const SITE_MENU = [
@@ -46,7 +48,17 @@ th, td { padding: 0.5rem 0.65rem; border: 1px solid #dbe3ec; text-align: left; v
 th { background: #f1f5f9; }
 hr { margin: 2rem 0; border: 0; border-top: 1px solid #dbe3ec; }
 .site-footer { padding-top: 1.25rem; padding-bottom: 2.5rem; border-top: 1px solid #dbe3ec; color: #4b5563; }
+.launch-note { margin: 0; padding: 0.55rem 1.25rem; background: #111827; color: #ffffff; font-weight: 600; text-align: center; }
 `;
+
+/**
+ * The one line every page opens with until sales open (ADR-524 Amendment 4). The
+ * pages read as if Pro is on sale; `salesOpen` in website/commerce.config.mjs
+ * removes the line from them all.
+ */
+export function launchNoteHtml(salesOpen = commerce.salesOpen) {
+  return salesOpen ? '' : `<p class="launch-note">${LAUNCH_NOTE}</p>\n`;
+}
 
 function menu(links, current) {
   return links
@@ -77,7 +89,7 @@ ${sources.map((source) => `       ${source}`).join('\n')}
 <style>${STYLES}</style>
 </head>
 <body>
-<header class="site-header">
+${launchNoteHtml()}<header class="site-header">
 <a class="brand" href="/">KerfDesk</a>
 <nav aria-label="KerfDesk">${menu(SITE_MENU, path)}</nav>
 </header>

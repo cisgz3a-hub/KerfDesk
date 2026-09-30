@@ -1,7 +1,9 @@
 // The document shell every page renders into: head metadata, header with the
 // primary navigation (a scriptless <details> menu on small screens), and footer.
 
+import { commerce } from '../commerce.config.mjs';
 import { footerNav, primaryNav, site } from '../site.config.mjs';
+import { LAUNCH_NOTE } from './commerce.mjs';
 import { html } from './html.mjs';
 
 const EXTERNAL = /^https?:\/\//;
@@ -128,7 +130,7 @@ export function renderDocument(page, body, ctx) {
     ${head(page, ctx)}
     <body>
       <a class="skip-link" href="#main">Skip to content</a>
-      ${header(page)}
+      ${!commerce.salesOpen && html`<p class="launch-note">${LAUNCH_NOTE}</p>`} ${header(page)}
       <main id="main">${body}</main>
       ${footer()}
     </body>

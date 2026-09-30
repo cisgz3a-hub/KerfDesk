@@ -83,7 +83,7 @@ export async function populatePreviewDownloads(document, search, fetchRequest = 
 }
 
 const COMMERCIAL_NOT_RELEASED =
-  'The licensed Windows edition has not been released yet. Its verified trial download will appear here when it is; until then, use the free Preview below or the web app.';
+  'There is no licensed Windows edition to download right now. Use the free Preview below or the web app.';
 // The page cannot tell an unprovisioned or unreachable download host from a transient
 // failure, so this wording must stay true whether or not a release exists.
 const COMMERCIAL_UNVERIFIED =
