@@ -26,6 +26,10 @@ and `CLOUDFLARE_ANALYTICS_ZONE_ID`; never commit them or paste them into chat.
 - Both are request estimates, not people, completed downloads or installations.
   Repeat downloads, updater downloads, bots and operator checks can contribute.
 - HEAD requests, manifests, failures and unknown paths are excluded. All dates use UTC.
+- **Request country** is Cloudflare's country estimate for the request's network
+  address, not a person's residence. VPNs and proxies can show another country.
+  Missing country data and saved records from before this breakdown are **Unknown**;
+  the dashboard never invents countries for older totals.
 - The live dataset's Settings determine retention, available fields and query
   limits. Unsupported or failed queries display an error, never a zero count.
 - Refresh saves daily aggregate snapshots under
@@ -36,7 +40,8 @@ and `CLOUDFLARE_ANALYTICS_ZONE_ID`; never commit them or paste them into chat.
   A retention-clipped day cannot overwrite a previously complete day. The current
   day remains provisional. Saved observations can contain gaps and are **not an
   all-time total**. Refresh within Cloudflare's retention period to avoid gaps.
-- Export CSV saves the selected live report's daily per-release aggregate rows.
+- Export CSV saves the selected live report's daily per-release and country
+  aggregate rows. Country uses a two-letter code or `unknown`.
 
 Cloudflare can [sample and estimate traffic](https://developers.cloudflare.com/analytics/graphql-api/sampling/).
 The dashboard uses the already scaled `count`; it does not multiply it again.

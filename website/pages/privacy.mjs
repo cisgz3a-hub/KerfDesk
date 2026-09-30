@@ -106,11 +106,12 @@ function websitePart(site) {
     <h3>Download statistics</h3>
     <p>
       For installer downloads from ${site.downloadHost}, the owner can view aggregate request
-      estimates from Cloudflare, grouped by date, app version and platform. These figures include
-      repeat requests and partial downloads; they do not identify people or prove an installation.
-      The owner's local dashboard saves only these aggregate figures, not IP addresses, device
-      identifiers or licence details. This adds no tracking script or cookie to this site or the
-      app.
+      estimates from Cloudflare, grouped by date, app version, platform and request country. The
+      country is estimated from the request's network address; VPNs and proxies can show another
+      country, so it does not establish where a person lives. These figures include repeat requests
+      and partial downloads; they do not identify people or prove an installation. The owner's local
+      dashboard saves only these aggregate figures, not IP addresses, device identifiers or licence
+      details. This adds no tracking script or cookie to this site or the app.
     </p>
   </div>`;
 }

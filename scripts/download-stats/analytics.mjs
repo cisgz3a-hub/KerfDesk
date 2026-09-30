@@ -4,6 +4,7 @@ const REQUIRED_FIELDS = [
   'count',
   'avg_sampleInterval',
   'dimensions_date',
+  'dimensions_clientCountryName',
   'dimensions_clientRequestPath',
   'dimensions_clientRequestHTTPMethodName',
   'dimensions_edgeResponseStatus',
@@ -36,7 +37,7 @@ export const DOWNLOAD_QUERY = `query DownloadRequests($zoneTag: string!, $start:
       clientRequestPath_like: "/desktop/%"
     }) {
       count avg { sampleInterval }
-      dimensions { date clientRequestPath clientRequestHTTPMethodName edgeResponseStatus }
+      dimensions { date clientCountryName clientRequestPath clientRequestHTTPMethodName edgeResponseStatus }
     }
   } }
 }`;
@@ -182,6 +183,8 @@ function validateRows(rows, from) {
       !Number.isFinite(row.avg?.sampleInterval) ||
       row.avg.sampleInterval < 1 ||
       dimension?.date !== new Date(from).toISOString().slice(0, 10) ||
+      typeof dimension.clientCountryName !== 'string' ||
+      !/^(?:[A-Z]{2}|T1)$/u.test(dimension.clientCountryName) ||
       typeof dimension.clientRequestPath !== 'string' ||
       dimension.clientRequestPath.length > 2048 ||
       dimension.clientRequestHTTPMethodName !== 'GET' ||
@@ -190,6 +193,7 @@ function validateRows(rows, from) {
       throw invalidResponse();
     const key = JSON.stringify([
       dimension.date,
+      dimension.clientCountryName,
       dimension.clientRequestPath,
       dimension.edgeResponseStatus,
     ]);

@@ -10,6 +10,7 @@ const instant = (value) =>
   Number.isFinite(Date.parse(value)) &&
   new Date(value).toISOString() === value;
 const rowKeys = ['date', 'version', 'platform', 'channel', 'full', 'partial'];
+const countryRowKeys = [...rowKeys, 'country'];
 const dayKeys = ['date', 'from', 'to', 'full', 'partial', 'observedAt', 'rows'];
 
 function validRows(day) {
@@ -19,10 +20,15 @@ function validRows(day) {
   let partial = 0;
   for (const row of day.rows) {
     if (
-      !exact(row, rowKeys) ||
+      !(exact(row, rowKeys) || exact(row, countryRowKeys)) ||
       row.date !== day.date ||
       !validCount(row.full) ||
       !validCount(row.partial)
+    )
+      return false;
+    if (
+      'country' in row &&
+      (typeof row.country !== 'string' || !/^(?:[A-Z]{2}|unknown)$/u.test(row.country))
     )
       return false;
     if (
@@ -35,7 +41,7 @@ function validRows(day) {
       !/^(?:unknown|\d{1,16}\.\d{1,16}\.\d{1,16}(?:-preview\.\d{1,16})?)$/u.test(row.version)
     )
       return false;
-    const key = `${row.version}/${row.platform}/${row.channel}`;
+    const key = `${row.version}/${row.platform}/${row.channel}/${row.country ?? 'unknown'}`;
     if (seen.has(key)) return false;
     seen.add(key);
     full += row.full;
@@ -82,5 +88,12 @@ export function validateHistory(history) {
     partial += day.partial;
     if (!validCount(full) || !validCount(partial)) throw new Error('Invalid download history');
   }
-  return history;
+  // Archives saved before country reporting cannot recover that dimension retroactively.
+  return {
+    ...history,
+    days: history.days.map((day) => ({
+      ...day,
+      rows: day.rows.map((row) => ({ ...row, country: row.country ?? 'unknown' })),
+    })),
+  };
 }

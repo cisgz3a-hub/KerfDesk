@@ -14,7 +14,9 @@
           <span class="brand">KERFDESK</span><span class="badge">Private · This computer</span>
         </div>
         <h1>Download overview</h1>
-        <p class="intro">See how often your installers are requested, by day and release.</p>
+        <p class="intro">
+          See how often your installers are requested, by day, release and country.
+        </p>
       </header>
       <section class="setup card" id="setup" aria-labelledby="setup-heading">
         <div>
@@ -119,6 +121,33 @@
             </tbody>
           </table>
         </div>
+      </section>
+      <section class="card" aria-labelledby="countries-heading">
+        <div class="section-heading">
+          <h2 id="countries-heading">By request country</h2>
+          <span class="muted">Loaded period · Estimated requests</span>
+        </div>
+        <div class="table-scroll">
+          <table aria-describedby="country-disclosure">
+            <thead>
+              <tr>
+                <th>Country / region</th>
+                <th class="number">Full</th>
+                <th class="number">Partial</th>
+              </tr>
+            </thead>
+            <tbody id="countries">
+              <tr>
+                <td colspan="3" class="empty">No figures loaded.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p id="country-disclosure" class="muted">
+          Cloudflare estimates the request's country from its network address. VPNs and proxies can
+          show another country; this does not establish where a person lives. Unavailable country
+          data and older saved records are Unknown.
+        </p>
       </section>
       <details class="card">
         <summary>What these figures mean</summary>

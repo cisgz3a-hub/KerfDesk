@@ -14,6 +14,7 @@ const settings = (patch = {}) => ({
     'count',
     'avg_sampleInterval',
     'dimensions_date',
+    'dimensions_clientCountryName',
     'dimensions_clientRequestPath',
     'dimensions_clientRequestHTTPMethodName',
     'dimensions_edgeResponseStatus',
@@ -27,11 +28,12 @@ const settings = (patch = {}) => ({
 const json = (value) =>
   new Response(JSON.stringify(value), { headers: { 'Content-Type': 'application/json' } });
 const result = (zone) => json({ data: { viewer: { zones: [zone] } }, errors: null });
-const row = (date, count = 1, path = MANUAL, status = 200, interval = 1) => ({
+const row = (date, count = 1, path = MANUAL, status = 200, interval = 1, country = 'US') => ({
   count,
   avg: { sampleInterval: interval },
   dimensions: {
     date,
+    clientCountryName: country,
     clientRequestPath: path,
     clientRequestHTTPMethodName: 'GET',
     edgeResponseStatus: status,
@@ -124,6 +126,8 @@ test('separates full/range estimates, releases and days without persisting paths
   ]);
   assert.equal(report.rows.length, 2);
   assert.equal(report.releases.length, 2);
+  assert.deepEqual(report.countries, [{ country: 'US', full: 24, partial: 3 }]);
+  assert.ok(report.rows.every((item) => item.country === 'US'));
   assert.equal(report.coverage.sampled, true);
   assert.equal(report.coverage.queryCount, 2);
   assert.equal(report.measurement, 'estimated-download-requests');
@@ -133,6 +137,76 @@ test('separates full/range estimates, releases and days without persisting paths
   assert.match(f.calls[1].query, /clientRequestHTTPMethodName: "GET"/u);
   assert.match(f.calls[1].query, /requestSource: "eyeball"/u);
   assert.match(f.calls[1].query, /edgeResponseStatus_in: \[200, 206\]/u);
+  assert.match(f.calls[1].query, /dimensions \{ date clientCountryName /u);
+  assert.doesNotMatch(f.calls[1].query, /clientIP/u);
+});
+
+test('country grouping preserves every total and combines only explicit non-country markers', async () => {
+  const f = fixture({
+    rows: ({ start }) => [
+      row(start.slice(0, 10), 8, MANUAL, 200, 2, 'US'),
+      row(start.slice(0, 10), 3, MANUAL, 206, 1, 'US'),
+      row(start.slice(0, 10), 5, MANUAL, 200, 1, 'ZA'),
+      row(start.slice(0, 10), 2, MANUAL, 200, 1, 'XX'),
+      row(start.slice(0, 10), 4, MANUAL, 200, 1, 'T1'),
+      row(start.slice(0, 10), 1, PREVIEW, 206, 1, 'ZA'),
+    ],
+  });
+  const report = await fetchDownloadReport({ ...f.options, days: 2 });
+  assert.deepEqual(report.totals, { full: 38, partial: 8 });
+  assert.deepEqual(report.countries, [
+    { country: 'US', full: 16, partial: 6 },
+    { country: 'ZA', full: 10, partial: 2 },
+    { country: 'unknown', full: 12, partial: 0 },
+  ]);
+  assert.equal(report.rows.length, 8);
+  assert.equal(report.releases.length, 2);
+  for (const collection of [report.countries, report.days, report.rows, report.releases]) {
+    for (const field of ['full', 'partial'])
+      assert.equal(
+        collection.reduce((sum, item) => sum + item[field], 0),
+        report.totals[field],
+      );
+  }
+  const unknown = report.rows.filter((item) => item.country === 'unknown');
+  assert.equal(unknown.length, 2);
+  assert.ok(unknown.every((item) => item.full === 6 && item.partial === 0));
+  assert.ok(report.limitations.some((item) => item.includes('approximate network geolocation')));
+});
+
+test('missing country access or malformed country data fails without discarding its counts', async () => {
+  for (const configured of [
+    settings({
+      availableFields: settings().availableFields.filter(
+        (field) => field !== 'dimensions_clientCountryName',
+      ),
+    }),
+    settings({ maxNumberOfFields: 6 }),
+  ]) {
+    const f = fixture({ configured });
+    await assert.rejects(fetchDownloadReport(f.options), errorCode('analytics_fields'));
+    assert.equal(f.calls.length, 1);
+  }
+  for (const country of [null, '', 'us', 'USA', 'United States', '<script>', 'T2', 42]) {
+    const f = fixture({
+      rows: ({ start }) => [row(start.slice(0, 10), 1, MANUAL, 200, 1, country)],
+    });
+    await assert.rejects(
+      fetchDownloadReport({ ...f.options, days: 1 }),
+      errorCode('analytics_response'),
+    );
+  }
+  const f = fixture({
+    rows: ({ start }) => {
+      const missing = row(start.slice(0, 10));
+      delete missing.dimensions.clientCountryName;
+      return [missing];
+    },
+  });
+  await assert.rejects(
+    fetchDownloadReport({ ...f.options, days: 1 }),
+    errorCode('analytics_response'),
+  );
 });
 
 test('preserves requested UTC days and clips oldest day to actual retention and query duration', async () => {

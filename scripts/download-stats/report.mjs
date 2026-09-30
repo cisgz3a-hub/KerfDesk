@@ -88,22 +88,36 @@ function summarize(raw, windows) {
     windows.map((window) => [window.date, { ...window, full: 0, partial: 0 }]),
   );
   const releases = new Map();
+  const countries = new Map();
   const daily = new Map();
   const totals = { full: 0, partial: 0 };
   for (const entry of raw) {
     const identity = recognizeInstallerPath(entry.dimensions.clientRequestPath);
     if (!identity) continue;
     const day = entry.dimensions.date;
+    // Cloudflare uses XX for missing country data and T1 for Tor, not a country.
+    const country = ['XX', 'T1'].includes(entry.dimensions.clientCountryName)
+      ? 'unknown'
+      : entry.dimensions.clientCountryName;
     const key = JSON.stringify(identity);
-    const dailyKey = JSON.stringify([day, key]);
+    const dailyKey = JSON.stringify([day, key, country]);
     if (!releases.has(key)) releases.set(key, { ...identity, full: 0, partial: 0 });
-    if (!daily.has(dailyKey)) daily.set(dailyKey, { date: day, ...identity, full: 0, partial: 0 });
-    for (const target of [totals, dayMap.get(day), releases.get(key), daily.get(dailyKey)])
+    if (!countries.has(country)) countries.set(country, { country, full: 0, partial: 0 });
+    if (!daily.has(dailyKey))
+      daily.set(dailyKey, { date: day, ...identity, country, full: 0, partial: 0 });
+    for (const target of [
+      totals,
+      dayMap.get(day),
+      releases.get(key),
+      countries.get(country),
+      daily.get(dailyKey),
+    ])
       add(target, entry.count, entry.dimensions.edgeResponseStatus === 206);
   }
   return {
     days: [...dayMap.values()],
     releases: [...releases.values()],
+    countries: [...countries.values()],
     rows: [...daily.values()],
     totals,
   };
@@ -156,6 +170,7 @@ export async function fetchDownloadReport({
       'The current UTC day is provisional. History older than Cloudflare retention needs earlier saved reports.',
       'Only recognized installer paths on dl.kerfdesk.com are included; manifests, HEAD requests and other hosts are excluded.',
       'The legacy latest-installer alias has no recoverable version attribution and is labelled unknown.',
+      'Country is approximate network geolocation, not a verified person location. Missing country data and Tor are grouped as unknown; VPNs or proxies can change attribution.',
     ],
     coverage: {
       requestedDays: days,

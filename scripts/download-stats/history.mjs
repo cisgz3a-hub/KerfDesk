@@ -24,17 +24,17 @@ export function mergeHistory(history, report) {
       rows: report.rows.filter((row) => row.date === observed.date),
     });
   }
-  return {
+  return validateHistory({
     schemaVersion: 1,
     days: [...days.values()].sort((a, b) => a.date.localeCompare(b.date)),
-  };
+  });
 }
 
 export async function saveHistory(path, history) {
-  validateHistory(history);
+  const validated = validateHistory(history);
   await mkdir(dirname(path), { recursive: true });
   const temporary = `${path}.tmp`;
-  const text = `${JSON.stringify(history, null, 2)}\n`;
+  const text = `${JSON.stringify(validated, null, 2)}\n`;
   if (Buffer.byteLength(text) > 20 * 1024 * 1024) throw new Error('History is too large');
   await writeFile(temporary, text, { mode: 0o600 });
   await rename(temporary, path);

@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { createDownloadDashboard } from './server.mjs';
-import { mergeHistory, readHistory } from './history.mjs';
+import { mergeHistory, readHistory, saveHistory } from './history.mjs';
 
 const TOKEN = 'synthetic-read-token-not-a-secret';
 const ZONE = 'a'.repeat(32);
@@ -214,6 +214,57 @@ test('malformed archive cannot inflate totals or be silently replaced', async (t
   ];
   for (const value of corruptions) {
     const text = JSON.stringify(value);
+    await writeFile(f.historyPath, text);
+    await assert.rejects(readHistory(f.historyPath), /not been replaced/u);
+    assert.equal(await readFile(f.historyPath, 'utf8'), text);
+  }
+});
+
+test('legacy countryless history stays Unknown until equal or wider coverage replaces it', async (t) => {
+  const f = await fixture(t);
+  const legacy = {
+    schemaVersion: 1,
+    days: [{ ...day(), observedAt: report().generatedAt, rows: report().rows }],
+  };
+  const original = JSON.stringify(legacy);
+  await writeFile(f.historyPath, original);
+  const loaded = await readHistory(f.historyPath);
+  assert.equal(loaded.days[0].rows[0].country, 'unknown');
+  assert.equal(await readFile(f.historyPath, 'utf8'), original);
+  const split = report();
+  split.rows = [
+    { ...split.rows[0], country: 'US', full: 3, partial: 1 },
+    { ...split.rows[0], country: 'ZA', full: 1, partial: 1 },
+  ];
+  const clipped = { ...split, days: [day(4, '2026-09-29T12:00:00.000Z')] };
+  assert.equal(mergeHistory(loaded, clipped).days[0].rows[0].country, 'unknown');
+  const refreshed = mergeHistory(loaded, split);
+  assert.equal(refreshed.days[0].full, 4);
+  assert.equal(refreshed.days[0].partial, 2);
+  assert.deepEqual(
+    refreshed.days[0].rows.map((row) => row.country),
+    ['US', 'ZA'],
+  );
+  await saveHistory(f.historyPath, refreshed);
+  assert.deepEqual(await readHistory(f.historyPath), refreshed);
+});
+
+test('country history rejects malformed codes and duplicate dimensions without replacing files', async (t) => {
+  const f = await fixture(t);
+  const original = mergeHistory({ schemaVersion: 1, days: [] }, report());
+  const row = original.days[0].rows[0];
+  for (const country of ['us', 'USA', '', '<script>', null, ['US']]) {
+    const invalid = structuredClone(original);
+    invalid.days[0].rows[0].country = country;
+    await assert.rejects(saveHistory(f.historyPath, invalid), /Invalid download history/u);
+  }
+  for (const country of ['US', 'unknown']) {
+    const first = { ...row, country, full: 2, partial: 1 };
+    const second = { ...first };
+    if (country === 'unknown') delete second.country;
+    const invalid = structuredClone(original);
+    invalid.days[0].rows = [first, second];
+    const text = JSON.stringify(invalid);
     await writeFile(f.historyPath, text);
     await assert.rejects(readHistory(f.historyPath), /not been replaced/u);
     assert.equal(await readFile(f.historyPath, 'utf8'), text);

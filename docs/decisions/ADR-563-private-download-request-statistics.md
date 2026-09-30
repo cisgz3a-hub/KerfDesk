@@ -8,10 +8,17 @@ unchanged. The browser, desktop app and product website gain no tracking script.
 
 A local owner dashboard queries Cloudflare's existing zone HTTP request metrics.
 It checks dataset access and limits, then groups recognised installer requests by
-UTC day, version, platform and channel. HTTP 200 and 206 counts remain separate.
+UTC day, version, platform, channel and request country. HTTP 200 and 206 counts remain separate.
 Counts are labelled estimated download requests, never people, installations or
 completed transfers. Adaptive sampling, retries, automated requests, update
 downloads and retention limits are visible limitations.
+
+Country is Cloudflare's estimate for the request's network address, not a person's
+residence. VPNs and proxies can change it. The dashboard displays country names,
+exports two-letter country codes and retains only aggregate counts. Unavailable
+countries use `unknown`. Existing history without a country remains compatible
+and is labelled Unknown; a refresh replaces a covered day's old aggregate rather
+than adding country rows to it. Duplicate detection includes the country dimension.
 
 The owner provides a read-only analytics credential to a loopback server. It is
 kept in memory, never stored in browser storage, returned through an API or

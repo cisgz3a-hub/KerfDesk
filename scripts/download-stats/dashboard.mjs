@@ -1,6 +1,7 @@
 /* global document */
 const element = (id) => document.getElementById(id);
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
+const countryNames = new Intl.DisplayNames(undefined, { type: 'region', fallback: 'code' });
 let latest = null;
 let cooldownTimer;
 
@@ -56,6 +57,24 @@ function drawChart(days) {
   );
 }
 
+function drawCountries(report) {
+  const countries = report.countries ?? [{ country: 'unknown', ...report.totals }];
+  const rows = countries.map(({ country, full, partial }) => {
+    const row = document.createElement('tr');
+    const name = /^[A-Z]{2}$/u.test(country) ? countryNames.of(country) : 'Unknown';
+    row.append(cell(name), cell(full, true), cell(partial, true));
+    return row;
+  });
+  if (!rows.length) {
+    const row = document.createElement('tr');
+    const empty = cell('No matching installer requests were observed in this period.');
+    empty.colSpan = 3;
+    row.append(empty);
+    rows.push(row);
+  }
+  element('countries').replaceChildren(...rows);
+}
+
 function render(state) {
   element('setup').hidden = state.configured;
   element('disconnect').hidden = !state.configured;
@@ -73,6 +92,7 @@ function render(state) {
   element('partial').textContent = number.format(latest.totals.partial);
   element('export').disabled = false;
   drawChart(latest.days);
+  drawCountries(latest);
   const rows = latest.releases.map((release) => {
     const row = document.createElement('tr');
     row.append(
@@ -157,10 +177,20 @@ element('disconnect').addEventListener('click', () => {
 element('export').addEventListener('click', () => {
   if (!latest) return;
   const lines = [
-    'date_utc,version,platform,channel,full_response_requests_estimated,partial_requests_estimated',
+    'date_utc,version,platform,channel,country,full_response_requests_estimated,partial_requests_estimated',
   ];
   for (const row of latest.rows)
-    lines.push([row.date, row.version, row.platform, row.channel, row.full, row.partial].join(','));
+    lines.push(
+      [
+        row.date,
+        row.version,
+        row.platform,
+        row.channel,
+        row.country ?? 'unknown',
+        row.full,
+        row.partial,
+      ].join(','),
+    );
   const link = document.createElement('a');
   link.href = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/csv' }));
   link.download = `kerfdesk-download-requests-${latest.generatedAt.slice(0, 10)}.csv`;
