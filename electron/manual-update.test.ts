@@ -52,8 +52,13 @@ async function harness() {
   folders.push(folder);
   let manifest = envelope(release());
   let installer = () => new Response(bytes);
+  let notes = () => new Response('Not found', { status: 404 });
   const fetch = vi.fn(async (url: string) =>
-    url.endsWith('latest.json') ? new Response(manifest) : installer(),
+    url.endsWith('latest.json')
+      ? new Response(manifest)
+      : url.endsWith('release-notes.json')
+        ? notes()
+        : installer(),
   );
   const eligible = vi.fn(async () => true);
   const announce = vi.fn();
@@ -89,6 +94,9 @@ async function harness() {
     },
     setInstaller: (next: () => Response) => {
       installer = next;
+    },
+    setNotes: (next: () => Response) => {
+      notes = next;
     },
   };
 }
@@ -127,7 +135,7 @@ describe('authenticated manual desktop updates', () => {
       version: '1.0.1',
     });
     expect(h.announce).toHaveBeenCalledOnce();
-    expect(h.fetch.mock.calls.every(([url]) => url.endsWith('latest.json'))).toBe(true);
+    expect(h.fetch.mock.calls.every(([url]) => url.endsWith('.json'))).toBe(true);
     expect(await h.updates.prepareInstall()).toBeNull();
     expect(h.updates.download?.().state).toBe('downloading');
     await h.updates.settled();
@@ -221,7 +229,119 @@ describe('authenticated manual desktop updates', () => {
     h.updates.download?.();
     h.updates.download?.();
     await h.updates.settled();
-    expect(h.fetch).toHaveBeenCalledTimes(2);
+    expect(h.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('shows authenticated matching notes before download and retains them through explicit installation', async () => {
+    const h = await harness();
+    const payload = release();
+    const highlights = [
+      'Edit power values by clearing and replacing the number.',
+      'Read improvements before downloading an update.',
+    ];
+    h.setNotes(
+      () =>
+        new Response(
+          envelope({
+            schemaVersion: 1,
+            product: payload.product,
+            kind: 'update-notes',
+            channel: 'stable',
+            version: payload.version,
+            sourceSha: payload.sourceSha,
+            publishedAt: payload.publishedAt,
+            highlights,
+          }),
+        ),
+    );
+    await h.discover();
+    expect(h.updates.status()).toMatchObject({
+      state: 'available',
+      releaseNotesState: 'available',
+      releaseNotes: highlights,
+    });
+    expect(h.fetch.mock.calls.some(([url]) => url.endsWith('.exe'))).toBe(false);
+    h.updates.download?.();
+    await h.updates.settled();
+    expect(h.updates.status()).toMatchObject({
+      state: 'ready',
+      releaseNotes: highlights,
+      installOnQuit: false,
+    });
+    await h.updates.installOnQuit?.();
+    expect(h.updates.status()).toMatchObject({ releaseNotes: highlights, installOnQuit: true });
+  });
+
+  it('does not block a valid update for missing, corrupt, mismatched or redirected notes', async () => {
+    const h = await harness();
+    const payload = release();
+    const valid = {
+      schemaVersion: 1,
+      product: payload.product,
+      kind: 'update-notes',
+      channel: 'stable',
+      version: payload.version,
+      sourceSha: payload.sourceSha,
+      publishedAt: payload.publishedAt,
+      highlights: ['Clearer number editing.'],
+    };
+    for (const notes of [
+      () => new Response('missing', { status: 404 }),
+      () => new Response('offline', { status: 503 }),
+      () => {
+        throw new Error('offline');
+      },
+      () => new Response(envelope(valid).replace('"signature":"', '"signature":"X')),
+      () => new Response(envelope({ ...valid, sourceSha: 'b'.repeat(40) })),
+      () => new Response(envelope({ ...valid, version: '9.0.0' })),
+      () => new Response(envelope({ ...valid, publishedAt: '2026-09-29T00:00:00.000Z' })),
+      () => new Response('x'.repeat(65_537)),
+      () => {
+        const response = new Response(envelope(valid));
+        Object.defineProperty(response, 'url', { value: 'https://untrusted.invalid/notes' });
+        return response;
+      },
+    ]) {
+      h.setNotes(notes);
+      await h.discover();
+      expect(h.updates.status()).toMatchObject({
+        state: 'available',
+        releaseNotesState: 'unavailable',
+      });
+      expect(h.updates.status().releaseNotes).toBeUndefined();
+    }
+    h.updates.download?.();
+    await h.updates.settled();
+    expect(h.updates.status()).toMatchObject({ state: 'ready' });
+  });
+
+  it('clears previous version notes during checks and never attaches them to a newer candidate', async () => {
+    const h = await harness();
+    const payload = release();
+    h.setNotes(
+      () =>
+        new Response(
+          envelope({
+            schemaVersion: 1,
+            product: payload.product,
+            kind: 'update-notes',
+            channel: 'stable',
+            version: payload.version,
+            sourceSha: payload.sourceSha,
+            publishedAt: payload.publishedAt,
+            highlights: ['Previous version improvements.'],
+          }),
+        ),
+    );
+    await h.discover();
+    h.setManifest(envelope(release('1.0.2')));
+    expect(h.updates.check().releaseNotes).toBeUndefined();
+    await h.updates.settled();
+    expect(h.updates.status()).toMatchObject({
+      version: '1.0.2',
+      releaseNotesState: 'unavailable',
+    });
+    expect(h.updates.status().releaseNotes).toBeUndefined();
   });
 });
 

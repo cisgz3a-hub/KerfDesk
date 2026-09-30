@@ -163,7 +163,7 @@ jobs:
             Tee-Object -FilePath (Join-Path $evidence 'packaged-security.txt')
           if ($LASTEXITCODE -ne 0) { throw 'Packaged fuse or runtime closure verification failed.' }
           $before = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
-          node scripts/verify-asar-integrity-enforced.mjs $executable $archive 2>&1 |
+          node scripts/verify-asar-integrity-enforced.mjs $executable $archive "--output=$evidence/asar-probe" 2>&1 |
             Tee-Object -FilePath (Join-Path $evidence 'asar-integrity.txt')
           $integrityExit = $LASTEXITCODE
           $after = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash

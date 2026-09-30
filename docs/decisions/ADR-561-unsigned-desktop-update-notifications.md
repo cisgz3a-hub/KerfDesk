@@ -41,3 +41,13 @@ The Linux qualification job checks the batch before starting a Windows runner. T
 The **Release unsigned Windows desktop** manual workflow input `release_now` is a boolean defaulting to false. Only an explicit true selection on `main` bypasses the 20-PR threshold. A manual dispatch without that selection follows the batch rule. The override retains exact-main successful checks, a clean source checkout, previous-source ancestry, authenticated manifests, package verification, Windows qualification and publication guards. API uncertainty still refuses a manual release when a previous release exists. The initial release, which has no authenticated baseline, requires an explicit release-now dispatch. Duplicate published source remains a no-op even with the override.
 
 Reference: [GitHub's merge commit SHA semantics](https://docs.github.com/en/rest/pulls/pulls#get-a-pull-request) and [pull request listing and pagination](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests).
+
+### Amendment 2 - Brief improvements before updating
+
+Date: 2026-10-01. Accepted by the maintainer's request for short release improvements users can read before updating.
+
+Help > Check for Updates displays a **What's improved** section above the download action. It contains one to six short, reviewed customer-facing bullets for the offered version. They remain visible while downloading and before the user chooses installation. Notes are plain text, never rendered HTML or executable links.
+
+The manual download manifest stays byte-schema compatible with existing installations. Notes live in a separate immutable `release-notes.json` beside each release, signed with the independently pinned stable release key and bound to the authenticated version, source commit and publication time. The app derives the URL, limits the response size and request duration, and rejects tampered or mismatched notes. Missing notes or a temporary notes outage show an honest unavailable message and do not prevent an otherwise verified update. Existing download, licence, installation-consent and normal-close safeguards remain unchanged.
+
+Each publication requires fresh reviewed notes in the candidate source, based on the previous authenticated release source. Publication verifies and reads back the immutable notes before advancing the latest pointer. The normal 20-PR batch and explicit early-release override still apply. Older installed builds need one update to gain this presentation; changing the server cannot add UI to an already installed executable. Native and public release proof remain separate from source tests.

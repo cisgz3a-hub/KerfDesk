@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -148,6 +148,108 @@ test('does not tamper if the unmodified executable fails or writes an invalid sm
     assert.equal(calls, 1);
     assert.deepEqual(readFileSync(archivePath), bytes);
   }
+});
+
+test('retains bounded baseline diagnostics without storing licence payloads or touching the archive', async (context) => {
+  const { archivePath, bytes, baseline } = fixture(context);
+  const output = join(archivePath, '..', 'evidence');
+  await assert.rejects(
+    verifyAsarIntegrity(
+      'fixture',
+      archivePath,
+      1000,
+      async () => ({
+        ...baseline,
+        code: 1,
+        failure: { kind: 'exit', message: 'packaged app exited 1' },
+        stdout: 'x'.repeat(30_000) + ' KD1.synthetic-secret {"claimToken":"synthetic-claim"}',
+        stderr: 'meaningful baseline diagnostic; Bearer synthetic-token',
+        smokeResult: { ...baseline.smokeResult, licenseKey: 'must-not-be-recorded' },
+      }),
+      { output },
+    ),
+    /native smoke baseline/u,
+  );
+  const run = join(output, readdirSync(output)[0]);
+  const text = readFileSync(join(run, 'baseline.json'), 'utf8');
+  assert.equal(JSON.parse(text).process.code, 1);
+  assert.equal(text.includes('must-not-be-recorded'), false);
+  assert.ok(readFileSync(join(run, 'baseline-stdout.txt')).length <= 16_384);
+  assert.match(readFileSync(join(run, 'baseline-stderr.txt'), 'utf8'), /meaningful baseline/u);
+  assert.equal(JSON.parse(text).logs.stdoutTruncated, true);
+  for (const filename of ['baseline-stdout.txt', 'baseline-stderr.txt'])
+    assert.doesNotMatch(
+      readFileSync(join(run, filename), 'utf8'),
+      /synthetic-(?:secret|claim|token)/u,
+    );
+  assert.deepEqual(readFileSync(archivePath), bytes);
+});
+
+test('retains both phase observations and restores the archive after a tampered launch or observer fails', async (context) => {
+  const { archivePath, bytes, baseline } = fixture(context);
+  const output = join(archivePath, '..', 'evidence');
+  for (const throws of [false, true]) {
+    let calls = 0;
+    let run;
+    await assert.rejects(
+      verifyAsarIntegrity(
+        'fixture',
+        archivePath,
+        1000,
+        async () => {
+          if (calls++ === 0) return baseline;
+          if (throws) throw new Error('observer failed before returning');
+          return { ...LAUNCH, code: 1, stderr: 'unrelated app failure' };
+        },
+        {
+          output,
+          reportEvidence: (directory) => {
+            run = directory;
+          },
+        },
+      ),
+    );
+    assert.equal(JSON.parse(readFileSync(join(run, 'baseline.json'), 'utf8')).process.code, 0);
+    const observation = JSON.parse(readFileSync(join(run, 'tampered.json'), 'utf8'));
+    if (throws) assert.match(observation.observerError, /observer failed/u);
+    else {
+      assert.equal(observation.process.code, 1);
+      assert.match(
+        readFileSync(join(run, 'tampered-stderr.txt'), 'utf8'),
+        /unrelated app failure/u,
+      );
+    }
+    assert.deepEqual(readFileSync(archivePath), bytes);
+  }
+  assert.equal(readdirSync(output).length, 2);
+});
+
+test('an evidence write failure still restores the archive and cannot pass the gate', async (context) => {
+  const { archivePath, bytes, baseline } = fixture(context);
+  const output = join(archivePath, '..', 'evidence');
+  let calls = 0;
+  let run;
+  await assert.rejects(
+    verifyAsarIntegrity(
+      'fixture',
+      archivePath,
+      1000,
+      async () => {
+        if (calls++ === 0) return baseline;
+        writeFileSync(join(run, 'tampered.json'), 'conflict');
+        return { ...LAUNCH, stderr: DIAGNOSTIC };
+      },
+      {
+        output,
+        reportEvidence: (directory) => {
+          run = directory;
+        },
+      },
+    ),
+    { code: 'EEXIST' },
+  );
+  assert.deepEqual(readFileSync(archivePath), bytes);
+  assert.equal(readFileSync(join(run, 'tampered.json'), 'utf8'), 'conflict');
 });
 
 test('restores the exact archive after a failed tampered launch or observer exception', async (context) => {

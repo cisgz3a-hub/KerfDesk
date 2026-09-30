@@ -10,6 +10,9 @@ import {
   verifyManualDownload,
 } from '../public/desktop-manual-download.mjs';
 import { commercialArtifactNames } from '../public/desktop-commercial-catalog.mjs';
+import { updateNotesUrl } from '../public/desktop-update-notes.mjs';
+import { readReviewedDesktopUpdateNotes } from './reviewed-desktop-update-notes.mjs';
+import { requireNotesBaseline } from './manual-commercial-notes.mjs';
 
 const REPOSITORY = 'cisgz3a-hub/KerfDesk';
 const WORKFLOWS = ['ci.yml', 'e2e.yml', 'desktop-package-check.yml'];
@@ -217,6 +220,8 @@ async function inspectReleaseBatch(sourceSha) {
     decision.publish = false;
     decision.reason = 'This source is already published.';
   }
+  if (decision.publish)
+    requireNotesBaseline(await readReviewedDesktopUpdateNotes(sourceSha, process.cwd()), latest);
   return { bytes, latest, decision };
 }
 
@@ -261,8 +266,14 @@ export function nextPatch(version) {
 }
 
 async function occupied(version) {
-  for (const name of [commercialArtifactNames(version)[0], 'download-manifest.json']) {
-    const response = await request(manualDownloadUrl(version, name), 'HEAD');
+  const urls = [
+    ...[commercialArtifactNames(version)[0], 'download-manifest.json'].map((name) =>
+      manualDownloadUrl(version, name),
+    ),
+    updateNotesUrl(version),
+  ];
+  for (const url of urls) {
+    const response = await request(url, 'HEAD');
     await response.body?.cancel();
     if (response.status === 200) return true;
   }

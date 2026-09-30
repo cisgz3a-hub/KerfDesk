@@ -6,6 +6,11 @@ import {
 } from '../public/desktop-manual-download.mjs';
 import { CommercialReleaseError, digest } from './commercial-release-manifest.mjs';
 import { manualDownloadPayload, signManualDownload } from './manual-commercial-manifest.mjs';
+import {
+  requireNotesBaseline,
+  signUpdateNotes,
+  updateNotesStorageKey,
+} from './manual-commercial-notes.mjs';
 
 const same = (a, b) => (a === null ? b === null : Buffer.isBuffer(b) && a.equals(b));
 const state = (bytes) => (bytes === null ? 'none' : digest(bytes));
@@ -23,6 +28,7 @@ export async function publishManualCommercialRelease({
   keyId,
   verifyInstaller,
   expectedLatestSha256,
+  reviewedNotes,
 }) {
   if (typeof verifyInstaller !== 'function')
     refuse('Unsigned commercial package verification is mandatory.');
@@ -31,6 +37,7 @@ export async function publishManualCommercialRelease({
   const payload = manualDownloadPayload(identity, installer, keySet);
   const envelope = await signManualDownload(payload, privateKeyPem, keyId, keySet);
   const manifest = Buffer.from(`${JSON.stringify(envelope)}\n`);
+  const notes = await signUpdateNotes(payload, reviewedNotes, privateKeyPem, keyId, keySet);
   await verifyInstaller(installer, 'local');
   const initial = await store.get(MANUAL_DOWNLOAD_LATEST_KEY);
   if (!same(initial, manifest) && state(initial) !== expectedLatestSha256)
@@ -44,10 +51,12 @@ export async function publishManualCommercialRelease({
       refuse('Manual download publication cannot roll back version or release date.');
     if (payload.version === previous.version && !same(initial, manifest))
       refuse('The published manual version conflicts with this build.');
-  }
+    if (!same(initial, manifest)) requireNotesBaseline(reviewedNotes, previous);
+  } else requireNotesBaseline(reviewedNotes, null);
   const plan = [
     { key: manualDownloadKey(payload.version, payload.artifacts[0].name), bytes: installer },
     { key: manualDownloadKey(payload.version, 'download-manifest.json'), bytes: manifest },
+    { key: updateNotesStorageKey(payload.version), bytes: notes },
   ];
   // Preflight every versioned object before any write; exact interrupted retries are safe.
   for (const item of plan) {
