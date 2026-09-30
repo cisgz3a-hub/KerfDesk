@@ -76,7 +76,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build renderer and Electron main
-        run: pnpm build:web && pnpm build:electron-main
+        run: pnpm build:renderer:desktop && pnpm build:electron-main
 
       - name: Package the stable config as an unpacked Linux app
         run: pnpm exec electron-builder --linux dir --x64 --config electron-builder.yml --publish never
@@ -148,7 +148,7 @@ jobs:
         shell: bash
         env:
           KERFDESK_DESKTOP_VERSION: ${{ env.VERSION }}
-        run: pnpm build:web && pnpm build:electron-main
+        run: pnpm build:renderer:desktop && pnpm build:electron-main
 
       - name: Build the unsigned Windows Preview installer as the release lane does
         shell: bash
@@ -250,7 +250,7 @@ jobs:
       - name: Build renderer and Electron main at the check version
         env:
           KERFDESK_DESKTOP_VERSION: ${{ env.VERSION }}
-        run: pnpm build:web && pnpm build:electron-main
+        run: pnpm build:renderer:desktop && pnpm build:electron-main
 
       - name: Build the unsigned macOS Preview DMG as the release lane does
         env:

@@ -82,11 +82,11 @@ function VcarveTool({ onOpen }: { readonly onOpen: () => void }): JSX.Element {
   );
 }
 
-it('leaves every tool open in builds without licensing', async () => {
+it('can explicitly use an unrestricted development context', async () => {
   const open = vi.fn();
   await act(async () =>
     root.render(
-      <EditionProvider>
+      <EditionProvider unlicensedRunsFree={false}>
         <VcarveTool onOpen={open} />
       </EditionProvider>,
     ),

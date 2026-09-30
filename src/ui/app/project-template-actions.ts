@@ -9,6 +9,7 @@ import { claimProjectOpenRequest } from './project-open-request-owner';
 import { portableProjectAssets } from './portable-project-assets';
 import type { PagedRasterAssetReader } from '../import/paged-raster-hydration';
 import { createProjectSaveWriteCoordinator } from '../state/project-save-write-coordinator';
+import { describePendingProProject } from '../state/pending-pro-project';
 
 type OpenTemplateContext = ProjectOpenCompletionContext & {
   readonly platform: PlatformAdapter;
@@ -57,6 +58,10 @@ export async function openTemplateFile(
     return;
   }
   const loaded = ctx.setProject(project);
+  if (loaded.kind === 'desktop-required') {
+    describePendingProProject(project, file.name);
+    return;
+  }
   ctx.markLoaded(`${file.name.replace(/\.lf2template$/i, '')}.lf2`, { dirty: true });
   ctx.pushToast(
     `Started a new project from ${file.name}. Save will ask for a destination.`,

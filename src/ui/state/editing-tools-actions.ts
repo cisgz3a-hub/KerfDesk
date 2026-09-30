@@ -16,11 +16,11 @@ export type EditingToolsActions = OffsetShapesActions &
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
-export function editingToolsActions(set: Setter): EditingToolsActions {
+export function editingToolsActions(set: Setter, copySet: Setter = set): EditingToolsActions {
   return {
     ...offsetShapesActions(set),
     ...selectionQueryActions(set),
-    ...designToolsActions(set),
+    ...designToolsActions(set, copySet),
     ...laserTabActions(set),
   };
 }

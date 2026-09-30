@@ -8,6 +8,8 @@ import {
   populatePreviewDownloads,
 } from '../public/desktop-downloads.mjs';
 import { verifyCommercialCatalog } from '../public/desktop-commercial-catalog.mjs';
+import { MANUAL_DOWNLOAD_LATEST_URL } from '../public/desktop-manual-download.mjs';
+import { manualDownloadPayload, signManualDownload } from './manual-commercial-manifest.mjs';
 import { verifyPreviewManifest } from '../public/desktop-release-manifest.mjs';
 import {
   catalogBytes,
@@ -53,17 +55,58 @@ function publishedCatalog(versions, source = {}) {
   });
   return { entries, text: catalogBytes(entries).toString('utf8') };
 }
-function commercialServer(catalog) {
+function commercialServer(catalog, manual = null) {
   const requests = [];
   return {
     requests,
     fetchRequest: async (url, options) => {
       requests.push({ url, options });
       if (url === '/desktop-release-keys.json') return new Response(JSON.stringify(anchors));
+      if (url === MANUAL_DOWNLOAD_LATEST_URL)
+        return manual === null ? new Response('Not found', { status: 404 }) : new Response(manual);
       return catalog === null ? new Response('Not found', { status: 404 }) : new Response(catalog);
     },
   };
 }
+
+test('manual commercial download is labelled unsigned and manual, separate from the Preview and signed update feed', async () => {
+  const payload = manualDownloadPayload(
+    stable.fixture().identity,
+    Buffer.from('unsigned package'),
+    stable.keySet,
+  );
+  const manual = JSON.stringify(
+    await signManualDownload(payload, stable.privateKeyPem, stable.keyId, stable.keySet),
+  );
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(document, commercialServer(null, manual).fetchRequest);
+  const [download, manifest] = commercialLinks(document);
+  assert.equal(download.hidden, false);
+  assert.ok(download.href.includes('/desktop/commercial-manual/releases/'));
+  assert.ok(manifest.href.endsWith('/download-manifest.json'));
+  assert.match(
+    document.querySelector('#commercial-status').textContent,
+    /Unsigned installer · Manual updates/u,
+  );
+  assert.match(
+    document.querySelector('#commercial-installation').textContent,
+    /not Windows code-signed/u,
+  );
+  assert.match(
+    document.querySelector('#commercial-installation').textContent,
+    /never downloads or installs unsigned updates automatically/u,
+  );
+  assert.equal(document.querySelector('#commercial-history').hidden, true);
+  for (const link of document.querySelectorAll('[data-preview-suffix]'))
+    assert.equal(link.hasAttribute('href'), false);
+  const tampered = commercialServer('{"schemaVersion":1,"releases":[{}]}', manual);
+  await populateCommercialDownload(document, tampered.fetchRequest);
+  assert.equal(download.hasAttribute('href'), false);
+  assert.equal(
+    tampered.requests.some(({ url }) => url === MANUAL_DOWNLOAD_LATEST_URL),
+    false,
+  );
+});
 function commercialLinks(document) {
   return ['#commercial-download', '#commercial-manifest'].map((id) => document.querySelector(id));
 }

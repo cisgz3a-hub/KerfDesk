@@ -4,6 +4,8 @@
 // electron/main.ts). We only stamp `id: 'electron'` for UI feature-gating.
 
 import { StrictMode } from 'react';
+import { resolveWindowsDesktopDownload } from '../../../public/desktop-windows-download.mjs';
+import { DesktopDownloadContext } from '../licensing/desktop-download-context';
 import { createRoot } from 'react-dom/client';
 import {
   createDesktopPreviewUpdateAdapter,
@@ -101,11 +103,16 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <EditionProvider
-          {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
-        >
-          <App />
-        </EditionProvider>
+        <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>
+          <EditionProvider
+            {...(import.meta.env.DEV && import.meta.env.MODE === 'test'
+              ? { unlicensedRunsFree: false }
+              : {})}
+            {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
+          >
+            <App />
+          </EditionProvider>
+        </DesktopDownloadContext.Provider>
       </PlatformProvider>
     </ErrorBoundary>
   </StrictMode>,

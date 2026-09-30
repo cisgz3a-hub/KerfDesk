@@ -1,0 +1,64 @@
+# Internal Windows qualification only. The explicit preparation command writes
+# the required signed test identity; this template alone deliberately fails.
+# Standalone: electron-builder merges inherited arrays, so extending the
+# production config would retain its .lf2 file association even with [].
+appId: dev.kerfdesk.sandbox
+productName: KerfDesk Sandbox
+executableName: KerfDesk-Sandbox
+copyright: Copyright © 2026 Johann Stolk
+forceCodeSigning: false
+afterPack: scripts/prepare-sandbox-desktop.mjs
+directories:
+  output: release/sandbox/${version}
+  buildResources: build
+files:
+  - dist-electron/**/*
+  - '!dist-electron/**/*.map'
+  - dist/web/**/*
+  - package.json
+  - public/desktop-release-manifest.mjs
+  - public/desktop-release-keys.json
+  - public/desktop-sandbox-contract.mjs
+  - '!**/node_modules/**/*'
+  - '**/node_modules/{electron-updater,builder-util-runtime,debug,ms,sax,fs-extra,graceful-fs,jsonfile,universalify,js-yaml,argparse,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter}/**/*'
+extraResources:
+  - from: LICENSE
+    to: legal/LICENSE
+  - from: THIRD_PARTY_NOTICES.md
+    to: legal/THIRD_PARTY_NOTICES.md
+  - from: public/third-party-notices.txt
+    to: legal/third-party-notices.txt
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false
+extraMetadata:
+  name: kerfdesk-sandbox
+  kerfdeskSandbox: true
+  kerfdeskUpdateChannelTrusted: false
+  kerfdeskDesktopReleaseChannel: sandbox
+  kerfdeskCommercialLicense:
+    schema: 0
+fileAssociations: []
+nsis:
+  include: scripts/nsis-sandbox.nsh
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: KerfDesk Sandbox
+  license: public/eula.txt
+  differentialPackage: false
+win:
+  icon: public/favicon.svg
+  verifyUpdateCodeSignature: true
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: KerfDesk-Sandbox-${version}-windows-${arch}-setup.${ext}
+publish: null

@@ -1,6 +1,6 @@
 import { app, net, Notification, safeStorage, shell } from 'electron';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
-import { isTransactionId } from './licensing-commerce.js';
+import { isLicenceCheckoutUrl } from './licensing-commerce.js';
 import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
 import { withLicensingRoutes, type ProtocolHandler } from './licensing-routes.js';
 import { createLicensingStore } from './licensing-store.js';
@@ -53,25 +53,17 @@ export function createDesktopLicensing(options: Options) {
       userDataPath: options.userDataPath,
       secureStorage: safeStorage,
       platform: process.platform,
+      sandbox: config.channel === 'commercial' && config.sandbox === true,
     }),
     // reg.exe runs once per process, not on every licence read (ADR-523 Amendment 2).
     deviceId: rememberDeviceId(() => licensingDeviceId()),
     deviceName: DEVICE_NAMES[process.platform] ?? 'KerfDesk device',
     fetch: (url, init) => net.fetch(url, init),
     openCheckout: async (url) => {
-      const target = new URL(url);
-      if (
-        target.origin !== 'https://kerfdesk.com' ||
-        target.pathname !== '/buy.html' ||
-        target.username ||
-        target.password ||
-        target.hash ||
-        [...target.searchParams.keys()].join(',') !== '_ptxn' ||
-        !isTransactionId(target.searchParams.get('_ptxn') ?? '')
-      ) {
+      if (!isLicenceCheckoutUrl(url, config.channel === 'commercial' && config.sandbox === true)) {
         throw new Error('Invalid checkout destination');
       }
-      await shell.openExternal(target.href);
+      await shell.openExternal(url);
     },
   });
   const rings = createUpdateRingStore(options.userDataPath);

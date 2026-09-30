@@ -84,11 +84,16 @@ describe('cross-surface parity (ELE-08)', () => {
     expect(new Set(webUrls)).toEqual(new Set(electronUrls));
   });
 
-  it('the web-app and electron CSP policies match directive-by-directive', () => {
+  it('CSP policies match except the browser-only verified desktop download host', () => {
     const bridgePort = literalNumber(read('electron/rtsp-camera-bridge.ts'), 'CAMERA_BRIDGE_PORT');
     const web = cspDirectiveMap(webHeadersCsp());
     const electron = cspDirectiveMap(electronCsp(bridgePort));
     expect(Object.keys(web).length).toBeGreaterThan(0);
+    expect(web['connect-src']?.split(' ')).toContain('https://dl.kerfdesk.com');
+    expect(electron['connect-src']?.split(' ')).not.toContain('https://dl.kerfdesk.com');
+    web['connect-src'] = web['connect-src']!.split(' ')
+      .filter((source) => source !== 'https://dl.kerfdesk.com')
+      .join(' ');
     expect(electron).toEqual(web);
   });
 });

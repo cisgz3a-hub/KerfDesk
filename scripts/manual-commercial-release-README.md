@@ -1,0 +1,25 @@
+# Unsigned commercial Windows downloads
+
+This lane publishes the production licensed app as an **unsigned Windows installer with manual updates**. The release identity and download manifest are authenticated with the existing stable Ed25519 trust anchors. This metadata signature is not Windows code signing. It does not remove Windows publisher warnings or authorize automatic installation.
+
+Prepare the package with the explicit unsigned commercial profile, then use:
+
+```text
+node scripts/publish-manual-commercial-release.mjs --expected-latest-sha256 <64-hex|none> <release-directory> <commercial-release-identity.json> <packaged-resources-directory>
+```
+
+The operator process needs `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY`, `DESKTOP_STABLE_MANIFEST_KEY_ID`, `COMMERCIAL_CLOUDFLARE_ACCOUNT_ID` and `COMMERCIAL_R2_API_TOKEN`. Use the actual independently pinned stable key. Never substitute a sandbox key or expose secret values in logs or command-line arguments. The source must be clean, match the signed release identity, and belong to the declared main commit or matching version tag. Follow repository publication and current licence checks before running the command.
+
+The package reader verifies production licensing, trusted release identity, desktop renderer, legal notices, explicit `kerfdeskUnsignedInstaller: true`, `commercial-unsigned` channel, disabled update trust and absence of `app-update.yml`. The installer verifier reads its archive without executing it, checks `NotSigned` Authenticode status and binds its embedded executable, ASAR and notices to the verified package. It runs before publication and again on remote readback.
+
+The publisher writes only:
+
+- `desktop/commercial-manual/releases/X.Y.Z/KerfDesk-X.Y.Z-windows-x64-setup.exe`
+- `desktop/commercial-manual/releases/X.Y.Z/download-manifest.json`
+- `desktop/commercial-manual/latest.json`
+
+The first two are immutable and read back before advancing `latest.json` with `Cache-Control: no-store`. State the SHA-256 of the exact latest manifest reviewed, or `none` only if it does not exist. The tool reports the new SHA-256. It refuses changed reviewed state, conflicting immutable bytes, rollback, backdating, invalid signatures and package differences. An exact interrupted retry is safe. Operators must be serialized; the final state comparison is not a distributed lock against another administrator.
+
+No `latest.yml`, blockmap, signed commercial catalogue, beta catalogue or Preview object is published or changed. A manual-download manifest has a distinct schema and is rejected by existing automatic update validators.
+
+The browser popup and download page prefer the verified signed stable commercial catalogue. Only a 404 or valid empty catalogue permits this separate manual lane. A malformed, tampered or unreachable signed catalogue is an error, never a fallback trigger. The UI labels the installer unsigned, explains Windows publisher warnings and states that updates are manual. Older immutable exact-version URLs remain available; this first manual lane does not add an automatic update feed.

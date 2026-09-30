@@ -166,6 +166,29 @@ jobs:
           KERFDESK_COMMERCIAL_TERMS_SHA256: ${{ vars.KERFDESK_COMMERCIAL_TERMS_SHA256 }}
         run: node scripts/release-train.mjs preflight --output="${RUNNER_TEMP}/kerfdesk-terms.txt"
 
+      # CI deliberately does not block merges on newly published advisories.
+      # A customer release must still have current, valid runtime evidence,
+      # including Electron itself even though npm lists it as a dev dependency.
+      - name: Require a clean packaged-runtime dependency graph
+        shell: bash
+        run: |
+          mkdir -p artifacts/dependency-audit
+          set +e
+          pnpm audit --json > artifacts/dependency-audit/full.json
+          full_exit=$?
+          pnpm audit --prod --json > artifacts/dependency-audit/runtime.json
+          runtime_exit=$?
+          set -e
+          pnpm report:dependency-audit \
+            --full=artifacts/dependency-audit/full.json \
+            --runtime=artifacts/dependency-audit/runtime.json \
+            --full-exit="${full_exit}" \
+            --runtime-exit="${runtime_exit}" \
+            --output=artifacts/dependency-audit
+          cat artifacts/dependency-audit/report.md >> "${GITHUB_STEP_SUMMARY}"
+          runtime_count=$(node -p "require('./artifacts/dependency-audit/report.json').runtimeCount")
+          test "${runtime_count}" = '0'
+
   native-check:
     name: Desktop package check on the release commit
     needs: [decide, preflight]
@@ -251,7 +274,7 @@ jobs:
         shell: bash
         env:
           KERFDESK_DESKTOP_VERSION: ${{ needs.decide.outputs.version }}
-        run: pnpm build:electron-main && pnpm build:bundle
+        run: pnpm build:electron-main && pnpm build:bundle && pnpm build:bundle:desktop
 
       # eSigner CKA presents the cloud certificate to Windows as an ordinary
       # certificate in CurrentUser\My, so signtool signs with it by thumbprint

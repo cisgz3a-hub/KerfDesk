@@ -8,7 +8,7 @@ import { warpFrameToBedImage } from '../../../core/camera/model/bed-image';
 import type { BedArea } from '../../../core/camera/model/camera-model-accuracy';
 import type { CameraModelRecord } from '../../../core/camera/model/camera-model-record';
 import { isHeadCameraModel } from '../../../core/camera/model/head-camera';
-import { ownModelFor } from '../../../core/camera/model/saved-cameras';
+import { ownCameraModel } from '../active-camera-model';
 import type { SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import type { RgbaImage } from '../../../core/camera/rgba-image';
 import { useStore } from '../../state';
@@ -16,7 +16,6 @@ import { useCameraStore } from '../../state/camera-store';
 import { cameraModelForFrame } from '../camera-model-frame';
 import {
   cameraCaptureBindingForFrame,
-  cameraSourceIdentity,
   captureSourceFrame,
   type ActiveCameraSource,
 } from '../frame-source';
@@ -34,7 +33,7 @@ export function watchCameraNow(): WatchCamera | null {
   const camera = useCameraStore.getState();
   if (camera.sourceState.kind !== 'live') return null;
   const source = camera.sourceState.source;
-  const own = ownModelFor(useStore.getState().project.device, cameraSourceIdentity(source));
+  const own = ownCameraModel(useStore.getState().project.device, camera.sourceState);
   return {
     source,
     fixedModel: own !== undefined && !isHeadCameraModel(own) ? own : null,

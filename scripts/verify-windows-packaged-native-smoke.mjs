@@ -5,7 +5,7 @@ import { nativeSmokeLaunchOptions, runIsolatedNativeSmoke } from './native-smoke
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-export function validateNativeSmokeResult(result, expectedUserData) {
+export function validateNativeSmokeResult(result, expectedUserData, options = {}) {
   const expected = normalizedPath(expectedUserData);
   const renderer = object(result?.renderer);
   const failures = Array.isArray(result?.failures) ? result.failures : ['invalid failures field'];
@@ -24,6 +24,7 @@ export function validateNativeSmokeResult(result, expectedUserData) {
       : ['project save was not observed']),
     ...(renderer?.url === 'app://app/index.html' ? [] : ['unexpected renderer URL']),
     ...nativeSmokeSecurityProblems(result),
+    ...nativeSmokeLicensingProblems(renderer?.licensing, options.expectFreshSandbox === true),
     ...(renderer?.fileAccess?.openPicker === 'stubbed' &&
     renderer?.fileAccess?.savePicker === 'stubbed' &&
     renderer?.fileAccess?.writeTarget === 'memory'
@@ -32,6 +33,49 @@ export function validateNativeSmokeResult(result, expectedUserData) {
   ];
   if (problems.length > 0) throw new Error(problems.join('; '));
   return result;
+}
+
+function nativeSmokeLicensingProblems(observed, expectFreshSandbox) {
+  const states = [
+    'ready',
+    'activation-required',
+    'trial-expired',
+    'updates-expired',
+    'invalid-licence',
+    'unavailable',
+    'clock-error',
+  ];
+  const updateStates = [
+    'unavailable',
+    'idle',
+    'checking',
+    'downloading',
+    'up-to-date',
+    'ready',
+    'not-covered',
+    'failed',
+  ];
+  if (
+    observed?.kind !== 'observed' ||
+    !['free', 'commercial'].includes(observed.channel) ||
+    !states.includes(observed.state) ||
+    !['free', 'pro'].includes(observed.edition) ||
+    observed.proEnabled !== (observed.edition === 'pro') ||
+    !updateStates.includes(observed.updateState)
+  )
+    return ['local licensing status was missing or invalid'];
+  if (
+    expectFreshSandbox &&
+    (observed.channel !== 'commercial' ||
+      observed.state !== 'activation-required' ||
+      observed.edition !== 'free' ||
+      observed.proEnabled !== false ||
+      observed.updateState !== 'unavailable')
+  )
+    return [
+      'fresh sandbox must report commercial licensing, activation-required, Free and unavailable updates',
+    ];
+  return [];
 }
 
 function nativeSmokeSecurityProblems(result) {
@@ -77,7 +121,8 @@ async function runCli() {
 export { nativeSmokeLaunchOptions };
 
 export async function runNativeSmoke(args, spawnProcess = spawn, dependencies = {}) {
-  const result = await runIsolatedNativeSmoke(args, validateNativeSmokeResult, {
+  const validate = (result, userData) => validateNativeSmokeResult(result, userData, args);
+  const result = await runIsolatedNativeSmoke(args, validate, {
     ...dependencies,
     spawnProcess,
   });
@@ -94,14 +139,19 @@ function parseArgs(args) {
   const executable = args.find((arg) => !arg.startsWith('--'));
   if (executable === undefined || !isAbsolute(executable)) {
     throw new Error(
-      'usage: verify-windows-packaged-native-smoke.mjs <absolute packaged executable>',
+      'usage: verify-windows-packaged-native-smoke.mjs <absolute packaged executable> [--expect-fresh-sandbox]',
     );
   }
   const output = valueFor(args, '--output=');
   const timeout = valueFor(args, '--timeout-ms=');
   const timeoutMs = timeout === null ? DEFAULT_TIMEOUT_MS : Number(timeout);
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('timeout must be positive');
-  return { executable, output, timeoutMs };
+  return {
+    executable,
+    output,
+    timeoutMs,
+    expectFreshSandbox: args.includes('--expect-fresh-sandbox'),
+  };
 }
 
 function valueFor(args, prefix) {

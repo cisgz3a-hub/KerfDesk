@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import { BROWSER_FREE_BUILD } from '../../platform/build-capabilities';
 import {
   EditionContext,
   LICENCE_SETTINGS_EVENT,
@@ -23,8 +24,8 @@ type PendingPro = { readonly feature: ProFeature; readonly onAllowed?: (() => vo
 /**
  * Supplies the Free/Pro edition to the app (ADR-540). The workspace always
  * mounts at once: a licence never blocks opening KerfDesk, a project or a
- * machine. A build that cannot take a licence keeps every tool until sales
- * open, then runs KerfDesk Free (ADR-544).
+ * machine. Builds without a licence adapter run Free. The browser build's
+ * fixed capabilities cannot be unlocked by passing a desktop licence client.
  */
 export function EditionProvider({
   client,
@@ -35,10 +36,14 @@ export function EditionProvider({
   readonly unlicensedRunsFree?: boolean;
   readonly children: ReactNode;
 }): JSX.Element {
-  if (client === undefined)
+  if (BROWSER_FREE_BUILD || client === undefined)
     return (
       <>
-        {unlicensedRunsFree ? <FreeOnlyEdition>{children}</FreeOnlyEdition> : children}
+        {BROWSER_FREE_BUILD || unlicensedRunsFree ? (
+          <FreeOnlyEdition>{children}</FreeOnlyEdition>
+        ) : (
+          children
+        )}
         <BrowserUpdatesNotice />
       </>
     );
@@ -161,7 +166,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   }, []);
   const accept = useCallback(
     async (reported: LicenceStatus): Promise<void> => {
-      // Once sales open, a free desktop build runs Free: it has no Pro to unlock.
+      // A free desktop build has no commercial metadata and no Pro to unlock.
       const result: LicenceStatus =
         unlicensedRunsFree && reported.channel === 'free'
           ? { ...reported, edition: 'free' }

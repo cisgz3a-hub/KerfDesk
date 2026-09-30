@@ -1,13 +1,19 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "kerfdesk-desktop-licensing",
+  "account_id": "10d5d0bdb9bf11ca0468db275a787e20",
   "main": "worker.mjs",
   "compatibility_date": "2026-09-28",
   "workers_dev": false,
   "preview_urls": false,
-  "observability": { "enabled": false },
+  "routes": [{ "pattern": "license.kerfdesk.com", "custom_domain": true }],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1, "invocation_logs": false },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 },
+  },
   "vars": {
-    "LICENSING_ENABLED": "false",
+    "LICENSING_ENABLED": "true",
     "PAYMENTS_ENABLED": "false",
     "PAYMENT_PROVIDER": "paddle",
     "PADDLE_CHECKOUT_URL": "https://kerfdesk.com/buy.html",

@@ -3,6 +3,7 @@ import { machineKindOf, type MachineKind } from '../../core/scene';
 import type { ProcessRecipe } from '../../core/material-library/process-recipe';
 import { useEdition } from '../licensing/edition';
 import type { ProFeature } from '../licensing/pro-features';
+import { operationProFeature } from '../licensing/pro-operation-policy';
 import { useStore } from '../state';
 
 export type ProcessRecipeControls = {
@@ -71,8 +72,9 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
 }
 
 function recipeProFeature(recipe: ProcessRecipe): ProFeature | null {
-  if (recipe.steps.some((step) => step.cnc?.cutType === 'v-carve')) return 'vcarve';
-  if (recipe.steps.some((step) => step.cnc?.pocketStrategy === 'adaptive'))
-    return 'adaptive-clearing';
+  for (const step of recipe.steps) {
+    const feature = operationProFeature(step);
+    if (feature !== null) return feature;
+  }
   return null;
 }

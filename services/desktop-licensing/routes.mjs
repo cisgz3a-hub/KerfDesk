@@ -15,6 +15,7 @@ export const ROUTE = Object.freeze({
   claim: '/v1/orders/claim',
   developerGrants: '/v1/admin/developer-grants',
   orders: '/v1/admin/orders',
+  reconcileOrder: '/v1/admin/orders/reconcile',
   licenseStatus: '/v1/admin/licenses/status',
   lookup: '/v1/admin/licenses/lookup',
   rekey: '/v1/admin/licenses/rekey',

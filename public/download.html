@@ -161,11 +161,13 @@
     <main>
       <h1>Download KerfDesk</h1>
       <p class="intro">
-        KerfDesk has two desktop editions. <strong>KerfDesk for Windows</strong> is the signed
-        edition: KerfDesk Free with no time limit, a 30-day Pro trial and in-app updates.
+        <strong>KerfDesk for Windows</strong> includes a Free workspace with no time limit. Unlock
+        Pro tools with a licence or an optional 30-day trial. Each verified download below states
+        whether its installer is code-signed and how it receives updates.
         <strong>KerfDesk Preview</strong> is the free, unsigned early build for Windows and Mac that
-        you update by hand. Downloads are served from <strong>dl.kerfdesk.com</strong>, and this
-        page verifies the publisher's release signature before it shows any download link.
+        you update by hand. Downloads are served from <strong>dl.kerfdesk.com</strong>. This page
+        verifies the publisher's download metadata signature before showing a link; that signature
+        is separate from Windows code signing.
       </p>
 
       <section class="edition" aria-labelledby="commercial-heading">
@@ -188,15 +190,12 @@
             >KerfDesk-&lt;version&gt;-windows-x64-setup.exe</code
           >
           <p class="artifact-hash" id="commercial-hash"></p>
-          <a class="download" id="commercial-download" hidden>Download the Windows trial</a>
+          <a class="download" id="commercial-download" hidden>Download KerfDesk for Windows</a>
         </div>
-        <p>
-          The licensed installer is code-signed. If Windows reports an unknown publisher for this
-          installer, do not run it; download it again from this page. Updates are checked inside the
-          app and install only after you quit KerfDesk yourself, never during a job. Installing this
-          edition is always your choice; a Preview never turns into it on its own.
-          <a id="commercial-manifest" hidden>Signed update manifest</a>
+        <p id="commercial-installation">
+          Installer signing and update details appear with the verified download.
         </p>
+        <p><a id="commercial-manifest" hidden>Publisher-signed download manifest</a></p>
         <details id="commercial-history" hidden>
           <summary>Earlier versions</summary>
           <p>

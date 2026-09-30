@@ -16,6 +16,7 @@ const ENTRIES = [
   'dist/web/index.html',
   'public/desktop-release-manifest.mjs',
   'public/desktop-release-keys.json',
+  'public/desktop-sandbox-contract.mjs',
   'node_modules/electron-updater/package.json',
 ];
 

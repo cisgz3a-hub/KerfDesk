@@ -51,7 +51,8 @@ export type ArrayActions = {
   ) => boolean;
 };
 
-type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+// The edition-aware setter returns false when an authoring change awaits Pro.
+type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => unknown;
 
 export function arrayActions(set: Setter): ArrayActions {
   return {
@@ -63,7 +64,7 @@ export function arrayActions(set: Setter): ArrayActions {
       ),
     placeSelectionCopies: (placements, expectedProject) => {
       let placed = false;
-      set((state) => {
+      const committed = set((state) => {
         if (expectedProject !== undefined && state.project !== expectedProject) return {};
         const next = applySelectionPlacements(state, () => placements, undefined, {
           instances: placements.length,
@@ -72,7 +73,7 @@ export function arrayActions(set: Setter): ArrayActions {
         placed = next !== state;
         return next;
       });
-      return placed;
+      return committed !== false && placed;
     },
   };
 }

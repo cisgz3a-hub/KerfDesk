@@ -16,9 +16,27 @@ test('loads the hashed production bundle and edits script through its outline wo
   });
 
   await page.setViewportSize({ width: 1500, height: 950 });
+  await page.route('https://dl.kerfdesk.com/**', (route) =>
+    route.fulfill({ status: 404, body: 'No test release' }),
+  );
   const documentResponse = await page.goto('/');
   expect(documentResponse?.status()).toBe(200);
   await expect(applicationHeader(page)).toContainText('KerfDesk');
+  const welcome = page.getByRole('dialog', { name: 'Choose your KerfDesk workspace' });
+  await expect(welcome).toBeVisible();
+  await welcome.getByRole('button', { name: 'Continue with Free', exact: true }).click();
+  await expect(welcome).toHaveCount(0);
+  // The shipped browser is Free even though the development renderer regression
+  // harness exercises desktop Pro tools. This assertion uses only visible UI.
+  await page.getByRole('button', { name: 'Open Design Studio', exact: true }).click();
+  const proDialog = page.getByRole('dialog', { name: 'Design Studio is a Pro tool' });
+  await expect(proDialog).toBeVisible();
+  await expect(proDialog.getByRole('link', { name: 'Get KerfDesk Pro' })).toHaveAttribute(
+    'href',
+    'https://kerfdesk.com/download.html',
+  );
+  await expect(page.getByRole('dialog', { name: 'Design Studio', exact: true })).toHaveCount(0);
+  await proDialog.getByRole('button', { name: 'Not now' }).click();
 
   const scriptSources = await page
     .locator('script[src]')

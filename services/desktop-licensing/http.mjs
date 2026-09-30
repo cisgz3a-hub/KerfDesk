@@ -3,6 +3,7 @@ import { deleteCustomer, exportRecords, rekeyLicense } from './admin.mjs';
 import { auditRefusal } from './audit.mjs';
 import { adminCredential } from './crypto.mjs';
 import { createCheckout } from './checkout.mjs';
+import { reconcileCheckout } from './checkout-reconciliation.mjs';
 import { paddleVerifier } from './paddle.mjs';
 import { receivePayment } from './payment-rejections.mjs';
 import { claimOrder, prepareOrder } from './payments.mjs';
@@ -43,6 +44,8 @@ const OPERATIONS = {
   [ROUTE.deactivate]: ({ authority, body }) => authority.deactivate(body),
   [ROUTE.developerGrants]: ({ authority, body, admin }) => authority.developerGrant(body, admin),
   [ROUTE.orders]: ({ authority, body, admin }) => prepareOrder(authority, body, admin),
+  [ROUTE.reconcileOrder]: ({ authority, env, body, admin, fetcher }) =>
+    reconcileCheckout(authority, env, body, admin, fetcher),
   [ROUTE.licenseStatus]: ({ authority, body, admin }) => authority.setLicenseStatus(body, admin),
   [ROUTE.lookup]: ({ authority, body, admin }) => authority.lookupLicense(body, admin),
   [ROUTE.rekey]: ({ authority, body, admin }) => rekeyLicense(authority, body, admin),

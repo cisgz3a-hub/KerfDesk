@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import verifyDesktopRenderer from './verify-desktop-renderer.mjs';
 
 const require = createRequire(import.meta.url);
 
@@ -108,6 +109,7 @@ async function resolveNoticePath(context, sourceName) {
 }
 
 export default async function copyPreviewRuntimeNotices(context) {
+  verifyDesktopRenderer(context);
   if (context.electronPlatformName !== 'darwin') {
     return;
   }

@@ -14,6 +14,12 @@ import {
   commercialReleaseUrl,
   verifyCommercialCatalog,
 } from './desktop-commercial-catalog.mjs';
+import {
+  MANUAL_DOWNLOAD_LATEST_URL,
+  MANUAL_DOWNLOAD_LIMIT,
+  manualDownloadUrl,
+  verifyManualDownload,
+} from './desktop-manual-download.mjs';
 
 function requestOptions(signal) {
   return {
@@ -83,20 +89,26 @@ export async function populatePreviewDownloads(document, search, fetchRequest = 
 }
 
 const COMMERCIAL_NOT_RELEASED =
-  'The licensed Windows edition has not been released yet. Its verified trial download will appear here when it is; until then, use the free Preview below or the web app.';
+  'The licensed Windows edition has not been released yet. Its verified Windows download will appear here when it is; until then, use the free Preview below or the web app.';
 // The page cannot tell an unprovisioned or unreachable download host from a transient
 // failure, so this wording must stay true whether or not a release exists.
 const COMMERCIAL_UNVERIFIED =
   'No verified download of the licensed Windows edition is available right now. Please try again later, or use the free Preview below or the web app.';
 
-// The licensed trial comes only from the signed commercial catalogue, never from a
-// Preview manifest, so paying customers are not sent to an unsigned free installer.
+// Prefer the signed installer catalogue. Only its absent/empty state permits a
+// separately authenticated manual commercial download; invalid stable is an error.
 export async function populateCommercialDownload(document, fetchRequest = fetch) {
   const status = document.getElementById('commercial-status');
   const links = [
     document.getElementById('commercial-download'),
     document.getElementById('commercial-manifest'),
   ];
+  for (const link of links) {
+    link.hidden = true;
+    link.removeAttribute('href');
+  }
+  document.getElementById('commercial-installation').textContent = '';
+  showEarlierReleases(document, []);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
   try {
@@ -114,18 +126,22 @@ export async function populateCommercialDownload(document, fetchRequest = fetch)
             keys,
           );
     if (releases.length === 0) {
-      status.textContent = COMMERCIAL_NOT_RELEASED;
+      if (!(await showManualDownload(document, links, fetchRequest, options, keys)))
+        status.textContent = COMMERCIAL_NOT_RELEASED;
       return;
     }
     const [release, ...earlier] = releases;
     const installer = windowsInstaller(release);
     links[0].href = commercialReleaseUrl(release.version, installer.name);
     links[1].href = commercialReleaseUrl(release.version, 'update-manifest.json');
+    links[1].textContent = 'Signed update manifest';
     for (const link of links) link.hidden = false;
     document.getElementById('commercial-asset').textContent = installer.name;
     document.getElementById('commercial-hash').textContent = `SHA-256: ${installer.sha256}`;
     showEarlierReleases(document, earlier);
     status.textContent = `KerfDesk ${release.version} · Released ${release.publishedAt.slice(0, 10)} · Publisher signature verified.`;
+    document.getElementById('commercial-installation').textContent =
+      'This installer is code-signed. If Windows reports an unknown publisher, do not run it; download it again from this page. Updates install only after you quit KerfDesk yourself, never during a job.';
   } catch {
     for (const link of links) {
       link.hidden = true;
@@ -137,6 +153,27 @@ export async function populateCommercialDownload(document, fetchRequest = fetch)
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function showManualDownload(document, links, fetchRequest, options, keys) {
+  const response = await fetchRequest(MANUAL_DOWNLOAD_LATEST_URL, options);
+  if (response.status === 404) return false;
+  const release = await verifyManualDownload(
+    await readBoundedManifest(response, MANUAL_DOWNLOAD_LIMIT),
+    keys,
+  );
+  const [installer] = release.artifacts;
+  links[0].href = manualDownloadUrl(release.version, installer.name);
+  links[1].href = manualDownloadUrl(release.version, 'download-manifest.json');
+  links[1].textContent = 'Publisher-signed download manifest';
+  for (const link of links) link.hidden = false;
+  document.getElementById('commercial-asset').textContent = installer.name;
+  document.getElementById('commercial-hash').textContent = `SHA-256: ${installer.sha256}`;
+  document.getElementById('commercial-status').textContent =
+    `KerfDesk ${release.version} · Released ${release.publishedAt.slice(0, 10)} · Unsigned installer · Manual updates · Download metadata signature verified.`;
+  document.getElementById('commercial-installation').textContent =
+    'This commercial installer is not Windows code-signed. Windows may show an unknown publisher warning. The download metadata is verified separately; it does not remove that warning. Updates are manual: finish machine work, close KerfDesk, and install a newer verified version from this page. This app never downloads or installs unsigned updates automatically.';
+  return true;
 }
 
 function windowsInstaller(release) {

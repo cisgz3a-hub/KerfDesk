@@ -300,6 +300,7 @@ class LicensingService {
           {
             saved,
             store: this.options.store,
+            sandbox: this.config.sandbox === true,
             request: this.request,
             openCheckout:
               this.options.openCheckout ??
@@ -332,6 +333,7 @@ class LicensingService {
         const key = await claimLicencePayment({
           saved,
           store: this.options.store,
+          sandbox: this.config.sandbox === true,
           request: this.request,
           openCheckout: this.options.openCheckout ?? (async () => undefined),
         });

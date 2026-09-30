@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { pdfResources } from './scripts/pdf-resources';
+import { browserFreeBuild } from './scripts/browser-free-build';
 
 import {
   appVersion,
@@ -56,6 +57,7 @@ function fileSystemAllowList(): ReadonlyArray<string> {
 
 export default defineConfig({
   plugins: [
+    browserFreeBuild(),
     react(),
     pdfResources(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
@@ -232,6 +234,7 @@ export default defineConfig({
     },
   },
   worker: {
+    plugins: () => [browserFreeBuild()],
     // Trace worker imports the lazy trace pipeline, so production workers must
     // emit as ES modules. Vite's default iife worker format cannot code-split.
     format: 'es',

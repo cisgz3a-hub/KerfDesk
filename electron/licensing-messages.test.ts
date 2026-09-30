@@ -31,6 +31,10 @@ const NEVER_SENT_TO_DEVICES = new Set([
   'order_not_found',
   // Only the admin API's customer deletion refuses a licence that is still active.
   'license_not_revoked',
+  // Only the authenticated admin reconciliation route can return these.
+  'order_not_pending',
+  'reconciliation_unavailable',
+  'transaction_not_found',
 ]);
 
 /** Every error code in the service source: `requireValue(…, 409, 'code')`, `code: 'code'`. */

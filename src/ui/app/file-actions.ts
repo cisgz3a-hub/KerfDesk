@@ -361,7 +361,7 @@ export async function handleOpenProject(
     ...ctx,
     setProject: (project) => {
       const result = ctx.setProject(project);
-      owner.adoptCurrentDocument();
+      if (result.kind !== 'desktop-required') owner.adoptCurrentDocument();
       return result;
     },
     pushToast: owner.pushToast,

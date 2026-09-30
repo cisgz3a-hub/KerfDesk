@@ -7,6 +7,8 @@ import {
 } from './edition';
 import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
+import { BROWSER_FREE_BUILD } from '../../platform/build-capabilities';
+import { BrowserDesktopWelcome } from './BrowserDesktopWelcome';
 
 /**
  * Pro requests in a build that cannot take a licence only explain (ADR-544).
@@ -37,9 +39,10 @@ export function useLicenceSettingsEvent(show: () => void): void {
   }, [show]);
 }
 
-/** KerfDesk Free for the web app once sales open: it has no licence adapter. */
+/** KerfDesk Free for builds without a desktop licence adapter. */
 export function FreeOnlyEdition({ children }: { readonly children: ReactNode }): JSX.Element {
   const desktop = useProInDesktop();
+  const browserWelcome = BROWSER_FREE_BUILD && window.location.protocol !== 'app:';
   useLicenceSettingsEvent(desktop.showAll);
   const value = useMemo<EditionValue>(
     () => ({
@@ -59,7 +62,10 @@ export function FreeOnlyEdition({ children }: { readonly children: ReactNode }):
   return (
     <EditionContext.Provider value={value}>
       {children}
-      {desktop.shown === null ? null : (
+      {browserWelcome ? (
+        <BrowserDesktopWelcome requested={desktop.shown === 'all'} onClose={desktop.close} />
+      ) : null}
+      {desktop.shown === null || (browserWelcome && desktop.shown === 'all') ? null : (
         <ProInDesktopDialog feature={desktop.shown} onClose={desktop.close} />
       )}
     </EditionContext.Provider>

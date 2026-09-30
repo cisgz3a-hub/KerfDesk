@@ -26,6 +26,7 @@ import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapsho
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
+import { preserveBrowserProProject } from '../state/pending-pro-project';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
@@ -95,6 +96,7 @@ export function useAutosave(): void {
 
 type AutosaveRecoveryService = {
   readLatest(): Promise<AutosaveDurableReadResult>;
+  retainRecovered(snapshot: AutosaveDurableSnapshot): Promise<void>;
   write(project: ReturnType<AutosaveSnapshotFn>['project']): Promise<AutosaveDurableWriteResult>;
   clearRecovered(
     snapshot: AutosaveDurableSnapshot,
@@ -125,10 +127,13 @@ export async function runAutosaveRecovery(
   // is mid-workflow and recovery would clobber it. Leave the slot alone
   // (M15: clearing here silently destroyed the only backup).
   if (!isUntouched()) return;
-  const ageMin = Math.max(0, Math.round((Date.now() - record.savedAt) / 60_000));
-  const ageLabel =
-    ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute${ageMin === 1 ? '' : 's'} ago`;
-  const ok = await chooseRestore(ageLabel);
+  // A browser cannot admit Pro operations. Offer a portable copy before any
+  // Restore/Discard choice; this source must not be rewritten or cleared here.
+  if (preserveBrowserProProject(record.project, { source: 'autosave', name: null }) !== null) {
+    await service.retainRecovered(record);
+    return;
+  }
+  const ok = await chooseRestore(recoveryAgeLabel(record.savedAt));
   // The nonblocking choice may stay open while the user imports, edits, or
   // starts a new document. Neither restore nor cleanup may act on that work.
   // null means Hide/unmount: leave the only backup intact.
@@ -136,6 +141,7 @@ export async function runAutosaveRecovery(
   const s = useStore.getState();
   if (ok) {
     const loadResult = s.setProject(record.project);
+    if (loadResult.kind === 'desktop-required') return;
     if (loadResult.kind === 'capability-warning') {
       useToastStore
         .getState()
@@ -164,6 +170,11 @@ export async function runAutosaveRecovery(
   }
   // Declining is an explicit discard — clearing stops the re-prompt loop.
   reportCleanupResult(await service.clearRecovered(record));
+}
+
+function recoveryAgeLabel(savedAt: number): string {
+  const ageMin = Math.max(0, Math.round((Date.now() - savedAt) / 60_000));
+  return ageMin === 0 ? 'less than a minute ago' : `${ageMin} minute${ageMin === 1 ? '' : 's'} ago`;
 }
 
 function reportRecoveryWarnings(result: AutosaveDurableReadResult): void {

@@ -44,10 +44,7 @@ import {
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import electronUpdater from 'electron-updater';
-import {
-  desktopApplicationMenuTemplate,
-  shouldEnableDesktopDevTools,
-} from './application-menu-policy.js';
+import * as appMenu from './application-menu-policy.js';
 import { mainWindowWebPreferences } from './desktop-window-options.js';
 import {
   PACKAGED_RENDERER_URL,
@@ -64,12 +61,8 @@ import {
 } from './rtsp-camera-bridge.js';
 import { configureAutoUpdater } from './auto-update.js';
 import { installApplicationFinalCleanup } from './application-final-cleanup.js';
-import {
-  DESKTOP_APP_USER_MODEL_ID,
-  DESKTOP_PRODUCT_NAME,
-  legacyDesktopDataPath,
-} from './desktop-identity.js';
-import { installPackagedNativeSmoke, readNativeSmokeConfig } from './native-smoke.js';
+import { desktopRuntimeIdentity } from './desktop-identity.js';
+import * as nativeSmoke from './native-smoke.js';
 import {
   canonicalOfficialDesktopDownloadUrl,
   isOfficialDesktopDownloadUrl,
@@ -112,7 +105,8 @@ const __dirname = path.dirname(__filename);
 // Nor does it open DevTools or a development renderer, whatever `app.isPackaged`
 // says: on Windows that only means the executable is not named electron.exe, and
 // a per-user install folder is writable (ADR-544 Amendment 1).
-const SELLS_LICENCES = readLicensingConfig(app.getAppPath()).channel !== 'free';
+const LICENSING_CONFIG = readLicensingConfig(app.getAppPath());
+const SELLS_LICENCES = LICENSING_CONFIG.channel !== 'free';
 const LOCKED_DOWN = app.isPackaged || SELLS_LICENCES;
 const REFUSED_DEBUG_SWITCH = refusedDebugSwitch({
   sellsLicences: SELLS_LICENCES,
@@ -129,9 +123,13 @@ if (REFUSED_DEBUG_SWITCH !== null) {
 
 // Public rename without a data migration: pin both Chromium/application roots
 // before Electron's ready event so existing projects and recovery state remain.
-const LEGACY_DESKTOP_DATA_PATH = legacyDesktopDataPath(app.getPath('appData'));
-const NATIVE_SMOKE_CONFIG = readNativeSmokeConfig(process.argv);
-const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DATA_PATH;
+const {
+  name: DESKTOP_PRODUCT_NAME,
+  appId: DESKTOP_APP_USER_MODEL_ID,
+  dataPath: PROFILE_DATA_PATH,
+} = desktopRuntimeIdentity(app.getPath('appData'), LICENSING_CONFIG);
+const NATIVE_SMOKE_CONFIG = nativeSmoke.readNativeSmokeConfig(process.argv);
+const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? PROFILE_DATA_PATH;
 app.setName(DESKTOP_PRODUCT_NAME);
 app.setPath('userData', DESKTOP_DATA_PATH);
 app.setPath('sessionData', DESKTOP_DATA_PATH);
@@ -163,7 +161,7 @@ if (!HAS_SINGLE_INSTANCE_LOCK) app.quit();
 const SUPPORT_LOG = startDesktopSupportLog(app, DESKTOP_DATA_PATH, HAS_SINGLE_INSTANCE_LOCK);
 
 function installApplicationMenu(): void {
-  const template = desktopApplicationMenuTemplate(process.platform);
+  const template = appMenu.desktopApplicationMenuTemplate(process.platform);
   Menu.setApplicationMenu(template === null ? null : Menu.buildFromTemplate(template));
 }
 
@@ -272,7 +270,7 @@ function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds
     autoHideMenuBar: true,
     backgroundColor: '#fafafa',
     title: DESKTOP_PRODUCT_NAME,
-    webPreferences: mainWindowWebPreferences(shouldEnableDesktopDevTools(LOCKED_DOWN)),
+    webPreferences: mainWindowWebPreferences(appMenu.shouldEnableDesktopDevTools(LOCKED_DOWN)),
   });
 }
 
@@ -386,12 +384,17 @@ function installDevTools(window: BrowserWindow): void {
 async function createWindow(): Promise<void> {
   const placement = loadWindowPlacement(app.getPath('userData'));
   const window = createMainWindow(placement.bounds);
+  // Keep the qualification label visible even when the renderer updates its title.
+  if (LICENSING_CONFIG.channel !== 'free' && LICENSING_CONFIG.sandbox === true)
+    window.on('page-title-updated', (event) => {
+      event.preventDefault();
+    });
   installWindowReadinessPolicy(window, {
     reportFailure: (message) => dialog.showErrorBox('KerfDesk window error', message),
     reveal: () => (placement.maximized ? window.maximize() : window.show()),
   });
   rememberWindowPlacement(window, app.getPath('userData'));
-  installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
+  nativeSmoke.installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
   installDesktopContextMenu(window);
   const closeGuard = installDesktopWindowClose(window, {
@@ -511,6 +514,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
   void app
     .whenReady()
     .then(async () => {
+      await nativeSmoke.prepareNetwork(session.defaultSession, NATIVE_SMOKE_CONFIG);
       // Wire the app:// scheme to the dist/web bundle before opening any
       // window. createWindow() will call loadURL('app://app/index.html'),
       // which fails fast if this handler isn't installed yet.

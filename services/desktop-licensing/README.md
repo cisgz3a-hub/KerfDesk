@@ -1,6 +1,6 @@
 # Desktop licensing service
 
-This is a locally tested Cloudflare Worker and SQLite Durable Object service. It is deployed at `license.kerfdesk.com` **switched off**: `LICENSING_ENABLED` and `PAYMENTS_ENABLED` are `"false"`, so only the public configuration route answers, and every other route answers `service_unavailable`. That deployment is from 27855387e, before ADR-523 Amendment 3, so the health route, request logs, trial and webhook limits, audited administration, rekey, export, customer deletion and refused-payment records described below arrive only with the next redeploy. A change in this directory reaches that Worker only when the owner redeploys it from their PC; merging it changes nothing live. The code creates no merchant account, Paddle products, customer licences, developer grants, or paid Cloudflare resources by itself.
+This Cloudflare Worker and SQLite Durable Object service uses `license.kerfdesk.com`. The checked-in configuration enables production licence activation and trials for the owner's authorised unsigned desktop release, while `PAYMENTS_ENABLED` remains `"false"`. It pins the verified account and existing custom domain, retains the `LicenseAuthority` binding and `licensing-authority-v1` database identity, and records bounded operational logs without request bodies or credentials. A source change reaches the Worker only through an explicit deployment; merging alone changes nothing live. Public configuration's `enabled` field describes checkout availability, not whether complimentary licences can activate. Developer grants are issued separately through the authenticated operator command; deployment creates no merchant account, Paddle products, customer licences or developer grants by itself.
 
 The approved commercial model is a 30-day full-feature trial, USD 49.50 perpetual desktop licence with three active computers and one year of eligible updates, and an optional USD 20 further year of updates. Existing eligible versions keep working when update entitlement ends. Johann and Father each receive a separately issued developer licence with three active computers and unlimited future update eligibility. The two developer grants require the private administration API; their names are not activation codes.
 
@@ -97,9 +97,52 @@ A transaction ID returns the same for its order, plus the rejection if that paym
 
 `POST /v1/admin/orders` records an operator-reconciled provider order using `{orderId,provider,providerOrderId,operation,licenseId?}`. It returns order claim credentials but does not grant a licence. Normal checkout uses `/v1/checkout`; the admin route is for a trusted operator and requires the same private credential. Do not ship administration credentials, the signing private key, or an issuance tool in the desktop package or public website.
 
+### Recovering a lost checkout answer
+
+`POST /v1/admin/orders/reconcile` accepts exactly `{orderId,transactionId}`, where
+`transactionId` is an existing Paddle `txn_` ID. It needs the same private admin
+credential as the other admin routes. The Paddle API key also needs
+`transaction.read` permission. The service reads that one transaction from its
+configured Paddle environment; it never creates, updates or cancels a payment.
+
+Recovery requires a pending, server-created Paddle order and positive evidence:
+the transaction's ID, original order ID, operation, HMAC-authenticated order
+proof, fixed catalog and exact approved checkout URL must all match. Only
+`draft`, `ready` and `completed` provider states are accepted. The transaction
+must not belong to another order. The service then binds the original order to
+that transaction and restores its checkout link in the same SQLite transaction
+as its admin audit record. A concurrent completed webhook or customer deletion
+is never overwritten. Retrying a recovered, still-pending order is idempotent.
+
+The response is `{orderId,transactionId,orderStatus:"pending",reconciled:true}`.
+The app can retry its existing checkout or Check payment action using its saved
+request ID and original claim credentials. A `completed` provider response here
+does **not** grant a licence: deliver or replay the authenticated
+`transaction.completed` webhook to fulfil the order, then let the app claim it.
+
+A missing transaction answers `transaction_not_found` (404); an unavailable
+provider or redirect answers `reconciliation_unavailable` (502). Wrong order
+proof, catalog or identity is refused. An order already settled answers
+`order_not_pending` (409). All these answers preserve the original order and
+checkout request ID; authenticated refusals are audited. No response proves
+that a transaction does not exist under a different ID.
+
+If support cannot identify an existing matching Paddle transaction, keep the
+intent pending and investigate the provider's records. There is no automatic
+"clear and charge again" operation. In particular, old intents created by the
+unsupported `redirect: 'error'` implementation still need operator reconciliation;
+this repair does not assume that every older pending order had the same cause.
+
 ## Paddle checkout and fulfilment
 
 The service first durably records a checkout intent, request-id HMAC, fixed price, claim-token HMAC, and an order proof. It then creates a Paddle Billing transaction server-side. Only configured price IDs, one item, USD, automatic collection, and the approved `https://kerfdesk.com/buy.html` page are sent. The response must match the fixed one-time catalog and exact checkout origin/path with a single `_ptxn` transaction parameter. No licence credentials or claim tokens go in that URL. The website must be approved in Paddle and load Paddle.js with the public client token. The page opens the transaction with Paddle's discount-code field hidden (`showAddDiscounts: false`); a discounted payment is refused at fulfilment regardless.
+
+Outbound Paddle requests use `redirect: 'manual'`, which the pinned workerd
+runtime supports. A redirect is never followed, so neither the API bearer nor a
+payable creation is forwarded to another destination. A redirected creation is
+treated as ambiguous and retains the original intent. Real workerd tests
+exercise successful creation, all common redirect statuses and reconciliation
+through an intercepted outbound service, with no merchant network requests.
 
 Paddle's answer to the transaction request decides what happens next (ADR-523 Amendment 3):
 

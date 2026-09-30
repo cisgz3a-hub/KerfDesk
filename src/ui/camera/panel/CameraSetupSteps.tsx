@@ -4,6 +4,7 @@
 // already done, driven by real state (active source, saved camera model).
 
 import { useCameraStore } from '../../state/camera-store';
+import { BROWSER_FREE_BUILD } from '../../../platform/build-capabilities';
 import { useOwnCameraModel } from '../active-camera-model';
 import { noteStyle } from './panel-styles';
 
@@ -14,6 +15,13 @@ export function CameraSetupSteps(): JSX.Element {
   const model = useOwnCameraModel();
 
   const sourceLive = sourceState.kind === 'live';
+  if (BROWSER_FREE_BUILD)
+    return (
+      <p style={noteStyle}>
+        {sourceLive ? 'Camera viewing is ready.' : 'Start a camera to view its picture.'} Camera
+        alignment is a Pro tool in the desktop app.
+      </p>
+    );
   const steps: ReadonlyArray<{ readonly label: string; readonly done: boolean }> = [
     { label: 'Use a camera', done: sourceLive },
     { label: 'Calibrate', done: model !== undefined },

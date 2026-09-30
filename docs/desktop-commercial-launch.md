@@ -14,8 +14,8 @@ change. Existing web and free/Preview app builds continue to work without activa
 | Johann and Father | Two individual free developer keys, three computers each, unlimited updates |
 
 Paddle-added taxes are additional. Expired update coverage never ends paid use of
-an already eligible version. The licence controls entry into a new commercial app
-session; it cannot stop an active machining session. Keep normal Frame, review,
+an already eligible version. The workspace always opens as Free; the licence
+controls choosing new Pro tools, never entry into the app or an active machining session. Keep normal Frame, review,
 Abort and controller workflows intact.
 
 ## Provider preparation
@@ -38,8 +38,8 @@ Abort and controller workflows intact.
    Create the fixed one-time USD purchase and renewal catalog, approve
    `https://kerfdesk.com/buy.html`, configure the signed webhook and run complete
    sandbox purchase/claim, renewal, duplicate-delivery and interrupted-checkout
-   scenarios. Set live credentials only after these pass. There is no staging
-   service for them yet; see "No staging service" below. Never put private API or
+   scenarios. Set live credentials only after these pass. Use the separate sandbox
+   and isolated package described below. Never put private API or
    webhook keys in the browser or app package.
 5. In Paddle, set both prices, purchase and renewal, to quantity minimum 1 and
    maximum 1, and apply no discount to them. The checkout page hides the discount
@@ -75,10 +75,13 @@ version, source SHA/ref and release date, with no circular hash of the installer
 Postbuild update manifests additionally bind the actual installer, blockmap and
 feed hashes. Preserve that same release identity on a retry.
 
-Windows release signing still needs a purchased/approved certificate or signing
-service and a verified publisher identity. A publisher's Ed25519 metadata signature
-does not replace Authenticode. The commercial builder fails without code signing.
-Existing unsigned Preview tools remain suitable for preview qualification only.
+The owner chose unsigned Windows testing first on 30 September 2026. No certificate
+purchase is required for that stage; use the isolated sandbox package below. Its
+licence checks work without Authenticode and its automatic updates stay disabled.
+The existing signed commercial release lane still requires an approved certificate
+or signing service and verified publisher identity. A publisher's Ed25519 metadata
+signature does not replace Authenticode. The commercial builder retains its signing
+requirement; public unsigned distribution would need a separately reviewed lane.
 macOS commercial signing/notarization and signed update qualification remain a
 separate launch prerequisite; no macOS auto-update claim is made here.
 
@@ -96,25 +99,44 @@ across, and nothing is signed again.
 
 ## Pilot verification
 
-### No staging service
+### Isolated sandbox service and package
 
-There is only the production licence service. Commercial builds are pinned to
-`https://license.kerfdesk.com` (`scripts/prepare-commercial-desktop.mjs`), so every
-pilot trial, activation and test order lands in the production database.
+The separate sandbox is
+`https://kerfdesk-desktop-licensing-sandbox.cisgz3a.workers.dev`. Its Paddle sandbox
+purchase, claim, renewal and duplicate webhook lifecycle was exercised on
+29 September 2026. That evidence does not qualify a packaged customer journey.
+Production packages remain pinned to `https://license.kerfdesk.com`; never switch
+that Worker to sandbox payment credentials for these tests.
 
-- A trial belongs to the Windows installation and cannot be started again, so run
-  pilot trials on disposable Windows installations, such as a virtual machine, and
-  never on the owner's own PC: a pilot trial there uses up that PC's one trial
-  unless the trial is deleted through the administration API.
-- Paddle's sandbox needs the service switched to `PADDLE_ENVIRONMENT=sandbox` with
-  sandbox credentials. Doing that on the production Worker puts sandbox orders in
-  the live database, and a sandbox payment, made with a test card, creates a
-  licence signed with the production key that works in the real app. Revoke and
-  delete every such licence, and switch the service back to live credentials,
-  before selling.
-- A separate staging Worker (its own name, hostname, database and signing keys,
-  with a test build pinned to it) avoids both, but the build's pinned endpoint
-  would have to change first.
+Prepare an unsigned qualification package with
+`node scripts/prepare-sandbox-desktop.mjs --sandbox-only --output-dir <external-dir> --version 0.0.1 --source-sha <40-character-SHA> --published-at <canonical-UTC>`.
+Set `KERFDESK_DESKTOP_VERSION=0.0.1`, then run `pnpm build:electron-main` and
+`pnpm build:bundle:desktop`. With signing discovery disabled, package using
+`electron-builder --win --x64 --config <external-dir>/electron-builder.sandbox.generated.json --publish never`.
+The sandbox has its own app identity, executable and data folder, no project file
+associations, no updates and no publication channel. Its public fixture release
+signature is not a production signing credential. AfterPack refuses a Free browser
+renderer accidentally left in `dist/web`.
+
+The sandbox installer and regular Windows package also carry the current licence
+and third-party notices under `resources/legal`. The sandbox package hook compares
+those copies with their source files and refuses incomplete or altered copies.
+After packaging, run the native smoke against the actual executable:
+
+```powershell
+node scripts/verify-windows-packaged-native-smoke.mjs <absolute-sandbox-executable> --expect-fresh-sandbox --output=<external-evidence-directory>
+```
+
+This creates a disposable profile, verifies startup and SVG import/project save,
+and checks the local licence and update status without starting a trial, creating
+a checkout or contacting hardware. File pickers and the save destination are
+stubbed; this is not installed-app native-dialog qualification. Windows may warn
+about the unsigned installer, and some policies can prevent it from running.
+Test payments use Paddle sandbox; this package is not a customer purchase build.
+
+Trial/seat identity still belongs to a Windows installation, not its app profile.
+Use independent installations or generalised VMs for real seat qualification.
+Sandbox package checks do not replace the signed production pilot below.
 
 After the service is live and its public keys match the package, privately issue
 the idempotent `johann` and `father` developer grants described in the service
@@ -142,14 +164,15 @@ behaviour.
 Record the exact source, artifact and hosted identity. Only then enable customer
 checkout and advertise automatic commercial updates.
 
-The same change that enables checkout sets `UNLICENSED_BUILDS_RUN_FREE = true` in
-`src/ui/licensing/edition-policy.ts` (ADR-544) and drops "Once sales open," from
+Browser and unlicensed desktop builds now run Free under ADR-540 Amendment 1,
+independently of whether checkout is enabled. Browser builds preserve saved Pro
+projects for desktop instead of loading their operations. Keep the owner's working
+desktop build until a licensed replacement is qualified; an unlicensed Preview
+cannot unlock new Pro tools. The launch change drops "Once sales open," from
 `public/download.html`. The website's `trialOpen` and `salesOpen` are set as
 `website/commerce.config.mjs` describes; buyers purchase inside the app, never
-through a checkout link on the website (ADR-524 Amendment 2). From that deploy, the web app and
-the free Preview builds run KerfDesk Free and send Pro tools to the desktop app.
-Before merging it, confirm the owner's own machines run the commercial build with
-a developer licence, since the free builds stop offering Pro to him too. On the
+through a checkout link on the website (ADR-524 Amendment 2). Before launch, confirm
+the owner's own machines run the commercial build with a developer licence. On the
 signed commercial build, confirm that starting KerfDesk with
 `--remote-debugging-port=9222` shows the refusal and opens no window.
 

@@ -23,7 +23,9 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: `pnpm exec vite . --host 127.0.0.1 --port ${port} --strictPort${coldDependencyCache ? ' --force' : ''}`,
+    // This suite exercises the complete desktop renderer's tools without native
+    // packaging. The shipped browser edition is tested from dist/web separately.
+    command: `pnpm exec vite . --mode test --host 127.0.0.1 --port ${port} --strictPort${coldDependencyCache ? ' --force' : ''}`,
     cwd: workspaceRoot,
     url: baseURL,
     reuseExistingServer: coldDependencyCache ? false : !process.env.CI,
