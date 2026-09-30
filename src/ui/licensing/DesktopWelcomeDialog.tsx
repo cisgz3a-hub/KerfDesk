@@ -84,15 +84,13 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
   );
 }
 
-function DesktopDownloadCard({
-  download,
-  onClose,
-  retry,
-}: {
+type DesktopDownloadCardProps = {
   readonly download: DownloadState;
   readonly onClose: () => void;
   readonly retry: () => void;
-}): JSX.Element {
+};
+
+function DesktopDownloadCard({ download, onClose, retry }: DesktopDownloadCardProps): JSX.Element {
   return (
     <section className="lf-desktop-welcome__desktop" aria-label="Windows desktop edition">
       <div className="lf-desktop-welcome__card-title">
