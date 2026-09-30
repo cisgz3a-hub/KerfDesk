@@ -42,8 +42,12 @@ test('desktop preparation writes only the generated copy and refreshes it when s
   }
 });
 
-test('all noncommercial NSIS profiles consume the generated copy before packaging', async () => {
+test('all noncommercial NSIS profiles consume the generated copy before packaging', async (t) => {
   const requireBuilder = createRequire(import.meta.resolve('electron-builder'));
+  const { log } = requireBuilder('builder-util');
+  // Raw Unicode logger writes can corrupt node:test's captured child protocol
+  // (nodejs/node#64061). Retain builder diagnostics through the runner instead.
+  t.mock.method(log, 'info', (fields, message) => t.diagnostic(`${message}: ${fields.file}`));
   const { getConfig } = await import(
     pathToFileURL(requireBuilder.resolve('app-builder-lib/out/util/config/config.js')).href
   );

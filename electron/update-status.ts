@@ -26,6 +26,9 @@ export type UpdateStatus = {
   readonly checkedAt: number | null;
   readonly mode?: 'manual';
   readonly installOnQuit?: boolean;
+  /** Verified, release-bound plain text; absent in older update services. */
+  readonly releaseNotes?: readonly string[];
+  readonly releaseNotesState?: 'loading' | 'available' | 'unavailable';
 };
 
 export type DesktopUpdates = {

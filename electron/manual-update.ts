@@ -1,4 +1,5 @@
 import { verifyManualDownload } from '../public/desktop-manual-download.mjs';
+import { fetchManualUpdateNotes } from './manual-update-notes.js';
 import {
   compareReleaseVersions,
   fetchManualCandidate,
@@ -37,6 +38,10 @@ export function createManualUpdates(options: Options): ManualUpdates {
 class ManualUpdateService implements ManualUpdates {
   private value: UpdateStatus;
   private candidate: ManualCandidate | null = null;
+  private notes: {
+    readonly candidate: ManualCandidate;
+    readonly highlights: readonly string[] | null;
+  } | null = null;
   private staged: StagedManualUpdate | null = null;
   private running: Promise<void> = Promise.resolve();
   private busy = false;
@@ -63,7 +68,26 @@ class ManualUpdateService implements ManualUpdates {
     version: string | null = this.value.version,
     armed = false,
   ): void {
-    this.value = { ...this.value, state, version, checkedAt: this.now(), installOnQuit: armed };
+    const notes =
+      version !== null &&
+      this.notes?.candidate === this.candidate &&
+      this.candidate?.release.version === version &&
+      !['idle', 'checking', 'up-to-date', 'unavailable'].includes(state)
+        ? this.notes
+        : null;
+    this.value = {
+      mode: 'manual',
+      currentVersion: this.options.currentVersion,
+      state,
+      version,
+      checkedAt: this.now(),
+      installOnQuit: armed,
+      ...(notes === null
+        ? {}
+        : notes.highlights === null
+          ? { releaseNotesState: 'unavailable' }
+          : { releaseNotesState: 'available', releaseNotes: notes.highlights }),
+    };
   }
   private start(operation: () => Promise<void>): void {
     this.busy = true;
@@ -100,6 +124,15 @@ class ManualUpdateService implements ManualUpdates {
     if (Date.parse(next.release.publishedAt) < this.options.currentPublishedAt)
       throw new Error('Backdated manual release');
     this.candidate = next;
+    this.notes = {
+      candidate: next,
+      highlights: await fetchManualUpdateNotes(
+        this.options.fetch,
+        this.options.keys,
+        next,
+        this.now(),
+      ),
+    };
     if (!(await this.options.eligible(next.envelope, next.release.version))) {
       this.set('not-covered', next.release.version);
       return;

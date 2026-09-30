@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import type { CommercialUpdateStatus, LicenceAdapter } from '../../platform/types';
 import { EarlyUpdatesOption } from './EarlyUpdatesOption';
 import { licenceButtons, licenceMuted } from './LicenceControls';
@@ -32,7 +33,6 @@ export function UpdatesPanel({
   onClose,
 }: Props): JSX.Element {
   const busy = requestBusy || status?.state === 'checking' || status?.state === 'downloading';
-  const updating = status !== null && status.state !== 'unavailable';
   return (
     <section style={panel} aria-busy={busy}>
       <div style={heading}>
@@ -47,14 +47,9 @@ export function UpdatesPanel({
           Close
         </button>
       </div>
-      {status === null ? null : (
-        <p style={{ margin: '12px 0 4px', fontWeight: 600 }}>
-          You have KerfDesk {status.currentVersion}
-        </p>
-      )}
-      <p role="status" style={{ lineHeight: 1.5 }}>
-        {updateStatusText(status, updatesUntil)}
-      </p>
+      <div style={details} role="region" aria-label="Update details" tabIndex={0}>
+        <UpdateDetails client={client} status={status} updatesUntil={updatesUntil} />
+      </div>
       <UpdateActions
         client={client}
         status={status}
@@ -63,6 +58,27 @@ export function UpdatesPanel({
         onDownload={onDownload}
         onInstallOnQuit={onInstallOnQuit}
       />
+    </section>
+  );
+}
+
+function UpdateDetails({
+  client,
+  status,
+  updatesUntil,
+}: Pick<Props, 'client' | 'status' | 'updatesUntil'>): JSX.Element {
+  const updating = status !== null && status.state !== 'unavailable';
+  return (
+    <>
+      {status === null ? null : (
+        <p style={{ margin: '12px 0 4px', fontWeight: 600 }}>
+          You have KerfDesk {status.currentVersion}
+        </p>
+      )}
+      <p role="status" style={{ lineHeight: 1.5 }}>
+        {updateStatusText(status, updatesUntil)}
+      </p>
+      <ReleaseSummary status={status} />
       <EarlyUpdatesOption client={client} />
       {updating ? (
         <p style={licenceMuted}>
@@ -71,6 +87,46 @@ export function UpdatesPanel({
             : 'New versions download in the background and install when you close KerfDesk.'}
         </p>
       ) : null}
+    </>
+  );
+}
+
+function ReleaseSummary({ status }: Pick<Props, 'status'>): JSX.Element | null {
+  const headingId = useId();
+  if (
+    !status?.version ||
+    !['available', 'downloading', 'ready', 'not-covered'].includes(status.state)
+  )
+    return null;
+  const loading = status.releaseNotesState === 'loading';
+  const notes =
+    status.releaseNotesState === 'available'
+      ? (status.releaseNotes?.slice(0, 6).map((note) => Array.from(note).slice(0, 240).join('')) ??
+        [])
+      : [];
+  return (
+    <section aria-labelledby={headingId} style={summary}>
+      <p style={{ ...licenceMuted, margin: '0 0 4px', fontWeight: 600 }}>
+        KerfDesk {status.version}
+      </p>
+      <h2 id={headingId} style={{ margin: 0, fontSize: 17 }}>
+        What’s improved
+      </h2>
+      <div aria-live="polite" aria-busy={loading}>
+        {notes.length > 0 ? (
+          <ul style={summaryList}>
+            {notes.map((note, index) => (
+              <li key={index}>{note}</li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ ...licenceMuted, margin: '10px 0 0' }}>
+            {loading
+              ? 'Loading the release summary…'
+              : 'No release summary is available for this version.'}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
@@ -88,7 +144,7 @@ function UpdateActions({
 >): JSX.Element | null {
   if (status === null || status.state === 'unavailable') return null;
   return (
-    <div style={licenceButtons}>
+    <div style={{ ...licenceButtons, flexShrink: 0 }}>
       <button
         type="button"
         className="lf-btn"
@@ -129,15 +185,43 @@ const heading = {
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 16,
+  flexShrink: 0,
 } as const;
 
 const panel = {
   width: '100%',
   maxWidth: 480,
-  padding: 28,
+  maxHeight: 'calc(100dvh - 82px)',
+  display: 'flex',
+  flexDirection: 'column',
+  padding: 'clamp(16px, 4vw, 28px)',
   boxSizing: 'border-box',
   background: 'var(--lf-bg-1)',
   borderRadius: 8,
   color: 'var(--lf-text)',
   fontFamily: 'var(--lf-font)',
+} as const;
+
+const details = {
+  minHeight: 0,
+  overflowY: 'auto',
+  overflowWrap: 'anywhere',
+  paddingRight: 4,
+} as const;
+
+const summary = {
+  padding: 16,
+  margin: '16px 0',
+  border: '1px solid var(--lf-border-strong)',
+  borderRadius: 8,
+  background: 'var(--lf-bg-2, var(--lf-bg-1))',
+} as const;
+
+const summaryList = {
+  display: 'grid',
+  gap: 8,
+  paddingLeft: 20,
+  margin: '12px 0 0',
+  fontSize: 14,
+  lineHeight: 1.5,
 } as const;

@@ -27,6 +27,7 @@ const REQUIRED_ENTRIES = [
   'dist-electron/main.js',
   'dist/web/index.html',
   'public/desktop-release-manifest.mjs',
+  'public/desktop-update-notes.mjs',
   'public/desktop-release-keys.json',
   'public/desktop-sandbox-contract.mjs',
 ];

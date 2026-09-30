@@ -15,6 +15,7 @@ const ENTRIES = [
   'dist-electron/main.js',
   'dist/web/index.html',
   'public/desktop-release-manifest.mjs',
+  'public/desktop-update-notes.mjs',
   'public/desktop-release-keys.json',
   'public/desktop-sandbox-contract.mjs',
   'node_modules/electron-updater/package.json',
@@ -80,13 +81,15 @@ test('lists nested asar entries as paths', () => {
   assert.deepEqual(asarEntries(header), ['package.json', 'node_modules/ms/index.js']);
 });
 
-test('requires the packaged verifier and trust anchors in both distribution configs', () => {
+test('requires the packaged verifiers and trust anchors in every distribution config', () => {
   for (const required of [
     'public/desktop-release-manifest.mjs',
+    'public/desktop-update-notes.mjs',
     'public/desktop-release-keys.json',
   ]) {
     assert.ok(STABLE.includes(`  - ${required}`));
     assert.ok(PREVIEW.includes(`  - ${required}`));
+    assert.ok(readFileSync('electron-builder.sandbox.yml', 'utf8').includes(`  - ${required}`));
     const problems = packagedDesktopProblems({
       wire: '010011001',
       fuses: configuredFuses(STABLE),

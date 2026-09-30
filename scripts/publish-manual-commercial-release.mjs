@@ -11,6 +11,7 @@ import { setTimeout } from 'node:timers/promises';
 import { createStableReleaseStore, ReleaseRateLimitError } from './stable-release-store.mjs';
 import { commercialArtifactNames } from '../public/desktop-commercial-catalog.mjs';
 import { publishManualCommercialRelease } from './manual-commercial-publisher.mjs';
+import { readReviewedDesktopUpdateNotes } from './reviewed-desktop-update-notes.mjs';
 import {
   readUnsignedCommercialPackage,
   createUnsignedCommercialInstallerVerifier,
@@ -71,6 +72,10 @@ async function main() {
   const identity = json(await readCommercialInput(identityPath, 65_536));
   const release = verifyCommercialEnvelope(identity, keySet, 'release-identity');
   await requireCommercialSource(release, fileURLToPath(new URL('..', import.meta.url)));
+  const reviewedNotes = await readReviewedDesktopUpdateNotes(
+    release.sourceSha,
+    fileURLToPath(new URL('..', import.meta.url)),
+  );
   const { resourceDigests } = await readUnsignedCommercialPackage(
     resolve(resourcesDirectory),
     identity,
@@ -95,6 +100,7 @@ async function main() {
     keySet,
     verifyInstaller,
     expectedLatestSha256,
+    reviewedNotes,
     privateKeyPem: process.env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY,
     keyId: process.env.DESKTOP_STABLE_MANIFEST_KEY_ID,
   });

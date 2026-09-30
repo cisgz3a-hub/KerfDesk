@@ -18,6 +18,7 @@ files:
   - package.json
   - public/desktop-release-manifest.mjs
   - public/desktop-manual-download.mjs
+  - public/desktop-update-notes.mjs
   - public/desktop-commercial-catalog.mjs
   - public/desktop-release-keys.json
   - public/desktop-sandbox-contract.mjs

@@ -84,6 +84,8 @@ export type CommercialUpdateStatus = {
   readonly mode?: 'manual';
   /** True only after the owner arms a manual installer for normal app close. */
   readonly installOnQuit?: boolean;
+  readonly releaseNotes?: readonly string[];
+  readonly releaseNotesState?: 'loading' | 'available' | 'unavailable';
 };
 
 /**

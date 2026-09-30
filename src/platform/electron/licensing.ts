@@ -74,7 +74,7 @@ const RELEASE_VERSION = /^\d{1,16}\.\d{1,16}\.\d{1,16}$/;
 export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateStatus {
   if (typeof value !== 'object' || value === null) throw new Error('Invalid update status.');
   const status = value as CommercialUpdateStatus;
-  if (!validUpdateFields(status) || !validManualUpdateStatus(status))
+  if (!validUpdateFields(status) || !validManualUpdateStatus(status) || !validUpdateNotes(status))
     throw new Error('Invalid update status.');
   const { state, currentVersion, version, checkedAt } = status;
   return {
@@ -84,7 +84,36 @@ export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateSta
     checkedAt,
     ...(status.mode === undefined ? {} : { mode: status.mode }),
     ...(status.installOnQuit === undefined ? {} : { installOnQuit: status.installOnQuit }),
+    ...(status.releaseNotesState === undefined
+      ? {}
+      : { releaseNotesState: status.releaseNotesState }),
+    ...(status.releaseNotes === undefined ? {} : { releaseNotes: [...status.releaseNotes] }),
   };
+}
+
+function validUpdateNotes(status: CommercialUpdateStatus): boolean {
+  if (status.releaseNotesState === undefined) return status.releaseNotes === undefined;
+  if (status.mode !== 'manual' || status.version === null) return false;
+  if (status.releaseNotesState !== 'available')
+    return (
+      ['loading', 'unavailable'].includes(status.releaseNotesState) &&
+      status.releaseNotes === undefined
+    );
+  return (
+    Array.isArray(status.releaseNotes) &&
+    status.releaseNotes.length >= 1 &&
+    status.releaseNotes.length <= 6 &&
+    status.releaseNotes.every(
+      (line: unknown) =>
+        typeof line === 'string' &&
+        line.length >= 1 &&
+        Array.from(line).length <= 240 &&
+        line.trim() === line &&
+        // Control characters are intentionally rejected at the renderer boundary.
+        // eslint-disable-next-line no-control-regex
+        !/[<>\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/u.test(line),
+    )
+  );
 }
 
 function validUpdateFields(status: CommercialUpdateStatus): boolean {
