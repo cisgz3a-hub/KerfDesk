@@ -69,7 +69,9 @@ export function LaserRecoveryRestartPicker(props: RestartPickerProps): JSX.Eleme
           placeholder={automatic === null ? 'Automatic' : `Automatic: ${automatic.line}`}
           disabled={props.disabled}
           style={{ width: 150 }}
-          onChange={(event) => {
+          onInput={(event) => {
+            // Native badInput (e.g. "-") and a cleared field both report value "".
+            // onChange can deduplicate them; every input event must update validity.
             const text = event.currentTarget.value;
             const line = event.currentTarget.validity.badInput
               ? null

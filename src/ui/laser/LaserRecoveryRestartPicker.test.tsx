@@ -99,6 +99,26 @@ function lineInput(): HTMLInputElement {
 }
 
 describe('LaserRecoveryRestartPicker route preparation', () => {
+  it('reports native bad input and its clearance even when the input value stays empty', async () => {
+    const capsule = await savedCapsule();
+    const onChange = vi.fn();
+    renderPicker(capsule, onChange);
+    const input = lineInput();
+    // Chrome reports value "" with badInput for unfinished "-" or "1e".
+    Object.defineProperty(input, 'validity', { configurable: true, value: { badInput: true } });
+    act(() => {
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(input.value).toBe('');
+    expect(onChange).toHaveBeenLastCalledWith(null);
+    Object.defineProperty(input, 'validity', { configurable: true, value: { badInput: false } });
+    act(() => {
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(onChange).toHaveBeenLastCalledWith(undefined);
+    expect(onChange).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the line field usable while the worker prepares the route, then shows the canvas', async () => {
     const capsule = await savedCapsule();
     renderPicker(capsule);
