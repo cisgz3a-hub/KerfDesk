@@ -148,16 +148,17 @@ describe('offline Ed25519 entitlement verification', () => {
     expect(verifyLicenceRelease(release(), keys, 'update-manifest')).toBeNull();
     expect(verifyLicenceRelease(envelope(claims()), keys)).toBeNull();
   });
-  it('defaults existing MIT packages to free but rejects malformed opt-in metadata', async () => {
+  it('keeps packages without commercial metadata Free and rejects malformed opt-in metadata', async () => {
     expect(licensingConfigFromMetadata({ version: '1.0.0' })).toEqual({ channel: 'free' });
     expect(licensingConfigFromMetadata({ kerfdeskCommercialLicense: false })).toEqual({
       channel: 'invalid',
     });
     const h = harness();
     const runtime = createLicensingRuntime({ ...h.options, config: { channel: 'free' } });
-    expect(await runtime.status()).toMatchObject({ channel: 'free', edition: 'pro' });
-    expect(runtime.proUnlocked()).toBe(true);
-    await runtime.startTrial();
+    expect(await runtime.status()).toMatchObject({ channel: 'free', edition: 'free' });
+    expect(runtime.proUnlocked()).toBe(false);
+    expect(await runtime.startTrial()).toMatchObject({ channel: 'free', edition: 'free' });
+    expect(await runtime.activate('KD1.synthetic.key')).toMatchObject({ edition: 'free' });
     expect(h.store.read).not.toHaveBeenCalled();
     expect(h.fetch).not.toHaveBeenCalled();
   });

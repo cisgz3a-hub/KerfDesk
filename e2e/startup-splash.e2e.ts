@@ -87,7 +87,10 @@ test('eventually dismisses when the mounted app has neither canvas nor error scr
       body: 'export function App() { return null; }',
     }),
   );
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  // The mobile router now loads the desktop module after the entry document.
+  // Wait for that module before measuring the mounted app's splash deadline;
+  // DOMContentLoaded can fire while its cold dependency graph is still loading.
+  await page.goto('/', { waitUntil: 'load' });
   await expect(page.locator('#app-splash')).toBeVisible();
   await expect(page.locator('#app-root')).toBeEmpty();
   await expect(page.locator('#app-splash')).toHaveCount(0, { timeout: 7000 });

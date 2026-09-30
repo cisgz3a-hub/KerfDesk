@@ -159,6 +159,7 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   const [failure, setFailure] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingPro | null>(null);
   const statusRef = useRef<LicenceStatus | null>(null);
+  const statusRequest = useRef(0);
   const pendingRef = useRef<PendingPro | null>(null);
   const settle = useCallback((next: PendingPro | null) => {
     pendingRef.current = next;
@@ -166,6 +167,9 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
   }, []);
   const accept = useCallback(
     async (reported: LicenceStatus): Promise<void> => {
+      // A completed action owns the new status. A read started before an
+      // activation/deactivation must never overwrite its result when it arrives.
+      statusRequest.current += 1;
       // A free desktop build has no commercial metadata and no Pro to unlock.
       const result: LicenceStatus =
         unlicensedRunsFree && reported.channel === 'free'
@@ -184,10 +188,13 @@ function useLicenceSession(client: LicenceAdapter, unlicensedRunsFree: boolean) 
     [settle, unlicensedRunsFree],
   );
   const load = useCallback(async (): Promise<void> => {
+    const request = ++statusRequest.current;
     try {
-      await accept(await client.status());
+      const reported = await client.status();
+      if (request === statusRequest.current) await accept(reported);
     } catch {
-      setFailure('The licence service could not be reached. Please retry or restart KerfDesk.');
+      if (request === statusRequest.current)
+        setFailure('The licence service could not be reached. Please retry or restart KerfDesk.');
     }
   }, [accept, client]);
   useEffect(() => {

@@ -6,6 +6,11 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_now:
+        description: Release now before 20 merged PRs (all checks and trust guards still apply)
+        type: boolean
+        default: false
 
 # This lane is the sole automatic writer of commercial-manual/latest.json.
 concurrency:
@@ -15,6 +20,7 @@ concurrency:
 permissions:
   contents: read
   actions: read
+  pull-requests: read
 
 jobs:
   qualify:
@@ -37,10 +43,11 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
-      - name: Require successful checks on the exact main push
+      - name: Require exact main checks and 20 merged PRs or explicit release now
         id: gate
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          KERFDESK_RELEASE_NOW: ${{ github.event_name == 'workflow_dispatch' && inputs.release_now }}
         run: node scripts/unsigned-release-plan.mjs gate
 
   publish:
@@ -59,6 +66,9 @@ jobs:
           node-version: 22
       - name: Plan a new immutable version from the verified public release
         id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KERFDESK_RELEASE_NOW: ${{ github.event_name == 'workflow_dispatch' && inputs.release_now }}
         shell: pwsh
         run: |
           git fetch --no-tags origin main
@@ -139,6 +149,28 @@ jobs:
           & ./scripts/qualify-windows-installer.ps1 -Scenario Launch -PackageKind CommercialUnsigned `
             -Installer $installer -Version $env:RELEASE_VERSION -SourceCommit $env:RELEASE_SHA `
             -EvidenceRoot (Join-Path $release 'installer-qualification')
+      - name: Verify packaged security and refuse a modified application archive
+        if: steps.plan.outputs.publish == 'true'
+        env:
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+        shell: pwsh
+        run: |
+          $release = Join-Path $env:GITHUB_WORKSPACE "release/commercial-unsigned/$env:RELEASE_VERSION"
+          $executable = Join-Path $release 'win-unpacked/KerfDesk.exe'
+          $archive = Join-Path $release 'win-unpacked/resources/app.asar'
+          $evidence = Join-Path $release 'installer-qualification'
+          node scripts/verify-packaged-desktop.mjs $executable $archive electron-builder.yml 2>&1 |
+            Tee-Object -FilePath (Join-Path $evidence 'packaged-security.txt')
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged fuse or runtime closure verification failed.' }
+          $before = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+          node scripts/verify-asar-integrity-enforced.mjs $executable $archive 2>&1 |
+            Tee-Object -FilePath (Join-Path $evidence 'asar-integrity.txt')
+          $integrityExit = $LASTEXITCODE
+          $after = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash
+          @{ beforeSha256 = $before; afterSha256 = $after; exitCode = $integrityExit } |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'asar-restoration.json')
+          if ($before -ne $after) { throw 'The integrity probe did not restore the candidate archive.' }
+          if ($integrityExit -ne 0) { throw 'The candidate did not prove ASAR tamper refusal.' }
       - name: Retain installed Windows qualification evidence
         if: always() && steps.plan.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

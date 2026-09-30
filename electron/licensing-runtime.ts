@@ -389,7 +389,7 @@ class LicensingService {
         return false;
       }
     });
-  readonly proUnlocked = (): boolean => this.config.channel === 'free' || this.proLatched;
+  readonly proUnlocked = (): boolean => this.config.channel === 'commercial' && this.proLatched;
   private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
     operation === 'renewal' && saved.credential !== undefined
       ? requireActivationBody(this.config, saved.credential, device)

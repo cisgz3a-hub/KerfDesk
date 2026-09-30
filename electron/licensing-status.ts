@@ -69,9 +69,9 @@ export function licenceSummary(
   const free = config.channel === 'free';
   return {
     channel: free ? 'free' : 'commercial',
-    // A build without commercial metadata is a Preview or source build with
-    // every feature; a commercial build unlocks Pro only with valid rights.
-    edition: free || pro ? 'pro' : 'free',
+    // Free/Preview/source builds have no licence authority and remain Free
+    // (ADR-540 Amendment 1). Only the commercial runtime may unlock Pro.
+    edition: config.channel === 'commercial' && pro ? 'pro' : 'free',
     state,
     tier: rights.tier,
     accessExpiresAt: rights.accessExpiresAt,
