@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RegisterSWOptions } from 'virtual:pwa-register/react';
 
 // Controllable test doubles, hoisted so the vi.mock factories below can close
 // over them without a temporal-dead-zone error.
@@ -10,11 +11,11 @@ const h = vi.hoisted(() => ({
   setNeedRefresh: vi.fn(),
   updateServiceWorker: vi.fn(),
   pushToast: vi.fn(),
-  registerOptions: null as { readonly onNeedReload?: () => void } | null,
+  registerOptions: null as RegisterSWOptions | null,
 }));
 
 vi.mock('virtual:pwa-register/react', () => ({
-  useRegisterSW: (options: { readonly onNeedReload?: () => void }) => {
+  useRegisterSW: (options: RegisterSWOptions) => {
     h.registerOptions = options;
     return {
       offlineReady: [h.swState.offlineReady, h.setOfflineReady],
@@ -46,9 +47,11 @@ async function render(): Promise<{ readonly host: HTMLDivElement; readonly root:
     root.render(<PwaUpdateWatcher />);
   });
   if (root === null) throw new Error('root missing');
+  roots.push(root);
   return { host, root };
 }
 
+const roots: Root[] = [];
 const originalLocation = window.location;
 let reload: ReturnType<typeof vi.fn>;
 
@@ -67,6 +70,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  act(() => roots.splice(0).forEach((root) => root.unmount()));
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   document.body.innerHTML = '';
   Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
 });
@@ -77,7 +83,67 @@ function needReload(): void {
   act(() => onNeedReload());
 }
 
+function register(update: () => Promise<unknown>): void {
+  const callback = h.registerOptions?.onRegisteredSW;
+  if (callback === undefined) throw new Error('Missing registration callback');
+  act(() => callback('/sw.js', { update } as ServiceWorkerRegistration));
+}
+
 describe('PwaUpdateWatcher', () => {
+  it('discovers updates every 30 minutes without applying or reloading them', async () => {
+    vi.useFakeTimers();
+    const update = vi.fn().mockResolvedValue(undefined);
+    await render();
+    register(update);
+    await act(async () => vi.advanceTimersByTimeAsync(30 * 60 * 1000 - 1));
+    expect(update).not.toHaveBeenCalled();
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(update).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(30 * 60 * 1000));
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(h.updateServiceWorker).not.toHaveBeenCalled();
+    expect(promptedReload.applyPromptedReload).not.toHaveBeenCalled();
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it('replaces discovery timers and ignores registration after unmount', async () => {
+    vi.useFakeTimers();
+    const first = vi.fn().mockResolvedValue(undefined);
+    const second = vi.fn().mockResolvedValue(undefined);
+    const { root } = await render();
+    register(first);
+    register(second);
+    await act(async () => vi.advanceTimersByTimeAsync(30 * 60 * 1000));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+    act(() => root.unmount());
+    register(first);
+    await act(async () => vi.advanceTimersByTimeAsync(60 * 60 * 1000));
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+
+  it('quietly skips offline checks, retries failures and avoids overlapping checks', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('navigator', { onLine: false });
+    const update = vi.fn().mockRejectedValueOnce(new Error('offline'));
+    let finish!: () => void;
+    update.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)));
+    await render();
+    register(update);
+    await act(async () => vi.advanceTimersByTimeAsync(30 * 60 * 1000));
+    expect(update).not.toHaveBeenCalled();
+    vi.stubGlobal('navigator', { onLine: true });
+    await act(async () => vi.advanceTimersByTimeAsync(30 * 60 * 1000));
+    expect(update).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(60 * 60 * 1000));
+    expect(update).toHaveBeenCalledTimes(2);
+    await act(async () => finish());
+    await act(async () => vi.advanceTimersByTimeAsync(30 * 60 * 1000));
+    expect(update).toHaveBeenCalledTimes(3);
+    expect(h.pushToast).not.toHaveBeenCalled();
+  });
+
   it('publishes ready availability to the store when an update is waiting', async () => {
     h.swState.needRefresh = true;
     await render();

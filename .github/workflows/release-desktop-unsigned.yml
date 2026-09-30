@@ -127,16 +127,26 @@ jobs:
           $config = Join-Path $env:RUNNER_TEMP 'commercial-preparation/electron-builder.commercial-unsigned.generated.json'
           pnpm exec electron-builder --config $config --win --x64 --publish never
           if ($LASTEXITCODE -ne 0) { throw 'Windows packaging failed.' }
-      - name: Launch the packaged Windows app with an isolated disposable profile
+      - name: Install, launch and uninstall the production Windows candidate
         if: steps.plan.outputs.publish == 'true'
         env:
           RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+          RELEASE_SHA: ${{ steps.plan.outputs.sourceSha }}
         shell: pwsh
         run: |
-          $executable = (Resolve-Path "release/commercial-unsigned/$env:RELEASE_VERSION/win-unpacked/KerfDesk.exe").Path
-          $evidence = Join-Path $env:RUNNER_TEMP 'unsigned-native-smoke'
-          node scripts/verify-windows-packaged-native-smoke.mjs $executable "--output=$evidence"
-          if ($LASTEXITCODE -ne 0) { throw 'Packaged Windows launch failed.' }
+          $release = Join-Path $env:GITHUB_WORKSPACE "release/commercial-unsigned/$env:RELEASE_VERSION"
+          $installer = Join-Path $release "KerfDesk-$env:RELEASE_VERSION-windows-x64-setup.exe"
+          & ./scripts/qualify-windows-installer.ps1 -Scenario Launch -PackageKind CommercialUnsigned `
+            -Installer $installer -Version $env:RELEASE_VERSION -SourceCommit $env:RELEASE_SHA `
+            -EvidenceRoot (Join-Path $release 'installer-qualification')
+      - name: Retain installed Windows qualification evidence
+        if: always() && steps.plan.outputs.publish == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: unsigned-installer-qualification-${{ steps.plan.outputs.version }}-${{ github.run_attempt }}
+          path: release/commercial-unsigned/${{ steps.plan.outputs.version }}/installer-qualification/
+          retention-days: 7
+          if-no-files-found: warn
       - name: Publish immutable installer and authenticated notification manifest
         if: steps.plan.outputs.publish == 'true'
         env:

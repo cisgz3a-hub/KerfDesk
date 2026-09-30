@@ -8,7 +8,7 @@ import test from 'node:test';
 
 const script = fileURLToPath(new URL('./qualify-windows-installer.ps1', import.meta.url));
 
-function rejectedRun(overrides, escapeEvidence = false) {
+function rejectedRun(overrides, escapeEvidence = false, args = []) {
   const root = mkdtempSync(path.join(tmpdir(), 'kerfdesk-installer-guard-'));
   const evidence = escapeEvidence
     ? path.join(root, '..', 'outside-evidence')
@@ -33,6 +33,7 @@ function rejectedRun(overrides, escapeEvidence = false) {
         'a'.repeat(40),
         '-EvidenceRoot',
         evidence,
+        ...args,
       ],
       {
         encoding: 'utf8',
@@ -81,6 +82,35 @@ test(
     assert.match(
       rejectedRun({ GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'self-hosted' }),
       /requires a disposable/u,
+    );
+  },
+);
+
+test(
+  'production qualification keeps the developer-machine refusal',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    assert.match(
+      rejectedRun({}, false, ['-PackageKind', 'CommercialUnsigned', '-Scenario', 'Launch']),
+      /requires a disposable GitHub-hosted Windows runner/u,
+    );
+  },
+);
+
+test(
+  'production full qualification refuses unsupported CDP before mutation',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    assert.match(
+      rejectedRun({ GITHUB_ACTIONS: 'true', RUNNER_ENVIRONMENT: 'github-hosted' }, false, [
+        '-PackageKind',
+        'CommercialUnsigned',
+      ]),
+      /Full requires CDP, which production packages forbid/u,
     );
   },
 );

@@ -10,16 +10,19 @@ import {
 } from './native-smoke-licence-config.js';
 import { nativeLicenceRendererSource } from './native-smoke-licence-renderer.js';
 import { nativeSmokeNetworkEvidence } from './native-smoke-network.js';
+import { installInteractiveNativeObservation } from './native-smoke-interactive.js';
 export { prepareNativeSmokeNetwork as prepareNetwork } from './native-smoke-network.js';
 
 const USER_DATA_ARG = '--kerfdesk-native-smoke-user-data=';
 const RESULT_ARG = '--kerfdesk-native-smoke-result=';
+const INTERACTIVE_ARG = '--kerfdesk-native-smoke-interactive';
 const SMOKE_TIMEOUT_MS = 45_000;
 
 export type NativeSmokeConfig = {
   readonly userDataPath: string;
   readonly resultPath: string;
   readonly licenceQualification?: NativeLicenceQualification;
+  readonly interactive?: true;
 };
 
 type NativeSmokeInspection = {
@@ -73,7 +76,13 @@ export function readNativeSmokeConfig(argv: ReadonlyArray<string>): NativeSmokeC
   const userDataPath = argumentValue(argv, USER_DATA_ARG);
   const resultPath = argumentValue(argv, RESULT_ARG);
   const licenceQualification = readNativeLicenceQualification(argv);
-  if (userDataPath === null && resultPath === null && licenceQualification === undefined)
+  const interactive = argv.includes(INTERACTIVE_ARG);
+  if (
+    !interactive &&
+    [userDataPath, resultPath, licenceQualification].every(
+      (value) => value === null || value === undefined,
+    )
+  )
     return null;
   if (userDataPath === null || resultPath === null) {
     throw new Error('native smoke requires both user-data and result paths');
@@ -81,10 +90,14 @@ export function readNativeSmokeConfig(argv: ReadonlyArray<string>): NativeSmokeC
   if (!isAbsolute(userDataPath) || !isAbsolute(resultPath)) {
     throw new Error('native smoke paths must be absolute');
   }
+  if (interactive && licenceQualification !== undefined) {
+    throw new Error('interactive observation cannot run automated licence qualification');
+  }
   return {
     userDataPath: resolve(userDataPath),
     resultPath: resolve(resultPath),
     ...(licenceQualification === undefined ? {} : { licenceQualification }),
+    ...(interactive ? { interactive: true as const } : {}),
   };
 }
 
@@ -94,6 +107,13 @@ export function installPackagedNativeSmoke(input: {
   readonly config: NativeSmokeConfig | null;
 }): void {
   if (input.config === null) return;
+  if (input.config.interactive === true) {
+    installInteractiveNativeObservation(
+      { ...input, config: input.config },
+      readNativeSmokeWebPreferences,
+    );
+    return;
+  }
   const failures: string[] = [];
   const claimTerminal = createNativeSmokeTerminalClaim();
   const timeout = setTimeout(() => {

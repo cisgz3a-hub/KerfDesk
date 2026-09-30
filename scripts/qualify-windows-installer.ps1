@@ -8,7 +8,8 @@ param(
   # Full: the dry run's install, save/reopen, upgrade and uninstall qualification.
   # Launch: every pull request's install, packaged launch/import/save and
   # uninstall (ADR-522), with no upgrade candidate and no file dialogs.
-  [ValidateSet('Full', 'Launch')][string]$Scenario = 'Full'
+  [ValidateSet('Full', 'Launch')][string]$Scenario = 'Full',
+  [ValidateSet('Preview', 'CommercialUnsigned')][string]$PackageKind = 'Preview'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,6 +24,9 @@ if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
   throw 'Installer qualification requires a disposable GitHub-hosted Windows runner.'
 }
 if ($SourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Expected a full source commit.' }
+if ($PackageKind -eq 'CommercialUnsigned' -and $Scenario -eq 'Full') {
+  throw 'Commercial unsigned qualification supports Launch only; Full requires CDP, which production packages forbid.'
+}
 if ($Scenario -eq 'Full' -and
     ([string]::IsNullOrWhiteSpace($UpgradeInstaller) -or [string]::IsNullOrWhiteSpace($UpgradeVersion))) {
   throw 'The full qualification needs an upgrade installer and version.'
@@ -68,9 +72,11 @@ $receipt = [ordered]@{
   os = (Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version, BuildNumber, OSArchitecture)
   elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   installRoot = $installRoot; profile = $profile; project = $project
-  scenario = $Scenario; steps = $steps
+  scenario = $Scenario; packageKind = $PackageKind; steps = $steps
   versions = @(if ($Scenario -eq 'Full') { $Version, $UpgradeVersion } else { $Version })
-  packaging = $(if ($Scenario -eq 'Full') {
+  packaging = $(if ($PackageKind -eq 'CommercialUnsigned') {
+    'Production unsigned Windows NSIS with pinned licence/release signatures and automatic updater disabled'
+  } elseif ($Scenario -eq 'Full') {
     'electron-builder.yml Windows NSIS, unsigned with preview metadata and trusted updater disabled'
   } else { 'Windows NSIS, unsigned with preview metadata and trusted updater disabled' })
   limitations = @(
@@ -165,8 +171,13 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
   $installedAsar = Get-FileEvidence (Join-Path $installRoot 'resources\app.asar')
   $candidateAsar = Get-FileEvidence (Join-Path (Split-Path -Parent $Candidate) 'win-unpacked\resources\app.asar')
   if ($installedAsar.sha256 -ne $candidateAsar.sha256) { throw 'Installed ASAR differs from packaged candidate.' }
-  & node (Join-Path $PSScriptRoot 'verify-packaged-preview-metadata.mjs') $installedAsar.path $ExpectedVersion | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw 'Installed Preview metadata/version/updater trust verification failed.' }
+  if ($PackageKind -eq 'CommercialUnsigned') {
+    & node (Join-Path $PSScriptRoot 'verify-installed-unsigned-commercial.mjs') (Join-Path $installRoot 'resources') $ExpectedVersion $SourceCommit | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Installed production signature/version/source/updater verification failed.' }
+  } else {
+    & node (Join-Path $PSScriptRoot 'verify-packaged-preview-metadata.mjs') $installedAsar.path $ExpectedVersion | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Installed Preview metadata/version/updater trust verification failed.' }
+  }
   $shortcuts = @(Get-Shortcuts)
   if ($shortcuts.Count -ne 2 -or @($shortcuts | Where-Object target -NE $executable).Count -ne 0) {
     throw 'Expected desktop and Start Menu shortcuts to the installed executable.'
@@ -182,7 +193,8 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
     registry = $records; asar = $installedAsar; candidateAsar = $candidateAsar
     executable = $installedExecutable; candidateExecutable = $candidateExecutable
     shortcuts = $shortcuts; projectAssociation = $association
-    previewMetadataVerified = $true; trustedUpdater = $false
+    previewMetadataVerified = ($PackageKind -eq 'Preview')
+    commercialUnsignedMetadataVerified = ($PackageKind -eq 'CommercialUnsigned'); trustedUpdater = $false
   }
 }
 
