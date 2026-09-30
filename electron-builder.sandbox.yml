@@ -53,7 +53,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: KerfDesk Sandbox
-  license: public/eula.txt
+  license: build/installer-terms.txt
   differentialPackage: false
 win:
   icon: public/favicon.svg

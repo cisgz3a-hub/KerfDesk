@@ -77,7 +77,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: KerfDesk
-  license: public/eula.txt
+  license: build/installer-terms.txt
   differentialPackage: false
 
 # Double-clicking a KerfDesk project opens it in KerfDesk (ADR-378). Only the

@@ -9,6 +9,7 @@ import {
 } from './commercial-release-manifest.mjs';
 import { hasSandboxMarker } from '../public/desktop-sandbox-contract.mjs';
 import { verifyDesktopRendererAsar } from './verify-desktop-renderer.mjs';
+import { encodeInstallerTerms } from './prepare-installer-terms.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const API_ORIGIN = 'https://license.kerfdesk.com';
@@ -314,10 +315,11 @@ export async function writeCommercialPreparation(input, root = ROOT) {
   );
   const metadata = prepareCommercialMetadata(input);
   const lane = input.unsignedInstaller ? 'commercial-unsigned' : 'commercial';
+  const installerTerms = join(output, 'commercial-installer-terms.txt');
   const config = {
     extends: join(await realpath(root), `electron-builder.${lane}.yml`),
     extraMetadata: metadata,
-    nsis: { license: terms },
+    nsis: { license: installerTerms },
   };
   const artifacts = [
     {
@@ -333,13 +335,14 @@ export async function writeCommercialPreparation(input, root = ROOT) {
       path: join(output, IDENTITY_NAME),
       bytes: `${JSON.stringify(metadata.kerfdeskCommercialLicense.release, null, 2)}\n`,
     },
+    { path: installerTerms, bytes: encodeInstallerTerms(Buffer.from(termsText, 'utf8')) },
   ];
   // Detect conflicts before writing anything; identical retries reuse the exact
   // signed timestamp and metadata rather than silently resigning a version.
   for (const item of artifacts) {
     try {
       requireInput(
-        (await readFile(item.path, 'utf8')) === item.bytes,
+        (await readFile(item.path)).equals(Buffer.from(item.bytes)),
         'Generated artifact already exists with different contents.',
       );
     } catch (error) {
@@ -357,7 +360,7 @@ export async function writeCommercialPreparation(input, root = ROOT) {
     } catch (error) {
       if (error.code !== 'EEXIST') throw error;
       requireInput(
-        (await readFile(item.path, 'utf8')) === item.bytes,
+        (await readFile(item.path)).equals(Buffer.from(item.bytes)),
         'Generated artifact changed during preparation.',
       );
     }
@@ -366,6 +369,7 @@ export async function writeCommercialPreparation(input, root = ROOT) {
     version: metadata.version,
     configPath: artifacts[0].path,
     identityPath: artifacts[1].path,
+    termsPath: installerTerms,
   };
 }
 
@@ -427,7 +431,7 @@ async function verifyPreparedPackage(context, unsignedInstaller) {
   const realTerms = await realpath(await externalPath(terms, root));
   requireInput(
     !within(await realpath(root), realTerms) &&
-      (await boundedFile(realTerms, 262_144)).trim().length > 0,
+      (await boundedFile(realTerms, 262_144 + 3)).trim().length > 0,
     'Explicit external commercial terms are required.',
   );
   verifyDesktopRendererAsar(join(context.appOutDir, 'resources', 'app.asar'));
