@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>KerfDesk · Download overview</title>
+    <link rel="stylesheet" href="/dashboard.css" />
+    <script type="module" src="/dashboard.mjs"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <div>
+          <span class="brand">KERFDESK</span><span class="badge">Private · This computer</span>
+        </div>
+        <h1>Download overview</h1>
+        <p class="intro">See how often your installers are requested, by day and release.</p>
+      </header>
+      <section class="setup card" id="setup" aria-labelledby="setup-heading">
+        <div>
+          <h2 id="setup-heading">Connect your download statistics</h2>
+          <p>
+            Use a Cloudflare token with <strong>Account Analytics · Read</strong> and your
+            kerfdesk.com Zone ID. Your token stays in this local process and is never saved.
+          </p>
+          <p>
+            <a
+              href="https://dash.cloudflare.com/profile/api-tokens"
+              target="_blank"
+              rel="noreferrer"
+              >Create a read-only token ↗</a
+            >
+            · Find the Zone ID on the kerfdesk.com overview in Cloudflare.
+          </p>
+        </div>
+        <form id="connect-form">
+          <label for="zone">Zone ID</label>
+          <input
+            id="zone"
+            name="zone"
+            type="text"
+            minlength="32"
+            maxlength="32"
+            pattern="[a-fA-F0-9]{32}"
+            autocomplete="off"
+            spellcheck="false"
+            required
+          />
+          <label for="token">Analytics read token</label>
+          <input
+            id="token"
+            name="token"
+            type="password"
+            minlength="20"
+            maxlength="256"
+            autocomplete="off"
+            required
+          />
+          <button type="submit">Connect &amp; load figures</button>
+        </form>
+      </section>
+      <div class="toolbar">
+        <label for="period">Refresh period</label>
+        <select id="period">
+          <option value="1">Today</option>
+          <option value="7" selected>Last 7 days</option>
+          <option value="30">Last 30 days, if available</option>
+        </select>
+        <button id="refresh" disabled>Refresh</button>
+        <button class="secondary" id="export" disabled>Export CSV</button>
+        <button class="quiet" id="disconnect" hidden>Disconnect</button>
+      </div>
+      <p id="message" role="status" aria-live="polite">No live figures loaded yet.</p>
+      <p id="retry" role="status" aria-live="polite"></p>
+      <section class="metrics" aria-label="Download request totals">
+        <article class="card">
+          <span class="eyebrow">Loaded period · HTTP 200</span><strong id="full">—</strong
+          ><span>Full-response requests</span>
+        </article>
+        <article class="card">
+          <span class="eyebrow">Loaded period · HTTP 206</span><strong id="partial">—</strong
+          ><span>Partial / resumed requests</span>
+        </article>
+        <article class="card">
+          <span class="eyebrow">Saved observations · HTTP 200</span><strong id="recorded">—</strong
+          ><span id="recorded-detail">History begins with your first refresh</span>
+        </article>
+      </section>
+      <section class="card chart-card" aria-labelledby="daily-heading">
+        <div class="section-heading">
+          <h2 id="daily-heading">Daily requests</h2>
+          <span class="muted">UTC · Full responses</span>
+        </div>
+        <div id="chart" class="chart">
+          <p class="empty">Connect Cloudflare to see your download activity.</p>
+        </div>
+        <p id="coverage" class="muted">Unavailable data is never shown as zero.</p>
+      </section>
+      <section class="card" aria-labelledby="releases-heading">
+        <div class="section-heading">
+          <h2 id="releases-heading">By release</h2>
+          <span class="muted">Estimated requests</span>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Platform</th>
+                <th>Channel</th>
+                <th class="number">Full</th>
+                <th class="number">Partial</th>
+              </tr>
+            </thead>
+            <tbody id="releases">
+              <tr>
+                <td colspan="5" class="empty">No figures loaded.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <details class="card">
+        <summary>What these figures mean</summary>
+        <p>
+          These are estimates of installer GET requests reaching dl.kerfdesk.com, including
+          downloads served from Cloudflare's cache. They are not a count of people, completed
+          downloads or installations.
+        </p>
+        <p>
+          Repeat downloads, update downloads, bots and release checks can contribute. Partial
+          requests are shown separately because a resumed download can make several requests. HEAD
+          requests, manifests, failed responses and unknown file paths are excluded.
+        </p>
+        <p>
+          Cloudflare can sample traffic and has a limited retention window. Refresh regularly to
+          keep daily aggregate observations on this computer. Missing history cannot be
+          reconstructed. The current day is provisional; saved observations are not an all-time
+          total.
+        </p>
+        <p>
+          No IP addresses, cookies, device identifiers, licence records or project data are
+          collected by this dashboard. It adds no tracking to the app.
+        </p>
+      </details>
+      <footer>
+        <span>Local owner dashboard</span><span id="updated">Awaiting first refresh</span>
+      </footer>
+    </main>
+  </body>
+</html>
