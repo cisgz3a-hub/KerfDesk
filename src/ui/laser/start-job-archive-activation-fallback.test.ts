@@ -15,6 +15,7 @@ import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-genera
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { installReviewPendingFramedRunPermitForCurrentState } from './framed-run-testing';
+import { hashOnSimulatedClock } from './host-sha256-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { createSecondPassExecutionFixture } from './second-pass-execution-testing';
 import { secondPassOfferable } from './second-pass/second-pass-offer';
@@ -33,6 +34,9 @@ let uninstallTracking = (): void => undefined;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // A run settles through WebCrypto digests, which otherwise answer on real
+  // time and can land after an assertion that follows a fake-time advance.
+  hashOnSimulatedClock();
   resetStore();
   useJobReviewStore.getState().close();
   useLaserStore.setState(initialLaserState());
