@@ -82,47 +82,106 @@ const QUICK_STOP_LOG =
   '[lf2] Abort quick-stopped the controller (M410): homing and position are unverified until you re-home or re-check the origin.';
 
 export async function runStopJob(context: JobStopContext, reason?: JobStopReason): Promise<void> {
-  const { set, refs, driver } = context;
-  cancelPendingManualMotions(refs);
-  set((state) => ({ manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1 }));
-  // Motion nothing here owns (a Console G1, `$J=` or `$H`) first gets the stop
-  // that keeps position; a cancelled jog needs no reset (ADR-375 C-2). A page
-  // that is closing cannot wait for a hold to settle, so it resets at once.
-  if (reason !== 'app-closing' && (await stopUnownedControllerMotion(context)) === 'stopped') {
+  const connection = context.refs.connection;
+  const connectionAttempt = context.get().connectionAttempt;
+  const session = context.get().controllerSessionEpoch;
+  const ownsAttempt = (): boolean => context.get().connectionAttempt === connectionAttempt;
+  const ownsConnection = (): boolean => context.refs.connection === connection && ownsAttempt();
+  const ownsSession = (): boolean =>
+    ownsConnection() && context.get().controllerSessionEpoch === session;
+  context = bindStopConnection(context, ownsConnection, ownsAttempt);
+  try {
+    const { set, refs, driver } = context;
+    cancelPendingManualMotions(refs);
+    set((state) => ({ manualMotionCancelEpoch: state.manualMotionCancelEpoch + 1 }));
+    // Motion nothing here owns (a Console G1, `$J=` or `$H`) first gets the stop
+    // that keeps position; a cancelled jog needs no reset (ADR-375 C-2). A page
+    // that is closing cannot wait for a hold to settle, so it resets at once.
+    if (reason !== 'app-closing') {
+      const motionStop = await stopUnownedControllerMotion(context);
+      if (!ownsSession() || motionStop === 'superseded') return;
+      if (motionStop !== 'reset') {
+        finishUnownedJogStop(context, motionStop);
+        return;
+      }
+    }
+    const softReset = driver().realtime.softReset;
+    // Queued stop lines need a single writer, so a controller without a realtime
+    // reset takes the hosted refill back first (ADR-334).
+    if (softReset === null) await releaseHostedRefill(refs);
+    if (!ownsSession()) return;
+    // Read before the cancel below clears it: a hold or restart still settling
+    // means the last status report may not show the machine moving.
+    const pauseResumeSettling = hasPauseResumeTransition(refs);
+    cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
+    const outcome =
+      softReset === null
+        ? await stopWithoutReset(context)
+        : await stopWithReset(context, softReset, reason, pauseResumeSettling);
+    if (!ownsConnection()) return;
+    set((state) => ({
+      // Abort ends the run, so its machine kind and any tool-change bits it never
+      // reached are no longer the operator's pending work.
+      ...finishedJobStateReset(),
+      wcoCache: null,
+      accessoryCache: null,
+      // Only a line that switched air off clears the Manual Air latch (CG-10).
+      ...(outcome.airOffSent ? { airAssistOn: false } : {}),
+      // ADR-228 amendment: Abort during a frame must kill the proof directly —
+      // an aborted trace was not completed, whatever the side effects imply.
+      ...frameProofReset(),
+      ...(softReset === null ? {} : originUnknownAfterControllerReset(state)),
+      ...quickStopOutcomePatch(state, outcome.quickStop),
+      streamer:
+        state.streamer === null
+          ? state.streamer
+          : softReset !== null
+            ? wipeInFlight(cancelStreamer(state.streamer))
+            : cancelStreamer(state.streamer),
+      ...liveCanvasLifecyclePatch(state, 'stopped'),
+    }));
+  } catch (error) {
+    // Another connect/disconnect owns any current UI. A cable loss without a
+    // new attempt still belongs to this Abort and must report its failure.
+    if (ownsAttempt()) throw error;
+  }
+}
+
+/** Keep every delayed stop write, including banner cleanup, on its original
+ * transport. The stop's own reset changes the session epoch, so that epoch
+ * fences only preparation above, not its expected post-reset cleanup. */
+function bindStopConnection(
+  context: JobStopContext,
+  ownsConnection: () => boolean,
+  ownsAttempt: () => boolean,
+): JobStopContext {
+  const driver = context.driver();
+  return {
+    ...context,
+    driver: () => driver,
+    set: (partial) => {
+      if (ownsAttempt()) context.set(partial);
+    },
+    safeWrite: async (line, action) => {
+      if (!ownsConnection()) throw new Error('Abort belongs to a replaced controller connection.');
+      await context.safeWrite(line, action);
+    },
+  };
+}
+
+function finishUnownedJogStop(context: JobStopContext, result: 'stopped' | 'unconfirmed'): void {
+  if (result === 'stopped') {
+    context.set({ airAssistOn: false, accessoryCache: null });
     return;
   }
-  const softReset = driver().realtime.softReset;
-  // Queued stop lines need a single writer, so a controller without a realtime
-  // reset takes the hosted refill back first (ADR-334).
-  if (softReset === null) await releaseHostedRefill(refs);
-  // Read before the cancel below clears it: a hold or restart still settling
-  // means the last status report may not show the machine moving.
-  const pauseResumeSettling = hasPauseResumeTransition(refs);
-  cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
-  const outcome =
-    softReset === null
-      ? await stopWithoutReset(context)
-      : await stopWithReset(context, softReset, reason, pauseResumeSettling);
-  set((state) => ({
-    // Abort ends the run, so its machine kind and any tool-change bits it never
-    // reached are no longer the operator's pending work.
-    ...finishedJobStateReset(),
-    wcoCache: null,
-    accessoryCache: null,
-    // Only a line that switched air off clears the Manual Air latch (CG-10).
-    ...(outcome.airOffSent ? { airAssistOn: false } : {}),
-    // ADR-228 amendment: Abort during a frame must kill the proof directly —
-    // an aborted trace was not completed, whatever the side effects imply.
-    ...frameProofReset(),
-    ...(softReset === null ? {} : originUnknownAfterControllerReset(state)),
-    ...quickStopOutcomePatch(state, outcome.quickStop),
-    streamer:
-      state.streamer === null
-        ? state.streamer
-        : softReset !== null
-          ? wipeInFlight(cancelStreamer(state.streamer))
-          : cancelStreamer(state.streamer),
-    ...liveCanvasLifecyclePatch(state, 'stopped'),
+  context.set((state) => ({
+    safetyNotice: state.safetyNotice ?? {
+      kind: 'disconnect-stop-unconfirmed',
+      message:
+        'Abort requested jog cancellation, but could not confirm Idle and send all ' +
+        'spindle/laser and air-off commands. Accessories may still be on. Use the physical ' +
+        'E-stop or power cutoff if unsafe, and check the machine before continuing.',
+    },
   }));
 }
 

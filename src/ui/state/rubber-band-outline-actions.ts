@@ -25,23 +25,32 @@ export type RubberBandOutlineActions = {
   readonly addRubberBandOutline: () => boolean;
 };
 
-type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+// The edition-aware setter returns false while a new Pro copy waits for admission.
+type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => unknown;
 
 export function rubberBandOutlineActions(set: Setter): RubberBandOutlineActions {
   return {
     addRubberBandOutline: () => {
       let added = false;
-      set((state) => {
-        const next = rubberBandOutlineMutation(state);
+      let success: string | undefined;
+      const committed = set((state) => {
+        const next = rubberBandOutlineMutation(state, (message) => {
+          success = message;
+        });
         added = next !== state;
         return next;
       });
+      if (committed === false) return false;
+      if (added && success !== undefined) useToastStore.getState().pushToast(success, 'success');
       return added;
     },
   };
 }
 
-function rubberBandOutlineMutation(state: AppState): AppState | Partial<AppState> {
+function rubberBandOutlineMutation(
+  state: AppState,
+  reportSuccess: (message: string) => void,
+): AppState | Partial<AppState> {
   const ids = new Set(selectedObjectIds(state));
   const scene0 = state.project.scene;
   const selected = scene0.objects.filter((object) => ids.has(object.id));
@@ -56,12 +65,9 @@ function rubberBandOutlineMutation(state: AppState): AppState | Partial<AppState
   const bound = bindOutline(scene0, outline, selected);
   const scene = addObject(bound.scene, bound.object);
   const { minX, minY, maxX, maxY } = outline.bounds;
-  useToastStore
-    .getState()
-    .pushToast(
-      `Added a rubber-band outline around ${selected.length === 1 ? '1 object' : `${selected.length} objects`} (${formatDisplayMillimetres(maxX - minX)} × ${formatDisplayMillimetres(maxY - minY)} mm).`,
-      'success',
-    );
+  reportSuccess(
+    `Added a rubber-band outline around ${selected.length === 1 ? '1 object' : `${selected.length} objects`} (${formatDisplayMillimetres(maxX - minX)} × ${formatDisplayMillimetres(maxY - minY)} mm).`,
+  );
   return {
     project: { ...state.project, scene },
     selectedObjectId: bound.object.id,

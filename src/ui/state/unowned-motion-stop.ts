@@ -30,19 +30,24 @@
 // hold (Smoothieware) keeps the immediate reset.
 
 import type { ControllerDriver } from '../../core/controllers';
+import type { StatusReport } from '../../core/controllers/grbl';
 import { softResetMayLosePosition } from './job-stop-request';
+import { resetCleanupLines } from './laser-reset-cleanup';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import { unownedControllerMotion } from './unowned-controller-motion';
 
-/** 'stopped': the motion ended with no reset. 'reset': send the reset now. */
-export type UnownedMotionStop = 'stopped' | 'reset';
+/** Only 'reset' permits a reset. 'unconfirmed' retains the jog cancel without
+ * claiming accessories are off; 'superseded' belongs to an ended session. */
+export type UnownedMotionStop = 'stopped' | 'reset' | 'unconfirmed' | 'superseded';
 
 export type UnownedMotionStopContext = {
   readonly get: () => LaserState;
   readonly safeWrite: (line: string, action?: LaserSafetyAction) => Promise<void>;
   readonly driver: () => ControllerDriver;
 };
+
+type OwnedStopContext = UnownedMotionStopContext & { readonly isCurrent: () => boolean };
 
 // A feed hold decelerates at the configured acceleration, well under a second
 // on a typical machine; the bound only keeps a silent controller from holding
@@ -54,10 +59,57 @@ export async function stopUnownedControllerMotion(
   context: UnownedMotionStopContext,
 ): Promise<UnownedMotionStop> {
   const motion = unownedControllerMotion(context.get());
-  if (motion === 'Jog') return (await cancelUnownedJog(context)) ? 'stopped' : 'reset';
-  if (motion === 'Run') await holdUntilSettled(context);
-  if (motion === 'Hold' || motion === 'Door') await waitForReportedHold(context);
-  return 'reset';
+  if (motion === null) return 'reset';
+  const owned = ownStopSession(context);
+  let outcome: UnownedMotionStop = 'reset';
+  if (motion === 'Jog' && (await cancelUnownedJog(owned))) {
+    outcome = await cleanUpCancelledJog(owned);
+  }
+  if (motion === 'Run') await holdUntilSettled(owned);
+  if (motion === 'Hold' || motion === 'Door') await waitForReportedHold(owned);
+  return owned.isCurrent() ? outcome : 'superseded';
+}
+
+function ownStopSession(context: UnownedMotionStopContext): OwnedStopContext {
+  const session = context.get().controllerSessionEpoch;
+  const driver = context.driver();
+  const isCurrent = (): boolean =>
+    context.get().connection.kind === 'connected' &&
+    context.get().controllerSessionEpoch === session;
+  return {
+    ...context,
+    driver: () => driver,
+    isCurrent,
+    safeWrite: async (line, action) => {
+      if (!isCurrent()) throw new Error('Abort belongs to an ended controller session.');
+      await context.safeWrite(line, action);
+    },
+  };
+}
+
+async function cleanUpCancelledJog(context: OwnedStopContext): Promise<UnownedMotionStop> {
+  const statusQuery = context.driver().realtime.statusQuery;
+  if (statusQuery === null) return 'unconfirmed';
+  // GRBL rejects queued G-code during Jog. Cancel stops motion but deliberately
+  // leaves spindle/coolant alone, so Abort owes M5/M9 only after fresh Idle.
+  // protocol.c:91-93,346-377 in pinned GRBL bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e.
+  const idle = await waitForSettledReport(
+    context,
+    statusQuery,
+    context.get().statusSequence,
+    (report) => report?.state === 'Idle',
+  );
+  if (!idle) return 'unconfirmed';
+  try {
+    // Use stop cleanup, not Frame's tool-off lines: some Frame contracts
+    // intentionally keep the air pump running, while Abort must turn it off.
+    for (const line of resetCleanupLines(context.driver())) {
+      await context.safeWrite(`${line}\n`, 'stop');
+    }
+    return 'stopped';
+  } catch {
+    return 'unconfirmed';
+  }
 }
 
 /** Whether a jog-ending byte reached the transport. */
@@ -79,7 +131,7 @@ async function cancelUnownedJog(context: UnownedMotionStopContext): Promise<bool
   }
 }
 
-async function holdUntilSettled(context: UnownedMotionStopContext): Promise<void> {
+async function holdUntilSettled(context: OwnedStopContext): Promise<void> {
   const { hold, statusQuery } = context.driver().realtime;
   // Without both a settled hold can be neither requested nor seen.
   if (hold === null || statusQuery === null) return;
@@ -91,7 +143,7 @@ async function holdUntilSettled(context: UnownedMotionStopContext): Promise<void
   await waitForSettledReport(context, statusQuery, context.get().statusSequence);
 }
 
-async function waitForReportedHold(context: UnownedMotionStopContext): Promise<void> {
+async function waitForReportedHold(context: OwnedStopContext): Promise<void> {
   const state = context.get();
   const report = state.statusReport;
   const statusQuery = context.driver().realtime.statusQuery;
@@ -104,20 +156,22 @@ async function waitForReportedHold(context: UnownedMotionStopContext): Promise<v
 /** Poll until a report newer than `afterSequence` shows the reset would keep
  *  position, the session ends, or the bound passes. */
 async function waitForSettledReport(
-  context: UnownedMotionStopContext,
+  context: OwnedStopContext,
   statusQuery: string,
   afterSequence: number,
-): Promise<void> {
-  const session = context.get().controllerSessionEpoch;
+  accept: (report: StatusReport | null) => boolean = (report) =>
+    !softResetMayLosePosition(report, null, false),
+): Promise<boolean> {
   const deadline = Date.now() + UNOWNED_HOLD_SETTLE_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const state = context.get();
-    if (state.connection.kind !== 'connected' || state.controllerSessionEpoch !== session) return;
+    if (!context.isCurrent()) return false;
     const fresh = state.statusSequence > afterSequence;
-    if (fresh && !softResetMayLosePosition(state.statusReport, null, false)) return;
+    if (fresh && accept(state.statusReport)) return true;
     await context.safeWrite(statusQuery).catch(() => undefined);
     await sleep(SETTLE_POLL_MS);
   }
+  return false;
 }
 
 function sleep(ms: number): Promise<void> {

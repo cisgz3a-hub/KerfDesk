@@ -2048,7 +2048,11 @@ minimum target size.
    `$H`), Abort first takes the stop that keeps position: a jog gets jog cancel (`0x85`; feed hold
    `!` where the driver has none) and no reset; a run gets feed hold `!`, then `\x18` once a fresh
    report shows `Hold:0` (at most 2 s later); Hold and Door get `\x18` once the hold has settled;
-   Home gets `\x18` at once (ADR-375).
+   Home gets `\x18` at once (ADR-375). After cancelling a Console jog, Abort waits up to 2 s
+   for a fresh Idle report from that controller, then sends its accessory-off commands (GRBL:
+   `M5`, `M9`). Without confirmed Idle or successful writes, it reports that accessories may
+   still be on; it does not reset the jog or claim they are off. Reconnecting retires an old
+   Abort and its cleanup so they cannot write to or clear state for the replacement connection.
 3. The UI marks the streamer cancelled. This software action does not prove that the command arrived or that physical energy stopped.
 4. A reset sent into motion leaves a GRBL controller in `Alarm` (ALARM:3); the user clears it with
    `$X` (F-B9). A reset after a completed hold or a cancelled jog raises no alarm.

@@ -4,9 +4,9 @@
   "highlights": [
     "Read what has improved before downloading a desktop update.",
     "Clear and retype power, size and machine-setting numbers more easily.",
-    "Enter a recovery restart line without accidentally choosing a shorter number.",
-    "More reliable trial expiry and clearer licence and update messages.",
-    "Read installer licence text with the correct punctuation.",
-    "Updated security protections used when importing SVG artwork."
+    "Choose a recovery restart line with clearer number entry and automatic selection.",
+    "Improved Abort cleanup after Console jogs and controller reconnections.",
+    "More reliable trial expiry, Pro tool checks, and licence and update messages.",
+    "Updated SVG import security protections and corrected installer licence punctuation."
   ]
 }

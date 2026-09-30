@@ -63,13 +63,16 @@ type VectorPathMutation = {
 
 type VectorPathSet = (fn: (state: VectorPathState) => VectorPathMutation | VectorPathState) => void;
 
-export function vectorPathActions(set: VectorPathSet): VectorPathActions {
+export function vectorPathActions(
+  set: VectorPathSet,
+  copySet: VectorPathSet = set,
+): VectorPathActions {
   return {
     ...vectorRepairActions(set),
     convertSelectionToPath: () => set((state) => convertSelectionToPathMutation(state)),
     weldSelection: () => set((state) => weldSelectionMutation(state)),
     booleanSelection: (op) => set((state) => booleanSelectionMutation(state, op)),
-    offsetSelection: (deltaMm) => set((state) => offsetSelectionMutation(state, deltaMm)),
+    offsetSelection: (deltaMm) => copySet((state) => offsetSelectionMutation(state, deltaMm)),
     dogboneSelection: (bitDiameterMm) =>
       set((state) => dogboneSelectionMutation(state, bitDiameterMm)),
   };

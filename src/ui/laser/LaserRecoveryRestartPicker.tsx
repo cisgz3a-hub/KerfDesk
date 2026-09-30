@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { AutomaticRestart } from '../../core/recovery/automatic-restart-line';
 import type { ExecutionArtifactV1, RecoveryCapsule } from '../state/recovery';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
@@ -18,8 +18,13 @@ type RestartPickerProps = {
 };
 
 export function LaserRecoveryRestartPicker(props: RestartPickerProps): JSX.Element {
+  const input = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<{ text: string; line: RecoveryRestartLine } | null>(null);
   const chooseLine = (line: number | undefined): void => {
+    // Native unfinished numbers have value "" while their editing buffer still
+    // shows "-" or "1e". React skips an unchanged empty value, so an explicit
+    // selection must also replace that buffer before enabling the chosen line.
+    if (input.current !== null) input.current.value = line === undefined ? '' : String(line);
     setDraft(null);
     props.onChange(line);
   };
@@ -29,6 +34,7 @@ export function LaserRecoveryRestartPicker(props: RestartPickerProps): JSX.Eleme
     () => (given !== undefined ? given : automaticRecoveryRestart(props.capsule)),
     [given, props.capsule],
   );
+  const value = draft !== null && draft.line === props.fromLine ? draft.text : props.fromLine;
   return (
     <section aria-labelledby="laser-recovery-restart-title" style={{ marginTop: 14 }}>
       <h3 id="laser-recovery-restart-title" style={{ fontSize: 13, margin: '0 0 5px' }}>
@@ -55,15 +61,14 @@ export function LaserRecoveryRestartPicker(props: RestartPickerProps): JSX.Eleme
           Restart from G-code line
         </label>
         <input
+          ref={input}
           id="laser-recovery-start-line"
           type="number"
           title="Original G-code line number, starting at 1. Recovery replays this line and the rest of the job."
           min={1}
           max={artifact.fingerprint.lines}
           step={1}
-          value={
-            draft !== null && draft.line === props.fromLine ? draft.text : (props.fromLine ?? '')
-          }
+          value={value ?? ''}
           aria-invalid={props.fromLine === null}
           aria-describedby={props.fromLine === null ? 'laser-recovery-line-error' : undefined}
           placeholder={automatic === null ? 'Automatic' : `Automatic: ${automatic.line}`}

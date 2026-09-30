@@ -796,6 +796,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   );
   const restartCanvas = review.getByRole('img', { name: /^Laser recovery canvas:/ });
   await expect(restartCanvas).toBeVisible();
+  await verifyRecoveryNativeInputReset(review);
   await selectRecoveryMovement(restartCanvas);
   const selectedLine = await review
     .getByTestId('selected-recovery-movement')
@@ -804,6 +805,11 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review.getByRole('spinbutton', { name: 'Restart from G-code line' })).toHaveValue(
     selectedLine,
   );
+  expect(
+    await review
+      .getByRole('spinbutton', { name: 'Restart from G-code line' })
+      .evaluate((input: HTMLInputElement) => input.validity.badInput),
+  ).toBe(false);
   const beforeZoom = await restartCanvas.getAttribute('viewBox');
   if (beforeZoom === null) throw new Error('Expected the saved route viewport.');
   await review.getByRole('button', { name: 'Zoom in recovery canvas' }).click();
@@ -849,6 +855,34 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await review.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('47');
 });
+
+/** Number inputs hide unfinished native drafts behind value "". A deliberate
+ * automatic or canvas selection must also replace that visible editing buffer. */
+async function verifyRecoveryNativeInputReset(review: Locator): Promise<void> {
+  const input = review.getByRole('spinbutton', { name: 'Restart from G-code line' });
+  const start = review.getByRole('button', { name: 'Start supervised recovery', exact: true });
+  const automatic = review.getByRole('button', { name: 'Use automatic line', exact: true });
+  for (const draft of ['-', 'e', '1e']) {
+    await input.pressSequentially(draft);
+    await expect(start).toBeDisabled();
+    expect(await input.evaluate((field: HTMLInputElement) => field.validity.badInput)).toBe(true);
+    await automatic.click();
+    await expect(input).toHaveValue('');
+    expect(await input.evaluate((field: HTMLInputElement) => field.validity.badInput)).toBe(false);
+    await expect(input).toHaveAttribute('aria-invalid', 'false');
+    await expect(start).toBeEnabled();
+    await expect(automatic).toBeDisabled();
+  }
+  await input.pressSequentially('2');
+  await expect(input).toHaveValue('2');
+  await expect(start).toBeEnabled();
+  await automatic.click();
+  await expect(input).toHaveValue('');
+  await expect(automatic).toBeDisabled();
+  // Leave the same native badInput for the following real canvas selection.
+  await input.pressSequentially('-');
+  await expect(start).toBeDisabled();
+}
 
 test('prepares a large image restart preview and starts only the selected remainder', async ({
   page,

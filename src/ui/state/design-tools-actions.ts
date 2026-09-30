@@ -36,7 +36,7 @@ export function designToolsActions(set: Setter, copySet: Setter = set): DesignTo
   return {
     ...shapeQueryActions(set),
     ...pathCleanupActions(set),
-    ...rubberBandOutlineActions(set),
+    ...rubberBandOutlineActions(copySet),
     ...imageMaskFlattenActions(set),
     ...copyAlongPathActions(copySet),
     ...trimShapesActions(set),
