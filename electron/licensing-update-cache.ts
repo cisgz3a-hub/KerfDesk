@@ -1,6 +1,8 @@
 import { clockRolledBack } from './licensing-clock.js';
 import type { LicensingConfig } from './licensing-config.js';
 import type { LicenceRecord } from './licensing-store.js';
+import { verifyManualDownload } from '../public/desktop-manual-download.mjs';
+import { manualReleaseKeySet } from './manual-update-manifest.js';
 import {
   licenceCoversRelease,
   verifyEntitlement,
@@ -40,6 +42,42 @@ export class LicensingUpdateCache {
   }
 
   eligible(envelope: unknown, expectedVersion: string): boolean {
+    if (this.config.channel !== 'commercial') return false;
+    return this.eligibleRelease(
+      verifyLicenceRelease(envelope, this.config.releaseKeys, 'update-manifest'),
+      expectedVersion,
+    );
+  }
+
+  async manualEligible(envelope: string, expectedVersion: string): Promise<boolean> {
+    if (
+      this.config.channel !== 'commercial' ||
+      this.config.manualUpdates !== true ||
+      this.config.sandbox === true
+    )
+      return false;
+    try {
+      const release = await verifyManualDownload(
+        envelope,
+        manualReleaseKeySet(this.config.releaseKeys),
+        this.now() * 1000,
+      );
+      return this.eligibleRelease(
+        {
+          version: release.version,
+          publishedAt: Math.floor(Date.parse(release.publishedAt) / 1000),
+        },
+        expectedVersion,
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private eligibleRelease(
+    release: ReturnType<typeof verifyLicenceRelease>,
+    expectedVersion: string,
+  ): boolean {
     if (
       this.config.channel !== 'commercial' ||
       this.mutations !== 0 ||
@@ -48,7 +86,6 @@ export class LicensingUpdateCache {
     )
       return false;
     const { saved, device } = this.value;
-    const release = verifyLicenceRelease(envelope, this.config.releaseKeys, 'update-manifest');
     if (release === null || release.version !== expectedVersion) return false;
     if (saved.pendingDeactivation !== undefined) return false;
     // A device with no licence runs the Free edition, which every release

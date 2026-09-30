@@ -82,11 +82,11 @@ function VcarveTool({ onOpen }: { readonly onOpen: () => void }): JSX.Element {
   );
 }
 
-it('leaves every tool open in builds without licensing', async () => {
+it('can explicitly use an unrestricted development context', async () => {
   const open = vi.fn();
   await act(async () =>
     root.render(
-      <EditionProvider>
+      <EditionProvider unlicensedRunsFree={false}>
         <VcarveTool onOpen={open} />
       </EditionProvider>,
     ),
@@ -167,6 +167,34 @@ it('keeps the workspace mounted while the licence is managed or deactivated', as
   expect(unmount).not.toHaveBeenCalled();
   await act(async () => button('Close').click());
   expect(host.textContent).toBe('workspace');
+});
+it('ignores an older status response after the operator deactivates this device', async () => {
+  const api = client(trial);
+  let reportStatus: ((status: LicenceStatus) => void) | undefined;
+  vi.mocked(api.status)
+    .mockResolvedValueOnce(trial)
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          reportStatus = resolve;
+        }),
+    );
+  const open = vi.fn();
+  await act(async () =>
+    root.render(
+      <EditionProvider client={api}>
+        <VcarveTool onOpen={open} />
+      </EditionProvider>,
+    ),
+  );
+  await act(async () => window.dispatchEvent(new Event(LICENCE_SETTINGS_EVENT)));
+  await act(async () => button('Deactivate this device').click());
+  expect(proFeaturesUnlocked()).toBe(false);
+  await act(async () => reportStatus?.(trial));
+  expect(proFeaturesUnlocked()).toBe(false);
+  await act(async () => button('Close').click());
+  await act(async () => button('Open V-carve').click());
+  expect(open).not.toHaveBeenCalled();
 });
 it('shows a saved licence key so a buyer can activate other devices', async () => {
   const api = client({ ...trial, tier: 'paid', licenseKey: 'KD1.license-1.secret' });

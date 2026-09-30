@@ -20,7 +20,11 @@ export function withLicensingRoutes(
     if (!trustedAppRequest(request, url, 'X-KerfDesk-Licensing')) return missing();
     const action = url.pathname.slice(PREFIX.length);
     if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
-    if (action === 'update-status' || action === 'check-updates')
+    if (
+      ['update-status', 'check-updates', 'download-update', 'install-update-on-quit'].includes(
+        action,
+      )
+    )
       return updateRoute(action, request, updates);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
     if (!jsonPost(request)) return missing();
@@ -73,7 +77,11 @@ async function updateRoute(
   const body = await readBody(request);
   if (!record(body) || Object.keys(body).length !== 0)
     return response({ error: 'invalid_request' }, 400);
-  return response(updates.check());
+  if (action === 'check-updates') return response(updates.check());
+  if (action === 'download-update')
+    return updates.download === undefined ? missing() : response(updates.download());
+  if (updates.installOnQuit === undefined) return missing();
+  return response(await updates.installOnQuit());
 }
 
 async function dispatch(

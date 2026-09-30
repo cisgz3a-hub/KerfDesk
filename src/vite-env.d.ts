@@ -12,6 +12,7 @@ declare module '*.svg?raw' {
 declare const __BUILD_TIME__: string;
 declare const __GIT_SHA__: string;
 declare const __APP_VERSION__: string;
+declare const __KERFDESK_BROWSER_FREE__: boolean;
 
 // File System Access API — not yet in lib.dom.d.ts (as of TypeScript 5.9).
 // PROJECT.md "Delivery targets" requires Chromium, where these are stable.

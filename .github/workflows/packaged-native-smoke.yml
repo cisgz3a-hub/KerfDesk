@@ -33,7 +33,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build renderer and Electron main
-        run: pnpm build:web && pnpm build:electron-main
+        run: pnpm build:renderer:desktop && pnpm build:electron-main
 
       - name: Package disposable unpacked Preview
         env:

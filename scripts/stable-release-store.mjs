@@ -1,6 +1,21 @@
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const MAX_OBJECT_BYTES = 300_000_000;
 
+// Retry the whole publication, not a delayed mutable-pointer write. The caller
+// must re-read its expected latest state before attempting any further writes.
+export class ReleaseRateLimitError extends Error {
+  constructor(header, now = Date.now()) {
+    super('Release storage is rate limited: HTTP 429.');
+    const seconds = /^\d+$/u.test(header ?? '')
+      ? Number(header)
+      : (Date.parse(header) - now) / 1000;
+    this.retryAfterMs = Math.max(
+      60_000,
+      Math.ceil((Number.isFinite(seconds) ? seconds : 300) * 1000),
+    );
+  }
+}
+
 // Documented Cloudflare object API, also used by Wrangler. Only HTTP 404
 // represents absence, after bucket access itself has succeeded. Redirects and
 // authentication/network/rate-limit/provider failures never become absence.
@@ -14,13 +29,20 @@ export async function createStableReleaseStore({ accountId, apiToken, fetchReque
     throw new Error('Stable R2 account and API token are required.');
   }
   const bucketUrl = `${API_BASE}/accounts/${accountId}/r2/buckets/kerfdesk-downloads`;
-  const request = (url, init) =>
-    fetchRequest(url, {
+  const request = async (url, init) => {
+    const response = await fetchRequest(url, {
       ...init,
       redirect: 'error',
       signal: AbortSignal.timeout(60_000),
       headers: { Authorization: `Bearer ${apiToken}`, ...init.headers },
     });
+    if (response.status === 429) {
+      const retry = new ReleaseRateLimitError(response.headers.get('retry-after'));
+      await response.body?.cancel();
+      throw retry;
+    }
+    return response;
+  };
   const bucket = await request(bucketUrl, { method: 'GET' });
   if (bucket.status !== 200)
     throw new Error(`Stable R2 bucket access failed: HTTP ${bucket.status}.`);

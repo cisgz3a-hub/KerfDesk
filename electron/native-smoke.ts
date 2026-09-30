@@ -3,14 +3,26 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { createNativeSmokeTerminalClaim } from './native-smoke-terminal-claim.js';
 import { RENDERER_SMOKE_SOURCE } from './native-smoke-renderer.js';
+import {
+  readNativeLicenceQualification,
+  readNativeQualificationKey,
+  type NativeLicenceQualification,
+} from './native-smoke-licence-config.js';
+import { nativeLicenceRendererSource } from './native-smoke-licence-renderer.js';
+import { nativeSmokeNetworkEvidence } from './native-smoke-network.js';
+import { installInteractiveNativeObservation } from './native-smoke-interactive.js';
+export { prepareNativeSmokeNetwork as prepareNetwork } from './native-smoke-network.js';
 
 const USER_DATA_ARG = '--kerfdesk-native-smoke-user-data=';
 const RESULT_ARG = '--kerfdesk-native-smoke-result=';
+const INTERACTIVE_ARG = '--kerfdesk-native-smoke-interactive';
 const SMOKE_TIMEOUT_MS = 45_000;
 
 export type NativeSmokeConfig = {
   readonly userDataPath: string;
   readonly resultPath: string;
+  readonly licenceQualification?: NativeLicenceQualification;
+  readonly interactive?: true;
 };
 
 type NativeSmokeInspection = {
@@ -63,14 +75,30 @@ export function readNativeSmokeWebPreferences(contents: object) {
 export function readNativeSmokeConfig(argv: ReadonlyArray<string>): NativeSmokeConfig | null {
   const userDataPath = argumentValue(argv, USER_DATA_ARG);
   const resultPath = argumentValue(argv, RESULT_ARG);
-  if (userDataPath === null && resultPath === null) return null;
+  const licenceQualification = readNativeLicenceQualification(argv);
+  const interactive = argv.includes(INTERACTIVE_ARG);
+  if (
+    !interactive &&
+    [userDataPath, resultPath, licenceQualification].every(
+      (value) => value === null || value === undefined,
+    )
+  )
+    return null;
   if (userDataPath === null || resultPath === null) {
     throw new Error('native smoke requires both user-data and result paths');
   }
   if (!isAbsolute(userDataPath) || !isAbsolute(resultPath)) {
     throw new Error('native smoke paths must be absolute');
   }
-  return { userDataPath: resolve(userDataPath), resultPath: resolve(resultPath) };
+  if (interactive && licenceQualification !== undefined) {
+    throw new Error('interactive observation cannot run automated licence qualification');
+  }
+  return {
+    userDataPath: resolve(userDataPath),
+    resultPath: resolve(resultPath),
+    ...(licenceQualification === undefined ? {} : { licenceQualification }),
+    ...(interactive ? { interactive: true as const } : {}),
+  };
 }
 
 export function installPackagedNativeSmoke(input: {
@@ -79,6 +107,13 @@ export function installPackagedNativeSmoke(input: {
   readonly config: NativeSmokeConfig | null;
 }): void {
   if (input.config === null) return;
+  if (input.config.interactive === true) {
+    installInteractiveNativeObservation(
+      { ...input, config: input.config },
+      readNativeSmokeWebPreferences,
+    );
+    return;
+  }
   const failures: string[] = [];
   const claimTerminal = createNativeSmokeTerminalClaim();
   const timeout = setTimeout(() => {
@@ -93,7 +128,7 @@ export function installPackagedNativeSmoke(input: {
     if (level === 'error') failures.push(`console ${sourceId}:${lineNumber}: ${message}`);
   });
   input.window.once('ready-to-show', () => {
-    void runRendererSmoke(input.window)
+    void runRendererSmoke(input.window, input.config?.licenceQualification)
       .then((renderer) => {
         if (!claimTerminal()) return;
         clearTimeout(timeout);
@@ -114,8 +149,18 @@ export function installPackagedNativeSmoke(input: {
   });
 }
 
-async function runRendererSmoke(window: BrowserWindow): Promise<unknown> {
-  return window.webContents.executeJavaScript(RENDERER_SMOKE_SOURCE, true);
+async function runRendererSmoke(
+  window: BrowserWindow,
+  qualification: NativeLicenceQualification | undefined,
+): Promise<unknown> {
+  const source =
+    qualification === undefined
+      ? RENDERER_SMOKE_SOURCE
+      : nativeLicenceRendererSource(
+          qualification.phase,
+          await readNativeQualificationKey(qualification),
+        );
+  return window.webContents.executeJavaScript(source, true);
 }
 
 async function finishNativeSmoke(
@@ -158,15 +203,26 @@ async function finishNativeSmoke(
     devToolsProbe: { method: 'openDevTools', opened: devToolsOpened },
     supportLog: { recordedLaunch: supportLogRecordedLaunch },
     renderer,
+    networkIsolation: nativeSmokeNetworkEvidence(),
     ...(error === undefined ? {} : { error }),
   };
   await mkdir(dirname(config.resultPath), { recursive: true });
-  await writeFile(config.resultPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+  // Qualification never persists the private input even if a future UI error
+  // accidentally includes it. Ordinary smoke output keeps its existing shape.
+  const safe = serializeNativeSmokeResult(result, config);
+  await writeFile(config.resultPath, `${safe}\n`, 'utf8');
   process.stdout.write(`NATIVE_SMOKE_OK=${result.ok}\n`);
   process.stdout.write(`IS_PACKAGED=${result.isPackaged}\n`);
   process.stdout.write(`USER_DATA=${result.userData}\n`);
   if (result.ok) input.app.quit();
   else input.app.exit(1);
+}
+
+function serializeNativeSmokeResult(result: unknown, config: NativeSmokeConfig): string {
+  const serialized = JSON.stringify(result, null, 2);
+  return config.licenceQualification === undefined
+    ? serialized
+    : serialized.replace(/KD1\.[A-Za-z0-9_-]{1,100}\.[A-Za-z0-9_-]{43}/g, '[REDACTED]');
 }
 
 /** The packaged app records its own launch in the support log (ADR-546). */

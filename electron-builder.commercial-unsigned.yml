@@ -1,0 +1,21 @@
+# Customer Windows release with production licensing and manual downloads.
+# Generate an external config with prepare-commercial-desktop --unsigned-installer.
+# Licence/release Ed25519 signatures remain mandatory; only Authenticode is absent.
+extends: ./electron-builder.commercial.yml
+forceCodeSigning: false
+afterPack: scripts/verify-unsigned-commercial-package.mjs
+directories:
+  output: release/commercial-unsigned/${version}
+extraMetadata:
+  kerfdeskUnsignedInstaller: true
+  kerfdeskUpdateChannelTrusted: false
+  kerfdeskDesktopReleaseChannel: commercial-unsigned
+  kerfdeskCommercialLicense:
+    schema: 0
+win:
+  # Keep Windows icon/version resources and ASAR integrity; skip only signing.
+  signExecutable: false
+  verifyUpdateCodeSignature: true
+nsis:
+  differentialPackage: false
+publish: null

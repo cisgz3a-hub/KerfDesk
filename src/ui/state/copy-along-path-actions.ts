@@ -27,17 +27,23 @@ export type CopyAlongPathActions = {
   readonly copyAlongPath: (request: CopyAlongPathRequest) => boolean;
 };
 
-type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+// The edition-aware setter returns false when copies await Pro.
+type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => unknown;
 
 export function copyAlongPathActions(set: Setter): CopyAlongPathActions {
   return {
     copyAlongPath: (request) => {
       let placed = false;
-      set((state) => {
-        const next = copyAlongPathMutation(state, request);
+      let success: string | undefined;
+      const committed = set((state) => {
+        const next = copyAlongPathMutation(state, request, undefined, (message) => {
+          success = message;
+        });
         placed = next !== state;
         return next;
       });
+      if (committed === false) return false;
+      if (placed && success !== undefined) useToastStore.getState().pushToast(success, 'success');
       return placed;
     },
   };
@@ -55,6 +61,8 @@ export function copyAlongPathMutation(
   state: AppState,
   request: CopyAlongPathRequest,
   idFactory: () => string = () => crypto.randomUUID(),
+  reportSuccess: (message: string) => void = (message) =>
+    useToastStore.getState().pushToast(message, 'success'),
 ): AppState | Partial<AppState> {
   const plan = planCopyAlongPath(selectedSceneObjects(state), request, state.project.scene);
   if (plan.kind === 'problem') {
@@ -77,7 +85,7 @@ export function copyAlongPathMutation(
     return state;
   }
   if (replaced !== null) reportDependencyRepairs(replaced);
-  useToastStore.getState().pushToast(placedMessage(plan.placements.length, request), 'success');
+  reportSuccess(placedMessage(plan.placements.length, request));
   return {
     project: { ...state.project, scene },
     selectedObjectId: copies.selectedIds[0] ?? null,

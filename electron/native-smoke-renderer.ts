@@ -11,10 +11,42 @@ export const RENDERER_NODE_PRIMITIVES_SOURCE = String.raw`({
     Buffer: typeof globalThis.Buffer,
 })`;
 
+// Only reads the app's local protocol. Never copies licence keys, order IDs,
+// messages or account data into smoke evidence, and never initiates a check.
+export const RENDERER_LICENSING_SOURCE = String.raw`(async () => {
+  if (location.protocol !== 'app:' || location.host !== 'app')
+    return { kind: 'not-app-runtime' };
+  const read = async (action) => {
+    const response = await fetch('app://app/api/licensing/' + action, {
+      method: 'GET',
+      headers: { 'X-KerfDesk-Licensing': '1' },
+      cache: 'no-store',
+      redirect: 'error',
+    });
+    if (!response.ok) throw new Error('Local licensing ' + action + ' returned HTTP ' + response.status);
+    return response.json();
+  };
+  const status = await read('status');
+  const updates = await read('update-status');
+  if (!status || !updates || !['free', 'commercial'].includes(status.channel) ||
+      !['free', 'pro'].includes(status.edition) || typeof status.state !== 'string' ||
+      typeof updates.state !== 'string') throw new Error('Invalid local licensing observation');
+  return {
+    kind: 'observed',
+    channel: status.channel,
+    state: status.state,
+    edition: status.edition,
+    proEnabled: status.edition === 'pro',
+    updateState: updates.state,
+  };
+})()`;
+
 export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
   // Read the actual main-world globals before installing the picker stubs.
-  // This deliberately performs no Node access, network request or device I/O.
+  // This deliberately performs no Node access or device I/O. The licensing
+  // observation below uses only the app's local protocol, never a provider.
   const nodePrimitives = ${RENDERER_NODE_PRIMITIVES_SOURCE};
+  const licensing = await ${RENDERER_LICENSING_SOURCE};
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const labelled = (selector, label) =>
     [...document.querySelectorAll(selector)].find(
@@ -86,6 +118,7 @@ export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
     savedSchemaVersion,
     savedBytes: saved.length,
     nodePrimitives,
+    licensing,
     fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' },
     title: document.title,
     url: location.href,

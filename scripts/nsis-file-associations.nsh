@@ -3,8 +3,10 @@
 ; customInstall runs after registerFileAssociations. Keep the existing per-user
 ; or per-machine SHELL_CONTEXT, class registration and uninstall ownership.
 !macro customInstall
+  !ifndef KERFDESK_SANDBOX
   WriteRegStr SHELL_CONTEXT "Software\Classes\KerfDesk.Project\shell\open\command" "" '"$appExe" "%1"'
   !insertmacro UPDATEFILEASSOC
+  !endif
 !macroend
 
 ; KerfDesk installs for the current user (ADR-545). The assisted installer

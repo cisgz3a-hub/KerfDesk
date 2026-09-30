@@ -28,6 +28,7 @@ const REQUIRED_ENTRIES = [
   'dist/web/index.html',
   'public/desktop-release-manifest.mjs',
   'public/desktop-release-keys.json',
+  'public/desktop-sandbox-contract.mjs',
 ];
 
 export function readFuseWire(executable) {

@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // ADR-483: app.asar ships only the node_modules the main process loads. The
@@ -9,7 +9,11 @@ import { describe, expect, it } from 'vitest';
 // allowlist equal to what main actually needs.
 
 const ROOT = process.cwd();
-const BUILDER_CONFIGS = ['electron-builder.yml', 'electron-builder.preview.yml'];
+const BUILDER_CONFIGS = [
+  'electron-builder.yml',
+  'electron-builder.preview.yml',
+  'electron-builder.sandbox.yml',
+];
 const MAIN_PROCESS_PACKAGES = ['electron-updater'];
 
 function shippedNodeModules(config: string): string[] {
@@ -49,7 +53,38 @@ function mainProcessImports(): Set<string> {
   return specifiers;
 }
 
+function requiredPublicModules(): Set<string> {
+  const publicRoot = join(ROOT, 'public');
+  const seen = new Set<string>();
+  const queue = readdirSync(join(ROOT, 'electron'))
+    .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+    .map((name) => join(ROOT, 'electron', name));
+  for (let index = 0; index < queue.length; index += 1) {
+    const file = queue[index]!;
+    for (const match of readFileSync(file, 'utf8').matchAll(/(?:from|import)\s*\(?\s*'([^']+)'/g)) {
+      const specifier = match[1]!;
+      if (!specifier.startsWith('.')) continue;
+      const target = resolve(dirname(file), specifier);
+      const inPublic = relative(publicRoot, target);
+      if (inPublic.startsWith('..') || !inPublic.endsWith('.mjs') || seen.has(target)) continue;
+      seen.add(target);
+      queue.push(target);
+    }
+  }
+  return new Set([...seen].map((path) => relative(ROOT, path).replaceAll('\\', '/')));
+}
+
 describe('packaged main-process dependencies (ADR-483)', () => {
+  it('includes every shared public module reachable from main in all standalone profiles', () => {
+    const required = requiredPublicModules();
+    expect(required.has('public/desktop-manual-download.mjs')).toBe(true);
+    expect(required.has('public/desktop-commercial-catalog.mjs')).toBe(true);
+    for (const config of BUILDER_CONFIGS) {
+      const yaml = readFileSync(join(ROOT, config), 'utf8');
+      for (const path of required)
+        expect(yaml, `${config} missing ${path}`).toContain(`  - ${path}`);
+    }
+  });
   it('loads only Electron, Node built-ins and the updater', () => {
     const packages = [...mainProcessImports()].filter(
       (specifier) => specifier !== 'electron' && !specifier.startsWith('node:'),

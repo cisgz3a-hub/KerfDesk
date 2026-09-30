@@ -1,36 +1,45 @@
-// The status bar's Update ready button (ADR-547). A licensed desktop app
-// downloads a new version in the background and installs it when KerfDesk
-// closes; this makes that visible without a pop-up. It opens Help > Check for
-// Updates and never restarts or closes anything itself.
+// The desktop status bar announces offered and downloaded versions without a
+// pop-up. It opens Help > Check for Updates and never closes the app itself.
 
+import type { CommercialUpdateStatus } from '../../platform/types';
 import { useCommercialUpdateStore } from '../state/commercial-update-store';
-import { CHECK_UPDATES_EVENT } from './update-status-text';
+import { CHECK_UPDATES_EVENT, updateStatusText } from './update-status-text';
 
 export function UpdateReadyButton(): JSX.Element {
   const status = useCommercialUpdateStore((state) => state.status);
-  const version = status?.state === 'ready' ? status.version : null;
+  const notice = updateNotice(status);
   return (
     <>
       {/* Mounted while empty so the reader hears the text change (see PwaUpdateButton). */}
       <span role="status" style={visuallyHiddenStyle}>
-        {version === null
-          ? ''
-          : `KerfDesk ${version} is ready and installs when you close KerfDesk.`}
+        {notice?.description ?? ''}
       </span>
-      {version !== null && (
+      {notice !== null && (
         <button
           type="button"
           className="lf-btn lf-btn--ghost"
           style={buttonStyle}
           onClick={() => window.dispatchEvent(new Event(CHECK_UPDATES_EVENT))}
-          title={`KerfDesk ${version} installs when you close KerfDesk. Open Check for Updates`}
-          aria-label={`Update ready: KerfDesk ${version}. Open Check for Updates`}
+          title={notice.title}
+          aria-label={`${notice.label}: KerfDesk ${notice.version}. Open Check for Updates`}
         >
-          Update ready
+          {notice.label}
         </button>
       )}
     </>
   );
+}
+
+function updateNotice(status: CommercialUpdateStatus | null) {
+  if (status === null || !['ready', 'available'].includes(status.state) || status.version === null)
+    return null;
+  const label = status.state === 'available' ? 'Update available' : 'Update ready';
+  const description = updateStatusText(status, null);
+  const title =
+    status.mode === 'manual' || status.state === 'available'
+      ? `${description} Open Check for Updates`
+      : `KerfDesk ${status.version} installs when you close KerfDesk. Open Check for Updates`;
+  return { label, description, title, version: status.version };
 }
 
 const buttonStyle: React.CSSProperties = {

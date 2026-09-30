@@ -61,6 +61,7 @@ const UPDATE_STATES: ReadonlyArray<CommercialUpdateStatus['state']> = [
   'unavailable',
   'idle',
   'checking',
+  'available',
   'downloading',
   'up-to-date',
   'ready',
@@ -73,16 +74,39 @@ const RELEASE_VERSION = /^\d{1,16}\.\d{1,16}\.\d{1,16}$/;
 export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateStatus {
   if (typeof value !== 'object' || value === null) throw new Error('Invalid update status.');
   const status = value as CommercialUpdateStatus;
-  if (
+  if (!validUpdateFields(status) || !validManualUpdateStatus(status))
+    throw new Error('Invalid update status.');
+  const { state, currentVersion, version, checkedAt } = status;
+  return {
+    state,
+    currentVersion,
+    version,
+    checkedAt,
+    ...(status.mode === undefined ? {} : { mode: status.mode }),
+    ...(status.installOnQuit === undefined ? {} : { installOnQuit: status.installOnQuit }),
+  };
+}
+
+function validUpdateFields(status: CommercialUpdateStatus): boolean {
+  return !(
     !UPDATE_STATES.includes(status.state) ||
     typeof status.currentVersion !== 'string' ||
     status.currentVersion.length > 100 ||
-    !(status.version === null || RELEASE_VERSION.test(String(status.version))) ||
+    !(
+      status.version === null ||
+      (typeof status.version === 'string' && RELEASE_VERSION.test(status.version))
+    ) ||
     !(status.checkedAt === null || Number.isSafeInteger(status.checkedAt))
-  )
-    throw new Error('Invalid update status.');
-  const { state, currentVersion, version, checkedAt } = status;
-  return { state, currentVersion, version, checkedAt };
+  );
+}
+
+function validManualUpdateStatus(status: CommercialUpdateStatus): boolean {
+  if (status.mode === undefined)
+    return status.installOnQuit === undefined && status.state !== 'available';
+  if (status.mode !== 'manual') return false;
+  if (![undefined, false, true].includes(status.installOnQuit)) return false;
+  if (status.installOnQuit === true && status.state !== 'ready') return false;
+  return !['available', 'ready'].includes(status.state) || status.version !== null;
 }
 
 export function createDesktopLicenceAdapter(
@@ -121,5 +145,8 @@ export function createDesktopLicenceAdapter(
     setEarlyUpdates: async (enabled) => parseEarlyUpdates(await send('early-updates', { enabled })),
     updateStatus: async () => parseCommercialUpdateStatus(await send('update-status')),
     checkForUpdates: async () => parseCommercialUpdateStatus(await send('check-updates', {})),
+    downloadUpdate: async () => parseCommercialUpdateStatus(await send('download-update', {})),
+    installUpdateOnQuit: async () =>
+      parseCommercialUpdateStatus(await send('install-update-on-quit', {})),
   };
 }

@@ -300,6 +300,7 @@ class LicensingService {
           {
             saved,
             store: this.options.store,
+            sandbox: this.config.sandbox === true,
             request: this.request,
             openCheckout:
               this.options.openCheckout ??
@@ -332,6 +333,7 @@ class LicensingService {
         const key = await claimLicencePayment({
           saved,
           store: this.options.store,
+          sandbox: this.config.sandbox === true,
           request: this.request,
           openCheckout: this.options.openCheckout ?? (async () => undefined),
         });
@@ -378,7 +380,16 @@ class LicensingService {
     });
   readonly isReleaseEligibleCached = (releaseEnvelope: unknown, expectedVersion: string): boolean =>
     this.updateCache.eligible(releaseEnvelope, expectedVersion);
-  readonly proUnlocked = (): boolean => this.config.channel === 'free' || this.proLatched;
+  readonly isManualReleaseEligible = (envelope: string, version: string): Promise<boolean> =>
+    this.serial(async () => {
+      try {
+        await this.load();
+        return await this.updateCache.manualEligible(envelope, version);
+      } catch {
+        return false;
+      }
+    });
+  readonly proUnlocked = (): boolean => this.config.channel === 'commercial' && this.proLatched;
   private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
     operation === 'renewal' && saved.credential !== undefined
       ? requireActivationBody(this.config, saved.credential, device)

@@ -53,6 +53,7 @@ describe('runAutosaveRecovery warnings', () => {
         }),
         write: async () => ({ kind: 'superseded' }),
         clearRecovered: async () => ({ kind: 'ok' }),
+        retainRecovered: async () => undefined,
       });
     } finally {
       useToastStore.setState({ pushToast: originalPushToast });
@@ -74,6 +75,7 @@ describe('runAutosaveRecovery warnings', () => {
         }),
         write: async () => ({ kind: 'superseded' }),
         clearRecovered: async () => ({ kind: 'ok' }),
+        retainRecovered: async () => undefined,
       });
     } finally {
       useToastStore.setState({ pushToast: originalPushToast });
@@ -185,7 +187,12 @@ describe('runAutosaveRecovery (M15)', () => {
     const confirm = vi.fn(() => true);
     const write = vi.fn(async () => ({ kind: 'superseded' as const }));
     const clearRecovered = vi.fn(async () => ({ kind: 'ok' as const }));
-    const recovery = runAutosaveRecovery(confirm, { readLatest, write, clearRecovered });
+    const recovery = runAutosaveRecovery(confirm, {
+      readLatest,
+      write,
+      clearRecovered,
+      retainRecovered: async () => undefined,
+    });
     await vi.waitFor(() => expect(readLatest).toHaveBeenCalledOnce());
 
     const opened = { ...createProject(), notes: 'explicitly opened empty project' };

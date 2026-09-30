@@ -72,7 +72,7 @@ jobs:
         if: ${{ !inputs.qualify_installer }}
         env:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
-        run: pnpm release:check
+        run: pnpm release:check && pnpm build:bundle:desktop
 
       - name: Compile qualification candidate
         if: inputs.qualify_installer
@@ -80,7 +80,7 @@ jobs:
         env:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          pnpm build:web
+          pnpm build:renderer:desktop
           pnpm build:electron-main
 
       - name: Build unsigned installer
@@ -114,7 +114,7 @@ jobs:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.upgrade_version }}
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
-          pnpm build:web
+          pnpm build:renderer:desktop
           pnpm build:electron-main
           pnpm exec electron-builder --win --x64 \
             --config.extraMetadata.version="${{ steps.version.outputs.upgrade_version }}" \
@@ -143,7 +143,7 @@ jobs:
         if: inputs.qualify_installer
         env:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.upgrade_version }}
-        run: pnpm release:check
+        run: pnpm release:check && pnpm build:bundle:desktop
 
       - name: Upload installed application qualification evidence
         if: always() && inputs.qualify_installer

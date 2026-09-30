@@ -1,6 +1,7 @@
 appId: dev.laserforge.app
 productName: KerfDesk
 copyright: Copyright © 2026 Johann Stolk
+afterPack: scripts/verify-desktop-renderer.mjs
 
 directories:
   output: release/${version}
@@ -15,7 +16,10 @@ files:
   - dist/web/**/*
   - package.json
   - public/desktop-release-manifest.mjs
+  - public/desktop-manual-download.mjs
+  - public/desktop-commercial-catalog.mjs
   - public/desktop-release-keys.json
+  - public/desktop-sandbox-contract.mjs
   # The renderer is bundled into dist/web, so the main process needs only
   # electron-updater at runtime. Ship its dependency closure and no other
   # node_modules (ADR-483): the renderer-only packages were 88.6 MB of the
@@ -24,6 +28,14 @@ files:
   # this list equal to electron-updater's installed dependency tree.
   - '!**/node_modules/**/*'
   - '**/node_modules/{electron-updater,builder-util-runtime,debug,ms,sax,fs-extra,graceful-fs,jsonfile,universalify,js-yaml,argparse,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter}/**/*'
+
+extraResources:
+  - from: LICENSE
+    to: legal/LICENSE
+  - from: THIRD_PARTY_NOTICES.md
+    to: legal/THIRD_PARTY_NOTICES.md
+  - from: public/third-party-notices.txt
+    to: legal/third-party-notices.txt
 
 # Electron fuses, flipped in the packaged binary before signing (ADR-483).
 # KerfDesk never runs its executable as plain Node, reads NODE_OPTIONS, takes

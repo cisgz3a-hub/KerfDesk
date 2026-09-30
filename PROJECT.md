@@ -37,6 +37,8 @@ The 1.0 codebase shipped a working app but had a coupling problem: fixes in one 
 
 Single role: **operator**. Free/web/Preview builds need no activation. The explicitly prepared commercial desktop channel always opens and runs KerfDesk Free; only opening a Pro tool asks for a signed trial, paid or developer licence (ADR-540, amending ADR-523's admission). Pro stays for the running session even if a trial ends, and a licence never gates Frame, Start or output or stops a running job; machine Start policy is unchanged.
 
+ADR-540 Amendment 1 brings forward the browser Free split: browser bundles omit Pro entry implementations. A saved project requiring Pro machining is preserved for desktop before it can replace the browser document. Desktop Free continues to load and output existing Pro work. This is project admission, never an additional Frame or Start guard.
+
 User profile:
 - Owns a GRBL-based diode or CO₂ laser (xTool, Sculpfun, Ortur, Atomstack, NEJE, OpenBuilds, FluidNC retrofits).
 - Comes from LightBurn or LaserGRBL and expects that workflow.

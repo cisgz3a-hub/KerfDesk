@@ -22,6 +22,50 @@ test('accepts only packaged, isolated, ready/imported/saved results', () => {
   assert.equal(validateNativeSmokeResult(result, userData), result);
 });
 
+test('requires local licensing evidence without imposing sandbox policy on Preview', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  for (const licensing of [undefined, { kind: 'not-app-runtime' }, { kind: 'observed' }]) {
+    const result = validResult(userData);
+    result.renderer.licensing = licensing;
+    assert.throws(() => validateNativeSmokeResult(result, userData), /local licensing status/);
+  }
+});
+
+test('accepts an observed available manual update without treating it as downloaded or armed', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const result = validResult(userData);
+  result.renderer.licensing.updateState = 'available';
+  assert.equal(validateNativeSmokeResult(result, userData), result);
+  result.renderer.licensing.updateState = 'installing';
+  assert.throws(() => validateNativeSmokeResult(result, userData), /local licensing status/);
+});
+
+test('fresh-sandbox expectation requires the commercial Free state and unavailable updates', () => {
+  const userData = resolve('tmp', 'native-smoke');
+  const result = validResult(userData);
+  const expected = {
+    kind: 'observed',
+    channel: 'commercial',
+    state: 'activation-required',
+    edition: 'free',
+    proEnabled: false,
+    updateState: 'unavailable',
+  };
+  result.renderer.licensing = expected;
+  const options = { expectFreshSandbox: true };
+  assert.equal(validateNativeSmokeResult(result, userData, options), result);
+  for (const patch of [
+    { channel: 'free' },
+    { state: 'ready' },
+    { state: 'unavailable' },
+    { edition: 'pro', proEnabled: true },
+    { updateState: 'idle' },
+  ]) {
+    result.renderer.licensing = { ...expected, ...patch };
+    assert.throws(() => validateNativeSmokeResult(result, userData, options), /fresh sandbox/);
+  }
+});
+
 test('rejects readiness evidence when the packaged window never became visible', () => {
   const userData = resolve('tmp', 'native-smoke');
   assert.throws(

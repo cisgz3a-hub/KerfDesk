@@ -8,6 +8,7 @@ import {
   type ProjectMachineCapabilityLoadResult,
 } from './project-machine-capability';
 import { currentSavedLibrariesState } from './saved-libraries-actions';
+import { preserveBrowserProProject } from './pending-pro-project';
 import type { AppState } from './store';
 import {
   canonicalizeOpenedProjectBed,
@@ -36,6 +37,8 @@ export function projectActions(
 ): ProjectActions {
   return {
     setProject: (project) => {
+      const preserved = preserveBrowserProProject(project);
+      if (preserved !== null) return { kind: 'desktop-required', features: preserved.features };
       const current = get();
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);

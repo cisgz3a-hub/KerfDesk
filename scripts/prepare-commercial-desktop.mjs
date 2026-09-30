@@ -7,6 +7,8 @@ import {
   CommercialReleaseError,
   validateCommercialPayload,
 } from './commercial-release-manifest.mjs';
+import { hasSandboxMarker } from '../public/desktop-sandbox-contract.mjs';
+import { verifyDesktopRendererAsar } from './verify-desktop-renderer.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const API_ORIGIN = 'https://license.kerfdesk.com';
@@ -125,6 +127,10 @@ function requirePublishableIdentity(payload, now) {
 }
 
 export function prepareCommercialMetadata(input, now = Date.now()) {
+  requireInput(
+    input.unsignedInstaller === undefined || typeof input.unsignedInstaller === 'boolean',
+    'Unsigned installer selection must be explicit.',
+  );
   const payload = identity(input);
   requirePublishableIdentity(payload, now);
   const keys = trustedKeys(input.entitlementKeySet, input.releaseKeySet);
@@ -151,23 +157,47 @@ export function prepareCommercialMetadata(input, now = Date.now()) {
   };
   return {
     version: input.version,
-    kerfdeskUpdateChannelTrusted: true,
-    kerfdeskDesktopReleaseChannel: 'stable',
+    kerfdeskUpdateChannelTrusted: input.unsignedInstaller !== true,
+    kerfdeskDesktopReleaseChannel: input.unsignedInstaller ? 'commercial-unsigned' : 'stable',
+    ...(input.unsignedInstaller ? { kerfdeskUnsignedInstaller: true } : {}),
     kerfdeskCommercialLicense: { schema: 1, apiOrigin: API_ORIGIN, ...keys, release: envelope },
   };
 }
 
 export function verifyCommercialMetadata(metadata, entitlementKeySet, releaseKeySet) {
+  requireInput(
+    !hasSandboxMarker(metadata),
+    'Sandbox packages cannot be published as commercial releases.',
+  );
+  requireInput(
+    metadata?.kerfdeskUpdateChannelTrusted === true &&
+      metadata?.kerfdeskDesktopReleaseChannel === 'stable' &&
+      metadata?.kerfdeskUnsignedInstaller === undefined,
+    'Commercial update-channel trust is invalid.',
+  );
+  return verifyProductionLicenceMetadata(metadata, entitlementKeySet, releaseKeySet);
+}
+
+export function verifyUnsignedCommercialMetadata(metadata, entitlementKeySet, releaseKeySet) {
+  requireInput(
+    metadata?.kerfdeskUpdateChannelTrusted === false &&
+      metadata?.kerfdeskDesktopReleaseChannel === 'commercial-unsigned' &&
+      metadata?.kerfdeskUnsignedInstaller === true,
+    'Unsigned commercial packages must disable automatic updates explicitly.',
+  );
+  return verifyProductionLicenceMetadata(metadata, entitlementKeySet, releaseKeySet);
+}
+
+function verifyProductionLicenceMetadata(metadata, entitlementKeySet, releaseKeySet) {
+  requireInput(
+    !hasSandboxMarker(metadata),
+    'Sandbox packages cannot be published as commercial releases.',
+  );
   const keys = trustedKeys(entitlementKeySet, releaseKeySet);
   const commercial = metadata?.kerfdeskCommercialLicense;
   requireInput(
     record(commercial) && commercial.schema === 1 && commercial.apiOrigin === API_ORIGIN,
     'Commercial licensing metadata is missing or invalid.',
-  );
-  requireInput(
-    metadata.kerfdeskUpdateChannelTrusted === true &&
-      metadata.kerfdeskDesktopReleaseChannel === 'stable',
-    'Commercial update-channel trust is invalid.',
   );
   for (const field of ['entitlementKeys', 'releaseKeys'])
     requireInput(
@@ -283,13 +313,22 @@ export async function writeCommercialPreparation(input, root = ROOT) {
     'Commercial terms must contain nonempty UTF-8 text.',
   );
   const metadata = prepareCommercialMetadata(input);
+  const lane = input.unsignedInstaller ? 'commercial-unsigned' : 'commercial';
   const config = {
-    extends: join(await realpath(root), 'electron-builder.commercial.yml'),
+    extends: join(await realpath(root), `electron-builder.${lane}.yml`),
     extraMetadata: metadata,
     nsis: { license: terms },
   };
   const artifacts = [
-    { path: join(output, CONFIG_NAME), bytes: `${JSON.stringify(config, null, 2)}\n` },
+    {
+      path: join(
+        output,
+        input.unsignedInstaller
+          ? 'electron-builder.commercial-unsigned.generated.json'
+          : CONFIG_NAME,
+      ),
+      bytes: `${JSON.stringify(config, null, 2)}\n`,
+    },
     {
       path: join(output, IDENTITY_NAME),
       bytes: `${JSON.stringify(metadata.kerfdeskCommercialLicense.release, null, 2)}\n`,
@@ -333,6 +372,36 @@ export async function writeCommercialPreparation(input, root = ROOT) {
 // electron-builder afterPack hook: inspect the bytes actually written to ASAR,
 // not only the prebuild input. Code signing still occurs after this hook.
 export default async function verifyCommercialPackage(context) {
+  return verifyPreparedPackage(context, false);
+}
+
+export async function verifyUnsignedCommercialPackage(context) {
+  const config = context.packager.config;
+  requireInput(
+    config.appId === 'dev.laserforge.app' &&
+      config.productName === 'KerfDesk' &&
+      config.forceCodeSigning === false &&
+      config.win?.signExecutable === false &&
+      config.publish === null &&
+      config.nsis?.differentialPackage === false,
+    'Unsigned commercial configuration must retain production identity and disable signing and updates.',
+  );
+  await verifyPreparedPackage(context, true);
+  for (const [source, destination] of [
+    ['LICENSE', 'LICENSE'],
+    ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
+    ['public/third-party-notices.txt', 'third-party-notices.txt'],
+  ]) {
+    const expected = await readFile(join(context.packager.projectDir, source));
+    const actual = await readFile(join(context.appOutDir, 'resources/legal', destination));
+    requireInput(
+      expected.length > 0 && actual.equals(expected),
+      `Commercial legal notice differs: ${source}`,
+    );
+  }
+}
+
+async function verifyPreparedPackage(context, unsignedInstaller) {
   requireInput(
     context.electronPlatformName === 'win32',
     'Commercial packaging currently supports Windows only.',
@@ -342,11 +411,10 @@ export default async function verifyCommercialPackage(context) {
   );
   const root = context.packager.projectDir;
   const catalogs = await publicCatalogs(root);
-  const claims = verifyCommercialMetadata(
-    metadata,
-    catalogs.entitlementKeySet,
-    catalogs.releaseKeySet,
-  );
+  const verifyMetadata = unsignedInstaller
+    ? verifyUnsignedCommercialMetadata
+    : verifyCommercialMetadata;
+  const claims = verifyMetadata(metadata, catalogs.entitlementKeySet, catalogs.releaseKeySet);
   requireInput(
     claims.version === context.packager.appInfo.version,
     'The actual packaged version does not match the signed identity.',
@@ -362,6 +430,7 @@ export default async function verifyCommercialPackage(context) {
       (await boundedFile(realTerms, 262_144)).trim().length > 0,
     'Explicit external commercial terms are required.',
   );
+  verifyDesktopRendererAsar(join(context.appOutDir, 'resources', 'app.asar'));
 }
 
 export async function runPreparation(args, env = process.env, root = ROOT) {
@@ -375,16 +444,26 @@ export async function runPreparation(args, env = process.env, root = ROOT) {
     '--key-id': 'keyId',
   };
   const input = {};
-  for (let index = 0; index < args.length; index += 2) {
+  for (let index = 0; index < args.length; ) {
+    if (args[index] === '--unsigned-installer') {
+      requireInput(
+        input.unsignedInstaller === undefined,
+        'Duplicate unsigned installer selection.',
+      );
+      input.unsignedInstaller = true;
+      index += 1;
+      continue;
+    }
     const field = names[args[index]];
     requireInput(
       field && args[index + 1] && !Object.hasOwn(input, field),
-      'Usage: prepare-commercial-desktop.mjs --output-dir <external-dir> --terms-file <external-terms.txt> --version <X.Y.Z> --source-sha <sha> --source-ref <refs/tags/vX.Y.Z|refs/heads/main> --published-at <canonical-UTC> --key-id <stable-key-id>',
+      'Usage: prepare-commercial-desktop.mjs [--unsigned-installer] --output-dir <external-dir> --terms-file <external-terms.txt> --version <X.Y.Z> --source-sha <sha> --source-ref <refs/tags/vX.Y.Z|refs/heads/main> --published-at <canonical-UTC> --key-id <stable-key-id>',
     );
     input[field] = args[index + 1];
+    index += 2;
   }
   requireInput(
-    Object.keys(input).length === Object.keys(names).length,
+    Object.values(names).every((field) => Object.hasOwn(input, field)),
     'All commercial preparation arguments are required.',
   );
   const inline = env.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY;

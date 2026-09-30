@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { record } from './licensing-verification.js';
 import type { LicenceRecord, LicensingStore } from './licensing-store.js';
+import { SANDBOX_ORIGIN } from '../public/desktop-sandbox-contract.mjs';
 
 export type LicencePayment = {
   readonly requestId: string;
@@ -27,15 +28,14 @@ export function isTransactionId(value: string): boolean {
   return /^txn_[a-z0-9]{26}$/.test(value);
 }
 
-export function isLicenceCheckoutUrl(value: unknown): value is string {
+export function isLicenceCheckoutUrl(value: unknown, sandbox = false): value is string {
+  const page = sandbox ? `${SANDBOX_ORIGIN}/buy.html?_ptxn=` : CHECKOUT_PAGE;
   return (
-    typeof value === 'string' &&
-    value.startsWith(CHECKOUT_PAGE) &&
-    isTransactionId(value.slice(CHECKOUT_PAGE.length))
+    typeof value === 'string' && value.startsWith(page) && isTransactionId(value.slice(page.length))
   );
 }
 
-export function validLicencePayment(value: unknown): value is LicencePayment {
+export function validLicencePayment(value: unknown, sandbox = false): value is LicencePayment {
   if (
     !record(value) ||
     typeof value.requestId !== 'string' ||
@@ -48,17 +48,20 @@ export function validLicencePayment(value: unknown): value is LicencePayment {
         value.licenseKey.length > 256))
   )
     return false;
-  return value.order === undefined || validOrder(value.order);
+  return value.order === undefined || validOrder(value.order, sandbox);
 }
 
-function validOrder(value: unknown): value is NonNullable<LicencePayment['order']> {
+function validOrder(
+  value: unknown,
+  sandbox = false,
+): value is NonNullable<LicencePayment['order']> {
   return (
     record(value) &&
     typeof value.orderId === 'string' &&
     /^[A-Za-z0-9_-]{1,160}$/.test(value.orderId) &&
     typeof value.claimToken === 'string' &&
     /^[A-Za-z0-9_-]{43}$/.test(value.claimToken) &&
-    isLicenceCheckoutUrl(value.checkoutUrl)
+    isLicenceCheckoutUrl(value.checkoutUrl, sandbox)
   );
 }
 
@@ -79,6 +82,7 @@ type CommerceDependencies = {
   readonly store: LicensingStore;
   readonly request: (path: string, body: unknown) => Promise<unknown>;
   readonly openCheckout: (url: string) => Promise<void>;
+  readonly sandbox?: boolean;
 };
 
 /** Persist intent before the request, then proof before opening a browser. */
@@ -96,9 +100,11 @@ export async function prepareLicenceCheckout(
   if (order === undefined) {
     order = await requestOrder(deps, payment);
     const completed = { ...payment, order };
-    if (!validLicencePayment(completed)) throw new Error('Checkout proof is invalid.');
+    if (!validLicencePayment(completed, deps.sandbox))
+      throw new Error('Checkout proof is invalid.');
     await deps.store.write({ ...deps.saved, payment: completed });
   }
+  if (!validOrder(order, deps.sandbox)) throw new Error('Checkout destination is invalid.');
   if (openBrowser) await deps.openCheckout(order.checkoutUrl);
 }
 
@@ -134,7 +140,8 @@ async function requestOrder(
     record(result) &&
     result.currency === 'USD' &&
     result.amount === (payment.operation === 'purchase' ? 4950 : 2000);
-  if (!priceMatches || !validOrder(result)) throw new Error('Checkout was not confirmed.');
+  if (!priceMatches || !validOrder(result, deps.sandbox))
+    throw new Error('Checkout was not confirmed.');
   return {
     orderId: result.orderId,
     claimToken: result.claimToken,
@@ -151,6 +158,7 @@ export async function claimLicencePayment(deps: CommerceDependencies): Promise<s
   }
   const order = saved.payment?.order;
   if (order === undefined) throw new Error('Payment is still pending.');
+  if (!validOrder(order, deps.sandbox)) throw new Error('Checkout destination is invalid.');
   const result = await deps.request('/v1/orders/claim', {
     orderId: order.orderId,
     claimToken: order.claimToken,

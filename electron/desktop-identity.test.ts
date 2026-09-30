@@ -6,6 +6,7 @@ import {
   DESKTOP_PRODUCT_NAME,
   legacyDesktopDataPath,
   LEGACY_DESKTOP_DATA_DIRECTORY,
+  desktopRuntimeIdentity,
 } from './desktop-identity.js';
 
 describe('desktop identity continuity', () => {
@@ -21,9 +22,20 @@ describe('desktop identity continuity', () => {
     expect(main.indexOf("app.setPath('userData', DESKTOP_DATA_PATH)")).toBeLessThan(ready);
     expect(main.indexOf("app.setPath('sessionData', DESKTOP_DATA_PATH)")).toBeLessThan(ready);
     expect(main).toContain(
-      'const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? LEGACY_DESKTOP_DATA_PATH',
+      'const DESKTOP_DATA_PATH = NATIVE_SMOKE_CONFIG?.userDataPath ?? PROFILE_DATA_PATH',
     );
     expect(main).toContain('title: DESKTOP_PRODUCT_NAME');
+  });
+
+  it('isolates even a damaged sandbox package from the working profile and taskbar', () => {
+    expect(desktopRuntimeIdentity('app-data', { channel: 'invalid', sandbox: true })).toEqual({
+      name: 'KerfDesk Sandbox',
+      appId: 'dev.kerfdesk.sandbox',
+      dataPath: join('app-data', 'kerfdesk-sandbox'),
+    });
+    expect(desktopRuntimeIdentity('app-data', { channel: 'free' }).dataPath).toBe(
+      join('app-data', 'laserforge'),
+    );
   });
 
   it('runs under the same Windows app ID the installer gives its shortcuts', () => {

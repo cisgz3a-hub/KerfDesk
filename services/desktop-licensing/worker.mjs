@@ -1,5 +1,10 @@
 /* global Request, URL */
 import { LicensingAuthority } from './authority.mjs';
+import {
+  browserPurchasePreflight,
+  browserPurchaseResponse,
+  requirePurchaseOrigin,
+} from './browser-purchase.mjs';
 import { createCryptography } from './crypto.mjs';
 import { authorityRequest, failure, json } from './http.mjs';
 import { rateLimitKey, rateLimiterFor } from './rate-limit.mjs';
@@ -81,6 +86,8 @@ async function route(request, env, url) {
     if (url.pathname === ROUTE.config) return publicConfiguration(request, env);
     if (url.pathname === ROUTE.health) return health(request, env);
   }
+  requirePurchaseOrigin(request, url);
+  if (request.method === 'OPTIONS') return browserPurchasePreflight(request, url);
   requireValue(env.LICENSING_ENABLED === 'true', 503, 'service_unavailable');
   requireValue(url.protocol === 'https:', 400, 'https_required');
   const limiter = rateLimiterFor(env, url.pathname);
@@ -105,6 +112,7 @@ export default {
     } catch (error) {
       response = failure(error);
     }
+    response = browserPurchaseResponse(request, url, response);
     try {
       return await logRequest(request, url, response, started);
     } catch {
