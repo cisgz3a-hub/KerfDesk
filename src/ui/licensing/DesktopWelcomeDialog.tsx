@@ -47,6 +47,7 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
           type="button"
           onClick={onClose}
           aria-label="Close and continue with Free"
+          title="Close this window and continue using the Free browser workspace"
         >
           ×
         </button>
@@ -65,7 +66,12 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
             <h3>Keep creating in your browser</h3>
             <span>Drawing, basic tracing, laser &amp; 2D CNC tools.</span>
           </div>
-          <button type="button" className="lf-desktop-welcome__continue" onClick={onClose}>
+          <button
+            type="button"
+            className="lf-desktop-welcome__continue"
+            onClick={onClose}
+            title="Continue using Free browser tools without an account or installation"
+          >
             Continue with Free <span aria-hidden="true">→</span>
           </button>
           <p>No account. No time limit. No installation.</p>
@@ -120,7 +126,12 @@ function DesktopDownloadCard({
           <DownloadIcon /> Download for Windows <span aria-hidden="true">↗</span>
         </a>
       ) : (
-        <button className="lf-desktop-welcome__download" type="button" disabled>
+        <button
+          className="lf-desktop-welcome__download"
+          type="button"
+          disabled
+          title="A desktop download becomes available after its release metadata is verified"
+        >
           <DownloadIcon />
           {download.status === 'loading'
             ? 'Checking download…'
@@ -144,7 +155,11 @@ function DesktopDownloadCard({
         ) : download.status === 'error' ? (
           <>
             We couldn’t check the download.{' '}
-            <button type="button" onClick={retry}>
+            <button
+              type="button"
+              onClick={retry}
+              title="Check again for a verified Windows download"
+            >
               Try again
             </button>
           </>
