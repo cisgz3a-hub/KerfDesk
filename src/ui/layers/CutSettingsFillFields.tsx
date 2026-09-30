@@ -232,7 +232,7 @@ function NumberInput(props: {
     title: `Set cut settings ${props.label ?? props.name}.`,
   };
   return props.onChange === undefined ? (
-    <input {...input} type="number" defaultValue={props.value} />
+    <input {...input} type="number" defaultValue={props.value} title={input.title} />
   ) : (
     <DraftNumberInput {...input} value={props.value} onValueChange={props.onChange} />
   );

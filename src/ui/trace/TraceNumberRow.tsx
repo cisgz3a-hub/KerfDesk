@@ -77,6 +77,7 @@ function NumberRowInput(props: {
         {...inputProps}
         type="number"
         className="lf-input"
+        title={props.title}
         value=""
         placeholder="Auto"
         disabled

@@ -94,9 +94,9 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   // Reconcile when the store changes the canonical value out from under us
   // (e.g. undo / external setLayerParam from a different surface), or when
   // reconcileKey reports the display mapping itself moved (toolbar resize
-  // rescaling a shape field). We only overwrite the local draft when the
-  // parsed draft doesn't already match — otherwise the user's in-flight
-  // typing would be wiped mid-keystroke.
+  // rescaling a shape field). Preserve matching parsed drafts only during an
+  // actual edit. Otherwise a sibling's update can leave an untouched display
+  // stale merely because parsing it clamps to the new value.
   useEffect(() => {
     // A canonical store update or display-mapping change owns the field now.
     // Drop work parsed against the previous state before acknowledging the new
@@ -104,7 +104,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current?.cancel();
     debouncerRef.current?.acknowledge(value);
     setErrorMessage(null);
-    if (parseRef.current(draftRef.current) !== value) {
+    if (!editedRef.current || parseRef.current(draftRef.current) !== value) {
       editedRef.current = false;
       setDraft(formatRef.current(value));
     }
