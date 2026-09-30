@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { UPDATE_NOTES_LIMIT } from '../public/desktop-update-notes.mjs';
-import { CommercialReleaseError } from './commercial-release-manifest.mjs';
+import { CommercialReleaseError } from './commercial-release-error.mjs';
 import { validateReviewedNotes } from './manual-commercial-notes.mjs';
 
 export const REVIEWED_NOTES_PATH = 'docs/releases/desktop-update-notes.json';
