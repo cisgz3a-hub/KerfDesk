@@ -452,7 +452,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...machineActions(set, get),
   ...airAssistDefaultActions(set, get),
   ...fillSelectionActions(set),
-  ...vectorPathActions(set),
+  ...vectorPathActions(set, proOperationMutationSetter(set, get)),
   ...editingToolsActions(set, proOperationMutationSetter(set, get)),
   ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),
