@@ -12,7 +12,7 @@ import {
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
 import { createStreamer } from '../../core/controllers/grbl';
-import type { HostedStreamRefill } from '../../platform/types';
+import type { HostedStreamRefill, SerialPortRef } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { resetStore } from './test-helpers';
 
@@ -78,6 +78,42 @@ async function abort(sim: GrblSimulator): Promise<ReadonlyArray<string>> {
 
 function withoutStatusQueries(written: ReadonlyArray<string>): ReadonlyArray<string> {
   return written.filter((data) => data !== '?');
+}
+
+function deferred<T>() {
+  let resolve = (_value: T): void => undefined;
+  let reject = (_error: Error): void => undefined;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+function holdAbortCompletion(sim: GrblSimulator) {
+  const reset = deferred<undefined>();
+  const release = deferred<undefined>();
+  const originalWrite = sim.port.connection.write;
+  let resetHeld = false;
+  let releaseCalls = 0;
+  vi.spyOn(sim.port.connection, 'write').mockImplementation(async (line) => {
+    if (line === '\x18' && !resetHeld) {
+      resetHeld = true;
+      await reset.promise;
+      return;
+    }
+    await originalWrite(line);
+  });
+  const hostedStreaming: HostedStreamRefill = {
+    isArmed: () => false,
+    arm: async () => undefined,
+    release: async () => {
+      if (++releaseCalls === 1) await release.promise;
+    },
+    onWriteError: () => () => undefined,
+  };
+  Object.assign(sim.port.connection, { hostedStreaming });
+  return { reset, release, resetStarted: () => resetHeld };
 }
 
 describe('Abort for Console motion on GRBL', () => {
@@ -274,6 +310,78 @@ describe('Abort completion after reconnect', () => {
       expect(useLaserStore.getState().workOriginActive).toBe(true);
       expect(useLaserStore.getState().activeJobMachineKind).toBe('cnc');
       expect(useLaserStore.getState().alarmCode).toBeNull();
+    },
+  );
+});
+
+describe('Late rejected Abort ownership', () => {
+  it('retires an old rejection while the replacement connection waits for its picker', async () => {
+    const original = await connectIdle({ motionMs: 5_000 });
+    const pending = holdAbortCompletion(original);
+    const stopping = useLaserStore
+      .getState()
+      .stopJob()
+      .then(
+        () => null,
+        (error: unknown) => error,
+      );
+    await pump(5);
+    expect(pending.resetStarted()).toBe(true);
+    const replacement = createGrblSimulator({ motionMs: 5_000 });
+    const replacementPort = await replacement.adapter.serial.requestPort();
+    const picker = deferred<SerialPortRef | null>();
+    const adapter = {
+      ...replacement.adapter,
+      serial: { ...replacement.adapter.serial, requestPort: () => picker.promise },
+    };
+    const switching = useLaserStore.getState().connect(adapter, { portSelection: 'choose' });
+    await pump(1_100);
+    expect(useLaserStore.getState().connection.kind).toBe('connecting');
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+
+    pending.reset.reject(new Error('old reset transport failed'));
+    pending.release.resolve(undefined);
+    await pump(10);
+    expect(await stopping).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(useLaserStore.getState().lastWriteError).toBeNull();
+    picker.resolve(replacementPort);
+    await pump(1_100);
+    await switching;
+
+    expect(useLaserStore.getState().connection.kind).toBe('connected');
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(replacement.outbound()).not.toContain('\x18');
+    expect(replacement.outbound()).not.toContain('M5\n');
+    expect(replacement.outbound()).not.toContain('M9\n');
+  });
+
+  it.each(['connected', 'closed'] as const)(
+    'still reports same-attempt reset failure when %s',
+    async (port) => {
+      const sim = await connectIdle({ motionMs: 5_000 });
+      const attempt = useLaserStore.getState().connectionAttempt;
+      const pending = holdAbortCompletion(sim);
+      const stopping = useLaserStore
+        .getState()
+        .stopJob()
+        .then(
+          () => null,
+          (error: unknown) => error,
+        );
+      await pump(5);
+      expect(pending.resetStarted()).toBe(true);
+      if (port === 'closed') sim.yankCable();
+      pending.reset.reject(new Error('current reset transport failed'));
+      pending.release.resolve(undefined);
+      await pump(10);
+
+      expect(await stopping).toEqual(new Error('current reset transport failed'));
+      expect(useLaserStore.getState().connectionAttempt).toBe(attempt);
+      expect(useLaserStore.getState().safetyNotice).toMatchObject({
+        kind: 'write-failed',
+        action: 'stop',
+      });
     },
   );
 });
