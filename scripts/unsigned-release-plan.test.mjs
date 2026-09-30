@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { load } from 'js-yaml';
 import {
   commitsSinceRelease,
@@ -16,6 +17,45 @@ import {
 import { ReleaseRateLimitError } from './stable-release-store.mjs';
 
 const sourceSha = 'a'.repeat(40);
+
+test('release planning boots before dependencies are installed', async (t) => {
+  const root = await mkdtemp(join(tmpdir(), 'kerfdesk-release-bootstrap-'));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  for (const directory of ['scripts', 'public']) {
+    await mkdir(join(root, directory));
+    const source = new URL(`../${directory}/`, import.meta.url);
+    for (const name of await readdir(source))
+      if (name.endsWith('.mjs') && !name.endsWith('.test.mjs'))
+        await copyFile(new URL(name, source), join(root, directory, name));
+  }
+  const loader = join(root, 'no-packages.mjs');
+  await writeFile(
+    loader,
+    `export async function resolve(name, context, next) {
+    if (!name.startsWith('node:') && !name.startsWith('.') && !name.startsWith('file:'))
+      throw new Error('Bootstrap requires an installed package: ' + name);
+    return next(name, context);
+  }`,
+  );
+  const entry = pathToFileURL(join(root, 'scripts/unsigned-release-plan.mjs')).href;
+  const result = execFileSync(
+    process.execPath,
+    [
+      '--no-warnings',
+      '--experimental-loader',
+      pathToFileURL(loader).href,
+      '--input-type=module',
+      '--eval',
+      `globalThis.fetch = () => { throw new Error('Unexpected bootstrap network call'); };
+     const planner = await import(${JSON.stringify(entry)});
+     if (planner.RELEASE_PR_THRESHOLD !== 20) throw new Error('Missing release policy');
+     console.log('BOOTSTRAP_OK');`,
+    ],
+    { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 10_000 },
+  );
+  assert.equal(result.trim(), 'BOOTSTRAP_OK');
+});
+
 const run = {
   id: 1,
   head_sha: sourceSha,

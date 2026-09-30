@@ -6,6 +6,7 @@
     "Clear and retype power, size and machine-setting numbers more easily.",
     "Enter a recovery restart line without accidentally choosing a shorter number.",
     "More reliable trial expiry and clearer licence and update messages.",
-    "Read installer licence text with the correct punctuation."
+    "Read installer licence text with the correct punctuation.",
+    "Updated security protections used when importing SVG artwork."
   ]
 }

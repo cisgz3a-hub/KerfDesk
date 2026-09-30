@@ -885,9 +885,9 @@ test('prepares a large image restart preview and starts only the selected remain
     /G[0123]\s/,
   );
   await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
-  expect(Number(await preview.getByLabel('Restart from G-code line').inputValue())).toBeGreaterThan(
-    50,
-  );
+  await expect
+    .poll(async () => Number(await preview.getByLabel('Restart from G-code line').inputValue()))
+    .toBeGreaterThan(50);
   await preview.screenshot({ path: testInfo.outputPath('image-restart-preview.png') });
   await preview.getByRole('button', { name: 'Cancel', exact: true }).click();
   expect(serialWrites(await kerfdesk.events())).not.toContain('resume preamble');

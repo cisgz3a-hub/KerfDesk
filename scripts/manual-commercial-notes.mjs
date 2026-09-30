@@ -5,7 +5,7 @@ import {
   validateUpdateNotes,
   verifyUpdateNotes,
 } from '../public/desktop-update-notes.mjs';
-import { CommercialReleaseError } from './commercial-release-manifest.mjs';
+import { CommercialReleaseError } from './commercial-release-error.mjs';
 
 export function validateReviewedNotes(value) {
   if (
