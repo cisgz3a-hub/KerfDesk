@@ -103,6 +103,16 @@ function websitePart(site) {
       serves installers from ${site.downloadHost}. Your browser may tell the next site that you came
       from here, but not which page.
     </p>
+    <h3>Download statistics</h3>
+    <p>
+      For installer downloads from ${site.downloadHost}, the owner can view aggregate request
+      estimates from Cloudflare, grouped by date, app version, platform and request country. The
+      country is estimated from the request's network address; VPNs and proxies can show another
+      country, so it does not establish where a person lives. These figures include repeat requests
+      and partial downloads; they do not identify people or prove an installation. The owner's local
+      dashboard saves only these aggregate figures, not IP addresses, device identifiers or licence
+      details. This adds no tracking script or cookie to this site or the app.
+    </p>
   </div>`;
 }
 
@@ -268,7 +278,7 @@ export const page = {
     'KerfDesk has no account, analytics or cloud sync, and this site sets no cookies. See what the site and the app send, including for Pro licensing.',
   render: ({ site }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-09-29">September 29, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-09-30">September 30, 2026</time>`,
       title: 'Privacy',
       lead: 'KerfDesk doesn’t track you. This page covers this website and the KerfDesk app: what each one sends over the network, and what stays on your computer.',
     })}
