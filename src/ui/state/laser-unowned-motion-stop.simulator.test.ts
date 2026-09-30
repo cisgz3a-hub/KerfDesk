@@ -11,6 +11,8 @@ import {
   type GrblSimulator,
 } from '../../__fixtures__/controllers';
 import { grblDriver } from '../../core/controllers';
+import { createStreamer } from '../../core/controllers/grbl';
+import type { HostedStreamRefill } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { resetStore } from './test-helpers';
 
@@ -101,8 +103,177 @@ describe('Abort for Console motion on GRBL', () => {
 
     const written = await abort(sim);
 
-    expect(withoutStatusQueries(written)).toEqual(['\x85']);
+    expect(withoutStatusQueries(written)).toEqual(['\x85', 'M5\n', 'M9\n']);
     expect(useLaserStore.getState().alarmCode).toBeNull();
     expect(sim.state().machine).toBe('Idle');
   });
+});
+
+describe('Abort accessory cleanup and controller ownership', () => {
+  it('turns off a Console spindle and coolant after cancelling a jog without losing position', async () => {
+    const sim = await connectIdle({
+      motionMs: 5_000,
+      settings: [
+        [32, '0'],
+        [30, '12000'],
+      ],
+    });
+    for (const line of ['M3 S12000', 'M8']) {
+      const sent = useLaserStore.getState().sendConsoleCommand(line);
+      await pump(50);
+      await sent;
+    }
+    await consoleMotion('$J=G91 X50 F1000', 'Jog');
+    expect(sim.state().spindle).toBe(12_000);
+    expect(sim.outbound()).toContain('M8\n');
+    const position = sim.state().mpos;
+    const session = useLaserStore.getState().controllerSessionEpoch;
+
+    const written = await abort(sim);
+
+    expect(withoutStatusQueries(written)).toEqual(['\x85', 'M5\n', 'M9\n']);
+    expect(written.slice(written.indexOf('\x85'), written.indexOf('M5\n'))).toContain('?');
+    expect(sim.state().spindle).toBe(0);
+    // The simulator models spindle, not coolant: M8/M9 assertions prove the
+    // coolant wire contract, not physical pump state.
+    expect(sim.state().mpos).toEqual(position);
+    expect(sim.state().machine).toBe('Idle');
+    expect(useLaserStore.getState().controllerSessionEpoch).toBe(session);
+    expect(useLaserStore.getState().alarmCode).toBeNull();
+  });
+
+  it('retires a pending hold Abort when another controller replaces its connection', async () => {
+    await connectIdle({ motionMs: 5_000 });
+    await consoleMotion('G1 X300 F100', 'Run');
+    let stopped = false;
+    const stopping = useLaserStore
+      .getState()
+      .stopJob()
+      .then(() => {
+        stopped = true;
+      });
+    await pump(5);
+    expect(stopped).toBe(false);
+
+    const replacement = createGrblSimulator({ motionMs: 5_000 });
+    const switching = useLaserStore.getState().connect(replacement.adapter);
+    await pump(10);
+    await switching;
+    // The replacement controller is already moving when its port opens.
+    await replacement.port.connection.write('G1 X300 F100\n');
+    const before = replacement.outbound().length;
+    expect(replacement.state().machine).toBe('Run');
+    await pump(150);
+    await stopping;
+
+    expect(withoutStatusQueries(replacement.outbound().slice(before))).toEqual([]);
+    expect(replacement.state().machine).toBe('Run');
+    expect(useLaserStore.getState().alarmCode).toBeNull();
+  });
+});
+
+describe('Unconfirmed Console jog Abort', () => {
+  it.each(['silent', 'still jogging'] as const)(
+    'reports accessories unconfirmed when %s',
+    async (response) => {
+      const sim = await connectIdle({
+        motionMs: 30_000,
+        settings: [
+          [32, '0'],
+          [30, '12000'],
+        ],
+      });
+      const spindle = useLaserStore.getState().sendConsoleCommand('M3 S12000');
+      await pump(50);
+      await spindle;
+      await consoleMotion('$J=G91 X50 F1000', 'Jog');
+      useLaserStore.setState({ airAssistOn: true });
+      const originalWrite = sim.port.connection.write;
+      const write = vi.spyOn(sim.port.connection, 'write').mockImplementation(async (data) => {
+        if (response === 'silent' && data === '?') return;
+        if (response === 'still jogging' && data === '\x85') return;
+        await originalWrite(data);
+      });
+
+      const stopping = useLaserStore.getState().stopJob();
+      await pump(2_100);
+      await stopping;
+
+      const written = write.mock.calls.map(([line]) => line);
+      expect(written).toContain('\x85');
+      expect(withoutStatusQueries(written)).toEqual(['\x85']);
+      expect(sim.state().spindle).toBe(12_000);
+      expect(useLaserStore.getState().airAssistOn).toBe(true);
+      expect(useLaserStore.getState().safetyNotice?.message).toContain(
+        'Accessories may still be on',
+      );
+      expect(useLaserStore.getState().alarmCode).toBeNull();
+      write.mockRestore();
+    },
+  );
+});
+
+describe('Abort completion after reconnect', () => {
+  it.each(['replacement', 'reopened'] as const)(
+    'preserves the %s connection and its new stream',
+    async (kind) => {
+      const original = await connectIdle({ motionMs: 5_000 });
+      let finishRelease = (): void => undefined;
+      const heldRelease = new Promise<void>((resolve) => {
+        finishRelease = resolve;
+      });
+      let holdRelease = true;
+      const hostedStreaming: HostedStreamRefill = {
+        isArmed: () => false,
+        arm: async () => undefined,
+        release: async () => {
+          if (holdRelease) await heldRelease;
+        },
+        onWriteError: () => () => undefined,
+      };
+      Object.assign(original.port.connection, { hostedStreaming });
+      const oldAttempt = useLaserStore.getState().connectionAttempt ?? 0;
+      let stopped = false;
+      const stopping = useLaserStore
+        .getState()
+        .stopJob()
+        .then(() => {
+          stopped = true;
+        });
+      await pump(5);
+      expect(original.outbound()).toContain('\x18');
+      expect(stopped).toBe(false);
+
+      holdRelease = false;
+      const replacement = kind === 'reopened' ? original : createGrblSimulator({ motionMs: 5_000 });
+      const switching = useLaserStore.getState().connect(replacement.adapter);
+      await pump(1_100);
+      await switching;
+      await replacement.port.connection.write('G1 X300 F100\n');
+      await pump(10);
+      const streamer = { ...createStreamer('G1 X400 F100\n'), status: 'streaming' as const };
+      const frameVerification = { boundsSignature: '0,0,10,10', wco: null, workOriginActive: true };
+      useLaserStore.setState({
+        streamer,
+        frameVerification,
+        workOriginActive: true,
+        workOriginSource: 'g92',
+        activeJobMachineKind: 'cnc',
+      });
+      const before = replacement.outbound().length;
+      expect(useLaserStore.getState().connectionAttempt).toBeGreaterThan(oldAttempt);
+
+      finishRelease();
+      await pump(150);
+      await stopping;
+
+      expect(withoutStatusQueries(replacement.outbound().slice(before))).toEqual([]);
+      expect(replacement.state().machine).toBe('Run');
+      expect(useLaserStore.getState().streamer).toBe(streamer);
+      expect(useLaserStore.getState().frameVerification).toBe(frameVerification);
+      expect(useLaserStore.getState().workOriginActive).toBe(true);
+      expect(useLaserStore.getState().activeJobMachineKind).toBe('cnc');
+      expect(useLaserStore.getState().alarmCode).toBeNull();
+    },
+  );
 });

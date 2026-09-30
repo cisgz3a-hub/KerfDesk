@@ -24,6 +24,8 @@ type PendingResetCleanup = {
 
 export type ResetCleanupRefs = {
   pendingResetCleanup: PendingResetCleanup | null;
+  /** Also retires cleanup already flushing when its pending timer is gone. */
+  resetCleanupGeneration?: number;
 };
 
 type CleanupWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
@@ -58,8 +60,10 @@ export function flushResetCleanup(refs: ResetCleanupRefs, safeWrite: CleanupWrit
   if (pending === null) return;
   clearTimeout(pending.timer);
   refs.pendingResetCleanup = null;
+  const generation = refs.resetCleanupGeneration;
   void (async () => {
     for (const line of pending.lines) {
+      if (refs.resetCleanupGeneration !== generation) return;
       await safeWrite(`${line}\n`, 'stop');
     }
   })().catch(() => undefined);
@@ -67,6 +71,7 @@ export function flushResetCleanup(refs: ResetCleanupRefs, safeWrite: CleanupWrit
 
 /** Drop armed cleanup without writing (port teardown). */
 export function cancelResetCleanup(refs: ResetCleanupRefs): void {
+  refs.resetCleanupGeneration = (refs.resetCleanupGeneration ?? 0) + 1;
   const pending = refs.pendingResetCleanup;
   if (pending === null) return;
   clearTimeout(pending.timer);
