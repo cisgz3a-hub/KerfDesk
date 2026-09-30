@@ -2,7 +2,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createLayer, createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  IDENTITY_TRANSFORM,
+  type ImportedSvg,
+} from '../../core/scene';
+import { setActiveEdition } from '../licensing/edition';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { OffsetShapesDialogHost, resetOffsetShapesDialogMemory } from './OffsetShapesDialogHost';
@@ -23,6 +30,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   vi.unstubAllGlobals();
+  setActiveEdition(null);
 });
 
 function square(size: number): ImportedSvg {
@@ -94,7 +102,54 @@ async function setDistance(value: string): Promise<void> {
 }
 
 describe('Offset Shapes dialog', () => {
+  it.each([false, true])('keeps a Pro copy pending until admission (Pro=%s)', async (pro) => {
+    load(10);
+    const project = useStore.getState().project;
+    const layer = project.scene.layers[0]!;
+    useStore.setState({
+      project: {
+        ...project,
+        scene: {
+          ...project.scene,
+          layers: [{ ...layer, cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' } }],
+        },
+      },
+    });
+    const requestPro = vi.fn((_feature: string, _allowed?: () => void) => false);
+    setActiveEdition({ status: null, licensed: true, pro, requestPro, openLicence: vi.fn() });
+    const before = useStore.getState().project;
+    const onClose = await render();
+    await act(async () => button('Offset').click());
+    if (pro) {
+      expect(onClose).toHaveBeenCalledOnce();
+      expect(requestPro).not.toHaveBeenCalled();
+    } else {
+      expect(useStore.getState().project).toBe(before);
+      expect(onClose).not.toHaveBeenCalled();
+      expect(requestPro).toHaveBeenCalledWith('vcarve', expect.any(Function));
+      setActiveEdition({
+        status: null,
+        licensed: true,
+        pro: true,
+        requestPro,
+        openLicence: vi.fn(),
+      });
+      await act(async () => requestPro.mock.calls[0]?.[1]?.());
+      expect(onClose).not.toHaveBeenCalled();
+    }
+    expect(useStore.getState().project.scene.objects).toHaveLength(2);
+    expect(useStore.getState().project.scene.layers[1]?.cnc?.cutType).toBe('v-carve');
+  });
+
   it('previews the result size and adds both offsets on submit', async () => {
+    const requestPro = vi.fn();
+    setActiveEdition({
+      status: null,
+      licensed: true,
+      pro: false,
+      requestPro,
+      openLicence: vi.fn(),
+    });
     load(10);
     const onClose = await render();
     await setDistance('2');
@@ -108,6 +163,7 @@ describe('Offset Shapes dialog', () => {
 
     expect(useStore.getState().project.scene.objects).toHaveLength(3);
     expect(onClose).toHaveBeenCalledOnce();
+    expect(requestPro).not.toHaveBeenCalled();
   });
 
   it('explains a collapsed inward offset and keeps Offset unavailable', async () => {

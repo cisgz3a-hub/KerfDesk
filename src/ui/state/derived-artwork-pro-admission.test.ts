@@ -3,11 +3,24 @@ import { createLayer, DEFAULT_CNC_LAYER_SETTINGS, IDENTITY_TRANSFORM } from '../
 import { setActiveEdition } from '../licensing/edition';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
+import { dependentText } from './testing/scene-clipboard-fixtures';
 import { useToastStore } from './toast-store';
+
+const offsetRequest = {
+  distanceMm: 1,
+  direction: 'outward' as const,
+  cornerStyle: 'corner' as const,
+  outerShapesOnly: false,
+  deleteOriginals: false,
+};
 
 const copyActions = [
   { name: 'Offset', run: () => useStore.getState().offsetSelection(1) },
   { name: 'Rubber-Band Outline', run: () => useStore.getState().addRubberBandOutline() },
+  {
+    name: 'Offset Shapes dialog',
+    run: () => useStore.getState().offsetShapesSelection(offsetRequest),
+  },
 ] as const;
 
 function edition(pro = false) {
@@ -89,7 +102,7 @@ describe.each(copyActions)('$name Pro operation admission', ({ name, run }) => {
     expect(useToastStore.getState().toasts.some((toast) => toast.variant === 'success')).toBe(
       false,
     );
-    if (name === 'Rubber-Band Outline') expect(result).toBe(false);
+    if (name !== 'Offset') expect(result).toBe(false);
   });
 
   it('allows the same derived Pro copy after unlocking, only once', () => {
@@ -148,9 +161,50 @@ describe.each(copyActions)('$name Pro operation admission', ({ name, run }) => {
     expect(useStore.getState().project.scene.objects).toHaveLength(2);
     expect(useStore.getState().project.scene.layers[1]?.cnc?.cutType).toBe('v-carve');
     expect(request).not.toHaveBeenCalled();
-    if (name === 'Rubber-Band Outline') expect(result).toBe(true);
+    if (name !== 'Offset') expect(result).toBe(true);
   });
 });
+
+it.each([false, true])(
+  'reports offset dependency changes only after immediate admission (Pro=%s)',
+  (pro) => {
+    const request = edition(pro);
+    const project = load();
+    const text = dependentText('dependent-text', 'source');
+    useStore.setState({
+      project: {
+        ...project,
+        scene: { ...project.scene, objects: [...project.scene.objects, text] },
+      },
+    });
+    const before = useStore.getState().project;
+    const applied = useStore.getState().offsetShapesSelection({
+      ...offsetRequest,
+      direction: 'both',
+      distanceMm: 21,
+      deleteOriginals: true,
+    });
+    expect(applied).toBe(pro);
+    if (pro) {
+      expect(useToastStore.getState().toasts.map((toast) => toast.variant)).toEqual([
+        'info',
+        'warning',
+      ]);
+      expect(
+        useStore.getState().project.scene.objects.find((object) => object.id === text.id),
+      ).not.toHaveProperty('pathText');
+    } else {
+      expect(useStore.getState().project).toBe(before);
+      expect(useToastStore.getState().toasts).toEqual([]);
+      edition(true);
+      request.mock.calls[0]?.[1]?.();
+      expect(
+        useStore.getState().project.scene.objects.find((object) => object.id === text.id),
+      ).not.toHaveProperty('pathText');
+      expect(useStore.getState().undoStack).toEqual([before]);
+    }
+  },
+);
 
 it('keeps existing desktop V-carve operation edits available in Free', () => {
   const request = edition();

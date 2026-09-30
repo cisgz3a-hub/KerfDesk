@@ -40,17 +40,22 @@ type OffsetShapesMutation = {
 
 type OffsetShapesSet = (
   fn: (state: OffsetShapesState) => OffsetShapesMutation | OffsetShapesState,
-) => void;
+) => unknown;
 
 export function offsetShapesActions(set: OffsetShapesSet): OffsetShapesActions {
   return {
     offsetShapesSelection: (request) => {
       let applied = false;
-      set((state) => {
-        const next = offsetShapesMutation(state, request);
+      // The guard evaluates a proposed edit before admitting it. Keep messages
+      // about that edit out of the preview phase, just like the scene itself.
+      const notifications: Array<() => void> = [];
+      const committed = set((state) => {
+        const next = offsetShapesMutation(state, request, (notify) => notifications.push(notify));
         applied = next !== state;
         return next;
       });
+      if (committed === false) return false;
+      if (applied) notifications.forEach((notify) => notify());
       return applied;
     },
   };
@@ -71,6 +76,7 @@ export function offsetShapesTargets(
 function offsetShapesMutation(
   state: OffsetShapesState,
   request: OffsetShapesRequest,
+  afterCommit: (notify: () => void) => void,
 ): OffsetShapesMutation | OffsetShapesState {
   const targets = offsetShapesTargets(state.project.scene, selectedObjectIds(state));
   const scene0 = state.project.scene;
@@ -88,9 +94,14 @@ function offsetShapesMutation(
   const first = created[0];
   if (first === undefined) return state;
   if (request.direction === 'both' && result.value.inward === null) {
-    useToastStore
-      .getState()
-      .pushToast('Only the outward offset was added: the inward one collapsed the shape.', 'info');
+    afterCommit(() =>
+      useToastStore
+        .getState()
+        .pushToast(
+          'Only the outward offset was added: the inward one collapsed the shape.',
+          'info',
+        ),
+    );
   }
   let scene = scene0;
   const createdIds: string[] = [];
@@ -99,7 +110,7 @@ function offsetShapesMutation(
     scene = addObject(prepared.scene, prepared.object);
     createdIds.push(prepared.object.id);
   }
-  if (request.deleteOriginals) scene = removeOriginals(scene, targets);
+  if (request.deleteOriginals) scene = removeOriginals(scene, targets, afterCommit);
   return {
     project: { ...state.project, scene },
     selectedObjectId: createdIds[0] ?? first.id,
@@ -112,7 +123,11 @@ function offsetShapesMutation(
   };
 }
 
-function removeOriginals(scene: Scene, targets: ReadonlyArray<VectorSceneObject>): Scene {
+function removeOriginals(
+  scene: Scene,
+  targets: ReadonlyArray<VectorSceneObject>,
+  afterCommit: (notify: () => void) => void,
+): Scene {
   const ids = new Set(targets.map((object) => object.id));
   const kept: Scene = {
     ...scene,
@@ -122,6 +137,6 @@ function removeOriginals(scene: Scene, targets: ReadonlyArray<VectorSceneObject>
       : { artworkOrder: scene.artworkOrder.filter((id) => !ids.has(id)) }),
   };
   const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(kept, ids));
-  reportDependencyRepairs(repaired);
+  afterCommit(() => reportDependencyRepairs(repaired));
   return pruneOrphanLayers(repaired.scene);
 }
