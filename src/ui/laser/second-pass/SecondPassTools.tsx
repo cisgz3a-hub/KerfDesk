@@ -1,4 +1,5 @@
 import type { LaserSecondPassSelection } from '../../../core/laser-second-pass';
+import { DraftNumberInput } from '../../kit/DraftNumberInput';
 import type { SecondPassTool } from './SecondPassCanvas';
 
 type SecondPassToolsProps = {
@@ -79,34 +80,28 @@ function BrushControls(props: SecondPassToolsProps): JSX.Element {
       </div>
       <label>
         Brush diameter (mm)
-        <input
+        <DraftNumberInput
           className="lf-input"
-          type="number"
           min={0.01}
           step={0.1}
           value={props.diameter}
           title="Diameter of new paint or eraser strokes, measured in the original job's millimetres."
           disabled={props.disabled}
-          onChange={(e) => {
-            const n = e.currentTarget.valueAsNumber;
-            if (Number.isFinite(n) && n > 0) props.onDiameter(n);
-          }}
+          normalize={(value) => (value > 0 ? value : props.diameter)}
+          onValueChange={props.onDiameter}
         />
       </label>
       <label>
         {props.selected ? 'Selected stroke power (% of original)' : 'Paint power (% of original)'}
-        <input
+        <DraftNumberInput
           className="lf-input"
-          type="number"
           min={1}
           step={5}
           value={props.power}
           title="Power for the selected stroke or new paint, as a percentage of saved power. 100% repeats it; machine maximum still applies."
           disabled={props.disabled || props.tool === 'erase'}
-          onChange={(e) => {
-            const n = e.currentTarget.valueAsNumber;
-            if (Number.isFinite(n) && n > 0) props.onPower(n);
-          }}
+          normalize={(value) => (value > 0 ? value : props.power)}
+          onValueChange={props.onPower}
         />
       </label>
     </>

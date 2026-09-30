@@ -9,6 +9,7 @@
 // the operator exits it.
 
 import { isHeadCameraModel } from '../../core/camera/model/head-camera';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { useCameraStore } from '../state/camera-store';
 import { useActiveCameraModel, useOwnCameraModel } from './active-camera-model';
 import { HeadCaptureControls } from './head/HeadCaptureControls';
@@ -123,15 +124,15 @@ function SurfaceHeightControl(props: {
       <label style={heightStyle}>
         Material surface height
         <span style={heightInputStyle}>
-          <input
-            type="number"
+          <DraftNumberInput
             min={0}
             max={500}
             step={0.1}
             value={props.heightMm}
             aria-label="Material surface height above bed"
             title="Height of the material's top surface above the machine bed. The camera picture is corrected to this height."
-            onChange={(event) => props.onChange(Number(event.currentTarget.value))}
+            normalize={(value) => Math.max(0, Math.min(500, value))}
+            onValueChange={props.onChange}
           />{' '}
           mm
         </span>

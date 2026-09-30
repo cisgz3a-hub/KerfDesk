@@ -12,6 +12,7 @@ import {
 } from '../../core/job/operation-cut-extras';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { imageDensityBounds } from '../raster/image-density-bounds';
 import { dotWidthCorrectionMax } from './cut-settings-draft';
 import { ImageScanPatternFields } from './CutSettingsScanPatternFields';
@@ -202,9 +203,8 @@ function MinPowerInput(props: {
   const [value, setValue] = useState(props.initialValue);
   useEffect(() => setValue((current) => Math.min(current, props.maxPower)), [props.maxPower]);
   return (
-    <input
+    <DraftNumberInput
       name="minPower"
-      type="number"
       className="lf-input"
       aria-label="Cut settings minPower"
       title="Set the minimum grayscale power."
@@ -212,7 +212,8 @@ function MinPowerInput(props: {
       min={0}
       max={props.maxPower}
       step="any"
-      onChange={(event) => setValue(numericValue(event.target.value, 0))}
+      normalize={(next) => Math.min(next, props.maxPower)}
+      onValueChange={setValue}
       style={numberStyle}
     />
   );
@@ -234,21 +235,16 @@ function ImageDensityFields(props: {
         title="Hidden synchronized image scan density used when saving cut settings."
       />
       <Field label="Line Interval">
-        <input
+        <DraftNumberInput
           name="lineIntervalMm"
-          type="number"
           min={bounds.intervalMm.min}
           max={bounds.intervalMm.max}
           step="any"
           className="lf-input"
-          value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
-          onChange={(event) =>
-            props.onChange(
-              lineIntervalMmToLinesPerMm(
-                numericValue(event.target.value, linesPerMmToLineIntervalMm(props.linesPerMm)),
-              ),
-            )
-          }
+          value={linesPerMmToLineIntervalMm(props.linesPerMm)}
+          format={(value) => String(displayNumber(value, 4))}
+          normalize={(value) => linesPerMmToLineIntervalMm(lineIntervalMmToLinesPerMm(value))}
+          onValueChange={(value) => props.onChange(lineIntervalMmToLinesPerMm(value))}
           style={numberStyle}
           aria-label="Cut settings line interval"
           title="Distance between raster scan lines. Smaller values pack rows closer and burn more energy per area at the same power and speed."
@@ -256,19 +252,16 @@ function ImageDensityFields(props: {
         <span className="lf-field-unit">mm</span>
       </Field>
       <Field label="DPI">
-        <input
+        <DraftNumberInput
           name="imageDpi"
-          type="number"
           min={bounds.dpi.min}
           max={bounds.dpi.max}
           step="any"
           className="lf-input"
-          value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
-          onChange={(event) =>
-            props.onChange(
-              dpiToLinesPerMm(numericValue(event.target.value, linesPerMmToDpi(props.linesPerMm))),
-            )
-          }
+          value={linesPerMmToDpi(props.linesPerMm)}
+          format={(value) => String(displayNumber(value, 2))}
+          normalize={(value) => linesPerMmToDpi(dpiToLinesPerMm(value))}
+          onValueChange={(value) => props.onChange(dpiToLinesPerMm(value))}
           style={numberStyle}
           aria-label="Cut settings DPI"
           title="Image engraving resolution in dots per inch. Higher values create more scan lines."
@@ -353,11 +346,6 @@ const DITHER_LABELS: Readonly<Record<Layer['ditherAlgorithm'], string>> = {
   ordered: 'Ordered',
   grayscale: 'Grayscale',
 };
-
-function numericValue(s: string, fallback: number): number {
-  const n = Number.parseFloat(s);
-  return Number.isFinite(n) ? n : fallback;
-}
 
 function displayNumber(value: number, decimals: number): number {
   return Number(value.toFixed(decimals));

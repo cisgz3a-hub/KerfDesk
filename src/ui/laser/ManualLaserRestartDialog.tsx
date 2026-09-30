@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { Dialog, DialogActions } from '../kit';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { LaserRecoveryCanvas } from './LaserRecoveryCanvas';
 import { recoveryRouteFromCanvasPlan } from './laser-recovery-preview-route';
 import { noteManualRestartStarted, type ManualRestartSource } from './manual-restart-source';
@@ -116,8 +117,7 @@ function ManualRestartLine(props: {
   return (
     <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
       Restart from G-code line
-      <input
-        type="number"
+      <DraftNumberInput
         title="Prepared G-code line number, starting at 1. Restart replays this line and the rest of the job."
         min={1}
         max={props.maximum}
@@ -125,11 +125,10 @@ function ManualRestartLine(props: {
         value={props.fromLine}
         disabled={props.disabled}
         style={{ width: 110 }}
-        onChange={(event) => {
-          const value = Number(event.target.value);
-          if (Number.isInteger(value) && value >= 1 && value <= props.maximum)
-            props.onChange(value);
-        }}
+        normalize={(value) =>
+          Number.isInteger(value) && value >= 1 && value <= props.maximum ? value : props.fromLine
+        }
+        onValueChange={props.onChange}
       />
     </label>
   );

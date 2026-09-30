@@ -9,7 +9,7 @@ import { sameRecoveryOrigin } from './laser-recovery-origin';
 import type { HeadStopContinue } from './LaserRecoveryHeadStop';
 import type { RecoveryWorkBounds } from './laser-recovery-picker-model';
 import { LaserRecoveryPlacement } from './LaserRecoveryPlacement';
-import { LaserRecoveryRestartPicker } from './LaserRecoveryRestartPicker';
+import { LaserRecoveryRestartPicker, type RecoveryRestartLine } from './LaserRecoveryRestartPicker';
 
 export type LaserRecoveryReviewDialogProps = {
   readonly capsule: RecoveryCapsule;
@@ -47,7 +47,7 @@ export type LaserRecoveryReviewDialogProps = {
 export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps): JSX.Element {
   const [selection, setSelection] = useState<{
     key: string;
-    fromLine: number | undefined;
+    fromLine: RecoveryRestartLine;
   } | null>(null);
   const fingerprint = props.capsule.artifact.fingerprint;
   const selectionKey = `${props.capsule.runId}:${fingerprint.fnv1a}:${fingerprint.chars}:${fingerprint.lines}`;
@@ -64,7 +64,7 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
         capsule={props.capsule}
         liveWorkOffsetMm={props.liveWorkOffsetMm}
         {...(props.liveOriginSet === undefined ? {} : { liveOriginSet: props.liveOriginSet })}
-        restartLine={fromLine ?? automatic?.line}
+        restartLine={resolvedRestartLine(fromLine, automatic?.line)}
         disabled={start.state === 'starting'}
         {...(props.onFrameRemaining === undefined
           ? {}
@@ -91,11 +91,19 @@ export function LaserRecoveryReviewDialog(props: LaserRecoveryReviewDialogProps)
       ) : null}
       <RecoveryActions
         state={start.state}
+        invalidLine={fromLine === null}
         onClose={start.closeReadOnly}
         onStart={() => void start.startRecovery()}
       />
     </Dialog>
   );
+}
+
+function resolvedRestartLine(
+  fromLine: RecoveryRestartLine,
+  automatic: number | undefined,
+): number | undefined {
+  return fromLine === null ? undefined : (fromLine ?? automatic);
 }
 
 /** Continue from where the head stopped (ADR-341 Amendment 6): offered when a
@@ -136,7 +144,7 @@ type RecoveryStartState = 'idle' | 'starting' | 'failed';
 
 function useRecoveryStart(
   props: LaserRecoveryReviewDialogProps,
-  fromLine: number | undefined,
+  fromLine: RecoveryRestartLine,
 ): {
   readonly state: RecoveryStartState;
   readonly failureMessage: string;
@@ -150,7 +158,7 @@ function useRecoveryStart(
     if (!startInFlight.current) props.onClose();
   };
   const startRecovery = async (): Promise<void> => {
-    if (startInFlight.current) return;
+    if (startInFlight.current || fromLine === null) return;
     startInFlight.current = true;
     setFailureMessage('');
     setState('starting');
@@ -253,6 +261,7 @@ function DiagnosticRow(props: {
 
 function RecoveryActions(props: {
   readonly state: RecoveryStartState;
+  readonly invalidLine: boolean;
   readonly onClose: () => void;
   readonly onStart: () => void;
 }): JSX.Element {
@@ -269,7 +278,7 @@ function RecoveryActions(props: {
       </button>
       <button
         type="button"
-        disabled={starting}
+        disabled={starting || props.invalidLine}
         onClick={props.onStart}
         title="Run fresh safety checks, then start this saved laser job under supervised recovery."
       >

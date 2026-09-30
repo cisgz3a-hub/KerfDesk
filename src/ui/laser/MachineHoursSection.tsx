@@ -77,6 +77,10 @@ function ReminderRow(props: {
           step={1}
           defaultValue={reminder.everyHours}
           onBlur={(event) => {
+            if (event.currentTarget.value.trim() === '') {
+              event.currentTarget.value = String(reminder.everyHours);
+              return;
+            }
             const hours = Number(event.currentTarget.value);
             if (hours !== reminder.everyHours) setEveryHours(props.machine, reminder.id, hours);
           }}
@@ -104,8 +108,9 @@ function AddReminderRow(props: { readonly machine: HoursMachine }): JSX.Element 
   const addReminder = useMachineHoursStore((store) => store.addReminder);
   const [label, setLabel] = useState('');
   const [hours, setHours] = useState('50');
+  const incomplete = label.trim() === '' || hours.trim() === '';
   const add = (): void => {
-    if (label.trim() === '') return;
+    if (incomplete) return;
     addReminder(props.machine, label, Number(hours));
     setLabel('');
   };
@@ -133,7 +138,7 @@ function AddReminderRow(props: { readonly machine: HoursMachine }): JSX.Element 
         onChange={(event) => setHours(event.currentTarget.value)}
       />
       <span style={mutedStyle}>h</span>
-      <Button onClick={add} disabled={label.trim() === ''}>
+      <Button onClick={add} disabled={incomplete}>
         Add
       </Button>
     </div>

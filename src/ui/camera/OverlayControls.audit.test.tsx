@@ -131,3 +131,34 @@ it('offers the accuracy map only for a calibration saved with its rings, and tog
   await clickControl(bare, 'Accuracy map on');
   expect(camera.getState().accuracyMapVisible).toBe(false);
 });
+
+it('keeps a cleared material-height draft separate from the stored camera correction', async () => {
+  camera.setState({ surfaceHeightMm: 12.5 });
+  const host = await mountControl(<OverlayControls />);
+  const input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="Material surface height above bed"]',
+  );
+  if (input === null) throw new Error('Material height input missing');
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+  const type = async (value: string): Promise<void> => {
+    await act(async () => {
+      input.focus();
+      setValue?.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  await type('');
+  expect(input.value).toBe('');
+  expect(camera.getState().surfaceHeightMm).toBe(12.5);
+  await type('0.5');
+  expect(camera.getState().surfaceHeightMm).toBe(0.5);
+  await type('');
+  await act(async () => input.blur());
+  expect(input.value).toBe('0.5');
+  expect(camera.getState().surfaceHeightMm).toBe(0.5);
+  await type('501');
+  expect(input.value).toBe('501');
+  expect(camera.getState().surfaceHeightMm).toBe(500);
+  await act(async () => input.blur());
+  expect(input.value).toBe('500');
+});

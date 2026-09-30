@@ -4,6 +4,7 @@
 // Feather by a px amount), and the selection action buttons.
 
 import { useState } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { invertMask, type SelectionCombineMode } from '../../core/image-select';
 import type { SelectionModifyKind } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
@@ -51,12 +52,12 @@ export function SelectionModeButtons(): JSX.Element {
       ))}
       <label style={radiusLabelStyle}>
         Feather
-        <input
-          type="number"
+        <DraftNumberInput
           min={0}
           max={250}
           value={feather}
-          onChange={(e) => setSelectionFeather(Number(e.target.value) || 0)}
+          normalize={(next) => Math.min(250, Math.max(0, next))}
+          onValueChange={setSelectionFeather}
           style={radiusInputStyle}
           title="Soft-edge every new selection by this many pixels"
           aria-label="Selection feather in pixels"
@@ -75,12 +76,12 @@ export function SelectionModifyRow(): JSX.Element | null {
     <span style={groupStyle} aria-label="Modify selection">
       <label style={radiusLabelStyle}>
         px
-        <input
-          type="number"
+        <DraftNumberInput
           min={1}
           max={250}
           value={radius}
-          onChange={(e) => setRadius(Math.max(1, Math.min(250, Number(e.target.value) || 1)))}
+          normalize={(next) => Math.max(1, Math.min(250, next))}
+          onValueChange={setRadius}
           style={radiusInputStyle}
           title="Pixel amount for the Modify operations"
           aria-label="Modify amount in pixels"
