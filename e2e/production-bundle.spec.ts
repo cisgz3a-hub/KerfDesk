@@ -1,6 +1,48 @@
 import { applicationHeader } from './fixtures/workspace-ui';
 import { expect, test } from '@playwright/test';
 
+test('routes mobile browsers without downloading workspace algorithms', async ({
+  browser,
+  baseURL,
+}) => {
+  for (const [width, height, userAgent] of [
+    [390, 844, 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Safari/604.1'],
+    [844, 390, 'Mozilla/5.0 (Linux; Android 15) Chrome/144 Mobile Safari/537.36'],
+    [1024, 1366, 'Mozilla/5.0 (iPad) AppleWebKit/605.1.15 Safari/604.1'],
+  ] as const) {
+    const context = await browser.newContext({
+      ...(baseURL === undefined ? {} : { baseURL }),
+      viewport: { width, height },
+      userAgent,
+      isMobile: true,
+      hasTouch: true,
+    });
+    try {
+      await context.route('https://license.kerfdesk.com/**', (route) =>
+        route.fulfill({ contentType: 'application/json', body: '{"enabled":false}' }),
+      );
+      const page = await context.newPage();
+      const modules: string[] = [];
+      page.on('request', (request) => {
+        const path = new URL(request.url()).pathname;
+        if (path.startsWith('/assets/') && path.endsWith('.js')) modules.push(path);
+      });
+      await page.goto('/');
+      await expect(page).toHaveURL(/\/buy(?:\.html)?$/);
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Pro purchases are not open yet' }),
+      ).toBeVisible();
+      await expect(page.locator('canvas')).toHaveCount(0);
+      expect(modules.some((path) => /\/index-[^/]+\.js$/u.test(path))).toBe(true);
+      expect(
+        modules.every((path) => /^\/assets\/(?:index|preload-helper)-[^/]+\.js$/u.test(path)),
+      ).toBe(true);
+    } finally {
+      await context.close();
+    }
+  }
+});
+
 test('loads the hashed production bundle and edits script through its outline worker', async ({
   page,
 }) => {

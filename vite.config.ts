@@ -200,6 +200,10 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalized = id.replace(/\\/g, '/');
+          // Keep Vite's shared import helper out of application chunks. The
+          // mobile router needs it before deciding whether to load main; placing
+          // it in core would eagerly fetch core and its CAM dependencies.
+          if (normalized === '\0vite/preload-helper.js') return 'preload-helper';
           if (normalized.includes('/node_modules/react')) return 'vendor-react';
           if (normalized.includes('/node_modules/zustand')) return 'vendor-state';
           if (
