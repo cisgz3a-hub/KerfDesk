@@ -11,6 +11,23 @@ export const RENDERER_NODE_PRIMITIVES_SOURCE = String.raw`({
     Buffer: typeof globalThis.Buffer,
 })`;
 
+// ready-to-show can precede React's ordinary workspace-ready handshake. Wait
+// for usable App controls behind that gate; qualification must never open it.
+// This leaves the existing 45s native watchdog and 60s wrapper unchanged.
+export const RENDERER_WORKSPACE_READY_SOURCE = String.raw`(async () => {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    if (document.querySelector('#app-root > [role="alert"]'))
+      throw new Error('Workspace startup failed');
+    const toolbar = document.querySelector('header[aria-label="Toolbar"]');
+    const button = toolbar?.querySelector(
+      'button[aria-label="Import..."]:not(:disabled), button[aria-label="More commands"]:not(:disabled)',
+    );
+    if (button instanceof HTMLButtonElement) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error('Workspace did not open within the native smoke budget');
+})()`;
+
 // Only reads the app's local protocol. Never copies licence keys, order IDs,
 // messages or account data into smoke evidence, and never initiates a check.
 export const RENDERER_LICENSING_SOURCE = String.raw`(async () => {
@@ -42,6 +59,7 @@ export const RENDERER_LICENSING_SOURCE = String.raw`(async () => {
 })()`;
 
 export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
+  await ${RENDERER_WORKSPACE_READY_SOURCE};
   // Read the actual main-world globals before installing the picker stubs.
   // This deliberately performs no Node access or device I/O. The licensing
   // observation below uses only the app's local protocol, never a provider.
