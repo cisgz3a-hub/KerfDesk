@@ -22,10 +22,14 @@ describe('stable desktop release action references', () => {
       match[1]?.trim(),
     );
 
-    expect(references).toHaveLength(7);
-    expect(references.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference ?? ''))).toBe(
+    const external = references.filter((reference) => !reference?.startsWith('./'));
+    const local = references.filter((reference) => reference?.startsWith('./'));
+    expect(external).toHaveLength(7);
+    expect(external.every((reference) => FULL_SHA_ACTION_REFERENCE.test(reference ?? ''))).toBe(
       true,
     );
-    expect([...new Set(references)].sort()).toEqual([...EXPECTED_ACTION_REFERENCES].sort());
+    expect([...new Set(external)].sort()).toEqual([...EXPECTED_ACTION_REFERENCES].sort());
+    // The recursive policy gate checks the composite's pinned external actions.
+    expect(local).toEqual(['./.github/actions/setup-remote-control']);
   });
 });
