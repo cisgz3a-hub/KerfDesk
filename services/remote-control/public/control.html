@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="Read and edit your open KerfDesk workspace from your phone, with approval on your computer."
+    />
+    <title>Phone control · KerfDesk</title>
+    <link rel="stylesheet" href="/control.css" />
+    <script type="module" src="/control.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <a class="brand" href="/control">KerfDesk<span>Phone control</span></a
+        ><span class="badge" id="connection">Not connected</span>
+      </header>
+      <section class="intro">
+        <p class="eyebrow">Your workspace, within reach</p>
+        <h1>A small screen.<br />A connected workspace.</h1>
+        <p>
+          Read and edit the job open on your computer. Pair once, approve it on the PC, then keep
+          your changes together.
+        </p>
+      </section>
+      <p class="notice" id="notice" role="status" aria-live="polite" hidden></p>
+      <section class="card" id="pair-card">
+        <h2>Connect to your computer</h2>
+        <ol class="steps">
+          <li>Open KerfDesk on your PC and enable phone access.</li>
+          <li>Create a pairing code and enter it below.</li>
+          <li>Approve this phone on the PC.</li>
+        </ol>
+        <form id="pair-form">
+          <label
+            >Computer ID<input
+              name="deviceId"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+              required
+              maxlength="36"
+              placeholder="Paste the computer ID"
+          /></label>
+          <div class="two">
+            <label
+              >Pairing code<input
+                name="code"
+                autocomplete="off"
+                autocapitalize="none"
+                spellcheck="false"
+                required
+                minlength="12"
+                maxlength="12"
+                placeholder="12 characters" /></label
+            ><label
+              >Name for this phone<input
+                name="clientLabel"
+                required
+                maxlength="64"
+                value="My phone"
+                autocomplete="off"
+            /></label>
+          </div>
+          <label class="check"
+            ><input name="edit" type="checkbox" /> Request editing permission</label
+          ><button type="submit">Request PC approval</button>
+        </form>
+        <p class="muted" id="pair-status">The code expires after five minutes and works once.</p>
+      </section>
+      <section id="workspace-area" hidden>
+        <section class="card workspace-heading">
+          <div>
+            <p class="eyebrow" id="device-name">Connected computer</p>
+            <h2 id="workspace-name">Workspace</h2>
+            <p class="muted" id="workspace-meta"></p>
+          </div>
+          <button class="secondary" id="refresh" type="button">Refresh</button>
+        </section>
+        <nav class="tabs" aria-label="Workspace views">
+          <button type="button" data-view="artwork" aria-pressed="true">Artwork</button
+          ><button type="button" data-view="edit" aria-pressed="false">Edit</button
+          ><button type="button" data-view="details" aria-pressed="false">Details</button>
+        </nav>
+        <section class="card" data-panel="artwork">
+          <h2>Artwork</h2>
+          <p class="muted">Select items to move or rotate. Changes are made on your PC.</p>
+          <div id="artwork-list" class="item-list"></div>
+          <p class="muted" id="truncated" hidden></p>
+          <button type="button" id="save-selection" data-edit>Use this selection</button>
+        </section>
+        <div data-panel="edit" hidden>
+          <section class="card" id="readonly-note" hidden>
+            <h2>Read access</h2>
+            <p>
+              This PC approved reading only. Pair again and request editing permission to make
+              changes.
+            </p>
+          </section>
+          <div id="edit-forms">
+            <section class="card">
+              <h2>Add text</h2>
+              <form id="text-form">
+                <label
+                  >Text<textarea
+                    name="text"
+                    rows="3"
+                    required
+                    maxlength="4096"
+                    placeholder="Your text"
+                  ></textarea>
+                </label>
+                <div class="two">
+                  <label
+                    >X (mm)<input
+                      name="xMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="0"
+                      required /></label
+                  ><label
+                    >Y (mm)<input
+                      name="yMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="0"
+                      required /></label
+                  ><label
+                    >Width (mm)<input
+                      name="widthMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="50"
+                      required /></label
+                  ><label
+                    >Font size (mm)<input
+                      name="fontSizeMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="10"
+                      required
+                  /></label>
+                </div>
+                <button>Add text</button>
+              </form>
+            </section>
+            <section class="card">
+              <h2>Add a rectangle</h2>
+              <form id="rectangle-form">
+                <div class="two">
+                  <label
+                    >X (mm)<input
+                      name="xMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="0"
+                      required /></label
+                  ><label
+                    >Y (mm)<input
+                      name="yMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="0"
+                      required /></label
+                  ><label
+                    >Width (mm)<input
+                      name="widthMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="40"
+                      required /></label
+                  ><label
+                    >Height (mm)<input
+                      name="heightMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="30"
+                      required
+                  /></label>
+                </div>
+                <button>Add rectangle</button>
+              </form>
+            </section>
+            <section class="card">
+              <h2>Transform selected artwork</h2>
+              <form id="move-form">
+                <div class="two">
+                  <label
+                    >Move X (mm)<input
+                      name="dxMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="0"
+                      required /></label
+                  ><label
+                    >Move Y (mm)<input
+                      name="dyMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="0"
+                      required
+                  /></label>
+                </div>
+                <button>Move selection</button>
+              </form>
+              <form id="rotate-form" class="separated">
+                <label
+                  >Rotation (degrees)<input
+                    name="angleDeg"
+                    inputmode="decimal"
+                    type="text"
+                    value="0"
+                    required /></label
+                ><button>Rotate selection</button>
+              </form>
+            </section>
+            <section class="card">
+              <h2>Laser operation settings</h2>
+              <p class="muted">
+                Choose an existing laser operation. These settings do not start the machine.
+              </p>
+              <form id="operation-form">
+                <label
+                  >Operation<select name="operationId" id="operation-list" required></select
+                ></label>
+                <div class="two">
+                  <label
+                    >Power (%)<input name="powerPercent" inputmode="decimal" type="text" /></label
+                  ><label
+                    >Speed (mm/min)<input
+                      name="speedMmPerMin"
+                      inputmode="decimal"
+                      type="text" /></label
+                  ><label>Passes<input name="passes" inputmode="numeric" type="text" /></label
+                  ><label class="check"
+                    ><input name="enabled" type="checkbox" checked /> Enabled</label
+                  >
+                </div>
+                <button>Apply settings</button>
+              </form>
+            </section>
+          </div>
+        </div>
+        <section class="card" data-panel="details" hidden>
+          <h2>Computer and job</h2>
+          <div id="details-list" class="details-list"></div>
+          <p class="muted">
+            Frame and Start remain on the computer. This page cannot control the machine.
+          </p>
+        </section>
+        <section class="card compact">
+          <p>
+            Keep KerfDesk open on your computer. Disconnect or revoke this connection there whenever
+            you need.
+          </p>
+          <button class="secondary" id="disconnect" type="button">Disconnect this phone</button>
+        </section>
+      </section>
+      <footer>
+        <p>Paired by you. Approved on your PC.</p>
+        <a href="https://kerfdesk.com/privacy/" rel="noreferrer">Privacy</a>
+        <a href="/third-party-notices.txt">Third-party notices</a>
+      </footer>
+    </main>
+  </body>
+</html>
