@@ -49,10 +49,7 @@ async function api(path, body, generation) {
   return data;
 }
 function rejectResponse(response, data) {
-  if (response.status === 401) {
-    session = null;
-    showPairing();
-  }
+  if (response.status === 401) setSession(null);
   if (response.status === 429) throw new Error('Too many requests. Wait a minute, then try again.');
   throw new Error(
     errorMessages[data.error?.code] ??
@@ -61,11 +58,30 @@ function rejectResponse(response, data) {
         : errorMessages.failed),
   );
 }
-function showPairing() {
-  $('#pair-card').hidden = false;
-  $('#workspace-area').hidden = true;
-  $('#connection').textContent = 'Not connected';
+function setSession(value) {
+  if (!value || value.client.id !== session?.client?.id) resetWorkspace();
+  session = value;
+  const canEdit = value ? value.client.scopes.includes('edit') : false;
+  $('#readonly-note').hidden = !value || canEdit;
+  $('#edit-forms').hidden = !canEdit;
+  $('#save-selection').hidden = !canEdit;
+  for (const input of document.querySelectorAll('#artwork-list input')) input.disabled = !canEdit;
+  $('#connection').textContent = value
+    ? value.online
+      ? 'PC connected'
+      : 'PC offline'
+    : 'Not connected';
+  $('#device-name').textContent = value?.deviceLabel ?? 'Connected computer';
+  $('#pair-card').hidden = !!value;
+  $('#workspace-area').hidden = !value;
+  return canEdit;
+}
+function resetWorkspace() {
   workspace = null;
+  const cleared = '#workspace-name,#workspace-meta,#artwork-list,#operation-list,#details-list';
+  for (const target of document.querySelectorAll(cleared)) target.replaceChildren();
+  $('#truncated').hidden = true;
+  loadOperation();
 }
 function view(name) {
   for (const panel of document.querySelectorAll('[data-panel]'))
@@ -83,6 +99,9 @@ function number(form, name) {
   if (!Number.isFinite(parsed)) throw new Error('Use a valid number.');
   return parsed;
 }
+function numbers(form, names) {
+  return Object.fromEntries(names.map((name) => [name, number(form, name)]));
+}
 function admission() {
   if (!workspace || !session?.client?.scopes.includes('edit'))
     throw new Error('Refresh a workspace with editing permission first.');
@@ -96,10 +115,7 @@ function renderWorkspace(value) {
   $('#workspace-name').textContent = value.name || 'Untitled workspace';
   $('#workspace-meta').textContent =
     `${value.mode === 'cnc' ? 'CNC' : 'Laser'} · ${value.totalArtwork} artwork · ${value.totalOperations} operations${value.dirty ? ' · Unsaved changes' : ''}`;
-  const canEdit = session.client.scopes.includes('edit');
-  $('#readonly-note').hidden = canEdit;
-  $('#edit-forms').hidden = !canEdit;
-  $('#save-selection').hidden = !canEdit;
+  const canEdit = setSession(session);
   const list = $('#artwork-list');
   list.replaceChildren();
   for (const item of value.artwork) {
@@ -172,14 +188,10 @@ function detail(title, text) {
 async function refresh(generation) {
   const current = await api('/api/session', undefined, generation);
   if (current.status !== 'approved') {
-    showPairing();
+    setSession(null);
     return false;
   }
-  session = current;
-  $('#connection').textContent = current.online ? 'PC connected' : 'PC offline';
-  $('#device-name').textContent = current.deviceLabel;
-  $('#pair-card').hidden = true;
-  $('#workspace-area').hidden = false;
+  setSession(current);
   if (!current.online) {
     notice(errorMessages.unavailable, true);
     return false;
@@ -216,11 +228,9 @@ async function refresh(generation) {
 async function action(callback) {
   if (busy) return;
   busy = true;
-  const controls = [
-    ...document.querySelectorAll(
-      '#pair-form button, #disconnect, #refresh, #save-selection, #edit-forms button',
-    ),
-  ];
+  const controls = document.querySelectorAll(
+    '#pair-form button, #disconnect, #refresh, #save-selection, #edit-forms button',
+  );
   for (const button of controls) button.disabled = true;
   document.body.setAttribute('aria-busy', 'true');
   try {
@@ -276,7 +286,7 @@ async function pairStatus(deadline, generation) {
   try {
     const value = await api('/api/pair/status', undefined, generation);
     if (value.status === 'approved') {
-      session = value;
+      setSession(value);
       clearTimeout(poll);
       poll = null;
       const refreshed = continueToMcp() || (await refresh(generation));
@@ -298,7 +308,7 @@ async function pairStatus(deadline, generation) {
 bindForm('#pair-form', async (form) => {
   const generation = ++pairGeneration;
   clearTimeout(poll);
-  session = null;
+  setSession(null);
   const deviceId = form.elements.deviceId.value.trim();
   const code = form.elements.code.value.trim();
   const clientLabel = form.elements.clientLabel.value.trim();
@@ -322,18 +332,11 @@ bindForm('#pair-form', async (form) => {
 bindForm('#text-form', (form) =>
   edit('add_text', {
     text: form.elements.text.value,
-    ...Object.fromEntries(
-      ['xMm', 'yMm', 'widthMm', 'fontSizeMm'].map((key) => [key, number(form, key)]),
-    ),
+    ...numbers(form, ['xMm', 'yMm', 'widthMm', 'fontSizeMm']),
   }),
 );
 bindForm('#rectangle-form', (form) =>
-  edit(
-    'add_rectangle',
-    Object.fromEntries(
-      ['xMm', 'yMm', 'widthMm', 'heightMm'].map((key) => [key, number(form, key)]),
-    ),
-  ),
+  edit('add_rectangle', numbers(form, ['xMm', 'yMm', 'widthMm', 'heightMm'])),
 );
 bindForm('#move-form', (form) =>
   edit('transform_artwork', {
@@ -368,8 +371,7 @@ $('#disconnect').addEventListener('click', () => {
     clearTimeout(poll);
     poll = null;
     await api('/api/client/revoke', {});
-    session = null;
-    showPairing();
+    setSession(null);
     notice('This phone is disconnected.');
   });
 });
@@ -384,14 +386,14 @@ void action(async () => {
     const value = await api('/api/session');
     if (value.status === 'approved') {
       admitted = true;
-      session = value;
+      setSession(value);
       if (!continueToMcp()) await refresh();
     } else if (value.status === 'pending') {
       $('#pair-status').textContent = 'Waiting for approval on the PC…';
       await pairStatus(Date.now() + 300_000, pairGeneration);
     }
   } catch (error) {
-    if (!session) showPairing();
+    if (!session) setSession(null);
     if (admitted) notice(error.message, true);
   }
 });

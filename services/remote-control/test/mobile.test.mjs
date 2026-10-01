@@ -9,7 +9,8 @@ const closeSocket = (socket) => {
 };
 function syntheticDesktop(desktop, commands, suppliedOperations) {
   let revision = 1;
-  let detailGate;
+  let workspaceName = workspace.name;
+  const gates = new Map();
   let operations = suppliedOperations ?? [
     {
       id: 'op-1',
@@ -30,6 +31,7 @@ function syntheticDesktop(desktop, commands, suppliedOperations) {
     if (name === 'get_workspace')
       result = {
         ...workspace,
+        name: workspaceName,
         revision: `audit-${revision}`,
         artwork: [
           {
@@ -80,14 +82,33 @@ function syntheticDesktop(desktop, commands, suppliedOperations) {
       result = { revision: `audit-${revision}` };
     }
     const respond = () => desktop.send({ type: 'result', requestId: message.requestId, result });
-    if (name === 'get_app_status' && detailGate) {
-      const gate = detailGate;
-      detailGate = undefined;
+    const gate = gates.get(name);
+    if (gate) {
+      gates.delete(name);
       gate.respond = respond;
       gate.arrived();
     } else respond();
   });
+  function holdNext(name) {
+    const gate = { respond: null, arrived: null };
+    const reached = new Promise((resolve) => {
+      gate.arrived = resolve;
+    });
+    gates.set(name, gate);
+    return {
+      reached,
+      release() {
+        if (gates.get(name) === gate) gates.delete(name);
+        const respond = gate.respond;
+        gate.respond = null;
+        respond?.();
+      },
+    };
+  }
   return {
+    renameWorkspace(name) {
+      workspaceName = name;
+    },
     replaceOperations(next) {
       operations = next;
     },
@@ -95,20 +116,10 @@ function syntheticDesktop(desktop, commands, suppliedOperations) {
       return structuredClone(operations.find((operation) => operation.id === id));
     },
     holdNextAppStatus() {
-      const gate = { respond: null, arrived: null };
-      const reached = new Promise((resolve) => {
-        gate.arrived = resolve;
-      });
-      detailGate = gate;
-      return {
-        reached,
-        release() {
-          if (detailGate === gate) detailGate = undefined;
-          const respond = gate.respond;
-          gate.respond = null;
-          respond?.();
-        },
-      };
+      return holdNext('get_app_status');
+    },
+    holdNextWorkspace() {
+      return holdNext('get_workspace');
     },
   };
 }
@@ -202,6 +213,60 @@ test(
       assert.match(operation.args.requestId, /^[0-9a-f-]{36}$/);
       assert.equal(fixture.getOperation('op-1').powerPercent, 25);
       assert.equal(await power.inputValue(), '25');
+      const text = page.locator('#text-form');
+      await text.locator('[name=text]').fill('Audit text');
+      await text.locator('[name=xMm]').fill('-');
+      await text.locator('button').click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(
+        commands.some((command) => command.name === 'add_text'),
+        false,
+      );
+      assert.equal(await text.locator('[name=xMm]').inputValue(), '-');
+      for (const [name, value] of Object.entries({
+        xMm: '-2.5',
+        yMm: ' 3.25 ',
+        widthMm: '40.5',
+        fontSizeMm: '8',
+      }))
+        await text.locator(`[name=${name}]`).fill(value);
+      await text.locator('button').click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      const addedText = commands.find((command) => command.name === 'add_text');
+      assert.deepEqual(
+        Object.fromEntries(
+          ['text', 'xMm', 'yMm', 'widthMm', 'fontSizeMm'].map((name) => [
+            name,
+            addedText.args[name],
+          ]),
+        ),
+        { text: 'Audit text', xMm: -2.5, yMm: 3.25, widthMm: 40.5, fontSizeMm: 8 },
+      );
+      assert.equal(addedText.args.expectedRevision, 'audit-2');
+      const rectangle = page.locator('#rectangle-form');
+      await rectangle.locator('[name=xMm]').fill('');
+      await rectangle.locator('button').click();
+      assert.equal(
+        commands.some((command) => command.name === 'add_rectangle'),
+        false,
+      );
+      for (const [name, value] of Object.entries({
+        xMm: '10.5',
+        yMm: '-20.25',
+        widthMm: '5.75',
+        heightMm: '6.25',
+      }))
+        await rectangle.locator(`[name=${name}]`).fill(value);
+      await rectangle.locator('button').click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      const addedRectangle = commands.find((command) => command.name === 'add_rectangle');
+      assert.deepEqual(
+        Object.fromEntries(
+          ['xMm', 'yMm', 'widthMm', 'heightMm'].map((name) => [name, addedRectangle.args[name]]),
+        ),
+        { xMm: 10.5, yMm: -20.25, widthMm: 5.75, heightMm: 6.25 },
+      );
+      assert.equal(addedRectangle.args.expectedRevision, 'audit-3');
       assert.equal(await page.locator('canvas').count(), 0);
       const storage = await page.evaluate(() => ({
         local: Object.keys(localStorage),
@@ -308,6 +373,267 @@ for (const pairedOnStartup of [true, false])
       }
     },
   );
+
+for (const failure of ['offline PC', 'workspace error', 'second session error'])
+  test(
+    `mobile Chrome: saved read approval keeps scopes and Refresh through ${failure}`,
+    { timeout: 30_000 },
+    async () => {
+      const worker = start();
+      let desktop;
+      let browser;
+      try {
+        desktop = await connectDesktop(worker);
+        const commands = [];
+        syntheticDesktop(desktop, commands);
+        const phone = await pairPhone(worker, desktop, ['read']);
+        const [name, value] = phone.cookie.split('=');
+        const loaded = await browserPage(worker, [
+          { name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' },
+        ]);
+        browser = loaded.browser;
+        const page = loaded.page;
+        let healthy = false;
+        let sessionReads = 0;
+        await page.route('**/api/session', async (route) => {
+          sessionReads += 1;
+          if (!healthy && failure === 'offline PC')
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ ...phone.session, online: false }),
+            });
+          else if (!healthy && failure === 'second session error' && sessionReads === 2)
+            await route.fulfill({
+              status: 503,
+              contentType: 'application/json',
+              body: JSON.stringify({ error: { code: 'failed' } }),
+            });
+          else await route.fallback();
+        });
+        await page.route('**/api/client/command', async (route) => {
+          if (
+            !healthy &&
+            failure === 'workspace error' &&
+            route.request().postDataJSON().name === 'get_workspace'
+          )
+            await route.fulfill({
+              status: 503,
+              contentType: 'application/json',
+              body: JSON.stringify({ error: { code: 'failed' } }),
+            });
+          else await route.fallback();
+        });
+        await page.goto(`${ORIGIN}/control`);
+        await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        assert.equal(await page.locator('#workspace-area').isVisible(), true);
+        assert.equal(await page.locator('#pair-card').isHidden(), true);
+        await page.getByRole('button', { name: 'Edit', exact: true }).click();
+        assert.equal(await page.locator('#edit-forms').isHidden(), true);
+        assert.equal(await page.locator('#readonly-note').isVisible(), true);
+        assert.equal(await page.locator('#save-selection').isHidden(), true);
+        assert.equal(await page.locator('#operation-form button').isDisabled(), true);
+        assert.equal(await page.locator('#notice').getAttribute('data-kind'), 'error');
+        const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
+        assert.equal(await refresh.isEnabled(), true);
+        healthy = true;
+        await refresh.click();
+        await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        assert.equal(await page.locator('#workspace-name').textContent(), workspace.name);
+        assert.equal(await page.locator('#edit-forms').isHidden(), true);
+        assert.equal(await page.locator('#readonly-note').isVisible(), true);
+        assert.equal(await page.locator('#artwork-list input:enabled').count(), 0);
+        assert.equal(await page.locator('#notice').textContent(), 'Workspace refreshed.');
+        assert.equal(
+          commands.some((command) => command.name === 'update_operation'),
+          false,
+        );
+      } finally {
+        await browser?.close();
+        closeSocket(desktop?.socket);
+        await worker.dispose();
+      }
+    },
+  );
+
+test(
+  'mobile Chrome: disconnect clears the previous PC before a replacement read approval loads',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let previous;
+    let replacement;
+    let browser;
+    let workspaceDelay;
+    try {
+      previous = await connectDesktop(worker);
+      const commands = [];
+      syntheticDesktop(previous, commands).renameWorkspace('Previous PC workspace');
+      const phone = await pairPhone(worker, previous);
+      const [name, value] = phone.cookie.split('=');
+      const receipts = [];
+      const loaded = await browserPage(
+        worker,
+        [{ name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' }],
+        null,
+        receipts,
+      );
+      browser = loaded.browser;
+      const page = loaded.page;
+      await page.goto(`${ORIGIN}/control`);
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('#workspace-name').textContent(), 'Previous PC workspace');
+      assert.ok(await page.locator('#artwork-list label').count());
+      assert.ok(await page.locator('#details-list .detail').count());
+      await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await page.locator('#operation-form [name=powerPercent]').fill('55');
+      await page.locator('#disconnect').click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.ok(receipts.some((item) => item.path === '/api/client/revoke' && item.status === 200));
+      assert.equal(
+        (await worker.dispatchFetch(`${ORIGIN}/api/session`, { headers: { Cookie: phone.cookie } }))
+          .status,
+        401,
+      );
+      assert.equal(await page.locator('#pair-card').isVisible(), true);
+      assert.equal(await page.locator('#readonly-note').isHidden(), true);
+      assert.equal(await page.locator('#edit-forms').isHidden(), true);
+      for (const selector of [
+        '#workspace-name',
+        '#workspace-meta',
+        '#artwork-list',
+        '#details-list',
+      ])
+        assert.equal(await page.locator(selector).textContent(), '');
+      assert.equal(await page.locator('#operation-list option').count(), 0);
+      assert.equal(await page.locator('#operation-form [name=powerPercent]').inputValue(), '');
+      replacement = await connectDesktop(worker);
+      const fixture = syntheticDesktop(replacement, commands);
+      fixture.renameWorkspace('Replacement PC workspace');
+      workspaceDelay = fixture.holdNextWorkspace();
+      replacement.send({ type: 'pair.create', requestId: crypto.randomUUID() });
+      const offer = await replacement.inbox.next('pair.offer');
+      await page.locator('[name=deviceId]').fill(replacement.deviceId);
+      await page.locator('[name=code]').fill(offer.code);
+      await page.locator('[name=edit]').uncheck();
+      await page.getByRole('button', { name: 'Request PC approval' }).click();
+      const request = await replacement.inbox.next('pair.request');
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      replacement.send({
+        type: 'pair.decide',
+        pairingId: request.pairingId,
+        approved: true,
+        scopes: ['read'],
+      });
+      await workspaceDelay.reached;
+      assert.equal(await page.locator('#workspace-area').isVisible(), true);
+      assert.equal(await page.locator('#edit-forms').isHidden(), true);
+      assert.equal(await page.locator('#readonly-note').isVisible(), true);
+      for (const selector of [
+        '#workspace-name',
+        '#workspace-meta',
+        '#artwork-list',
+        '#details-list',
+      ])
+        assert.equal(await page.locator(selector).textContent(), '');
+      assert.equal(await page.locator('#operation-list option').count(), 0);
+      assert.equal(await page.locator('#operation-form [name=powerPercent]').inputValue(), '');
+      workspaceDelay.release();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('#workspace-name').textContent(), 'Replacement PC workspace');
+      assert.equal(await page.locator('#edit-forms').isHidden(), true);
+      assert.equal(await page.locator('#artwork-list input:enabled').count(), 0);
+      assert.equal(
+        commands.some((command) => command.name === 'update_operation'),
+        false,
+      );
+    } finally {
+      workspaceDelay?.release();
+      await browser?.close();
+      closeSocket(previous?.socket);
+      closeSocket(replacement?.socket);
+      await worker.dispose();
+    }
+  },
+);
+
+test(
+  'mobile Chrome: a changed approved client clears old PC data even with the same device label',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let previous;
+    let replacement;
+    let browser;
+    let workspaceDelay;
+    try {
+      previous = await connectDesktop(worker);
+      const commands = [];
+      syntheticDesktop(previous, commands).renameWorkspace('Previous PC workspace');
+      const phone = await pairPhone(worker, previous);
+      const [name, value] = phone.cookie.split('=');
+      const loaded = await browserPage(worker, [
+        { name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' },
+      ]);
+      browser = loaded.browser;
+      const page = loaded.page;
+      await page.goto(`${ORIGIN}/control`);
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await page.locator('#operation-form [name=powerPercent]').fill('55');
+      assert.equal(await page.locator('#workspace-name').textContent(), 'Previous PC workspace');
+      replacement = await connectDesktop(worker);
+      const fixture = syntheticDesktop(replacement, commands);
+      fixture.renameWorkspace('Replacement PC workspace');
+      const nextPhone = await pairPhone(worker, replacement, ['read']);
+      assert.equal(nextPhone.session.deviceLabel, phone.session.deviceLabel);
+      assert.notEqual(nextPhone.clientId, phone.clientId);
+      const [nextName, nextValue] = nextPhone.cookie.split('=');
+      // A second browser tab can replace the shared HttpOnly session cookie legitimately.
+      await loaded.context.addCookies([
+        {
+          name: nextName,
+          value: nextValue,
+          url: ORIGIN,
+          httpOnly: true,
+          secure: true,
+          sameSite: 'Strict',
+        },
+      ]);
+      workspaceDelay = fixture.holdNextWorkspace();
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await workspaceDelay.reached;
+      assert.equal(await page.locator('#workspace-area').isVisible(), true);
+      assert.equal(await page.locator('#edit-forms').isHidden(), true);
+      assert.equal(await page.locator('#readonly-note').isVisible(), true);
+      assert.equal(await page.locator('#save-selection').isHidden(), true);
+      for (const selector of [
+        '#workspace-name',
+        '#workspace-meta',
+        '#artwork-list',
+        '#details-list',
+      ])
+        assert.equal(await page.locator(selector).textContent(), '');
+      assert.equal(await page.locator('#operation-list option').count(), 0);
+      assert.equal(await page.locator('#operation-form [name=powerPercent]').inputValue(), '');
+      workspaceDelay.release();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('#workspace-name').textContent(), 'Replacement PC workspace');
+      assert.equal(await page.locator('#edit-forms').isHidden(), true);
+      assert.equal(await page.locator('#artwork-list input:enabled').count(), 0);
+      assert.equal(
+        commands.some((command) => command.name === 'update_operation'),
+        false,
+      );
+    } finally {
+      workspaceDelay?.release();
+      await browser?.close();
+      closeSocket(previous?.socket);
+      closeSocket(replacement?.socket);
+      await worker.dispose();
+    }
+  },
+);
 
 test(
   'mobile Chrome: saved approval detail failure stays recoverable through Refresh',
@@ -558,6 +884,72 @@ test(
     }
   },
 );
+
+for (const pairedOnStartup of [true, false])
+  test(
+    `mobile Chrome: ${pairedOnStartup ? 'saved read approval' : 'polling read approval'} hides editing before the workspace reply`,
+    { timeout: 30_000 },
+    async () => {
+      const worker = start();
+      let desktop;
+      let browser;
+      let workspaceDelay;
+      try {
+        desktop = await connectDesktop(worker);
+        const commands = [];
+        const fixture = syntheticDesktop(desktop, commands);
+        workspaceDelay = fixture.holdNextWorkspace();
+        let cookies = [];
+        if (pairedOnStartup) {
+          const phone = await pairPhone(worker, desktop, ['read']);
+          const [name, value] = phone.cookie.split('=');
+          cookies = [
+            { name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' },
+          ];
+        }
+        const loaded = await browserPage(worker, cookies);
+        browser = loaded.browser;
+        const page = loaded.page;
+        await page.goto(`${ORIGIN}/control`);
+        if (!pairedOnStartup) {
+          await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+          desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
+          const offer = await desktop.inbox.next('pair.offer');
+          await page.locator('[name=deviceId]').fill(desktop.deviceId);
+          await page.locator('[name=code]').fill(offer.code);
+          await page.getByRole('button', { name: 'Request PC approval' }).click();
+          const request = await desktop.inbox.next('pair.request');
+          await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+          desktop.send({
+            type: 'pair.decide',
+            pairingId: request.pairingId,
+            approved: true,
+            scopes: ['read'],
+          });
+        }
+        await workspaceDelay.reached;
+        await page.getByRole('button', { name: 'Edit', exact: true }).click();
+        assert.equal(await page.locator('body').getAttribute('aria-busy'), 'true');
+        assert.equal(await page.locator('#edit-forms').isHidden(), true);
+        assert.equal(await page.locator('#readonly-note').isVisible(), true);
+        assert.equal(await page.locator('#save-selection').isHidden(), true);
+        workspaceDelay.release();
+        await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        assert.equal(await page.locator('#edit-forms').isHidden(), true);
+        assert.equal(await page.locator('#readonly-note').isVisible(), true);
+        assert.equal(await page.locator('#artwork-list input:enabled').count(), 0);
+        assert.equal(
+          commands.some((command) => command.name === 'update_operation'),
+          false,
+        );
+      } finally {
+        workspaceDelay?.release();
+        await browser?.close();
+        closeSocket(desktop?.socket);
+        await worker.dispose();
+      }
+    },
+  );
 
 test(
   'mobile Chrome: read approval hides edit forms and rejects an external consent return URL',
