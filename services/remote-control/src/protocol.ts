@@ -51,6 +51,7 @@ export const commandSchema = z.strictObject({
 });
 export const grantSchema = z.strictObject({ deviceId: uuid, clientId: uuid, leaseId: uuid });
 export type GrantProps = z.output<typeof grantSchema>;
+export type McpReservation = { key: string; id: string };
 // A fresh encrypted grant identity separates OAuth apps/approvals sharing one paired browser.
 export const oauthGrantSchema = grantSchema.extend({ mcpGrantId: uuid });
 export type OAuthGrantProps = z.output<typeof oauthGrantSchema>;

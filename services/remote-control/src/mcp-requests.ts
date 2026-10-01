@@ -1,7 +1,8 @@
-import { COMMAND_TIMEOUT_MS, type GrantProps } from './protocol.js';
+import { COMMAND_TIMEOUT_MS, type GrantProps, type McpReservation } from './protocol.js';
 
 type StopCode = 'cancelled' | 'unavailable';
 type Exchange = {
+  id: string;
   clientId: string;
   leaseId: string;
   connectionId: string | null;
@@ -15,9 +16,10 @@ type Exchange = {
 export class McpRequests {
   private readonly active = new Map<string, Exchange>();
 
-  begin(key: string, props: GrantProps, connectionId: string | null): boolean {
-    if (!/^[a-f0-9]{64}$/.test(key) || this.active.has(key) || this.active.size >= 32) return false;
+  begin(key: string, props: GrantProps, connectionId: string | null): string | null {
+    if (!/^[a-f0-9]{64}$/.test(key) || this.active.has(key) || this.active.size >= 32) return null;
     const entry: Exchange = {
+      id: crypto.randomUUID(),
       clientId: props.clientId,
       leaseId: props.leaseId,
       connectionId,
@@ -25,27 +27,33 @@ export class McpRequests {
       timer: setTimeout(() => this.remove(key, entry, 'unavailable'), COMMAND_TIMEOUT_MS),
     };
     this.active.set(key, entry);
-    return true;
+    return entry.id;
   }
 
   attach(
-    key: string,
+    reservation: McpReservation,
     props: GrantProps,
     connectionId: string,
     requestId: string,
     stop: (code: StopCode) => void,
   ): boolean {
-    const entry = this.lookup(key, props);
-    if (!entry || entry.cancelled || entry.requestId || entry.connectionId !== connectionId)
+    const entry = this.lookup(reservation.key, props);
+    if (
+      !entry ||
+      entry.id !== reservation.id ||
+      entry.cancelled ||
+      entry.requestId ||
+      entry.connectionId !== connectionId
+    )
       return false;
     entry.requestId = requestId;
     entry.stop = stop;
     return true;
   }
 
-  detach(key: string, requestId: string): void {
-    const entry = this.active.get(key);
-    if (entry?.requestId === requestId) entry.stop = undefined;
+  detach(reservation: McpReservation, requestId: string): void {
+    const entry = this.active.get(reservation.key);
+    if (entry?.id === reservation.id && entry.requestId === requestId) entry.stop = undefined;
   }
 
   cancel(key: string, props: GrantProps): void {
@@ -56,9 +64,9 @@ export class McpRequests {
     entry.stop = undefined;
   }
 
-  end(key: string, props: GrantProps): void {
-    const entry = this.lookup(key, props);
-    if (entry) this.remove(key, entry, 'cancelled');
+  end(reservation: McpReservation, props: GrantProps): void {
+    const entry = this.lookup(reservation.key, props);
+    if (entry?.id === reservation.id) this.remove(reservation.key, entry, 'cancelled');
   }
 
   revoke(clientId: string): void {

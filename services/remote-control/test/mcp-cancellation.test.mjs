@@ -203,7 +203,8 @@ test(
       );
       props.leaseId = session.leaseId;
       const key = createHash('sha256').update('synthetic-cancel-before-dispatch').digest('hex');
-      assert.equal(await stub.beginMcpRequest(props, ['read'], key), true);
+      let reservation = { key, id: await stub.beginMcpRequest(props, ['read'], key) };
+      assert.match(reservation.id, /^[a-f0-9-]{36}$/);
       await stub.cancelMcpRequest(props, ['read'], key);
       const run = async () =>
         JSON.parse(
@@ -213,18 +214,19 @@ test(
             crypto.randomUUID(),
             JSON.stringify({ name: 'get_workspace', args: {} }),
             undefined,
-            key,
+            reservation,
           ),
         );
       assert.equal((await run()).error.code, 'cancelled');
-      await stub.endMcpRequest(props, key);
-      assert.equal(await stub.beginMcpRequest(props, ['read'], key), true);
+      await stub.endMcpRequest(props, reservation);
+      reservation = { key, id: await stub.beginMcpRequest(props, ['read'], key) };
+      assert.match(reservation.id, /^[a-f0-9-]{36}$/);
       replacement = await connectDesktop(worker, {
         deviceId: desktop.deviceId,
         ownerSecret: desktop.ownerSecret,
       });
       assert.equal((await run()).error.code, 'cancelled');
-      await stub.endMcpRequest(props, key);
+      await stub.endMcpRequest(props, reservation);
       assert.equal(
         replacement.inbox.queue.some((value) => value.type === 'command'),
         false,
@@ -232,15 +234,86 @@ test(
       const reserved = [];
       for (let index = 0; index < 33; index++) {
         const boundedKey = createHash('sha256').update(`synthetic-capacity-${index}`).digest('hex');
-        reserved.push(boundedKey);
-        assert.equal(await stub.beginMcpRequest(props, ['read'], boundedKey), index < 32);
+        const id = await stub.beginMcpRequest(props, ['read'], boundedKey);
+        reserved.push({ key: boundedKey, id });
+        if (index < 32) assert.match(id, /^[a-f0-9-]{36}$/);
+        else assert.equal(id, null);
       }
       await stub.endMcpRequest(props, reserved[0]);
-      assert.equal(await stub.beginMcpRequest(props, ['read'], reserved[32]), true);
-      for (const boundedKey of reserved) await stub.endMcpRequest(props, boundedKey);
+      reserved[32].id = await stub.beginMcpRequest(props, ['read'], reserved[32].key);
+      assert.match(reserved[32].id, /^[a-f0-9-]{36}$/);
+      for (const item of reserved) await stub.endMcpRequest(props, item);
     } finally {
       closeSocket(desktop?.socket);
       closeSocket(replacement?.socket);
+      await worker.dispose();
+    }
+  },
+);
+
+test(
+  'real workerd: expired reservation cleanup and dispatch cannot affect a later generation',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let desktop;
+    try {
+      desktop = await connectDesktop(worker);
+      const phone = await pairPhone(worker, desktop);
+      const namespace = await worker.getDurableObjectNamespace('REMOTE_DEVICES');
+      const stub = namespace.get(namespace.idFromName(desktop.deviceId));
+      const session = await stub.session(
+        phone.clientId,
+        createHash('sha256').update(phone.cookie.split('.').at(-1)).digest('hex'),
+      );
+      const props = {
+        deviceId: desktop.deviceId,
+        clientId: phone.clientId,
+        leaseId: session.leaseId,
+      };
+      const key = createHash('sha256').update('synthetic-reservation-generation').digest('hex');
+      const old = { key, id: await stub.beginMcpRequest(props, ['read'], key) };
+      assert.match(old.id, /^[a-f0-9-]{36}$/);
+      await new Promise((resolve) => setTimeout(resolve, 21_000));
+      const current = { key, id: await stub.beginMcpRequest(props, ['read'], key) };
+      assert.match(current.id, /^[a-f0-9-]{36}$/);
+      assert.notEqual(current.id, old.id);
+      await stub.endMcpRequest(props, old);
+      assert.equal(
+        await stub.beginMcpRequest(props, ['read'], key),
+        null,
+        'Old cleanup must leave its replacement reserved.',
+      );
+      const commandJson = JSON.stringify({ name: 'get_workspace', args: {} });
+      const oldResult = JSON.parse(
+        await stub.runCommand(props, ['read'], crypto.randomUUID(), commandJson, undefined, old),
+      );
+      assert.equal(
+        oldResult.error.code,
+        'cancelled',
+        'Old dispatch must not borrow the new reservation.',
+      );
+      assert.equal(
+        desktop.inbox.queue.some((value) => value.type === 'command'),
+        false,
+      );
+      const requestId = crypto.randomUUID();
+      const result = stub.runCommand(props, ['read'], requestId, commandJson, undefined, current);
+      const command = await desktop.inbox.next('command');
+      assert.equal(command.requestId, requestId);
+      await stub.endMcpRequest(props, old);
+      assert.equal(
+        desktop.inbox.queue.some((value) => value.type === 'cancel'),
+        false,
+        'Stale cleanup cannot cancel the new attached command.',
+      );
+      await stub.cancelMcpRequest(props, ['read'], key);
+      assert.equal((await desktop.inbox.next('cancel')).requestId, requestId);
+      desktop.send({ type: 'result', requestId, result: workspace });
+      assert.equal(JSON.parse(await result).error.code, 'cancelled');
+      await stub.endMcpRequest(props, current);
+    } finally {
+      closeSocket(desktop?.socket);
       await worker.dispose();
     }
   },

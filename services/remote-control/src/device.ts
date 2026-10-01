@@ -11,6 +11,7 @@ import {
   parseCommand,
   uuid,
   type GrantProps,
+  type McpReservation,
   type RemoteScope,
 } from './protocol.js';
 import { digest, json, pairingCode, sameDigest } from './security.js';
@@ -23,7 +24,7 @@ type Pending = {
   leaseId: string;
   scopes: RemoteScope;
   sessionDigest?: string;
-  mcpKey?: string;
+  mcpReservation?: McpReservation;
   name: keyof typeof mcpOutputSchemas;
   connectionId: string;
   resolve: (value: CommandResponse) => void;
@@ -119,7 +120,7 @@ export class RemoteDevice extends DeviceApprovals {
   private finish(item: Pending, result: CommandResponse, cancelDesktop = false): void {
     if (this.pending.get(item.requestId) !== item) return;
     this.pending.delete(item.requestId);
-    if (item.mcpKey) this.mcpRequests.detach(item.mcpKey, item.requestId);
+    if (item.mcpReservation) this.mcpRequests.detach(item.mcpReservation, item.requestId);
     clearTimeout(item.timer);
     if (cancelDesktop && this.owner()?.connectionId === item.connectionId)
       this.send({ v: 1, type: 'cancel', requestId: item.requestId });
@@ -138,19 +139,22 @@ export class RemoteDevice extends DeviceApprovals {
     if (item?.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
   }
 
-  async beginMcpRequest(props: GrantProps, scopes: RemoteScope, key: string): Promise<boolean> {
-    return (
-      this.isAuthorized(props, scopes) &&
-      this.mcpRequests.begin(key, props, this.owner()?.connectionId ?? null)
-    );
+  async beginMcpRequest(
+    props: GrantProps,
+    scopes: RemoteScope,
+    key: string,
+  ): Promise<string | null> {
+    return this.isAuthorized(props, scopes)
+      ? this.mcpRequests.begin(key, props, this.owner()?.connectionId ?? null)
+      : null;
   }
 
   async cancelMcpRequest(props: GrantProps, scopes: RemoteScope, key: string): Promise<void> {
     if (this.isAuthorized(props, scopes)) this.mcpRequests.cancel(key, props);
   }
 
-  async endMcpRequest(props: GrantProps, key: string): Promise<void> {
-    this.mcpRequests.end(key, props);
+  async endMcpRequest(props: GrantProps, reservation: McpReservation): Promise<void> {
+    this.mcpRequests.end(reservation, props);
   }
 
   async runCommand(
@@ -159,7 +163,7 @@ export class RemoteDevice extends DeviceApprovals {
     requestId: string,
     commandJson: string,
     sessionDigest?: string,
-    mcpKey?: string,
+    mcpReservation?: McpReservation,
   ): Promise<string> {
     if (new TextEncoder().encode(commandJson).byteLength > MAX_BYTES)
       return JSON.stringify(errorResult('invalid_input'));
@@ -170,7 +174,7 @@ export class RemoteDevice extends DeviceApprovals {
       return JSON.stringify(errorResult('invalid_input'));
     }
     return JSON.stringify(
-      await this.command(props, scopes, requestId, command, sessionDigest, mcpKey),
+      await this.command(props, scopes, requestId, command, sessionDigest, mcpReservation),
     );
   }
 
@@ -180,7 +184,7 @@ export class RemoteDevice extends DeviceApprovals {
     requestId: string,
     command: unknown,
     sessionDigest?: string,
-    mcpKey?: string,
+    mcpReservation?: McpReservation,
   ): Promise<CommandResponse> {
     const parsed = parseCommand(command);
     if (!parsed || !uuid.safeParse(requestId).success) return errorResult('invalid_input');
@@ -202,7 +206,7 @@ export class RemoteDevice extends DeviceApprovals {
         scopes,
         name: parsed.name,
         sessionDigest,
-        mcpKey,
+        mcpReservation,
         connectionId: owner.connectionId,
         resolve,
         timer: setTimeout(() => {
@@ -210,8 +214,8 @@ export class RemoteDevice extends DeviceApprovals {
         }, COMMAND_TIMEOUT_MS),
       };
       if (
-        mcpKey &&
-        !this.mcpRequests.attach(mcpKey, props, owner.connectionId, requestId, (code) =>
+        mcpReservation &&
+        !this.mcpRequests.attach(mcpReservation, props, owner.connectionId, requestId, (code) =>
           this.finish(item, errorResult(code), true),
         )
       ) {

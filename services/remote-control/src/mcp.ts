@@ -12,6 +12,7 @@ import {
   oauthGrantSchema,
   oauthScopes,
   type OAuthGrantProps,
+  type McpReservation,
   type RemoteScope,
 } from './protocol.js';
 import { bodyJson, json } from './security.js';
@@ -111,13 +112,13 @@ async function streamExchange(
   ctx: ExecutionContext,
   props: OAuthGrantProps,
   scopes: RemoteScope,
-  key?: string,
+  reservation?: McpReservation,
 ): Promise<Response> {
   const exchange = new AbortController();
   const release = () =>
-    key
+    reservation
       ? device(env, props.deviceId)
-          .endMcpRequest(props, key)
+          .endMcpRequest(props, reservation)
           .catch(() => undefined)
       : Promise.resolve();
   let ready: () => void = () => undefined;
@@ -138,7 +139,7 @@ async function streamExchange(
             AbortSignal.any([request.signal, exchange.signal, ...(signal ? [signal] : [])]),
             undefined,
             ctx,
-            key,
+            reservation,
           );
         },
       }),
@@ -189,7 +190,7 @@ export const protectedHandler = {
     );
     return (
       prepared.response ??
-      streamExchange(request, env, ctx, permitted.props, permitted.scopes, prepared.key)
+      streamExchange(request, env, ctx, permitted.props, permitted.scopes, prepared.reservation)
     );
   },
 } satisfies ExportedHandler<Env>;

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { bodyJson, digest, json } from './security.js';
 import { device } from './relay.js';
-import type { OAuthGrantProps, RemoteScope } from './protocol.js';
+import type { OAuthGrantProps, RemoteScope, McpReservation } from './protocol.js';
 
 const wireId = z.union([z.string().max(512), z.number().int().safe()]);
 const toolRequest = z.object({
@@ -16,7 +16,7 @@ const cancellation = z.object({
   params: z.object({ requestId: wireId }),
 });
 
-export type McpExchange = { key?: string; response?: Response };
+export type McpExchange = { reservation?: McpReservation; response?: Response };
 
 function invalidToolMessage(value: unknown, valid: boolean): boolean {
   return (
@@ -58,7 +58,8 @@ export async function prepareMcpExchange(
     await stub.cancelMcpRequest(props, scopes, key);
     return { response: new Response(null, { status: 202 }) };
   }
-  return (await stub.beginMcpRequest(props, scopes, key))
-    ? { key }
+  const reservationId = await stub.beginMcpRequest(props, scopes, key);
+  return reservationId
+    ? { reservation: { key, id: reservationId } }
     : { response: json({ error: 'unavailable' }, 503) };
 }

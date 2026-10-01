@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { KerfDeskMcpError } from '../../../electron/mcp/backend.js';
 import { mcpOutputSchemas } from '../../../electron/mcp/output-schemas.js';
-import { MAX_BYTES, parseCommand, type GrantProps, type RemoteScope } from './protocol.js';
+import {
+  MAX_BYTES,
+  parseCommand,
+  type GrantProps,
+  type RemoteScope,
+  type McpReservation,
+} from './protocol.js';
 import { sessionIdentity } from './security.js';
 
 const relayResponseSchema = z.strictObject({
@@ -40,7 +46,7 @@ export async function relayRequest(
   signal?: AbortSignal,
   sessionDigest?: string,
   execution?: ExecutionContext,
-  mcpKey?: string,
+  mcpReservation?: McpReservation,
 ): Promise<Record<string, unknown>> {
   const command = parseCommand({ name, args });
   if (!command) throw new KerfDeskMcpError('invalid_input');
@@ -61,7 +67,7 @@ export async function relayRequest(
       requestId,
       JSON.stringify(command),
       sessionDigest,
-      mcpKey,
+      mcpReservation,
     );
     if (signal?.aborted) throw new KerfDeskMcpError('cancelled');
     return decodeRelayResponse(serialized, command.name);
