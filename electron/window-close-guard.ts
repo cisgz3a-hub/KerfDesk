@@ -37,25 +37,37 @@ export class WindowCloseGuard {
   private closed = false;
   private rendererUnavailable = false;
   private requestId = 0;
+  private approvedClose = false;
 
   constructor(
     private readonly window: CloseTarget,
     private readonly options: CloseOptions,
   ) {
     window.on('close', (event) => this.onClose(event));
-    window.on('closed', () => (this.closed = true));
+    window.on('closed', () => {
+      this.approvedClose = this.approvedClose && this.awaitingUnload && !this.rendererUnavailable;
+      this.closed = true;
+    });
     window.webContents.on('will-prevent-unload', (event) => this.onPreventUnload(event));
     window.on('unresponsive', () => this.onRendererUnavailable('Renderer is unresponsive.'));
     window.on('responsive', () => (this.rendererUnavailable = false));
     window.webContents.on('render-process-gone', () => {
       this.onRendererUnavailable('Renderer exited during close preparation.');
     });
-    window.webContents.on('did-finish-load', () => (this.rendererUnavailable = false));
+    window.webContents.on('did-finish-load', () => {
+      this.rendererUnavailable = false;
+      this.approvedClose = false;
+    });
   }
 
   /** True while a close attempt owns the window (ADR-482 crash recovery defers to it). */
   isClosing(): boolean {
     return this.preparing || this.awaitingUnload;
+  }
+
+  /** Installation authority is granted only after this approved window actually closed. */
+  wasClosedWithApproval(): boolean {
+    return this.closed && this.approvedClose;
   }
 
   private onClose(event: CloseEvent): void {
@@ -69,6 +81,7 @@ export class WindowCloseGuard {
         return;
       }
       this.awaitingUnload = true;
+      this.approvedClose = true;
       return;
     }
     event.preventDefault();
@@ -76,6 +89,7 @@ export class WindowCloseGuard {
   }
 
   private begin(): void {
+    this.approvedClose = false;
     if (this.preparing || this.closed) return;
     this.preparing = true;
     const id = ++this.requestId;
@@ -138,6 +152,7 @@ export class WindowCloseGuard {
   }
 
   private async unavailable(id: number, error: unknown, ownedId = id): Promise<void> {
+    this.approvedClose = false;
     if (!this.isCurrent(id)) return;
     this.options.reportFailure(error);
     if (this.options.decideUnavailable() === 'stay') {
@@ -156,6 +171,7 @@ export class WindowCloseGuard {
   }
 
   private onRendererUnavailable(message: string): void {
+    this.approvedClose = false;
     if (this.rendererUnavailable) return;
     this.rendererUnavailable = true;
     const hadRequest = this.preparing || this.awaitingUnload;
@@ -173,6 +189,7 @@ export class WindowCloseGuard {
   }
 
   private async cancel(id: number, ownedId = id): Promise<void> {
+    this.approvedClose = false;
     if (id === this.requestId) this.requestId += 1;
     this.allowNextClose = false;
     this.awaitingUnload = false;
@@ -189,6 +206,7 @@ export class WindowCloseGuard {
   }
 
   private onPreventUnload(event: CloseEvent): void {
+    this.approvedClose = false;
     // A renderer reload/navigation during a pending Abort cannot override
     // ownership with an idle Leave prompt and tear down the active handoff.
     if (this.preparing) return;

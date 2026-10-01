@@ -40,7 +40,9 @@ still holds.
 4. **Pro stays for the session.** Once Pro is available in a running app, it stays
    until the app closes, even if a trial ends or the clock or updates coverage
    changes. Deactivating this device is the owner's own act, so it locks Pro at
-   once.
+   once. The trial session grace is superseded by
+   [Amendment 2](ADR-540-amendment-2-trial-expiry-at-tool-entry.md): new Pro tool
+   choices stop at the trial expiry while existing work remains usable.
 5. **Updates follow the edition.** A device without a licence, or whose trial has
    ended, runs Free and takes the newest signed release. A paid device only takes
    releases its update period covers, so an automatic update never takes its Pro

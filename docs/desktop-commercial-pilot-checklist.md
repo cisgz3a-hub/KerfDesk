@@ -1,5 +1,9 @@
 # Commercial Windows pilot checklist
 
+The owner's current sequence is unsigned Sandbox testing first (30 September
+2026); see `desktop-commercial-launch.md`. This signed pilot is a later stage,
+not a requirement to purchase a certificate before testing the licence system.
+
 Use this checklist for every signed commercial pilot, and again before the first
 customer release. It turns the pilot section of `desktop-commercial-launch.md`
 into steps with recorded evidence. Completing a run qualifies only the exact
@@ -67,7 +71,8 @@ For each version, from a clean checkout at the tagged source:
    `--source-ref refs/tags/vX.Y.Z`, a canonical UTC `--published-at` and
    `--key-id stable-2026-09`. Supply the protected stable signing key through
    `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY_FILE`; never paste it into the command.
-2. Build with `pnpm build:electron-main`, `pnpm build:bundle`, then
+2. Set `KERFDESK_DESKTOP_VERSION` to the candidate version. Build with
+   `pnpm build:electron-main`, `pnpm build:bundle:desktop`, then
    `electron-builder --win --x64 --config <output-dir>/electron-builder.commercial.generated.json`
    with the signing credentials loaded.
 3. Record the generated `commercial-release-identity.json` next to the run

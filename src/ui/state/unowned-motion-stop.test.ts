@@ -77,20 +77,28 @@ afterEach(() => {
 
 describe('stopUnownedControllerMotion', () => {
   it('cancels a jog through the operator Cancel path, with no reset', async () => {
-    const { context, writes, cancelJog } = harness(report('Jog'));
+    const { context, writes, cancelJog } = harness(report('Jog'), [report('Idle')]);
 
-    await expect(stopUnownedControllerMotion(context)).resolves.toBe('stopped');
+    const stopping = stopUnownedControllerMotion(context);
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(stopping).resolves.toBe('stopped');
 
     expect(cancelJog).toHaveBeenCalledTimes(1);
-    expect(writes).toEqual([]);
+    expect(writes).toEqual(['?', 'M5\n', 'M9\n']);
   });
 
   it('sends a feed hold for a jog on a driver without jog cancel', async () => {
-    const { context, writes, cancelJog } = harness(report('Jog'), [], falconLikeDriver);
+    const { context, writes, cancelJog } = harness(
+      report('Jog'),
+      [report('Idle')],
+      falconLikeDriver,
+    );
 
-    await expect(stopUnownedControllerMotion(context)).resolves.toBe('stopped');
+    const stopping = stopUnownedControllerMotion(context);
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(stopping).resolves.toBe('stopped');
 
-    expect(writes).toEqual(['!']);
+    expect(writes).toEqual(['!', '?', 'M5\n', 'M9\n']);
     expect(cancelJog).not.toHaveBeenCalled();
   });
 
@@ -158,7 +166,7 @@ describe('stopUnownedControllerMotion', () => {
     await vi.advanceTimersByTimeAsync(60);
     patch({ connection: { kind: 'disconnected' } });
     await vi.advanceTimersByTimeAsync(60);
-    expect(outcome).toBe('reset');
+    expect(outcome).toBe('superseded');
   });
 
   it('keeps the immediate reset on a driver without a feed hold', async () => {
@@ -221,5 +229,54 @@ describe('unownedControllerMotion', () => {
     ['a pendant in MPG mode', { mpgActive: true }],
   ])('reports nothing for %s', (_name, partial) => {
     expect(unownedControllerMotion({ ...base, ...(partial as Partial<LaserState>) })).toBeNull();
+  });
+});
+
+describe('unowned Abort settlement ownership', () => {
+  it('does not send accessory-off until a newer Idle report', async () => {
+    const { context, writes } = harness(report('Jog'), [
+      report('Jog'),
+      report('Jog'),
+      report('Idle'),
+    ]);
+    const stopping = stopUnownedControllerMotion(context);
+    await vi.advanceTimersByTimeAsync(60);
+    expect(writes).toEqual(['?', '?']);
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(stopping).resolves.toBe('stopped');
+    expect(writes).toEqual(['?', '?', '?', 'M5\n', 'M9\n']);
+  });
+
+  it('does not poll a session which replaced the one awaiting its hold write', async () => {
+    const { context, writes, patch } = harness(report('Run'), [report('Hold', 0)]);
+    const safeWrite = async (line: string): Promise<void> => {
+      await context.safeWrite(line);
+      if (line === '!') patch({ controllerSessionEpoch: 2 });
+    };
+    await expect(stopUnownedControllerMotion({ ...context, safeWrite })).resolves.toBe(
+      'superseded',
+    );
+    expect(writes).toEqual(['!']);
+  });
+
+  it('does not reset or clean up a session replacing a cancelled jog', async () => {
+    const { context, writes, patch, cancelJog } = harness(report('Jog'), [report('Idle')]);
+    cancelJog.mockImplementationOnce(async () => {
+      patch({ controllerSessionEpoch: 2 });
+    });
+    await expect(stopUnownedControllerMotion(context)).resolves.toBe('superseded');
+    expect(writes).toEqual([]);
+  });
+
+  it('retires remaining jog cleanup if its session changes during M5', async () => {
+    const { context, writes, patch } = harness(report('Jog'), [report('Idle')]);
+    const safeWrite = async (line: string): Promise<void> => {
+      await context.safeWrite(line);
+      if (line === 'M5\n') patch({ controllerSessionEpoch: 2 });
+    };
+    const stopping = stopUnownedControllerMotion({ ...context, safeWrite });
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(stopping).resolves.toBe('superseded');
+    expect(writes).toEqual(['?', 'M5\n']);
   });
 });

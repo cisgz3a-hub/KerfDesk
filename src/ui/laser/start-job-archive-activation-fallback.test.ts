@@ -15,6 +15,7 @@ import { MemoryRecoveryGenerationStore } from '../state/recovery/recovery-genera
 import { createCurrentTestExecutionArtifact } from '../state/recovery/testing';
 import { resetStore } from '../state/test-helpers';
 import { installReviewPendingFramedRunPermitForCurrentState } from './framed-run-testing';
+import { hashOnSimulatedClock } from './host-sha256-testing';
 import { installAutoJobReview, useJobReviewStore } from './job-review';
 import { createSecondPassExecutionFixture } from './second-pass-execution-testing';
 import { secondPassOfferable } from './second-pass/second-pass-offer';
@@ -33,6 +34,9 @@ let uninstallTracking = (): void => undefined;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // A run settles through WebCrypto digests, which otherwise answer on real
+  // time and can land after an assertion that follows a fake-time advance.
+  hashOnSimulatedClock();
   resetStore();
   useJobReviewStore.getState().close();
   useLaserStore.setState(initialLaserState());
@@ -264,10 +268,17 @@ describe('archive activation fallback and second-pass eligibility', () => {
       expect(useUnarchivedRunStore.getState().runId).toBe(runId);
       if (ending === 'completed') {
         await vi.advanceTimersByTimeAsync(5_000);
-        expect(useUnarchivedRunStore.getState().completedRun?.runId ?? null).toBe(
-          rotary ? null : runId,
+        // Advancing the simulated controller does not await the repository's
+        // queued terminal writes or the completion offer that follows them.
+        await vi.waitFor(
+          () => {
+            expect(useUnarchivedRunStore.getState().completedRun?.runId ?? null).toBe(
+              rotary ? null : runId,
+            );
+            expect(repository.getSnapshot().pendingStart).toBeNull();
+          },
+          { timeout: 1_000, interval: 20 },
         );
-        expect(repository.getSnapshot().pendingStart).toBeNull();
         const framing = runFrameNow();
         await vi.advanceTimersByTimeAsync(12_000);
         expect(await framing).toBe(true);

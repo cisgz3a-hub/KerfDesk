@@ -7,6 +7,7 @@
 import { useState } from 'react';
 import { clipAreaToBed, type SurfaceHeightArea } from '../../../core/camera/model/height-areas';
 import { combinedBBox, type Project } from '../../../core/scene';
+import { DraftNumberInput } from '../../kit/DraftNumberInput';
 import { useStore } from '../../state';
 import { useCameraStore, type HeightAreaPatch } from '../../state/camera-store';
 import { useTraceFromCamera } from '../use-trace-from-camera';
@@ -80,6 +81,7 @@ function HeightAreaRow(props: {
           label="Height"
           ariaLabel={`${name} height above bed`}
           value={area.surfaceHeightMm}
+          normalize={(value) => Math.max(0, Math.min(500, value))}
           onChange={(value) => set({ surfaceHeightMm: value })}
           autoFocus={props.autoFocus}
         />
@@ -119,12 +121,14 @@ function HeightAreaRow(props: {
           label="W"
           ariaLabel={`${name} width`}
           value={area.width}
+          normalize={(value) => Math.max(0, value)}
           onChange={(width) => set({ width })}
         />
         <NumberField
           label="D"
           ariaLabel={`${name} depth along Y`}
           value={area.height}
+          normalize={(value) => Math.max(0, value)}
           onChange={(height) => set({ height })}
         />
       </div>
@@ -137,19 +141,21 @@ function NumberField(props: {
   readonly ariaLabel: string;
   readonly value: number;
   readonly onChange: (value: number) => void;
+  readonly normalize?: (value: number) => number;
   readonly autoFocus?: boolean;
 }): JSX.Element {
   return (
     <label style={fieldStyle}>
       {props.label}
-      <input
-        type="number"
+      <DraftNumberInput
         step={0.1}
-        value={round(props.value)}
+        value={props.value}
+        format={formatHeight}
+        {...(props.normalize === undefined ? {} : { normalize: props.normalize })}
         aria-label={props.ariaLabel}
         title={props.ariaLabel}
         autoFocus={props.autoFocus}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
+        onValueChange={props.onChange}
         style={inputStyle}
       />
       mm
@@ -159,8 +165,8 @@ function NumberField(props: {
 
 // Selection bounds come from transformed geometry; a tenth of a millimetre is
 // all a camera placement can use.
-function round(value: number): number {
-  return Math.round(value * 10) / 10;
+function formatHeight(value: number): string {
+  return String(Math.round(value * 10) / 10);
 }
 
 function selectedObjects(

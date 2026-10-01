@@ -11,6 +11,30 @@ import {
 } from './native-smoke.js';
 
 describe('packaged native smoke configuration', () => {
+  it('requires both isolated paths for interactive observation and refuses automated qualification', () => {
+    const profile = resolve('tmp', 'interactive-profile');
+    const result = resolve('tmp', 'interactive-result.json');
+    const paths = [
+      `--kerfdesk-native-smoke-user-data=${profile}`,
+      `--kerfdesk-native-smoke-result=${result}`,
+    ];
+    expect(() => readNativeSmokeConfig(['--kerfdesk-native-smoke-interactive'])).toThrow(/both/);
+    expect(() => readNativeSmokeConfig(['--kerfdesk-native-smoke-interactive', paths[0]!])).toThrow(
+      /both/,
+    );
+    expect(readNativeSmokeConfig([...paths, '--kerfdesk-native-smoke-interactive'])).toEqual({
+      userDataPath: profile,
+      resultPath: result,
+      interactive: true,
+    });
+    expect(() =>
+      readNativeSmokeConfig([
+        ...paths,
+        '--kerfdesk-native-smoke-interactive',
+        '--kerfdesk-native-smoke-licence-phase=offline',
+      ]),
+    ).toThrow(/cannot run automated/);
+  });
   it('leaves ordinary launches on the legacy profile contract', () => {
     expect(readNativeSmokeConfig(['KerfDesk.exe'])).toBeNull();
   });

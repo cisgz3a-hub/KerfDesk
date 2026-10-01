@@ -1,0 +1,281 @@
+.lf-dialog.lf-desktop-welcome {
+  width: min(870px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  padding: 0;
+  gap: 0;
+  border: 1px solid var(--lf-border);
+  border-radius: 20px;
+  box-shadow: 0 24px 90px #0005;
+  overflow: auto;
+}
+.lf-desktop-welcome__art {
+  position: relative;
+  isolation: isolate;
+  min-height: 540px;
+  padding: 32px;
+  box-sizing: border-box;
+  color: #faf5ef;
+  background: #161412;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.lf-desktop-welcome__art img {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 62% center;
+}
+.lf-desktop-welcome__art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(180deg, #100e0ccc, transparent 28%, #100e0c44 52%, #100e0cf5);
+}
+.lf-desktop-welcome__wordmark {
+  font-size: 25px;
+  font-weight: 750;
+  letter-spacing: -1px;
+}
+.lf-desktop-welcome__wordmark span {
+  color: #e6a777;
+}
+.lf-desktop-welcome__eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.7px;
+  line-height: 1.5;
+}
+.lf-desktop-welcome__art-copy .lf-desktop-welcome__eyebrow {
+  color: #e6b58f;
+}
+.lf-desktop-welcome__art-copy p {
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  margin: 12px 0;
+}
+.lf-desktop-welcome__art-copy > span:last-child {
+  color: #e0d1c3;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.lf-desktop-welcome__content {
+  padding: 36px 32px 24px;
+  position: relative;
+  min-width: 0;
+}
+.lf-desktop-welcome__content > .lf-desktop-welcome__eyebrow {
+  color: var(--lf-accent-fg);
+}
+.lf-desktop-welcome__content h2 {
+  font-size: 27px;
+  letter-spacing: -0.9px;
+  line-height: 1.2;
+  margin: 9px 0 10px;
+  font-weight: 650;
+}
+.lf-desktop-welcome__intro {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--lf-text-muted);
+  margin: 0 0 22px;
+}
+.lf-desktop-welcome__close {
+  position: absolute;
+  right: 12px;
+  top: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--lf-text-muted);
+  width: 32px;
+  height: 32px;
+  font-size: 23px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.lf-desktop-welcome__close:hover {
+  background: var(--lf-bg-2);
+  color: var(--lf-text);
+}
+.lf-desktop-welcome__desktop {
+  padding: 19px;
+  border: 1px solid var(--lf-border);
+  background: var(--lf-bg-input);
+  border-radius: 12px;
+}
+.lf-desktop-welcome__card-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.lf-desktop-welcome__monitor {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--lf-accent-fg);
+  background: var(--lf-tint-accent);
+  flex-shrink: 0;
+}
+.lf-desktop-welcome__monitor svg {
+  width: 23px;
+  height: 23px;
+}
+.lf-desktop-welcome__content h3 {
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 0 0 4px;
+  font-weight: 650;
+}
+.lf-desktop-welcome__card-title span:not(.lf-desktop-welcome__monitor),
+.lf-desktop-welcome__free > div > span {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--lf-text-muted);
+}
+.lf-desktop-welcome__features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px 10px;
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 10px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.lf-desktop-welcome__features li::before {
+  content: '✓';
+  color: var(--lf-accent-fg);
+  margin-right: 6px;
+}
+.lf-desktop-welcome__licence {
+  color: var(--lf-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0 0 16px;
+}
+.lf-desktop-welcome__download,
+.lf-desktop-welcome__continue {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  text-decoration: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.lf-desktop-welcome__download {
+  background: var(--lf-accent);
+  color: var(--lf-on-fill);
+}
+.lf-desktop-welcome__download:hover {
+  background: var(--lf-accent-hover);
+}
+.lf-desktop-welcome__download:disabled {
+  background: var(--lf-bg-2);
+  color: var(--lf-text-muted);
+  border-color: var(--lf-border);
+  cursor: default;
+}
+.lf-desktop-welcome__download svg {
+  height: 17px;
+  width: 17px;
+}
+.lf-desktop-welcome__availability {
+  min-height: 15px;
+  margin-top: 10px;
+  text-align: center;
+  color: var(--lf-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.lf-desktop-welcome__availability button {
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  color: var(--lf-accent-fg);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.lf-desktop-welcome__free {
+  padding-top: 21px;
+  text-align: center;
+}
+.lf-desktop-welcome__continue {
+  color: var(--lf-text);
+  border-color: var(--lf-border-strong);
+  background: var(--lf-bg-1);
+  margin-top: 13px;
+}
+.lf-desktop-welcome__continue:hover {
+  background: var(--lf-bg-2);
+  border-color: var(--lf-accent);
+}
+.lf-desktop-welcome__free p {
+  color: var(--lf-text-muted);
+  font-size: 10px;
+  margin: 9px 0 0;
+}
+.lf-desktop-welcome__footnote {
+  border-top: 1px solid var(--lf-border);
+  padding-top: 14px;
+  margin: 20px 0 0;
+  color: var(--lf-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+.lf-desktop-welcome button:focus-visible,
+.lf-desktop-welcome a:focus-visible {
+  outline: 2px solid var(--lf-accent);
+  outline-offset: 3px;
+}
+@media (max-width: 680px) {
+  .lf-dialog.lf-desktop-welcome {
+    grid-template-columns: 1fr;
+    max-height: calc(100dvh - 20px);
+    border-radius: 14px;
+  }
+  .lf-desktop-welcome__art {
+    min-height: 130px;
+    padding: 20px 24px;
+  }
+  .lf-desktop-welcome__art img {
+    object-position: 65% 48%;
+  }
+  .lf-desktop-welcome__art-copy {
+    display: none;
+  }
+  .lf-desktop-welcome__content {
+    padding: 28px 22px 18px;
+  }
+  .lf-desktop-welcome__content h2 {
+    font-size: 24px;
+  }
+}
+@media (max-width: 370px) {
+  .lf-desktop-welcome__features {
+    grid-template-columns: 1fr;
+  }
+  .lf-desktop-welcome__content {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}

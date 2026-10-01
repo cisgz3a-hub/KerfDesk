@@ -1,8 +1,10 @@
 /* global Response, URL */
 import { deleteCustomer, exportRecords, rekeyLicense } from './admin.mjs';
 import { auditRefusal } from './audit.mjs';
+import { browserPurchaseBody, requirePurchaseOrigin } from './browser-purchase.mjs';
 import { adminCredential } from './crypto.mjs';
 import { createCheckout } from './checkout.mjs';
+import { reconcileCheckout } from './checkout-reconciliation.mjs';
 import { paddleVerifier } from './paddle.mjs';
 import { receivePayment } from './payment-rejections.mjs';
 import { claimOrder, prepareOrder } from './payments.mjs';
@@ -43,6 +45,8 @@ const OPERATIONS = {
   [ROUTE.deactivate]: ({ authority, body }) => authority.deactivate(body),
   [ROUTE.developerGrants]: ({ authority, body, admin }) => authority.developerGrant(body, admin),
   [ROUTE.orders]: ({ authority, body, admin }) => prepareOrder(authority, body, admin),
+  [ROUTE.reconcileOrder]: ({ authority, env, body, admin, fetcher }) =>
+    reconcileCheckout(authority, env, body, admin, fetcher),
   [ROUTE.licenseStatus]: ({ authority, body, admin }) => authority.setLicenseStatus(body, admin),
   [ROUTE.lookup]: ({ authority, body, admin }) => authority.lookupLicense(body, admin),
   [ROUTE.rekey]: ({ authority, body, admin }) => rekeyLicense(authority, body, admin),
@@ -69,7 +73,7 @@ export async function authorityRequest(request, env, authority, options = {}) {
   try {
     requireValue(env.LICENSING_ENABLED === 'true', 503, 'service_unavailable');
     const url = new URL(request.url);
-    requireValue(!url.search && !request.headers.has('origin'), 400, 'invalid_request');
+    const browser = requirePurchaseOrigin(request, url);
     requireValue(request.method === 'POST', 405, 'method_not_allowed');
     path = url.pathname;
     if (path.startsWith('/v1/admin/')) {
@@ -78,6 +82,7 @@ export async function authorityRequest(request, env, authority, options = {}) {
     }
     if (path === ROUTE.webhook) return json(await paymentWebhook(request, env, authority));
     body = parseBody(await readBody(request));
+    if (browser) browserPurchaseBody(path, body);
     requireValue(Object.hasOwn(OPERATIONS, path), 404, 'not_found');
     const result = await OPERATIONS[path]({
       authority,

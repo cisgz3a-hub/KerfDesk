@@ -36,6 +36,14 @@ function status(
   return { state, currentVersion: '2026.40.0', version, checkedAt: null };
 }
 
+function manual(
+  state: CommercialUpdateStatus['state'],
+  version: string | null = '2026.41.0',
+  installOnQuit = false,
+): CommercialUpdateStatus {
+  return { ...status(state, version), mode: 'manual', installOnQuit };
+}
+
 function client(...answers: CommercialUpdateStatus[]): LicenceAdapter {
   const queue = [...answers];
   return {
@@ -115,9 +123,8 @@ describe('desktop updates in the window (ADR-547)', () => {
     expect(host.querySelector('[aria-label="KerfDesk updates"]')).toBeNull();
   });
 
-  it('shows a build that does not update itself, and stops asking when the status is unreadable', async () => {
-    const adapter = client(status('idle'));
-    vi.mocked(adapter.updateStatus).mockRejectedValue(new Error('unavailable'));
+  it('shows an explicitly unsupported build without repeatedly asking', async () => {
+    const adapter = client(status('unavailable'));
     await mount(adapter);
     await wait(0);
     act(() => {
@@ -129,6 +136,29 @@ describe('desktop updates in the window (ADR-547)', () => {
     expect(adapter.updateStatus).toHaveBeenCalledOnce();
   });
 
+  it('offers retry after a transient initial status failure without downloading or installing', async () => {
+    const adapter = {
+      ...client(manual('up-to-date', null)),
+      downloadUpdate: vi.fn(async () => manual('downloading')),
+      installUpdateOnQuit: vi.fn(async () => manual('ready', '2026.41.0', true)),
+    };
+    vi.mocked(adapter.updateStatus).mockRejectedValueOnce(new Error('temporary bridge failure'));
+    vi.mocked(adapter.checkForUpdates).mockResolvedValue(manual('checking', null));
+    await mount(adapter);
+    await wait(0);
+    act(() => {
+      window.dispatchEvent(new Event(CHECK_UPDATES_EVENT));
+    });
+    expect(button('Check now')?.disabled).toBe(false);
+    expect(host.textContent).not.toContain("This copy of KerfDesk doesn't update itself.");
+    await act(async () => button('Check now')?.click());
+    await wait(3_000);
+    expect(host.textContent).toContain('KerfDesk is up to date.');
+    expect(adapter.checkForUpdates).toHaveBeenCalledOnce();
+    expect(adapter.downloadUpdate).not.toHaveBeenCalled();
+    expect(adapter.installUpdateOnQuit).not.toHaveBeenCalled();
+  });
+
   it('explains in the web app that the browser version updates itself', async () => {
     await act(async () => root.render(<BrowserUpdatesNotice />));
     act(() => {
@@ -137,5 +167,108 @@ describe('desktop updates in the window (ADR-547)', () => {
     expect(useToastStore.getState().toasts.map((toast) => toast.message)).toEqual([
       'KerfDesk in the browser updates itself. When a new version is ready, an Update button appears in the status bar.',
     ]);
+  });
+
+  it('notifies about later manual releases and requires separate download and install consent', async () => {
+    const downloadUpdate = vi.fn(async () => manual('downloading'));
+    const installUpdateOnQuit = vi.fn(async () => manual('ready', '2026.41.0', true));
+    const adapter = {
+      ...client(manual('up-to-date', null), manual('available'), manual('ready')),
+      downloadUpdate,
+      installUpdateOnQuit,
+      earlyUpdates: vi.fn(async () => ({ available: false, enabled: false })),
+    };
+    await mount(adapter);
+    await wait(0);
+    await wait(30_000);
+    expect(button('Update available')?.title).toContain('Download it when you are ready');
+    expect(downloadUpdate).not.toHaveBeenCalled();
+    await act(async () => button('Update available')?.click());
+    expect(host.textContent).not.toContain('Get new versions early (beta)');
+    expect(host.textContent).not.toContain('New versions download in the background');
+    await act(async () => button('Download update')?.click());
+    expect(downloadUpdate).toHaveBeenCalledOnce();
+    expect(host.textContent).toContain('Downloading KerfDesk');
+    expect(installUpdateOnQuit).not.toHaveBeenCalled();
+    await wait(3_000);
+    expect(button('Update ready')?.title).toContain('Choose Install when I close KerfDesk');
+    const install = button('Install when I close KerfDesk');
+    expect(install?.title).toContain('does not close the app or interrupt a job');
+    expect(installUpdateOnQuit).not.toHaveBeenCalled();
+    await act(async () => install?.click());
+    expect(installUpdateOnQuit).toHaveBeenCalledOnce();
+    expect(host.textContent).toContain('installer will open after you close KerfDesk normally');
+    expect(button('Install when I close KerfDesk')).toBeUndefined();
+    expect(host.querySelector('[aria-label="KerfDesk updates"]')).not.toBeNull();
+  });
+
+  it('keeps polling settled manual status, including after a temporarily unreadable response', async () => {
+    const adapter = client(manual('up-to-date', null));
+    await mount(adapter);
+    await wait(0);
+    for (let poll = 0; poll < 3; poll += 1) await wait(30_000);
+    expect(adapter.updateStatus).toHaveBeenCalledTimes(4);
+    vi.mocked(adapter.updateStatus).mockRejectedValueOnce(new Error('temporarily unavailable'));
+    await wait(30_000);
+    expect(useCommercialUpdateStore.getState().status).toMatchObject({
+      state: 'failed',
+      mode: 'manual',
+    });
+    await wait(30_000);
+    expect(useCommercialUpdateStore.getState().status?.state).toBe('up-to-date');
+  });
+
+  it('ignores an older poll after a manual action and disables repeated requests while pending', async () => {
+    let resolvePoll: (value: CommercialUpdateStatus) => void = () => undefined;
+    let resolveDownload: (value: CommercialUpdateStatus) => void = () => undefined;
+    const adapter = {
+      ...client(manual('available')),
+      downloadUpdate: vi.fn(
+        () =>
+          new Promise<CommercialUpdateStatus>((resolve) => {
+            resolveDownload = resolve;
+          }),
+      ),
+    };
+    await mount(adapter);
+    await wait(0);
+    vi.mocked(adapter.updateStatus).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolvePoll = resolve;
+        }),
+    );
+    await wait(30_000);
+    await act(async () => button('Update available')?.click());
+    await act(async () => {
+      button('Download update')?.click();
+      button('Download update')?.click();
+    });
+    expect(adapter.downloadUpdate).toHaveBeenCalledOnce();
+    expect(button('Download update')?.disabled).toBe(true);
+    await act(async () => resolveDownload(manual('downloading')));
+    await act(async () => resolvePoll(manual('available')));
+    expect(useCommercialUpdateStore.getState().status?.state).toBe('downloading');
+  });
+
+  it('does not claim installation is armed after a failed manual request', async () => {
+    const adapter = {
+      ...client(manual('ready')),
+      installUpdateOnQuit: vi.fn(async () => {
+        throw new Error('verification failed');
+      }),
+    };
+    await mount(adapter);
+    await wait(0);
+    await act(async () => button('Update ready')?.click());
+    await act(async () => button('Install when I close KerfDesk')?.click());
+    expect(host.textContent).toContain('try Check now again');
+    expect(host.textContent).not.toContain('installer will open after');
+    expect(button('Check now')?.disabled).toBe(false);
+    expect(useCommercialUpdateStore.getState().status).toMatchObject({
+      state: 'failed',
+      mode: 'manual',
+      installOnQuit: false,
+    });
   });
 });

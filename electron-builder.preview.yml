@@ -16,7 +16,11 @@ files:
   - dist/web/**/*
   - package.json
   - public/desktop-release-manifest.mjs
+  - public/desktop-manual-download.mjs
+  - public/desktop-update-notes.mjs
+  - public/desktop-commercial-catalog.mjs
   - public/desktop-release-keys.json
+  - public/desktop-sandbox-contract.mjs
   # The renderer is bundled into dist/web, so the main process needs only
   # electron-updater at runtime. Ship its dependency closure and no other
   # node_modules (ADR-483): the renderer-only packages were 88.6 MB of the
@@ -74,7 +78,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   shortcutName: KerfDesk
-  license: public/eula.txt
+  license: build/installer-terms.txt
   differentialPackage: false
 
 # Double-clicking a KerfDesk project opens it in KerfDesk (ADR-378). Only the

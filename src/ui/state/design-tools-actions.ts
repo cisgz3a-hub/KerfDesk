@@ -32,13 +32,13 @@ export type DesignToolsActions = ShapeQueryActions &
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
-export function designToolsActions(set: Setter): DesignToolsActions {
+export function designToolsActions(set: Setter, copySet: Setter = set): DesignToolsActions {
   return {
     ...shapeQueryActions(set),
     ...pathCleanupActions(set),
-    ...rubberBandOutlineActions(set),
+    ...rubberBandOutlineActions(copySet),
     ...imageMaskFlattenActions(set),
-    ...copyAlongPathActions(set),
+    ...copyAlongPathActions(copySet),
     ...trimShapesActions(set),
     ...cutShapesActions(set),
     ...warpDeformActions(set),

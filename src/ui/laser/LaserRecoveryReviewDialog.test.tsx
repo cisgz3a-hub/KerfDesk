@@ -18,7 +18,10 @@ import {
   START_INTENT_INTERRUPTION_MESSAGE,
   startIntentStandInArtifact,
 } from '../state/recovery/start-intent';
-import { LaserRecoveryReviewDialog } from './LaserRecoveryReviewDialog';
+import {
+  LaserRecoveryReviewDialog,
+  type LaserRecoveryReviewDialogProps,
+} from './LaserRecoveryReviewDialog';
 
 // React DOM's test renderer reads this conventional global. The optional
 // augmentation is test-only and does not change the production global type.
@@ -133,7 +136,10 @@ describe('LaserRecoveryReviewDialog', () => {
       host?.querySelector<HTMLButtonElement>('[aria-label="Zoom in recovery canvas"]')?.click(),
     );
     expect(svg.getAttribute('viewBox')).not.toBe(initialView);
+    setRestartLine(String(capsule.artifact.fingerprint.lines + 1));
+    expect(button('Start supervised recovery').disabled).toBe(true);
     const rawLine = clickFirstBurn(svg, capsule);
+    expect(host?.querySelector('#laser-recovery-line-error')).toBeNull();
     expect(host?.querySelector<HTMLInputElement>('#laser-recovery-start-line')?.value).toBe(
       String(rawLine),
     );
@@ -160,6 +166,59 @@ describe('LaserRecoveryReviewDialog', () => {
     act(() => button('Use automatic line').click());
     await act(async () => button('Start supervised recovery').click());
     expect(onStart).toHaveBeenLastCalledWith(capsule);
+  });
+
+  it.each(['10', '0', '-1', '1.5'])(
+    'keeps invalid draft %s visible and cannot start its earlier valid prefix',
+    async (draft) => {
+      const capsule = legacyCapsule();
+      const onStart = vi.fn(async () => false);
+      renderDialog(capsule, vi.fn(), onStart);
+      setRestartLine('1');
+      setRestartLine(draft);
+      const input = host?.querySelector<HTMLInputElement>('#laser-recovery-start-line');
+      expect(input?.value).toBe(draft);
+      expect(input?.getAttribute('aria-invalid')).toBe('true');
+      expect(host?.querySelector('#laser-recovery-line-error')?.textContent).toContain(
+        'Enter a whole G-code line from 1 to 8',
+      );
+      expect(button('Start supervised recovery').disabled).toBe(true);
+      await act(async () => button('Start supervised recovery').click());
+      expect(onStart).not.toHaveBeenCalled();
+      setRestartLine('8');
+      expect(input?.value).toBe('8');
+      expect(input?.getAttribute('aria-invalid')).toBe('false');
+      await act(async () => button('Start supervised recovery').click());
+      expect(onStart).toHaveBeenCalledExactlyOnceWith(capsule, 8);
+    },
+  );
+
+  it('clears an invalid draft explicitly with automatic selection', async () => {
+    const capsule = legacyCapsule();
+    const onStart = vi.fn(async () => false);
+    renderDialog(capsule, vi.fn(), onStart);
+    setRestartLine('10');
+    act(() => button('Use automatic line').click());
+    expect(host?.querySelector<HTMLInputElement>('#laser-recovery-start-line')?.value).toBe('');
+    expect(host?.querySelector('#laser-recovery-line-error')).toBeNull();
+    await act(async () => button('Start supervised recovery').click());
+    expect(onStart).toHaveBeenCalledExactlyOnceWith(capsule);
+  });
+
+  it('does not frame a stale remainder while its replacement line is invalid', async () => {
+    const capsule = exactCapsule();
+    const onStart = vi.fn(async () => false);
+    const onFrameRemaining = vi.fn(async () => undefined);
+    renderDialog(capsule, vi.fn(), onStart, { onFrameRemaining });
+    setRestartLine('1');
+    expect(button('Frame remaining area').disabled).toBe(false);
+    setRestartLine(String(capsule.artifact.fingerprint.lines + 1));
+    expect(button('Frame remaining area').disabled).toBe(true);
+    await act(async () => button('Frame remaining area').click());
+    expect(onFrameRemaining).not.toHaveBeenCalled();
+    expect(onStart).not.toHaveBeenCalled();
+    setRestartLine('1');
+    expect(button('Frame remaining area').disabled).toBe(false);
   });
 });
 
@@ -212,13 +271,19 @@ function renderDialog(
   capsule: RecoveryCapsule,
   onClose: () => void,
   onStart: (capsule: RecoveryCapsule, fromLine?: number) => Promise<boolean>,
+  options: Pick<LaserRecoveryReviewDialogProps, 'onFrameRemaining'> = {},
 ): void {
   host = document.createElement('div');
   document.body.appendChild(host);
   const root = createRoot(host);
   act(() =>
     root.render(
-      <LaserRecoveryReviewDialog capsule={capsule} onClose={onClose} onStart={onStart} />,
+      <LaserRecoveryReviewDialog
+        capsule={capsule}
+        onClose={onClose}
+        onStart={onStart}
+        {...options}
+      />,
     ),
   );
   unmount = () => root.unmount();

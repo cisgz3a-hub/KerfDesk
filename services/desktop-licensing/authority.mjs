@@ -16,6 +16,12 @@ function requireUsableStatus(license) {
   requireValue(license?.status === 'active', 403, 'license_inactive');
 }
 
+function requireCurrentKey(license, keyHash) {
+  requireValue(license?.keyHash === keyHash, 401, 'invalid_credentials');
+  requireUsableStatus(license);
+  return license;
+}
+
 export function nextUpdateYear(seconds) {
   const date = new Date(seconds * 1000);
   const month = date.getUTCMonth();
@@ -56,8 +62,9 @@ export class LicensingAuthority {
       401,
       'invalid_credentials',
     );
-    requireUsableStatus(license);
-    return license;
+    // HMAC verification yields. A completed rekey or revocation invalidates the
+    // earlier snapshot before it can authorise another key-based operation.
+    return requireCurrentKey(this.records.get(`license:${license.licenseId}`), license.keyHash);
   }
 
   async developerGrant(body, admin) {
@@ -133,10 +140,11 @@ export class LicensingAuthority {
       license.licenseId,
       body,
       await this.crypto.hash('device', device(body.deviceId)),
+      license.keyHash,
     );
   }
 
-  async allocate(licenseId, body, deviceHash) {
+  async allocate(licenseId, body, deviceHash, authenticatedKeyHash) {
     const deviceId = device(body.deviceId);
     const deviceName = text(body.deviceName, 1, 80);
     const activationId = this.crypto.id();
@@ -148,6 +156,13 @@ export class LicensingAuthority {
     const result = this.records.transaction((tx) => {
       const license = tx.get(`license:${licenseId}`);
       this.usable(license, now);
+      // Key verification and token hashing await Web Crypto. A support rekey
+      // must win if it completed before this atomic seat allocation.
+      requireValue(
+        authenticatedKeyHash === undefined || license.keyHash === authenticatedKeyHash,
+        401,
+        'invalid_credentials',
+      );
       const existing = license.active
         .map((id) => tx.get(`activation:${id}`))
         .find((item) => item.deviceHash === deviceHash);
@@ -224,18 +239,21 @@ export class LicensingAuthority {
 
   async releaseWithKey(body) {
     const license = await this.authenticateLicense(body.licenseKey);
-    return this.release(license.licenseId, identifier(body.activationId));
+    return this.release(license.licenseId, identifier(body.activationId), license.keyHash);
   }
 
-  release(licenseId, activationId) {
+  release(licenseId, activationId, authenticatedKeyHash) {
     const now = this.now();
     return this.records.transaction((tx) => {
+      const license = tx.get(`license:${licenseId}`);
+      // A key-authorised release must still own the current key at mutation.
+      // Device-token sign-out remains available for revoked/released seats.
+      if (authenticatedKeyHash !== undefined) requireCurrentKey(license, authenticatedKeyHash);
       const activation = tx.get(`activation:${activationId}`);
       requireValue(activation?.licenseId === licenseId, 404, 'activation_not_found');
       // A repeated deactivation (a retry after a lost response) frees nothing
       // and is not counted.
       if (!activation.active) return { deactivated: true };
-      const license = tx.get(`license:${licenseId}`);
       const releases = (license.releases ?? []).filter((at) => at > now - RELEASE_WINDOW);
       requireValue(
         license.tier !== 'paid' || releases.length < MAX_RELEASES,
@@ -253,16 +271,19 @@ export class LicensingAuthority {
 
   async listActivations(body) {
     const license = await this.authenticateLicense(body.licenseKey);
-    return {
-      activations: license.active.map((id) => {
-        const activation = this.records.get(`activation:${id}`);
-        return {
-          activationId: id,
-          deviceName: activation.deviceName,
-          createdAt: activation.createdAt,
-        };
-      }),
-    };
+    return this.records.transaction((tx) => {
+      const current = requireCurrentKey(tx.get(`license:${license.licenseId}`), license.keyHash);
+      return {
+        activations: current.active.map((id) => {
+          const activation = tx.get(`activation:${id}`);
+          return {
+            activationId: id,
+            deviceName: activation.deviceName,
+            createdAt: activation.createdAt,
+          };
+        }),
+      };
+    });
   }
 
   /**
@@ -308,9 +329,22 @@ export class LicensingAuthority {
       perpetualUpdates: license.perpetualUpdates,
       maxDevices: MAX_DEVICES,
     };
-    return {
-      entitlement: await this.crypto.sign(claims),
-      activationToken: await this.activationToken(activation.activationId),
-    };
+    const entitlement = await this.crypto.sign(claims);
+    const activationToken = await this.activationToken(activation.activationId);
+    // Signing yields to other requests. Do not disclose a fresh grant if a
+    // revocation or seat release completed while its bytes were being signed.
+    this.records.transaction((tx) => {
+      const current = tx.get(`license:${license.licenseId}`);
+      this.usable(current, this.now());
+      const seat = tx.get(`activation:${activation.activationId}`);
+      requireValue(
+        seat?.active &&
+          seat.licenseId === current.licenseId &&
+          current.active.includes(seat.activationId),
+        403,
+        'activation_inactive',
+      );
+    });
+    return { entitlement, activationToken };
   }
 }

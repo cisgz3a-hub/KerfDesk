@@ -68,7 +68,7 @@ function validCredential(value: unknown): value is LicenceCredential {
   );
 }
 
-function parseRecord(value: unknown): LicenceRecord {
+function parseRecord(value: unknown, sandbox = false): LicenceRecord {
   if (
     !record(value) ||
     value.schemaVersion !== 1 ||
@@ -76,7 +76,7 @@ function parseRecord(value: unknown): LicenceRecord {
     (value.lastSeenAt as number) < 0 ||
     !validSavedExtras(value) ||
     !validCredentialState(value) ||
-    (value.payment !== undefined && !validLicencePayment(value.payment))
+    (value.payment !== undefined && !validLicencePayment(value.payment, sandbox))
   ) {
     throw new Error('The saved licence could not be read. Contact KerfDesk support.');
   }
@@ -101,6 +101,7 @@ export function createLicensingStore(options: {
   readonly userDataPath: string;
   readonly secureStorage: SecureStorage;
   readonly platform: string;
+  readonly sandbox?: boolean;
 }): LicensingStore {
   const file = join(options.userDataPath, FILE_NAME);
   const secure = options.secureStorage;
@@ -119,7 +120,9 @@ export function createLicensingStore(options: {
   };
   const write = async (value: LicenceRecord): Promise<void> => {
     await check();
-    const encrypted = await secure.encryptStringAsync(JSON.stringify(parseRecord(value)));
+    const encrypted = await secure.encryptStringAsync(
+      JSON.stringify(parseRecord(value, options.sandbox)),
+    );
     await mkdir(options.userDataPath, { recursive: true });
     const temporary = `${file}.${randomUUID()}.tmp`;
     try {
@@ -144,7 +147,7 @@ export function createLicensingStore(options: {
       let value: LicenceRecord;
       try {
         decrypted = await secure.decryptStringAsync(encrypted);
-        value = parseRecord(JSON.parse(decrypted.result));
+        value = parseRecord(JSON.parse(decrypted.result), options.sandbox);
       } catch {
         // A changed OS account key, a corrupt file or an older format. The
         // caller offers a reset; the server keeps this device's seat for reuse.

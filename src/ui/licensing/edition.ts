@@ -1,11 +1,12 @@
-// The app-wide view of the Free/Pro edition (ADR-540). Without a provider —
-// the web app, Preview and source builds, and every component test — the app is
-// unrestricted: each Pro request is allowed at once. EditionProvider replaces
-// this only in a build that sells licences.
+// App-wide edition state. The browser build starts Free even before the React
+// provider mounts. Desktop development and isolated component tests can use an
+// unrestricted default; shipped builds mount EditionProvider with Free defaults.
 
 import { createContext, useContext } from 'react';
+import { BROWSER_FREE_BUILD } from '../../platform/build-capabilities';
 import type { LicenceStatus } from '../../platform/types';
 import type { ProFeature } from './pro-features';
+import { trialHasExpired } from './trial-expiry';
 
 export type EditionValue = {
   readonly status: LicenceStatus | null;
@@ -41,17 +42,27 @@ export const UNRESTRICTED_EDITION: EditionValue = {
   openLicence: () => undefined,
 };
 
-export const EditionContext = createContext<EditionValue>(UNRESTRICTED_EDITION);
+const BROWSER_FREE_EDITION: EditionValue = {
+  status: null,
+  licensed: false,
+  pro: false,
+  proInDesktop: true,
+  requestPro: () => false,
+  openLicence: () => undefined,
+};
+const DEFAULT_EDITION = BROWSER_FREE_BUILD ? BROWSER_FREE_EDITION : UNRESTRICTED_EDITION;
+
+export const EditionContext = createContext<EditionValue>(DEFAULT_EDITION);
 
 export function useEdition(): EditionValue {
   return useContext(EditionContext);
 }
 
-let active: EditionValue = UNRESTRICTED_EDITION;
+let active: EditionValue = DEFAULT_EDITION;
 
 /** EditionProvider publishes itself here for callers outside React. */
 export function setActiveEdition(value: EditionValue | null): void {
-  active = value ?? UNRESTRICTED_EDITION;
+  active = value ?? DEFAULT_EDITION;
 }
 
 /** The edition this window runs as right now, for callers outside React. */
@@ -65,5 +76,5 @@ export function requestProFeature(feature: ProFeature, onAllowed?: () => void): 
 }
 
 export function proFeaturesUnlocked(): boolean {
-  return active.pro;
+  return active.pro && !trialHasExpired(active.status);
 }

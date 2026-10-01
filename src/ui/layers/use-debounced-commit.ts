@@ -19,6 +19,8 @@ export type UseDebouncedCommitArgs<T> = {
   readonly parse: (input: string) => T;
   readonly format?: (value: T) => string;
   readonly debounceMs?: number;
+  /** Keep edits local until blur/Enter when committing reorders the editor. */
+  readonly commitOnBlur?: boolean;
   // Extra reconciliation trigger for fields whose DISPLAY depends on more
   // than `value`: a shape field shows spec × transform scale, so a toolbar
   // resize changes what the box should read while `value` (the spec) stays
@@ -92,9 +94,9 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   // Reconcile when the store changes the canonical value out from under us
   // (e.g. undo / external setLayerParam from a different surface), or when
   // reconcileKey reports the display mapping itself moved (toolbar resize
-  // rescaling a shape field). We only overwrite the local draft when the
-  // parsed draft doesn't already match — otherwise the user's in-flight
-  // typing would be wiped mid-keystroke.
+  // rescaling a shape field). Preserve matching parsed drafts only during an
+  // actual edit. Otherwise a sibling's update can leave an untouched display
+  // stale merely because parsing it clamps to the new value.
   useEffect(() => {
     // A canonical store update or display-mapping change owns the field now.
     // Drop work parsed against the previous state before acknowledging the new
@@ -102,7 +104,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current?.cancel();
     debouncerRef.current?.acknowledge(value);
     setErrorMessage(null);
-    if (parseRef.current(draftRef.current) !== value) {
+    if (!editedRef.current || parseRef.current(draftRef.current) !== value) {
       editedRef.current = false;
       setDraft(formatRef.current(value));
     }
@@ -121,6 +123,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     draft,
     editedRef,
     debounceMs,
+    commitOnBlur: args.commitOnBlur === true,
     parse,
     format,
     validationError,
@@ -141,6 +144,7 @@ type DebouncedHandlerContext<T> = {
   readonly draft: string;
   readonly editedRef: { current: boolean };
   readonly debounceMs: number;
+  readonly commitOnBlur: boolean;
   readonly parse: (input: string) => T;
   readonly format: (value: T) => string;
   readonly validationError: (input: string) => string | null;
@@ -169,6 +173,10 @@ function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedC
       return;
     }
     const parsed = context.parse(nextText);
+    if (context.commitOnBlur) {
+      context.debouncer?.cancel();
+      return;
+    }
     if (context.debounceMs <= 0) context.debouncer?.flush(parsed);
     else context.debouncer?.schedule(parsed);
   };

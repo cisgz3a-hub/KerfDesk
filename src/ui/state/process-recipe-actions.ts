@@ -19,7 +19,8 @@ type RecipePatch = Partial<MaterialLibraryState> &
     readonly dirty?: boolean;
     readonly redoStack?: [];
   };
-type RecipeSet = (fn: (state: RecipeState) => RecipePatch) => void;
+// The edition-aware setter returns false when an authoring change awaits Pro.
+type RecipeSet = (fn: (state: RecipeState) => RecipePatch) => unknown;
 
 export type ProcessRecipeActions = {
   readonly saveSelectedProcessRecipe: (name: string) => ProcessRecipeResult<ProcessRecipe>;
@@ -87,7 +88,7 @@ function applyRecipe(set: RecipeSet, id: string): ProcessRecipeResult<number> {
     kind: 'invalid',
     reason: 'Choose a saved process recipe.',
   };
-  set((state) => {
+  const committed = set((state) => {
     const recipe = state.materialLibrary?.processRecipes?.find((candidate) => candidate.id === id);
     if (recipe === undefined) return {};
     const ids = selectedIds(state);
@@ -111,7 +112,9 @@ function applyRecipe(set: RecipeSet, id: string): ProcessRecipeResult<number> {
       dirty: true,
     };
   });
-  return result;
+  return committed === false
+    ? { kind: 'invalid', reason: 'This process needs Pro. Unlock Pro to apply it.' }
+    : result;
 }
 
 function selectedIds(state: RecipeState): string[] {

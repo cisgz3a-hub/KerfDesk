@@ -126,14 +126,14 @@ export function paiaManualCommand(): AppCommand {
   );
 }
 
-// The desktop app's version and update status, with Check now and the beta
-// choice; the web app explains that it updates itself (ADR-547).
+// The installed version and update choices for this release channel; the web
+// app explains its separate browser update flow (ADRs 547 and 561).
 export function checkForUpdatesCommand(): AppCommand {
   return enabled(
     'help.check-updates',
     'help',
     'Check for Updates...',
-    'See which version you have, whether a newer one is ready, and get new versions early',
+    'See your version and check for available updates',
     () => window.dispatchEvent(new Event(CHECK_UPDATES_EVENT)),
   );
 }

@@ -20,9 +20,10 @@ export function installDesktopWindowClose(
   return new WindowCloseGuard(window, {
     ...options,
     isApprovalCurrent: (requestId) =>
-      gateApprovalId !== requestId ||
-      (options.isWorkspaceAdmitted?.() === false &&
-        options.isTrustedRenderer(window.webContents.getURL())),
+      options.isTrustedRenderer(window.webContents.getURL()) &&
+      (gateApprovalId !== requestId ||
+        (options.isWorkspaceAdmitted?.() === false &&
+          options.isTrustedRenderer(window.webContents.getURL()))),
     request: async (operation, requestId) => {
       if (!options.isTrustedRenderer(window.webContents.getURL())) {
         return { status: 'unavailable' };

@@ -148,16 +148,17 @@ describe('offline Ed25519 entitlement verification', () => {
     expect(verifyLicenceRelease(release(), keys, 'update-manifest')).toBeNull();
     expect(verifyLicenceRelease(envelope(claims()), keys)).toBeNull();
   });
-  it('defaults existing MIT packages to free but rejects malformed opt-in metadata', async () => {
+  it('keeps packages without commercial metadata Free and rejects malformed opt-in metadata', async () => {
     expect(licensingConfigFromMetadata({ version: '1.0.0' })).toEqual({ channel: 'free' });
     expect(licensingConfigFromMetadata({ kerfdeskCommercialLicense: false })).toEqual({
       channel: 'invalid',
     });
     const h = harness();
     const runtime = createLicensingRuntime({ ...h.options, config: { channel: 'free' } });
-    expect(await runtime.status()).toMatchObject({ channel: 'free', edition: 'pro' });
-    expect(runtime.proUnlocked()).toBe(true);
-    await runtime.startTrial();
+    expect(await runtime.status()).toMatchObject({ channel: 'free', edition: 'free' });
+    expect(runtime.proUnlocked()).toBe(false);
+    expect(await runtime.startTrial()).toMatchObject({ channel: 'free', edition: 'free' });
+    expect(await runtime.activate('KD1.synthetic.key')).toMatchObject({ edition: 'free' });
     expect(h.store.read).not.toHaveBeenCalled();
     expect(h.fetch).not.toHaveBeenCalled();
   });
@@ -248,19 +249,48 @@ describe('commercial edition (ADR-540)', () => {
       ),
     ).toBe(false);
   });
-  it('keeps Pro for the open session when a trial ends, and opens Free next time', async () => {
-    const expiry = NOW / 1000 + 30 * 86_400;
-    const h = harness(
-      saved(claims({ tier: 'trial', accessExpiresAt: expiry, updatesUntil: expiry })),
-    );
-    expect(await h.runtime.status()).toMatchObject({ edition: 'pro' });
-    h.clock(expiry * 1000);
-    expect(await h.runtime.status()).toMatchObject({ state: 'trial-expired', edition: 'pro' });
-    expect(h.runtime.proUnlocked()).toBe(true);
-    expect(await createLicensingRuntime(h.options).status()).toMatchObject({
-      state: 'trial-expired',
-      edition: 'free',
-    });
+  it.each(['wall', 'elapsed'] as const)(
+    'ends new Pro access at the trial deadline using %s time',
+    async (source) => {
+      const expiry = NOW / 1000 + 30 * 86_400;
+      let elapsed = 0;
+      const elapsedClock = vi.spyOn(performance, 'now').mockImplementation(() => elapsed);
+      const h = harness(
+        saved(claims({ tier: 'trial', accessExpiresAt: expiry, updatesUntil: expiry })),
+      );
+      try {
+        expect(await h.runtime.status()).toMatchObject({ edition: 'pro' });
+        if (source === 'wall') h.clock(expiry * 1000);
+        else {
+          h.clock(NOW - 60_000);
+          elapsed = 30 * 86_400_000;
+        }
+        expect(h.runtime.proUnlocked()).toBe(false);
+        h.clock((expiry - 60) * 1000);
+        expect(h.runtime.proUnlocked()).toBe(false);
+        expect(await h.runtime.status()).toMatchObject({ state: 'trial-expired', edition: 'free' });
+        expect(h.saved()?.lastSeenAt).toBe(expiry);
+        h.clock(expiry * 1000);
+        expect(await createLicensingRuntime(h.options).status()).toMatchObject({
+          state: 'trial-expired',
+          edition: 'free',
+        });
+      } finally {
+        elapsedClock.mockRestore();
+      }
+    },
+  );
+  it('never returns unbounded Pro on a trial store failure while preserving paid session rights', async () => {
+    const trial = harness(saved(trialClaims()));
+    const paid = harness(saved());
+    for (const h of [trial, paid]) {
+      expect(await h.runtime.status()).toMatchObject({ edition: 'pro' });
+      h.store.read.mockRejectedValue(new Error('storage unavailable'));
+    }
+    expect(await trial.runtime.status()).toMatchObject({ edition: 'free', state: 'unavailable' });
+    expect(trial.runtime.proUnlocked()).toBe(false);
+    expect(await paid.runtime.status()).toMatchObject({ edition: 'pro', state: 'unavailable' });
+    expect(paid.runtime.proUnlocked()).toBe(true);
   });
   it('holds only a trial to the clock, and locks Pro in a version newer than the licence covers', async () => {
     const covered = release('update-manifest', '2026-09-28T00:00:00.000Z', '1.1.0');
@@ -539,7 +569,7 @@ describe('synchronous eligibility at update installation', () => {
     expect(h.runtime.isReleaseEligibleCached(candidate, '1.2.0')).toBe(false);
     expect(h.runtime.isReleaseEligibleCached(release(), '1.0.0')).toBe(false);
   });
-  it('treats a trial that ends before quitting as Free while the open session keeps Pro', async () => {
+  it('treats an ended trial as Free for updates and new Pro choices in the open session', async () => {
     const expiry = NOW / 1000 + 1000;
     const late = release('update-manifest', '2026-10-28T00:00:00.000Z', '1.1.0');
     const h = harness(
@@ -549,7 +579,7 @@ describe('synchronous eligibility at update installation', () => {
     expect(await h.runtime.isReleaseEligible(late, '1.1.0')).toBe(false);
     h.clock(expiry * 1000);
     expect(h.runtime.isReleaseEligibleCached(late, '1.1.0')).toBe(true);
-    expect(h.runtime.proUnlocked()).toBe(true);
+    expect(h.runtime.proUnlocked()).toBe(false);
   });
   it('invalidates immediately when deactivation is requested, before its network promise settles', async () => {
     const h = harness(saved());

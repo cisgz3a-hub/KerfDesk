@@ -1,5 +1,8 @@
 import { createHash, createPrivateKey, createPublicKey, sign, verify } from 'node:crypto';
 import { compareStableVersions, stableArtifactNames } from './stable-release-artifacts.mjs';
+import { CommercialReleaseError } from './commercial-release-error.mjs';
+
+export { CommercialReleaseError } from './commercial-release-error.mjs';
 
 export const COMMERCIAL_PREFIX = 'desktop/commercial';
 // The stable ring: what shipped clients and the download page read.
@@ -27,12 +30,6 @@ const IDENTITY_FIELDS = [
 const record = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const exact = (value, keys) =>
   record(value) && Object.keys(value).sort().join(',') === [...keys].sort().join(',');
-/**
- * A refusal raised by the commercial release tooling itself. Its message is
- * written here, never copied from a secret or a provider response, so the
- * operator CLI may print it.
- */
-export class CommercialReleaseError extends Error {}
 const SECRET_NAME = /KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|ACCOUNT/iu;
 
 /**

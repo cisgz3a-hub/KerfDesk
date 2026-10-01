@@ -1,16 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { record, type PublicKeys } from './licensing-verification.js';
+import { hasSandboxMarker, isSandboxMetadata } from '../public/desktop-sandbox-contract.mjs';
 
 export type LicensingConfig =
   | { readonly channel: 'free' }
-  | { readonly channel: 'invalid' }
+  | { readonly channel: 'invalid'; readonly sandbox?: true }
   | {
       readonly channel: 'commercial';
       readonly apiOrigin: string;
       readonly entitlementKeys: PublicKeys;
       readonly releaseKeys: PublicKeys;
       readonly release: unknown;
+      readonly sandbox?: true;
+      readonly manualUpdates?: true;
     };
 
 function publicKeys(value: unknown): value is PublicKeys {
@@ -27,6 +30,8 @@ function publicKeys(value: unknown): value is PublicKeys {
 
 export function licensingConfigFromMetadata(metadata: unknown): LicensingConfig {
   if (!record(metadata)) return { channel: 'invalid' };
+  const sandbox = hasSandboxMarker(metadata);
+  if (sandbox && !isSandboxMetadata(metadata)) return { channel: 'invalid', sandbox: true };
   if (!Object.hasOwn(metadata, 'kerfdeskCommercialLicense')) return { channel: 'free' };
   const value = metadata.kerfdeskCommercialLicense;
   if (
@@ -44,7 +49,23 @@ export function licensingConfigFromMetadata(metadata: unknown): LicensingConfig 
     entitlementKeys: value.entitlementKeys,
     releaseKeys: value.releaseKeys,
     release: value.release,
+    ...(sandbox ? { sandbox: true as const } : {}),
+    ...manualMetadata(metadata, value.apiOrigin, sandbox),
   };
+}
+
+function manualMetadata(
+  metadata: Record<string, unknown>,
+  origin: string,
+  sandbox: boolean,
+): { readonly manualUpdates?: true } {
+  return !sandbox &&
+    origin === 'https://license.kerfdesk.com' &&
+    metadata.kerfdeskUnsignedInstaller === true &&
+    metadata.kerfdeskUpdateChannelTrusted === false &&
+    metadata.kerfdeskDesktopReleaseChannel === 'commercial-unsigned'
+    ? { manualUpdates: true }
+    : {};
 }
 
 function httpsOrigin(value: string): boolean {

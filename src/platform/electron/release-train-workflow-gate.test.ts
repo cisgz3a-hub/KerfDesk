@@ -144,7 +144,7 @@ describe('Release train workflow gate (ADR-541)', () => {
     const order = [
       'pnpm install --frozen-lockfile',
       'node scripts/prepare-commercial-desktop.mjs',
-      'pnpm build:electron-main && pnpm build:bundle',
+      'pnpm build:electron-main && pnpm build:bundle && pnpm build:bundle:desktop',
       'pnpm exec electron-builder --win --x64',
       'Get-AuthenticodeSignature',
       'node scripts/verify-packaged-desktop.mjs',
@@ -165,6 +165,19 @@ describe('Release train workflow gate (ADR-541)', () => {
     expect(runs.join('\n')).toContain('--config "${CONFIG}"');
     expect(runs.join('\n')).toContain('--publish never');
     expect(stepText(jobs.build!)).toContain('electron-builder.commercial.generated.json');
+  });
+
+  it('requires current runtime advisory evidence before native checks and commercial signing', () => {
+    const preflight = stepText(jobs.preflight!);
+    expect(preflight).toContain('pnpm audit --json');
+    expect(preflight).toContain('pnpm audit --prod --json');
+    expect(preflight).toContain('pnpm report:dependency-audit');
+    expect(preflight).toContain('--full-exit=');
+    expect(preflight).toContain('--runtime-exit=');
+    expect(preflight).toContain('runtimeCount');
+    expect(preflight).toContain('test \\"${runtime_count}\\" = \'0\'');
+    expect(needsOf(jobs.build!)).toContain('preflight');
+    expect(needsOf(jobs['native-check']!)).toContain('preflight');
   });
 
   it('never tags, pushes or uploads anything to GitHub', () => {

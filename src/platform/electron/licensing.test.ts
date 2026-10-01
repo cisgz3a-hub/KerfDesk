@@ -77,4 +77,78 @@ describe('desktop update status (ADR-547)', () => {
       expect(() => parseCommercialUpdateStatus(value)).toThrow('Invalid update status');
     expect(parseCommercialUpdateStatus({ ...ready, extra: true })).toEqual(ready);
   });
+
+  it('sends empty explicit manual actions and only accepts consistent manual states', async () => {
+    const manual = { ...ready, mode: 'manual', installOnQuit: false };
+    const fetchLicence = vi.fn(async () => Response.json(manual));
+    const adapter = createDesktopLicenceAdapter(fetchLicence);
+    expect(await adapter.downloadUpdate?.()).toEqual(manual);
+    expect(await adapter.installUpdateOnQuit?.()).toEqual(manual);
+    expect(fetchLicence.mock.calls).toEqual(
+      ['download-update', 'install-update-on-quit'].map((action) => [
+        `./api/licensing/${action}`,
+        expect.objectContaining({
+          method: 'POST',
+          body: '{}',
+          cache: 'no-store',
+          headers: expect.objectContaining({
+            'X-KerfDesk-Licensing': '1',
+            'Content-Type': 'application/json',
+          }),
+        }),
+      ]),
+    );
+    expect(parseCommercialUpdateStatus({ ...manual, state: 'available' })).toMatchObject({
+      state: 'available',
+    });
+    expect(parseCommercialUpdateStatus({ ...manual, installOnQuit: true })).toMatchObject({
+      installOnQuit: true,
+    });
+    for (const value of [
+      { ...ready, mode: 'automatic' },
+      { ...ready, state: 'available' },
+      { ...ready, installOnQuit: true },
+      { ...manual, installOnQuit: 'true' },
+      { ...manual, state: 'available', installOnQuit: true },
+      { ...manual, state: 'downloading', installOnQuit: true },
+      { ...manual, version: null },
+      { ...manual, state: 'available', version: null },
+    ])
+      expect(() => parseCommercialUpdateStatus(value)).toThrow('Invalid update status');
+  });
+
+  it('copies bounded notes and refuses inconsistent or malformed presentation metadata', () => {
+    const notes = {
+      ...ready,
+      mode: 'manual',
+      releaseNotesState: 'available',
+      releaseNotes: ['Improved number editing.'],
+    };
+    const parsed = parseCommercialUpdateStatus(notes);
+    expect(parsed.releaseNotes).toEqual(notes.releaseNotes);
+    expect(parsed.releaseNotes).not.toBe(notes.releaseNotes);
+    for (const patch of [
+      { mode: undefined },
+      { version: null },
+      { releaseNotesState: undefined },
+      { releaseNotesState: 'loading' },
+      { releaseNotesState: 'unavailable' },
+      { releaseNotesState: 'anything' },
+      { releaseNotes: [] },
+      { releaseNotes: Array(7).fill('Too many') },
+      { releaseNotes: ['x'.repeat(241)] },
+      { releaseNotes: [' leading space'] },
+      { releaseNotes: ['Two\nlines'] },
+      { releaseNotes: ['Control\u0000character'] },
+      { releaseNotes: [123] },
+    ])
+      expect(() => parseCommercialUpdateStatus({ ...notes, ...patch })).toThrow(
+        'Invalid update status',
+      );
+    for (const releaseNotesState of ['loading', 'unavailable'])
+      expect(
+        parseCommercialUpdateStatus({ ...notes, releaseNotesState, releaseNotes: undefined })
+          .releaseNotesState,
+      ).toBe(releaseNotesState);
+  });
 });

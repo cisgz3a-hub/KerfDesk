@@ -4,6 +4,7 @@ import { join } from 'node:path';
 type PackageMetadata = {
   readonly kerfdeskUpdateChannelTrusted?: unknown;
   readonly kerfdeskDesktopReleaseChannel?: unknown;
+  readonly kerfdeskUnsignedInstaller?: unknown;
 };
 
 export type DesktopUpdateModes = {
@@ -27,7 +28,9 @@ export function updateChannelTrustedFromPackageMetadata(value: unknown): boolean
   return (
     typeof value === 'object' &&
     value !== null &&
-    (value as PackageMetadata).kerfdeskUpdateChannelTrusted === true
+    (value as PackageMetadata).kerfdeskUpdateChannelTrusted === true &&
+    (value as PackageMetadata).kerfdeskUnsignedInstaller !== true &&
+    (value as PackageMetadata).kerfdeskDesktopReleaseChannel !== 'commercial-unsigned'
   );
 }
 

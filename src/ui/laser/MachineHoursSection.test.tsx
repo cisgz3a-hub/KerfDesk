@@ -153,6 +153,47 @@ describe('MachineHoursSection (ADR-502)', () => {
       'Maintenance due on Default 400×400: Clean the lens and its window. Mark it done under Machine hours.',
     ]);
   });
+
+  it('restores a cleared interval on blur without persisting a half-hour reminder', async () => {
+    const machine = currentHoursMachine();
+    useMachineHoursStore.getState().addRun(machine, HOUR_MS, true);
+    await act(async () => root.render(<MachineHoursSection />));
+    const before = structuredClone(useMachineHoursStore.getState().book);
+    const every = input('Hours between: Clean the lens and its window');
+    await act(async () => {
+      every.value = '';
+      Simulate.blur(every);
+    });
+    expect(every.value).toBe('20');
+    expect(useMachineHoursStore.getState().book).toEqual(before);
+    await act(async () => useMachineHoursStore.getState().reload());
+    expect(useMachineHoursStore.getState().book).toEqual(before);
+    await act(async () => {
+      every.value = '25';
+      Simulate.blur(every);
+    });
+    expect(input('Hours between: Clean the lens and its window').value).toBe('25');
+  });
+
+  it('does not add a reminder with empty hours by button or Enter', async () => {
+    await act(async () => root.render(<MachineHoursSection />));
+    const label = input('New reminder');
+    await act(async () => {
+      label.value = 'Replace the honeycomb';
+      Simulate.change(label);
+      const hours = input('Hours between: new reminder');
+      hours.value = '';
+      Simulate.change(hours);
+    });
+    const before = structuredClone(useMachineHoursStore.getState().book);
+    expect(button('Add').disabled).toBe(true);
+    await act(async () => {
+      button('Add').click();
+      Simulate.keyDown(label, { key: 'Enter' });
+    });
+    expect(useMachineHoursStore.getState().book).toEqual(before);
+    expect(label.value).toBe('Replace the honeycomb');
+  });
 });
 
 function button(label: string): HTMLButtonElement {

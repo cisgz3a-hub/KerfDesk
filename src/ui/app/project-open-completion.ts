@@ -7,6 +7,7 @@ import { jobAwareAlert } from '../state/job-aware-dialogs';
 import type { ProjectMachineCapabilityLoadResult } from '../state/project-machine-capability';
 import type { MarkLoadedOptions } from '../state/store-save-tracking-actions';
 import type { ToastVariant } from '../state/toast-store';
+import { describePendingProProject } from '../state/pending-pro-project';
 import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 import { describeOpenResult } from './file-action-formatters';
 
@@ -35,6 +36,10 @@ export function completeNativeProjectOpen(
 ): boolean {
   if (result.kind === 'ok') {
     const loadResult = ctx.setProject(result.project);
+    if (loadResult.kind === 'desktop-required') {
+      describePendingProProject(result.project, fileName);
+      return false;
+    }
     markCapabilityAwareLoad(ctx, fileName, loadResult, saveTarget);
     clearAutosaveAfterFileHandoff(ctx.pushToast);
     const migration =
@@ -67,6 +72,10 @@ export function completeLightBurnProjectOpen(
     return false;
   }
   const loadResult = ctx.setProject(result.project);
+  if (loadResult.kind === 'desktop-required') {
+    describePendingProProject(result.project, fileName);
+    return false;
+  }
   ctx.markLoaded(fileName.replace(/\.lbrn2?$/i, '.lf2'), { dirty: true });
   clearAutosaveAfterFileHandoff(ctx.pushToast);
   // The report's warnings name every shape and setting left behind, the
@@ -100,7 +109,7 @@ function reportMachineCapabilityRepair(
 function markCapabilityAwareLoad(
   ctx: ProjectOpenCompletionContext,
   filename: string,
-  result: ProjectMachineCapabilityLoadResult,
+  result: Exclude<ProjectMachineCapabilityLoadResult, { readonly kind: 'desktop-required' }>,
   saveTarget: SaveTarget | null,
 ): void {
   const dirty = result.projectBedReconciled === true;

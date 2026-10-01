@@ -124,7 +124,7 @@ jobs:
         # dist-electron, which electron-builder then packages.
         env:
           KERFDESK_DESKTOP_VERSION: ${{ steps.version.outputs.version }}
-        run: pnpm release:check
+        run: pnpm release:check && pnpm build:bundle:desktop
 
       - name: Require a clean packaged-runtime dependency graph
         shell: bash

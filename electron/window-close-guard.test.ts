@@ -33,6 +33,42 @@ function harness() {
 }
 
 describe('ordinary desktop close and quit', () => {
+  it('grants update installation authority only after an approved actual close', async () => {
+    const h = harness();
+    expect(h.guard.wasClosedWithApproval()).toBe(false);
+    h.window.close();
+    await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledOnce());
+    expect(h.guard.wasClosedWithApproval()).toBe(false);
+    h.window.emit('closed');
+    expect(h.guard.wasClosedWithApproval()).toBe(true);
+  });
+  it('never treats renderer-unavailable force close as update approval', async () => {
+    const h = harness();
+    h.options.request.mockResolvedValue({ status: 'unavailable' });
+    h.options.decideUnavailable.mockReturnValue('leave');
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.forceClose).toHaveBeenCalledOnce());
+    expect(h.guard.wasClosedWithApproval()).toBe(false);
+  });
+  it('invalidates update approval when a renderer is lost after preparation', async () => {
+    const h = harness();
+    h.window.close();
+    await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledOnce());
+    h.window.webContents.emit('render-process-gone');
+    h.window.emit('closed');
+    expect(h.guard.wasClosedWithApproval()).toBe(false);
+  });
+  it.each(['did-finish-load', 'will-prevent-unload'])(
+    'invalidates installation on %s before final closed',
+    async (event) => {
+      const h = harness();
+      h.window.close();
+      await vi.waitFor(() => expect(h.allowed).toHaveBeenCalledOnce());
+      h.window.webContents.emit(event, { preventDefault: vi.fn() });
+      h.window.emit('closed');
+      expect(h.guard.wasClosedWithApproval()).toBe(false);
+    },
+  );
   it('prevents teardown until delayed preparation and approval complete, joining repeats', async () => {
     const h = harness();
     let finish: (reply: unknown) => void = () => undefined;

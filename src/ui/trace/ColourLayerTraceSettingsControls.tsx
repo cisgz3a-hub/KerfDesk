@@ -3,6 +3,7 @@
 // the traced colours with the power each colour's operation will start at.
 
 import { useId } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import type { TraceOptions } from '../../core/trace';
 import {
   MAX_COLOUR_LAYERS,
@@ -144,10 +145,9 @@ function SpeckRow(props: {
       <label htmlFor={id}>
         <span>Remove specks</span>
         <span className="lf-trace-number-input">
-          <input
+          <DraftNumberInput
             id={id}
             className="lf-input"
-            type="number"
             min={0}
             max={10000}
             step={1}
@@ -155,10 +155,8 @@ function SpeckRow(props: {
             aria-label="Trace Remove specks"
             aria-describedby={hintId}
             title={hint}
-            onChange={(event) => {
-              const next = Number(event.target.value);
-              props.onChange(Number.isFinite(next) ? Math.max(0, Math.min(10000, next)) : 0);
-            }}
+            normalize={(next) => Math.max(0, Math.min(10000, next))}
+            onValueChange={props.onChange}
           />
           <span>px²</span>
         </span>

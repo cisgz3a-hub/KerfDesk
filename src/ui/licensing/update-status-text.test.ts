@@ -42,6 +42,25 @@ describe('update status text (ADR-547)', () => {
     expect(updateCheckAllowed(null)).toBe(false);
   });
 
+  it('requires explicit manual installation consent and describes errors without automatic promises', () => {
+    const manual = {
+      ...status('ready', '2026.41.0'),
+      mode: 'manual' as const,
+      installOnQuit: false,
+    };
+    expect(updateStatusText(manual, null)).toContain('Choose Install when I close KerfDesk');
+    expect(updateStatusText({ ...manual, installOnQuit: true }, null)).toContain(
+      'installer will open after you close KerfDesk normally',
+    );
+    expect(updateStatusText({ ...manual, state: 'available' }, null)).toContain(
+      'Download it when you are ready',
+    );
+    expect(updateStatusText({ ...manual, state: 'failed' }, null)).toContain('try Check now again');
+    expect(updateStatusText({ ...manual, state: 'unavailable' }, null)).toContain(
+      'update status is unavailable',
+    );
+  });
+
   it('lets the owner check only when no check, download or install is waiting', () => {
     const allowed = (['idle', 'up-to-date', 'not-covered', 'failed'] as const).map((state) =>
       updateCheckAllowed(status(state)),

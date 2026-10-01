@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MAX_FILL_OVERSCAN_MM } from '../../core/job/compile-job-defaults';
 import type { Layer } from '../../core/scene';
 import { useStore } from '../state';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { CutSettingsFillDirectionPreview } from './CutSettingsFillDirectionPreview';
 import { CutSettingsFillDensityFields } from './CutSettingsFillDensityFields';
 import { scanLineOverscanNote } from './fill-overscan-fallback';
@@ -219,25 +220,21 @@ function NumberInput(props: {
   readonly disabled?: boolean;
   readonly onChange?: (value: number) => void;
 }): JSX.Element {
-  return (
-    <input
-      name={props.name}
-      type="number"
-      className="lf-input"
-      min={props.min}
-      {...(props.max !== undefined ? { max: props.max } : {})}
-      step={props.step ?? 1}
-      disabled={props.disabled === true}
-      {...(props.onChange !== undefined
-        ? {
-            value: props.value,
-            onChange: (event) => props.onChange?.(Number(event.currentTarget.value)),
-          }
-        : { defaultValue: props.value })}
-      style={numberStyle}
-      aria-label={`Cut settings ${props.label ?? props.name}`}
-      title={`Set cut settings ${props.label ?? props.name}.`}
-    />
+  const input = {
+    name: props.name,
+    className: 'lf-input',
+    min: props.min,
+    ...(props.max !== undefined ? { max: props.max } : {}),
+    step: props.step ?? 1,
+    disabled: props.disabled === true,
+    style: numberStyle,
+    'aria-label': `Cut settings ${props.label ?? props.name}`,
+    title: `Set cut settings ${props.label ?? props.name}.`,
+  };
+  return props.onChange === undefined ? (
+    <input {...input} type="number" defaultValue={props.value} title={input.title} />
+  ) : (
+    <DraftNumberInput {...input} value={props.value} onValueChange={props.onChange} />
   );
 }
 

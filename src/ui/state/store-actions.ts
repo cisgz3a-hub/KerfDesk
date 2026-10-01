@@ -45,6 +45,7 @@ type Setter = (
 
 export function sceneActions(
   set: Setter,
+  authoringSet: Setter = set,
 ): Pick<
   AppState,
   | 'setLayerParam'
@@ -56,7 +57,7 @@ export function sceneActions(
 > {
   return {
     setLayerParam: (layerId, patch) =>
-      set((s) => {
+      authoringSet((s) => {
         const updated = sceneWithModeSwitchRecipe(
           s.project,
           updateLayer(s.project.scene, layerId, patch),

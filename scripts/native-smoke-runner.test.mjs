@@ -26,6 +26,23 @@ test('launches the tested GUI normally without suppressing its visibility', asyn
   assert.equal(captured.options.windowsHide, false);
 });
 
+test('applies and records the requested fresh-sandbox licensing expectation', async (t) => {
+  const fixture = await smokeFixture(t);
+  const error = await failedSmoke(
+    runNativeSmoke(
+      { ...smokeArgs(fixture), expectFreshSandbox: true },
+      scriptedSpawn(async (child, args) => {
+        await writeSmokeResult(args);
+        closeChild(child);
+      }),
+      { tempBase: fixture.root },
+    ),
+  );
+  assert.match(error.message, /fresh sandbox/);
+  assert.equal(error.manifest.licensingExpectation, 'fresh-sandbox');
+  assert.equal(error.manifest.failure.kind, 'validation');
+});
+
 test('retains exact malformed result and logs before validation fails', async (t) => {
   const fixture = await smokeFixture(t);
   await assert.rejects(

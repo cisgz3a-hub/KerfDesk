@@ -87,6 +87,14 @@ export function validResult(userData, overrides = {}) {
         Buffer: 'undefined',
       },
       fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' },
+      licensing: {
+        kind: 'observed',
+        channel: 'free',
+        state: 'ready',
+        edition: 'pro',
+        proEnabled: true,
+        updateState: 'unavailable',
+      },
     },
     ...overrides,
   };

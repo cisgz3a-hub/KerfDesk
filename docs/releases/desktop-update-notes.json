@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "sinceSourceSha": "6cd0eb8040377562847ec467eb066192400ac203",
+  "highlights": [
+    "Read what has improved before downloading a desktop update.",
+    "Clear and retype power, size and machine-setting numbers more easily.",
+    "Choose a recovery restart line with clearer number entry and automatic selection.",
+    "Improved Abort cleanup after Console jogs and controller reconnections.",
+    "More reliable trial expiry, Pro tool checks, and licence and update messages.",
+    "Updated SVG import security protections and corrected installer licence punctuation."
+  ]
+}

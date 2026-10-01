@@ -31,13 +31,22 @@ export function LicencePanel({
   const [key, setKey] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const run = async (work: () => Promise<LicenceStatus>): Promise<void> => {
+  const run = async (work: () => Promise<LicenceStatus>, activatedKey?: string): Promise<void> => {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      await onStatus(await work());
-      setKey('');
+      const next = await work();
+      await onStatus(next);
+      // Failures may resolve with cached rights. Only clear a confirmed matching
+      // activation, never a rejected key or an unrelated licence action.
+      if (
+        activatedKey !== undefined &&
+        next.state === 'ready' &&
+        next.licenseKey === activatedKey &&
+        next.message === null
+      )
+        setKey('');
     } catch {
       setError('This request could not be completed. Please try again.');
     } finally {
@@ -46,7 +55,8 @@ export function LicencePanel({
   };
   const activate = (event: FormEvent): void => {
     event.preventDefault();
-    void run(() => client.activate(key.trim()));
+    const submitted = key.trim();
+    void run(() => client.activate(submitted), submitted);
   };
   if (status?.channel === 'free') return <EveryFeaturePanel onClose={onClose} />;
   return (

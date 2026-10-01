@@ -5,6 +5,7 @@ import {
   linesPerMmToLineIntervalMm,
 } from '../../core/raster';
 import { DITHER_ALGORITHMS, type Layer } from '../../core/scene';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import {
   algorithmLabel,
   dotWidthCorrectionMax,
@@ -136,7 +137,9 @@ function LineIntervalField(props: {
     <NumberField
       name="lineIntervalMm"
       label="Line Interval"
-      value={displayNumber(linesPerMmToLineIntervalMm(props.linesPerMm), 4)}
+      value={linesPerMmToLineIntervalMm(props.linesPerMm)}
+      format={(value) => String(displayNumber(value, 4))}
+      normalize={(value) => linesPerMmToLineIntervalMm(lineIntervalMmToLinesPerMm(value))}
       min={props.bounds.min}
       max={props.bounds.max}
       step={0.001}
@@ -157,7 +160,9 @@ function DpiField(props: {
     <NumberField
       name="imageDpi"
       label="DPI"
-      value={displayNumber(linesPerMmToDpi(props.linesPerMm), 2)}
+      value={linesPerMmToDpi(props.linesPerMm)}
+      format={(value) => String(displayNumber(value, 2))}
+      normalize={(value) => linesPerMmToDpi(dpiToLinesPerMm(value))}
       min={props.bounds.min}
       max={props.bounds.max}
       step={1}
@@ -204,21 +209,25 @@ function NumberField(props: {
   readonly max: number;
   readonly step: number;
   readonly unit?: string;
+  readonly format?: (value: number) => string;
+  readonly normalize?: (value: number) => number;
   readonly onChange: (value: number) => void;
 }): JSX.Element {
   return (
     <label style={styles.fieldStyle}>
       <span style={styles.labelStyle}>{props.label}</span>
-      <input
+      <DraftNumberInput
         name={props.name}
-        type="number"
         min={props.min}
         max={props.max}
         step={props.step}
         value={props.value}
-        onChange={(event) =>
-          props.onChange(numberValueOr(event.target.value, props.value, props.min, props.max))
-        }
+        {...(props.format === undefined ? {} : { format: props.format })}
+        normalize={(next) => {
+          const bounded = numberValueOr(String(next), props.value, props.min, props.max);
+          return props.normalize?.(bounded) ?? bounded;
+        }}
+        onValueChange={props.onChange}
         className="lf-input"
         style={styles.inputStyle}
         aria-label={`Adjust image ${props.label}`}

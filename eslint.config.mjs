@@ -24,6 +24,7 @@ const moduleBoundaries = {
     // must be classified before the broader src/platform/web|electron/
     // patterns are considered. `mode: 'file'` pins it to one file path.
     { type: 'platform-types', pattern: 'src/platform/types.ts', mode: 'file' },
+    { type: 'platform-types', pattern: 'src/platform/build-capabilities.ts', mode: 'file' },
     { type: 'platform-web', pattern: 'src/platform/web', mode: 'folder' },
     { type: 'platform-electron', pattern: 'src/platform/electron', mode: 'folder' },
     { type: 'core', pattern: 'src/core', mode: 'folder' },

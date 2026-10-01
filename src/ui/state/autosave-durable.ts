@@ -112,7 +112,9 @@ export class AutosaveDurableService {
     // the immediate clear below cannot delete that backup. A failed claim
     // reaches the queued clear, which awaits the same promise.
     this.session().catch(() => undefined);
-    const localClears = [clearAutosave()];
+    // The legacy slot is a separate recovery document. Only an explicit
+    // recovery restore/discard may clear it, never saving a different file.
+    const localClears = [clearAutosave({ sessionId: currentAutosaveSessionId() })];
     return this.enqueue(async () => {
       const session = await this.session();
       // Repeat inside the queue: an earlier IndexedDB write can fail after the
@@ -121,6 +123,21 @@ export class AutosaveDurableService {
       // Rotation may have released the old session to another window. Only
       // the session this queued operation still owns can be cleared here.
       return combineClearResults(await this.clearNow(session.sessionId), localClears);
+    });
+  }
+
+  retainRecovered(snapshot: AutosaveDurableSnapshot): Promise<void> {
+    if (snapshot.sessionId !== this.sessionIdHint) return Promise.resolve();
+    const previous = this.session();
+    // Publish the new identity synchronously: beforeunload and manual-save
+    // cleanup can run before asynchronous lock acquisition finishes. Leave
+    // the original bytes/epoch untouched in the detached recovery slot.
+    this.sessionIdHint = this.rotateSessionId();
+    this.sessionPromise = null;
+    const fresh = this.session();
+    return this.enqueue(async () => {
+      await fresh;
+      await (await previous).guard?.release();
     });
   }
 

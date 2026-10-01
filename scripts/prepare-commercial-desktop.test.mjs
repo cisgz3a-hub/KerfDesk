@@ -7,12 +7,15 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createPackage } from '@electron/asar';
+import { finished } from 'node:stream/promises';
 import ts from 'typescript';
 import verifyCommercialPackage, {
   prepareCommercialMetadata,
   publicKeyRecord,
   runPreparation,
   verifyCommercialMetadata,
+  verifyUnsignedCommercialMetadata,
+  verifyUnsignedCommercialPackage,
   writeCommercialPreparation,
 } from './prepare-commercial-desktop.mjs';
 
@@ -231,7 +234,7 @@ test('external preparation is idempotent, leaves root package unchanged, and req
   assert.deepEqual(await writeCommercialPreparation(input, paths.root), result);
   const config = JSON.parse(await readFile(result.configPath, 'utf8'));
   assert.equal(config.extends, join(paths.root, 'electron-builder.commercial.yml'));
-  assert.equal(config.nsis.license, paths.termsFile);
+  assert.equal(config.nsis.license, result.termsPath);
   assert.deepEqual(
     JSON.parse(await readFile(result.identityPath, 'utf8')),
     config.extraMetadata.kerfdeskCommercialLicense.release,
@@ -319,7 +322,44 @@ test('CLI sources private key only from explicit protected env or file and never
     assert.equal(content.includes(input.privateKeyPem), false);
     assert.equal(content.includes(keyFile), false);
   }
+  const unsigned = await runPreparation(
+    ['--unsigned-installer', ...args],
+    { DESKTOP_STABLE_MANIFEST_PRIVATE_KEY_FILE: keyFile },
+    paths.root,
+  );
+  const unsignedConfig = JSON.parse(await readFile(unsigned.configPath, 'utf8'));
+  assert.equal(unsignedConfig.extraMetadata.kerfdeskUnsignedInstaller, true);
+  assert.equal(unsignedConfig.extraMetadata.kerfdeskUpdateChannelTrusted, false);
+  assert.equal(
+    unsignedConfig.extends,
+    join(paths.root, 'electron-builder.commercial-unsigned.yml'),
+  );
+  await assert.rejects(
+    runPreparation(['--unsigned-installer', '--unsigned-installer', ...args], {}, paths.root),
+    /Duplicate/u,
+  );
 });
+
+for (const unsignedInstaller of [false, true])
+  test(`${unsignedInstaller ? 'unsigned' : 'signed'} preparation marks UTF-8 terms without changing approved text`, async () => {
+    const paths = await files();
+    const input = { ...fixture({ unsignedInstaller }), ...paths };
+    const original = Buffer.from('Safety — read carefully.\r\nLiability — café 中文.\n');
+    await writeFile(paths.termsFile, original);
+    const result = await writeCommercialPreparation(input, paths.root);
+    const encoded = await readFile(result.termsPath);
+    assert.deepEqual(encoded.subarray(0, 3), Buffer.from([0xef, 0xbb, 0xbf]));
+    assert.deepEqual(encoded.subarray(3), original);
+    assert.equal(
+      new TextDecoder('utf-8', { fatal: true }).decode(encoded),
+      original.toString('utf8'),
+    );
+    assert.deepEqual(await readFile(paths.termsFile), original);
+    assert.deepEqual(await writeCommercialPreparation(input, paths.root), result);
+    await writeFile(paths.termsFile, 'Different approved text.');
+    await assert.rejects(writeCommercialPreparation(input, paths.root), /different contents/u);
+    assert.deepEqual(await readFile(result.termsPath), encoded);
+  });
 
 test('afterPack verifies actual ASAR metadata and explicit external terms before code signing', async () => {
   const paths = await files();
@@ -337,8 +377,13 @@ test('afterPack verifies actual ASAR metadata and explicit external terms before
   const app = join(paths.workspace, 'app');
   await mkdir(join(appOutDir, 'resources'), { recursive: true });
   await mkdir(app);
+  await mkdir(join(app, 'dist/web'), { recursive: true });
+  await writeFile(
+    join(app, 'dist/web/index.html'),
+    '<meta name="kerfdesk-build-capabilities" content="desktop">',
+  );
   await writeFile(join(app, 'package.json'), JSON.stringify(prepareCommercialMetadata(input)));
-  await createPackage(app, join(appOutDir, 'resources/app.asar'));
+  await finished(await createPackage(app, join(appOutDir, 'resources/app.asar')));
   const context = {
     electronPlatformName: 'win32',
     appOutDir,
@@ -367,6 +412,21 @@ test('afterPack verifies actual ASAR metadata and explicit external terms before
     }),
     /terms/u,
   );
+  for (const mode of ['browser-free', 'missing']) {
+    const brokenOut = join(paths.workspace, mode);
+    await mkdir(join(brokenOut, 'resources'), { recursive: true });
+    await writeFile(
+      join(app, 'dist/web/index.html'),
+      mode === 'missing'
+        ? '<html></html>'
+        : `<meta name="kerfdesk-build-capabilities" content="${mode}">`,
+    );
+    await finished(await createPackage(app, join(brokenOut, 'resources/app.asar')));
+    await assert.rejects(
+      verifyCommercialPackage({ ...context, appOutDir: brokenOut }),
+      /desktop renderer/u,
+    );
+  }
 });
 
 // electron-builder logs "  • loaded configuration" to stdout, which node --test reads
@@ -404,7 +464,168 @@ test('installed builder resolves commercial inheritance with mandatory signing a
   const effective = await getConfig(ROOT, generated.configPath, null);
   assert.equal(effective.extraMetadata.kerfdeskCommercialLicense.schema, 1);
   assert.equal(effective.extraMetadata.version, '1.2.3');
-  assert.equal(effective.nsis.license, paths.termsFile);
+  assert.equal(effective.nsis.license, generated.termsPath);
   assert.equal(effective.forceCodeSigning, true);
   assert.equal(effective.publish.url, 'https://dl.kerfdesk.com/desktop/commercial');
+});
+
+test('unsigned preparation keeps production signatures and pins, and cannot enter signed publisher', async () => {
+  const input = fixture({ unsignedInstaller: true });
+  const metadata = prepareCommercialMetadata(input);
+  assert.equal(metadata.kerfdeskUnsignedInstaller, true);
+  assert.equal(metadata.kerfdeskDesktopReleaseChannel, 'commercial-unsigned');
+  assert.equal(metadata.kerfdeskUpdateChannelTrusted, false);
+  assert.equal(metadata.kerfdeskCommercialLicense.apiOrigin, 'https://license.kerfdesk.com');
+  assert.equal(
+    verifyUnsignedCommercialMetadata(metadata, input.entitlementKeySet, input.releaseKeySet)
+      .version,
+    input.version,
+  );
+  const { verifyLicenceRelease } = await runtimeVerification();
+  assert.equal(
+    verifyLicenceRelease(
+      metadata.kerfdeskCommercialLicense.release,
+      metadata.kerfdeskCommercialLicense.releaseKeys,
+    ).version,
+    input.version,
+  );
+  for (const changes of [
+    {},
+    { kerfdeskUpdateChannelTrusted: true, kerfdeskDesktopReleaseChannel: 'stable' },
+  ])
+    assert.throws(
+      () =>
+        verifyCommercialMetadata(
+          { ...metadata, ...changes },
+          input.entitlementKeySet,
+          input.releaseKeySet,
+        ),
+      /trust/u,
+    );
+  for (const changes of [
+    { kerfdeskUpdateChannelTrusted: true },
+    { kerfdeskDesktopReleaseChannel: 'preview' },
+    { kerfdeskUnsignedInstaller: undefined },
+    { kerfdeskSandbox: true },
+    {
+      kerfdeskCommercialLicense: {
+        ...metadata.kerfdeskCommercialLicense,
+        apiOrigin: 'https://example.com',
+      },
+    },
+    {
+      kerfdeskCommercialLicense: {
+        ...metadata.kerfdeskCommercialLicense,
+        entitlementKeys: { fixture: key().publicKeySpki },
+      },
+    },
+    {
+      kerfdeskCommercialLicense: {
+        ...metadata.kerfdeskCommercialLicense,
+        release: {
+          ...metadata.kerfdeskCommercialLicense.release,
+          signature: Buffer.alloc(64).toString('base64'),
+        },
+      },
+    },
+  ])
+    assert.throws(() =>
+      verifyUnsignedCommercialMetadata(
+        { ...metadata, ...changes },
+        input.entitlementKeySet,
+        input.releaseKeySet,
+      ),
+    );
+  assert.throws(
+    () => prepareCommercialMetadata({ ...input, unsignedInstaller: 'true' }),
+    /explicit/u,
+  );
+});
+
+test('unsigned generated config disables signing and feeds while preserving customer resources', async () => {
+  const paths = await files();
+  const result = await writeCommercialPreparation(
+    { ...fixture(), ...paths, unsignedInstaller: true },
+    ROOT,
+  );
+  const requireBuilder = createRequire(import.meta.resolve('electron-builder'));
+  const { getConfig } = await import(
+    pathToFileURL(requireBuilder.resolve('app-builder-lib/out/util/config/config.js')).href
+  );
+  const config = await getConfig(ROOT, result.configPath, null);
+  assert.equal(config.appId, 'dev.laserforge.app');
+  assert.equal(config.productName, 'KerfDesk');
+  assert.equal(config.forceCodeSigning, false);
+  assert.equal(config.win.signExecutable, false);
+  assert.notEqual(config.win.signAndEditExecutable, false);
+  assert.equal(config.win.verifyUpdateCodeSignature, true);
+  assert.equal(config.publish, null);
+  assert.equal(config.nsis.differentialPackage, false);
+  assert.equal(config.nsis.license, result.termsPath);
+  assert.equal(config.extraMetadata.kerfdeskCommercialLicense.schema, 1);
+  assert.equal(config.electronFuses.enableEmbeddedAsarIntegrityValidation, true);
+  assert.ok(config.extraResources.some((entry) => entry.to === 'legal/THIRD_PARTY_NOTICES.md'));
+  assert.ok(config.fileAssociations.some((entry) => entry.ext === 'lf2'));
+});
+
+test('unsigned afterPack validates production ASAR, renderer, notices and actual effective config', async () => {
+  const paths = await files();
+  const input = fixture({ unsignedInstaller: true });
+  const metadata = prepareCommercialMetadata(input);
+  const app = join(paths.workspace, 'app');
+  const appOutDir = join(paths.workspace, 'packed');
+  await mkdir(join(paths.root, 'public'));
+  await writeFile(
+    join(paths.root, 'public/desktop-licence-keys.json'),
+    JSON.stringify(input.entitlementKeySet),
+  );
+  await writeFile(
+    join(paths.root, 'public/desktop-release-keys.json'),
+    JSON.stringify(input.releaseKeySet),
+  );
+  await mkdir(join(app, 'dist/web'), { recursive: true });
+  await writeFile(
+    join(app, 'dist/web/index.html'),
+    '<meta name="kerfdesk-build-capabilities" content="desktop">',
+  );
+  await writeFile(join(app, 'package.json'), JSON.stringify(metadata));
+  await mkdir(join(appOutDir, 'resources/legal'), { recursive: true });
+  for (const [source, destination] of [
+    ['LICENSE', 'LICENSE'],
+    ['THIRD_PARTY_NOTICES.md', 'THIRD_PARTY_NOTICES.md'],
+    ['public/third-party-notices.txt', 'third-party-notices.txt'],
+  ]) {
+    await writeFile(join(paths.root, source), 'Notice fixture');
+    await writeFile(join(appOutDir, 'resources/legal', destination), 'Notice fixture');
+  }
+  await finished(await createPackage(app, join(appOutDir, 'resources/app.asar')));
+  const config = {
+    appId: 'dev.laserforge.app',
+    productName: 'KerfDesk',
+    forceCodeSigning: false,
+    win: { signExecutable: false },
+    publish: null,
+    nsis: { license: paths.termsFile, differentialPackage: false },
+  };
+  const context = {
+    electronPlatformName: 'win32',
+    appOutDir,
+    packager: { projectDir: paths.root, appInfo: { version: input.version }, config },
+  };
+  await verifyUnsignedCommercialPackage(context);
+  for (const changes of [
+    { forceCodeSigning: true },
+    { publish: { provider: 'generic', url: 'https://dl.kerfdesk.com/desktop/commercial' } },
+    { win: { signExecutable: true } },
+    { appId: 'dev.kerfdesk.sandbox' },
+  ])
+    await assert.rejects(
+      verifyUnsignedCommercialPackage({
+        ...context,
+        packager: { ...context.packager, config: { ...config, ...changes } },
+      }),
+      /disable signing and updates/u,
+    );
+  await writeFile(join(appOutDir, 'resources/legal/LICENSE'), 'Wrong notice');
+  await assert.rejects(verifyUnsignedCommercialPackage(context), /legal notice/u);
 });

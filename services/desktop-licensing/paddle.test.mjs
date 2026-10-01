@@ -47,7 +47,7 @@ test('checkout defaults disabled, pins price/url, and repeated request cannot cr
   let intent;
   const fetcher = paddleFetcher(f.env, (data, options) => {
     calls++;
-    assert.equal(options.redirect, 'error');
+    assert.equal(options.redirect, 'manual');
     assert.deepEqual(data.items, [{ price_id: f.env.PADDLE_PURCHASE_PRICE_ID, quantity: 1 }]);
     assert.equal(data.checkout.url, f.env.PADDLE_CHECKOUT_URL);
     intent = {

@@ -4,86 +4,273 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
+    <meta name="theme-color" content="#171714" />
+    <meta
+      name="description"
+      content="Meet KerfDesk Pro for Windows. Buy a licence on your phone when sales open, then activate it on your computer. Free tools stay free."
+    />
     <meta
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self' https://cdn.paddle.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.paddle.com; connect-src https://license.kerfdesk.com https://*.paddle.com; frame-src https://*.paddle.com; base-uri 'none'; form-action 'none'"
     />
-    <title>KerfDesk — Licence checkout</title>
+    <title>KerfDesk — Pro for your next project</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/desktop-checkout.css" />
     <script type="module" src="/desktop-checkout.mjs"></script>
   </head>
   <body>
+    <a class="skip-link" href="#licence">Skip to licence and purchase</a>
+    <header class="site-header">
+      <a class="brand" href="/buy.html" aria-label="KerfDesk licence page">Kerf<span>Desk</span></a>
+      <a class="header-link" href="/download.html">Windows app <span aria-hidden="true">↗</span></a>
+    </header>
     <main>
-      <a class="brand" href="https://kerfdesk.com">KerfDesk</a>
-      <p class="eyebrow">KERFDESK PRO</p>
-      <h1>Buy KerfDesk Pro</h1>
-      <p>
-        One Pro licence for KerfDesk for Windows, on up to three computers at a time. You get a
-        licence to use the software, not ownership of it.
-      </p>
-      <div class="prices">
-        <div>
-          <span>KerfDesk Pro licence</span
-          ><strong>US$49.50 <span class="plus-tax">plus tax</span></strong
-          ><small>Paid once. Includes one year of updates.</small>
+      <section class="hero" aria-labelledby="page-title">
+        <img class="hero-art" src="/startup-craft.webp" alt="" fetchpriority="high" />
+        <div class="hero-content">
+          <p class="eyebrow">MADE FOR MAKERS</p>
+          <h1 id="page-title">Your next idea.<br /><span>Beautifully made.</span></h1>
+          <p class="hero-copy">
+            From lettering to carved reliefs. Make more with the laser and CNC tools in KerfDesk
+            Pro.
+          </p>
+          <a class="hero-link" href="#licence"
+            >Find your licence <span aria-hidden="true">↓</span></a
+          >
         </div>
-        <div>
-          <span>One more year of updates (optional)</span
-          ><strong>US$20 <span class="plus-tax">plus tax</span></strong
-          ><small>Paid once, only if you choose to.</small>
+        <p class="hero-caption">DESIGN / ENGRAVE / CARVE</p>
+      </section>
+
+      <div class="page-grid">
+        <section class="licence-card" id="licence" aria-labelledby="licence-heading">
+          <div class="card-heading">
+            <p class="eyebrow">YOUR WORKSPACE, UPGRADED</p>
+            <span class="platform-pill">Windows desktop</span>
+          </div>
+          <h2 id="licence-heading">KerfDesk <span>Pro</span></h2>
+          <p class="card-intro">Buy on your phone. Create on your computer.</p>
+          <div class="price">
+            <span class="currency">US$</span><strong>49.50</strong
+            ><span class="payment-kind">one-time<br />licence</span>
+          </div>
+          <p class="tax">Plus applicable tax, shown before you pay.</p>
+          <ul class="licence-facts">
+            <li><span aria-hidden="true">✓</span> Three active computers</li>
+            <li><span aria-hidden="true">✓</span> One year of updates included</li>
+            <li><span aria-hidden="true">✓</span> Keep using your licensed versions</li>
+          </ul>
+          <div class="purchase-panel" aria-labelledby="checkout-heading">
+            <h3 id="checkout-heading">Choose your licence</h3>
+            <p id="checkout-status" role="status" aria-live="polite">
+              Checking purchase availability…
+            </p>
+            <div id="checkout-agreement" hidden>
+              <label>
+                <input type="checkbox" data-checkout-agreement />
+                <span
+                  >I have read and agree to the
+                  <a href="/terms/" target="_blank">Terms of Service</a> and the
+                  <a href="/refunds/" target="_blank">Refund Policy</a>, and I have read the
+                  <a href="/privacy/" target="_blank">Privacy Notice</a>.</span
+                >
+              </label>
+              <label>
+                <input type="checkbox" data-checkout-agreement />
+                <span
+                  >I have read the machine-safety section of the terms (<a
+                    href="/terms/#section-2"
+                    target="_blank"
+                    >section 2</a
+                  >), understand the risks, and will operate my machine safely.</span
+                >
+              </label>
+            </div>
+            <button
+              id="checkout-open"
+              type="button"
+              hidden
+              title="Reopen the secure checkout created by your desktop app"
+            >
+              Open secure checkout
+            </button>
+            <div id="browser-purchase" hidden>
+              <button
+                id="purchase-open"
+                type="button"
+                disabled
+                title="Save a recoverable order on this device, then open secure payment"
+              >
+                Checking availability…
+              </button>
+              <div class="purchase-actions">
+                <button
+                  id="purchase-check"
+                  class="secondary"
+                  type="button"
+                  hidden
+                  title="Ask the licence service to confirm this saved payment and reveal your key"
+                >
+                  Check payment
+                </button>
+                <button
+                  id="purchase-refresh"
+                  class="text-button"
+                  type="button"
+                  title="Check whether purchases are available; this does not place an order"
+                >
+                  Retry availability
+                </button>
+              </div>
+              <p id="purchase-reference" class="purchase-reference"></p>
+              <div id="licence-result" class="licence-result" hidden>
+                <label for="licence-key">Your licence key</label>
+                <textarea
+                  id="licence-key"
+                  readonly
+                  rows="3"
+                  spellcheck="false"
+                  autocomplete="off"
+                  aria-describedby="licence-key-help"
+                ></textarea>
+                <button
+                  id="licence-copy"
+                  type="button"
+                  title="Copy your confirmed licence key to your clipboard"
+                >
+                  Copy licence key
+                </button>
+                <p id="licence-copy-status" role="status" aria-live="polite"></p>
+                <p id="licence-key-help">
+                  Keep this key somewhere private. On Windows, open
+                  <strong>Help → Licence</strong> in KerfDesk and enter it. This phone uses no
+                  licence seat.
+                </p>
+              </div>
+              <p class="storage-note">
+                An unfinished purchase is saved only in this browser. Keep its site data until you
+                have saved your key. Private browsing or clearing storage can remove your recovery
+                details. On a shared device, keep your key private.
+              </p>
+            </div>
+            <p id="desktop-checkout-note">
+              After payment, return to KerfDesk and select <strong>Check payment</strong>. The app
+              confirms your purchase with the licence service.
+            </p>
+            <noscript
+              >Enable JavaScript to check purchase availability. You can still download and use
+              KerfDesk Free.</noscript
+            >
+          </div>
+          <p class="renewal">
+            Want more updates later? <strong>US$20</strong> adds another year from Help → Licence in
+            the desktop app. Optional. No subscription or automatic renewal.
+          </p>
+        </section>
+
+        <div class="details-column">
+          <section class="features" aria-labelledby="features-heading">
+            <p class="eyebrow">ROOM FOR MORE</p>
+            <h2 id="features-heading">Go beyond the basics.</h2>
+            <ul class="feature-list">
+              <li>
+                <span class="feature-number">01</span>
+                <div>
+                  <h3>V-carve &amp; 3D relief</h3>
+                  <p>Turn lettering, artwork and height maps into dimensional pieces.</p>
+                </div>
+              </li>
+              <li>
+                <span class="feature-number">02</span>
+                <div>
+                  <h3>Advanced tracing</h3>
+                  <p>Centreline, colour layers, photo shading and multi-file tracing.</p>
+                </div>
+              </li>
+              <li>
+                <span class="feature-number">03</span>
+                <div>
+                  <h3>Camera alignment</h3>
+                  <p>Calibrate your camera and align its view with your machine bed.</p>
+                </div>
+              </li>
+              <li>
+                <span class="feature-number">04</span>
+                <div>
+                  <h3>More ways to make</h3>
+                  <p>Adaptive clearing, box generation, Design Studio and the G-code Inspector.</p>
+                </div>
+              </li>
+            </ul>
+          </section>
+          <section class="free-card" aria-labelledby="free-heading">
+            <span class="free-label">FREE IS ALWAYS HERE</span>
+            <h2 id="free-heading">Start with what you have.</h2>
+            <p>
+              The Windows app opens in Free. Drawing, basic tracing, laser cutting and engraving,
+              and 2D CNC need no licence. Pro tools unlock with a licence or an optional 30-day
+              trial started in the desktop app.
+            </p>
+            <a
+              class="download-link"
+              href="/download.html"
+              title="See verified Windows downloads and installer details"
+              >Get the Windows app <span aria-hidden="true">↗</span></a
+            >
+            <p class="small">
+              The browser workspace is for desktop computers. This mobile page helps you choose and
+              manage your purchase.
+            </p>
+          </section>
         </div>
       </div>
-      <p class="tax">
-        Prices are in US dollars and don't include tax. Paddle adds the tax that applies where you
-        live and shows the total before you pay. Nothing renews automatically.
-      </p>
-      <section aria-labelledby="checkout-heading">
-        <h2 id="checkout-heading">Complete your purchase</h2>
-        <p id="checkout-status" role="status" aria-live="polite">Checking checkout availability…</p>
-        <div id="checkout-agreement" hidden>
-          <label>
-            <input type="checkbox" data-checkout-agreement />
-            <span
-              >I have read and agree to the
-              <a href="/terms/" target="_blank">Terms of Service</a> and the
-              <a href="/refunds/" target="_blank">Refund Policy</a>, and I have read the
-              <a href="/privacy/" target="_blank">Privacy Notice</a>.</span
-            >
-          </label>
-          <label>
-            <input type="checkbox" data-checkout-agreement />
-            <span
-              >I have read the machine-safety section of the terms (<a
-                href="/terms/#section-2"
-                target="_blank"
-                >section 2</a
-              >), understand the risks, and will operate my machine safely.</span
-            >
-          </label>
-        </div>
-        <button id="checkout-open" type="button" hidden disabled>Open secure checkout</button>
-        <p>
-          After payment, return to KerfDesk and select <strong>Check payment</strong>. The app
-          confirms your purchase with the licence service.
-        </p>
+
+      <section class="questions" aria-labelledby="questions-heading">
+        <h2 id="questions-heading">A few useful details.</h2>
+        <details>
+          <summary>What happens after my year of updates?</summary>
+          <p>
+            Your licence keeps working with every version released during your covered period. Renew
+            only if you want another year of updates.
+          </p>
+        </details>
+        <details>
+          <summary>Can I buy here and activate later?</summary>
+          <p>
+            When purchases are open, yes. After payment is confirmed, this page shows your licence
+            key. Save it and activate KerfDesk Pro on up to three Windows computers. Buying on your
+            phone does not activate it or start a trial.
+          </p>
+        </details>
+        <details>
+          <summary>I paid, but I cannot find my key.</summary>
+          <p>
+            Return in the same browser and select Check payment. If its saved data is gone or
+            payment needs review, contact <a href="/support.html">KerfDesk support</a> with your
+            receipt. Support will privately verify the purchase. Do not pay again or send your key
+            in a public message.
+          </p>
+        </details>
       </section>
-      <p class="seller">
-        Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant
-        of Record for all our orders. Paddle provides all customer service inquiries and handles
-        returns.
-      </p>
-      <p class="seller">
-        KerfDesk is made and licensed by Johannes Stephanus Stolk, trading as KerfDesk. For help
-        with a payment, receipt, invoice or refund, go to
-        <a href="https://paddle.net">paddle.net</a>; for help with KerfDesk or your licence, see
-        <a href="/support.html">Support</a>.
-      </p>
-      <footer>
-        <a href="/terms/">Terms of Service</a> · <a href="/refunds/">Refund Policy</a> ·
-        <a href="/privacy/">Privacy Notice</a> · <a href="/pricing/">Pricing</a> ·
-        <a href="/download.html">Desktop downloads</a> ·
-        <a href="https://kerfdesk.com">Back to KerfDesk</a>
-      </footer>
     </main>
+    <p class="seller">
+      Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant
+      of Record for all our orders. Paddle provides all customer service inquiries and handles
+      returns.
+    </p>
+    <p class="seller">
+      KerfDesk is made and licensed by Johannes Stephanus Stolk, trading as KerfDesk. For help with
+      a payment, receipt, invoice or refund, go to
+      <a href="https://paddle.net">paddle.net</a>; for help with KerfDesk or your licence, see
+      <a href="/support.html">Support</a>.
+    </p>
+
+    <p class="seller">You buy a licence to use the software, not ownership of it.</p>
+    <footer class="site-footer">
+      <p>KerfDesk <span>by Ons Houtkombuis</span></p>
+      <nav aria-label="Footer">
+        <a href="/support.html">Support</a><a href="/eula.txt">App licence</a
+        ><a href="/download.html">Downloads</a>
+      </nav>
+    </footer>
   </body>
 </html>

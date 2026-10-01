@@ -52,12 +52,16 @@ export type LicenceAdapter = {
   readonly updateStatus: () => Promise<CommercialUpdateStatus>;
   /** Starts an update check and answers at once; `updateStatus` gives the result. */
   readonly checkForUpdates: () => Promise<CommercialUpdateStatus>;
+  /** Explicitly download an offered manual update; never closes the app. */
+  readonly downloadUpdate?: () => Promise<CommercialUpdateStatus>;
+  /** Arm a verified installer for the next normal close; never quits now. */
+  readonly installUpdateOnQuit?: () => Promise<CommercialUpdateStatus>;
 };
 
 /**
  * Where the desktop app's own updates stand (ADR-547). `unavailable` is a
- * build that does not update itself; `ready` is a downloaded version that
- * installs when KerfDesk closes; `not-covered` is a newer version this
+ * build that does not update itself; `ready` is a downloaded version. Manual
+ * updates require explicit installation consent; `not-covered` is a version this
  * licence's updates do not cover.
  */
 export type CommercialUpdateStatus = {
@@ -65,6 +69,7 @@ export type CommercialUpdateStatus = {
     | 'unavailable'
     | 'idle'
     | 'checking'
+    | 'available'
     | 'downloading'
     | 'up-to-date'
     | 'ready'
@@ -75,6 +80,12 @@ export type CommercialUpdateStatus = {
   readonly version: string | null;
   /** When the last check finished, in milliseconds since 1970. */
   readonly checkedAt: number | null;
+  /** Manual packages require separate download and installation consent. */
+  readonly mode?: 'manual';
+  /** True only after the owner arms a manual installer for normal app close. */
+  readonly installOnQuit?: boolean;
+  readonly releaseNotes?: readonly string[];
+  readonly releaseNotesState?: 'loading' | 'available' | 'unavailable';
 };
 
 /**

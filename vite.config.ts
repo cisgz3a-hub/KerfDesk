@@ -5,6 +5,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import { pdfResources } from './scripts/pdf-resources';
+import { browserFreeBuild } from './scripts/browser-free-build';
 
 import {
   appVersion,
@@ -56,6 +57,7 @@ function fileSystemAllowList(): ReadonlyArray<string> {
 
 export default defineConfig({
   plugins: [
+    browserFreeBuild(),
     react(),
     pdfResources(),
     // Offline PWA (ADR-060). registerType 'prompt' (never auto-reload — see
@@ -203,6 +205,10 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           const normalized = id.replace(/\\/g, '/');
+          // Keep Vite's shared import helper out of application chunks. The
+          // mobile router needs it before deciding whether to load main; placing
+          // it in core would eagerly fetch core and its CAM dependencies.
+          if (normalized === '\0vite/preload-helper.js') return 'preload-helper';
           if (normalized.includes('/node_modules/react')) return 'vendor-react';
           if (normalized.includes('/node_modules/zustand')) return 'vendor-state';
           if (
@@ -237,6 +243,7 @@ export default defineConfig({
     },
   },
   worker: {
+    plugins: () => [browserFreeBuild()],
     // Trace worker imports the lazy trace pipeline, so production workers must
     // emit as ES modules. Vite's default iife worker format cannot code-split.
     format: 'es',

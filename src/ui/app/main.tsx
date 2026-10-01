@@ -4,6 +4,8 @@
 // electron/main.ts). We only stamp `id: 'electron'` for UI feature-gating.
 
 import { StrictMode } from 'react';
+import { resolveWindowsDesktopDownload } from '../../../public/desktop-windows-download.mjs';
+import { DesktopDownloadContext } from '../licensing/desktop-download-context';
 import { createRoot } from 'react-dom/client';
 import {
   createDesktopPreviewUpdateAdapter,
@@ -30,8 +32,9 @@ import { initAppTheme } from '../theme/app-theme';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 import { EditionProvider } from '../licensing/EditionProvider';
-import { TermsAgreementGate } from '../legal/TermsAgreementGate';
 import { watchPreloadErrors } from './preload-error-toast';
+import { DesktopStartupGate } from './DesktopStartupGate';
+import { TermsAgreementGate } from '../legal/TermsAgreementGate';
 
 const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
@@ -102,14 +105,20 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        {/* First use asks for agreement to the terms and machine safety before
-            anything else starts (ADR-564). */}
         <TermsAgreementGate>
-          <EditionProvider
-            {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
-          >
-            <App />
-          </EditionProvider>
+          <DesktopStartupGate>
+            <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>
+              <EditionProvider
+                {...(import.meta.env.DEV &&
+                (import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'test')
+                  ? { unlicensedRunsFree: false }
+                  : {})}
+                {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
+              >
+                <App />
+              </EditionProvider>
+            </DesktopDownloadContext.Provider>
+          </DesktopStartupGate>
         </TermsAgreementGate>
       </PlatformProvider>
     </ErrorBoundary>
@@ -147,10 +156,8 @@ function fadeOutSplash(): void {
 }
 
 function dismissWhenBoardReady(): void {
-  // The first-use agreement (ADR-564) stands in for the board until it is answered.
   const boardPainted =
-    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null ||
-    document.querySelector('#app-root [data-terms-agreement="first"]') !== null;
+    document.querySelector('#app-root canvas[data-workspace-painted="true"]') !== null;
   const startupCrashed = document.querySelector('#app-root > [role="alert"]') !== null;
   const timedOut = performance.now() - splashStartedAt > SPLASH_MAX_WAIT_MS;
   // performance.now() counts from navigation, when the static splash first paints.

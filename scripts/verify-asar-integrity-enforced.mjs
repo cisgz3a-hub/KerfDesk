@@ -10,7 +10,7 @@
 // The archive is changed in place and put back afterwards, so run this only on
 // a disposable package, after every other check on it has passed.
 //
-// usage: node scripts/verify-asar-integrity-enforced.mjs <executable> <app.asar> [--timeout-ms=N]
+// usage: node scripts/verify-asar-integrity-enforced.mjs <executable> <app.asar> [--timeout-ms=N] [--output=directory]
 
 import { spawn } from 'node:child_process';
 import {
@@ -28,6 +28,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectNativeSmokeProcess } from './native-smoke-process.mjs';
 import { validateNativeSmokeResult } from './verify-windows-packaged-native-smoke.mjs';
+import { createIntegrityEvidence } from './asar-integrity-evidence.mjs';
 
 const HASH_KEY = '"hash":"';
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -127,8 +128,27 @@ async function launch(executable, timeoutMs) {
 }
 
 /** Prove the same package works before changing it, and always restore its header. */
-export async function verifyAsarIntegrity(executable, archive, timeoutMs, launchProcess = launch) {
-  const baseline = await launchProcess(executable, timeoutMs);
+export async function verifyAsarIntegrity(
+  executable,
+  archive,
+  timeoutMs,
+  launchProcess = launch,
+  options = {},
+) {
+  const evidence = createIntegrityEvidence(options.output);
+  if (evidence.directory !== null) options.reportEvidence?.(evidence.directory);
+  const observe = async (phase) => {
+    let observation;
+    try {
+      observation = await launchProcess(executable, timeoutMs);
+    } catch (error) {
+      evidence.record(phase, null, error);
+      throw error;
+    }
+    evidence.record(phase, observation);
+    return observation;
+  };
+  const baseline = await observe('baseline');
   if (
     baseline.code !== 0 ||
     baseline.signal !== null ||
@@ -136,7 +156,9 @@ export async function verifyAsarIntegrity(executable, archive, timeoutMs, launch
     !baseline.spawned ||
     !baseline.childClosed
   ) {
-    throw new Error('unmodified package did not complete its native smoke baseline');
+    throw new Error(
+      `unmodified package did not complete its native smoke baseline (exit=${baseline.code}, signal=${baseline.signal}, failure=${baseline.failure?.kind ?? 'none'}, spawned=${baseline.spawned}, closed=${baseline.childClosed})`,
+    );
   }
   validateNativeSmokeResult(baseline.smokeResult, baseline.userData);
   const { prefix, header } = readHeader(archive);
@@ -144,7 +166,7 @@ export async function verifyAsarIntegrity(executable, archive, timeoutMs, launch
   writeByte(archive, tamper.offset, tamper.replacement);
   let observed;
   try {
-    observed = await launchProcess(executable, timeoutMs);
+    observed = await observe('tampered');
   } finally {
     // The launch observer waits for close, with a bounded termination attempt.
     // A still-live child fails qualification, and the on-disk package is restored.
@@ -160,13 +182,25 @@ async function runCli() {
   const [executable, asarPath] = args.filter((arg) => !arg.startsWith('--'));
   if (executable === undefined || asarPath === undefined || !isAbsolute(executable)) {
     throw new Error(
-      'usage: verify-asar-integrity-enforced.mjs <absolute executable> <app.asar> [--timeout-ms=N]',
+      'usage: verify-asar-integrity-enforced.mjs <absolute executable> <app.asar> [--timeout-ms=N] [--output=directory]',
     );
   }
   const timeoutArg = args.find((arg) => arg.startsWith('--timeout-ms='));
   const timeoutMs = timeoutArg === undefined ? DEFAULT_TIMEOUT_MS : Number(timeoutArg.slice(13));
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('timeout must be positive');
-  const { observed, verdict } = await verifyAsarIntegrity(executable, resolve(asarPath), timeoutMs);
+  const outputArg = args.find((arg) => arg.startsWith('--output='));
+  if (outputArg !== undefined && outputArg.slice(9).trim() === '')
+    throw new Error('output directory must not be empty');
+  const { observed, verdict } = await verifyAsarIntegrity(
+    executable,
+    resolve(asarPath),
+    timeoutMs,
+    launch,
+    {
+      output: outputArg?.slice(9),
+      reportEvidence: (directory) => process.stdout.write(`ASAR_INTEGRITY_EVIDENCE=${directory}\n`),
+    },
+  );
   process.stdout.write(`${observed.stderr.trim().slice(-4000)}\n`);
   process.stdout.write(`ASAR_INTEGRITY_ENFORCED=true (${verdict.reason})\n`);
 }

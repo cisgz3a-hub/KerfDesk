@@ -2,14 +2,15 @@ import type { UpdateCheckOutcome } from './commercial-update.js';
 
 /**
  * What Help > Check for Updates shows (ADR-547). `unavailable` is a build that
- * does not update itself; `ready` is a verified download that installs when
- * KerfDesk closes; `not-covered` is a newer release this licence's updates do
- * not cover.
+ * does not update itself; `ready` is a verified download. In manual mode it
+ * installs after an approved close only when installOnQuit was explicitly
+ * armed. `not-covered` is a newer release this licence's updates do not cover.
  */
 export type UpdateState =
   | 'unavailable'
   | 'idle'
   | 'checking'
+  | 'available'
   | 'downloading'
   | 'up-to-date'
   | 'ready'
@@ -23,6 +24,11 @@ export type UpdateStatus = {
   readonly version: string | null;
   /** When the last check finished, in milliseconds since 1970. */
   readonly checkedAt: number | null;
+  readonly mode?: 'manual';
+  readonly installOnQuit?: boolean;
+  /** Verified, release-bound plain text; absent in older update services. */
+  readonly releaseNotes?: readonly string[];
+  readonly releaseNotesState?: 'loading' | 'available' | 'unavailable';
 };
 
 export type DesktopUpdates = {
@@ -35,6 +41,8 @@ export type DesktopUpdates = {
   readonly check: () => UpdateStatus;
   /** Settles when the check running now, if any, ends. */
   readonly settled: () => Promise<void>;
+  readonly download?: () => UpdateStatus;
+  readonly installOnQuit?: () => Promise<UpdateStatus>;
 };
 
 const BUSY: ReadonlySet<UpdateState> = new Set(['checking', 'downloading', 'ready']);

@@ -10,6 +10,7 @@ import {
 } from '../../../core/devices';
 import { selectControllerDriver } from '../../../core/controllers';
 import { usePlatformOptional } from '../../app/platform-context';
+import { DraftNumberInput } from '../../kit/DraftNumberInput';
 import { backgroundStreamingPreferenceTitle } from '../../state/laser-background-streaming-notice';
 import { isGrblFamilyDriver } from '../../state/laser-disconnect-transaction';
 import { mutedStyle } from '../MachineSetupStyles';
@@ -159,16 +160,15 @@ function BaudRow(props: {
 }): JSX.Element {
   return (
     <Row label="Baud rate">
-      <input
-        type="number"
+      <DraftNumberInput
         min={1200}
         max={1000000}
         step={100}
         value={props.state.draft.baudRate ?? props.guide.defaultBaudRate}
-        onChange={(event) => {
-          const baudRate = Number(event.target.value);
-          if (Number.isFinite(baudRate) && baudRate > 0) props.update({ baudRate });
-        }}
+        normalize={(value) =>
+          value > 0 ? value : (props.state.draft.baudRate ?? props.guide.defaultBaudRate)
+        }
+        onValueChange={(baudRate) => props.update({ baudRate })}
         aria-label="Serial baud rate"
         title="Serial speed from the controller manual. A wrong value prevents a readable connection."
       />
@@ -228,17 +228,13 @@ function RxWindowRow(props: {
 }): JSX.Element {
   return (
     <Row label="RX window">
-      <input
-        type="number"
+      <DraftNumberInput
         min={1}
         max={4096}
         step={1}
         value={props.state.draft.rxBufferBytes}
-        onChange={(event) => {
-          const rxBufferBytes = Number(event.target.value);
-          if (Number.isFinite(rxBufferBytes) && rxBufferBytes > 0)
-            props.update({ rxBufferBytes: Math.floor(rxBufferBytes) });
-        }}
+        normalize={(value) => (value > 0 ? Math.floor(value) : props.state.draft.rxBufferBytes)}
+        onValueChange={(rxBufferBytes) => props.update({ rxBufferBytes })}
         aria-label="Controller receive window bytes"
         title="Set the controller receive-buffer allowance used by buffered streaming. Start never streams more than the capacity the controller reports; grblHAL profiles default to 1024 bytes."
       />

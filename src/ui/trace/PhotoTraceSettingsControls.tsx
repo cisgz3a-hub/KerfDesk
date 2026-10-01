@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import type { TraceOptions } from '../../core/trace';
 import type { LightBurnTraceSettingOverrides } from './trace-options';
 
@@ -77,8 +78,8 @@ function PhotoNumberRow(props: {
   readonly min: number;
   readonly max?: number;
   readonly step?: number;
-  // A cleared field reads as 0, the neutral value of Brightness and Contrast.
-  // Midtones is neutral at 1; 0 would clamp to its darkest setting.
+  // Leaving a cleared field restores its neutral value on blur. While typing,
+  // keep it empty so a replacement or a negative number can be entered.
   readonly cleared?: number;
   readonly value: number;
   readonly hint: string;
@@ -99,15 +100,18 @@ function PhotoNumberRow(props: {
       <label htmlFor={inputId}>
         <span>{props.label}</span>
         <span className="lf-trace-number-input">
-          <input
+          <DraftNumberInput
             id={inputId}
             className="lf-input"
-            type="number"
             min={props.min}
             max={props.max ?? 100}
             step={props.step ?? 1}
             value={props.value}
-            onChange={(event) => change(event.target.value)}
+            normalize={(next) => Math.max(props.min, Math.min(props.max ?? 100, next))}
+            onValueChange={props.onChange}
+            onBlur={(event) => {
+              if (event.currentTarget.value.trim() === '') change('');
+            }}
             aria-label={`Trace ${props.label}`}
             aria-describedby={hintId}
             title={props.hint}

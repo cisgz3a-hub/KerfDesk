@@ -25,6 +25,7 @@ import { WorkspaceViewport } from '../workspace/WorkspaceViewport';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
 import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
+import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
 import { useAutoConnectController } from './use-auto-connect-controller';
@@ -59,6 +60,7 @@ export function App(): JSX.Element {
       <DesktopCloseNotice />
       <DesktopSessionEndNotice />
       <AutosaveRecoveryBanner />
+      <ProProjectDesktopDialog />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
       <RecentProjectsHost />

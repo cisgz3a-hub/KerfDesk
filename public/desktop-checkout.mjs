@@ -1,67 +1,9 @@
-/* global URLSearchParams, AbortSignal, TextDecoder, setTimeout, clearTimeout, fetch, window */
-const CONFIG_URL = 'https://license.kerfdesk.com/v1/public/config';
+/* global setTimeout, clearTimeout, fetch, window */
+import { checkoutTransaction, publicConfig } from './desktop-checkout-api.mjs';
+import { startBrowserPurchase } from './desktop-browser-purchase.mjs';
+export { checkoutTransaction, checkoutConfiguration } from './desktop-checkout-api.mjs';
 
-export function checkoutTransaction(search) {
-  const params = new URLSearchParams(search);
-  if ([...params.keys()].join(',') !== '_ptxn') return null;
-  const value = params.get('_ptxn');
-  return /^txn_[a-z0-9]{26}$/u.test(value ?? '') ? value : null;
-}
-
-export function checkoutConfiguration(value) {
-  if (
-    value?.enabled !== true ||
-    value.provider !== 'paddle' ||
-    !['sandbox', 'live'].includes(value.environment) ||
-    typeof value.clientToken !== 'string'
-  )
-    return null;
-  const prefix = value.environment === 'sandbox' ? 'test_' : 'live_';
-  if (
-    !value.clientToken.startsWith(prefix) ||
-    !/^(test|live)_[a-zA-Z0-9]{27}$/u.test(value.clientToken)
-  )
-    return null;
-  if (
-    value.purchase?.amount !== 4950 ||
-    value.purchase.currency !== 'USD' ||
-    value.renewal?.amount !== 2000 ||
-    value.renewal.currency !== 'USD'
-  )
-    return null;
-  return { token: value.clientToken, environment: value.environment };
-}
-
-async function publicConfig(fetcher) {
-  const response = await fetcher(CONFIG_URL, {
-    credentials: 'omit',
-    redirect: 'error',
-    cache: 'no-store',
-    signal: AbortSignal.timeout(8000),
-  });
-  if (!response.ok || !response.body) throw new Error('Checkout unavailable');
-  const reader = response.body.getReader();
-  const parts = [];
-  let size = 0;
-  try {
-    for (;;) {
-      const next = await reader.read();
-      if (next.done) break;
-      size += next.value.length;
-      if (size > 4096) throw new Error('Invalid checkout configuration');
-      parts.push(next.value);
-    }
-  } finally {
-    await reader.cancel().catch(() => undefined);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const part of parts) {
-    bytes.set(part, offset);
-    offset += part.length;
-  }
-  return checkoutConfiguration(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
-}
+const sessions = new WeakMap();
 
 async function paddleScript(document) {
   await new Promise((resolve, reject) => {
@@ -78,43 +20,57 @@ async function paddleScript(document) {
     };
     script.onerror = () => {
       clearTimeout(timer);
+      script.remove();
       reject(new Error('Checkout failed to load'));
     };
     document.head.append(script);
   });
 }
 
-async function initializedPaddle(window, config, status) {
-  await paddleScript(window.document);
-  const paddle = window.Paddle;
-  if (!paddle?.Initialize || !paddle?.Checkout?.open) throw new Error('Checkout unavailable');
-  if (config.environment === 'sandbox') paddle.Environment.set('sandbox');
-  paddle.Initialize({
-    token: config.token,
-    eventCallback: (event) => {
-      if (event.name === 'checkout.completed')
-        status.textContent =
-          'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
-    },
+async function openCheckout(window, config, transaction, onCompleted) {
+  let session = sessions.get(window);
+  if (session === undefined) {
+    await paddleScript(window.document);
+    const paddle = window.Paddle;
+    if (!paddle?.Initialize || !paddle?.Checkout?.open) throw new Error('Checkout unavailable');
+    session = { token: config.token, environment: config.environment, onCompleted };
+    if (config.environment === 'sandbox') paddle.Environment.set('sandbox');
+    paddle.Initialize({
+      token: config.token,
+      eventCallback: (event) => {
+        if (event.name === 'checkout.completed') session.onCompleted();
+      },
+    });
+    sessions.set(window, session);
+  }
+  if (session.token !== config.token || session.environment !== config.environment)
+    throw new Error('Checkout configuration changed; reload this page');
+  session.onCompleted = onCompleted;
+  window.Paddle.Checkout.open({
+    transactionId: transaction,
+    settings: { showAddDiscounts: false },
   });
-  return paddle;
 }
 
 const UNAVAILABLE =
   'Checkout is temporarily unavailable. Return to KerfDesk to check an existing payment before trying again.';
-
-// The buyer agrees to the terms and confirms the machine-safety section before
-// Paddle's checkout opens (terms s1.3 and s2.5), and Paddle's code loads only
-// then, so the page sets no Paddle cookie for a visitor who does not go ahead.
 export async function startCheckoutPage(window, fetcher = fetch) {
   const status = window.document.getElementById('checkout-status');
   const button = window.document.getElementById('checkout-open');
   const agreement = window.document.getElementById('checkout-agreement');
   if (!status || !button || !agreement) return;
+  const boxes = [...agreement.querySelectorAll('input[data-checkout-agreement]')];
+  const agreed = () => boxes.length === 2 && boxes.every((box) => box.checked);
   const transaction = checkoutTransaction(window.location.search);
   if (transaction === null) {
+    if (window.location.search === '')
+      return startBrowserPurchase(window, fetcher, openCheckout, {
+        element: agreement,
+        boxes,
+        agreed,
+      });
     status.textContent =
-      'Open Help → Licence in the desktop app to start a purchase or renew updates.';
+      'This checkout link is invalid. Reopen it from the desktop app or visit the licence page without a query string.';
     return;
   }
   try {
@@ -124,23 +80,19 @@ export async function startCheckoutPage(window, fetcher = fetch) {
         'Checkout is not available yet. Return to KerfDesk to check an existing payment.';
       return;
     }
-    const boxes = [...agreement.querySelectorAll('input[data-checkout-agreement]')];
-    const agreed = () => boxes.length > 0 && boxes.every((box) => box.checked);
     const refresh = () => {
       button.disabled = !agreed();
     };
     for (const box of boxes) box.addEventListener('change', refresh);
-    let paddle = null;
     // No discount field: the licence service refuses a discounted payment, so a code
     // entered here would take money without issuing a licence (ADR-523 Amendment 3).
     button.addEventListener('click', () => {
       if (!agreed()) return;
       void (async () => {
         try {
-          paddle ??= await initializedPaddle(window, config, status);
-          paddle.Checkout.open({
-            transactionId: transaction,
-            settings: { showAddDiscounts: false },
+          await openCheckout(window, config, transaction, () => {
+            status.textContent =
+              'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
           });
         } catch {
           status.textContent = UNAVAILABLE;

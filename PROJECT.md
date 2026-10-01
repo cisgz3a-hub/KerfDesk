@@ -37,6 +37,8 @@ The 1.0 codebase shipped a working app but had a coupling problem: fixes in one 
 
 Single role: **operator**. Free/web/Preview builds need no activation. The explicitly prepared commercial desktop channel always opens and runs KerfDesk Free; only opening a Pro tool asks for a signed trial, paid or developer licence (ADR-540, amending ADR-523's admission). Pro stays for the running session even if a trial ends, and a licence never gates Frame, Start or output or stops a running job; machine Start policy is unchanged.
 
+ADR-540 Amendment 1 brings forward the browser Free split: browser bundles omit Pro entry implementations. A saved project requiring Pro machining is preserved for desktop before it can replace the browser document. Desktop Free continues to load and output existing Pro work. This is project admission, never an additional Frame or Start guard.
+
 User profile:
 - Owns a GRBL-based diode or CO₂ laser (xTool, Sculpfun, Ortur, Atomstack, NEJE, OpenBuilds, FluidNC retrofits).
 - Comes from LightBurn or LaserGRBL and expects that workflow.
@@ -456,7 +458,7 @@ phase; tracked here so they don't get lost.
 5. **Deterministic G-code** — same input + same parameters → byte-identical output. Snapshot-tested.
 6. **Units honest** — internal model is mm. Inches accepted only at import boundary via explicit conversion.
 7. **Power scale honest** — `S` values match the device profile's max-power scale (`$30`). Property-tested.
-8. **No telemetry; pinned release and commercial licensing services only (ADR-523)** — local-first. No analytics, error-reporting service, cloud sync, project data, machine data or job data leaves the machine. Desktop release discovery uses pinned first-party endpoints; Preview remains metadata-only. Only the explicit commercial channel may send its documented product-hashed installation identity, device label, licensing credentials and order fields to the licensing service. Checkout sends payment details directly to its approved provider. Servers necessarily receive connection metadata such as IP address and time. Web/PWA and every CAM/preview/streaming path stay fully offline.
+8. **No telemetry; pinned release and commercial licensing services only (ADR-523)** — local-first. No app-usage analytics, error-reporting service, cloud sync, project data, machine data or job data leaves the machine. Desktop release discovery uses pinned first-party endpoints; Preview remains metadata-only. Only the explicit commercial channel may send its documented product-hashed installation identity, device label, licensing credentials and order fields to the licensing service. Checkout sends payment details directly to its approved provider. Servers necessarily receive connection metadata such as IP address and time. The owner may inspect aggregate installer request statistics from the download host, without client tracking or personal identifiers in saved reports (ADR-563). Web/PWA and every CAM/preview/streaming path stay fully offline.
 9. **Abort reachable always** — the software Abort / Controller Reset control is reachable from any window state during a job. No modal can block it. This command is not a safety-rated E-stop; dangerous conditions require the machine's physical E-stop or power isolation.
 
 ### Architectural (anti-shotgun-surgery)

@@ -36,12 +36,18 @@ describe('Cut Settings image density outside the recommended range', () => {
     },
   );
 
-  it('still holds a new density entry to the recommended range', async () => {
+  it('holds new density to the recommended range while retaining the typing draft', async () => {
     const view = await renderDialog({ mode: 'image', linesPerMm: 2 });
     try {
       await change(input(view.host, 'DPI'), '60');
-      expect(input(view.host, 'DPI').value).toBe('127');
+      expect(input(view.host, 'DPI').value).toBe('60');
+      expect(view.form.querySelector<HTMLInputElement>('input[name="linesPerMm"]')?.value).toBe(
+        '5',
+      );
       expect(input(view.host, 'line interval').value).toBe('0.2');
+
+      await act(async () => Simulate.blur(input(view.host, 'DPI')));
+      expect(input(view.host, 'DPI').value).toBe('127');
 
       await submit(view.form);
 

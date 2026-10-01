@@ -11,6 +11,7 @@ import { cncToolGeometryLabel } from '../common/cnc-tool-geometry-label';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { RailSection } from '../kit';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { AddCncBitForm } from './AddCncBitForm';
 import { CncBitCatalogPanel } from './CncBitCatalogPanel';
 import { staleCatalogBitCorrections } from './cnc-bit-catalog-corrections';
@@ -100,16 +101,16 @@ function CncToolManagerRow(props: {
         {label}
       </span>
       {props.onChangeFluteCount === undefined ? null : (
-        <input
-          type="number"
+        <DraftNumberInput
           min={1}
           step={1}
           value={props.tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT}
-          onChange={(event) => {
-            const fluteCount = Number(event.target.value);
-            if (!isValidFluteCount(fluteCount)) return;
-            props.onChangeFluteCount?.(props.tool.id, fluteCount);
-          }}
+          normalize={(value) =>
+            isValidFluteCount(value)
+              ? value
+              : (props.tool.fluteCount ?? DEFAULT_ASSUMED_FLUTE_COUNT)
+          }
+          onValueChange={(fluteCount) => props.onChangeFluteCount?.(props.tool.id, fluteCount)}
           aria-label={`Flute count for ${props.tool.name}`}
           title="Set this cutter's actual number of cutting flutes. This Machine Setup change is saved with the job."
           style={fluteInputStyle}

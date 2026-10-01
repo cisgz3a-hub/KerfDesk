@@ -1,17 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { CommercialUpdateStatus, LicenceAdapter } from '../../platform/types';
-import { useCommercialUpdateStore } from '../state/commercial-update-store';
+import type { LicenceAdapter } from '../../platform/types';
 import { useToastStore } from '../state/toast-store';
 import { LICENCE_SETTINGS_EVENT } from './edition';
 import { panelOverlay, useDismissOnEscape } from './panel-overlay';
-import { CHECK_UPDATES_EVENT, updateStatusSettled } from './update-status-text';
+import { CHECK_UPDATES_EVENT } from './update-status-text';
 import { UpdatesPanel } from './UpdatesPanel';
-
-// The main process checks once after the window opens (ADR-547). Until the
-// status settles the window asks again: often while a check or download runs,
-// rarely while the first check has not started.
-const BUSY_POLL_MS = 3_000;
-const IDLE_POLL_MS = 30_000;
+import { useCommercialUpdateStatus } from './use-commercial-update-status';
 
 /**
  * Keeps the desktop app's update status for the status bar, and answers Help >
@@ -24,7 +18,7 @@ export function CommercialUpdates({
   readonly client: LicenceAdapter;
   readonly updatesUntil: number | null;
 }): JSX.Element | null {
-  const { status, check } = useCommercialUpdateStatus(client);
+  const { status, busy, check, download, installOnQuit } = useCommercialUpdateStatus(client);
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
@@ -46,6 +40,9 @@ export function CommercialUpdates({
         status={status}
         updatesUntil={updatesUntil}
         onCheck={check}
+        busy={busy}
+        onDownload={download}
+        onInstallOnQuit={installOnQuit}
         onClose={close}
       />
     </div>
@@ -67,50 +64,4 @@ export function BrowserUpdatesNotice(): null {
     return () => window.removeEventListener(CHECK_UPDATES_EVENT, explain);
   }, []);
   return null;
-}
-
-export function useCommercialUpdateStatus(client: LicenceAdapter): {
-  readonly status: CommercialUpdateStatus | null;
-  readonly check: () => Promise<void>;
-} {
-  const status = useCommercialUpdateStore((state) => state.status);
-  const setStatus = useCommercialUpdateStore((state) => state.setStatus);
-  useEffect(() => {
-    if (status !== null && updateStatusSettled(status)) return undefined;
-    let live = true;
-    const wait = status === null ? 0 : status.state === 'idle' ? IDLE_POLL_MS : BUSY_POLL_MS;
-    const timer = window.setTimeout(() => {
-      client.updateStatus().then(
-        (next) => {
-          if (live) setStatus(next);
-        },
-        () => {
-          // A window that cannot read the status shows this build as not
-          // updating itself rather than asking again for ever.
-          if (live) setStatus(unreadable(status));
-        },
-      );
-    }, wait);
-    return () => {
-      live = false;
-      window.clearTimeout(timer);
-    };
-  }, [client, setStatus, status]);
-  const check = useCallback(async (): Promise<void> => {
-    try {
-      setStatus(await client.checkForUpdates());
-    } catch {
-      setStatus(unreadable(useCommercialUpdateStore.getState().status));
-    }
-  }, [client, setStatus]);
-  return { status, check };
-}
-
-function unreadable(status: CommercialUpdateStatus | null): CommercialUpdateStatus {
-  return {
-    state: 'unavailable',
-    currentVersion: status?.currentVersion ?? __APP_VERSION__,
-    version: null,
-    checkedAt: null,
-  };
 }

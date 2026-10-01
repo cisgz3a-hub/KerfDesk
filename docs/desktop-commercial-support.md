@@ -28,15 +28,16 @@ the single command that needs it.
 - KerfDesk always opens (ADR-540). Without Pro it runs KerfDesk Free: only the
   Pro tools (V-carve, 3D relief, adaptive clearing, advanced tracing, camera
   alignment, box generator, Design Studio, G-code Inspector) ask for a licence.
-  Existing projects that use them still preview, frame, start and save G-code.
+  Existing desktop projects that use them still preview, frame, start and save G-code.
 - A version released after the update cutoff opens as Free with "This version is
   newer" and the update date in Help > Licence. Older eligible versions keep Pro
   and stay downloadable under **Earlier versions** on the download page.
 - Pro stays unlocked for the rest of a running session even if a trial ends.
   Nothing a licence does can stop a running job.
-- The web app and the free Preview builds never need a licence. Pro is sold only for the
-  desktop app (ADR-540 item 7); once sales open, those builds run KerfDesk Free and send Pro
-  tools to the desktop app.
+- The web app and the free Preview builds never need a licence. Those builds run
+  KerfDesk Free and send Pro tools to the desktop app. Browser Free preserves Pro
+  machining projects for desktop, with a complete Save As copy; it does not remove
+  their operations or overwrite an unsupported autosave (ADR-540 Amendment 1).
 
 ## Situations
 

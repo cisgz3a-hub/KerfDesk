@@ -1,11 +1,11 @@
 import { Button, Dialog, DialogActions } from '../kit';
 import { DESKTOP_DOWNLOAD_URL } from './edition-policy';
 import { licenceMuted } from './LicenceControls';
-import { PRO_FEATURES, PRO_PRICE_LABEL, type ProFeature } from './pro-features';
+import { PRO_FEATURES, type ProFeature } from './pro-features';
 
 /**
- * A build that cannot take a licence runs KerfDesk Free once sales open
- * (ADR-544). Its Pro tools, its status bar notice and Help > Licence all point
+ * A build that cannot take a licence runs KerfDesk Free. Its Pro tools,
+ * its status bar notice and Help > Licence all point
  * to the desktop app, where Pro is unlocked, and list every Pro feature.
  */
 export function ProInDesktopDialog({
@@ -31,7 +31,7 @@ export function ProInDesktopDialog({
         ))}
       </ul>
       <p style={bodyStyle}>
-        Try every Pro tool free for 30 days there, or buy Pro once for {PRO_PRICE_LABEL}.
+        Check the download page for licensed desktop availability and trial details.
       </p>
       <DialogActions>
         <a

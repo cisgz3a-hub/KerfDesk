@@ -12,8 +12,10 @@ import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import { cncMachineWithReusableTools } from './machine-actions';
 import { projectForModeSwitch } from './mode-switch-settings';
 import { projectWithParkedCnc } from './parked-cnc-machine';
+import type { ProFeature } from '../licensing/pro-features';
 
 export type ProjectMachineCapabilityLoadResult =
+  | { readonly kind: 'desktop-required'; readonly features: ReadonlyArray<ProFeature> }
   | { readonly kind: 'loaded'; readonly projectBedReconciled?: boolean }
   | {
       readonly kind: 'capability-warning';

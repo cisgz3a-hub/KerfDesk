@@ -357,7 +357,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'help.check-updates': {
     family: 'help',
     tooltip:
-      'See which KerfDesk version you have and whether a newer one is ready. The desktop app downloads new versions in the background and installs them when you close it; you can check now or get new versions early.',
+      'See your installed version, check for a newer release, and follow the available download and installation choices. Updates never close KerfDesk while you work.',
   },
   'help.tutorials': {
     family: 'help',

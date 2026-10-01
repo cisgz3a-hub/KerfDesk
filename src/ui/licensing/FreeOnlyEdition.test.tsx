@@ -15,9 +15,8 @@ import { LICENCE_SETTINGS_EVENT, proFeaturesUnlocked, useEdition } from './editi
 import { DESKTOP_DOWNLOAD_URL } from './edition-policy';
 import { PRO_FEATURES } from './pro-features';
 
-// Once sales open, builds that cannot take a licence run KerfDesk Free
-// (ADR-544): the web app and free desktop builds point Pro tools to the
-// desktop app instead of opening them.
+// Builds that cannot take a licence run KerfDesk Free. Pro tools point to the
+// licensed desktop download page instead of opening them.
 
 const freeBuild: LicenceStatus = {
   channel: 'free',
@@ -105,7 +104,7 @@ function statusChip(): HTMLButtonElement | undefined {
   );
 }
 
-it('keeps every tool in the web app until sales open', async () => {
+it('supports an explicitly unrestricted development provider', async () => {
   const open = vi.fn();
   await act(async () =>
     root.render(
@@ -118,11 +117,11 @@ it('keeps every tool in the web app until sales open', async () => {
   expect(open).toHaveBeenCalledTimes(1);
 });
 
-it('runs the web app as KerfDesk Free once sales open', async () => {
+it('runs the web app as KerfDesk Free by default', async () => {
   const open = vi.fn();
   await act(async () =>
     root.render(
-      <EditionProvider unlicensedRunsFree>
+      <EditionProvider>
         <VcarveTool onOpen={open} />
       </EditionProvider>,
     ),
@@ -132,11 +131,11 @@ it('runs the web app as KerfDesk Free once sales open', async () => {
   await expectDesktopDialog(open);
 });
 
-it('runs a free desktop build as KerfDesk Free once sales open', async () => {
+it('runs a free desktop build as KerfDesk Free by default', async () => {
   const open = vi.fn();
   await act(async () =>
     root.render(
-      <EditionProvider client={client(freeBuild)} unlicensedRunsFree>
+      <EditionProvider client={client(freeBuild)}>
         <VcarveTool onOpen={open} />
       </EditionProvider>,
     ),
@@ -166,7 +165,7 @@ it('does not open a Pro tool asked for before a free desktop build reports', asy
   expectEveryProFeatureListed();
 });
 
-it('keeps every tool in a free desktop build until sales open', async () => {
+it('allows an explicit unrestricted desktop development provider', async () => {
   const open = vi.fn();
   await act(async () =>
     root.render(
@@ -222,7 +221,7 @@ it('gives a free desktop build the notice instead of the licence panel', async (
   expectEveryProFeatureListed();
 });
 
-it('shows no Pro notice before sales open', async () => {
+it('shows no Pro notice in explicit unrestricted development providers', async () => {
   await act(async () =>
     root.render(
       <>

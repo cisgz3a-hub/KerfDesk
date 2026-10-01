@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { DraftNumberInput } from '../kit/DraftNumberInput';
 import { TraceAutoCheckbox, type TraceAutoChoice } from './TraceCheckboxRow';
 import { traceNumberTitle } from './trace-number-title';
 
@@ -6,7 +7,7 @@ import { traceNumberTitle } from './trace-number-title';
 // and a visible hint. With `auto`, an Auto checkbox hands the value to the
 // engine (ADR-434 Amendment 1); the input is then empty and disabled rather
 // than showing a number the engine is not using.
-export function NumberRow(props: {
+type NumberRowProps = {
   readonly label: string;
   readonly min: number;
   readonly max: number;
@@ -16,37 +17,20 @@ export function NumberRow(props: {
   readonly onChange: (next: number) => void;
   readonly title?: string;
   readonly auto?: TraceAutoChoice;
-}): JSX.Element {
+};
+
+export function NumberRow(props: NumberRowProps): JSX.Element {
   const inputId = useId();
-  const snapped = clamp(Math.round(props.value / props.step) * props.step, props.min, props.max);
   const hintId = useId();
   const unit = NUMBER_ROW_UNITS[props.label] ?? (props.max === 10000 ? 'px²' : undefined);
   const hasSlider = props.max <= 255;
-  const auto = props.auto?.checked === true;
   const title = props.title ?? traceNumberTitle(props.label);
   return (
     <div className="lf-trace-number">
       <label htmlFor={inputId}>
         <span>{props.label}</span>
         <span className="lf-trace-number-input">
-          <input
-            id={inputId}
-            className="lf-input"
-            type="number"
-            min={props.min}
-            max={props.max}
-            step={props.step}
-            value={auto ? '' : props.value}
-            placeholder={auto ? 'Auto' : undefined}
-            disabled={auto}
-            onChange={(e) => props.onChange(clamp(Number(e.target.value), props.min, props.max))}
-            onBlur={() => {
-              if (props.snapToStep === true && snapped !== props.value) props.onChange(snapped);
-            }}
-            aria-label={`Trace ${props.label}`}
-            aria-describedby={hintId}
-            title={title}
-          />
+          <NumberRowInput number={props} inputId={inputId} hintId={hintId} title={title} />
           {unit === undefined ? null : <span>{unit}</span>}
         </span>
       </label>
@@ -68,6 +52,52 @@ export function NumberRow(props: {
       ) : null}
       <p id={hintId}>{title}</p>
     </div>
+  );
+}
+
+function NumberRowInput(props: {
+  readonly number: NumberRowProps;
+  readonly inputId: string;
+  readonly hintId: string;
+  readonly title: string;
+}): JSX.Element {
+  const field = props.number;
+  const inputProps = {
+    id: props.inputId,
+    min: field.min,
+    max: field.max,
+    step: field.step,
+    'aria-label': `Trace ${field.label}`,
+    'aria-describedby': props.hintId,
+    title: props.title,
+  };
+  if (field.auto?.checked === true)
+    return (
+      <input
+        {...inputProps}
+        type="number"
+        className="lf-input"
+        title={props.title}
+        value=""
+        placeholder="Auto"
+        disabled
+      />
+    );
+  return (
+    <DraftNumberInput
+      {...inputProps}
+      value={field.value}
+      normalize={(next) => clamp(next, field.min, field.max)}
+      onValueChange={field.onChange}
+      onBlur={() => {
+        const snapped = clamp(
+          Math.round(field.value / field.step) * field.step,
+          field.min,
+          field.max,
+        );
+        if (field.snapToStep === true && snapped !== field.value) field.onChange(snapped);
+      }}
+    />
   );
 }
 

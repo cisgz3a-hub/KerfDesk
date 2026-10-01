@@ -22,6 +22,7 @@ import {
 } from './licensing-messages.js';
 import { prepareLicenceCheckout, claimLicencePayment } from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
+import { TrialSessionClock } from './licensing-trial-clock.js';
 import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
 import {
   activationBody,
@@ -59,9 +60,10 @@ export function createLicensingRuntime(options: RuntimeOptions) {
 
 class LicensingService {
   private readonly config: LicensingConfig;
-  // Once Pro is available in a session it stays until KerfDesk closes, unless
-  // this device is deactivated. An ending trial never interrupts open work.
+  // Paid rights retain their session allowance. A trial's deadline applies to
+  // new Pro choices even while open; existing work/output never reads this gate.
   private proLatched = false;
+  private trialClock: TrialSessionClock | null = null;
   private queue: Promise<unknown> = Promise.resolve();
   private readonly updateCache: LicensingUpdateCache;
 
@@ -75,7 +77,13 @@ class LicensingService {
     claims: LicenceClaims | null = null,
     message: string | null = null,
     extras: Parameters<typeof licenceSummary>[5] = {},
-  ): LicenceStatus => licenceSummary(this.config, this.proLatched, state, claims, message, extras);
+  ): LicenceStatus => {
+    // An error without verified trial claims must not turn bounded access into
+    // an unbounded Pro status in the renderer. Paid session rights are unchanged.
+    if (this.trialClock !== null) this.proLatched = false;
+    return licenceSummary(this.config, this.proUnlocked(), state, claims, message, extras);
+  };
+  private readonly trialNow = (): number => this.trialClock?.now() ?? this.now();
   private readonly serial = <T>(work: () => Promise<T>): Promise<T> => {
     const result = this.queue.then(work, work);
     this.queue = result.catch(() => undefined);
@@ -100,15 +108,22 @@ class LicensingService {
     this.updateCache.update(saved, device);
   };
   private readonly evaluate = (saved: LicenceRecord, device: string): LicenceStatus => {
+    const clock = this.trialClock;
+    const ended = clock !== null && this.trialNow() >= clock.expiresAt;
     const result = evaluateLicence(
       this.config,
       this.options.currentVersion,
       saved,
       device,
-      this.now(),
-      this.proLatched,
+      ended ? Math.max(this.now(), clock.expiresAt) : this.now(),
+      clock === null && this.proUnlocked(),
     );
-    if (result.state === 'ready' && this.config.channel === 'commercial') this.proLatched = true;
+    if (result.state === 'ready' && this.config.channel === 'commercial') {
+      this.proLatched = true;
+      if (result.tier !== 'trial') this.trialClock = null;
+      else if (result.accessExpiresAt !== null && clock?.expiresAt !== result.accessExpiresAt)
+        this.trialClock = new TrialSessionClock(result.accessExpiresAt, this.now);
+    } else if (this.trialClock !== null || result.tier === 'trial') this.proLatched = false;
     return result;
   };
   private readonly readStatus = async (): Promise<LicenceStatus> => {
@@ -129,7 +144,7 @@ class LicensingService {
     device: string,
     status: LicenceStatus,
   ): Promise<void> => {
-    const mark = nextClockMark(status, saved.lastSeenAt, this.now());
+    const mark = nextClockMark(status, saved.lastSeenAt, Math.floor(this.trialNow()));
     if (mark !== null) await this.write({ ...saved, lastSeenAt: mark }, device);
   };
   private readonly safe = (work: () => Promise<LicenceStatus>, mutation = false) => {
@@ -205,6 +220,10 @@ class LicensingService {
     }
     const { next, droppedOrder } = grantedRecord(action, saved, grant, this.now(), licenseKey);
     await this.write(next, device);
+    // Only a newly verified online grant can re-anchor a clock that was wrong;
+    // rereading cached rights must not revive an already observed trial expiry.
+    this.trialClock = null;
+    this.proLatched = false;
     this.updateCache.acceptAuthentication();
     onAccepted?.();
     const status = this.evaluate(next, device);
@@ -300,6 +319,7 @@ class LicensingService {
           {
             saved,
             store: this.options.store,
+            sandbox: this.config.sandbox === true,
             request: this.request,
             openCheckout:
               this.options.openCheckout ??
@@ -332,6 +352,7 @@ class LicensingService {
         const key = await claimLicencePayment({
           saved,
           store: this.options.store,
+          sandbox: this.config.sandbox === true,
           request: this.request,
           openCheckout: this.options.openCheckout ?? (async () => undefined),
         });
@@ -378,7 +399,19 @@ class LicensingService {
     });
   readonly isReleaseEligibleCached = (releaseEnvelope: unknown, expectedVersion: string): boolean =>
     this.updateCache.eligible(releaseEnvelope, expectedVersion);
-  readonly proUnlocked = (): boolean => this.config.channel === 'free' || this.proLatched;
+  readonly isManualReleaseEligible = (envelope: string, version: string): Promise<boolean> =>
+    this.serial(async () => {
+      try {
+        await this.load();
+        return await this.updateCache.manualEligible(envelope, version);
+      } catch {
+        return false;
+      }
+    });
+  readonly proUnlocked = (): boolean =>
+    this.config.channel === 'commercial' &&
+    this.proLatched &&
+    (this.trialClock === null || this.trialNow() < this.trialClock.expiresAt);
   private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
     operation === 'renewal' && saved.credential !== undefined
       ? requireActivationBody(this.config, saved.credential, device)

@@ -217,7 +217,9 @@ export async function createPaddleTransaction(env, intent, fetcher = fetch) {
   try {
     response = await fetcher(`${config.api}/transactions`, {
       method: 'POST',
-      redirect: 'error',
+      // workerd supports manual redirects; never forward the bearer to a redirect.
+      // A 3xx below remains ambiguous and preserves the original checkout intent.
+      redirect: 'manual',
       signal: AbortSignal.timeout(10_000),
       headers: {
         authorization: `Bearer ${env.PADDLE_API_KEY}`,
@@ -280,7 +282,7 @@ async function providerRefusal(response) {
   return error;
 }
 
-function checkoutLink(data, config) {
+export function checkoutLink(data, config) {
   const link = data.checkout?.url;
   let checkout;
   try {
@@ -298,7 +300,7 @@ function checkoutLink(data, config) {
       !checkout.password &&
       !checkout.hash &&
       checkout.searchParams.get('_ptxn') === data.id &&
-      [...checkout.searchParams.keys()].every((key) => key === '_ptxn'),
+      [...checkout.searchParams.keys()].join(',') === '_ptxn',
     503,
     'invalid_provider_response',
   );

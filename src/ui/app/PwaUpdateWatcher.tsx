@@ -25,6 +25,7 @@ import { usePwaUpdateStore } from '../state/pwa-update-store';
 import { useToastStore } from '../state/toast-store';
 import { applyPromptedReload } from './pwa-prompted-reload';
 import { createRetryableUpdateApplyOwner } from './pwa-update-apply-owner';
+import { usePwaUpdateDiscovery } from './use-pwa-update-discovery';
 
 export const UPDATED_IN_ANOTHER_WINDOW_MESSAGE =
   'KerfDesk was updated in another window. Click Update here when you are ready to reload this one.';
@@ -37,11 +38,13 @@ export function PwaUpdateWatcher(): JSX.Element | null {
   pushToastRef.current = pushToast;
   const updateRequestedHereRef = useRef(false);
   const otherWindowNoticeShownRef = useRef(false);
+  const onRegisteredSW = usePwaUpdateDiscovery();
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh],
     updateServiceWorker,
   } = useRegisterSW({
+    onRegisteredSW,
     onNeedReload() {
       if (updateRequestedHereRef.current) {
         window.location.reload();
