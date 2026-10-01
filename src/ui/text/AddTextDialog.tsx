@@ -82,7 +82,7 @@ function DialogForm(props: {
         <h2 className="lf-dialog-title">{state.mode === 'add' ? 'Add Text' : 'Edit Text'}</h2>
       </div>
       <ContentField value={fields.values.content} onChange={fields.setContent} />
-      <TextFormattingFields fields={fields} />
+      <TextFormattingFields fields={fields} disabled={submitting} />
       <FormActions
         mode={state.mode}
         canSubmit={

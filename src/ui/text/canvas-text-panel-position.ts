@@ -13,7 +13,7 @@ export function canvasTextPanelPosition(
   if (rect.left - 16 > width + 12) return { left: 12 };
   const below = size.height - 76 - rect.bottom - 16;
   const above = rect.top - 28;
-  if (above > below && above >= 200) {
+  if (above > below && above >= 144) {
     return { right: 12, top: 12, maxHeight: above };
   }
   const top = Math.max(12, Math.min(rect.bottom + 16, size.height - 220));

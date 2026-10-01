@@ -1,300 +1,209 @@
-// FontPicker — custom dropdown for AddTextDialog that previews each
-// bundled font in its own typeface. Replaces the native <select>
-// because Chromium's font-family on <option> works on the row but
-// not the closed-state label, and we want both to render in the
-// font being picked.
-//
-// The picker registers every bundled outline font with the browser's
-// FontFace API on first mount (lazy / fire-and-forget). CNC stroke fonts
-// draw their actual open paths instead of pretending to be CSS fonts. Once a
-// FontFace finishes loading, document.fonts auto-fires a refresh
-// of any element using that family — the dropdown labels animate
-// from system fallback to the real typeface as fonts arrive.
-//
-// Closes on outside click, Escape, and selection. Pure
-// presentational state (open/closed) lives in local useState; the
-// selected fontKey is owned by the parent dialog.
-
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { FONT_REGISTRY, type FontEntry, type KnownFontKey } from '../../core/text';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { FONT_REGISTRY } from '../../core/text';
 import type { EmbeddedFont } from '../../core/scene';
+import { AnchoredPopover } from '../common/AnchoredPopover';
 import { cssFamilyForFont, ensureFontCss } from './font-loader';
-import { SingleLineFontPreview } from './SingleLineFontPreview';
+import { FontPickerOptions, type PickerFont } from './FontPickerOptions';
+import './font-picker.css';
 
 type Props = {
   readonly value: string;
   readonly onChange: (next: string) => void;
   readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
+  readonly previewText?: string;
+  readonly disabled?: boolean;
 };
 
-type OutlineFontKey = Extract<FontEntry, { readonly geometry: 'outline' }>['key'];
-
-function isOutlineFontKey(key: KnownFontKey): key is OutlineFontKey {
-  return FONT_REGISTRY.find((font) => font.key === key)?.geometry === 'outline';
-}
-
+/** Readable names and real specimens, outside the text panel's clipping/scroll. */
 export function FontPicker(props: Props): JSX.Element {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const id = useId();
   const close = useCallback(() => setOpen(false), []);
-  useFontCssRegistration();
-  useOutsideClickToClose(rootRef, open, close);
-  const selected = FONT_REGISTRY.find((f) => f.key === props.value);
-  const selectedEmbedded = props.embeddedFonts?.find((font) => font.key === props.value);
-  if (selected === undefined && props.value === '' && FONT_REGISTRY.length === 0) {
-    // FONT_REGISTRY is a static non-empty array — this branch keeps
-    // TS happy under noUncheckedIndexedAccess but is unreachable in
-    // practice.
-    return <span>No fonts available</span>;
-  }
-  const handleSelect = (key: KnownFontKey): void => {
+  useFontCssRegistration(props.embeddedFonts);
+  useEffect(() => {
+    if (props.disabled) close();
+  }, [props.disabled, close]);
+  const fonts = useMemo(() => pickerFonts(props.embeddedFonts), [props.embeddedFonts]);
+  const selected = fonts.find((font) => font.key === props.value);
+  const select = (key: string): void => {
+    if (props.disabled) return;
     props.onChange(key);
-    setOpen(false);
+    close();
+    trigger.current?.focus();
   };
   return (
-    <div ref={rootRef} style={rootStyle} onKeyDown={fontPickerEscapeHandler(open, close, rootRef)}>
+    <div className="lf-font-picker">
       <button
+        ref={trigger}
         type="button"
-        className="lf-btn"
-        onClick={() => setOpen((v) => !v)}
-        aria-haspopup="listbox"
+        className="lf-btn lf-font-picker-trigger"
+        aria-label="Font"
+        aria-haspopup="dialog"
+        aria-controls={open ? id : undefined}
         aria-expanded={open}
+        disabled={props.disabled}
+        onClick={() => setOpen((value) => !value)}
+        onKeyDownCapture={(event) => {
+          if (open) fontChooserKeyBoundary(event, close, trigger);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(true);
+        }}
         title="Open the font picker and choose the text typeface."
-        style={
-          selected === undefined || !isOutlineFontKey(selected.key)
-            ? triggerBaseStyle
-            : triggerStyleFor(selected.key)
-        }
       >
-        {selectedEmbedded !== undefined ? (
-          <>
-            <span style={triggerNameStyle}>{selectedEmbedded.fileName}</span>
-            <span style={triggerClassStyle}>(project font)</span>
-          </>
-        ) : selected === undefined ? (
-          <>
-            <span style={triggerNameStyle}>Missing font: {props.value}</span>
-            <span style={triggerClassStyle}>(choose replacement)</span>
-          </>
-        ) : (
-          <>
-            <span style={triggerNameStyle}>{selected.displayName}</span>
-            <span style={triggerClassStyle}>({selected.styleClass})</span>
-          </>
-        )}
-        <span aria-hidden style={caretStyle}>
-          ▾
+        <span className="lf-font-picker-name">
+          {selected?.name ?? `Missing font: ${props.value}`}
         </span>
+        <span aria-hidden="true">▾</span>
       </button>
-      {open && (
-        <ul role="listbox" className="lf-menu" style={menuStyle}>
-          {FONT_REGISTRY.map((f) => (
-            <li key={f.key} role="option" aria-selected={f.key === props.value}>
-              <button
-                type="button"
-                className="lf-menu-item"
-                onClick={() => handleSelect(f.key)}
-                title={`Use ${f.displayName} for this text object.`}
-                style={optionStyleFor(f.key, f.key === props.value)}
-              >
-                <FontOptionName font={f} />
-                <span style={optionMetaStyle(f.key === props.value)}>({f.styleClass})</span>
-              </button>
-            </li>
-          ))}
-          <EmbeddedFontOptions
-            fonts={props.embeddedFonts}
-            selectedKey={props.value}
-            select={(key) => {
-              props.onChange(key);
-              setOpen(false);
-            }}
-          />
-        </ul>
-      )}
+      {open && !props.disabled ? (
+        <FontChooser
+          id={id}
+          anchor={trigger}
+          fonts={fonts}
+          value={props.value}
+          sample={previewSample(props.previewText)}
+          onSelect={select}
+          onClose={close}
+        />
+      ) : null}
     </div>
   );
 }
 
-function fontPickerEscapeHandler(
-  open: boolean,
+function FontChooser(props: {
+  readonly id: string;
+  readonly anchor: React.RefObject<HTMLButtonElement>;
+  readonly fonts: ReadonlyArray<PickerFont>;
+  readonly value: string;
+  readonly sample: string;
+  readonly onSelect: (key: string) => void;
+  readonly onClose: () => void;
+}): JSX.Element {
+  const [query, setQuery] = useState('');
+  const term = query.trim().toLocaleLowerCase();
+  const fonts = useMemo(
+    () =>
+      props.fonts.filter((font) =>
+        `${font.name} ${font.category}`.toLocaleLowerCase().includes(term),
+      ),
+    [props.fonts, term],
+  );
+  return (
+    <AnchoredPopover
+      id={props.id}
+      label="Choose a font"
+      role="dialog"
+      anchorRef={props.anchor}
+      portalHost={props.anchor.current?.closest('[role="dialog"][aria-modal="true"]') ?? null}
+      className="lf-font-picker-popup"
+      initialFocus="input"
+      onClose={props.onClose}
+      onKeyDownCapture={(event) => fontChooserKeyBoundary(event, props.onClose, props.anchor)}
+      onKeyDown={(event) => browseFonts(event, props.value)}
+    >
+      <div className="lf-font-picker-search">
+        <input
+          className="lf-input"
+          type="search"
+          aria-label="Search fonts"
+          placeholder="Search fonts…"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+        />
+        <span>Arrow keys to browse · Enter to choose</span>
+      </div>
+      <FontPickerOptions
+        fonts={fonts}
+        value={props.value}
+        sample={props.sample}
+        select={props.onSelect}
+      />
+    </AnchoredPopover>
+  );
+}
+
+function fontChooserKeyBoundary(
+  event: React.KeyboardEvent<HTMLElement>,
   close: () => void,
-  root: React.RefObject<HTMLDivElement>,
-): React.KeyboardEventHandler {
-  return (event) => {
-    if (event.key !== 'Escape' || !open) return;
+  anchor: React.RefObject<HTMLButtonElement>,
+): void {
+  if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) {
+    event.stopPropagation();
+    return;
+  }
+  if (event.key !== 'Escape' && event.key !== 'Tab') return;
+  if (event.key === 'Escape') event.preventDefault();
+  event.stopPropagation();
+  anchor.current?.focus();
+  close();
+}
+
+function browseFonts(event: React.KeyboardEvent<HTMLDivElement>, selected: string): void {
+  const buttons = [
+    ...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"] button'),
+  ];
+  const search = event.target instanceof HTMLInputElement;
+  if (search && event.key === 'Enter') {
     event.preventDefault();
     event.stopPropagation();
-    close();
-    root.current?.querySelector('button')?.focus();
-  };
+    (buttons.find((button) => button.dataset['fontKey'] === selected) ?? buttons[0])?.click();
+    return;
+  }
+  const index = buttons.findIndex((button) => button === document.activeElement);
+  const next = fontFocusIndex(event.key, index, buttons.length, search);
+  if (next === null) return;
+  event.preventDefault();
+  event.stopPropagation();
+  buttons[next]?.focus({ preventScroll: true });
+  buttons[next]?.scrollIntoView?.({ block: 'nearest' });
 }
 
-function FontOptionName({ font }: { readonly font: FontEntry }): JSX.Element {
-  return (
-    <span style={optionNameStyle}>
-      <span>{font.displayName}</span>
-      {font.geometry === 'single-line' ? <SingleLineFontPreview fontKey={font.key} /> : null}
-    </span>
-  );
+function fontFocusIndex(key: string, index: number, count: number, search: boolean): number | null {
+  if (count === 0 || (search && key !== 'ArrowDown' && key !== 'ArrowUp')) return null;
+  if (key === 'Home') return 0;
+  if (key === 'End') return count - 1;
+  if (key === 'ArrowDown') return (index + 1) % count;
+  if (key === 'ArrowUp') return index <= 0 ? count - 1 : index - 1;
+  return null;
 }
 
-function EmbeddedFontOptions(props: {
-  readonly fonts: ReadonlyArray<EmbeddedFont> | undefined;
-  readonly selectedKey: string;
-  readonly select: (key: string) => void;
-}): JSX.Element {
-  return (
-    <>
-      {props.fonts?.map((font) => (
-        <li key={font.key} role="option" aria-selected={font.key === props.selectedKey}>
-          <button
-            type="button"
-            className="lf-menu-item"
-            onClick={() => props.select(font.key)}
-            title={`Use embedded font ${font.fileName}.`}
-            style={optionBaseStyle}
-          >
-            <span style={optionNameStyle}>{font.fileName}</span>
-            <span style={optionMetaStyle(font.key === props.selectedKey)}>(project)</span>
-          </button>
-        </li>
-      ))}
-    </>
-  );
+function pickerFonts(embedded: ReadonlyArray<EmbeddedFont> | undefined): ReadonlyArray<PickerFont> {
+  return [
+    ...FONT_REGISTRY.map((font) => ({
+      key: font.key,
+      name: font.displayName,
+      category: font.styleClass,
+      font,
+    })),
+    ...(embedded ?? []).map((font) => ({
+      key: font.key,
+      name: font.fileName,
+      category: 'project font',
+      font: null,
+    })),
+  ];
 }
 
-// Kicks off CSS-side registration of every bundled font on mount.
-// We don't await — the dropdown is usable immediately with system
-// fallback, and each row swaps to its real font as soon as its
-// FontFace finishes loading. Errors are swallowed (logged) because
-// a bad font file shouldn't crash the dialog; the row just stays in
-// the fallback typeface.
-function useFontCssRegistration(): void {
+function previewSample(text: string | undefined): string {
+  const firstLine = text?.split(/\r?\n/)[0]?.trim() ?? '';
+  return Array.from(firstLine).slice(0, 40).join('') || 'Aa Bb 123';
+}
+
+function useFontCssRegistration(embedded: ReadonlyArray<EmbeddedFont> | undefined): void {
   useEffect(() => {
-    for (const f of FONT_REGISTRY) {
-      if (!isOutlineFontKey(f.key)) continue;
-      ensureFontCss(f.key).catch((err: unknown) => {
-        console.warn(`FontPicker: failed to register ${f.key} CSS:`, err);
+    const keys = [
+      ...FONT_REGISTRY.filter((font) => font.geometry === 'outline').map((font) => font.key),
+      ...(embedded ?? []).map((font) => font.key),
+    ];
+    for (const key of keys) {
+      ensureFontCss(key, embedded).catch((error: unknown) => {
+        console.warn(`FontPicker: failed to register ${cssFamilyForFont(key)} CSS:`, error);
       });
     }
-  }, []);
+  }, [embedded]);
 }
-
-function useOutsideClickToClose(
-  ref: React.RefObject<HTMLDivElement | null>,
-  open: boolean,
-  close: () => void,
-): void {
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (e: MouseEvent): void => {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
-    };
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') close();
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open, close, ref]);
-}
-
-// Chrome comes from tokens.css (.lf-btn trigger, .lf-menu/.lf-menu-item
-// rows — hover and focus states for free); inline styles carry only the
-// per-row font-family hop and layout. The regression this replaces:
-// rows hardcoded a white background with INHERITED text color, which
-// turned white-on-white the moment the dialog went dark (ADR-047).
-function triggerStyleFor(key: OutlineFontKey): React.CSSProperties {
-  return {
-    ...triggerBaseStyle,
-    fontFamily: cssFontFamilyStack(key),
-  };
-}
-
-function optionStyleFor(key: KnownFontKey, selected: boolean): React.CSSProperties {
-  return {
-    ...optionBaseStyle,
-    ...(isOutlineFontKey(key) ? { fontFamily: cssFontFamilyStack(key) } : {}),
-    fontWeight: selected ? 600 : 400,
-    ...(selected ? { background: 'var(--lf-accent)', color: 'var(--lf-on-fill)' } : {}),
-  };
-}
-
-function optionMetaStyle(selected: boolean): React.CSSProperties {
-  return {
-    fontFamily: 'system-ui, sans-serif',
-    fontSize: 11,
-    color: selected ? 'inherit' : 'var(--lf-text-muted)',
-  };
-}
-
-// CSS generic families for the classes whose shape a sans fallback would
-// misrepresent. Anything absent here falls through to the sans default.
-const GENERIC_FALLBACK: Readonly<Partial<Record<FontEntry['styleClass'], string>>> = {
-  mono: 'monospace',
-  serif: 'serif',
-};
-
-// CSS font stack with a sensible per-class fallback so labels stay
-// readable while the real font is still loading.
-function cssFontFamilyStack(key: OutlineFontKey): string {
-  const entry = FONT_REGISTRY.find((f) => f.key === key);
-  const fallback =
-    (entry === undefined ? undefined : GENERIC_FALLBACK[entry.styleClass]) ??
-    'system-ui, sans-serif';
-  return `'${cssFamilyForFont(key)}', ${fallback}`;
-}
-
-const rootStyle: React.CSSProperties = {
-  position: 'relative',
-  flex: 1,
-};
-
-const triggerBaseStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  width: '100%',
-  fontSize: 14,
-  textAlign: 'left',
-};
-
-const triggerNameStyle: React.CSSProperties = { flex: 1 };
-const triggerClassStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-};
-const caretStyle: React.CSSProperties = {
-  fontFamily: 'system-ui, sans-serif',
-  fontSize: 11,
-  color: 'var(--lf-text-muted)',
-};
-
-// Position/scroll only — surface chrome comes from .lf-menu.
-const menuStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: 'calc(100% + 2px)',
-  left: 0,
-  right: 0,
-  margin: 0,
-  listStyle: 'none',
-  maxHeight: 240,
-  overflowY: 'auto',
-};
-
-const optionBaseStyle: React.CSSProperties = {
-  fontSize: 16,
-};
-
-const optionNameStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 8,
-  flex: 1,
-};

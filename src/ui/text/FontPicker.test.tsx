@@ -21,13 +21,15 @@ it('shows the four OFL CNC fonts with previews drawn from their machining paths'
     await act(async () =>
       root.render(<FontPicker value="roboto-regular" onChange={() => undefined} />),
     );
-    const trigger = host.querySelector('button[aria-haspopup="listbox"]');
+    const trigger = host.querySelector('button[aria-haspopup="dialog"]');
     if (!(trigger instanceof HTMLButtonElement)) throw new Error('Font picker trigger missing');
     await act(async () => {
       trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     });
-    expect(host.textContent).toContain('Relief SingleLine');
-    await waitForPreviewPaths(host);
+    const menu = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+    if (menu === null) throw new Error('Font chooser missing');
+    expect(menu.textContent).toContain('Relief SingleLine');
+    await waitForPreviewPaths(menu);
 
     for (const name of [
       'Relief SingleLine',
@@ -35,7 +37,7 @@ it('shows the four OFL CNC fonts with previews drawn from their machining paths'
       'EMS Decorous Script',
       'EMS Casual Hand',
     ]) {
-      expect(host.textContent).toContain(name);
+      expect(menu.textContent).toContain(name);
     }
   } finally {
     await act(async () => root.unmount());
