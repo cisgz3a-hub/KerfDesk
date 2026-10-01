@@ -1,0 +1,71 @@
+name: Qualify published Windows upgrade
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_version:
+        description: Previously published unsigned Windows release
+        required: true
+        type: string
+        default: '1.0.2'
+      target_version:
+        description: Published unsigned Windows release to upgrade to
+        required: true
+        type: string
+        default: '1.0.3'
+
+permissions:
+  contents: read
+
+jobs:
+  historical-upgrade:
+    if: github.repository == 'cisgz3a-hub/KerfDesk' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Install the locked qualification tools
+        run: pnpm install --frozen-lockfile
+      - name: Authenticate the immutable historical installers
+        env:
+          PREVIOUS_RELEASE_VERSION: ${{ inputs.previous_version }}
+          TARGET_RELEASE_VERSION: ${{ inputs.target_version }}
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE 'artifacts/historical-installers'
+          node scripts/published-upgrade-installers.mjs $env:PREVIOUS_RELEASE_VERSION $root
+          if ($LASTEXITCODE -ne 0) { throw 'Historical baseline was not authenticated.' }
+          node scripts/published-upgrade-installers.mjs $env:TARGET_RELEASE_VERSION $root
+          if ($LASTEXITCODE -ne 0) { throw 'Historical upgrade was not authenticated.' }
+      - name: Qualify upgrade, preferences, saved machine, real files and data retention
+        env:
+          PREVIOUS_RELEASE_VERSION: ${{ inputs.previous_version }}
+          TARGET_RELEASE_VERSION: ${{ inputs.target_version }}
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE 'artifacts/historical-installers'
+          $previous = Get-Content -LiteralPath (Join-Path $root "$env:PREVIOUS_RELEASE_VERSION/public-release.json") -Raw | ConvertFrom-Json
+          $target = Get-Content -LiteralPath (Join-Path $root "$env:TARGET_RELEASE_VERSION/public-release.json") -Raw | ConvertFrom-Json
+          & ./scripts/qualify-windows-installer.ps1 -Scenario HistoricalUpgrade -PackageKind CommercialUnsigned `
+            -Installer $previous.installer -Version $previous.manifest.version -SourceCommit $previous.manifest.sourceSha `
+            -UpgradeInstaller $target.installer -UpgradeVersion $target.manifest.version -UpgradeSourceCommit $target.manifest.sourceSha `
+            -EvidenceRoot (Join-Path $env:GITHUB_WORKSPACE 'artifacts/installed-qualification/historical-upgrade')
+          "Qualified published Windows $($previous.manifest.version) to $($target.manifest.version). Review the retained native receipts and screenshots; paid licences, standard-user UAC, SmartScreen and hardware remain separate." >> $env:GITHUB_STEP_SUMMARY
+      - name: Retain authenticated download and native evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: historical-upgrade-${{ inputs.previous_version }}-to-${{ inputs.target_version }}-${{ github.run_attempt }}
+          path: |
+            artifacts/installed-qualification/
+            artifacts/historical-installers/*/public-release.json
+            artifacts/historical-installers/*/download-manifest.json
+            artifacts/historical-installers/*/archive-*.txt
+          retention-days: 7
+          if-no-files-found: warn
