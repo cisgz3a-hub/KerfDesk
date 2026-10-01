@@ -175,7 +175,9 @@ export function assertBuildMetadata(title, args) {
 
 export function validateProject(bytes) {
   const project = JSON.parse(bytes.toString('utf8'));
-  assert.equal(project.schemaVersion, 9, 'Expected current project schema');
+  // Authenticated 1.0.2/1.0.3 and the current writer emit schema 12. The
+  // release-integrity sentinel checks this against the canonical declaration.
+  assert.equal(project.schemaVersion, 12, 'Expected current project schema');
   assert.equal(
     project.scene?.objects?.length,
     1,

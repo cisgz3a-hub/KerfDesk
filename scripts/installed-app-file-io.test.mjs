@@ -231,7 +231,7 @@ test('build badge assertions fail for stale version, wrong commit and missing id
 
 function projectFixture() {
   return {
-    schemaVersion: 9,
+    schemaVersion: 12,
     workspace: { width: 300, height: 300, units: 'mm' },
     jobSetup: { placement: 'fixture' },
     scene: {
@@ -271,17 +271,19 @@ test('disk evidence rejects missing source, missing geometry and changed millime
   changed.scene.objects[0].paths[0].polylines[0].points[1].x = 200;
   assert.throws(() => validateProject(Buffer.from(JSON.stringify(changed))), /millimetre geometry/);
   assert.throws(
-    () => validateProject(Buffer.from('{"schemaVersion":9,"scene":{"objects":[]}}')),
+    () => validateProject(Buffer.from('{"schemaVersion":12,"scene":{"objects":[]}}')),
     /exactly one/,
   );
 });
 
-test('disk evidence rejects a stale schema-8 save from an older installed build', () => {
-  const stale = { ...projectFixture(), schemaVersion: 8 };
-  assert.throws(
-    () => validateProject(Buffer.from(JSON.stringify(stale))),
-    /Expected current project schema/,
-  );
+test('disk evidence rejects stale, future and malformed project schemas', () => {
+  for (const schemaVersion of [8, 9, 10, 11, 13, '12', null, undefined]) {
+    const stale = { ...projectFixture(), schemaVersion };
+    assert.throws(
+      () => validateProject(Buffer.from(JSON.stringify(stale))),
+      /Expected current project schema/,
+    );
+  }
 });
 
 test('roundtrip comparison detects lost operations, changed geometry and changed workspace', () => {
