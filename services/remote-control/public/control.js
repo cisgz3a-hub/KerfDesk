@@ -129,6 +129,7 @@ function renderWorkspace(value) {
   $('#truncated').textContent =
     'This page shows up to 200 items. Use the PC for the complete workspace.';
   const operations = $('#operation-list');
+  const selectedOperation = operations.value;
   operations.replaceChildren();
   // The desktop validates actual operation support; the phone never modifies CNC settings.
   for (const item of value.mode === 'laser' ? value.operations : []) {
@@ -137,6 +138,8 @@ function renderWorkspace(value) {
     option.textContent = item.name || item.type;
     operations.append(option);
   }
+  if ([...operations.options].some((option) => option.value === selectedOperation))
+    operations.value = selectedOperation;
   $('#operation-form').querySelector('button').disabled = !operations.options.length;
   loadOperation();
 }

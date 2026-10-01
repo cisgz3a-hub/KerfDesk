@@ -7,8 +7,19 @@ import { ORIGIN, start, connectDesktop, pairPhone, workspace, authorizeMcp } fro
 const closeSocket = (socket) => {
   if (socket && socket.readyState < 2) socket.close();
 };
-function syntheticDesktop(desktop, commands) {
+function syntheticDesktop(desktop, commands, suppliedOperations) {
   let revision = 1;
+  let operations = suppliedOperations ?? [
+    {
+      id: 'op-1',
+      type: 'laser_vector',
+      name: 'Laser cut',
+      enabled: true,
+      powerPercent: 30,
+      speedMmPerMin: 1000,
+      passes: 1,
+    },
+  ];
   desktop.socket.addEventListener('message', (event) => {
     const message = JSON.parse(event.data);
     if (message.type !== 'command') return;
@@ -27,19 +38,9 @@ function syntheticDesktop(desktop, commands) {
             bounds: { xMm: 0, yMm: 0, widthMm: 50, heightMm: 10 },
           },
         ],
-        operations: [
-          {
-            id: 'op-1',
-            type: 'laser_vector',
-            name: 'Laser cut',
-            enabled: true,
-            powerPercent: 30,
-            speedMmPerMin: 1000,
-            passes: 1,
-          },
-        ],
+        operations: structuredClone(operations),
         totalArtwork: 1,
-        totalOperations: 1,
+        totalOperations: operations.length,
       };
     else if (name === 'get_app_status')
       result = {
@@ -70,11 +71,20 @@ function syntheticDesktop(desktop, commands) {
     else if (name === 'list_material_recipes')
       result = { revision: `audit-${revision}`, recipes: [], total: 0, truncated: false };
     else {
+      if (name === 'update_operation') {
+        const operation = operations.find((item) => item.id === args.operationId);
+        if (operation) Object.assign(operation, args.patch);
+      }
       revision += 1;
       result = { revision: `audit-${revision}` };
     }
     desktop.send({ type: 'result', requestId: message.requestId, result });
   });
+  return {
+    replaceOperations(next) {
+      operations = next;
+    },
+  };
 }
 async function browserPage(worker, cookies = [], callbackOrigin = null, receipts = []) {
   const browser = await chromium.launch({
@@ -185,6 +195,125 @@ test(
       await page.getByRole('button', { name: 'Disconnect this phone' }).click();
       await page.locator('#pair-card').waitFor({ state: 'visible' });
       assert.equal(await page.locator('#workspace-area').isHidden(), true);
+    } finally {
+      await browser?.close();
+      closeSocket(desktop?.socket);
+      await worker.dispose();
+    }
+  },
+);
+
+test(
+  'mobile Chrome: applying twice preserves the second operation; refresh falls back only after deletion',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let desktop;
+    let browser;
+    try {
+      desktop = await connectDesktop(worker);
+      const commands = [];
+      const operations = [
+        {
+          id: 'op-cut',
+          type: 'laser_vector',
+          name: 'Cut outside',
+          enabled: true,
+          powerPercent: 30,
+          speedMmPerMin: 1000,
+          passes: 1,
+        },
+        {
+          id: 'op-score',
+          type: 'laser_vector',
+          name: 'Mark details',
+          enabled: true,
+          powerPercent: 60,
+          speedMmPerMin: 2000,
+          passes: 2,
+        },
+      ];
+      const fixture = syntheticDesktop(desktop, commands, operations);
+      const phone = await pairPhone(worker, desktop);
+      const [name, value] = phone.cookie.split('=');
+      const loaded = await browserPage(worker, [
+        { name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' },
+      ]);
+      browser = loaded.browser;
+      const page = loaded.page;
+      await page.goto(`${ORIGIN}/control`);
+      await page.locator('#workspace-area').waitFor({ state: 'visible' });
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      const selection = page.locator('#operation-list');
+      await selection.selectOption('op-score');
+      const power = page.locator('#operation-form [name=powerPercent]');
+      await power.press('Home');
+      await power.press('Delete');
+      assert.equal(await power.inputValue(), '0');
+      await power.fill('87');
+      await page.locator('#operation-form [name=speedMmPerMin]').fill('-');
+      await page.locator('#operation-form [name=passes]').fill('');
+      const beforeIdle = commands.length;
+      await page.clock.install();
+      await page.clock.fastForward(10 * 60_000);
+      assert.equal(await power.inputValue(), '87');
+      assert.equal(await page.locator('#operation-form [name=speedMmPerMin]').inputValue(), '-');
+      assert.equal(await page.locator('#operation-form [name=passes]').inputValue(), '');
+      assert.equal(await selection.inputValue(), 'op-score');
+      assert.equal(commands.length, beforeIdle);
+      await page.clock.resume();
+      await page.locator('#operation-form [name=powerPercent]').fill('55');
+      await page.locator('#operation-form [name=speedMmPerMin]').fill('2000');
+      await page.locator('#operation-form [name=passes]').fill('2');
+      await page.getByRole('button', { name: 'Apply settings' }).click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await page.waitForFunction(
+        () => document.querySelector('#notice').textContent === 'Updated on your computer.',
+      );
+      assert.equal(await selection.inputValue(), 'op-score');
+      assert.equal(await page.locator('#operation-form [name=powerPercent]').inputValue(), '55');
+      await page.locator('#operation-form [name=speedMmPerMin]').fill('3333');
+      await page.getByRole('button', { name: 'Apply settings' }).click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await page.waitForFunction(
+        () => document.querySelector('#notice').textContent === 'Updated on your computer.',
+      );
+      const writes = commands.filter((command) => command.name === 'update_operation');
+      assert.equal(writes.length, 2);
+      assert.deepEqual(
+        writes.map((command) => command.args.operationId),
+        ['op-score', 'op-score'],
+      );
+      assert.equal(operations[0].powerPercent, 30);
+      assert.equal(operations[0].speedMmPerMin, 1000);
+      assert.equal(operations[1].powerPercent, 55);
+      assert.equal(operations[1].speedMmPerMin, 3333);
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await page.waitForFunction(
+        () => document.querySelector('#notice').textContent === 'Workspace refreshed.',
+      );
+      assert.equal(await selection.inputValue(), 'op-score');
+      fixture.replaceOperations([operations[1], operations[0]]);
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(await selection.inputValue(), 'op-score');
+      assert.equal(await power.inputValue(), '55');
+      fixture.replaceOperations([operations[0]]);
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(
+        () => document.querySelector('#operation-list').options.length === 1,
+      );
+      assert.equal(await selection.inputValue(), 'op-cut');
+      assert.equal(await page.locator('#operation-form [name=powerPercent]').inputValue(), '30');
+      fixture.replaceOperations([]);
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(
+        () => document.querySelector('#operation-list').options.length === 0,
+      );
+      assert.equal(await selection.inputValue(), '');
+      assert.equal(await page.getByRole('button', { name: 'Apply settings' }).isDisabled(), true);
     } finally {
       await browser?.close();
       closeSocket(desktop?.socket);
