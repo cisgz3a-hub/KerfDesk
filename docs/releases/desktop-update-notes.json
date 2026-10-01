@@ -1,12 +1,10 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "a6c7642ffcd784c2f680867b494d29cd71d826ef",
+  "sinceSourceSha": "5cfa9e1b1eb3dbba51b764e90c86419575eda25c",
   "highlights": [
-    "Connect a phone control page or an MCP client with approval on your computer.",
-    "View workspace details and edit basic laser artwork from approved connections.",
-    "Your saved machine and its settings now load automatically on startup.",
-    "New canvases start with fresh job settings; saved projects keep their settings.",
-    "Improved desktop startup, licence refresh order and checks that upgrades retain your projects.",
-    "Restored the public privacy notice and improved download statistics reliability."
+    "Browse and search fonts in a scrollable menu with clear font previews.",
+    "Font menus stay inside smaller windows and display long imported font names cleanly.",
+    "Improved keyboard navigation and editing focus when adding or changing text.",
+    "Clearer guidance for laser and CNC jobs when every layer has Output switched off."
   ]
 }
