@@ -2,11 +2,12 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
+import { createProject, DEFAULT_CNC_MACHINE_CONFIG, DEFAULT_CNC_TILING } from '../../core/scene';
 import { useStore } from '../state';
 import { loadLastMachineSelection, rememberLastMachine } from '../state/last-machine-persistence';
 import { createStartupProject } from '../state/startup-project';
 import { resetStore } from '../state/test-helpers';
+import type { CncMachinePatch } from '../state/machine-actions';
 import { useMachineProfilePersistence } from './use-machine-profile-persistence';
 import { runAutosaveRecovery } from './use-autosave';
 
@@ -14,6 +15,20 @@ import { runAutosaveRecovery } from './use-autosave';
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 const saved = { ...DEFAULT_DEVICE_PROFILE, name: 'My machine', bedWidth: 321, bedHeight: 234 };
+const jobEdits: ReadonlyArray<readonly [string, CncMachinePatch]> = [
+  ['stock', { stock: { thicknessMm: 29 } }],
+  ['tool', { toolId: DEFAULT_CNC_MACHINE_CONFIG.tools.find((tool) => tool.id !== 'em-3175')!.id }],
+  [
+    'tools',
+    {
+      tools: DEFAULT_CNC_MACHINE_CONFIG.tools.map((tool) => ({
+        ...tool,
+        name: `${tool.name} edited`,
+      })),
+    },
+  ],
+  ['tiling', { tiling: DEFAULT_CNC_TILING }],
+];
 let root: Root;
 let host: HTMLDivElement;
 function Probe(): null {
@@ -75,6 +90,66 @@ describe('application machine persistence', () => {
     expect(createStartupProject().device).toEqual(saved);
   });
 
+  it.each(
+    jobEdits.flatMap(([name, patch]) =>
+      [false, true].map((hasMirror) => ({ name, patch, hasMirror })),
+    ),
+  )(
+    'CNC $name edit/undo/redo preserves the saved machine (profile mirror: $hasMirror)',
+    ({ patch, hasMirror }) => {
+      openCncFile(hasMirror);
+      const before = useStore.getState().project;
+      if (before.machine?.kind !== 'cnc') throw new Error('Expected CNC file');
+      useStore.getState().updateCncMachine(patch);
+      expect(useStore.getState().project.machine).toMatchObject({ params: before.machine.params });
+      expect(useStore.getState().project.machine).not.toEqual(before.machine);
+      expect(useStore.getState().project.device).not.toBe(before.device);
+      expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
+      useStore.getState().undo();
+      expect(useStore.getState().project.machine).toEqual(before.machine);
+      expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
+      useStore.getState().redo();
+      expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
+    },
+  );
+
+  it('ignores semantically identical profile edits with reordered nested fields', () => {
+    openCncFile(true);
+    useStore.getState().updateDeviceProfile({
+      homing: { direction: 'front-left', enabled: false },
+    });
+    expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
+  });
+
+  it('persists genuine CNC hardware edits and their undo/redo after Open', () => {
+    openCncFile(true);
+    useStore.getState().updateCncMachine({ params: { safeZMm: 17 } });
+    expect(loadLastMachineSelection(localStorage)).toMatchObject({
+      profile: { name: 'File CNC', cncSubProfile: { safeZMm: 17 } },
+      machineKind: 'cnc',
+    });
+    useStore.getState().undo();
+    expect(loadLastMachineSelection(localStorage)?.profile.cncSubProfile?.safeZMm).toBe(
+      DEFAULT_CNC_MACHINE_CONFIG.params.safeZMm,
+    );
+    useStore.getState().redo();
+    expect(loadLastMachineSelection(localStorage)?.profile.cncSubProfile?.safeZMm).toBe(17);
+  });
+
+  it('persists an explicit mode change and its undo after Open', () => {
+    openCncFile(true);
+    useStore.getState().setMachineKind('laser');
+    expect(loadLastMachineSelection(localStorage)).toMatchObject({
+      profile: { name: 'File CNC' },
+      machineKind: 'laser',
+    });
+    useStore.getState().undo();
+    expect(loadLastMachineSelection(localStorage)).toMatchObject({
+      profile: { name: 'File CNC' },
+      machineKind: 'cnc',
+    });
+  });
+
   it('recovers an autosaved job over the restored machine without replacing app preferences', async () => {
     rememberLastMachine(localStorage, saved);
     useStore.getState().setProject(createStartupProject());
@@ -118,3 +193,19 @@ describe('application machine persistence', () => {
     expect(createStartupProject().device).toEqual(DEFAULT_DEVICE_PROFILE);
   });
 });
+
+function openCncFile(hasMirror: boolean): void {
+  useStore.getState().replaceDeviceProfile(saved);
+  const fileMachine = {
+    ...DEFAULT_DEVICE_PROFILE,
+    name: 'File CNC',
+    bedWidth: 654,
+    bedHeight: 432,
+    ...(hasMirror ? { cncSubProfile: { ...DEFAULT_CNC_MACHINE_CONFIG.params } } : {}),
+  };
+  useStore.getState().setProject({
+    ...createProject(fileMachine),
+    machine: { ...DEFAULT_CNC_MACHINE_CONFIG },
+  });
+  expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
+}
