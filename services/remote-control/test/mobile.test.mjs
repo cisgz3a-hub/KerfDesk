@@ -9,6 +9,7 @@ const closeSocket = (socket) => {
 };
 function syntheticDesktop(desktop, commands, suppliedOperations) {
   let revision = 1;
+  let detailGate;
   let operations = suppliedOperations ?? [
     {
       id: 'op-1',
@@ -78,11 +79,36 @@ function syntheticDesktop(desktop, commands, suppliedOperations) {
       revision += 1;
       result = { revision: `audit-${revision}` };
     }
-    desktop.send({ type: 'result', requestId: message.requestId, result });
+    const respond = () => desktop.send({ type: 'result', requestId: message.requestId, result });
+    if (name === 'get_app_status' && detailGate) {
+      const gate = detailGate;
+      detailGate = undefined;
+      gate.respond = respond;
+      gate.arrived();
+    } else respond();
   });
   return {
     replaceOperations(next) {
       operations = next;
+    },
+    getOperation(id) {
+      return structuredClone(operations.find((operation) => operation.id === id));
+    },
+    holdNextAppStatus() {
+      const gate = { respond: null, arrived: null };
+      const reached = new Promise((resolve) => {
+        gate.arrived = resolve;
+      });
+      detailGate = gate;
+      return {
+        reached,
+        release() {
+          if (detailGate === gate) detailGate = undefined;
+          const respond = gate.respond;
+          gate.respond = null;
+          respond?.();
+        },
+      };
     },
   };
 }
@@ -137,7 +163,7 @@ test(
     try {
       desktop = await connectDesktop(worker);
       const commands = [];
-      syntheticDesktop(desktop, commands);
+      const fixture = syntheticDesktop(desktop, commands);
       desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
       const offer = await desktop.inbox.next('pair.offer');
       const loaded = await browserPage(worker);
@@ -169,13 +195,13 @@ test(
       await power.fill('25');
       assert.equal(await power.inputValue(), '25');
       await page.getByRole('button', { name: 'Apply settings' }).click();
-      await page.waitForFunction(
-        () => document.querySelector('#notice').textContent === 'Updated on your computer.',
-      );
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
       const operation = commands.find((command) => command.name === 'update_operation');
       assert.equal(operation.args.patch.powerPercent, 25);
       assert.equal(operation.args.expectedRevision, 'audit-1');
       assert.match(operation.args.requestId, /^[0-9a-f-]{36}$/);
+      assert.equal(fixture.getOperation('op-1').powerPercent, 25);
+      assert.equal(await power.inputValue(), '25');
       assert.equal(await page.locator('canvas').count(), 0);
       const storage = await page.evaluate(() => ({
         local: Object.keys(localStorage),
@@ -195,6 +221,138 @@ test(
       await page.getByRole('button', { name: 'Disconnect this phone' }).click();
       await page.locator('#pair-card').waitFor({ state: 'visible' });
       assert.equal(await page.locator('#workspace-area').isHidden(), true);
+    } finally {
+      await browser?.close();
+      closeSocket(desktop?.socket);
+      await worker.dispose();
+    }
+  },
+);
+
+for (const pairedOnStartup of [true, false])
+  test(
+    `mobile Chrome: ${pairedOnStartup ? 'saved approval startup' : 'pairing approval timer'} holds Apply until detail reads settle`,
+    { timeout: 30_000 },
+    async () => {
+      const worker = start();
+      let desktop;
+      let browser;
+      let detailDelay;
+      try {
+        desktop = await connectDesktop(worker);
+        const commands = [];
+        const fixture = syntheticDesktop(desktop, commands);
+        detailDelay = fixture.holdNextAppStatus();
+        let cookies = [];
+        if (pairedOnStartup) {
+          const phone = await pairPhone(worker, desktop);
+          const [name, value] = phone.cookie.split('=');
+          cookies = [
+            { name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' },
+          ];
+        }
+        const receipts = [];
+        const loaded = await browserPage(worker, cookies, null, receipts);
+        browser = loaded.browser;
+        const page = loaded.page;
+        await page.goto(`${ORIGIN}/control`);
+        if (!pairedOnStartup) {
+          await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+          desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
+          const offer = await desktop.inbox.next('pair.offer');
+          await page.locator('[name=deviceId]').fill(desktop.deviceId);
+          await page.locator('[name=code]').fill(offer.code);
+          await page.locator('[name=edit]').check();
+          await page.getByRole('button', { name: 'Request PC approval' }).click();
+          const request = await desktop.inbox.next('pair.request');
+          await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+          assert.ok(
+            receipts.some((item) => item.path === '/api/pair/status' && item.status === 200),
+          );
+          desktop.send({
+            type: 'pair.decide',
+            pairingId: request.pairingId,
+            approved: true,
+            scopes: ['read', 'edit'],
+          });
+        }
+        await detailDelay.reached;
+        await page.getByRole('button', { name: 'Edit', exact: true }).click();
+        const apply = page.getByRole('button', { name: 'Apply settings' });
+        assert.equal(await page.locator('body').getAttribute('aria-busy'), 'true');
+        assert.equal(await apply.isDisabled(), true);
+        const power = page.locator('#operation-form [name=powerPercent]');
+        await power.fill('');
+        await power.fill('25');
+        assert.equal(
+          commands.some((command) => command.name === 'update_operation'),
+          false,
+        );
+        detailDelay.release();
+        await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        await apply.click();
+        await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        const writes = commands.filter((command) => command.name === 'update_operation');
+        assert.equal(writes.length, 1);
+        assert.equal(writes[0].args.patch.powerPercent, 25);
+        assert.equal(writes[0].args.expectedRevision, 'audit-1');
+        assert.equal(fixture.getOperation('op-1').powerPercent, 25);
+        assert.equal(await power.inputValue(), '25');
+        assert.equal(await page.locator('#notice').textContent(), 'Updated on your computer.');
+        assert.equal(await apply.isEnabled(), true);
+      } finally {
+        detailDelay?.release();
+        await browser?.close();
+        closeSocket(desktop?.socket);
+        await worker.dispose();
+      }
+    },
+  );
+
+test(
+  'mobile Chrome: saved approval detail failure stays recoverable through Refresh',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let desktop;
+    let browser;
+    try {
+      desktop = await connectDesktop(worker);
+      const commands = [];
+      syntheticDesktop(desktop, commands);
+      const phone = await pairPhone(worker, desktop);
+      const [name, value] = phone.cookie.split('=');
+      const loaded = await browserPage(worker, [
+        { name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' },
+      ]);
+      browser = loaded.browser;
+      const page = loaded.page;
+      let failed = false;
+      await page.route('**/api/client/command', async (route) => {
+        if (route.request().postDataJSON().name === 'get_app_status' && !failed) {
+          failed = true;
+          await route.fulfill({
+            status: 503,
+            contentType: 'application/json',
+            body: JSON.stringify({ error: { code: 'failed' } }),
+          });
+        } else await route.fallback();
+      });
+      await page.goto(`${ORIGIN}/control`);
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(failed, true);
+      assert.equal(await page.locator('#workspace-area').isVisible(), true);
+      assert.equal(await page.locator('#pair-card').isHidden(), true);
+      assert.equal(await page.locator('#notice').getAttribute('data-kind'), 'error');
+      assert.match(await page.locator('#notice').textContent(), /Refresh the workspace/);
+      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('#notice').textContent(), 'Workspace refreshed.');
+      assert.ok(commands.some((command) => command.name === 'get_app_status'));
+      assert.equal(
+        commands.some((command) => command.name === 'update_operation'),
+        false,
+      );
     } finally {
       await browser?.close();
       closeSocket(desktop?.socket);
