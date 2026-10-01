@@ -11,7 +11,8 @@ function Initialize-UpgradeControls($App, [string]$ExpectedExecutable) {
   $deadline = [DateTime]::UtcNow.AddSeconds(45)
   do {
     Assert-UpgradeApp
-    if ($App.MainWindowHandle -ne [IntPtr]::Zero) {
+    if ($App.MainWindowHandle -ne [IntPtr]::Zero -and
+        $App.MainWindowTitle.StartsWith('KerfDesk', [StringComparison]::Ordinal)) {
       $script:upgradeWindow = $App.MainWindowHandle
       return
     }
@@ -27,12 +28,27 @@ function Assert-UpgradeApp {
       $script:upgradeApp.StartTime.ToUniversalTime() -ne $script:upgradeStarted) {
     throw 'Native UI process ownership changed.'
   }
-  if ($script:upgradeWindow -ne [IntPtr]::Zero -and $script:upgradeApp.MainWindowHandle -ne $script:upgradeWindow) {
-    throw 'Native UI window ownership changed.'
+  if ($script:upgradeWindow -ne [IntPtr]::Zero) {
+    # Windows can report a transient Chrome pane as MainWindowHandle while the
+    # original app window remains alive. Verify the tracked HWND itself.
+    $ownedWindow = Get-UpgradeWindowElement $script:upgradeWindow
+    if ($null -eq $ownedWindow -or $ownedWindow.Current.ProcessId -ne $script:upgradeApp.Id -or
+        $ownedWindow.Current.ControlType.ProgrammaticName -ne 'ControlType.Window') {
+      throw 'Native UI window ownership changed.'
+    }
   }
 }
 
-function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [switch]$Prefix, [int]$TimeoutSeconds = 30) {
+function Get-UpgradeWindowElement([IntPtr]$Window) {
+  return [Windows.Automation.AutomationElement]::FromHandle($Window)
+}
+
+function Get-UpgradeWindowTitle {
+  Assert-UpgradeApp
+  return (Get-UpgradeWindowElement $script:upgradeWindow).Current.Name
+}
+
+function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [switch]$Prefix, [int]$TimeoutSeconds = 30, [switch]$Optional) {
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
     Assert-UpgradeApp
@@ -49,6 +65,7 @@ function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [swit
     if ($matches.Count -eq 1) { return $matches[0] }
     Start-Sleep -Milliseconds 150
   } while ([DateTime]::UtcNow -lt $deadline)
+  if ($Optional) { return $null }
   throw "Native control did not appear: $Role $Name"
 }
 
@@ -150,5 +167,23 @@ function Assert-UpgradePreferences($Value) {
 function Assert-UpgradeMachine($Value) {
   if ($Value.name -ne 'Upgrade retention fixture' -or $Value.bedWidth -ne '321' -or $Value.bedHeight -ne '234') {
     throw "Retained machine settings differ: $($Value | ConvertTo-Json -Compress)"
+  }
+}
+
+function Read-RestoredUpgradeMachine {
+  # Prove this is the blank workspace before a retained document can supply
+  # its own correct machine and hide damaged app-level persistence.
+  $null = Get-UpgradeControl 'Import or draw artwork to create its first operation.' 'Text'
+  $offer = Get-UpgradeControl 'Use Upgrade retention fixture' 'Button' -TimeoutSeconds 1 -Optional
+  $needsDiscard = $null -ne $offer
+  if ($needsDiscard) { Invoke-UpgradeControl 'Use Upgrade retention fixture' 'Button' }
+  # Older releases require the offer; newer ones already restore at startup.
+  # Both paths must independently retain exact values before opening a file.
+  $machine = Open-UpgradeMachine
+  $values = Read-UpgradeMachine $machine
+  Assert-UpgradeMachine $values
+  return [pscustomobject]@{
+    restorePath = $(if ($needsDiscard) { 'legacy-offer' } else { 'already-restored' })
+    needsScratchDiscard = $needsDiscard; values = $values; window = $machine
   }
 }
