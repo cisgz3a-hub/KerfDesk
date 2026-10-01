@@ -48,6 +48,6 @@ function persistConfiguredProfile(profile: DeviceProfile): void {
     deviceProfileSignature(profile, machineKindOf(useStore.getState().project.machine)),
   );
   persistConfiguredSignatures(storage, configured);
-  // ADR-500: a later session starts on the starter machine and offers this one back.
-  rememberLastMachine(storage, profile);
+  // ADR-500 Amendment 1: restore the saved profile and selected head on restart.
+  rememberLastMachine(storage, profile, machineKindOf(useStore.getState().project.machine));
 }

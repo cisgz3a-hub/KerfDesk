@@ -20,7 +20,8 @@ export function useLayerDefaultsPersistence(): void {
       storage === null
         ? null
         : restoreLayerDefaults(storage, useStore.getState().project.device.name);
-    if (restored !== null) useStore.getState().setLayerDefaults(restored);
+    if (restored !== null)
+      useStore.getState().setLayerDefaults({ ...restored, applyToNewOperations: false });
 
     let hasWarned = false;
     let restoringProfile = false;
@@ -36,7 +37,10 @@ export function useLayerDefaultsPersistence(): void {
         // profile's still-active values into the destination slot.
         restoringProfile = true;
         try {
-          useStore.getState().setLayerDefaults(nextDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE);
+          useStore.getState().setLayerDefaults({
+            ...(nextDefaults ?? DEFAULT_LAYER_DEFAULTS_STATE),
+            applyToNewOperations: false,
+          });
         } finally {
           restoringProfile = false;
         }

@@ -34,6 +34,7 @@ import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useJobCheckpoint } from './use-job-checkpoint';
 import { useLayerDefaultsPersistence } from './use-layer-defaults-persistence';
 import { useMachineHoursTracking } from './use-machine-hours-tracking';
+import { useMachineProfilePersistence } from './use-machine-profile-persistence';
 import { useMaterialLibraryPersistence } from './use-material-library-persistence';
 import { usePolylineFairingUpgrade } from './use-polyline-fairing-upgrade';
 import { useShortcuts } from './use-shortcuts';
@@ -116,6 +117,7 @@ function AppLifecycle(): null {
   usePolylineFairingUpgrade();
   useSingleArtworkSelection();
   useAutosave();
+  useMachineProfilePersistence();
   useMaterialLibraryPersistence();
   useCncLibraryPersistence();
   useLayerDefaultsPersistence();

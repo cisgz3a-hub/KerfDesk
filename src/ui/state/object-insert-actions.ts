@@ -362,6 +362,7 @@ function svgStructuralDefaults(defaults: LayerDefaultsState): LayerDefaultsState
     return rest;
   };
   return {
+    ...defaults,
     allColors: defaults.allColors === null ? null : settings(defaults.allColors),
     byColor: Object.fromEntries(
       Object.entries(defaults.byColor).map(([key, value]) => [key, settings(value)]),

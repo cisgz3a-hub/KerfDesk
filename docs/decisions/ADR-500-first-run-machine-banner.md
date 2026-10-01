@@ -2,6 +2,9 @@
 
 **Status:** Accepted. | **Date:** 2026-09-28
 
+Startup restoration and fresh-canvas defaults are superseded by
+[Amendment 1](ADR-500-amendment-1-machine-persistence-and-fresh-canvas.md).
+
 The banner is advisory (ADR-228): it blocks nothing and nothing waits on it.
 
 ### Context
