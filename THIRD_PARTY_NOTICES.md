@@ -31,6 +31,15 @@ macOS; JS license banners also remain in shipped assets.
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |
 | lucide-static | ISC | © Lucide Contributors — https://github.com/lucide-icons/lucide |
 | @tabler/icons 3.43.0 | MIT | © 2020-2026 Paweł Kuna and Tabler Icons contributors — https://github.com/tabler/tabler-icons/tree/v3.43.0 |
+| @modelcontextprotocol/server, @modelcontextprotocol/core 2.2.0 (desktop and MCP relay) | Apache-2.0 and historical MIT, as described by the packages' licence transition notice | Anthropic, PBC and MCP contributors — https://github.com/modelcontextprotocol/typescript-sdk |
+| zod 4.4.3 | MIT | © Colin McDonnell — https://github.com/colinhacks/zod |
+| ws 8.21.0 (desktop relay connection) | MIT | © Einar Otto Stangvik and contributors — https://github.com/websockets/ws |
+
+The MCP packages' `package.json` metadata says MIT, while their actual `LICENSE`
+files include the Apache-2.0 transition notice, full Apache-2.0 terms and retained
+historical MIT terms. The generated release notices reproduce those complete
+files; the metadata label does not replace them. The MCP client and WebSocket
+TypeScript declarations are development-only dependencies.
 
 The MIT / ISC permission notices ("Permission is hereby granted, free of charge, …
 THE SOFTWARE IS PROVIDED "AS IS"…"), the Apache-2.0 / MPL-2.0 texts (DOMPurify),
