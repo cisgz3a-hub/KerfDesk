@@ -79,7 +79,10 @@ export function persistLayerDefaults(
       storage.removeItem(key);
       return true;
     }
-    storage.setItem(key, JSON.stringify(defaults));
+    storage.setItem(
+      key,
+      JSON.stringify({ byColor: defaults.byColor, allColors: defaults.allColors }),
+    );
     return true;
   } catch {
     return false;

@@ -9,6 +9,157 @@ import test from 'node:test';
 const script = fileURLToPath(new URL('./qualify-windows-installer.ps1', import.meta.url));
 
 test(
+  'native ownership keeps the original HWND through transient panes and rejects dead, foreign or recycled owners',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    const helper = fileURLToPath(new URL('./installed-upgrade-controls.ps1', import.meta.url));
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    const command = `
+. ${quoted(helper)}
+function Get-UpgradeWindowElement([IntPtr]$Window) {
+  $script:observedHandles.Add($Window.ToInt64())
+  if ($script:currentCase.dead) { throw 'The original HWND no longer exists.' }
+  if ($script:currentCase.missing) { return $null }
+  return [pscustomobject]@{ Current = [pscustomobject]@{ ProcessId = $script:currentCase.pid; Name = ('KerfDesk ' + [char]0x2014 + ' retained.lf2'); ControlType = [pscustomobject]@{ ProgrammaticName = $script:currentCase.role } } }
+}
+$started = [DateTime]::Parse('2026-10-01T00:00:00Z').ToUniversalTime()
+$reports = foreach ($case in @(
+  @{ label = 'normal'; pid = 8000; role = 'ControlType.Window'; dead = $false; missing = $false; recycled = $false; foreignExe = $false; exited = $false; reportedHandle = 9000 },
+  @{ label = 'transient-pane'; pid = 8000; role = 'ControlType.Window'; dead = $false; missing = $false; recycled = $false; foreignExe = $false; exited = $false; reportedHandle = 40000 },
+  @{ label = 'dead'; pid = 8000; role = 'ControlType.Window'; dead = $true; missing = $false; recycled = $false; foreignExe = $false; exited = $false; reportedHandle = 40000 },
+  @{ label = 'missing'; pid = 8000; role = 'ControlType.Window'; dead = $false; missing = $true; recycled = $false; foreignExe = $false; exited = $false; reportedHandle = 40000 },
+  @{ label = 'foreign-pid'; pid = 9001; role = 'ControlType.Window'; dead = $false; missing = $false; recycled = $false; foreignExe = $false; exited = $false; reportedHandle = 40000 },
+  @{ label = 'tracked-pane'; pid = 8000; role = 'ControlType.Pane'; dead = $false; missing = $false; recycled = $false; foreignExe = $false; exited = $false; reportedHandle = 40000 },
+  @{ label = 'recycled'; pid = 8000; role = 'ControlType.Window'; dead = $false; missing = $false; recycled = $true; foreignExe = $false; exited = $false; reportedHandle = 40000 },
+  @{ label = 'foreign-exe'; pid = 8000; role = 'ControlType.Window'; dead = $false; missing = $false; recycled = $false; foreignExe = $true; exited = $false; reportedHandle = 40000 },
+  @{ label = 'exited'; pid = 8000; role = 'ControlType.Window'; dead = $false; missing = $false; recycled = $false; foreignExe = $false; exited = $true; reportedHandle = 40000 }
+)) {
+  $script:currentCase = $case
+  $script:observedHandles = [Collections.Generic.List[long]]::new()
+  $script:upgradeApp = [pscustomobject]@{ Id = 8000; HasExited = $case.exited; MainWindowHandle = [IntPtr]$case.reportedHandle; MainModule = [pscustomobject]@{ FileName = $(if ($case.foreignExe) { 'C:\\foreign\\KerfDesk.exe' } else { 'C:\\owned\\KerfDesk.exe' }) }; StartTime = $(if ($case.recycled) { $started.AddSeconds(1) } else { $started }) }
+  $script:upgradeApp | Add-Member -MemberType ScriptMethod -Name Refresh -Value {}
+  $script:upgradeExecutable = 'C:\\owned\\KerfDesk.exe'; $script:upgradeStarted = $started; $script:upgradeWindow = [IntPtr]9000
+  try { Assert-UpgradeApp; $titleMatches = (Get-UpgradeWindowTitle) -eq ('KerfDesk ' + [char]0x2014 + ' retained.lf2'); @{ label = $case.label; passed = $true; trackedTitleMatches = $titleMatches; observedHandles = @($script:observedHandles) } }
+  catch { @{ label = $case.label; passed = $false; error = $_.ToString(); observedHandles = @($script:observedHandles) } }
+}
+$reports | ConvertTo-Json -Depth 5 -Compress
+`;
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        windowsHide: true,
+      },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const reports = JSON.parse(result.stdout);
+    assert.equal(reports.length, 9);
+    for (const success of reports.slice(0, 2)) {
+      assert.equal(success.passed, true, success.label);
+      assert.equal(success.trackedTitleMatches, true);
+      assert.ok(success.observedHandles.length > 0);
+      assert.ok(
+        success.observedHandles.every((handle) => handle === 9000),
+        'must never adopt a transient replacement HWND or its title',
+      );
+    }
+    for (const rejected of reports.slice(2)) assert.equal(rejected.passed, false, rejected.label);
+    for (const recycled of reports.slice(6))
+      assert.deepEqual(recycled.observedHandles, [], 'reject process changes before touching UI');
+  },
+);
+
+test(
+  'pre-project machine verification supports legacy offers and automatic restore without masking corruption',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    const helper = fileURLToPath(new URL('./installed-upgrade-controls.ps1', import.meta.url));
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    const command = `
+. ${quoted(helper)}
+function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [switch]$Prefix, [int]$TimeoutSeconds = 30, [switch]$Optional) {
+  if (-not $script:currentCase.owned) { throw 'Native UI process ownership changed.' }
+  if ($Name -eq 'Import or draw artwork to create its first operation.') {
+    $script:events.Add('verify-blank')
+    if (-not $script:currentCase.blank) { throw 'Not a blank workspace before project open.' }
+    return [pscustomobject]@{ name = $Name }
+  }
+  $script:events.Add('check-offer')
+  if ($script:currentCase.offer) { return [pscustomobject]@{ name = $Name } }
+  return $null
+}
+function Invoke-UpgradeControl([string]$Name, [string]$Role) { $script:events.Add('apply-offer') }
+function Open-UpgradeMachine { $script:events.Add('open-machine'); return [pscustomobject]@{ name = 'Machine Setup' } }
+function Read-UpgradeMachine($Machine) { $script:events.Add('read-machine'); return $script:currentCase.machine }
+$fixture = [pscustomobject]@{ name = 'Upgrade retention fixture'; bedWidth = '321'; bedHeight = '234' }
+$corrupt = [pscustomobject]@{ name = 'Upgrade retention fixture'; bedWidth = '320'; bedHeight = '234' }
+$missing = [pscustomobject]@{ name = 'Generic starter'; bedWidth = '300'; bedHeight = '200' }
+$reports = foreach ($case in @(
+  @{ label = 'legacy'; offer = $true; machine = $fixture; blank = $true; owned = $true },
+  @{ label = 'automatic'; offer = $false; machine = $fixture; blank = $true; owned = $true },
+  @{ label = 'missing'; offer = $false; machine = $missing; blank = $true; owned = $true },
+  @{ label = 'corrupt-legacy'; offer = $true; machine = $corrupt; blank = $true; owned = $true },
+  @{ label = 'corrupt-automatic'; offer = $false; machine = $corrupt; blank = $true; owned = $true },
+  @{ label = 'loaded-project'; offer = $false; machine = $fixture; blank = $false; owned = $true },
+  @{ label = 'ownership-changed'; offer = $false; machine = $fixture; blank = $true; owned = $false }
+)) {
+  $script:currentCase = $case
+  $script:events = [Collections.Generic.List[string]]::new()
+  try {
+    $restored = Read-RestoredUpgradeMachine
+    @{ label = $case.label; passed = $true; path = $restored.restorePath; discard = $restored.needsScratchDiscard; values = $restored.values; events = @($script:events) }
+  } catch { @{ label = $case.label; passed = $false; error = $_.ToString(); events = @($script:events) } }
+}
+$reports | ConvertTo-Json -Depth 5 -Compress
+`;
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        windowsHide: true,
+      },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const reports = JSON.parse(result.stdout);
+    assert.equal(reports.length, 7);
+    const [legacy, automatic, ...failures] = reports;
+    assert.equal(legacy.path, 'legacy-offer');
+    assert.equal(legacy.discard, true);
+    assert.deepEqual(legacy.events, [
+      'verify-blank',
+      'check-offer',
+      'apply-offer',
+      'open-machine',
+      'read-machine',
+    ]);
+    assert.equal(automatic.path, 'already-restored');
+    assert.equal(automatic.discard, false);
+    assert.deepEqual(automatic.events, [
+      'verify-blank',
+      'check-offer',
+      'open-machine',
+      'read-machine',
+    ]);
+    for (const failure of failures) assert.equal(failure.passed, false, failure.label);
+    assert.match(failures[0].error, /Retained machine settings differ/u);
+    assert.match(failures[1].error, /Retained machine settings differ/u);
+    assert.match(failures[2].error, /Retained machine settings differ/u);
+    assert.match(failures[3].error, /Not a blank workspace/u);
+    assert.match(failures[4].error, /ownership changed/u);
+  },
+);
+
+test(
   'sequential fresh and historical qualifications use distinct owned runner roots',
   {
     skip: process.platform !== 'win32',

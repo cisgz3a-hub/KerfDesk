@@ -9,7 +9,6 @@ import type { Sketch } from '../../core/design';
 import type { DesignApplyRecord } from './design-apply-record';
 import type { DeviceProfile } from '../../core/devices';
 import {
-  createProject,
   type BoardShape,
   type CncMachineConfig,
   type EmbeddedFont,
@@ -34,6 +33,7 @@ import { machineActions, type MachineActions } from './machine-actions';
 import { projectActions, type ProjectActions } from './project-actions';
 import type { ProjectBedReconciliationNotice } from './project-bed-reconciliation';
 import { initialProjectWorkspaceState } from './store-initial-project-state';
+import { createStartupProject } from './startup-project';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
@@ -392,7 +392,7 @@ export type AppState = ObjectPropertiesActions &
   };
 
 function initialState(
-  project = createProject(),
+  project = createStartupProject(),
 ): Pick<
   AppState,
   | 'project'

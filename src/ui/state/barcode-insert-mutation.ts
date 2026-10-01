@@ -69,6 +69,7 @@ export function applyInsertBarcode(
 // lookup falls through to the next default, or to a plain new operation.
 function fillDefaultsOnly(defaults: LayerDefaultsState): LayerDefaultsState {
   return {
+    ...defaults,
     byColor: Object.fromEntries(
       Object.entries(defaults.byColor).filter(([, settings]) => settings.mode === 'fill'),
     ),

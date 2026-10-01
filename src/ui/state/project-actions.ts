@@ -140,7 +140,7 @@ function retainedApplicationState(
   return {
     ...currentMaterialLibraryState(state),
     ...currentSavedLibrariesState(state),
-    layerDefaults: state.layerDefaults,
+    layerDefaults: { ...state.layerDefaults, applyToNewOperations: false },
     cncLibrary: state.cncLibrary,
     cncLiveCaps: state.cncLiveCaps,
     projectOpenRequestEpoch: state.projectOpenRequestEpoch,

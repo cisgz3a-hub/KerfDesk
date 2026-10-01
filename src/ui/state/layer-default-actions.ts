@@ -16,6 +16,8 @@ import { pushUndo, type StateSlice } from './scene-mutations';
 export type LayerDefaultsState = {
   readonly byColor: Readonly<Record<string, LayerDefaultSettings>>;
   readonly allColors: LayerDefaultSettings | null;
+  // Session/document-only consent to seed additional operations. Never saved.
+  readonly applyToNewOperations?: boolean;
 };
 
 export const DEFAULT_LAYER_DEFAULTS_STATE: LayerDefaultsState = {
@@ -63,6 +65,7 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
         return {
           layerDefaults: {
             ...state.layerDefaults,
+            applyToNewOperations: true,
             byColor: {
               ...state.layerDefaults.byColor,
               [defaultColorForOperation(scene.objects, layer)]: captureLayerDefaultSettings(
@@ -80,6 +83,7 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
         return {
           layerDefaults: {
             ...state.layerDefaults,
+            applyToNewOperations: true,
             allColors: captureLayerDefaultSettings(layer, machineKindOf(state.project.machine)),
           },
         };
@@ -92,6 +96,7 @@ export function layerDefaultActions(set: LayerDefaultActionSet): LayerDefaultsAc
           state.layerDefaults,
           state.project.scene.objects,
           layer,
+          'explicit-reuse',
         );
         if (Object.keys(defaults).length === 0) return {};
         const scene = updateLayer(
@@ -120,7 +125,9 @@ export function defaultSettingsForOperation(
   layerDefaults: LayerDefaultsState,
   objects: ReadonlyArray<SceneObject>,
   operation: Layer,
+  purpose: 'creation' | 'explicit-reuse' = 'creation',
 ): LayerDefaultSettings {
+  if (purpose === 'creation' && layerDefaults.applyToNewOperations === false) return {};
   return (
     layerDefaults.byColor[defaultColorForOperation(objects, operation)] ??
     layerDefaults.allColors ??

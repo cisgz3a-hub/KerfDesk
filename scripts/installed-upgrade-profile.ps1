@@ -85,7 +85,7 @@ function Wait-UpgradeTitle([string]$File) {
   $deadline = [DateTime]::UtcNow.AddSeconds(30)
   do {
     Assert-UpgradeApp
-    if ($app.MainWindowTitle -eq $expected) { return }
+    if ((Get-UpgradeWindowTitle) -eq $expected) { return }
     Start-Sleep -Milliseconds 150
   } while ([DateTime]::UtcNow -lt $deadline)
   throw 'Saved project was not reflected in the normal window title.'
@@ -137,17 +137,17 @@ try {
     Wait-UpgradeTitle $Project
     $saved = $Project
   } else {
-    # Apply and read the app-level saved machine before the project can restore
-    # its own device. A same-name profile with corrupt dimensions must fail.
-    Invoke-UpgradeControl 'Use Upgrade retention fixture' 'Button'
-    $receipt.lastMachineOffer = 'applied before opening the retained project'
-    $profileMachine = Open-UpgradeMachine
-    $receipt.restoredProfileMachine = Read-UpgradeMachine $profileMachine
-    Assert-UpgradeMachine $receipt.restoredProfileMachine
+    # Accept the old restore offer only when present. Automatic restore leaves
+    # no offer and no dirty scratch edit; exact pre-project values still must pass.
+    $restored = Read-RestoredUpgradeMachine
+    $receipt.machineRestorePath = $restored.restorePath
+    $receipt.restoredProfileMachine = $restored.values
     $receipt.restoredProfileWindow = Invoke-UpgradeHelper 'Inspect' 'restored-profile-window'
-    Invoke-UpgradeControl 'Cancel without saving' 'Button' $profileMachine
-    $receipt.openDialog = Invoke-UpgradeHelper 'Open' 'open-dialog' $Project 'Open...' -DiscardOwnedScratch
-    $receipt.scratchDisposition = 'normal Don''t Save confirmation discarded only the restored-machine edit to the owned blank project'
+    Invoke-UpgradeControl 'Cancel without saving' 'Button' $restored.window
+    $receipt.openDialog = Invoke-UpgradeHelper 'Open' 'open-dialog' $Project 'Open...' -DiscardOwnedScratch:$restored.needsScratchDiscard
+    $receipt.scratchDisposition = $(if ($restored.needsScratchDiscard) {
+      'normal Don''t Save confirmation discarded only the restored-machine edit to the owned blank project'
+    } else { 'already restored in the blank workspace; no scratch edit or discard' })
     Wait-UpgradeTitle $Project
     $saved = Join-Path $EvidenceRoot 'reopened-roundtrip.lf2'
     $receipt.saveDialog = Invoke-UpgradeHelper 'Save' 'save-dialog' $saved 'Save As...'

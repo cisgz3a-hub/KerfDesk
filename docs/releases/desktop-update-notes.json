@@ -2,8 +2,10 @@
   "schemaVersion": 1,
   "sinceSourceSha": "a6c7642ffcd784c2f680867b494d29cd71d826ef",
   "highlights": [
-    "Updated Electron with the latest Chromium and Windows fixes.",
+    "Updated the desktop runtime with Chromium and Windows fixes.",
     "Improved desktop opening order for licence and update checks.",
+    "Your saved machine and its settings now load automatically on startup.",
+    "New canvases start with fresh job settings; saved projects keep their settings.",
     "Added checks that desktop upgrades retain projects and preferences.",
     "Restored the public privacy notice and improved download statistics reliability."
   ]

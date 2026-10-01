@@ -58,7 +58,10 @@ describe('useLayerDefaultsPersistence', () => {
 
     const { unmount } = await mountHook();
     try {
-      expect(useStore.getState().layerDefaults).toEqual(defaultsFixture());
+      expect(useStore.getState().layerDefaults).toEqual({
+        ...defaultsFixture(),
+        applyToNewOperations: false,
+      });
     } finally {
       await unmount();
     }
@@ -89,13 +92,22 @@ describe('useLayerDefaultsPersistence', () => {
 
     const first = await mountHook();
     try {
-      expect(useStore.getState().layerDefaults).toEqual(defaultsA);
+      expect(useStore.getState().layerDefaults).toEqual({
+        ...defaultsA,
+        applyToNewOperations: false,
+      });
       await act(async () => useStore.getState().replaceDeviceProfile(profileB));
-      expect(useStore.getState().layerDefaults).toEqual(defaultsB);
+      expect(useStore.getState().layerDefaults).toEqual({
+        ...defaultsB,
+        applyToNewOperations: false,
+      });
       expect(restoreLayerDefaults(localStorage, profileB.name)).toEqual(defaultsB);
       await act(async () => useStore.getState().setLayerDefaults(editedB));
       await act(async () => useStore.getState().replaceDeviceProfile(profileA));
-      expect(useStore.getState().layerDefaults).toEqual(defaultsA);
+      expect(useStore.getState().layerDefaults).toEqual({
+        ...defaultsA,
+        applyToNewOperations: false,
+      });
       expect(restoreLayerDefaults(localStorage, profileA.name)).toEqual(defaultsA);
       expect(restoreLayerDefaults(localStorage, profileB.name)).toEqual(editedB);
     } finally {
@@ -106,7 +118,10 @@ describe('useLayerDefaultsPersistence', () => {
     useStore.getState().replaceDeviceProfile(profileB);
     const second = await mountHook();
     try {
-      expect(useStore.getState().layerDefaults).toEqual(editedB);
+      expect(useStore.getState().layerDefaults).toEqual({
+        ...editedB,
+        applyToNewOperations: false,
+      });
     } finally {
       await second.unmount();
     }
@@ -124,11 +139,17 @@ describe('useLayerDefaultsPersistence', () => {
       const { unmount } = await mountHook();
       try {
         await act(async () => useStore.getState().replaceDeviceProfile(profileB));
-        expect(useStore.getState().layerDefaults).toEqual(DEFAULT_LAYER_DEFAULTS_STATE);
+        expect(useStore.getState().layerDefaults).toEqual({
+          ...DEFAULT_LAYER_DEFAULTS_STATE,
+          applyToNewOperations: false,
+        });
         expect(localStorage.getItem(layerDefaultsStorageKey(profileB.name))).toBeNull();
         expect(restoreLayerDefaults(localStorage, profileA.name)).toEqual(defaultsFixture());
         await act(async () => useStore.getState().replaceDeviceProfile(profileA));
-        expect(useStore.getState().layerDefaults).toEqual(defaultsFixture());
+        expect(useStore.getState().layerDefaults).toEqual({
+          ...defaultsFixture(),
+          applyToNewOperations: false,
+        });
       } finally {
         await unmount();
       }

@@ -76,6 +76,23 @@ describe('applyInsertBarcode', () => {
     expect(result.project.scene.layers[0]).toMatchObject({ mode: 'fill', power: 55, speed: 3000 });
   });
 
+  it('does not reactivate a retained Fill preset after New ends automatic reuse', async () => {
+    const object = await barcode();
+    const plain = applyInsertBarcode(state(), object).project.scene.layers[0];
+    const result = applyInsertBarcode(
+      {
+        ...state(),
+        layerDefaults: {
+          applyToNewOperations: false,
+          byColor: { '#000000': { mode: 'fill', power: 55, speed: 3000 } },
+          allColors: { mode: 'fill', power: 65, speed: 456 },
+        },
+      },
+      object,
+    );
+    expect(result.project.scene.layers[0]).toEqual(plain);
+  });
+
   it('skips a line default for black and falls through to a Fill default for all', async () => {
     const before = {
       ...state(),

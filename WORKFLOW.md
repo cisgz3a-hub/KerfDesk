@@ -45,9 +45,10 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 1. App opens to **empty workspace** state (see F-A2).
 2. Status bar shows: `Ready · No device configured · Empty workspace`.
 3. **No** welcome modal, **no** onboarding tour, **no** "what's new" dialog. Just the workspace.
-   A card over the canvas's top right corner says the machine is the generic starter (ADR-500):
-   **Set up machine** opens Machine Setup, or, once a machine was saved there, **Use *name***
-   applies it as one undo step. **Not now** hides it until the next launch. It blocks nothing,
+   When no saved machine can be restored, a card over the canvas's top right corner says the
+   machine is the generic starter (ADR-500 Amendment 1). **Set up machine** opens Machine Setup.
+   A document on the generic starter can still offer **Use *name*** as one undo step.
+   **Not now** hides it until the next launch. It blocks nothing,
    takes no focus or canvas room, and goes as soon as the project's machine changes by any route.
 4. Default device profile is auto-loaded:
    - Name: `Default 400×400`
@@ -59,7 +60,9 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 5. The user can override this in Settings → Device Profile (Phase C; in Phase A it lives in a `device-profile.json` file the user can edit directly, with a doc in `README`).
 
 #### Success — returning run (had a project last session)
-1. App opens to empty workspace.
+1. App opens to an empty workspace with the last committed machine profile and Laser/CNC mode
+   restored. This creates no undo step, dirty document, connection or controller command.
+   Appearance/preferences and reusable libraries retain their existing separate storage.
 2. **Phase A does not auto-reopen the last project.** Autosave + recovery is a Phase C feature.
 3. User reopens it from the recent projects at the foot of the File menu, from
    `File → Recent Projects...`, or with `File → Open` (F-A12).
@@ -727,8 +730,13 @@ destination and cannot overwrite the template source.
   **Cancel** leaves the operation unchanged.
 - **Saved defaults** in More cut settings offers **Make Default for #rrggbb**, which remembers
   the operation's applied settings for the colour it names: the colour of the artwork the operation
-  was created for, or the operation's own colour when it has no artwork. New operations and **Reset
-  to Default** use the default saved for that same colour, otherwise **Make Default for All**. The
+  was created for, or the operation's own colour when it has no artwork. Further operations in this
+  canvas and **Reset to Default** use the default saved for that same colour, otherwise **Make
+  Default for All**. New, Open and restart end automatic reuse, while **Reset to Default** still
+  explicitly reuses the saved preset. Without an explicitly selected recipe/preset, operations use
+  unchanged app starter values with existing machine/profile/head seeding; choose power and speed
+  from the material recipe or selected machine's instructions. Hardware limits are not cutting
+  recipes. The
   automatic operation colour is never matched for artwork, so a default saved for black artwork
   does not reach other artwork whose operation happens to be black.
 - CNC settings lead with cut type, bit and material, then depth and feeds, followed by named
@@ -1409,6 +1417,10 @@ the completed physical Frame is the spatial source of truth.
 1. `File → New` (`Cmd/Ctrl+N`).
 2. Workspace returns to empty state (F-A2).
 3. Window title resets.
+4. The selected machine and application preferences/libraries remain. Operation settings, current
+   job setup and automatic reuse of saved layer defaults reset (ADR-500 Amendment 1). No prior
+   canvas power or speed carries forward. Explicit saved presets remain available through Reset
+   to Default; opened projects and autosave recovery retain their saved settings.
 
 #### Edge — current project has unsaved changes
 1. Modal: `Save changes to <project-name>?` with `Save`, `Don't Save`, `Cancel`.

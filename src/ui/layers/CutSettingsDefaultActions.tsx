@@ -17,13 +17,15 @@ export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JS
       </summary>
       <div className="lf-cut-settings-disclosure__body">
         <p className="lf-laser-help">
-          Apply edits before saving a default. Reset restores the saved settings immediately.
+          Apply edits before saving a default. Make Default uses it for added operations in this
+          canvas. New and restart use app starter values; Reset explicitly reuses saved settings.
+          Choose power and speed from a material recipe or your selected machine’s instructions.
         </p>
         <section aria-label="Default layer settings" className="lf-cut-settings-default-actions">
           <Button
             type="button"
             onClick={props.onMakeDefault}
-            title={`Remember this layer's settings as the default for new artwork colored ${props.makeDefaultColor}.`}
+            title={`Save settings for ${props.makeDefaultColor} and use them for added artwork in this canvas. New and restart do not apply them automatically.`}
           >
             Make Default for {props.makeDefaultColor}
           </Button>
@@ -37,7 +39,7 @@ export function CutSettingsDefaultActions(props: CutSettingsDefaultHandlers): JS
           <Button
             type="button"
             onClick={props.onMakeDefaultForAll}
-            title="Use this layer's settings as the default for all layer colors."
+            title="Save settings for all colours and use them for added artwork in this canvas. New and restart use app starter values."
           >
             Make Default for All
           </Button>
