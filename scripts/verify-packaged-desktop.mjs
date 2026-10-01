@@ -7,7 +7,10 @@
 // usage: node scripts/verify-packaged-desktop.mjs <executable> <app.asar> <builder config>
 
 import { closeSync, openSync, readFileSync, readSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { extractFile } from '@electron/asar';
+import { packagedRuntimeProblems } from './desktop-runtime-graph.mjs';
 
 // @electron/fuses marks the start of the fuse wire with this sentinel, then a
 // version byte and a length byte. Schema 1 order, from Electron's fuses.json5.
@@ -88,7 +91,20 @@ export function asarEntries(header) {
   return entries;
 }
 
-export function packagedDesktopProblems({ wire, fuses, allowed, entries }) {
+/** Resolve only files inside this archive, never ancestor checkout node_modules. */
+export function asarFileReader(asarPath, entries = asarEntries(readAsarHeader(asarPath))) {
+  const paths = new Set(entries);
+  return (path) =>
+    paths.has(path) ? extractFile(asarPath, join(...path.split('/'))).toString('utf8') : null;
+}
+
+export function requirePackagedRuntimeAsar(asarPath) {
+  const problems = packagedRuntimeProblems({ readFile: asarFileReader(asarPath) });
+  if (problems.length > 0)
+    throw new Error(`Desktop runtime closure verification failed:\n${problems.join('\n')}`);
+}
+
+export function packagedDesktopProblems({ wire, fuses, allowed, entries, readFile }) {
   const problems = [];
   FUSE_ORDER.forEach((name, index) => {
     if (!(name in fuses)) {
@@ -120,6 +136,7 @@ export function packagedDesktopProblems({ wire, fuses, allowed, entries }) {
     (entry) => entry.startsWith('dist-electron/') && entry.endsWith('.map'),
   );
   if (maps.length > 0) problems.push(`app.asar ships main-process source maps: ${maps.join(', ')}`);
+  if (readFile !== undefined) problems.push(...packagedRuntimeProblems({ readFile }));
   return problems;
 }
 
@@ -129,11 +146,13 @@ function runCli() {
     throw new Error('usage: verify-packaged-desktop.mjs <executable> <app.asar> <builder config>');
   }
   const configText = readFileSync(configPath, 'utf8');
+  const entries = asarEntries(readAsarHeader(asarPath));
   const problems = packagedDesktopProblems({
     wire: readFuseWire(executable),
     fuses: configuredFuses(configText),
     allowed: allowedNodeModules(configText),
-    entries: asarEntries(readAsarHeader(asarPath)),
+    entries,
+    readFile: asarFileReader(asarPath, entries),
   });
   if (problems.length > 0) {
     for (const problem of problems) process.stderr.write(`${problem}\n`);

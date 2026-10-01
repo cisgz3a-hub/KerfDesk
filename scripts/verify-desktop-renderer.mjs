@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { extractFile } from '@electron/asar';
+import { requirePackagedRuntimeAsar } from './verify-packaged-desktop.mjs';
 
 /** Refuse a browser Free bundle accidentally left in the shared dist/web directory. */
 export function requireDesktopRendererHtml(html) {
@@ -23,6 +24,7 @@ export function verifyDesktopRendererAsar(asarPath) {
   requireDesktopRendererHtml(
     extractFile(asarPath, join('dist', 'web', 'index.html')).toString('utf8'),
   );
+  requirePackagedRuntimeAsar(asarPath);
 }
 
 /** electron-builder supplies the platform-specific Resources path on every target. */
