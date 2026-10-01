@@ -31,6 +31,7 @@ if ($ExpectedCommit -notmatch '^[a-f0-9]{40}$' -or
 if (Test-Path -LiteralPath $EvidenceRoot) { throw 'Historical phase evidence must be new.' }
 New-Item -ItemType Directory -Path $EvidenceRoot | Out-Null
 . (Join-Path $PSScriptRoot 'installed-upgrade-controls.ps1')
+. (Join-Path $PSScriptRoot 'windows-powershell-process.ps1')
 $app = $null
 $receipt = [ordered]@{
   schemaVersion = 1; status = 'running'; startedAt = [DateTime]::UtcNow.ToString('o')
@@ -49,7 +50,7 @@ function Invoke-UpgradeHelper([string]$Action, [string]$Label, [string]$FilePath
     '-Action', $Action, '-ExpectedExecutable', $Executable, '-EvidenceRoot', $output)
   if ($null -ne $app) { $arguments += @('-AppProcessId', [string]$app.Id) }
   if ($FilePath) { $arguments += @('-FilePath', $FilePath) }
-  $info = [Diagnostics.ProcessStartInfo]::new((Get-Command powershell.exe).Source)
+  $info = New-QualificationWindowsPowerShell
   $info.UseShellExecute = $false; $info.CreateNoWindow = $true
   $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
   $info.Arguments = ($arguments | ForEach-Object { '"' + $_ + '"' }) -join ' '
