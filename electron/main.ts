@@ -59,7 +59,6 @@ import {
   startLocalRtspCameraBridge,
   type RtspCameraBridgeHandle,
 } from './rtsp-camera-bridge.js';
-import { configureAutoUpdater } from './auto-update.js';
 import { installApplicationFinalCleanup } from './application-final-cleanup.js';
 import { desktopRuntimeIdentity } from './desktop-identity.js';
 import * as nativeSmoke from './native-smoke.js';
@@ -93,6 +92,7 @@ import { installSessionEndGuard, withDesktopActivityRoute } from './session-end-
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
 import { withSupportRoutes } from './support-routes.js';
 import { withDesktopWindowCommands } from './desktop-window-commands.js';
+import { createDesktopBackgroundStartup } from './desktop-startup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -529,15 +529,22 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         canInstallManualUpdate: manualCloseApproval.canInstall,
       });
       prepareLicenceQuit = licence.prepareQuit;
+      const startup = createDesktopBackgroundStartup(licence, autoUpdater, {
+        isPackaged: app.isPackaged,
+        trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
+        startCamera: NATIVE_SMOKE_CONFIG === null ? startCameraBridgeSafely : undefined,
+      });
       // The workspace, projects, serial ports and camera never wait on a licence:
       // every build opens, and Pro tools unlock only in the renderer (ADR-540).
       protocol.handle(
         'app',
-        withDesktopWindowCommands(
-          withDesktopActivityRoute(
-            withSupportRoutes(
-              licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
-              SUPPORT_LOG,
+        startup.routes(
+          withDesktopWindowCommands(
+            withDesktopActivityRoute(
+              withSupportRoutes(
+                licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
+                SUPPORT_LOG,
+              ),
             ),
           ),
         ),
@@ -545,19 +552,9 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       // A Session survives macOS window closure; install its listeners once,
       // before the first renderer, rather than adding another picker on reopen.
       installSessionPermissions(session.defaultSession);
-      if (NATIVE_SMOKE_CONFIG === null) await startCameraBridgeSafely();
-      // Background auto-update against our self-hosted feed (ADR-024/135). This is
-      // inert until production artifacts are code-signed; once trusted, updates
-      // install on quit after the application close handoff. This does not prove
-      // the machine physically stopped. Check errors are never fatal to startup.
-      configureAutoUpdater(autoUpdater, {
-        isPackaged: app.isPackaged,
-        isChannelTrusted: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED && licence.config.channel === 'free',
-        onError: (error: unknown) => console.warn('Desktop update check failed:', error),
-      });
       await createWindow();
       desktopWindowReady = true;
-      licence.start();
+      if (IS_DEV_SERVER_RENDERER) startup.open();
     })
     .catch((err: unknown) => {
       console.error('Failed to create window:', err);
