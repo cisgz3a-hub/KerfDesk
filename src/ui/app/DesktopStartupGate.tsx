@@ -48,6 +48,7 @@ export function DesktopStartupGate({ children }: { readonly children: ReactNode 
       <p>KerfDesk could not finish opening.</p>
       <button
         type="button"
+        title="Try opening KerfDesk again"
         onClick={() => {
           setState('opening');
           setAttempt((value) => value + 1);
