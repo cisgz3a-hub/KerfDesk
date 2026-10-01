@@ -326,6 +326,16 @@
                   </td>
                 </tr>
                 <tr>
+                  <th scope="row">You open the separate Buy Pro page or check a saved purchase</th>
+                  <td>license.kerfdesk.com</td>
+                  <td>
+                    A request checking whether purchases are available. Checking a saved purchase
+                    also sends its order reference and secret claim credential kept in this browser.
+                    This does not activate a phone or use a computer seat; no installation digest,
+                    project, design, machine or job details are sent.
+                  </td>
+                </tr>
+                <tr>
                   <th scope="row">The unsigned Windows edition checks for updates</th>
                   <td>dl.kerfdesk.com</td>
                   <td>
@@ -377,8 +387,9 @@
             <h3 id="licensing">Pro trials and licenses</h3>
             <p>
               When you start a Pro trial, or activate or move a license, the KerfDesk desktop app
-              contacts the KerfDesk licensing service at license.kerfdesk.com. The web app has no
-              license and never contacts it. The desktop app sends only:
+              contacts the KerfDesk licensing service at license.kerfdesk.com. The Free browser
+              workspace has no license and does not contact this service. The separate Buy Pro page
+              is described below. The desktop app sends only:
             </p>
             <ul>
               <li>
@@ -406,6 +417,15 @@
               Purchase isn’t open yet, and this privacy page has no checkout. When purchase opens,
               payments will be handled by Paddle, the payment provider, as merchant of record.
               Paddle processes the payment and your customer record under its own privacy notice.
+            </p>
+            <p>
+              The separate Buy Pro page contacts license.kerfdesk.com to check whether purchases are
+              available. Checking a saved purchase sends its order reference and secret claim
+              credential, kept in this browser's local storage. When purchase opens, creating an
+              order sends a random request identifier so a retry can recover the same order. These
+              requests send no installation digest, projects, designs, machine details or jobs, and
+              do not activate a phone or use a computer seat. Requests use no cookies. Clearing
+              browser storage can remove the information needed to recover an unfinished purchase.
             </p>
             <h3>The camera helper</h3>
             <p>

@@ -36,6 +36,9 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   assert.match(text, /grouped by date, app version, platform and request country/);
   assert.match(text, /do not identify people or prove an installation/);
   assert.match(text, /quiet weekly license confirmation is due/);
+  assert.match(text, /The Free browser workspace has no license and does not contact this service/);
+  assert.match(text, /You open the separate Buy Pro page or check a saved purchase/);
+  assert.match(text, /Requests use no cookies/);
   assert.match(text, /The unsigned Windows edition checks for updates/);
   assert.match(text, /installation starts only after you choose Install and close KerfDesk/);
   assert.match(document, /http-equiv="Content-Security-Policy"/);

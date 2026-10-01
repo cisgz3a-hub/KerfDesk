@@ -68,6 +68,11 @@ function connections(site) {
       'At startup and every 30 minutes while open, the app checks whether a quiet weekly license confirmation is due. When due, it sends the installation digest and saved credential. No project, design, machine or job details.',
     ],
     [
+      'You open the separate Buy Pro page or check a saved purchase',
+      site.licensingHost,
+      'A request checking whether purchases are available. Checking a saved purchase also sends its order reference and secret claim credential kept in this browser. This does not activate a phone or use a computer seat; no installation digest, project, design, machine or job details are sent.',
+    ],
+    [
       'The unsigned Windows edition checks for updates',
       site.downloadHost,
       'At startup and every 30 minutes while open, a request for the list of released versions. It also checks when you choose Check for Updates. An installer downloads only when you choose Download; installation starts only after you choose Install and close KerfDesk. No project, design, machine or job details.',
@@ -183,8 +188,9 @@ function licensing(site, appPrivacy) {
   return html`<h3 id="licensing">Pro trials and licenses</h3>
     <p>
       When you start a Pro trial, or activate or move a license, the KerfDesk desktop app contacts
-      the KerfDesk licensing service at ${site.licensingHost}. The web app has no license and never
-      contacts it. The desktop app sends only:
+      the KerfDesk licensing service at ${site.licensingHost}. The Free browser workspace has no
+      license and does not contact this service. The separate Buy Pro page is described below. The
+      desktop app sends only:
     </p>
     <ul>
       <li>
@@ -212,6 +218,15 @@ function licensing(site, appPrivacy) {
       checkout. When purchase opens, payments will be handled by Paddle, the payment provider, as
       merchant of record. Paddle processes the payment and your customer record under its own
       privacy notice.
+    </p>
+    <p>
+      The separate Buy Pro page contacts ${site.licensingHost} to check whether purchases are
+      available. Checking a saved purchase sends its order reference and secret claim credential,
+      kept in this browser's local storage. When purchase opens, creating an order sends a random
+      request identifier so a retry can recover the same order. These requests send no installation
+      digest, projects, designs, machine details or jobs, and do not activate a phone or use a
+      computer seat. Requests use no cookies. Clearing browser storage can remove the information
+      needed to recover an unfinished purchase.
     </p>`;
 }
 
