@@ -4,6 +4,7 @@ let session = null;
 let workspace = null;
 let poll = null;
 let busy = false;
+let pairGeneration = 0;
 const errorMessages = {
   unavailable: 'The computer is offline. Open KerfDesk on your PC and refresh.',
   stale_revision: 'The workspace changed on your PC. Refresh before trying the edit again.',
@@ -19,7 +20,7 @@ function notice(message, error = false) {
   target.hidden = !message;
   target.dataset.kind = error ? 'error' : 'info';
 }
-async function api(path, body) {
+async function api(path, body, generation) {
   const headers = body === undefined ? {} : { 'Content-Type': 'application/json' };
   if (body !== undefined && session?.csrf) headers['X-KerfDesk-CSRF'] = session.csrf;
   let response;
@@ -42,6 +43,8 @@ async function api(path, body) {
   } catch {
     throw new Error(errorMessages.failed);
   }
+  if (generation !== undefined && generation !== pairGeneration)
+    throw new Error(errorMessages.cancelled);
   if (!response.ok) rejectResponse(response, data);
   return data;
 }
@@ -85,8 +88,8 @@ function admission() {
     throw new Error('Refresh a workspace with editing permission first.');
   return { expectedRevision: workspace.revision, requestId: crypto.randomUUID() };
 }
-async function command(name, args = {}) {
-  return (await api('/api/client/command', { name, args })).result;
+async function command(name, args = {}, generation) {
+  return (await api('/api/client/command', { name, args }, generation)).result;
 }
 function renderWorkspace(value) {
   workspace = value;
@@ -140,8 +143,12 @@ function renderWorkspace(value) {
   }
   if ([...operations.options].some((option) => option.value === selectedOperation))
     operations.value = selectedOperation;
-  $('#operation-form').querySelector('button').disabled = !operations.options.length;
+  updateApplyButton();
   loadOperation();
+}
+function updateApplyButton() {
+  $('#operation-form').querySelector('button').disabled =
+    busy || !$('#operation-list').options.length;
 }
 function loadOperation() {
   const form = $('#operation-form');
@@ -162,11 +169,11 @@ function detail(title, text) {
   item.append(heading, content);
   $('#details-list').append(item);
 }
-async function refresh() {
-  const current = await api('/api/session');
+async function refresh(generation) {
+  const current = await api('/api/session', undefined, generation);
   if (current.status !== 'approved') {
     showPairing();
-    return;
+    return false;
   }
   session = current;
   $('#connection').textContent = current.online ? 'PC connected' : 'PC offline';
@@ -175,35 +182,36 @@ async function refresh() {
   $('#workspace-area').hidden = false;
   if (!current.online) {
     notice(errorMessages.unavailable, true);
-    return;
+    return false;
   }
-  renderWorkspace(await command('get_workspace'));
+  renderWorkspace(await command('get_workspace', {}, generation));
   $('#details-list').replaceChildren();
-  const status = await command('get_app_status');
+  const status = await command('get_app_status', {}, generation);
   detail('Desktop app', `${status.app.name} ${status.app.version} · ${status.edition.mode}`);
   if (status.updates.available)
     detail(
       'Update available on the PC',
       `${status.updates.version ?? 'New version'}${status.updates.highlights?.length ? ': ' + status.updates.highlights.join(' · ') : ''}`,
     );
-  const machine = (await command('get_machine')).machine;
+  const machine = (await command('get_machine', {}, generation)).machine;
   detail(
     'Machine profile',
     `${machine.name} · ${machine.bedWidthMm} × ${machine.bedHeightMm} mm${machine.controller ? ' · ' + machine.controller : ''}`,
   );
-  const review = await command('review_job');
+  const review = await command('review_job', {}, generation);
   detail(
     'Job review',
     `${review.status} · ${review.frame.complete ? 'Frame completed' : 'Frame required on the PC'}`,
   );
   for (const warning of review.warnings) detail('Job review warning', warning.message);
-  const recipes = await command('list_material_recipes');
+  const recipes = await command('list_material_recipes', {}, generation);
   detail(
     'Material recipes',
     recipes.recipes.length
       ? recipes.recipes.map((recipe) => recipe.name).join(' · ')
       : 'No saved recipes.',
   );
+  return true;
 }
 async function action(callback) {
   if (busy) return;
@@ -222,14 +230,13 @@ async function action(callback) {
   } finally {
     busy = false;
     for (const button of controls) button.disabled = false;
-    $('#operation-form').querySelector('button').disabled = !$('#operation-list').options.length;
+    updateApplyButton();
     document.body.setAttribute('aria-busy', 'false');
   }
 }
 async function edit(name, args) {
   await command(name, { ...admission(), ...args });
-  await refresh();
-  notice('Updated on your computer.');
+  if (await refresh()) notice('Updated on your computer.');
 }
 function bindForm(id, callback) {
   $(id).addEventListener('submit', (event) => {
@@ -257,31 +264,39 @@ function continueToMcp() {
   }
   return false;
 }
-async function pairStatus(deadline) {
+function schedulePairStatus(deadline, generation) {
+  poll = setTimeout(() => {
+    if (generation !== pairGeneration) return;
+    if (busy) schedulePairStatus(deadline, generation);
+    else void action(() => pairStatus(deadline, generation));
+  }, 2000);
+}
+async function pairStatus(deadline, generation) {
+  if (generation !== pairGeneration) return;
   try {
-    const value = await api('/api/pair/status');
+    const value = await api('/api/pair/status', undefined, generation);
     if (value.status === 'approved') {
       session = value;
       clearTimeout(poll);
       poll = null;
-      if (!continueToMcp()) await refresh();
-      notice('This phone is approved.');
+      const refreshed = continueToMcp() || (await refresh(generation));
+      if (generation === pairGeneration && refreshed) notice('This phone is approved.');
       return;
     }
     if (Date.now() >= deadline) throw new Error('Pairing expired. Create a new code on your PC.');
     $('#pair-status').textContent = value.online
       ? 'Waiting for your approval on the PC…'
       : 'The PC is offline. Reopen KerfDesk to finish approval.';
-    poll = setTimeout(() => {
-      void pairStatus(deadline);
-    }, 2000);
+    schedulePairStatus(deadline, generation);
   } catch (error) {
+    if (generation !== pairGeneration) return;
     notice(error.message, true);
     $('#pair-status').textContent = 'Pair again using a new code.';
     poll = null;
   }
 }
 bindForm('#pair-form', async (form) => {
+  const generation = ++pairGeneration;
   clearTimeout(poll);
   session = null;
   const deviceId = form.elements.deviceId.value.trim();
@@ -289,16 +304,20 @@ bindForm('#pair-form', async (form) => {
   const clientLabel = form.elements.clientLabel.value.trim();
   if (new TextEncoder().encode(JSON.stringify(clientLabel)).byteLength > 66)
     throw new Error('Use a shorter phone name.');
-  const result = await api('/api/pair/claim', {
-    v: 1,
-    deviceId,
-    code,
-    clientLabel,
-    requestedScopes: form.elements.edit.checked ? ['read', 'edit'] : ['read'],
-  });
+  const result = await api(
+    '/api/pair/claim',
+    {
+      v: 1,
+      deviceId,
+      code,
+      clientLabel,
+      requestedScopes: form.elements.edit.checked ? ['read', 'edit'] : ['read'],
+    },
+    generation,
+  );
   form.elements.code.value = '';
   notice('Approve this phone in KerfDesk on your PC.');
-  await pairStatus(result.expiresAt);
+  await pairStatus(result.expiresAt, generation);
 });
 bindForm('#text-form', (form) =>
   edit('add_text', {
@@ -340,12 +359,14 @@ $('#save-selection').addEventListener('click', () => {
 });
 $('#refresh').addEventListener('click', () => {
   void action(async () => {
-    await refresh();
-    notice('Workspace refreshed.');
+    if (await refresh()) notice('Workspace refreshed.');
   });
 });
 $('#disconnect').addEventListener('click', () => {
   void action(async () => {
+    pairGeneration++;
+    clearTimeout(poll);
+    poll = null;
     await api('/api/client/revoke', {});
     session = null;
     showPairing();
@@ -358,16 +379,19 @@ const suggestedId = new URLSearchParams(location.search).get('deviceId');
 if (suggestedId && /^[0-9a-f-]{36}$/i.test(suggestedId))
   pairForm.elements.deviceId.value = suggestedId;
 void action(async () => {
+  let admitted = false;
   try {
     const value = await api('/api/session');
     if (value.status === 'approved') {
+      admitted = true;
       session = value;
       if (!continueToMcp()) await refresh();
     } else if (value.status === 'pending') {
       $('#pair-status').textContent = 'Waiting for approval on the PC…';
-      await pairStatus(Date.now() + 300_000);
+      await pairStatus(Date.now() + 300_000, pairGeneration);
     }
-  } catch {
-    showPairing();
+  } catch (error) {
+    if (!session) showPairing();
+    if (admitted) notice(error.message, true);
   }
 });
