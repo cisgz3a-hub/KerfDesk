@@ -19,7 +19,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import * as prettier from 'prettier';
 
 import { APP_TERMS_MODULE, TERMS_SOURCE, appTermsModule } from './app-terms-module.mjs';
-import { launchNoteHtml, sitePage } from './site-pages-layout.mjs';
+import { launchNoteHtml, sitePage, SITE_STYLES, SITE_STYLES_FILE } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -119,6 +119,10 @@ export async function buildSitePages() {
   return built;
 }
 
+export async function buildSiteStyles() {
+  return new Map([[SITE_STYLES_FILE, await formatted(SITE_STYLES, SITE_STYLES_FILE)]]);
+}
+
 // The download page is written by hand. The generator keeps only its launch line,
 // between the two launch-note markers, in step with the other pages.
 export const DOWNLOAD_PAGE = 'public/download.html';
@@ -145,6 +149,7 @@ async function main(args) {
   const stale = [];
   const outputs = new Map([
     ...(await buildSitePages()),
+    ...(await buildSiteStyles()),
     ...(await buildDownloadPage()),
     ...(await buildAppTerms()),
   ]);

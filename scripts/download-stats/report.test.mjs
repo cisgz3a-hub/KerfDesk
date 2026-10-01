@@ -213,9 +213,10 @@ test('preserves requested UTC days and clips oldest day to actual retention and 
   const f = fixture({ configured: settings({ notOlderThan: 25 * 3600, maxDuration: 6 * 3600 }) });
   const report = await fetchDownloadReport(f.options);
   assert.equal(report.coverage.requestedFrom, '2026-09-24T00:00:00.000Z');
-  assert.equal(report.from, '2026-09-29T11:00:00.000Z');
+  assert.equal(report.from, '2026-09-29T11:02:22.000Z');
   assert.equal(report.to, '2026-09-30T12:00:00.000Z');
   assert.equal(report.coverage.clipped, true);
+  assert.equal(report.coverage.retentionMarginSeconds, 142);
   assert.deepEqual(
     report.days.map(({ date, from, to }) => ({ date, from, to })),
     [
@@ -231,6 +232,43 @@ test('preserves requested UTC days and clips oldest day to actual retention and 
   }
   assert.equal(lastEnd, report.to);
   assert.equal(report.coverage.queryCount, 6);
+});
+
+test('moving provider retention during settings and data calls stays inside the disclosed oldest interval', async () => {
+  let providerNow = NOW;
+  const retentionSeconds = 25 * 3600;
+  const calls = [];
+  const report = await fetchDownloadReport({
+    token: TOKEN,
+    zoneId: ZONE,
+    now: NOW,
+    fetcher: async (_url, init) => {
+      const request = JSON.parse(init.body);
+      // Settings plus the first data request reach the full existing report
+      // budget and final request allowance. Later queries are newer days.
+      providerNow += calls.length === 0 ? 20_000 : calls.length === 1 ? 120_000 : 0;
+      calls.push(request);
+      if (request.query.includes('DownloadSettings'))
+        return result({
+          settings: { httpRequestsAdaptiveGroups: settings({ notOlderThan: retentionSeconds }) },
+        });
+      const cutoff = providerNow - retentionSeconds * 1000;
+      if (Date.parse(request.variables.start) < cutoff)
+        return json({ errors: [{ message: 'query is outside the rolling retention window' }] });
+      return result({ httpRequestsAdaptiveGroups: [] });
+    },
+  });
+  assert.equal(report.from, '2026-09-29T11:02:22.000Z');
+  assert.equal(report.days[0].from, report.from);
+  assert.equal(report.coverage.clipped, true);
+  assert.ok(report.limitations.some((value) => value.includes('retention margin')));
+  assert.equal(calls[1].variables.start, report.from);
+});
+
+test('a retention window shorter than a bounded report fails rather than inventing zero coverage', async () => {
+  const f = fixture({ configured: settings({ notOlderThan: 142 }) });
+  await assert.rejects(fetchDownloadReport(f.options), errorCode('analytics_retention'));
+  assert.equal(f.calls.length, 1);
 });
 
 test('at midnight today has an explicit zero-duration interval, not an invented full day', async () => {

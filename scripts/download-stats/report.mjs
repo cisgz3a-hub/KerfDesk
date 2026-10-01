@@ -1,4 +1,4 @@
-import { createAnalyticsReader, DownloadStatsError } from './analytics.mjs';
+import { createAnalyticsReader, DownloadStatsError, RETENTION_MARGIN_MS } from './analytics.mjs';
 import { commercialArtifactNames } from '../../public/desktop-commercial-catalog.mjs';
 import { isPreviewVersion, previewArtifactNames } from '../../public/desktop-release-manifest.mjs';
 
@@ -147,7 +147,7 @@ export async function fetchDownloadReport({
   const { settings } = reader;
   const requestedFrom = Math.floor(now / DAY) * DAY - (days - 1) * DAY;
   const to = Math.floor(now / 1000) * 1000;
-  const from = Math.max(requestedFrom, to - settings.notOlderThan * 1000);
+  const from = Math.max(requestedFrom, to - settings.notOlderThan * 1000 + RETENTION_MARGIN_MS);
   const maxWindow = Math.min(DAY, settings.maxDuration * 1000);
   const windows = windowsFor(from, to);
   const raw = [];
@@ -171,6 +171,11 @@ export async function fetchDownloadReport({
       'Only recognized installer paths on dl.kerfdesk.com are included; manifests, HEAD requests and other hosts are excluded.',
       'The legacy latest-installer alias has no recoverable version attribution and is labelled unknown.',
       'Country is approximate network geolocation, not a verified person location. Missing country data and Tor are grouped as unknown; VPNs or proxies can change attribution.',
+      ...(from > requestedFrom
+        ? [
+            'The oldest interval includes a small retention margin so it remains readable while the report is running; the displayed coverage records the actual interval.',
+          ]
+        : []),
     ],
     coverage: {
       requestedDays: days,
@@ -182,6 +187,7 @@ export async function fetchDownloadReport({
       queryCount: reader.queryCount(),
       sampled: raw.some((row) => row.avg.sampleInterval > 1),
       retentionSeconds: settings.notOlderThan,
+      retentionMarginSeconds: RETENTION_MARGIN_MS / 1000,
       maxQuerySeconds: settings.maxDuration,
     },
   };

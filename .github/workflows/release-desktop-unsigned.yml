@@ -171,12 +171,38 @@ jobs:
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'asar-restoration.json')
           if ($before -ne $after) { throw 'The integrity probe did not restore the candidate archive.' }
           if ($integrityExit -ne 0) { throw 'The candidate did not prove ASAR tamper refusal.' }
+      - name: Require retained projects and profile when upgrading from the published version
+        if: steps.plan.outputs.publish == 'true' && steps.plan.outputs.previousVersion != ''
+        env:
+          PREVIOUS_RELEASE_VERSION: ${{ steps.plan.outputs.previousVersion }}
+          PREVIOUS_RELEASE_SHA: ${{ steps.plan.outputs.previousSourceSha }}
+          RELEASE_VERSION: ${{ steps.plan.outputs.version }}
+          RELEASE_SHA: ${{ steps.plan.outputs.sourceSha }}
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:GITHUB_WORKSPACE 'artifacts/historical-installers'
+          node scripts/published-upgrade-installers.mjs $env:PREVIOUS_RELEASE_VERSION $root
+          if ($LASTEXITCODE -ne 0) { throw 'Published upgrade baseline was not authenticated.' }
+          $previous = Get-Content -LiteralPath (Join-Path $root "$env:PREVIOUS_RELEASE_VERSION/public-release.json") -Raw | ConvertFrom-Json
+          if ($previous.manifest.sourceSha -ne $env:PREVIOUS_RELEASE_SHA) { throw 'Published baseline differs from the planned source.' }
+          $release = Join-Path $env:GITHUB_WORKSPACE "release/commercial-unsigned/$env:RELEASE_VERSION"
+          $installer = Join-Path $release "KerfDesk-$env:RELEASE_VERSION-windows-x64-setup.exe"
+          & ./scripts/qualify-windows-installer.ps1 -Scenario HistoricalUpgrade -PackageKind CommercialUnsigned `
+            -Installer $previous.installer -Version $previous.manifest.version -SourceCommit $previous.manifest.sourceSha `
+            -UpgradeInstaller $installer -UpgradeVersion $env:RELEASE_VERSION -UpgradeSourceCommit $env:RELEASE_SHA `
+            -EvidenceRoot (Join-Path $env:GITHUB_WORKSPACE 'artifacts/installed-qualification/historical-upgrade')
+          "Native upgrade from $env:PREVIOUS_RELEASE_VERSION retained the saved project, preferences, machine profile and Free licence state." >> $env:GITHUB_STEP_SUMMARY
       - name: Retain installed Windows qualification evidence
         if: always() && steps.plan.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: unsigned-installer-qualification-${{ steps.plan.outputs.version }}-${{ github.run_attempt }}
-          path: release/commercial-unsigned/${{ steps.plan.outputs.version }}/installer-qualification/
+          path: |
+            release/commercial-unsigned/${{ steps.plan.outputs.version }}/installer-qualification/
+            artifacts/installed-qualification/
+            artifacts/historical-installers/*/public-release.json
+            artifacts/historical-installers/*/download-manifest.json
+            artifacts/historical-installers/*/archive-*.txt
           retention-days: 7
           if-no-files-found: warn
       - name: Publish immutable installer and authenticated notification manifest

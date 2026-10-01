@@ -3,12 +3,15 @@ param(
   [string]$UpgradeInstaller,
   [Parameter(Mandatory = $true)][string]$Version,
   [string]$UpgradeVersion,
+  [string]$UpgradeSourceCommit,
   [Parameter(Mandatory = $true)][string]$SourceCommit,
   [Parameter(Mandatory = $true)][string]$EvidenceRoot,
   # Full: the dry run's install, save/reopen, upgrade and uninstall qualification.
   # Launch: every pull request's install, packaged launch/import/save and
   # uninstall (ADR-522), with no upgrade candidate and no file dialogs.
-  [ValidateSet('Full', 'Launch')][string]$Scenario = 'Full',
+  # HistoricalUpgrade: the actual published production installers, native UI
+  # preferences/machine/file roundtrips, reinstall and retained user data.
+  [ValidateSet('Full', 'Launch', 'HistoricalUpgrade')][string]$Scenario = 'Full',
   [ValidateSet('Preview', 'CommercialUnsigned')][string]$PackageKind = 'Preview'
 )
 
@@ -25,11 +28,16 @@ if ($env:OS -ne 'Windows_NT' -or $env:GITHUB_ACTIONS -ne 'true' -or
 }
 if ($SourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Expected a full source commit.' }
 if ($PackageKind -eq 'CommercialUnsigned' -and $Scenario -eq 'Full') {
-  throw 'Commercial unsigned qualification supports Launch only; Full requires CDP, which production packages forbid.'
+  throw 'Full requires CDP, which production packages forbid. Use Launch or HistoricalUpgrade.'
 }
-if ($Scenario -eq 'Full' -and
+if ($Scenario -in @('Full', 'HistoricalUpgrade') -and
     ([string]::IsNullOrWhiteSpace($UpgradeInstaller) -or [string]::IsNullOrWhiteSpace($UpgradeVersion))) {
   throw 'The full qualification needs an upgrade installer and version.'
+}
+if ($Scenario -eq 'HistoricalUpgrade' -and
+    ($PackageKind -ne 'CommercialUnsigned' -or $UpgradeSourceCommit -notmatch '^[a-f0-9]{40}$' -or
+     $UpgradeSourceCommit -eq $SourceCommit -or $UpgradeVersion -eq $Version)) {
+  throw 'Historical qualification needs distinct commercial versions and exact source commits.'
 }
 
 function Assert-ChildPath([string]$Path, [string]$Parent) {
@@ -42,9 +50,10 @@ function Assert-ChildPath([string]$Path, [string]$Parent) {
 }
 
 $Installer = Assert-ChildPath $Installer $env:GITHUB_WORKSPACE
-if ($Scenario -eq 'Full') { $UpgradeInstaller = Assert-ChildPath $UpgradeInstaller $env:GITHUB_WORKSPACE }
+if ($Scenario -in @('Full', 'HistoricalUpgrade')) { $UpgradeInstaller = Assert-ChildPath $UpgradeInstaller $env:GITHUB_WORKSPACE }
 $EvidenceRoot = Assert-ChildPath $EvidenceRoot $env:GITHUB_WORKSPACE
-$ownedRoot = Assert-ChildPath (Join-Path $env:RUNNER_TEMP "kerfdesk-installer-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT") $env:RUNNER_TEMP
+. (Join-Path $PSScriptRoot 'installer-qualification-root.ps1')
+$ownedRoot = Assert-ChildPath (Get-InstallerQualificationRoot $env:RUNNER_TEMP $env:GITHUB_RUN_ID $env:GITHUB_RUN_ATTEMPT $Scenario) $env:RUNNER_TEMP
 $installRoot = Assert-ChildPath (Join-Path $ownedRoot 'KerfDesk Installed') $ownedRoot
 $executable = Join-Path $installRoot 'KerfDesk.exe'
 $uninstaller = Join-Path $installRoot 'Uninstall KerfDesk.exe'
@@ -62,6 +71,7 @@ $steps = [Collections.Generic.List[object]]::new()
 $receipt = [ordered]@{
   schemaVersion = 1; status = 'running'; startedAt = [DateTime]::UtcNow.ToString('o')
   sourceCommit = $SourceCommit; runId = $env:GITHUB_RUN_ID; runAttempt = $env:GITHUB_RUN_ATTEMPT
+  qualificationSourceCommit = $env:GITHUB_SHA; upgradeSourceCommit = $UpgradeSourceCommit
   runnerImage = $env:ImageOS; runnerImageVersion = $env:ImageVersion
   toolchain = @{
     node = (& node --version); pnpm = (& pnpm --version)
@@ -73,19 +83,21 @@ $receipt = [ordered]@{
   elevated = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   installRoot = $installRoot; profile = $profile; project = $project
   scenario = $Scenario; packageKind = $PackageKind; steps = $steps
-  versions = @(if ($Scenario -eq 'Full') { $Version, $UpgradeVersion } else { $Version })
+  versions = @(if ($Scenario -in @('Full', 'HistoricalUpgrade')) { $Version, $UpgradeVersion } else { $Version })
   packaging = $(if ($PackageKind -eq 'CommercialUnsigned') {
     'Production unsigned Windows NSIS with pinned licence/release signatures and automatic updater disabled'
   } elseif ($Scenario -eq 'Full') {
     'electron-builder.yml Windows NSIS, unsigned with preview metadata and trusted updater disabled'
   } else { 'Windows NSIS, unsigned with preview metadata and trusted updater disabled' })
   limitations = @(
-    $(if ($Scenario -eq 'Full') {
+    $(if ($Scenario -in @('Full', 'HistoricalUpgrade')) {
       'Unsigned manual installer upgrade; production signed automatic updates remain unqualified.'
     } else {
       'Install, packaged launch/import/save on a throwaway profile, and uninstall only; no upgrade and no real file dialogs.'
     }),
-    'Both candidates use this same source commit; historical release/profile migrations remain separate checks.',
+    $(if ($Scenario -eq 'HistoricalUpgrade') {
+      'Authenticated production baseline and exact-source upgrade candidate with a native-created Free profile; paid licensing state remains separate qualification.'
+    } else { 'Both candidates use this same source commit; historical release/profile migrations remain separate checks.' }),
     'Hosted runner OS and account only; consumer Windows, standard-user UAC and SmartScreen remain separate checks.',
     'No physical controller, camera, laser, spindle or other hardware was operated.'
   )
@@ -154,7 +166,7 @@ function Invoke-BoundedProcess([string]$File, [string]$Arguments) {
   return $process.ExitCode
 }
 
-function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
+function Assert-Installed([string]$ExpectedVersion, [string]$Candidate, [string]$ExpectedSourceCommit = $SourceCommit) {
   $records = @(Get-InstallRecords)
   if ($records.Count -ne 1 -or $records[0].key -notlike 'HKEY_CURRENT_USER\*' -or
       $records[0].displayVersion -ne $ExpectedVersion -or
@@ -172,7 +184,8 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
   $candidateAsar = Get-FileEvidence (Join-Path (Split-Path -Parent $Candidate) 'win-unpacked\resources\app.asar')
   if ($installedAsar.sha256 -ne $candidateAsar.sha256) { throw 'Installed ASAR differs from packaged candidate.' }
   if ($PackageKind -eq 'CommercialUnsigned') {
-    & node (Join-Path $PSScriptRoot 'verify-installed-unsigned-commercial.mjs') (Join-Path $installRoot 'resources') $ExpectedVersion $SourceCommit | Out-Null
+    $verifier = if ($Scenario -eq 'HistoricalUpgrade') { 'verify-historical-installed.mjs' } else { 'verify-installed-unsigned-commercial.mjs' }
+    & node (Join-Path $PSScriptRoot $verifier) (Join-Path $installRoot 'resources') $ExpectedVersion $ExpectedSourceCommit | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Installed production signature/version/source/updater verification failed.' }
   } else {
     & node (Join-Path $PSScriptRoot 'verify-packaged-preview-metadata.mjs') $installedAsar.path $ExpectedVersion | Out-Null
@@ -198,11 +211,11 @@ function Assert-Installed([string]$ExpectedVersion, [string]$Candidate) {
   }
 }
 
-function Install-Candidate([string]$Label, [string]$Candidate, [string]$ExpectedVersion) {
+function Install-Candidate([string]$Label, [string]$Candidate, [string]$ExpectedVersion, [string]$ExpectedSourceCommit = $SourceCommit) {
   $started = [DateTime]::UtcNow
   # NSIS /D must be the final argument and is intentionally unquoted, including spaces.
   $exitCode = Invoke-BoundedProcess $Candidate "/S /currentuser /D=$installRoot"
-  $state = Assert-Installed $ExpectedVersion $Candidate
+  $state = Assert-Installed $ExpectedVersion $Candidate $ExpectedSourceCommit
   $steps.Add([pscustomobject]@{ name = $Label; exitCode = $exitCode; elapsedSeconds = ([DateTime]::UtcNow - $started).TotalSeconds; installed = $state })
   Write-Receipt
 }
@@ -329,6 +342,30 @@ function Invoke-InstalledSmoke([string]$Label) {
   Write-Receipt
 }
 
+function Invoke-HistoricalProfile([string]$Label, [string]$Phase, [string]$ExpectedVersion, [string]$ExpectedSourceCommit) {
+  $output = Join-Path $EvidenceRoot $Label
+  $info = [Diagnostics.ProcessStartInfo]::new((Get-Command powershell.exe).Source)
+  $info.UseShellExecute = $false; $info.CreateNoWindow = $true
+  $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+  foreach ($argument in @('-NoProfile', '-NonInteractive', '-File',
+    (Join-Path $PSScriptRoot 'installed-upgrade-profile.ps1'), '-Phase', $Phase,
+    '-Executable', $executable, '-EvidenceRoot', $output, '-ExpectedProfile', $profile,
+    '-Project', $project, '-ExpectedVersion', $ExpectedVersion, '-ExpectedCommit', $ExpectedSourceCommit)) {
+    $info.ArgumentList.Add($argument)
+  }
+  $process = [Diagnostics.Process]::Start($info)
+  $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+  $finished = $process.WaitForExit(300000)
+  if (-not $finished) { $process.Kill($true); $process.WaitForExit(10000) | Out-Null }
+  $stdout.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $EvidenceRoot "$Label-stdout.txt") -Encoding utf8
+  $stderr.GetAwaiter().GetResult() | Set-Content -LiteralPath (Join-Path $EvidenceRoot "$Label-stderr.txt") -Encoding utf8
+  if (-not $finished -or $process.ExitCode -ne 0) { throw "Native historical profile qualification failed: $Label" }
+  $result = Get-Content -LiteralPath (Join-Path $output 'result.json') -Raw | ConvertFrom-Json
+  if ($result.status -ne 'passed') { throw "Native historical profile qualification did not pass: $Label" }
+  $steps.Add([pscustomobject]@{ name = $Label; evidence = $output; project = (Get-FileEvidence $project) })
+  Write-Receipt
+}
+
 if (Test-Path -LiteralPath $EvidenceRoot) { throw 'Evidence directory must be new.' }
 New-Item -ItemType Directory -Path $EvidenceRoot | Out-Null
 try {
@@ -351,6 +388,30 @@ try {
     Invoke-InstalledSmoke 'installed-launch'
     Uninstall-Candidate 'final-uninstall'
     $receipt.status = 'passed'
+    return
+  }
+  if ($Scenario -eq 'HistoricalUpgrade') {
+    Install-Candidate 'historical-baseline-install' $Installer $Version $SourceCommit
+    Invoke-HistoricalProfile 'native-historical-create' 'create' $Version $SourceCommit
+    @{ sourceCommit = $SourceCommit; marker = [Guid]::NewGuid().ToString() } | ConvertTo-Json | Set-Content -LiteralPath $sentinel -Encoding utf8
+    $projectHash = (Get-FileEvidence $project).sha256
+    $sentinelHash = (Get-FileEvidence $sentinel).sha256
+    Invoke-HistoricalProfile 'historical-restart-reopen' 'reopen' $Version $SourceCommit
+    Install-Candidate 'historical-upgrade-install' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
+    Assert-DataRetained $projectHash $sentinelHash
+    Invoke-HistoricalProfile 'historical-upgrade-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+    Install-Candidate 'historical-same-version-reinstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
+    Assert-DataRetained $projectHash $sentinelHash
+    Invoke-HistoricalProfile 'historical-reinstall-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+    Uninstall-Candidate 'historical-uninstall-retaining-data'
+    Assert-DataRetained $projectHash $sentinelHash
+    Install-Candidate 'historical-install-after-uninstall' $UpgradeInstaller $UpgradeVersion $UpgradeSourceCommit
+    Invoke-HistoricalProfile 'historical-restore-reopen' 'reopen' $UpgradeVersion $UpgradeSourceCommit
+    Uninstall-Candidate 'historical-final-uninstall'
+    Assert-DataRetained $projectHash $sentinelHash
+    Copy-Item -LiteralPath $project -Destination (Join-Path $EvidenceRoot 'persisted-project.lf2')
+    $receipt.status = 'passed'; $receipt.retainedProject = Get-FileEvidence $project
+    $receipt.retainedProfileSentinel = Get-FileEvidence $sentinel
     return
   }
   Install-Candidate 'fresh-install' $Installer $Version

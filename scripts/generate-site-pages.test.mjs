@@ -11,6 +11,7 @@ import {
   REPO_ROOT,
   buildDownloadPage,
   buildSitePages,
+  buildSiteStyles,
 } from './generate-site-pages.mjs';
 import { launchNoteHtml } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
@@ -65,6 +66,17 @@ test('pages run no script and load nothing from another site', () => {
   for (const [file, content] of pages) {
     assert.doesNotMatch(content, /<script|\son[a-z]+=|javascript:/i, file);
     assert.doesNotMatch(content, /<(?:img|link|iframe)[^>]+(?:src|href)="https?:/i, file);
+    assert.match(content, /http-equiv="Content-Security-Policy"/i, file);
+    assert.match(content, /script-src 'none'/, file);
+    assert.doesNotMatch(content, /<style\b|\sstyle=/i, file);
+    assert.match(content, /href="\/site-pages[.]css"/, file);
+  }
+});
+
+test('the shared page stylesheet ships with the generated policy documents', async () => {
+  const styles = await buildSiteStyles();
+  for (const [file, content] of styles) {
+    assert.equal(await readFile(path.join(REPO_ROOT, file), 'utf8'), content);
   }
 });
 

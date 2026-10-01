@@ -46,7 +46,10 @@ and `CLOUDFLARE_ANALYTICS_ZONE_ID`; never commit them or paste them into chat.
 Cloudflare can [sample and estimate traffic](https://developers.cloudflare.com/analytics/graphql-api/sampling/).
 The dashboard uses the already scaled `count`; it does not multiply it again.
 On Free, the documented retention is seven days; actual Settings are checked each
-refresh. Older history cannot be recovered unless it was saved while available.
+refresh. A retention-clipped interval starts 142 seconds inside that boundary,
+covering the bounded report and final request while the provider's cutoff moves.
+The coverage records that actual interval, so the oldest partial day never becomes
+a complete saved day. Older history cannot be recovered unless it was saved while available.
 See [Settings](https://developers.cloudflare.com/analytics/graphql-api/features/discovery/settings/)
 and [Security Analytics retention](https://developers.cloudflare.com/waf/analytics/security-analytics/).
 
