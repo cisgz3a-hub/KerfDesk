@@ -77,16 +77,80 @@ describe('remote renderer uses the real authoring store', () => {
     );
   });
 
-  it('never revives a consumed ID after enough distinct writes', async () => {
+  it('renews a full idle request window and fences old writes behind a fresh read', async () => {
     const firstArgs = args({ artworkIds: [] });
     const first = await adapter.execute('set_selection', firstArgs);
     for (let index = 1; index < 256; index++)
       await adapter.execute('set_selection', args({ artworkIds: [] }));
-    expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe('failed');
     expect(await adapter.execute('set_selection', firstArgs)).toEqual(first);
     expect(
       code(await adapter.execute('set_selection', { ...firstArgs, artworkIds: ['missing'] })),
     ).toBe('request_conflict');
+    const beforeRenewal = adapter.getRevision();
+    const beforeState = useStore.getState();
+    expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe(
+      'stale_revision',
+    );
+    expect(adapter.getRevision()).not.toBe(beforeRenewal);
+    expect(useStore.getState()).toBe(beforeState);
+    expect(code(await adapter.execute('set_selection', firstArgs))).toBe('stale_revision');
+    expect(useStore.getState()).toBe(beforeState);
+    const current = await adapter.execute('get_workspace', {});
+    expect(current.ok).toBe(true);
+    expect(current.revision).toBe(adapter.getRevision());
+    for (let index = 0; index < 254; index++)
+      expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe('ok');
+    const nextGeneration = adapter.getRevision();
+    expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe('ok');
+    expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe(
+      'stale_revision',
+    );
+    expect(adapter.getRevision()).not.toBe(nextGeneration);
+    expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe('ok');
+  });
+
+  it('continues real artwork edits through two request windows with ordinary Undo', async () => {
+    const id = await rectangle();
+    let renewals = 0;
+    let firstMove: Record<string, unknown> | null = null;
+    for (let index = 0; index < 520; index++) {
+      let input = args({ artworkIds: [id], transform: { type: 'move', dxMm: 0.1, dyMm: 0.2 } });
+      if (firstMove === null) firstMove = input;
+      const before = useStore.getState();
+      const result = await adapter.execute('transform_artwork', input);
+      if (code(result) === 'stale_revision') {
+        renewals += 1;
+        expect(useStore.getState()).toBe(before);
+        expect((await adapter.execute('get_workspace', {})).ok).toBe(true);
+        input = args({ artworkIds: [id], transform: { type: 'move', dxMm: 0.1, dyMm: 0.2 } });
+        expect(code(await adapter.execute('transform_artwork', input))).toBe('ok');
+      } else expect(code(result)).toBe('ok');
+    }
+    expect(renewals).toBe(2);
+    const beforeReplay = useStore.getState();
+    expect(code(await adapter.execute('transform_artwork', firstMove))).toBe('stale_revision');
+    expect(useStore.getState()).toBe(beforeReplay);
+    const moved = useStore.getState().project.scene.objects[0]!.transform;
+    expect(moved.x).toBeCloseTo(52, 8);
+    expect(moved.y).toBeCloseTo(104, 8);
+    useStore.getState().undo();
+    const undone = useStore.getState().project.scene.objects[0]!.transform;
+    expect(undone.x).toBeCloseTo(51.9, 8);
+    expect(undone.y).toBeCloseTo(103.8, 8);
+  });
+
+  it('counts reserved writes before their execution microtasks start', async () => {
+    const before = adapter.getRevision();
+    const reserved = Array.from({ length: 256 }, () =>
+      adapter.execute('set_selection', args({ artworkIds: [] })),
+    );
+    const refused = adapter.execute('set_selection', args({ artworkIds: [] }));
+    expect(adapter.getRevision()).toBe(before);
+    expect(code(await refused)).toBe('failed');
+    await Promise.all(reserved);
+    expect(code(await adapter.execute('set_selection', args({ artworkIds: [] })))).toBe(
+      'stale_revision',
+    );
   });
 
   it('rejects stale revisions after selection, local edits, Undo, and document replacement', async () => {

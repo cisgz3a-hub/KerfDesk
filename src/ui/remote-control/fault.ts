@@ -7,7 +7,7 @@ const MESSAGES: Record<RemoteErrorCode, string> = {
   stale_revision: 'The workspace changed. Read it again before editing.',
   request_conflict: 'This request ID was already used with different arguments.',
   request_limit:
-    'This remote edit session reached its 256-request limit. Reconnect before editing again.',
+    'The current remote edit window is full while a request is still pending. Wait for it to finish, then read the workspace again.',
   read_only: 'This remote connection does not have editing permission.',
   busy: 'The workspace is not available for remote editing.',
   cancelled: 'The remote request was cancelled.',

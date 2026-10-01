@@ -32,7 +32,7 @@ export function remotePrivacy() {
       offers and pending claims expire after five minutes. An MCP access token lasts thirty minutes;
       an approval with refresh access can last up to thirty days. Authorization transactions and
       unexchanged authorization codes expire after ten minutes. OAuth client registrations have a
-      ninety-day idle retention period, renewed by successful token use.
+      ninety-day idle retention period, renewed by successful token exchanges.
     </p>
     <p>
       Expired pairing and approval records are removed when the computer or client next uses the

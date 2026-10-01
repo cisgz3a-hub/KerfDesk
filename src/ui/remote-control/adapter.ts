@@ -13,7 +13,11 @@ import type {
   RemoteWrite,
 } from './types';
 
-type CachedWrite = { readonly fingerprint: string; readonly result: Promise<RemoteCommandResult> };
+type CachedWrite = {
+  readonly fingerprint: string;
+  readonly result: Promise<RemoteCommandResult>;
+  settled: boolean;
+};
 const MAX_REQUESTS = 256;
 
 /** Renderer edit authority only. The main-process relay owns pairing and transport authorization. */
@@ -48,10 +52,10 @@ export function createRemoteControlAdapter(options: RemoteControlOptions): Remot
           if (cached.fingerprint !== fingerprint) throw new RemoteFault('request_conflict');
           return cached.result;
         }
-        if (requests.size >= MAX_REQUESTS) throw new RemoteFault('request_limit');
-        // Reserve identity before any async work; never evict an ID and replay its mutation.
+        renewFullRequestWindow(input, requests, context, execution.signal);
+        // Reserve identity before async work; unresolved receipts are never evicted.
         const result = Promise.resolve().then(() => runWrite(input, context, execution.signal));
-        requests.set(input.args.requestId, { fingerprint, result });
+        requests.set(input.args.requestId, cachedWrite(fingerprint, result));
         return result;
       } catch (cause) {
         return failure(cause);
@@ -73,6 +77,29 @@ type Context = {
   readonly isDisposed: () => boolean;
   readonly failure: (cause: unknown) => RemoteCommandResult;
 };
+function cachedWrite(fingerprint: string, result: Promise<RemoteCommandResult>): CachedWrite {
+  const receipt = { fingerprint, result, settled: false };
+  const settled = () => {
+    receipt.settled = true;
+  };
+  void result.then(settled, settled);
+  return receipt;
+}
+function renewFullRequestWindow(
+  write: RemoteWrite,
+  requests: Map<string, CachedWrite>,
+  context: Context,
+  signal?: AbortSignal,
+): void {
+  if (requests.size < MAX_REQUESTS) return;
+  assertCurrent(write, context, signal);
+  if ([...requests.values()].some((receipt) => !receipt.settled))
+    throw new RemoteFault('request_limit');
+  // A fresh namespace retires every serialized old write before forgetting receipts.
+  context.tracker.renew();
+  requests.clear();
+  throw new RemoteFault('stale_revision');
+}
 function isWrite(input: ValidatedCommand): input is RemoteWrite {
   return 'expectedRevision' in input.args;
 }
@@ -134,8 +161,8 @@ async function runWrite(
     context.pending.delete(controller);
   }
 }
-function assertCurrent(write: RemoteWrite, context: Context, signal: AbortSignal): void {
-  if (context.isDisposed() || signal.aborted) throw new RemoteFault('cancelled');
+function assertCurrent(write: RemoteWrite, context: Context, signal?: AbortSignal): void {
+  if (context.isDisposed() || signal?.aborted === true) throw new RemoteFault('cancelled');
   if (!context.options.canWrite()) throw new RemoteFault('read_only');
   if (context.options.canEdit?.() === false || context.store.getState().pendingUndo !== null)
     throw new RemoteFault('busy');

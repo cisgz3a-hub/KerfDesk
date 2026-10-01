@@ -20,10 +20,17 @@ const FIELDS = [
 
 /** Window/session generation prevents reuse across reloads; counter never rewinds on Undo. */
 export function createRevisionTracker(store: RemoteAppStore) {
-  const generation = crypto.randomUUID();
+  let generation = crypto.randomUUID();
   let counter = 0;
   const unsubscribe = store.subscribe((state, previous) => {
     if (FIELDS.some((field) => state[field] !== previous[field])) counter += 1;
   });
-  return { current: () => `${generation}:${counter}`, dispose: unsubscribe };
+  return {
+    current: () => `${generation}:${counter}`,
+    renew: () => {
+      generation = crypto.randomUUID();
+      counter = 0;
+    },
+    dispose: unsubscribe,
+  };
 }

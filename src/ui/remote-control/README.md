@@ -18,11 +18,13 @@ Frame, Start, output, or existing-work entitlement gates.
   a fresh session generation and increases on project, Open request, New/Open
   replacement, selection, history, defaults, material, or placement changes.
   Cursor motion alone does not retire an edit.
-- Repeating an identical write returns its original result. Different arguments
-  under the same ID are refused. The session retains 256 distinct IDs without
-  eviction, then fails closed with a bounded-session explanation. Reconnect for
-  a fresh session and read its new revision. Do not silently rebuild the adapter
-  for every command.
+- Repeating an identical write returns its original result within its revision
+  namespace. Different arguments under the same ID are refused. The adapter
+  retains up to 256 distinct IDs. Once every receipt is settled, a new authorized
+  write at capacity renews the revision namespace and returns `stale_revision`
+  without editing. Read the workspace before sending another write. Old
+  serialized writes cannot match the new namespace. Unresolved receipts are
+  never evicted, and stale or unauthorized traffic cannot trigger renewal.
 - Creation and operation settings currently support Laser workspaces only.
   Existing CNC artwork can be selected and transformed. No CNC creation or
   deferred Pro prompt is started. This does not change the normal desktop tools.

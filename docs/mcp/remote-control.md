@@ -35,6 +35,8 @@ Text uses the bundled regular font. Its requested width is a maximum layout widt
 
 Edits use the existing Undo, dirty-state and autosave behaviour. Each change carries the current document revision and a unique request ID. Local edits, Undo/Redo and opening a different document invalidate an old revision. A client must read the current workspace before retrying a stale change.
 
+Duplicate-request records use bounded edit windows. When an idle window fills, the app renews its revision and asks the client to read the workspace again. Remote editing can then continue without restarting KerfDesk. A pending write is never discarded to renew a window.
+
 There are no machine-connection, motion, laser/spindle, console/G-code, Frame, Start, shell or arbitrary-file tools. Machine execution remains in the desktop workflow. `review_job` currently reports unavailable because this integration does not own the desktop's prepared-job evidence; it does not claim a completed Frame.
 
 ## Disconnect, restart and privacy

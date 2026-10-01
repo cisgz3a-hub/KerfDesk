@@ -75,6 +75,59 @@ function localRectangle() {
 }
 
 describe('delayed text never crosses renderer authority', () => {
+  it('does not renew a full request window while a text write remains unresolved', async () => {
+    const firstRequest = request();
+    const pending = adapter.execute('add_text', firstRequest);
+    await rendering();
+    for (let index = 1; index < 256; index++) {
+      const denied = await adapter.execute('transform_artwork', {
+        expectedRevision: adapter.getRevision(),
+        requestId: crypto.randomUUID(),
+        artworkIds: ['missing'],
+        transform: { type: 'move', dxMm: 1, dyMm: 0 },
+      });
+      expect(denied).toMatchObject({ ok: false, error: { code: 'not_found' } });
+    }
+    const beforeCapacity = adapter.getRevision();
+    writable = false;
+    expect(
+      await adapter.execute('set_selection', {
+        expectedRevision: beforeCapacity,
+        requestId: crypto.randomUUID(),
+        artworkIds: [],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'read_only' } });
+    expect(adapter.getRevision()).toBe(beforeCapacity);
+    writable = true;
+    expect(
+      await adapter.execute('set_selection', {
+        expectedRevision: 'old-generation:1',
+        requestId: crypto.randomUUID(),
+        artworkIds: [],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'stale_revision' } });
+    expect(adapter.getRevision()).toBe(beforeCapacity);
+    const refused = await adapter.execute('set_selection', {
+      expectedRevision: beforeCapacity,
+      requestId: crypto.randomUUID(),
+      artworkIds: [],
+    });
+    expect(refused).toMatchObject({ ok: false, error: { code: 'failed' } });
+    expect(adapter.getRevision()).toBe(beforeCapacity);
+    const repeated = adapter.execute('add_text', firstRequest);
+    expect(render).toHaveBeenCalledTimes(1);
+    finish(geometry);
+    expect(await pending).toEqual(await repeated);
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+    expect(
+      await adapter.execute('set_selection', {
+        expectedRevision: adapter.getRevision(),
+        requestId: crypto.randomUUID(),
+        artworkIds: [],
+      }),
+    ).toMatchObject({ ok: false, error: { code: 'stale_revision' } });
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+  });
   it('places actual renderer geometry without bed fit and shrinks uniformly to maximum width', async () => {
     const result = adapter.execute('add_text', request());
     await rendering();
