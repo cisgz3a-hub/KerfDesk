@@ -1,7 +1,8 @@
-import { readdirSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { desktopRuntimeGraph } from '../scripts/desktop-runtime-graph.mjs';
 
 // ADR-483: app.asar ships only the node_modules the main process loads. The
 // renderer is bundled into dist/web, so every other production dependency is
@@ -14,7 +15,12 @@ const BUILDER_CONFIGS = [
   'electron-builder.preview.yml',
   'electron-builder.sandbox.yml',
 ];
-const MAIN_PROCESS_PACKAGES = ['electron-updater'];
+const GRAPH = desktopRuntimeGraph({
+  entry: 'electron/main.ts',
+  source: true,
+  readFile: (path: string) =>
+    existsSync(join(ROOT, path)) ? readFileSync(join(ROOT, path), 'utf8') : null,
+});
 
 function shippedNodeModules(config: string): string[] {
   const yaml = readFileSync(join(ROOT, config), 'utf8');
@@ -31,70 +37,38 @@ function installedClosure(name: string, fromDir: string, seen = new Set<string>(
   const packageDir = realpathSync(dirname(require.resolve(`${name}/package.json`)));
   const manifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as {
     readonly dependencies?: Record<string, string>;
+    readonly optionalDependencies?: Record<string, string>;
   };
   seen.add(name);
   for (const dependency of Object.keys(manifest.dependencies ?? {})) {
-    installedClosure(dependency, packageDir, seen);
+    if (!Object.hasOwn(manifest.optionalDependencies ?? {}, dependency))
+      installedClosure(dependency, packageDir, seen);
   }
   return seen;
 }
 
-function mainProcessImports(): Set<string> {
-  const specifiers = new Set<string>();
-  const sources = readdirSync(join(ROOT, 'electron')).filter(
-    (file) => file.endsWith('.ts') && !file.endsWith('.test.ts'),
-  );
-  for (const file of sources) {
-    const text = readFileSync(join(ROOT, 'electron', file), 'utf8');
-    for (const match of text.matchAll(/(?:from|import)\s*\(?\s*'([^'.][^']*)'/g)) {
-      if (match[1] !== undefined) specifiers.add(match[1]);
-    }
-  }
-  return specifiers;
-}
-
-function requiredPublicModules(): Set<string> {
-  const publicRoot = join(ROOT, 'public');
-  const seen = new Set<string>();
-  const queue = readdirSync(join(ROOT, 'electron'))
-    .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
-    .map((name) => join(ROOT, 'electron', name));
-  for (let index = 0; index < queue.length; index += 1) {
-    const file = queue[index]!;
-    for (const match of readFileSync(file, 'utf8').matchAll(/(?:from|import)\s*\(?\s*'([^']+)'/g)) {
-      const specifier = match[1]!;
-      if (!specifier.startsWith('.')) continue;
-      const target = resolve(dirname(file), specifier);
-      const inPublic = relative(publicRoot, target);
-      if (inPublic.startsWith('..') || !inPublic.endsWith('.mjs') || seen.has(target)) continue;
-      seen.add(target);
-      queue.push(target);
-    }
-  }
-  return new Set([...seen].map((path) => relative(ROOT, path).replaceAll('\\', '/')));
-}
-
 describe('packaged main-process dependencies (ADR-483)', () => {
   it('includes every shared public module reachable from main in all standalone profiles', () => {
-    const required = requiredPublicModules();
-    expect(required.has('public/desktop-manual-download.mjs')).toBe(true);
-    expect(required.has('public/desktop-commercial-catalog.mjs')).toBe(true);
+    const required = GRAPH.files.filter((path: string) => path.startsWith('public/'));
+    expect(required).toContain('public/desktop-manual-download.mjs');
+    expect(required).toContain('public/desktop-commercial-catalog.mjs');
     for (const config of BUILDER_CONFIGS) {
       const yaml = readFileSync(join(ROOT, config), 'utf8');
       for (const path of required)
         expect(yaml, `${config} missing ${path}`).toContain(`  - ${path}`);
     }
   });
-  it('loads only Electron, Node built-ins and the updater', () => {
-    const packages = [...mainProcessImports()].filter(
-      (specifier) => specifier !== 'electron' && !specifier.startsWith('node:'),
-    );
-    expect(packages.sort()).toEqual(MAIN_PROCESS_PACKAGES);
+  it('finds nested runtime imports while excluding types and unreachable SDK entry points', () => {
+    expect(GRAPH.packages).toEqual(['electron-updater', 'ws', 'zod']);
+    expect(GRAPH.files).toContain('electron/remote-access/relay-client.ts');
+    expect(GRAPH.files).toContain('electron/mcp/input-schemas.ts');
+    expect(GRAPH.files).not.toContain('electron/mcp/server.ts');
+    expect(GRAPH.files).not.toContain('electron/mcp/stdio.ts');
   });
 
-  it('ships exactly the updater and its installed dependencies', () => {
+  it('ships exactly the reachable runtime packages and their mandatory installed dependencies', () => {
     const closure = new Set<string>();
-    for (const name of MAIN_PROCESS_PACKAGES) installedClosure(name, ROOT, closure);
+    for (const name of GRAPH.packages) installedClosure(name, ROOT, closure);
     for (const config of BUILDER_CONFIGS) {
       expect(shippedNodeModules(config), config).toEqual([...closure].sort());
     }

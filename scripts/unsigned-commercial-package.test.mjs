@@ -73,6 +73,8 @@ async function fixture(t, overrides = {}) {
   const app = join(directory, 'app');
   const packed = join(directory, 'packed');
   await mkdir(join(app, 'dist/web'), { recursive: true });
+  await mkdir(join(app, 'dist-electron'), { recursive: true });
+  await writeFile(join(app, 'dist-electron/main.js'), '');
   await writeFile(join(app, 'package.json'), JSON.stringify(metadata));
   await writeFile(
     join(app, 'dist/web/index.html'),
