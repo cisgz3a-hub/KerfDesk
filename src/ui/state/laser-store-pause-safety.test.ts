@@ -9,7 +9,7 @@ import { canvasJobTimingPlan } from './canvas-job-timing-plan';
 import type { CanvasMotionPlan } from './canvas-motion-plan';
 import { cncControllerEpochOf, createCncSetupAttestation } from './cnc-setup-attestation';
 import { useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -49,14 +49,21 @@ function countdownTimingPlan(gcode: string) {
   });
 }
 
-function makeConnection(write: (data: string) => Promise<void>): FakeConnection {
+function makeConnection(
+  write: (data: string) => Promise<void>,
+  autoAckStartFence = true,
+): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const emit = (line: string): void => {
     for (const handler of lineHandlers) handler(line);
   };
   return {
     write: async (data) => {
+      const acknowledgeFence = autoAckStartFence
+        ? captureTestLaserStartFenceAck(data, emit)
+        : undefined;
       await write(data);
+      acknowledgeFence?.();
       if (
         data === '$I\n' &&
         useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
@@ -176,7 +183,7 @@ describe('laser-store pause safety', () => {
           );
         }, 0);
       }
-    });
+    }, false);
     liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({
@@ -229,7 +236,7 @@ describe('laser-store pause safety', () => {
           );
         }, 0);
       }
-    });
+    }, false);
     liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({
@@ -274,7 +281,7 @@ describe('laser-store pause safety', () => {
           liveConnection?.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
         }, 0);
       }
-    });
+    }, false);
     liveConnection = connection;
     await connectWith(connection);
     useLaserStore.setState({ controllerSettings: { laserModeEnabled: false } });

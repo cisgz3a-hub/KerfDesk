@@ -6,7 +6,7 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
 import { STREAM_HOLD_VISIBLE_MS } from './laser-stream-hold';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -18,6 +18,7 @@ function makeConnection(writes: string[]): FakeConnection {
   const closeHandlers = new Set<() => void>();
   const connection: FakeConnection = {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, connection.emitLine);
       writes.push(data);
       if (data === '?') {
         // Like the real reader, deliver the reply after the poll callback.
@@ -37,6 +38,7 @@ function makeConnection(writes: string[]): FakeConnection {
         connection.emitLine('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
         connection.emitLine('ok');
       }
+      acknowledgeStartFence();
     },
     onLine: (handler) => {
       lineHandlers.add(handler);

@@ -189,7 +189,7 @@ describe('laser-mode acknowledgement across Start and recovery', () => {
     const review = captureJobReviewModels();
 
     // The dialog-free watched Frame is its own step. Start then opens the
-    // single review and consumes the exact completion-issued artifact.
+    // single review and binds the freshly reviewed program to its footprint.
     await runFrameNow();
     await runStartJobFlow(recoveryHarness());
 
@@ -261,6 +261,8 @@ function installCompletingFrameMock() {
       const permit = createFramedRunPermit(candidate, useLaserStore.getState());
       useLaserStore.setState({
         framedRun: permit,
+        completedFrame: permit,
+        completedFrameRunOwner: null,
         frameVerification: candidate.frameVerification,
       });
     },

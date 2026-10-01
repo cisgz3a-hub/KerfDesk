@@ -1,4 +1,5 @@
 import { cappedFirePowerS, profileSupportsCapability } from '../../core/devices';
+import type { ControllerDriver } from '../../core/controllers';
 import { laserFireRefusal } from '../../core/preflight/laser-module-readiness';
 import { machineKindOf } from '../../core/scene';
 import { connectedLaserModuleEvidence } from './laser-module-probe';
@@ -10,7 +11,9 @@ import { isActiveJob, mpgCommandBlockMessage, pushLog } from './laser-store-help
 import {
   firePowerOverrideReset,
   firePowerOverrideResetLogLine,
+  flushPendingOverrideCommands,
 } from './laser-start-override-reset';
+import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
 
@@ -24,6 +27,7 @@ type SafeWriteFn = (
   source?: TranscriptSource,
 ) => Promise<void>;
 type FireRuntime = { requestToken: number; activationPending: boolean };
+type FlushPendingOverrides = () => Promise<unknown>;
 
 const FIRE_OFF_COMMAND = 'M5\n';
 
@@ -45,16 +49,28 @@ function fireOnCommand(powerS: number, feedMmPerMin: number): string {
   return `G1 F${feed} M3 S${powerS}\n`;
 }
 
+export function controllerFireActions(
+  set: SetFn,
+  get: GetFn,
+  refs: ControllerLifecycleRefs & { readonly driver: ControllerDriver },
+  write: SafeWriteFn,
+): Pick<LaserState, 'setFireActive'> {
+  return fireActions(set, get, write, () =>
+    flushPendingOverrideCommands(refs, write, refs.driver, 'fire'),
+  );
+}
+
 export function fireActions(
   set: SetFn,
   get: GetFn,
   safeWrite: SafeWriteFn,
+  flushPendingOverrides: FlushPendingOverrides,
 ): Pick<LaserState, 'setFireActive'> {
   const runtime: FireRuntime = { requestToken: 0, activationPending: false };
   return {
     setFireActive: (active, requestedPercent) =>
       active
-        ? activateFire(runtime, set, get, safeWrite, requestedPercent)
+        ? activateFire(runtime, set, get, safeWrite, flushPendingOverrides, requestedPercent)
         : deactivateFire(runtime, set, get, safeWrite),
   };
 }
@@ -65,6 +81,8 @@ async function deactivateFire(
   get: GetFn,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
+  const sessionEpoch = get().controllerSessionEpoch;
+  const connectionAttempt = get().connectionAttempt;
   runtime.requestToken += 1;
   const shouldWriteOff = runtime.activationPending || get().fireActive;
   set((state) => ({
@@ -74,7 +92,12 @@ async function deactivateFire(
   // hid the LASER OFF affordance while the beam could still be on, and a
   // retry skipped M5 entirely because the latch already read false.
   if (shouldWriteOff) await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console');
-  set({ fireActive: false });
+  if (
+    get().controllerSessionEpoch === sessionEpoch &&
+    get().connectionAttempt === connectionAttempt
+  ) {
+    set({ fireActive: false });
+  }
 }
 
 async function activateFire(
@@ -82,49 +105,52 @@ async function activateFire(
   set: SetFn,
   get: GetFn,
   safeWrite: SafeWriteFn,
+  flushPendingOverrides: FlushPendingOverrides,
   requestedPercent: number | undefined,
 ): Promise<void> {
   const token = ++runtime.requestToken;
   const blocked = fireActivationBlockMessage(get());
   if (blocked !== null) rejectFireActivation(set, get, blocked);
   if (runtime.activationPending || get().fireActive) return;
+  const ownsSession = fireSessionOwner(get);
 
-  const device = useStore.getState().project.device;
-  const control = device.fireControl;
-  if (control === undefined) {
-    rejectFireActivation(set, get, 'Enable low-power Fire in Device Profile first.');
-  }
-  const powerS = cappedFirePowerS(
-    requestedPercent ?? control.maxPowerPercent,
-    control,
-    device.maxPowerS,
-  );
-  if (powerS <= 0) rejectFireActivation(set, get, 'Fire power must resolve to a positive S value.');
+  const { powerS, feedMmPerMin } = firePowerSettings(set, get, requestedPercent);
 
   runtime.activationPending = true;
   set((state) => ({
     fireActive: true,
     accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
   }));
-  // Only a needed reset yields first. Without one, Fire-on is on its way before
-  // this call yields, as it always was.
+  // The Fire latch reserves override admission through the owned flag fence,
+  // standalone reset and Fire-on. A status saying 100% is not a reset ACK.
   const reset = firePowerOverrideReset(get().capabilities.overrides, get().ovCache);
   try {
     if (
       reset !== '' &&
-      !(await resetFirePowerOverride(runtime, token, reset, set, get, safeWrite))
+      !(await resetFirePowerOverride(
+        runtime,
+        token,
+        reset,
+        set,
+        get,
+        safeWrite,
+        flushPendingOverrides,
+        ownsSession,
+      ))
     ) {
       return;
     }
-    await safeWrite(fireOnCommand(powerS, device.framingFeedMmPerMin), 'fire', 'console');
-    if (token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null) {
+    if (!ownsSession() || token !== runtime.requestToken) return;
+    await safeWrite(fireOnCommand(powerS, feedMmPerMin), 'fire', 'console');
+    if (!ownsSession()) return;
+    if (fireActivationInterrupted(runtime, token, get)) {
       // Same latch rule as deactivateFire: this compensating M5 may race a
       // failed release write, so only a successful write may clear the latch.
       const offAccepted = await safeWrite(FIRE_OFF_COMMAND, 'fire', 'console').then(
         () => true,
         () => false,
       );
-      if (offAccepted) set({ fireActive: false });
+      if (offAccepted && ownsSession()) set({ fireActive: false });
       return;
     }
     set({
@@ -139,15 +165,52 @@ async function activateFire(
   }
 }
 
+function fireActivationInterrupted(runtime: FireRuntime, token: number, get: GetFn): boolean {
+  return token !== runtime.requestToken || fireActivationBlockMessage(get(), true) !== null;
+}
+
+function firePowerSettings(
+  set: SetFn,
+  get: GetFn,
+  requestedPercent: number | undefined,
+): { readonly powerS: number; readonly feedMmPerMin: number } {
+  const device = useStore.getState().project.device;
+  const control = device.fireControl;
+  if (control === undefined) {
+    rejectFireActivation(set, get, 'Enable low-power Fire in Device Profile first.');
+  }
+  const powerS = cappedFirePowerS(
+    requestedPercent ?? control.maxPowerPercent,
+    control,
+    device.maxPowerS,
+  );
+  if (powerS <= 0) rejectFireActivation(set, get, 'Fire power must resolve to a positive S value.');
+  return { powerS, feedMmPerMin: device.framingFeedMmPerMin };
+}
+
+function fireSessionOwner(get: GetFn): () => boolean {
+  const { controllerSessionEpoch, connectionAttempt } = get();
+  return () => {
+    const current = get();
+    return (
+      current.connection.kind === 'connected' &&
+      current.controllerSessionEpoch === controllerSessionEpoch &&
+      current.connectionAttempt === connectionAttempt
+    );
+  };
+}
+
 // The controller scales Fire's S by its power override, so one left above 100%
 // by a job would multiply the capped power (laser-start-override-reset.ts).
 // The reset is a realtime byte written on its own: a queued line may not carry
-// a byte above 0x7F (ADR-361). It owes no acknowledgement, and both main loops
-// apply pending realtime commands before they execute the next line (GRBL
+// a byte above 0x7F (ADR-361). It owes no acknowledgement. First an owned
+// queued line/ACK flushes older flags; otherwise a pending increase and this
+// reset can join one batch, which applies the increase after the reset (GRBL
 // https://github.com/gnea/grbl/blob/bfb67f0c7963fe3ce4aaf8a97f9009ea5a8db36e/grbl/protocol.c#L81,
 // grblHAL
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/protocol.c#L235),
-// so Fire-on runs at 100%. False when Fire must not go on.
+// so the later reset batch owns Fire's nominal 100% multiplier. False when
+// Fire must not go on. This does not measure actual optical output.
 async function resetFirePowerOverride(
   runtime: FireRuntime,
   token: number,
@@ -155,16 +218,25 @@ async function resetFirePowerOverride(
   set: SetFn,
   get: GetFn,
   safeWrite: SafeWriteFn,
+  flushPendingOverrides: FlushPendingOverrides,
+  ownsSession: () => boolean,
 ): Promise<boolean> {
   const before = get().ovCache;
   // Fire-on has not been written yet, so the beam is off: a reset that fails
   // or is overtaken leaves no uncertain-on latch and owes no M5 of its own.
   try {
+    await flushPendingOverrides();
+    if (!ownsSession() || token !== runtime.requestToken) return false;
+    if (fireActivationBlockMessage(get(), true) !== null) {
+      set({ fireActive: false });
+      return false;
+    }
     await safeWrite(reset, 'fire', 'console');
   } catch (error) {
-    set({ fireActive: false });
+    if (ownsSession() && token === runtime.requestToken) set({ fireActive: false });
     throw error;
   }
+  if (!ownsSession()) return false;
   set({ log: pushLog(get(), firePowerOverrideResetLogLine(before)) });
   // A release during this write owns the latch and its M5 (deactivateFire).
   if (token !== runtime.requestToken) return false;

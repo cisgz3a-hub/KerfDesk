@@ -104,7 +104,9 @@ export type StartControllerCommandOptions = {
   readonly statusOwnership?: ControllerCommandStatusOwnership;
 };
 
-export type ControllerCommandStatusOwnership = 'cnc-start-settle-dwell';
+export type ControllerCommandStatusOwnership =
+  | 'cnc-start-settle-dwell'
+  | 'laser-start-override-dwell';
 
 export type FreshIdleWaitOptions = {
   readonly kind: ControllerCommandKind;
@@ -190,10 +192,11 @@ export function activeControllerCommandLine(refs: ControllerLifecycleRefs): stri
   return refs.controllerCommand?.command;
 }
 
-export function controllerCommandOwnsCncStartSettleDwell(refs: ControllerLifecycleRefs): boolean {
+export function controllerCommandOwnsStartSettleDwell(refs: ControllerLifecycleRefs): boolean {
   return (
     refs.controllerCommand?.kind === 'start-arming' &&
-    refs.controllerCommand.statusOwnership === 'cnc-start-settle-dwell'
+    (refs.controllerCommand.statusOwnership === 'cnc-start-settle-dwell' ||
+      refs.controllerCommand.statusOwnership === 'laser-start-override-dwell')
   );
 }
 

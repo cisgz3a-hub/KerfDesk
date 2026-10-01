@@ -159,6 +159,13 @@ describe('settingsMapToProfilePatch', () => {
     expect(settingsMapToProfilePatch(map)).toEqual({});
   });
 
+  it('retains the reported Z step resolution for CNC Frame completion', () => {
+    expect(settingsMapToControllerSettings(new Map([[102, '400.000']]))).toEqual({
+      stepsPerMmZ: 400,
+    });
+    expect(settingsMapToProfilePatch(new Map([[102, '400.000']]))).toEqual({});
+  });
+
   it('takes the max of $110/$111 for maxFeed (vector reach)', () => {
     const map = new Map([
       [110, '3000'],

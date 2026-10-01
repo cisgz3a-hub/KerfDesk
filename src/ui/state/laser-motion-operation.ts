@@ -17,6 +17,9 @@ type LaserMotionOperationCommon = {
    * same owned settlement lifecycle, but can promote only frameVerification;
    * the richer candidate below is the sole source of a one-use Start permit. */
   readonly verification?: FrameVerification;
+  /** Owned CNC Frame completion target for a safe-Z park or nonnegative
+   * restore, interpreted within the controller's observed Z resolution. */
+  readonly expectedReturnWorkZMm?: number;
   /** Number of leading lines, including the one currently dispatched, whose
    * acknowledgement advances directly to the next line without waiting for a
    * motion status transition. Frame uses this for its instantaneous tool-off
@@ -71,6 +74,7 @@ export function startMotionOperation(
   operationId: LaserMotionOperationId = Symbol('motion-operation'),
   settlementLine?: string,
   verification?: FrameVerification,
+  expectedReturnWorkZMm?: number,
 ): LaserMotionOperation {
   const common = {
     operationId,
@@ -82,6 +86,7 @@ export function startMotionOperation(
     pendingMotionTransportWrites,
     ...(settlementLine === undefined ? {} : { settlementLine }),
     ...(verification === undefined ? {} : { verification }),
+    ...(expectedReturnWorkZMm === undefined ? {} : { expectedReturnWorkZMm }),
   };
   if (kind === 'jog') return { kind, ...common };
   return candidate === undefined ? { kind, ...common } : { kind, ...common, candidate };
@@ -264,6 +269,7 @@ export function takeNextAcknowledgedFramePrefixLine(
       operation.operationId,
       operation.settlementLine,
       operation.verification,
+      operation.expectedReturnWorkZMm,
     ),
     line,
   };
@@ -286,6 +292,7 @@ export function takeNextMotionLine(
     operation.operationId,
     operation.settlementLine,
     operation.verification,
+    operation.expectedReturnWorkZMm,
   );
   const dispatchesSettlement =
     pendingLines.length === 0 && operation.settlementLine !== undefined

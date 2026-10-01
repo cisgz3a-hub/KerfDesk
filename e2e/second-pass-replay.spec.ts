@@ -1,4 +1,5 @@
 import { test, expect } from './fixtures/kerfdesk-test';
+import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 import {
   IDLE,
   capsuleProbe,
@@ -8,7 +9,6 @@ import {
   dismissNotifications,
   drainHeldSerialWrites,
   frameCurrentJob,
-  programLinesSince,
   queuedJobLines,
   serialWriteLineCount,
   streamProbe,
@@ -102,7 +102,7 @@ test('a new painted pass seals writer 3 and resumes its exact interrupted progra
   );
   await expect(review).not.toBeVisible();
   await drainHeldSerialWrites(page, kerfdesk, baseline, 400);
-  expect(programLinesSince(await kerfdesk.events(), mark)).toEqual([
+  expect(recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), mark)).toEqual([
     ...capsule.expectedSent,
     'G4 P0.01',
   ]);

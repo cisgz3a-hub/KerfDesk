@@ -36,7 +36,13 @@ export const CNC_FRAME_POSITION_REQUIRED_MESSAGE =
   'CNC Frame needs a fresh controller position so it can return the bit to its exact starting Z. Wait for an Idle position report, then Frame again.';
 
 export type CncFrameMotionPlan =
-  | { readonly kind: 'ready'; readonly lines: ReadonlyArray<string> }
+  | {
+      readonly kind: 'ready';
+      readonly lines: ReadonlyArray<string>;
+      /** The dispatched safe-Z park or nonnegative Z-restore target. Completion
+       * compares it within observed controller/report resolution. */
+      readonly expectedReturnWorkZMm?: number;
+    }
   | { readonly kind: 'blocked'; readonly message: string };
 
 export function buildCncFrameMotion(input: {
@@ -73,12 +79,27 @@ export function buildCncFrameMotion(input: {
   if (isAtOrAboveSafeZ(input.preFrameWorkZMm, input.safeZMm)) {
     return { kind: 'ready', lines: xyMoves };
   }
-  const retract = input.buildRetract(input.safeZMm, input.zFeed);
+  // The supported CNC drivers dispatch millimetre Z words to three decimals.
+  // Record the same target that the builder sends, rather than the additional
+  // precision in a saved setting that never reaches the controller.
+  const dispatchedSafeZMm = Number(input.safeZMm.toFixed(3));
+  const retract = input.buildRetract(dispatchedSafeZMm, input.zFeed);
   // A negative work Z is inside the stock contract. Frame proves the XY
   // envelope tool-off; it must not finish by plunging the bit back into stock.
-  if (input.preFrameWorkZMm < 0) return { kind: 'ready', lines: [retract, ...xyMoves] };
+  if (input.preFrameWorkZMm < 0) {
+    return {
+      kind: 'ready',
+      lines: [retract, ...xyMoves],
+      expectedReturnWorkZMm: dispatchedSafeZMm,
+    };
+  }
   // The restore is the same absolute-Z jog shape, aimed back at the pre-frame
   // height, which is below safe Z here.
-  const restore = input.buildRetract(input.preFrameWorkZMm, input.zFeed);
-  return { kind: 'ready', lines: [retract, ...xyMoves, restore] };
+  const dispatchedReturnZMm = Number(input.preFrameWorkZMm.toFixed(3));
+  const restore = input.buildRetract(dispatchedReturnZMm, input.zFeed);
+  return {
+    kind: 'ready',
+    lines: [retract, ...xyMoves, restore],
+    expectedReturnWorkZMm: dispatchedReturnZMm,
+  };
 }

@@ -110,10 +110,10 @@ describe('JobControls Absolute Coordinates frame-first', () => {
       expect(buttonByText('Frame job').disabled).toBe(false);
       expect(buttonByText('Start').disabled).toBe(true);
       expect(buttonByText('Frame job').title).toBe(
-        "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run.",
+        "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged.",
       );
       expect(buttonByText('Start').title).toBe(
-        'Start unlocks when a Frame of this exact job finishes cleanly. Press Frame job first.',
+        'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.',
       );
 
       await act(async () => {

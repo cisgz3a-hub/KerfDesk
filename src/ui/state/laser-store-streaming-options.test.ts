@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
+import { LASER_START_OVERRIDE_RESET } from './laser-start-override-reset';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -14,7 +15,9 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeStartFence();
       if (
         data === '$I\n' &&
         useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
@@ -96,14 +99,14 @@ describe('laser-store profile streaming options', () => {
       writes.push(data);
     });
     await connectWith(connection);
-    // A controller that has reported baseline overrides needs no Start reset
-    // (ADR-355), so the first write is the program itself.
+    // Even a baseline report can precede a pending override flag. Start's
+    // owned dwell and standalone reset precede the unchanged program window.
     useLaserStore.setState({ ovCache: { feed: 100, rapid: 100, spindle: 100 } });
     writes.length = 0;
 
     await startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
 
-    expect(writes[0]).toBe('G21\n');
+    expect(writes).toEqual(['G4 P0.01\n', LASER_START_OVERRIDE_RESET, 'G21\n']);
     expect(useLaserStore.getState().streamer).toMatchObject({
       streamingMode: 'ping-pong',
       rxBufferBytes: 120,
@@ -135,14 +138,14 @@ describe('laser-store grblHAL receive-capacity evidence (ADR-331)', () => {
       streamingMode: 'char-counted',
       rxBufferBytes: 512,
     });
-    expect(writes.filter((line) => line.endsWith('\n'))).toEqual(['G21\n']);
+    expect(writes).toEqual(['G4 P0.01\n', LASER_START_OVERRIDE_RESET, 'G21\n']);
     expect(useLaserStore.getState().streamer).toMatchObject({
       streamingMode: 'ping-pong',
       inFlight: [{ line: 'G21\n', bytes: 4 }],
     });
     connection.emitLine('ok');
     await flushConnect();
-    expect(writes.filter((line) => line.endsWith('\n'))).toEqual(['G21\n', 'G90\n']);
+    expect(writes).toEqual(['G4 P0.01\n', LASER_START_OVERRIDE_RESET, 'G21\n', 'G90\n']);
   });
 
   function makeGrblHalConnection(writes: string[]): FakeConnection {
@@ -152,7 +155,9 @@ describe('laser-store grblHAL receive-capacity evidence (ADR-331)', () => {
     };
     return {
       write: async (data) => {
+        const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
         writes.push(data);
+        acknowledgeStartFence();
         // grblHAL is not asked for `$I` (its extended response is not stock
         // proof), so the handshake is the settings dump plus the modal read.
         if (data === '$$\n') {

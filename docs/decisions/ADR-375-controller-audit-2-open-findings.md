@@ -2,6 +2,10 @@
 
 **Status:** Accepted. | **Date:** 2026-09-29
 
+**Fire timing correction:** [ADR-355 Amendment 1](ADR-355-amendment-1-acknowledged-override-baseline.md)
+supersedes the known-100% Fire reset omission below. Pending flags are processed at an owned
+acknowledged boundary before resetting the spindle override and issuing capped Fire-on.
+
 A second audit of the controller layer and the controller settings (requested 2026-09-24), checked
 line by line against pinned firmware source: gnea/grbl v1.1h at `bfb67f0c`, grblHAL/core at
 `d7aaee3d` and FluidNC at `fdc17a2c`. It found 36 faults. A separate controller audit on

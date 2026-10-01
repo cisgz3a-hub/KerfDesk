@@ -339,7 +339,7 @@ describe('CNC tool-change activation (CNC-01..03)', () => {
     expect(assertFinalStartAuthorized).toHaveBeenCalledOnce();
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(useLaserStore.getState().activeRunId).toBeNull();
-    expect(writes).toEqual([]);
+    expect(writes).toEqual(['G4 P0.01\n']);
   });
 
   it('refuses a structured tool plan that cannot align with every M0 boundary', async () => {

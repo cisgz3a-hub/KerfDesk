@@ -1,4 +1,4 @@
-import { computeJobBounds, frameBoundsSignature } from '../../core/job';
+import { frameBoundsSignature } from '../../core/job';
 import { machineKindOf } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import { reportedWorkPositionMm } from '../state/canvas-motion-plan';
@@ -16,6 +16,8 @@ import type { StatusReport } from '../../core/controllers/grbl';
 import { prepareCurrentStartJob } from './start-job-source';
 import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgement';
 import { buildJobReviewModel } from './job-review';
+import { currentFrameSpatialSignature } from './frame-spatial-identity';
+import { frameVerificationBounds } from './frame-dispatch-support';
 
 export function idleControllerStatusForFrameTest(): StatusReport {
   return {
@@ -43,6 +45,8 @@ export async function installReviewPendingFramedRunPermitForCurrentState(): Prom
   const permit = await reviewPendingFramedRunPermitForCurrentState();
   useLaserStore.setState({
     framedRun: permit,
+    completedFrame: permit,
+    completedFrameRunOwner: null,
     frameVerification: permit.candidate.frameVerification,
   });
   return permit;
@@ -67,8 +71,13 @@ async function buildFramedRunPermitForCurrentState(
   if (!prepared.ok) {
     throw new Error(`Cannot build a framed-run fixture: ${prepared.messages.join(' ')}`);
   }
-  const bounds = computeJobBounds(prepared.prepared.job, app.project.device);
-  if (bounds === null) throw new Error('Cannot build a framed-run fixture for an empty job.');
+  const jobBounds = prepared.metrics.frameJobBounds;
+  if (jobBounds === null) throw new Error('Cannot build a framed-run fixture for an empty job.');
+  const bounds = frameVerificationBounds(
+    app.project.machine?.kind,
+    jobBounds,
+    prepared.metrics.frameMotionBounds ?? jobBounds,
+  );
 
   const machineKind = machineKindOf(app.project.machine);
   const laserSnapshot = captureLaserModeStartSnapshot(laser);
@@ -88,6 +97,7 @@ async function buildFramedRunPermitForCurrentState(
     project: app.project,
     outputScope: currentOutputScope(app),
     executionSignature: prepared.canvasPlan.retentionKey,
+    spatialSignature: currentFrameSpatialSignature(app),
     controllerBeforeFrame: framedRunControllerSnapshot(laser),
     returnToWorkPosition: { x: position.x, y: position.y },
     frameVerification: {
@@ -137,6 +147,8 @@ export async function installFramedRunPermitForCurrentState(): Promise<FramedRun
   const permit = await framedRunPermitForCurrentState();
   useLaserStore.setState({
     framedRun: permit,
+    completedFrame: permit,
+    completedFrameRunOwner: null,
     frameVerification: permit.candidate.frameVerification,
   });
   return permit;
@@ -163,9 +175,15 @@ export function completeFramedRunCandidateForTest(candidate: FramedRunCandidate)
       pendingLines: [],
     },
   });
-  useLaserStore.setState((laser) => ({
-    motionOperation: null,
-    framedRun: createFramedRunPermit(candidate, laser),
-    frameVerification: candidate.frameVerification,
-  }));
+  useLaserStore.setState((laser) => {
+    const permit = createFramedRunPermit(candidate, laser);
+    return {
+      motionOperation: null,
+      framedRun: permit,
+      ...(candidate.authorizationContext === undefined
+        ? { completedFrame: permit, completedFrameRunOwner: null }
+        : {}),
+      frameVerification: candidate.frameVerification,
+    };
+  });
 }

@@ -114,6 +114,7 @@ function makeLaserState(): LaserState {
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
     selectPrimaryWcsForFrame: async () => ({ kind: 'already-g54' as const }),
+    normalizeFrameReportUnits: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
     requestControllerStatus: async () => undefined,

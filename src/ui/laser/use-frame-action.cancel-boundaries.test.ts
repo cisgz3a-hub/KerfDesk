@@ -66,7 +66,7 @@ describe('Frame cancellation at asynchronous boundaries', () => {
       expect(trace).not.toHaveBeenCalled();
       expect(frame).not.toHaveBeenCalled();
       expect(useLaserStore.getState().framedRun).toBeNull();
-      expect(lastToast()?.message).toBe('Frame preparation cancelled. Nothing was sent.');
+      expect(lastToast()?.message).toBe('Frame preparation cancelled. No Start permit was issued.');
     },
   );
 

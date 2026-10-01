@@ -7,6 +7,7 @@ import {
   FRAME_RETURN_POSITION_CHANGED_MESSAGE,
   framedRunControllerSnapshot,
   framedRunCompletionIssue,
+  framedRunStartHandoffIssue,
   type FramedRunCandidate,
   type FramedRunControllerSource,
 } from './framed-run';
@@ -90,6 +91,58 @@ describe('FramedRun completion evidence', () => {
     const source = controllerSource();
     expect(framedRunCompletionIssue(candidateFor(source), source)).toBeNull();
   });
+
+  it.each([false, true])(
+    'accepts only the dispatched CNC safe-Z return with a representation change (inches=%s)',
+    (inches) => {
+      const scale = inches ? 25.4 : 1;
+      const before = {
+        ...controllerSource(),
+        controllerSettings: { reportInches: inches, stepsPerMmZ: 1000 },
+        controllerSettingsObservation: { sessionEpoch: 7, observedAt: 102 },
+        statusReport: {
+          ...statusReport,
+          mPos: { x: 12 / scale, y: 34 / scale, z: -2 / scale },
+        },
+        wcoCache: { x: 2 / scale, y: 4 / scale, z: 0 },
+      } as FramedRunControllerSource;
+      const candidate = candidateFor(before);
+      const completed = {
+        ...before,
+        statusReport: {
+          ...before.statusReport!,
+          mPos: { x: 12 / scale, y: 34 / scale, z: 3.81 / scale },
+          wPos: { x: 10 / scale, y: 30 / scale, z: 3.81 / scale },
+        },
+      };
+      expect(framedRunCompletionIssue(candidate, completed)).toBe(
+        FRAME_RETURN_POSITION_CHANGED_MESSAGE,
+      );
+      expect(framedRunCompletionIssue(candidate, completed, 3.81)).toBeNull();
+      const permit = createFramedRunPermit(candidate, completed);
+      expect(framedRunStartHandoffIssue(permit, completed)).toBeNull();
+      for (const axis of ['x', 'y', 'z'] as const) {
+        const moved = {
+          ...completed,
+          statusReport: {
+            ...completed.statusReport,
+            mPos: {
+              ...completed.statusReport.mPos,
+              [axis]: completed.statusReport.mPos[axis] + 1 / scale,
+            },
+            wPos: {
+              ...completed.statusReport.wPos,
+              [axis]: completed.statusReport.wPos[axis] + 1 / scale,
+            },
+          },
+        };
+        expect(framedRunCompletionIssue(candidate, moved, 3.81)).toBe(
+          FRAME_RETURN_POSITION_CHANGED_MESSAGE,
+        );
+        expect(framedRunStartHandoffIssue(permit, moved)).not.toBeNull();
+      }
+    },
+  );
 
   it('keeps identity drift advisory instead of turning it into a new Frame refusal', () => {
     const source = controllerSource();

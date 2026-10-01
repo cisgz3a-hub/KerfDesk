@@ -88,6 +88,10 @@ export type ControllerCommands = {
    *  M120/M121). A Frame that ends after its push but before its own pop is
    *  restored with the pop once the controller is Idle. Absent: no wrapper. */
   readonly frameModalState?: { readonly push: string; readonly pop: string };
+  /** Acknowledged before Frame captures any reported coordinate. Smoothieware
+   * reports MPos/WPos in its parser units; its G21 also makes M120 capture mm.
+   * Absent where reporting units are independent of G20/G21. No newline. */
+  readonly frameReportUnitsCommand?: string;
 };
 
 /** What a firmware's own laser-module report proved (Smoothieware `M221`). */

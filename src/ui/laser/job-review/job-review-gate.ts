@@ -79,6 +79,7 @@ export async function runJobReviewGate(args: {
   readonly onCompletedReplayChanged?: () => Promise<void> | void;
   /** Exact-handoff owner check for a pre-existing permit. */
   readonly shouldAbandon?: () => boolean;
+  readonly onFrameMismatch?: () => void;
 }): Promise<ConfirmedJobReview | null> {
   const purpose = args.purpose ?? 'start';
   let current = args.initial;
@@ -101,6 +102,7 @@ export async function runJobReviewGate(args: {
         args.onCompletedReplayChanged,
         owner.signal,
       );
+      noteFrameMismatch(rebuilt, args);
       if (reviewPreparationWasCancelled(owner.signal, args.shouldAbandon)) return null;
       if (!rebuilt.ok) {
         if (presentRebuildFailure(rebuilt)) return null;
@@ -124,6 +126,13 @@ export async function runJobReviewGate(args: {
   } finally {
     owner.dispose();
   }
+}
+
+function noteFrameMismatch(
+  rebuilt: RebuiltStart,
+  args: { readonly onFrameMismatch?: () => void },
+): void {
+  if (!rebuilt.ok && rebuilt.display !== undefined) args.onFrameMismatch?.();
 }
 
 function reviewPreparationWasCancelled(

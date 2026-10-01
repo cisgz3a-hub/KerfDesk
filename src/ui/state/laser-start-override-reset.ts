@@ -8,15 +8,14 @@
 // percentages: an operator reported typing new speed and power for a fresh
 // image and watching it burn like the job they had just stopped.
 //
-// The reset is three GRBL realtime bytes, written on their own immediately
-// ahead of the program's first window: a queued line may not carry a byte
-// above 0x7F (ADR-361, audit transport-2). GRBL acts on realtime bytes the
-// moment they arrive and never stores them in its receive buffer, so they
-// cost no RX budget and cannot reorder behind a queued line. The reset goes
-// out only when the window can, so a Start that is refused, including one
-// whose program the wire cannot carry, sends nothing at all. Pausing and
-// resuming a running job never passes through here, so adjustments made
-// during a job stay put.
+// GRBL's receive interrupt sets pending override flags; its main loop applies
+// them at a realtime checkpoint. A status may still show 100% before that
+// checkpoint, and a reset plus an adjustment in the same flag batch applies
+// reset first, then the adjustment. An owned queued command/ACK therefore
+// flushes older flags before these standalone reset bytes and the first window.
+// The window is validated before that boundary. Realtime bytes owe no ACK or
+// RX budget and never share a queued line (ADR-361). Pause/Resume do not pass
+// through this new-run baseline; their per-run adjustments stay put.
 
 import {
   RT_FEED_OV_RESET,
@@ -25,7 +24,10 @@ import {
   type OverrideValues,
 } from '../../core/controllers/grbl';
 import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
+import type { ControllerDriver } from '../../core/controllers';
 import type { MachineKind } from '../../core/scene';
+import { startControllerCommand, type ControllerLifecycleRefs } from './laser-interactive-command';
+import type { SafeWrite } from './laser-safe-write';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 
@@ -43,6 +45,7 @@ export function laserStartOverrideReset(
     firstWindow: string,
     safeWrite: (payload: string, action: 'start') => Promise<void>,
     stillOwned: () => boolean,
+    markProgramAttempted: () => void,
   ) => Promise<void>;
   readonly accepted: (current: LaserState, patch: Partial<LaserState>) => Partial<LaserState>;
 } {
@@ -50,12 +53,13 @@ export function laserStartOverrideReset(
   const bytes = laserStartOverrideResetPrefix(machineKind, state.capabilities.overrides, before);
   return {
     bytes,
-    send: (firstWindow, safeWrite, stillOwned) =>
+    send: (firstWindow, safeWrite, stillOwned, markProgramAttempted) =>
       sendResetThenFirstWindow(
         bytes,
         firstWindow,
         (payload) => safeWrite(payload, 'start'),
         stillOwned,
+        markProgramAttempted,
       ),
     accepted: (current, patch) =>
       bytes === ''
@@ -65,6 +69,25 @@ export function laserStartOverrideReset(
 }
 
 export const LASER_START_OVERRIDE_RESET = RT_FEED_OV_RESET + RT_RAPID_OV_FULL + RT_SPINDLE_OV_RESET;
+
+/** A processed queued line proves older realtime flags reached their checkpoint
+ * before the later reset batch. Call while Start/Fire owns override admission. */
+export function flushPendingOverrideCommands(
+  refs: ControllerLifecycleRefs,
+  write: SafeWrite,
+  driver: Pick<ControllerDriver, 'commands'>,
+  action: 'start' | 'fire',
+): Promise<ReadonlyArray<string>> {
+  return startControllerCommand(refs, write, {
+    kind: action === 'start' ? 'start-arming' : 'interactive-command',
+    label: action === 'start' ? 'Laser override baseline fence' : 'Fire override baseline fence',
+    command: `${driver.commands.settleDwell}\n`,
+    action,
+    source: 'system',
+    timeoutMs: 1_500,
+    ...(action === 'start' ? { statusOwnership: 'laser-start-override-dwell' } : {}),
+  });
+}
 
 /** The reset, when there is one, as its own realtime-only write (no newline,
  * so it owes no acknowledgement), then the first program window. A window the
@@ -79,23 +102,24 @@ export async function sendResetThenFirstWindow(
   firstWindow: string,
   write: (payload: string) => Promise<void>,
   stillOwned: () => boolean,
+  markProgramAttempted: () => void,
 ): Promise<void> {
   if (bytes !== '' && wireEncodingError(firstWindow) === null) {
     await write(bytes);
     if (!stillOwned()) return;
   }
+  markProgramAttempted();
   await write(firstWindow);
 }
 
-/** Unknown overrides (no `Ov:` report yet this session) cannot be proved to be
- * at 100%, so they are reset as well. Known-baseline values need nothing. */
+/** Even a reported baseline can precede application of a pending adjustment.
+ * Supported laser Starts always establish the baseline after the flag fence. */
 export function laserStartNeedsOverrideReset(
   machineKind: MachineKind,
   controllerHasOverrides: boolean,
-  overrides: OverrideValues | null,
+  _overrides: OverrideValues | null,
 ): boolean {
-  if (machineKind !== 'laser' || !controllerHasOverrides) return false;
-  return overrides === null || !overridesAtBaseline(overrides);
+  return machineKind === 'laser' && controllerHasOverrides;
 }
 
 export function overridesAtBaseline(overrides: OverrideValues): boolean {
@@ -124,15 +148,15 @@ export function laserStartOverrideResetPrefix(
  * grblHAL
  * https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/spindle_control.c#L867-L868),
  * so a 200% left over from a job doubled the 5% ceiling (controller audit
- * P-2, ADR-375). Start's rule applies to that one override: unknown or not
- * 100% is reset first. Fire does not move, so feed and rapid do not matter.
+ * P-2, ADR-375). Fire flushes pending flags, then always resets that one
+ * override on supported firmware. Reported 100% may precede a pending change.
+ * Fire does not move, so feed and rapid do not matter.
  * Returns the realtime byte to write ahead of Fire-on, or ''. */
 export function firePowerOverrideReset(
   controllerHasOverrides: boolean,
-  overrides: OverrideValues | null,
+  _overrides: OverrideValues | null,
 ): string {
-  if (!controllerHasOverrides) return '';
-  return overrides?.spindle === BASELINE_PERCENT ? '' : RT_SPINDLE_OV_RESET;
+  return controllerHasOverrides ? RT_SPINDLE_OV_RESET : '';
 }
 
 export function firePowerOverrideResetLogLine(before: OverrideValues | null): string {

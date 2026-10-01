@@ -4,6 +4,7 @@ import type { SessionObservationStamp } from './laser-controller-observation';
 import { LASER_MODE_START_EVIDENCE_REQUIRED_MESSAGE } from './laser-mode-start-evidence';
 import { useLaserStore } from './laser-store';
 import { resetStore } from './test-helpers';
+import { captureTestLaserStartFenceAck } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -16,6 +17,7 @@ function makeConnection(writes: string[]): FakeConnection {
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       writes.push(data);
       if (
         data === '$I\n' &&
@@ -30,6 +32,7 @@ function makeConnection(writes: string[]): FakeConnection {
         emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
         emit('ok');
       }
+      acknowledgeStartFence();
     },
     onLine: (handler) => {
       lineHandlers.add(handler);

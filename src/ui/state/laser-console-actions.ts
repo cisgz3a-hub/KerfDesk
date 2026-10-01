@@ -19,6 +19,7 @@ import {
 } from './console-command-readiness';
 import { consoleOwnershipBlockReason } from './console-command-ownership';
 import { writeConsoleCommand } from './console-command-transport';
+import { normalizeFrameReportUnits } from './frame-report-units';
 import {
   canSelectFrameWcs,
   frameWcsSelectionPatch,
@@ -75,7 +76,13 @@ export function consoleActions(
   get: GetFn,
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
-): Pick<LaserState, 'sendConsoleCommand' | 'selectPrimaryWcsForFrame' | 'clearTranscript'> {
+): Pick<
+  LaserState,
+  | 'sendConsoleCommand'
+  | 'selectPrimaryWcsForFrame'
+  | 'normalizeFrameReportUnits'
+  | 'clearTranscript'
+> {
   return {
     sendConsoleCommand: async (input, options = {}) => {
       const prepared = refs.driver.prepareConsoleCommand(input);
@@ -121,6 +128,8 @@ export function consoleActions(
       }
     },
     selectPrimaryWcsForFrame: () => selectPrimaryWcsForFrame(set, get, refs, write),
+    normalizeFrameReportUnits: (signal) =>
+      normalizeFrameReportUnits({ set, get, refs, write, signal }),
     // Both retained histories, not just the displayed one: `log` is a parallel
     // 200-line ring buffer that Clear used to leave untouched. Anything the
     // stream buffer is holding back is dropped too, or Clear would be undone

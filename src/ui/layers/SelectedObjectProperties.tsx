@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import {
   artworkOperationName,
   isRegistrationBox,
@@ -20,7 +20,7 @@ import {
   isParametricShapeObject,
   SelectedShapeGeometryFields,
 } from './SelectedShapeGeometryFields';
-import { useDebouncedCommit } from './use-debounced-commit';
+import { useMixedOperationNumber } from './mixed-operation-input';
 
 const DEFAULT_POWER_SCALE_PERCENT = 100;
 const MIN_POWER_SCALE_PERCENT = 0;
@@ -251,12 +251,9 @@ function PowerScaleInput(props: {
   const selectionKey = props.objects
     .map((object) => `${object.id}:${object.powerScale ?? DEFAULT_POWER_SCALE_PERCENT}`)
     .join('|');
-  const explicitlyEdited = useRef(false);
-  useEffect(() => {
-    explicitlyEdited.current = false;
-  }, [selectionKey]);
-  const debounced = useDebouncedCommit<number>({
+  const debounced = useMixedOperationNumber({
     value: commonValue ?? DEFAULT_POWER_SCALE_PERCENT,
+    mixed,
     commit: (powerScale) => setObjectsPowerScale(objectIds, powerScale),
     parse: (input) => clampPowerScale(Number(input)),
     reconcileKey: selectionKey,
@@ -270,27 +267,15 @@ function PowerScaleInput(props: {
           min={MIN_POWER_SCALE_PERCENT}
           max={MAX_POWER_SCALE_PERCENT}
           step={1}
-          value={
-            mixed && debounced.displayValue === String(DEFAULT_POWER_SCALE_PERCENT)
-              ? ''
-              : debounced.displayValue
-          }
-          placeholder={mixed ? 'Mixed' : undefined}
-          data-mixed={mixed ? 'true' : undefined}
-          aria-valuetext={mixed ? 'Mixed' : undefined}
+          value={debounced.displayValue}
+          {...debounced.inputProps}
           aria-invalid={debounced.errorMessage === null ? undefined : true}
           aria-describedby={
             debounced.errorMessage === null ? undefined : 'selected-power-scale-error'
           }
           lang="en"
-          onChange={(event) => {
-            explicitlyEdited.current = true;
-            debounced.onChange(event);
-          }}
-          onBlur={(event) => {
-            if (mixed && !explicitlyEdited.current) return;
-            debounced.onBlur(event);
-          }}
+          onChange={debounced.onChange}
+          onBlur={debounced.onBlur}
           aria-label={`Power scale for ${props.selectionActive ? 'selected objects' : 'inspected artwork'}`}
           title="100% uses the operation’s power. Reduce it to lower power for only this artwork, without changing the operation."
           style={inputStyle}

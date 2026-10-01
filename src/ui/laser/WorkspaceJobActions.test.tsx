@@ -88,7 +88,7 @@ describe('Workspace job dock', () => {
     expect(button('Frame job').disabled).toBe(true);
     expect(button('Frame job').title).toContain('Wait for an Idle');
     expect(button('Start').disabled).toBe(true);
-    expect(button('Start').title).toContain('Start unlocks when a Frame of this exact job');
+    expect(button('Start').title).toContain('Start unlocks after a clean Frame of this footprint');
 
     expect(button('Frame job').dataset['primary']).toBe('false');
 
@@ -155,7 +155,7 @@ describe('Workspace job dock', () => {
 
     expect(button('Start').disabled).toBe(false);
     expect(button('Frame again').disabled).toBe(false);
-    expect(host.textContent).toContain('Ready to start — framed job unchanged');
+    expect(host.textContent).toContain('Ready to start — framed placement unchanged');
     // One bright action at a time: Start once framed, Frame again goes quiet.
     expect(button('Start').dataset['primary']).toBe('true');
     expect(button('Frame again').dataset['primary']).toBe('false');

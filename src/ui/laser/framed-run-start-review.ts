@@ -1,64 +1,53 @@
-// ADR-237: the single Job Review runs at Start. An ordinary Frame mints a
-// review-pending permit; this module opens the review for it against the
-// permit's exact prepared artifact plus live controller state, and enforces
-// the exact-artifact backstop when an in-review edit re-prepares the job.
+// ADR-237/565: ordinary Start prepares and reviews the current exact program.
+// Its coordinates must still match the completed Frame's footprint and
+// placement; the execution permit binds only the artifact finally affirmed.
 
 import type { FramedRunPermit, FramedRunReviewEvidence } from '../state/framed-run';
-import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
-import { useStore } from '../state';
 import { runJobReviewGate } from './job-review';
+import { framedRunReadinessIssue } from './framed-run-readiness';
+import {
+  prepareFramedStartReview,
+  preparedMatchesCompletedFrame,
+  rebindReviewedFramedRun,
+  revokeOwnedCompletedFrame,
+} from './framed-start-preparation';
+import { isOutputPreparationAbort } from './output-preparation-errors';
 
 export const FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE =
-  'The job or machine setup changed during review. Frame the exact job again.';
+  'The framed coordinates or machine setup changed during review. Frame the job again.';
 
 export const REVIEW_CHANGED_FRAMED_JOB_MESSAGE =
-  'The reviewed job no longer matches the framed one. Frame the exact job again.';
+  'The reviewed program no longer matches the completed Frame or current settings. Review the current job again.';
 
-// Builds the Start review against the LIVE stores plus the permit's exact
-// prepared artifact: permit invalidation guarantees the live project still
-// produces this artifact, while live controller state keeps the warnings
-// current. A rebuild inside the dialog (settings edit) yields a different
-// execution signature, which voids the permit — the operator Frames again.
+// Process edits rebuild the dialog and need fresh affirmative approval of
+// their exact bytes. Coordinate edits revoke the one-way spatial evidence;
+// equal execution signatures cannot bring that physical Frame back.
 export async function reviewFramedRunForStart(
   permit: FramedRunPermit,
-): Promise<FramedRunReviewEvidence | null> {
+): Promise<{ readonly permit: FramedRunPermit; readonly review: FramedRunReviewEvidence } | null> {
   const candidate = permit.candidate;
-  const laserAtOpen = useLaserStore.getState();
-  let sourceChangedDuringReview = false;
-  // Project edits are allowed to rebuild in place and surface the expected
-  // re-Frame blocker. Losing the permit while the source project is unchanged
-  // means an external handoff fact died, so there is nothing left to approve.
+  const initial = await prepareFramedStartReview(permit).catch((error: unknown) => {
+    if (isOutputPreparationAbort(error)) return null;
+    throw error;
+  });
+  if (initial === null) return null;
   const shouldAbandon = (): boolean => {
     const liveLaser = useLaserStore.getState();
-    if (candidate.authorizationContext === 'laser-second-pass') {
-      return liveLaser.framedRun !== permit;
-    }
-    if (
-      useStore.getState().project !== candidate.project ||
-      !onlyFrameOwnershipChanged(laserAtOpen, liveLaser)
-    ) {
-      sourceChangedDuringReview = true;
-    }
-    return liveLaser.framedRun !== permit && !sourceChangedDuringReview;
+    return (
+      liveLaser.framedRun !== permit ||
+      framedRunReadinessIssue(permit, undefined, liveLaser) !== null
+    );
   };
-  const app = useStore.getState();
-  const laser = useLaserStore.getState();
   const review = await runJobReviewGate({
-    initial: {
-      app,
-      project: candidate.project,
-      laser,
-      prepared: candidate.preparedStart,
-      laserModeStartSnapshot: captureLaserModeStartSnapshot(laser),
-      outputScope: candidate.outputScope,
-      ...(candidate.frameWcsNormalizationWarning === undefined
-        ? {}
-        : { frameWcsNormalizationWarning: candidate.frameWcsNormalizationWarning }),
-    },
+    initial,
+    // Run again follows this Frame's resolved placement. Its receipt supplies
+    // provenance and execution-input matching in the outer Start flow, rather
+    // than restoring the previous run's translated origin or fingerprint.
     completedReceipt: null,
     shouldAbandon,
+    onFrameMismatch: () => revokeOwnedCompletedFrame(permit),
     ...(candidate.authorizationContext === 'laser-second-pass'
       ? { purpose: 'laser-second-pass' }
       : {}),
@@ -69,30 +58,27 @@ export async function reviewFramedRunForStart(
     }
     return null;
   }
-  if (review.bundle.prepared.canvasPlan.retentionKey !== candidate.executionSignature) {
-    useLaserStore.setState({ framedRun: null, frameVerification: null });
+  const rebound = rebindReviewedFramedRun(permit, review.bundle);
+  if (rebound === null) {
+    if (
+      !preparedMatchesCompletedFrame(permit, review.bundle.prepared) ||
+      framedRunReadinessIssue(permit) !== null
+    )
+      revokeOwnedCompletedFrame(permit);
     useToastStore.getState().pushToast(REVIEW_CHANGED_FRAMED_JOB_MESSAGE, 'warning');
     return null;
   }
   return {
-    reviewedAtIso: review.reviewedAtIso,
-    reviewModel: review.reviewModel,
-    ...(review.laserModeStartEvidence === undefined
-      ? {}
-      : { laserModeStartEvidence: review.laserModeStartEvidence }),
-    ...(review.cncSetupAttestation === undefined
-      ? {}
-      : { cncSetupAttestation: review.cncSetupAttestation }),
+    permit: rebound,
+    review: {
+      reviewedAtIso: review.reviewedAtIso,
+      reviewModel: review.reviewModel,
+      ...(review.laserModeStartEvidence === undefined
+        ? {}
+        : { laserModeStartEvidence: review.laserModeStartEvidence }),
+      ...(review.cncSetupAttestation === undefined
+        ? {}
+        : { cncSetupAttestation: review.cncSetupAttestation }),
+    },
   };
-}
-
-function onlyFrameOwnershipChanged(
-  before: ReturnType<typeof useLaserStore.getState>,
-  after: ReturnType<typeof useLaserStore.getState>,
-): boolean {
-  for (const key of Object.keys(before) as ReadonlyArray<keyof typeof before>) {
-    if (key === 'framedRun' || key === 'frameVerification') continue;
-    if (before[key] !== after[key]) return false;
-  }
-  return true;
 }

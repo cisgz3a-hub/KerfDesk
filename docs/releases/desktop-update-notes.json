@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "5cfa9e1b1eb3dbba51b764e90c86419575eda25c",
+  "sinceSourceSha": "d02cfb112a2628396bfddb605f0729851484d596",
   "highlights": [
-    "Browse and search fonts in a scrollable menu with clear font previews.",
-    "Font menus stay inside smaller windows and display long imported font names cleanly.",
-    "Improved keyboard navigation and editing focus when adding or changing text.",
-    "Clearer guidance for laser and CNC jobs when every layer has Output switched off."
+    "Keep a completed Frame for unchanged placement while adjusting power and speed or repeating the job.",
+    "Corrected next-job framing and CNC safe-height completion, including inch-mode position reports.",
+    "Completed previews and timers follow current artwork without losing the second-pass offer.",
+    "Improved completion and recovery handling after cancellation, errors and controller restarts.",
+    "Fixed entering 100% power scale when selected artwork has mixed values.",
+    "Prevented stale power overrides from weakening new burns or increasing momentary Fire power."
   ]
 }

@@ -317,9 +317,12 @@ describe('laser-store console commands', () => {
 
   it('blocks console commands during an active job except realtime status query', async () => {
     const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
+    const connection = makeConnection(
+      async (data) => {
+        writes.push(data);
+      },
+      { autoAckStartFence: true },
+    );
     await connectWith(connection);
     await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
     writes.length = 0;
@@ -344,7 +347,7 @@ describe('job stream transcript source', () => {
   // that path drops the source, every refill lands as 'system' and the
   // console floods with raw G-code during jobs.
   it('tags both halves of the mid-job exchange as job traffic end-to-end', async () => {
-    const connection = makeConnection(async () => undefined);
+    const connection = makeConnection(async () => undefined, { autoAckStartFence: true });
     await connectWith(connection);
     connection.emitLine('ok');
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
@@ -380,7 +383,7 @@ describe('job stream transcript source', () => {
   });
 
   it('keeps the operator log free of the acknowledgement flood', async () => {
-    const connection = makeConnection(async () => undefined);
+    const connection = makeConnection(async () => undefined, { autoAckStartFence: true });
     await connectWith(connection);
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
     await Promise.resolve();

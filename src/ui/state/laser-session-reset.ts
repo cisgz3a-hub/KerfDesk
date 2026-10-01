@@ -56,18 +56,22 @@ export function finishedJobStateReset(): FinishedJobState {
 }
 
 /**
- * The three Frame proofs a physical or setup mutation voids together: the
- * compatibility bounds proof, the exact permit, and a trace still waiting for
- * its exact program (ADR-353). Spread it wherever a machine or setup change
- * invalidates Frame evidence. A clear scoped to one specific permit does not
- * need it: a permit and a trace never coexist, because every Frame dispatch
- * clears both and minting a permit consumes the trace.
+ * Physical or setup drift voids the compatibility bounds, exact permit,
+ * deferred trace and reusable spatial proof together (ADRs 353/565). Ordinary
+ * Start consumes only its exact permit; its owned run may retain the spatial
+ * proof after clean settlement.
  */
 export function frameProofReset(): Pick<
   LaserState,
-  'frameVerification' | 'framedRun' | 'frameTrace'
+  'frameVerification' | 'framedRun' | 'frameTrace' | 'completedFrame' | 'completedFrameRunOwner'
 > {
-  return { frameVerification: null, framedRun: null, frameTrace: null };
+  return {
+    frameVerification: null,
+    framedRun: null,
+    frameTrace: null,
+    completedFrame: null,
+    completedFrameRunOwner: null,
+  };
 }
 
 /**

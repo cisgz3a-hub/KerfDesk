@@ -2,8 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { nextQueuedLine, queuedLineCount } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PAUSE_RESUME_TRANSITION_TIMEOUT_MS } from './laser-pause-resume-transition';
+import {
+  deferredTestWrite as deferred,
+  observeTestWriteOutcome as observeOutcome,
+} from './laser-test-command-control';
 import { useLaserStore } from './laser-store';
-import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
+import {
+  captureTestLaserStartFenceAck,
+  respondToTestGrblHandshake,
+  startTestLaserJob,
+} from './laser-test-start-helpers';
 
 const GRBL_SAFETY_DOOR = '\x84';
 const GRBL_RESUME = '~';
@@ -21,7 +29,9 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   };
   return {
     write: async (data) => {
+      const acknowledgeFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeFence();
       respondToTestGrblHandshake(data, emit);
     },
     onLine: (handler) => {
@@ -62,32 +72,6 @@ async function connectWith(connection: FakeConnection): Promise<void> {
 
 async function flushPromises(): Promise<void> {
   for (let i = 0; i < 30; i += 1) await Promise.resolve();
-}
-
-function deferred(): { readonly promise: Promise<void>; readonly resolve: () => void } {
-  let resolve = (): void => undefined;
-  const promise = new Promise<void>((settle) => {
-    resolve = settle;
-  });
-  return { promise, resolve };
-}
-
-function observeOutcome(promise: Promise<void>): {
-  readonly outcome: () => 'pending' | 'resolved' | 'rejected';
-  readonly error: () => unknown;
-} {
-  let outcome: 'pending' | 'resolved' | 'rejected' = 'pending';
-  let error: unknown = null;
-  void promise.then(
-    () => {
-      outcome = 'resolved';
-    },
-    (reason: unknown) => {
-      outcome = 'rejected';
-      error = reason;
-    },
-  );
-  return { outcome: () => outcome, error: () => error };
 }
 
 function longLaserJob(): string {

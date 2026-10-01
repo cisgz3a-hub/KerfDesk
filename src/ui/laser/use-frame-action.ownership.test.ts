@@ -111,7 +111,7 @@ describe('split Frame preparation owns cancellation and physical motion', () => 
     await expect(outcome).resolves.toBe(false);
     expect({ dispatched: trace.mock.calls.length, toast: lastToast()?.message }).toEqual({
       dispatched: 0,
-      toast: 'Frame preparation cancelled. Nothing was sent.',
+      toast: 'Frame preparation cancelled. No Start permit was issued.',
     });
   });
 });

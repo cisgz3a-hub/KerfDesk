@@ -23,7 +23,7 @@ export const FRAME_NOT_DISPATCHED_MESSAGE =
 export const FRAME_COMPLETED_BUT_CHANGED_MESSAGE =
   'Frame completed, but the job or machine setup changed. Frame the current job again before starting.';
 export const FRAME_COMPLETE_MESSAGE =
-  'Frame complete — press Start to review and run this exact job.';
+  'Frame complete — press Start to review and run the current settings at this placement.';
 
 export type FrameOutcome = {
   readonly result: Promise<boolean>;

@@ -1,0 +1,17 @@
+## ADR-565 - Frame remains valid for unchanged placement
+
+**Status:** Accepted by the maintainer's explicit instruction on 2026-10-02. Software, release and physical-machine qualification remain separate evidence.
+
+**Context.** The maintainer requested that one completed Frame remain valid while changing power and speed, and that only coordinate changes require another Frame. Binding the physical trace to a full execution signature invalidated it after a process-setting edit and after each Start. Ignoring that signature alone would instead send the old prepared power and speed.
+
+**Decision.** A clean completed Frame records reusable spatial evidence for the job's framed footprint and resolved placement in the current controller session. Ordinary power and speed edits preserve that evidence. Starting or completing an app-owned job does not by itself discard it. Geometry, size, placement, output geometry, registration, work origin or coordinate-session drift invalidates the evidence. An interrupted Frame issues none. Reset, reconnect, alarm, interrupted execution and machine mutations retain their existing coordinate-evidence invalidation.
+
+Each Start prepares and reviews the current exact executable program. If the newly prepared motion envelope or resolved placement differs from the physically framed one, another Frame is required. In particular, a speed change that changes scan-offset or runway coordinates is a coordinate change, rather than an arbitrary speed-setting restriction. Current Position resolves from the actual head placement; a different resolved placement needs another Frame. Absolute placement may retain the completed footprint after an owned run settles, while its next approach uses the current reported head position.
+
+Known process-only device settings also preserve the footprint: S-value scales, air commands, controlled tool-off travel feed, Frame feed, timing calibration, no-go warnings and idle button configuration. Fresh review uses their real values. Acceleration and scanning calibration remain spatial inputs because they can change the emitted runway; unknown future fields are not assumed neutral.
+
+The reusable spatial evidence is distinct from the execution permit. Each Start claims one exact reviewed program once. Concurrent Start requests, asynchronous preparation and review edits cannot replace its bytes after approval. Existing controller-session, origin, live transport, final wire handoff, archive and recovery ownership remain bound to that execution. Job Review continues to be the single warning surface. No account, licence, controller-setting or calculated-bounds policy gate is added.
+
+This amends the exact-artifact and one-run wording of ADR-228, ADR-230, ADR-232 and ADR-237 for ordinary live-canvas Frame authorization. Transient camera markers and derived second-pass jobs retain their own immutable source and execution ownership. Frame evidence is session-local; an application or controller restart cannot restore physical-coordinate evidence from a saved project.
+
+**Verification required.** Cover power/speed edits before Start and in Job Review, emitted latest S/F commands, unchanged-placement repeated runs, move/resize/registration/origin invalidation, speed-dependent scan-envelope changes, concurrent Start and preparation races, interrupted/reset sessions, and transient/recovery workflows. Test and simulator evidence does not establish measured laser power or hardware qualification.

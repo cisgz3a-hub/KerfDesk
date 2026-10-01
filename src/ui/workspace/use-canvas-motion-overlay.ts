@@ -32,11 +32,13 @@ import {
   prepareIdleCanvasMotionPlanOffThread,
 } from './idle-canvas-motion-worker-client';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
+import { useTerminalCanvasRunInvalidation } from '../laser/terminal-canvas-run-invalidation';
 
 export function useCanvasMotionOverlay(
   project: Project,
   previewMode: boolean,
 ): CanvasMotionOverlay | null {
+  useTerminalCanvasRunInvalidation();
   const placementSettings = useStore((state) => state.jobPlacement);
   const interactionActive = useStore((state) => state.pendingUndo !== null);
   const outputScope = useOutputScope();
