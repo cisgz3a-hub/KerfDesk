@@ -61,7 +61,7 @@
   scrollbar-gutter: stable;
 }
 
-.lf-font-picker-option {
+.lf-menu-item.lf-font-picker-option {
   display: flex;
   flex-direction: column;
   align-items: stretch;
