@@ -42,6 +42,7 @@ function RemoteConsent(): JSX.Element {
       <label style={settingsRowStyle}>
         <input
           type="checkbox"
+          title="Enable pairing with connections you approve on this computer."
           checked={status?.enabled ?? false}
           disabled={busy || status?.available !== true}
           onChange={(event) => {
