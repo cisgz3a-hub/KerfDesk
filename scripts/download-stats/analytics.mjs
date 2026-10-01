@@ -1,5 +1,11 @@
 const ENDPOINT = 'https://api.cloudflare.com/client/v4/graphql';
 const MAX_BYTES = 4 * 1024 * 1024;
+const REPORT_BUDGET_MS = 120_000;
+const REQUEST_TIMEOUT_MS = 20_000;
+// The provider's retention cutoff keeps moving while settings and data requests
+// run. Keep the oldest query inside it for the whole bounded report, including
+// the final request and whole-second timestamp rounding.
+export const RETENTION_MARGIN_MS = REPORT_BUDGET_MS + REQUEST_TIMEOUT_MS + 2000;
 const REQUIRED_FIELDS = [
   'count',
   'avg_sampleInterval',
@@ -105,7 +111,7 @@ function responseZone(value) {
 
 async function request({ token, fetcher, now }, query, variables) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20_000);
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const response = await fetcher(ENDPOINT, {
       method: 'POST',
@@ -169,6 +175,11 @@ function validateSettings(settings) {
       'analytics_fields',
       'The analytics field limit is too small for a complete report.',
     );
+  if (settings.notOlderThan * 1000 <= RETENTION_MARGIN_MS)
+    throw new DownloadStatsError(
+      'analytics_retention',
+      'Cloudflare retention is too short for a complete download report.',
+    );
   return settings;
 }
 
@@ -210,7 +221,7 @@ export async function createAnalyticsReader(options) {
   const settings = validateSettings(zone.settings?.httpRequestsAdaptiveGroups);
   const limit = Math.min(1000, settings.maxPageSize);
   const read = async (from, to) => {
-    if (Date.now() - started > 120_000)
+    if (Date.now() - started > REPORT_BUDGET_MS)
       throw new DownloadStatsError(
         'analytics_timeout',
         'The analytics report took too long. Request fewer days.',

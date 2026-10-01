@@ -18,7 +18,10 @@ allowBuilds:
   sharp: true
   workerd: true
 minimumReleaseAgeExclude:
-  - electron@42.3.0
+  # Reviewed upstream backports: the npm signatures, tarball integrity and
+  # Windows ZIP digest match Electron's official 44.5.1 release. This exact
+  # version exception retains pnpm's default 24-hour policy for other packages.
+  - electron@44.5.1
   - tmp@0.2.6
   - miniflare@4.20260526.0
   - wrangler@4.95.0

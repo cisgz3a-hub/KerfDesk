@@ -302,6 +302,8 @@ async function plan() {
         sourceRef: 'refs/heads/main',
         publishedAt: new Date().toISOString(),
         expectedLatestSha256: bytes === null ? 'none' : digest(bytes),
+        previousVersion: latest?.version ?? '',
+        previousSourceSha: latest?.sourceSha ?? '',
       });
     version = nextPatch(version);
   }

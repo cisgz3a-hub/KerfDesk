@@ -36,6 +36,8 @@ function head(page, ctx) {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>${documentTitle(page)}</title>
     <meta name="description" content="${page.description}" />
+    ${ctx.contentSecurityPolicy &&
+    html`<meta http-equiv="Content-Security-Policy" content="${ctx.contentSecurityPolicy}" />`}
     ${canonical && html`<link rel="canonical" href="${canonical}" />`}
     ${page.noindex && html`<meta name="robots" content="noindex" />`}
     <meta name="color-scheme" content="light dark" />
@@ -131,6 +133,56 @@ export function renderDocument(page, body, ctx) {
       ${header(page)}
       <main id="main">${body}</main>
       ${footer()}
+    </body>
+  </html>`;
+  return `<!doctype html>\n${doc}\n`;
+}
+
+// The app origin publishes this one notice, rather than the separate marketing
+// site's navigation. Every destination below already belongs to the app.
+export function renderAppPrivacyDocument(page, body, ctx) {
+  const links = [
+    { href: site.downloadPageUrl, label: 'Download' },
+    { href: site.supportUrl, label: 'Support' },
+  ];
+  const doc = html`<html lang="en">
+    ${head(page, ctx)}
+    <body>
+      <a class="skip-link" href="#main">Skip to content</a>
+      <header class="site-header">
+        <div class="wrap site-header__inner">
+          <a class="brand" href="${site.appUrl}">
+            <img src="/favicon.svg" alt="" width="28" height="28" />
+            <span>Kerf<span class="brand__accent">Desk</span></span>
+          </a>
+          <nav class="site-nav" aria-label="Main">
+            <ul>
+              ${links.map(footerLink)}
+            </ul>
+          </nav>
+          <a class="btn btn--primary btn--sm site-header__cta" href="${site.appUrl}"
+            >Open the app</a
+          >
+          <details class="menu">
+            <summary>Menu</summary>
+            <nav aria-label="Main menu">
+              <ul>
+                ${links.map(footerLink)}
+              </ul>
+            </nav>
+          </details>
+        </div>
+      </header>
+      <main id="main">${body}</main>
+      <footer class="site-footer">
+        <div class="wrap site-footer__legal">
+          <p>
+            © 2026 Johann Stolk. <a href="/eula.txt">Licence agreement</a> ·
+            <a href="${site.noticesUrl}">Third-party notices</a> ·
+            <a href="/privacy/lucide-license.txt">Icon licence</a>
+          </p>
+        </div>
+      </footer>
     </body>
   </html>`;
   return `<!doctype html>\n${doc}\n`;

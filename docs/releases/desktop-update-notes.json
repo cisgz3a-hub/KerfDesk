@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "6cd0eb8040377562847ec467eb066192400ac203",
+  "sinceSourceSha": "a6c7642ffcd784c2f680867b494d29cd71d826ef",
   "highlights": [
-    "Read what has improved before downloading a desktop update.",
-    "Clear and retype power, size and machine-setting numbers more easily.",
-    "Choose a recovery restart line with clearer number entry and automatic selection.",
-    "Improved Abort cleanup after Console jogs and controller reconnections.",
-    "More reliable trial expiry, Pro tool checks, and licence and update messages.",
-    "Updated SVG import security protections and corrected installer licence punctuation."
+    "Updated the desktop runtime with Chromium and Windows fixes.",
+    "Improved desktop opening order for licence and update checks.",
+    "Your saved machine and its settings now load automatically on startup.",
+    "New canvases start with fresh job settings; saved projects keep their settings.",
+    "Added checks that desktop upgrades retain projects and preferences.",
+    "Restored the public privacy notice and improved download statistics reliability."
   ]
 }
