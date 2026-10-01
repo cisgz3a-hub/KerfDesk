@@ -34,12 +34,17 @@ macOS; JS license banners also remain in shipped assets.
 | @modelcontextprotocol/server, @modelcontextprotocol/core 2.2.0 (desktop and MCP relay) | Apache-2.0 and historical MIT, as described by the packages' licence transition notice | Anthropic, PBC and MCP contributors — https://github.com/modelcontextprotocol/typescript-sdk |
 | zod 4.4.3 | MIT | © Colin McDonnell — https://github.com/colinhacks/zod |
 | ws 8.21.0 (desktop relay connection) | MIT | © Einar Otto Stangvik and contributors — https://github.com/websockets/ws |
+| @cloudflare/workers-oauth-provider 1.2.1 (phone and MCP service) | MIT | © 2025 Cloudflare, Inc. — https://github.com/cloudflare/workers-oauth-provider |
 
 The MCP packages' `package.json` metadata says MIT, while their actual `LICENSE`
 files include the Apache-2.0 transition notice, full Apache-2.0 terms and retained
 historical MIT terms. The generated release notices reproduce those complete
 files; the metadata label does not replace them. The MCP client and WebSocket
 TypeScript declarations are development-only dependencies.
+
+The separately deployed phone and MCP service ships its complete production
+dependency notices in `services/remote-control/public/third-party-notices.txt`.
+Its licence gate checks both the installed closure and that generated file.
 
 The MIT / ISC permission notices ("Permission is hereby granted, free of charge, …
 THE SOFTWARE IS PROVIDED "AS IS"…"), the Apache-2.0 / MPL-2.0 texts (DOMPurify),
