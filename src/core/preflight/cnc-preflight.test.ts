@@ -316,8 +316,8 @@ describe('runCncPreflight', () => {
 
   it('flags a missing output layer', () => {
     const base = createProject();
-    const result = runCncPreflight(base, config, GOOD_GCODE);
-    expect(result.issues.some((issue) => issue.code === 'no-output-layer')).toBe(true);
+    const result = runCncPreflight(base, config, 'G21\nM5');
+    expect(result.issues.map((issue) => issue.code)).toEqual(['no-output-layer']);
   });
 
   it('flags non-positive depths', () => {
