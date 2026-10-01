@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
 import { expandMachineUtilities, toolbarCommand } from './fixtures/workspace-ui';
+import { confirmJobReview } from './fixtures/recovery-flow';
+import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 
 const SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><rect x="5" y="5" width="30" height="20" fill="none" stroke="#ff0000"/></svg>';
@@ -514,7 +516,7 @@ kerfDeskTest(
     const startButton = page.getByRole('button', { name: 'Start', exact: true });
     await expect(startButton).toBeEnabled();
     const frameNotice = page.getByRole('button', {
-      name: 'Dismiss success notification: Frame complete — press Start to review and run this exact job.',
+      name: 'Dismiss success notification: Frame complete — press Start to review and run the current settings at this placement.',
       exact: true,
     });
     await expect(frameNotice).toBeInViewport({ ratio: 1 });
@@ -540,7 +542,9 @@ kerfDeskTest(
     expect(firstMove).not.toBeNull();
     const acceptedThroughFirstMove =
       [...program.slice(0, firstMove?.index ?? 0)].filter((character) => character === '\n')
-        .length + 1;
+        .length +
+      1 -
+      acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
     await kerfdesk.acknowledgeSerial(acceptedThroughFirstMove);
     await expect
       .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
@@ -657,21 +661,7 @@ baseTest('an interrupted-job checkpoint surfaces isolated optional recovery', as
 // ADR-237: Frame runs dialog-free and mints a review-pending permit; the
 // single Job Review opens at Start and streams that exact artifact on confirm.
 async function confirmStartReview(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
-  const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === GRBL_STATUS_QUERY_BYTE,
-  ).length;
-  await page
-    .getByRole('dialog', { name: 'Review job before starting' })
-    .getByRole('button', { name: 'Start job', exact: true })
-    .click();
-  await expect
-    .poll(
-      async () =>
-        serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === GRBL_STATUS_QUERY_BYTE)
-          .length,
-    )
-    .toBeGreaterThan(statusQueriesBefore);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await confirmJobReview(page, kerfdesk);
 }
 
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
@@ -813,7 +803,8 @@ async function drainHeldSerialWrites(
   let stablePasses = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
-    const pending = written - acknowledged;
+    const pending =
+      written - acknowledged - acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
     if (pending > 0) {
       await kerfdesk.acknowledgeSerial(pending);
       acknowledged += pending;

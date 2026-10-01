@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 import { useLaserStore } from './laser-store';
 
 type FakeConnection = SerialConnection & {
@@ -23,7 +23,9 @@ function makeConnection(
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeStartFence();
       if (data === '$I\n') {
         emit('[VER:1.1f.20170801:test]');
         emit('[OPT:VM,15,128]');
@@ -271,7 +273,10 @@ describe('laser controller lifecycle operations', () => {
     };
     const connection = makeConnection(async (data) => {
       writes.push(data);
-      if (data === 'G4 P0.01\n') {
+      if (
+        data === 'G4 P0.01\n' &&
+        useLaserStore.getState().controllerOperation?.kind === 'post-job-settle'
+      ) {
         await new Promise<void>((resolve) => {
           resolveSettleWrite = () => {
             settleWriteResolved = true;

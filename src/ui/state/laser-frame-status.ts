@@ -76,6 +76,8 @@ export function frameCompletionPatch(args: {
 type FrameCompletionFields = Pick<
   LaserState,
   | 'framedRun'
+  | 'completedFrame'
+  | 'completedFrameRunOwner'
   | 'frameTrace'
   | 'frameVerification'
   | 'lastWriteError'
@@ -129,7 +131,12 @@ function completedFrameProofPatch(
 function completedFrameEvidencePatch(
   candidate: FrameMotionCandidate,
   source: FramedRunControllerSource,
-): Partial<Pick<LaserState, 'framedRun' | 'frameTrace' | 'frameVerification'>> {
+): Partial<
+  Pick<
+    LaserState,
+    'framedRun' | 'frameTrace' | 'frameVerification' | 'completedFrame' | 'completedFrameRunOwner'
+  >
+> {
   if (!isFramedRunCandidate(candidate)) {
     // A split Frame traced the bounds before its exact program existed. The
     // clean completion is recorded with the same controller evidence a permit
@@ -137,8 +144,12 @@ function completedFrameEvidencePatch(
     // arrives with these same bounds (ADR-353). No authorization exists yet.
     return { frameTrace: createFrameTrace(candidate, source) };
   }
+  const permit = createFramedRunPermit(candidate, source);
   return {
-    framedRun: createFramedRunPermit(candidate, source),
+    framedRun: permit,
+    ...(candidate.authorizationContext === undefined
+      ? { completedFrame: permit, completedFrameRunOwner: null }
+      : {}),
     frameTrace: null,
     frameVerification: candidate.frameVerification,
   };

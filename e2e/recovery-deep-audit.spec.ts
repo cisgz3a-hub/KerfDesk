@@ -33,6 +33,7 @@ import {
   type FixtureEvents,
 } from './fixtures/recovery-flow';
 import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 
 const RECONNECTED_HEAD = { x: 777.7, y: 666.6 };
 
@@ -87,7 +88,7 @@ async function recoverAndDrain(
   await expect(review).not.toBeVisible();
   await drainHeldSerialWrites(page, kerfdesk, baseline, 2_000);
   await kerfdesk.emitSerialLine(IDLE);
-  return programLinesSince(await kerfdesk.events(), mark);
+  return recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), mark);
 }
 
 async function savedCapsule(page: Page): Promise<CapsuleProbe> {

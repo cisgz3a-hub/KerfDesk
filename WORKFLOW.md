@@ -4,8 +4,8 @@
 >
 > This document has **Phase A, Phase B, Phase F (F.1-F.5), CNC/router (F-CNC1..F-CNC50 + F-CNC-PROBE), Phase I multi-controller, Phase K box generator, Camera Mode, and Desktop app flows written**. Phase C / D / E sections are still stubs and will be filled retroactively from ADR-016. Code is shipped through Phase K (well beyond the older through-F.3 framing) — the gap is documentation density, not implementation. F-CNC46 is the shipped ADR-290 height-map slice; F-CNC47-F-CNC50 remain planned user-facing flows except for the bounded ADR-292/294/295/296/297/298/299/300/301/304/305/308/309 plus ADR-292 Amendments 2-5 schema, exact 8/16-bit grayscale and 8-bit grayscale-alpha import, exact input-endpoint, mask-threshold/outside-meaning, and positive-finite gamma controls, finite-preserving legacy-mesh import/persistence/materialization, read-only declared-source-meaning, recorded-source-detail, field-geometry and resolved-aspect-policy disclosures, canonical Width integrity, bounded exact Width re-factorization and preview authority, existing CAM/preview, manual persistence, exact partial-edge geometry, and atomic large-project autosave/recovery substrate explicitly marked current below.
 >
-> **Start model — frame-first (ADR-228, 2026-07-18).** A completed Frame for the exact current
-> job (bounds signature + origin identity) is the ONLY Start policy gate, on laser and CNC, for
+> **Start model — frame-first (ADR-565, 2026-10-02).** A completed Frame for the unchanged
+> footprint and placement is the ONLY Start policy gate, on laser and CNC, for
 > every placement mode. Flows below were written across many phases; wherever one still says
 > Start "blocks", "refuses", "fails closed", or "cannot be overridden" on a policy finding
 > (work-Z zero, tool identity, probe plate, overrides, accessories, $30/$32, bounds, no-go
@@ -16,6 +16,8 @@
 > consistency. Authoritative per-gate disposition:
 > `docs/audits/2026-07-18-guard-inventory-frame-first.md`. Flow F-A10 reflects the current
 > model; passages that predate it are stamped inline.
+>
+> Power/speed edits retain completed spatial Frame evidence. A settled app-owned run also retains it while placement remains unchanged. Each Start prepares and reviews the latest exact program; changed geometry, resolved placement, origin or motion-envelope coordinates require another Frame. Earlier exact-artifact/one-run Frame wording is superseded by ADR-565; execution claims remain one-use.
 >
 > **Review location — Job Review runs at Start (ADR-237, 2026-07-21).** A plain Frame runs
 > dialog-free: prepare → physical trace → review-pending permit. The single Job Review dialog
@@ -1685,8 +1687,9 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 5. **Job Review runs at Start (ADR-237).** Frame dispatches dialog-free; the warnings, exact
    artifact, and — when preparation changed G55-G59 to G54 — the durable WCS disclosure ride the
    review-pending permit. Pressing Start opens the one Job Review; the operator confirms with
-   **Start job**. An edit inside the review re-prepares, and a re-prepared artifact that no longer
-   matches the framed one voids the permit (Frame again).
+   **Start job**. An edit inside the review re-prepares the current exact artifact. Power/speed
+   edits retain the Frame when the prepared footprint and resolved placement stay unchanged;
+   changed motion-envelope coordinates or placement require another Frame (ADR-565).
 6. Calculated motion-envelope, travel, and no-go findings remain visible in Job Review but do not
    pre-empt the governing physical test. Frame establishes driver-produced tool-off state and runs
    the watched exact envelope; controller rejection, cancel, or interrupted motion issues no permit.
@@ -1695,16 +1698,19 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 7. After tracing the box, Frame returns to the exact work position occupied when the artifact was
    prepared — the acknowledged G54 work position when serial preparation began under G55-G59. A
    final fresh clean `Idle`, all acknowledgements, and unchanged spatial session/origin evidence
-   issue a one-run permit for that exact artifact. Advisory settings/build-info observations may
+   record reusable spatial Frame evidence. Each Start separately claims its exact reviewed
+   program once (ADR-565). Advisory settings/build-info observations may
    refresh without invalidating the completed physical Frame.
 8. Cancel, error, Alarm, non-motion controller state, MPG takeover, disconnect, manual controller
    mutation, or evidence drift drops the candidate and issues no permit.
-9. **A laser job starts at 100% feed, rapid and power (ADR-355).** Live override percentages belong
+9. **A laser job starts at a 100% feed, rapid and power override baseline (ADR-355 Amendment 1).** Live override percentages belong
    to the controller, not the project: they outlive the job they were set in, and on grblHAL with
    `$676` bit 3 clear the feed override even survives the soft reset **ABORT JOB** sends. When the
-   controller reports anything other than 100%, or has not reported yet, Start puts the three
-   realtime reset bytes in front of the program's first write, and Job Review's controller summary
-   reads **overrides reset to 100% at Start**. A refused Start sends nothing. Pause and Resume do not
+   controller supports realtime overrides, Start first waits for its owned acknowledgement boundary
+   to process pending override flags, then puts the three standalone realtime reset bytes in front
+   of the program's first write. Current layer and artwork power/speed still determine the program.
+   Job Review's controller summary reads **overrides reset to 100% at Start** when reductions were
+   observed. An invalid executable window sends no boundary or reset. Pause and Resume do not
    pass through Start, so adjustments made during a job stay in effect for that job. CNC keeps its
    own override policy (warnings, safe reductions allowed).
 
@@ -1812,16 +1818,18 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    under G55-G59. Dispatch alone authorizes nothing: every Frame command must receive its terminal
    acknowledgement and the controller must reach final clean Idle without interruption or spatial
    session/origin drift. Advisory settings and build-info observations may refresh.
-4. Clean completion issues a one-run, review-pending `FramedRunPermit` and enables **Start**. The
-   controls read **Ready to start — framed job unchanged**, **Start**, and **Frame again**. For a
+4. Clean completion records reusable spatial Frame evidence and enables **Start**. The
+   controls read **Ready to start — framed placement unchanged**, **Start**, and **Frame again**. For a
    split Frame (ADR-353) the permit arrives when the exact program does; the trace's own motion
-   never cancels that program. The permit is exact and one-use. Any project,
-   output-scope, placement, or registration edit, Jog, Home, origin/probe/reset/disconnect, or
-   controller drift expires it and greys Start out again, with the reason in the status line.
+   never cancels that program. Each execution permit remains exact and one-use. Power/speed
+   edits preserve spatial evidence; changed geometry, output geometry, placement or registration,
+   Jog, Home, origin/probe/reset/disconnect, or coordinate drift expires it and greys Start out
+   again, with the reason in the status line. A settled app-owned run retains the unchanged Frame.
    Camera-only UI state does not.
 5. The user clicks **Start**. The app opens the single **Job Review** dialog (ADR-224,
-   ADR-237) against the permit's exact prepared program plus current controller state; it neither
-   recompiles nor streams before confirmation. A laser controller that reports `$32=0` contributes
+   ADR-237 and ADR-565) against the latest exact prepared program plus current controller state.
+   Settings changed since Frame are prepared before review; no job streams before confirmation.
+   A laser controller that reports `$32=0` contributes
    the `$32` acknowledgement banner rather than refusing Frame or Start.
 6. Job Review uses the v2 surface: five stat tiles (estimated time as the accent hero tile with
    cut/travel split, job size and motion envelope, operations/cutters, G-code lines and bytes, and a
@@ -1840,9 +1848,10 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
    facts describe requested/compiled settings and controller scaling, not measured spindle RPM.
 7. Editing a value in Job Review commits through the normal store actions and re-runs preparation.
    The stat tiles dim behind **Recomputing…** while synchronized evidence refreshes. **Approve
-   settings** remains informational and never adds a Start gate. If the edit changes the exact
-   execution signature, or any other invalidation kills the permit, no job bytes stream and the
-   operator must complete Frame again for the changed artifact.
+   settings** remains informational and never adds a Start gate. A power/speed edit retains
+   Frame when the new motion envelope and placement are unchanged. Changed coordinates require
+   another Frame; changed executable settings require fresh displayed review and approval before
+   streaming. Each Start claims the approved program once.
 8. Confirming **Start job** records the review evidence and acknowledgements, verifies that the same
    permit is still current, then atomically claims it and hands its bound G-code to the streamer.
    Only live transport and exact-handoff checks remain. Stock-GRBL option `M` observations for `M7`

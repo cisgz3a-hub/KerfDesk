@@ -1,7 +1,8 @@
 // override-actions — real-time feed/rapid/spindle override sends (ADR-103
-// G3). GRBL processes these single bytes instantly without queueing, so —
+// G3). GRBL sets realtime flags outside the queued-line buffer, so —
 // unlike every other command surface — they are legal DURING a streaming
-// job; that is their whole purpose. The live percentages come back in the
+// job; that is their whole purpose. The main-loop checkpoint applies them.
+// The live percentages come back in the
 // status report's `Ov:` field and are cached in `ovCache`.
 
 import type { RealtimeOverrideByte } from '../../core/controllers/grbl';

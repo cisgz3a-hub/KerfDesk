@@ -3,9 +3,14 @@ import { RT_SOFT_RESET } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { DISCONNECT_WRITE_TIMEOUT_MS } from './laser-disconnect-transaction';
 import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
+import { disconnectSafetyEvents as safetyEvents } from './laser-intentional-disconnect.test-support';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
-import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
+import {
+  captureTestLaserStartFenceAck,
+  respondToTestGrblHandshake,
+  startTestLaserJob,
+} from './laser-test-start-helpers';
 import { recoveryRepository } from './recovery';
 import { useToastStore } from './toast-store';
 
@@ -28,7 +33,9 @@ function makeConnection(
   return {
     write: async (data) => {
       events.push(`${label}:write:${JSON.stringify(data)}`);
+      const acknowledgeFence = captureTestLaserStartFenceAck(data, emitLine);
       await onWrite?.(data, emitLine);
+      acknowledgeFence();
       respondToTestGrblHandshake(data, emitLine, 'G0 G54');
     },
     onLine: (handler) => {
@@ -82,16 +89,6 @@ async function connectReady(connection: FakeConnection): Promise<void> {
 
 async function flush(): Promise<void> {
   for (let index = 0; index < 6; index += 1) await Promise.resolve();
-}
-
-function safetyEvents(events: ReadonlyArray<string>, label: string): ReadonlyArray<string> {
-  const expectedWrites = new Set([
-    `${label}:write:${JSON.stringify(RT_SOFT_RESET)}`,
-    `${label}:write:${JSON.stringify('M5\n')}`,
-    `${label}:write:${JSON.stringify('M9\n')}`,
-    `${label}:close`,
-  ]);
-  return events.filter((event) => expectedWrites.has(event));
 }
 
 beforeEach(async () => {

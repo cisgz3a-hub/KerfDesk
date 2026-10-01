@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { grblDriver } from '../../core/controllers';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import {
@@ -7,6 +8,7 @@ import {
   laserStartOverrideResetLogLine,
 } from './laser-start-override-reset';
 import { startTestLaserJob } from './laser-test-start-helpers';
+import { JobStartBeforeProgramError } from './laser-start-transmission-error';
 
 describe('laserStartNeedsOverrideReset', () => {
   const baseline = { feed: 100, rapid: 100, spindle: 100 };
@@ -21,8 +23,8 @@ describe('laserStartNeedsOverrideReset', () => {
     expect(laserStartNeedsOverrideReset('laser', true, null)).toBe(true);
   });
 
-  it('sends nothing when the controller already reports 100%', () => {
-    expect(laserStartNeedsOverrideReset('laser', true, baseline)).toBe(false);
+  it('resets even a reported baseline that can precede pending flag application', () => {
+    expect(laserStartNeedsOverrideReset('laser', true, baseline)).toBe(true);
   });
 
   it('leaves CNC to its own override policy and never writes to firmware without overrides', () => {
@@ -47,6 +49,7 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   return {
     write: async (data) => {
       await write(data);
+      if (data === `${grblDriver.commands.settleDwell}\n`) emit('ok');
       if (
         data === '$I\n' &&
         useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
@@ -117,7 +120,11 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
 
     // A queued line may not carry a byte above 0x7F (ADR-361), so the realtime
     // reset travels as its own write and the window follows it unchanged.
-    expect(writes.slice(0, 2)).toEqual([LASER_START_OVERRIDE_RESET, 'G21\n']);
+    expect(writes.slice(0, 3)).toEqual([
+      `${grblDriver.commands.settleDwell}\n`,
+      LASER_START_OVERRIDE_RESET,
+      'G21\n',
+    ]);
     // Realtime bytes never enter GRBL's receive buffer, so the streamer must
     // not charge them against it.
     expect(useLaserStore.getState().streamer?.inFlight).toEqual([{ line: 'G21\n', bytes: 4 }]);
@@ -126,7 +133,7 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
     );
   });
 
-  it('writes the program alone when the controller already reports 100%', async () => {
+  it('flushes flags and resets before the program even when the controller reports 100%', async () => {
     const writes: string[] = [];
     const connection = makeConnection(async (data) => {
       writes.push(data);
@@ -136,7 +143,11 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
 
     await startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' });
 
-    expect(writes[0]).toBe('G21\n');
+    expect(writes.slice(0, 3)).toEqual([
+      `${grblDriver.commands.settleDwell}\n`,
+      LASER_START_OVERRIDE_RESET,
+      'G21\n',
+    ]);
   });
 
   it('sends nothing, reset included, when the Start is refused', async () => {
@@ -165,9 +176,15 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
 
     await expect(
       startTestLaserJob('G21\nG90\nM3 S0\nM5\n', { streamingMode: 'ping-pong' }),
-    ).rejects.toThrow(/Transport rejected/);
+    ).rejects.toMatchObject({
+      name: 'JobStartBeforeProgramError',
+      message: 'Transport rejected the write.',
+    });
 
-    expect(writes[0]).toBe(LASER_START_OVERRIDE_RESET);
+    expect(writes.slice(0, 2)).toEqual([
+      `${grblDriver.commands.settleDwell}\n`,
+      LASER_START_OVERRIDE_RESET,
+    ]);
     expect(writes.join('')).not.toContain('G21');
   });
 
@@ -199,8 +216,13 @@ describe('laser Start resets leftover overrides (ADR-355)', () => {
 
     // Abort's soft reset is the last word: a controller without a homing lock
     // boots Idle and would run a program window written after it.
-    expect(writes.slice(0, 2)).toEqual([LASER_START_OVERRIDE_RESET, String.fromCharCode(0x18)]);
+    expect(writes.slice(0, 3)).toEqual([
+      `${grblDriver.commands.settleDwell}\n`,
+      LASER_START_OVERRIDE_RESET,
+      String.fromCharCode(0x18),
+    ]);
     expect(writes.join('')).not.toContain('G21');
+    await expect(start).rejects.toBeInstanceOf(JobStartBeforeProgramError);
   });
 
   it('holds the reset back when the first program window cannot go on the wire', async () => {

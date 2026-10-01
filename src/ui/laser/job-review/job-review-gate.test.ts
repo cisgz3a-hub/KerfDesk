@@ -34,6 +34,7 @@ import { prepareCurrentStartJob } from '../start-job-source';
 import { useStartBlockerStore } from '../start-blocker-store';
 import { runStartJobFlow } from '../start-job-flow';
 import { runFrameNow } from '../use-frame-action';
+import { withManualCncFeedPatch } from '../../state/cnc-feed-provenance';
 import { runJobReviewGate } from './job-review-gate';
 import { useJobReviewStore } from './job-review-store';
 import { captureJobReviewModels } from './testing';
@@ -351,52 +352,52 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     expect(startSpy()).not.toHaveBeenCalled();
   });
 
-  it('an in-review edit voids the framed permit; re-Framing streams the edited bytes', async () => {
+  it('reviews a feed edit on implicit CNC defaults and streams its latest bytes without re-Framing', async () => {
     configureReadyCncStart();
     const repository = recoveryHarness();
     await runFrameNow();
-    expect(useLaserStore.getState().framedRun).not.toBeNull();
+    const frame = useLaserStore.getState().framedRun;
+    if (frame === null) throw new Error('Expected the completed CNC Frame.');
+    expect(useStore.getState().project.scene.layers[0]?.cnc).toBeUndefined();
 
     const flow = runStartJobFlow(repository);
     await vi.waitFor(() => expect(reviewState().kind).toBe('open'));
     useStore.getState().setLayerParam('red', {
-      cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, feedMmPerMin: 777 },
+      cnc: withManualCncFeedPatch(DEFAULT_CNC_LAYER_SETTINGS, { feedMmPerMin: 777 }),
     });
-    // The edit invalidates the exact-artifact permit, so the in-dialog
-    // rebuild refuses with the frame-first message until the operator
-    // re-Frames the edited job.
-    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().completedFrame).toBe(frame);
+    const updated = await prepareCurrentStartJob(
+      useStore.getState(),
+      useLaserStore.getState(),
+      useCameraStore.getState(),
+      frame.candidate.preparedStart.jobOrigin,
+      false,
+    );
+    if (!updated.ok) throw new Error(updated.messages.join(' '));
+    expect(updated.metrics.frameJobBounds).toEqual(
+      frame.candidate.preparedStart.metrics.frameJobBounds,
+    );
+    expect(updated.metrics.frameMotionBounds).toEqual(
+      frame.candidate.preparedStart.metrics.frameMotionBounds,
+    );
     useJobReviewStore.getState().requestRebuild();
     await vi.waitFor(() => {
       const state = reviewState();
-      expect(state.kind === 'open' && state.blocker !== null).toBe(true);
+      const shown = state.kind === 'open' ? state.model.effectiveOperations : [];
+      expect(shown.flatMap((operation) => operation.summaries).join(' ')).toContain('777');
+      expect(state.kind === 'open' && state.blocker === null && !state.isPreparing).toBe(true);
     });
-    const blocked = reviewState();
-    expect(blocked.kind === 'open' ? blocked.blocker?.join(' ') : '').toMatch(/frame/i);
-    // The blocker explains the re-Frame, but the numbers under it must be the
-    // EDITED job's compile, not the last framed one (maintainer, 2026-09-19):
-    // the compiled summary carries the new feed while Confirm stays refused.
-    const shown = blocked.kind === 'open' ? blocked.model.effectiveOperations : [];
-    expect(shown.flatMap((operation) => operation.summaries).join(' ')).toContain('777');
-    useJobReviewStore.getState().confirm();
     expect(startSpy()).not.toHaveBeenCalled();
-    useJobReviewStore.getState().cancel();
+    useJobReviewStore.getState().confirm();
     await flow;
-    expect(startSpy()).not.toHaveBeenCalled();
 
-    await runFrameNow();
-    expect(frameSpy()).toHaveBeenCalledTimes(2);
-
-    const secondReview = runStartJobFlow(repository);
-    await vi.waitFor(() => expect(reviewState().kind).toBe('open'));
-    useJobReviewStore.getState().confirm();
-    await secondReview;
-
+    expect(frameSpy()).toHaveBeenCalledTimes(1);
     expect(startSpy()).toHaveBeenCalledTimes(1);
     const gcode = startSpy().mock.calls[0]?.[0];
     const options = startSpy().mock.calls[0]?.[1];
     if (typeof gcode !== 'string') throw new Error('Expected streamed G-code.');
     expect(gcode).toContain('F777');
+    expect(repository.getSnapshot().activeRun?.artifact.gcode).toBe(gcode);
     expect(
       cncSetupAttestationMatches(
         options?.cncSetupAttestation,
@@ -406,7 +407,7 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     ).toBe(true);
   });
 
-  it('a refused re-prepare blocks Confirm in place until the operator fixes it', async () => {
+  it('an alarm closes review and requires a new Frame before any Start', async () => {
     const repository = recoveryHarness();
     await runFrameNow();
 
@@ -414,29 +415,15 @@ describe('runJobReviewGate through runStartJobFlow', () => {
     await vi.waitFor(() => expect(reviewState().kind).toBe('open'));
     useLaserStore.setState({ alarmCode: 2 });
     useJobReviewStore.getState().requestRebuild();
-    await vi.waitFor(() => {
-      const state = reviewState();
-      expect(state.kind === 'open' && state.blocker !== null).toBe(true);
-    });
-    const blocked = reviewState();
-    expect(blocked.kind === 'open' ? blocked.blocker?.join(' ') : '').toMatch(/alarm/i);
-
-    useJobReviewStore.getState().confirm();
-    expect(reviewState().kind).toBe('open');
+    await flow;
+    expect(reviewState().kind).toBe('idle');
+    expect(useLaserStore.getState().completedFrame).toBeNull();
+    expect(useLaserStore.getState().frameVerification).toBeNull();
     expect(startSpy()).not.toHaveBeenCalled();
 
-    // The alarm also voided the exact-artifact permit, so a rebuild after
-    // recovery refuses with the frame-first message: the operator re-Frames.
     useLaserStore.setState({ alarmCode: null });
-    useJobReviewStore.getState().requestRebuild();
-    await vi.waitFor(() => {
-      const state = reviewState();
-      expect(
-        state.kind === 'open' && state.blocker !== null && /frame/i.test(state.blocker.join(' ')),
-      ).toBe(true);
-    });
-    useJobReviewStore.getState().cancel();
-    await flow;
+    await runStartJobFlow(repository);
+    expect(reviewState().kind).toBe('idle');
     expect(startSpy()).not.toHaveBeenCalled();
 
     await runFrameNow();

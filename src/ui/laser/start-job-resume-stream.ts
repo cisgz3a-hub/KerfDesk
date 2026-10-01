@@ -19,7 +19,10 @@ import { confirmLaserModeStartEvidence } from './laser-mode-start-acknowledgemen
 import { resumeConfirmation } from './resume-confirmation';
 import { markOwnedResumeCheckpoint, sameCheckpoint } from './start-job-checkpoint-policy';
 import { finalRecoveryStartAssertion } from './recovery-start-authorization';
-import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
+import {
+  isJobStartBeforeProgramError,
+  isJobStartTransmissionError,
+} from '../state/laser-start-transmission-error';
 
 // Shared resume back half: build the re-entry program, confirm, suspend
 // checkpoint tracking (the resume run has its own numbering — ADR-118), and
@@ -67,7 +70,7 @@ export async function streamResumeFromRawLine(
       // Manual restarts have no sealed run to retain, but attempted output must
       // still retire recovery records whose machine history is now obsolete.
       await recoveryRepository.noteUntrackedRunAccepted();
-    } else if (!finalAuthorizationPassed) {
+    } else if (!finalAuthorizationPassed || isJobStartBeforeProgramError(err)) {
       restoreUnacceptedResumeCheckpoint(
         checkpointBeforeStart,
         checkpointMarkedAtIso,

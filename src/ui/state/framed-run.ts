@@ -52,6 +52,9 @@ export type FramedRunCandidate = {
   readonly project: Project;
   readonly outputScope: OutputScope;
   readonly executionSignature: string;
+  /** Reusable ordinary Frame identity (ADR-565). Exact Start bytes retain
+   * executionSignature; transient/deferred candidates keep their own contract. */
+  readonly spatialSignature?: string;
   /** Bounds/origin compatibility proof retained during the Frame-first
    * migration. It becomes visible only with the completion-issued permit. */
   readonly frameVerification: FrameVerification;

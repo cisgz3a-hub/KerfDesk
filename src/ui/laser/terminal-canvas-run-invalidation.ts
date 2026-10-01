@@ -9,21 +9,22 @@ import { useStore } from '../state/store';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 
 const lifecycle = createStore<{ readonly installed: boolean }>(() => ({ installed: false }));
-// Status reports replace a run snapshot, but its plan/start stamp stay owned by
-// the same execution. A weak plan key keeps this display context session-only.
-const documentsByPlan = new WeakMap<CanvasMotionPlan, Map<number, string>>();
+// Status reports replace a run snapshot, but its stream epoch and start stamp
+// stay owned by the execution. A weak plan key keeps the context session-only.
+const documentsByPlan = new WeakMap<CanvasMotionPlan, Map<string, string>>();
 
 function isActiveRun(run: LiveCanvasRun): boolean {
   return ['running', 'paused', 'tool-change'].includes(run.lifecycle);
 }
 
-function documentOf(run: LiveCanvasRun): string {
+function documentOf(run: LiveCanvasRun, streamerEpoch: number): string {
+  const stamp = `${streamerEpoch}:${run.startedAtMs}`;
   const existing = documentsByPlan.get(run.plan);
-  const captured = existing?.get(run.startedAtMs);
+  const captured = existing?.get(stamp);
   if (captured !== undefined) return captured;
   const signature = currentReplayExecutionSignature();
-  const byStart = existing ?? new Map<number, string>();
-  byStart.set(run.startedAtMs, signature);
+  const byStart = existing ?? new Map<string, string>();
+  byStart.set(stamp, signature);
   documentsByPlan.set(run.plan, byStart);
   return signature;
 }
@@ -34,15 +35,25 @@ function expireChangedTerminalDisplay(): void {
   if (run === null) return;
   // Capture while active, before an Open or edit can replace its document.
   // Painted/recovered runs can have a different program key from that document.
-  const document = documentOf(run);
+  const document = documentOf(run, laser.streamerEpoch);
   // Interrupted displays retain their established recovery presentation.
   if (run.lifecycle !== 'finished' || isActiveJob(laser.streamer)) return;
   if (currentReplayExecutionSignature() === document) return;
-  useLaserStore.setState((state) =>
-    state.liveCanvasRun?.plan === run.plan && state.liveCanvasRun.startedAtMs === run.startedAtMs
-      ? { liveCanvasRun: null }
-      : {},
-  );
+  // Let recovery observers receive the original clean settlement transition
+  // before this display-only mutation creates another store notification.
+  queueMicrotask(() => {
+    const state = useLaserStore.getState();
+    const current = state.liveCanvasRun;
+    if (
+      current?.plan !== run.plan ||
+      state.streamerEpoch !== laser.streamerEpoch ||
+      current.startedAtMs !== run.startedAtMs ||
+      current.lifecycle !== 'finished' ||
+      isActiveJob(state.streamer)
+    )
+      return;
+    useLaserStore.setState({ liveCanvasRun: null });
+  });
 }
 
 /** Terminal output belongs to the job that produced it, independently of
@@ -71,6 +82,7 @@ export function ensureTerminalCanvasRunInvalidationSubscriptions(): void {
     if (
       previousRun !== null &&
       run.plan === previousRun.plan &&
+      state.streamerEpoch === previous.streamerEpoch &&
       run.startedAtMs === previousRun.startedAtMs &&
       run.lifecycle === previousRun.lifecycle &&
       (isActiveRun(run) || isActiveJob(state.streamer) === isActiveJob(previous.streamer))

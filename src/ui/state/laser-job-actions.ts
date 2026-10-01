@@ -11,6 +11,7 @@ import {
 } from '../../core/controllers/grbl';
 import { isToolChangeLine } from '../../core/controllers/grbl/streamer';
 import type { ControllerDriver } from '../../core/controllers';
+import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
 import { extractToolChangeLabels } from '../../core/output';
 import { cncControllerEpochOf, type CncControllerEpoch } from './cnc-setup-attestation';
 import {
@@ -54,10 +55,13 @@ import {
 } from './laser-stream-heartbeat-containment';
 import { consumeClaimedFramedRun } from './framed-run-start-consumption';
 import { refreshLaserLiveStartState } from './laser-live-start-readiness';
-import { laserStartOverrideReset } from './laser-start-override-reset';
+import {
+  flushPendingOverrideCommands,
+  laserStartOverrideReset,
+} from './laser-start-override-reset';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
-import { JobStartTransmissionError } from './laser-start-transmission-error';
+import { createJobStartWriteAttempt } from './laser-start-transmission-error';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -115,7 +119,7 @@ async function runStartJob(
   gcode: string,
   options: StartJobOptions,
 ): Promise<void> {
-  const { set, get, safeWrite } = context;
+  const { set, get } = context;
   assertProgramHasSendableLine(gcode);
   assertStartAllowed(set, get);
   const setupEpoch: StartSetupEpoch = cncControllerEpochOf(get());
@@ -126,15 +130,17 @@ async function runStartJob(
   });
   try {
     const effectiveOptions = await prepareStartBoundary(context, gcode, options, setupEpoch);
-    // prepareStartBoundary intentionally awaits queue/controller evidence. App
-    // and camera state are outside the controller reservation and can change
-    // during those awaits, so the owner gets one last synchronous refusal
-    // point before streamer/activeRun state or the first program write exists.
-    options.assertFinalStartAuthorized?.();
-    completion.assertCurrent();
-    consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const overrideReset = laserStartOverrideReset(options.machineKind ?? 'laser', get()); // ADR-355
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
+    await prepareStartHandoff(
+      context,
+      options,
+      stepped.toSend,
+      overrideReset.bytes,
+      completion.assertCurrent,
+    );
+    assertStartHandoff(context, options, setupEpoch, completion.assertCurrent);
+    consumeClaimedFramedRun(set, get, options.framedRunPermit);
     const entersHoldNow = stepped.state.status === 'tool-change';
     const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
     // Seed this run's tool queue first: a short first section can reach its M0
@@ -150,6 +156,14 @@ async function runStartJob(
       ...steppedStreamerPatch({ ...state, ...toolQueue }, null, stepped.state),
       streamerEpoch: writeOwner.streamerEpoch,
       activeRunId: options.runId ?? null,
+      completedFrameRunOwner:
+        options.framedRunPermit !== undefined && state.completedFrame === options.framedRunPermit
+          ? {
+              frame: options.framedRunPermit,
+              streamerEpoch: writeOwner.streamerEpoch,
+              runId: options.runId ?? null,
+            }
+          : null,
       ...liveCanvasStartPatch(
         options.canvasPlan,
         Date.now(),
@@ -163,27 +177,87 @@ async function runStartJob(
     }));
     completion.streamStarted(writeOwner, options.runId ?? null);
     if (stepped.toSend.length === 0) return;
-    try {
-      await overrideReset.send(stepped.toSend, safeWrite, completion.ownsCurrent);
-      if (!completion.ownsCurrent()) return;
-      set((state) => overrideReset.accepted(state, liveCanvasExecutionAcceptedPatch(state)));
-      // The first window is on the wire and accounted for, so the transport
-      // may take the refill from here (ADR-334). A transport that cannot host
-      // it, or a stream that is no longer simply streaming, is a no-op.
-      await armHostedRefill(context.refs, () => (completion.ownsCurrent() ? get().streamer : null));
-      completion.accept();
-    } catch (error) {
-      const state = get();
-      const ackedLines =
-        state.streamerEpoch === writeOwner.streamerEpoch ? (state.streamer?.completed ?? 0) : 0;
-      containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start', writeOwner);
-      // A rejected write can already have delivered a prefix. Preserve the
-      // attempt independently of live state, which teardown may already clear.
-      throw new JobStartTransmissionError(error, options.runId ?? null, ackedLines);
-    }
+    await transmitInitialWindow(
+      context,
+      overrideReset,
+      stepped.toSend,
+      completion,
+      writeOwner,
+      options.runId ?? null,
+    );
   } finally {
     completion.finish();
   }
+}
+
+async function transmitInitialWindow(
+  context: JobActionContext,
+  overrideReset: ReturnType<typeof laserStartOverrideReset>,
+  firstWindow: string,
+  completion: ReturnType<typeof createStartArmingCompletion>,
+  writeOwner: ReturnType<typeof streamWriteOwner>,
+  runId: string | null,
+): Promise<void> {
+  const { set, get, safeWrite } = context;
+  const attempt = createJobStartWriteAttempt(runId);
+  try {
+    await overrideReset.send(
+      firstWindow,
+      safeWrite,
+      completion.ownsCurrent,
+      attempt.markProgramAttempted,
+    );
+    attempt.assertProgramAttempted();
+    if (!completion.ownsCurrent()) return;
+    set((state) => overrideReset.accepted(state, liveCanvasExecutionAcceptedPatch(state)));
+    // The first window is accounted for. A capable transport may now own
+    // refill; an unsupported transport or superseded stream is a no-op.
+    await armHostedRefill(context.refs, () => (completion.ownsCurrent() ? get().streamer : null));
+    completion.accept();
+  } catch (error) {
+    const state = get();
+    const ackedLines =
+      state.streamerEpoch === writeOwner.streamerEpoch ? (state.streamer?.completed ?? 0) : 0;
+    containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start', writeOwner);
+    // Keep actual program-prefix uncertainty independently of live state.
+    // A rejected reset or cancelled reset continuation attempted no program.
+    throw attempt.failure(error, ackedLines);
+  }
+}
+
+async function prepareStartHandoff(
+  context: JobActionContext,
+  options: StartJobOptions,
+  firstWindow: string,
+  resetBytes: string,
+  assertCurrent: () => void,
+): Promise<void> {
+  const { safeWrite } = context;
+  const wireRefusal = wireEncodingError(firstWindow);
+  if (wireRefusal !== null) throw wireRefusal;
+  if (resetBytes !== '' && firstWindow.length !== 0) {
+    await flushPendingOverrideCommands(context.refs, safeWrite, context.driver(), 'start');
+    assertCurrent();
+  }
+  await refreshLaserLiveStartState({
+    ...context,
+    machineKind: options.machineKind ?? 'laser',
+    permit: options.framedRunPermit,
+  });
+}
+
+function assertStartHandoff(
+  { set, get }: JobActionContext,
+  options: StartJobOptions,
+  setupEpoch: StartSetupEpoch,
+  assertCurrent: () => void,
+): void {
+  assertStartAllowed(set, get, true);
+  assertStartReservation(get, setupEpoch);
+  // App and camera state can change while controller evidence is awaited.
+  // Give the owner a final synchronous refusal before stream state or bytes.
+  options.assertFinalStartAuthorized?.();
+  assertCurrent();
 }
 
 async function prepareStartBoundary(
@@ -212,15 +286,6 @@ async function prepareStartBoundary(
   }
   assertStartReservation(get, setupEpoch);
   await refreshCncLiveStartState(set, get, safeWrite, driver, machineKind);
-  await refreshLaserLiveStartState({
-    set,
-    get,
-    refs,
-    safeWrite,
-    driver,
-    machineKind,
-    permit: options.framedRunPermit,
-  });
   assertStartAllowed(set, get, true);
   assertCncLiveStartReady(set, get, machineKind);
   assertStartReservation(get, setupEpoch);

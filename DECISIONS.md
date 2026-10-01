@@ -9,8 +9,8 @@
 > same day. Numbering stays global across both: run `node scripts/check-adr-numbers.mjs`,
 > which reads both and prints the next free number.
 >
-> **Current Start policy — frame-first (ADR-228, ADR-230, ADR-232).** A completed Frame for the exact
-> current job is the sole Start guard on laser and CNC; the Job Review dialog is the single
+> **Current Start policy — frame-first (ADR-565, amending ADR-228, ADR-230, ADR-232 and ADR-237).** A completed Frame for the unchanged
+> footprint and placement is the sole Start guard on laser and CNC. Power/speed edits preserve it; each Start reviews the current exact program. The Job Review dialog is the single
 > warning surface. Older gate ADRs below that mandated Start blocks are stamped
 > "Superseded by ADR-228" in their Status lines — their evidence models often remain in use,
 > but their *refusals* do not. Per-gate disposition:

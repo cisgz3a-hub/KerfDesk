@@ -129,7 +129,7 @@ afterEach(() => {
 });
 
 describe('reviewFramedRunForStart', () => {
-  it('hands the exact framed artifact and Frame WCS disclosure to the Start review', async () => {
+  it('prepares the current exact artifact and retains the Frame WCS disclosure for Start review', async () => {
     const installed = await installReviewPendingFramedRunPermitForCurrentState();
     const disclosure = 'Controller was using G55. KerfDesk selected G54.';
     const permit = {
@@ -148,7 +148,9 @@ describe('reviewFramedRunForStart', () => {
     expect(reviewHarness.runJobReviewGate).toHaveBeenCalledTimes(1);
     const args = gateCalls[0];
     if (args === undefined) throw new Error('Expected the Start review gate to receive arguments.');
-    expect(args.initial.prepared).toBe(permit.candidate.preparedStart);
+    expect(args.initial.prepared).not.toBe(permit.candidate.preparedStart);
+    expect(args.initial.prepared.gcode).toBe(permit.candidate.preparedStart.gcode);
+    expect(args.initial.prepared.canvasPlan.retentionKey).toBe(permit.candidate.executionSignature);
     expect(args.initial.project).toBe(permit.candidate.project);
     expect(args.initial.frameWcsNormalizationWarning).toBe(disclosure);
     expect(args.completedReceipt).toBeNull();
@@ -158,7 +160,7 @@ describe('reviewFramedRunForStart', () => {
     expect(useLaserStore.getState().framedRun).toBe(permit);
   });
 
-  it('voids the permit when the confirmed review no longer matches the framed artifact', async () => {
+  it('refuses a stale exact review while retaining its unchanged spatial Frame', async () => {
     const permit = await installReviewPendingFramedRunPermitForCurrentState();
     reviewHarness.runJobReviewGate.mockImplementation(
       async (args: ReviewGateArgs): Promise<ConfirmedJobReview> => ({
@@ -187,7 +189,8 @@ describe('reviewFramedRunForStart', () => {
     await runStartJobFlow();
 
     expect(vi.mocked(useLaserStore.getState().startJob)).not.toHaveBeenCalled();
-    expect(useLaserStore.getState().framedRun).toBeNull();
+    expect(useLaserStore.getState().framedRun).toBe(permit);
+    expect(useLaserStore.getState().completedFrame).toBe(permit);
     expect(useToastStore.getState().toasts.at(-1)?.message).toBe(REVIEW_CHANGED_FRAMED_JOB_MESSAGE);
   });
 });

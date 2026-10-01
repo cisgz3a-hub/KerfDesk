@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sinceSourceSha": "d02cfb112a2628396bfddb605f0729851484d596",
   "highlights": [
-    "Improved framing between a finished job and the next job.",
-    "Corrected Smoothieware framing positions after inch-mode commands.",
-    "Improved CNC Frame completion for safe-height moves and inch position reports.",
-    "Completed-job previews and timers clear when the artwork changes.",
-    "More accurate completion and framing status messages.",
-    "Fixed entering 100% power scale for artwork with mixed previous values."
+    "Keep a completed Frame for unchanged placement while adjusting power and speed or repeating the job.",
+    "Corrected next-job framing and CNC safe-height completion, including inch-mode position reports.",
+    "Completed previews and timers follow current artwork without losing the second-pass offer.",
+    "Improved completion and recovery handling after cancellation, errors and controller restarts.",
+    "Fixed entering 100% power scale when selected artwork has mixed values.",
+    "Prevented stale power overrides from weakening new burns or increasing momentary Fire power."
   ]
 }

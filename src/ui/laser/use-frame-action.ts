@@ -1,5 +1,6 @@
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { frameBoundsSignature } from '../../core/job';
+import { currentFrameSpatialSignature } from './frame-spatial-identity';
 import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import {
@@ -368,11 +369,11 @@ async function dispatchPreparedFrame(
 function reviewedFrameCandidateOptions(
   bundle: ReviewedStartBundle,
   options: PreparedFrameDispatchOptions,
-): Pick<FramedRunCandidate, 'outputScope' | 'authorizationContext'> {
+): Pick<FramedRunCandidate, 'outputScope' | 'authorizationContext' | 'spatialSignature'> {
   const outputScope =
     options.outputScope === undefined ? currentOutputScope(bundle.app) : options.outputScope;
   return options.authorizationContext === undefined
-    ? { outputScope }
+    ? { outputScope, spatialSignature: currentFrameSpatialSignature(bundle.app) }
     : { outputScope, authorizationContext: options.authorizationContext };
 }
 

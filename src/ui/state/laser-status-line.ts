@@ -11,7 +11,7 @@ import {
 } from '../../core/controllers/grbl';
 import {
   cancelControllerLifecycleRefs,
-  controllerCommandOwnsCncStartSettleDwell,
+  controllerCommandOwnsStartSettleDwell,
   observeControllerIdleWait,
 } from './laser-interactive-command';
 import { dispatchQueuedMotionLine } from './laser-frame-dispatch';
@@ -103,7 +103,7 @@ export function handleStatusLine(
   const permitInterruptionPatch = framedRunInterruptionPatch(
     state,
     report,
-    controllerCommandOwnsCncStartSettleDwell(refs),
+    controllerCommandOwnsStartSettleDwell(refs),
   );
   const jogMpgInterruption = jogMpgInterruptionPatch(state, report.mpgActive === true);
   set({

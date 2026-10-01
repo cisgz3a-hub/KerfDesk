@@ -52,6 +52,10 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
   );
   await abort.click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('\u0018');
+  // Ctrl-X reboots this controller family. The fake port does not synthesize
+  // its banner; model that boundary before the new session's status. Idle
+  // alone cannot retire the abandoned job/settlement acknowledgement owners.
+  await kerfdesk.emitSerialLine("Grbl 1.1h ['$' for help]");
   // A controller whose reset keeps overrides ($676 bit 3 clear on grblHAL).
   await kerfdesk.emitSerialLine(
     '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>',
@@ -64,6 +68,7 @@ test('a new raster job after Abort resets leftover overrides and burns its own s
   await dismissNotifications(page);
   const home = page.getByRole('button', { name: 'Home', exact: true });
   if (await home.isVisible()) {
+    await expect(home).toBeEnabled({ timeout: 10_000 });
     await home.click();
     await kerfdesk.emitSerialLine(
       '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0|Ov:60,100,80>',

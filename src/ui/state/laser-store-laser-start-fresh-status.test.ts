@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { grblDriver } from '../../core/controllers';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import type { FramedRunCandidate, FramedRunPermit } from './framed-run';
 import { framedRunControllerSnapshot } from './framed-run';
@@ -36,6 +37,16 @@ function makeConnection(
       writes.push(data);
       await onWrite?.(data);
       respondToTestGrblHandshake(data, emitLine);
+      const operation = useLaserStore.getState().controllerOperation;
+      if (
+        data === `${grblDriver.commands.settleDwell}\n` &&
+        operation?.kind === 'start-arming' &&
+        operation.phase === 'queue-fence'
+      ) {
+        // This queued, app-owned line has reached the controller checkpoint.
+        // Its ACK is distinct from the later status and program replies.
+        emitLine('ok');
+      }
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -120,12 +131,15 @@ async function beginStart(writes: string[]): Promise<{
     laserModeStartEvidence: evidence,
   });
   await flush();
-  expect(writes).toEqual(['?']);
+  expect(writes).toEqual([`${grblDriver.commands.settleDwell}\n`, '?']);
   return { started, permit };
 }
 
 beforeEach(() => {
   connections = [];
+  // A close retains the terminal stream for recovery. Each scenario starts
+  // without that previous scenario's accepted program or disconnected record.
+  useLaserStore.setState({ streamer: null });
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
 });
 
@@ -136,6 +150,25 @@ afterEach(() => {
 });
 
 describe('ordinary laser Start fresh-status handoff', () => {
+  it('retains the permit for the owned non-motion fence Run while still requiring fresh Idle', async () => {
+    const writes: string[] = [];
+    const connection = makeConnection(writes, async (data) => {
+      if (data === `${grblDriver.commands.settleDwell}\n`) {
+        connection.emitLine('<Run|MPos:31.000,42.000,0.000|FS:0,0>');
+      }
+    });
+    await connectWith(connection);
+    const { started, permit } = await beginStart(writes);
+
+    expect(useLaserStore.getState().framedRun).toBe(permit);
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(hasJobBytes(writes)).toBe(false);
+    connection.emitLine(IDLE);
+    await started;
+
+    expect(hasJobBytes(writes)).toBe(true);
+  });
+
   it('does not create a streamer or send job bytes when the final query is silent', async () => {
     vi.useFakeTimers();
     const writes: string[] = [];

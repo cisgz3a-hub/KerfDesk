@@ -1,4 +1,5 @@
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
+import { currentFrameSpatialSignature } from './frame-spatial-identity';
 import { frameBoundsSignature, type JobOriginPlacement } from '../../core/job';
 import { currentOutputScope, type useStore } from '../state';
 import type { useCameraStore } from '../state/camera-store';
@@ -202,6 +203,7 @@ function traceCandidate(
     project: context.app.project,
     outputScope: currentOutputScope(context.app),
     executionSignature: preview.retentionKey,
+    spatialSignature: currentFrameSpatialSignature(context.app),
     controllerBeforeFrame: framedRunControllerSnapshot(currentLaser),
     frameVerification: {
       boundsSignature: frameBoundsSignature(verificationBounds),
@@ -273,6 +275,8 @@ function claimTraceAsPermit(trace: FrameTrace, permit: FramedRunPermit): boolean
     minted = true;
     return {
       framedRun: permit,
+      completedFrame: permit,
+      completedFrameRunOwner: null,
       frameTrace: null,
       frameVerification: permit.candidate.frameVerification,
     };

@@ -5,7 +5,8 @@ import { RESET_CLEANUP_BANNER_TIMEOUT_MS } from './laser-reset-cleanup';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck } from './laser-test-start-helpers';
+import { startTestLaserJobOnClock } from './laser-test-command-control';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -27,7 +28,11 @@ function makeConnection(
   let closes = 0;
   const connection: FakeConnection = {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, (line) =>
+        connection.emitLine(line),
+      );
       writes.push(data);
+      acknowledgeStartFence();
       const statusReply = data === '?' ? options.statusReply?.() : null;
       if (statusReply != null) {
         // Like the real reader, deliver the response after the poll callback.
@@ -127,7 +132,7 @@ describe('active stream transport heartbeat', () => {
     });
     liveConnection = connection;
     await connectReady(connection);
-    await startTestLaserJob(
+    await startTestLaserJobOnClock(
       ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
     );
     await vi.advanceTimersByTimeAsync(250);
@@ -152,7 +157,7 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes);
     liveConnection = connection;
     await connectReady(connection);
-    await startTestLaserJob(
+    await startTestLaserJobOnClock(
       ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
     );
     await vi.advanceTimersByTimeAsync(250);
@@ -176,7 +181,7 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes);
     liveConnection = connection;
     await connectReady(connection);
-    await startTestLaserJob(
+    await startTestLaserJobOnClock(
       ['G21', 'G90', 'M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join(
         '\n',
       ),
@@ -217,7 +222,7 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes, { autoResetBanner: false });
     liveConnection = connection;
     await connectReady(connection);
-    await startTestLaserJob(
+    await startTestLaserJobOnClock(
       ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
     );
     writes.length = 0;
@@ -245,7 +250,7 @@ describe('active stream transport heartbeat', () => {
     const oldConnection = makeConnection(oldWrites, { autoResetBanner: false });
     liveConnection = oldConnection;
     await connectReady(oldConnection);
-    await startTestLaserJob(
+    await startTestLaserJobOnClock(
       ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
     );
     oldWrites.length = 0;
@@ -271,7 +276,7 @@ describe('active stream transport heartbeat', () => {
     const connection = makeConnection(writes, { autoResetBanner: false });
     liveConnection = connection;
     await connectReady(connection);
-    await startTestLaserJob(
+    await startTestLaserJobOnClock(
       ['M4 S0', ...Array.from({ length: 30 }, (_, i) => `G1 X${i} S100`), 'M5'].join('\n'),
     );
     writes.length = 0;

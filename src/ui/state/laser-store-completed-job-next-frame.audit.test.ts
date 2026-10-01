@@ -22,7 +22,8 @@ import {
   framedRunCandidate,
   makeConnection,
 } from './laser-store-motion-operation.test-support';
-import { settleTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
+import { settleTestGrblHandshake } from './laser-test-start-helpers';
+import { startTestLaserJobOnClock } from './laser-test-command-control';
 import { useStore } from './store';
 
 const JOB = 'G21\nG90\nM3 S0\nG1 X10 F600 S100\nM5\n';
@@ -34,9 +35,13 @@ async function flush(): Promise<void> {
 }
 
 async function readyConnection(writes: string[]): Promise<FakeConnection> {
-  const connection = makeConnection(async (data) => {
-    writes.push(data);
-  });
+  const connection = makeConnection(
+    async (data) => {
+      writes.push(data);
+    },
+    undefined,
+    { autoAckStartFence: true },
+  );
   await connectWith(connection);
   await settleTestGrblHandshake();
   connection.emitLine(FINAL_IDLE);
@@ -46,7 +51,7 @@ async function readyConnection(writes: string[]): Promise<FakeConnection> {
 }
 
 async function acknowledgeJob(connection: FakeConnection): Promise<void> {
-  await startTestLaserJob(JOB, {
+  await startTestLaserJobOnClock(JOB, {
     ...laserCountdownTestHandoff({
       gcode: JOB,
       retentionKey: 'finished-job-next-frame-audit',

@@ -10,7 +10,11 @@ import {
   type Locator,
   type Page,
 } from './fixtures/kerfdesk-test';
-import { connectAndHome } from './fixtures/recovery-flow';
+import {
+  confirmJobReview as confirmRecoveryJobReview,
+  connectAndHome,
+} from './fixtures/recovery-flow';
+import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -630,6 +634,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   const writesBefore = serialWrites(await kerfdesk.events()).length;
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
@@ -640,7 +645,9 @@ test('shows controller-reported canvas progress without treating acknowledgement
   expect(firstMove).not.toBeNull();
   const acceptedThroughFirstMove =
     [...programWrites.slice(0, firstMove?.index ?? 0)].filter((character) => character === '\n')
-      .length + 1;
+      .length +
+    1 -
+    acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
   await kerfdesk.acknowledgeSerial(acceptedThroughFirstMove);
   await expect
     .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
@@ -832,16 +839,11 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
   await selectRecoveryMovement(review.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
   await kerfdesk.setAutoAcknowledge(false);
-  const queriesBeforeResume = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === 0x3f,
-  ).length;
-  await review.getByRole('button', { name: 'Start supervised recovery', exact: true }).click();
-  await expect
-    .poll(
-      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
-    )
-    .toBeGreaterThan(queriesBeforeResume);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await confirmRecoveryJobReview(
+    page,
+    kerfdesk,
+    review.getByRole('button', { name: 'Start supervised recovery', exact: true }),
+  );
   await expect(review).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await kerfdesk.acknowledgeSerial(1);
@@ -930,16 +932,11 @@ test('prepares a large image restart preview and starts only the selected remain
   await expect(preview).toBeVisible({ timeout: 30_000 });
   await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
   await kerfdesk.setAutoAcknowledge(false);
-  const queriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === 0x3f,
-  ).length;
-  await preview.getByRole('button', { name: 'Start selected remainder', exact: true }).click();
-  await expect
-    .poll(
-      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
-    )
-    .toBeGreaterThan(queriesBefore);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await confirmRecoveryJobReview(
+    page,
+    kerfdesk,
+    preview.getByRole('button', { name: 'Start selected remainder', exact: true }),
+  );
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await expect(preview).not.toBeVisible();
   expect(
@@ -1186,52 +1183,7 @@ async function confirmJobReview(
     .getByRole('dialog', { name: 'Review job before starting' })
     .getByRole('button', { name: 'Start job' }),
 ): Promise<void> {
-  const before = await reviewStartBoundary(page);
-  const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === 0x3f,
-  ).length;
-  await startButton.click();
-  await expect
-    .poll(
-      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
-    )
-    .toBeGreaterThan(statusQueriesBefore);
-  // The fixture replies synchronously inside the query write. Start requires
-  // a later report, after that write resolves. Ignore earlier periodic queries
-  // during handoff, and also allow a reply that already started this new stream.
-  await expect
-    .poll(async () => {
-      const current = await reviewStartBoundary(page);
-      return current.streamerEpoch !== before.streamerEpoch || current.awaitingFreshReport;
-    })
-    .toBe(true);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-}
-
-async function reviewStartBoundary(page: Page): Promise<{
-  streamerEpoch: number;
-  awaitingFreshReport: boolean;
-}> {
-  return page.evaluate(async () => {
-    const moduleUrl = '/src/ui/state/laser-store.ts';
-    const { useLaserStore } = (await import(moduleUrl)) as {
-      useLaserStore: {
-        getState: () => {
-          streamerEpoch: number;
-          controllerOperation: { kind: string; phase?: string } | null;
-          pendingTransportWrites?: number;
-        };
-      };
-    };
-    const state = useLaserStore.getState();
-    return {
-      streamerEpoch: state.streamerEpoch,
-      awaitingFreshReport:
-        state.controllerOperation?.kind === 'start-arming' &&
-        state.controllerOperation.phase === 'live-status' &&
-        (state.pendingTransportWrites ?? 0) === 0,
-    };
-  });
+  await confirmRecoveryJobReview(page, kerfdesk, startButton);
 }
 
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
@@ -1333,7 +1285,8 @@ async function drainHeldSerialWrites(
   let stablePasses = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
-    const pending = written - acknowledged;
+    const pending =
+      written - acknowledged - acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
     if (pending > 0) {
       await kerfdesk.acknowledgeSerial(pending);
       acknowledged += pending;

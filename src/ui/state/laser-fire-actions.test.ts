@@ -35,8 +35,8 @@ function readyState(): LaserState {
     autofocusBusy: false,
     probeBusy: false,
     pendingUntrackedAcks: 0,
-    // A controller known to be at 100% power override, so Fire needs no reset
-    // first; the reset cases below set their own override state.
+    // A reported baseline is advisory: queued override flags can still be
+    // pending, so Fire establishes its own power baseline before activation.
     ovCache: { feed: 100, rapid: 100, spindle: 100 },
     fireActive: false,
     accessoryCache: {
@@ -60,7 +60,16 @@ function harness(write = vi.fn<Parameters<typeof fireActions>[2]>(async () => un
     state = { ...state, ...(typeof partial === 'function' ? partial(state) : partial) };
   };
   const get = (): LaserState => state;
-  return { get, setFireActive: fireActions(set, get, write).setFireActive, write };
+  return {
+    get,
+    setFireActive: fireActions(set, get, write, async () => undefined).setFireActive,
+    write,
+  };
+}
+
+async function flushUntil(predicate: () => boolean): Promise<void> {
+  for (let index = 0; index < 128 && !predicate(); index += 1) await Promise.resolve();
+  expect(predicate()).toBe(true);
 }
 
 beforeEach(() => {
@@ -132,12 +141,18 @@ describe('momentary low-power Fire action', () => {
     const test = harness(write);
 
     const starting = test.setFireActive(true);
+    await flushUntil(() => resolveStart !== undefined);
     const stopping = test.setFireActive(false);
     await stopping;
     resolveStart?.();
     await starting;
 
-    expect(write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON, 'M5\n', 'M5\n']);
+    expect(write.mock.calls.map(([line]) => line)).toEqual([
+      SPINDLE_OV_RESET,
+      FIRE_ON,
+      'M5\n',
+      'M5\n',
+    ]);
     expect(test.get().fireActive).toBe(false);
   });
 
@@ -153,12 +168,13 @@ describe('momentary low-power Fire action', () => {
     const test = harness(write);
 
     const starting = test.setFireActive(true);
+    await flushUntil(() => resolveStart !== undefined);
     expect(test.get().fireActive).toBe(true);
     Object.assign(test.get(), { mpgActive: true });
     resolveStart?.();
     await starting;
 
-    expect(write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON, 'M5\n']);
+    expect(write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET, FIRE_ON, 'M5\n']);
     expect(test.get().fireActive).toBe(false);
   });
 
@@ -226,13 +242,13 @@ describe('momentary low-power Fire action', () => {
     expect(test.write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET, FIRE_ON]);
   });
 
-  it('leaves feed and rapid alone and sends nothing extra at 100% power', async () => {
+  it('leaves feed and rapid alone while establishing the power baseline', async () => {
     const test = harness();
     Object.assign(test.get(), { ovCache: { feed: 50, rapid: 25, spindle: 100 } });
 
     await test.setFireActive(true);
 
-    expect(test.write.mock.calls.map(([line]) => line)).toEqual([FIRE_ON]);
+    expect(test.write.mock.calls.map(([line]) => line)).toEqual([SPINDLE_OV_RESET, FIRE_ON]);
   });
 
   it('sends no override byte to a controller without realtime overrides', async () => {
@@ -261,6 +277,7 @@ describe('momentary low-power Fire action', () => {
     Object.assign(test.get(), { ovCache: null });
 
     const starting = test.setFireActive(true);
+    await flushUntil(() => resolveReset !== undefined);
     await test.setFireActive(false);
     resolveReset?.();
     await starting;
@@ -283,6 +300,7 @@ describe('momentary low-power Fire action', () => {
     Object.assign(current, { ovCache: null });
 
     const starting = test.setFireActive(true);
+    await flushUntil(() => resolveReset !== undefined);
     Object.assign(test.get(), { statusReport: { ...current.statusReport, state: 'Alarm' } });
     resolveReset?.();
     await starting;

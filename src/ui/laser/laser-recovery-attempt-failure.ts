@@ -1,10 +1,13 @@
-// A laser recovery attempt whose Start failed (ADR-341). Nothing accepted:
-// release the claim so the saved job can be retried. Some lines accepted: the
-// attempt is a real run now, so record it as interrupted, with or without an
-// archive (Amendment 8).
+// A laser recovery attempt whose Start failed (ADR-341). No program attempted:
+// release the claim so the saved job can be retried. A program prefix may have
+// reached the controller: retain that attempt as interrupted, with or without
+// an archive (Amendment 8).
 
 import { jobAwareAlert } from '../state/job-aware-dialogs';
-import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
+import {
+  isJobStartBeforeProgramError,
+  isJobStartTransmissionError,
+} from '../state/laser-start-transmission-error';
 import { useLaserStore } from '../state/laser-store';
 import type { RecoveryCapsule, RecoveryRepository } from '../state/recovery';
 import { acceptLaserRecoveryRun, type UntrackedLaserRecovery } from './laser-recovery-untracked';
@@ -22,8 +25,9 @@ export async function resolveFailedAttempt(args: {
   const message = args.error instanceof Error ? args.error.message : String(args.error);
   const attemptedAckedLines = attemptedRunAcknowledgements(args.error, args.recoveryRunId);
   if (
-    attemptedAckedLines === null &&
-    (state.streamer === null || state.activeRunId !== args.recoveryRunId)
+    (isJobStartBeforeProgramError(args.error) && args.error.runId === args.recoveryRunId) ||
+    (attemptedAckedLines === null &&
+      (state.streamer === null || state.activeRunId !== args.recoveryRunId))
   ) {
     const cleanup = await cleanupRejectedRecoveryAttempt({
       repository: args.repository,
@@ -33,7 +37,7 @@ export async function resolveFailedAttempt(args: {
     });
     const cleanupMessage = cleanup.retryable
       ? message
-      : `${message}\n\nNo controller command was accepted, but the durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available.`;
+      : `${message}\n\nThe durable Start handoff or recovery claim could not be cleared. Reload after recovery storage is available.`;
     jobAwareAlert(`Could not start laser recovery:\n\n${cleanupMessage}`);
     return;
   }

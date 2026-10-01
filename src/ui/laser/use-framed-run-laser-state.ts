@@ -18,6 +18,7 @@ type LaserState = ReturnType<typeof useLaserStore.getState>;
 
 const FRAMED_RUN_FIELDS = [
   'framedRun',
+  'completedFrame',
   'motionOperation',
   'statusReport',
   'wcoCache',
@@ -41,7 +42,13 @@ const fieldsBesideReportEqual = watchedFieldsEqual<LaserState, (typeof FRAMED_RU
 // the head, four a second for a whole job, need not re-render it (ADR-352).
 export function framedRunFieldsEqual(a: LaserState, b: LaserState): boolean {
   if (a === b) return true;
-  if (a.framedRun !== null || b.framedRun !== null) return allFieldsEqual(a, b);
+  if (
+    a.framedRun !== null ||
+    b.framedRun !== null ||
+    a.completedFrame != null ||
+    b.completedFrame != null
+  )
+    return allFieldsEqual(a, b);
   return (
     (a.statusReport?.state ?? null) === (b.statusReport?.state ?? null) &&
     fieldsBesideReportEqual(a, b)

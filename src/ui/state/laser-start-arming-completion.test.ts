@@ -5,7 +5,12 @@ import type { HostedStreamRefill, PlatformAdapter, SerialConnection } from '../.
 import { installJobCheckpointTracking } from '../app/use-job-checkpoint';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
-import { respondToTestGrblHandshake, startTestLaserJob } from './laser-test-start-helpers';
+import {
+  captureTestLaserStartFenceAck,
+  respondToTestGrblHandshake,
+  startTestLaserJob,
+} from './laser-test-start-helpers';
+import { LASER_START_OVERRIDE_RESET } from './laser-start-override-reset';
 import { RecoveryRepository } from './recovery';
 import { MemoryRecoveryStorageBackend } from './recovery/recovery-backend';
 import { MemoryRecoveryGenerationStore } from './recovery/recovery-generation';
@@ -43,9 +48,11 @@ function makeConnection(
   return {
     write: async (data) => {
       writes.push(data);
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emitLine);
       await behavior.beforeWrite?.(data);
       if (data === '\x18') emitLine('Grbl 1.1f');
       respondToTestGrblHandshake(data, emitLine);
+      acknowledgeStartFence();
     },
     onLine: (handler) => {
       lineHandlers.add(handler);
@@ -165,7 +172,10 @@ describe('completion during the Start reservation', () => {
       const starting = startTestLaserJob(GCODE, { runId });
       await vi.waitFor(() => expect(useLaserStore.getState().streamer?.status).toBe('done'));
       expect(useLaserStore.getState().controllerOperation?.kind).toBe('start-arming');
-      expect(writes).not.toContain(MARKER);
+      // Start's acknowledged override fence precedes the program. The
+      // separate completion marker must still wait for accepted transmission.
+      expect(writes[0]).toBe(MARKER);
+      expect(writes.filter((data) => data === MARKER)).toHaveLength(1);
       expect(onCompleted).not.toHaveBeenCalled();
 
       pending.resolve();
@@ -174,7 +184,7 @@ describe('completion during the Start reservation', () => {
         kind: 'post-job-settle',
         phase: 'dwell',
       });
-      expect(writes.filter((data) => data === MARKER)).toHaveLength(1);
+      expect(writes.filter((data) => data === MARKER)).toHaveLength(2);
       connection.emitLine(IDLE);
       connection.emitLine(IDLE);
       await flush();
@@ -230,7 +240,8 @@ describe('completion during the Start reservation', () => {
       connection.emitLine(IDLE);
       connection.emitLine(IDLE);
       await flush();
-      expect(writes).not.toContain(MARKER);
+      expect(writes[0]).toBe(MARKER);
+      expect(writes.filter((data) => data === MARKER)).toHaveLength(1);
       expect(onCompleted).not.toHaveBeenCalled();
       expect(repository.getSnapshot().lastCompletedReceipt).toBeNull();
     },
@@ -270,7 +281,8 @@ describe('completion during the Start reservation', () => {
       await starting;
       expect(useLaserStore.getState().controllerOperation).toBe(operation);
       expect(useLaserStore.getState().streamer).toBe(streamer);
-      expect(writes).not.toContain(MARKER);
+      expect(writes[0]).toBe(MARKER);
+      expect(writes.filter((data) => data === MARKER)).toHaveLength(1);
       expect(onCompleted).not.toHaveBeenCalled();
     },
   );
@@ -311,7 +323,8 @@ describe('completion during the Start reservation', () => {
       expect(useLaserStore.getState().controllerOperation).toBe(operation);
       expect(useLaserStore.getState().streamer).toBe(streamer);
       expect(arm).not.toHaveBeenCalled();
-      expect(writes).not.toContain(MARKER);
+      expect(writes[0]).toBe(MARKER);
+      expect(writes.filter((data) => data === MARKER)).toHaveLength(1);
       expect(onCompleted).not.toHaveBeenCalled();
     },
   );
@@ -337,7 +350,8 @@ describe('completion during the Start reservation', () => {
     expect(useLaserStore.getState().controllerOperation).toBeNull();
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(writes).not.toContain(GCODE);
-    expect(writes).not.toContain(MARKER);
+    expect(writes).not.toContain(LASER_START_OVERRIDE_RESET);
+    expect(writes).toEqual([MARKER]);
     expect(onCompleted).not.toHaveBeenCalled();
   });
 });

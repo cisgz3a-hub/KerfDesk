@@ -3,7 +3,8 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { laserCountdownTestHandoff } from './laser-countdown-test-handoff';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { type LaserState, useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck } from './laser-test-start-helpers';
+import { startTestLaserJobOnClock } from './laser-test-command-control';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -21,7 +22,9 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeStartFence();
       if (
         data === '$I\n' &&
         useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
@@ -93,7 +96,7 @@ const IDLE_WAIT_TIMEOUT_MS = 8_000;
 const FRESH_STATUS_INTERVAL_MS = ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS / 2;
 
 async function runJobUntilSettleAwaitsIdle(connection: FakeConnection): Promise<void> {
-  await startTestLaserJob(JOB_GCODE, {
+  await startTestLaserJobOnClock(JOB_GCODE, {
     ...laserCountdownTestHandoff({
       gcode: JOB_GCODE,
       retentionKey: POST_JOB_COUNTDOWN_RETENTION_KEY,
@@ -308,7 +311,7 @@ describe('post-job settle in a throttled hidden tab', () => {
     const connection = makeConnection(async () => undefined);
     await connectWith(connection);
     tickPoll();
-    await startTestLaserJob(JOB_GCODE, {
+    await startTestLaserJobOnClock(JOB_GCODE, {
       ...laserCountdownTestHandoff({
         gcode: JOB_GCODE,
         retentionKey: POST_JOB_COUNTDOWN_RETENTION_KEY,

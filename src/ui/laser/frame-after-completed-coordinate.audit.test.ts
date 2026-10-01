@@ -16,7 +16,7 @@ import {
 import { connectOptionsForDevice } from '../commands/connect-options';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { startTestLaserJob } from '../state/laser-test-start-helpers';
+import { startTestLaserJobOnClock as startThroughSimulator } from '../state/laser-test-command-control';
 import { useStore } from '../state/store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -131,7 +131,9 @@ describe('new Frame after prior completed output: coordinate/protocol audit', ()
               });
       await useLaserStore.getState().connect(sim.adapter, connectOptionsForDevice(project.device));
       await vi.advanceTimersByTimeAsync(2_000);
-      await startTestLaserJob('G21\nG90\nG0 X75 Y45\nM5\nG91\n', { streamingMode: 'ping-pong' });
+      await startThroughSimulator('G21\nG90\nG0 X75 Y45\nM5\nG91\n', {
+        streamingMode: 'ping-pong',
+      });
       await vi.advanceTimersByTimeAsync(5_000);
       expect(useLaserStore.getState().streamer).toBeNull();
       const position = () => {
@@ -190,7 +192,9 @@ describe('new Frame after prior completed output: coordinate/protocol audit', ()
       const settingOrigin = useLaserStore.getState().setOriginHere();
       await vi.advanceTimersByTimeAsync(2_000);
       await settingOrigin;
-      await startTestLaserJob('G21\nG90\nG0 X75 Y45\nM5\nG91\n', { streamingMode: 'ping-pong' });
+      await startThroughSimulator('G21\nG90\nG0 X75 Y45\nM5\nG91\n', {
+        streamingMode: 'ping-pong',
+      });
       await vi.advanceTimersByTimeAsync(5_000);
       expect(useLaserStore.getState().streamer).toBeNull();
       expect(useLaserStore.getState().wcoCache).toEqual({ x: 100, y: 50, z: 0 });
@@ -243,7 +247,9 @@ describe('new Frame after prior completed output: coordinate/protocol audit', ()
       .getState()
       .connect(withSmoothieInchReports(sim), connectOptionsForDevice(project.device));
     await vi.advanceTimersByTimeAsync(2_000);
-    await startTestLaserJob('G21\nG90\nG0 X254 Y127\nM5\nG20\n', { streamingMode: 'ping-pong' });
+    await startThroughSimulator('G21\nG90\nG0 X254 Y127\nM5\nG20\n', {
+      streamingMode: 'ping-pong',
+    });
     await vi.advanceTimersByTimeAsync(5_000);
     expect(useLaserStore.getState().streamer).toBeNull();
     expect(sim.state()).toMatchObject({ pos: { x: 254, y: 127 } });
@@ -284,7 +290,9 @@ describe('new Frame after prior completed output: coordinate/protocol audit', ()
       const origin = useLaserStore.getState().setOriginHere();
       await vi.advanceTimersByTimeAsync(2_000);
       await origin;
-      await startTestLaserJob('G21\nG90\nG0 X127 Y76.2\nM5\nG20\n', { streamingMode: 'ping-pong' });
+      await startThroughSimulator('G21\nG90\nG0 X127 Y76.2\nM5\nG20\n', {
+        streamingMode: 'ping-pong',
+      });
       await vi.advanceTimersByTimeAsync(5_000);
       const before = useLaserStore.getState();
       expect(before.wcoCache).toEqual({ x: 5, y: 2, z: 0 });

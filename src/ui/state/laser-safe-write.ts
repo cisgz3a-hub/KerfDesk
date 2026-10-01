@@ -107,6 +107,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       pendingTransportWrites: (state.pendingTransportWrites ?? 0) + 1,
       ...(owedAcks > 0 ? { pendingUntrackedAcks: state.pendingUntrackedAcks + owedAcks } : {}),
       ...motionTransportWritePatch(state, action, 1, ownedMotionOperationId),
+      ...(state.capabilities.overrides && containsRealtimeOverride(line) ? { ovCache: null } : {}),
     }));
     try {
       await conn.write(line);
@@ -117,6 +118,21 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+// Ov is intermittent. An admitted override makes its previous observation
+// stale before the adapter can deliver the command: keeping a cached 100%
+// would let the next laser Start (or Fire) omit its reset. Do not predict the
+// firmware's clamp or reset result. A fresh same-session Ov restores the
+// observation, including a reply delivered before the write promise settles.
+// No completion-side cache mutation can then erase that reply or a new session.
+function containsRealtimeOverride(payload: string): boolean {
+  for (let index = 0; index < payload.length; index += 1) {
+    const byte = payload.charCodeAt(index);
+    // GRBL feed/rapid 0x90–0x97 and spindle 0x99–0x9D; 0x98 is reserved.
+    if ((byte >= 0x90 && byte <= 0x97) || (byte >= 0x99 && byte <= 0x9d)) return true;
+  }
+  return false;
 }
 
 // A job makes `$` lines off limits, with two exceptions inside a tool-change

@@ -30,7 +30,7 @@ Keep this file small. It defines durable repository rules; task-specific details
 
 ## Machine and output policy
 
-- Preserve the current frame-first contract in `PROJECT.md` non-negotiable 21 and ADRs 228, 230, 232, and 237: a completed Frame for the exact reviewed job is the sole ordinary Start policy gate.
+- Preserve the current frame-first contract in `PROJECT.md` non-negotiable 21 and ADR-565 (amending ADRs 228, 230, 232 and 237): a completed Frame for the unchanged footprint and placement is the sole ordinary Start policy gate. Power/speed edits retain spatial evidence; each Start reviews and claims the current exact executable program.
 - The Pro licence check, which the maintainer approved (ADR-540 under ADR-523, recorded by ADR-247 Amendment 1), is the only licence gate: opening a Pro tool asks for a trial or licence. It never gates Frame, Start, output, Save G-code or a running job, so it is not a Start guard. Add no other account, trial, activation or entitlement check without the maintainer's explicit permission and an ADR.
 - Keep policy findings in Job Review as warnings. Refuse only when transport factually cannot accept work, executable output cannot be produced or streamed, or the reviewed artifact cannot be handed off consistently.
 - Do not relabel a policy judgment as one of those factual failures.

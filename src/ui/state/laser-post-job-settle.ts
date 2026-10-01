@@ -3,7 +3,8 @@ import type { SerialConnection } from '../../platform/types';
 import { startControllerCommand, waitForFreshIdle } from './laser-interactive-command';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import { controllerErrorNotice, type LaserSafetyAction } from './laser-safety-notice';
-import { finishedJobStateReset } from './laser-session-reset';
+import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
+import { settledCompletedFramePatch } from './completed-frame-run';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
 import type { TranscriptSource } from './laser-transcript';
@@ -132,6 +133,7 @@ async function runPostJobSettle(
             streamer: null,
             ...finishedJobStateReset(),
             liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
+            ...settledCompletedFramePatch(state),
             log: pushLog(state, '[lf2] Controller settled after job.'),
           }
         : {},
@@ -147,6 +149,7 @@ async function runPostJobSettle(
       ownsCurrent(state)
         ? {
             controllerOperation: null,
+            ...frameProofReset(),
             lastWriteError: message,
             safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),

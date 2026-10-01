@@ -57,12 +57,13 @@ import type { CncPauseLiftStoreState } from './cnc-pause-lift-state';
 import type { JobStopRequest, StreamReset } from './job-stop-request';
 import type { TranscriptBufferRefs } from './laser-transcript-buffer';
 import type { PauseResumeTransitionState } from './laser-pause-resume-transition';
-import { overrideActions } from './override-actions';
+import { controllerOverrideActions } from './laser-override-admission';
 import { probeActions } from './laser-probe-actions';
 import type { OverrideValues } from '../../core/controllers/grbl';
 import { useStore } from './store';
 import type { FrameVerification } from './frame-verification';
 import type { FramedRunPermit, FramedRunStartClaim, FrameTrace } from './framed-run';
+import type { CompletedFrameRunOwner } from './completed-frame-run';
 import type { WorkZZeroEvidence } from './work-z-zero-evidence';
 import type { WorkOriginState } from './work-origin-state';
 import type { LiveCanvasRun } from './canvas-motion-plan';
@@ -75,7 +76,7 @@ import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice
 import { createSafeWrite } from './laser-safe-write';
 import { bindLiveJobTransportLedger } from './laser-job-transport-ledger';
 import { setupActions } from './laser-setup-actions';
-import { fireActions } from './laser-fire-actions';
+import { controllerFireActions } from './laser-fire-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import { workZRecoveryActions } from './work-z-recovery-actions';
 import type { LaserStoreActions } from './laser-store-action-types';
@@ -297,6 +298,10 @@ export type LaserState = LaserStoreActions &
      * Ordinary permits await Start-time review; transient candidates may carry
      * review evidence from birth. A pending candidate lives on motionOperation. */
     readonly framedRun: FramedRunPermit | null;
+    /** Ordinary, session-local footprint proof retained across owned runs.
+     * An exact one-use execution permit is separately prepared for each Start. */
+    readonly completedFrame?: FramedRunPermit | null;
+    readonly completedFrameRunOwner?: CompletedFrameRunOwner | null;
     /** A clean Frame that traced the job's bounds before its exact program
      * existed (ADR-353). Not a Start authorization: the Frame flow binds the
      * exact program to it and mints `framedRun`, or it expires under the same
@@ -529,19 +534,13 @@ export const useLaserStore = create<LaserState>((set, get) => {
       safeWrite(set, get, line, action, source),
     ),
     ...airAssistActions(set, get),
-    ...fireActions(set, get, (line, action, source) => safeWrite(set, get, line, action, source)),
+    ...controllerFireActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
     ...probeActions(set, get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
     ),
-    ...overrideActions(
-      (line) => safeWrite(set, get, line),
-      () => get().capabilities.overrides,
-      () =>
-        mpgCommandBlockMessage(get()) ??
-        (get().controllerOperation?.kind === 'probe'
-          ? 'Realtime overrides are locked during a probe transaction.'
-          : null),
-    ),
+    ...controllerOverrideActions((line) => safeWrite(set, get, line), get),
     ...jobActions(
       set,
       get,
