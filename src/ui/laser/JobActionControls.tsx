@@ -3,6 +3,7 @@ import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-as
 import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
+import { isFramedRunCandidate } from '../state/framed-run';
 import {
   cancelOwnedFramePreparation,
   useFramePreparationStore,
@@ -95,6 +96,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const cancellable = useFramePreparationStore((state) => state.cancellable);
   const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
+  const frameDeferred = frameIsDeferred(laser.motionOperation);
   const preparingFrame = framePending && !frameActive;
   const busy = props.disabled || props.streaming || framePending;
   const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
@@ -120,6 +122,7 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     },
     statusText: framedRunStatusText({
       frameActive,
+      frameDeferred,
       stage,
       framedReady,
       hasFramedRun: laser.framedRun !== null,
@@ -130,6 +133,16 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     }),
     estimate,
   };
+}
+
+function frameIsDeferred(
+  operation: ReturnType<typeof useFramedRunLaserState>['motionOperation'],
+): boolean {
+  return (
+    operation?.kind === 'frame' &&
+    operation.candidate !== undefined &&
+    !isFramedRunCandidate(operation.candidate)
+  );
 }
 
 function JobActionButtons(props: {
@@ -180,6 +193,7 @@ function JobActionButtons(props: {
 
 function framedRunStatusText(args: {
   readonly frameActive: boolean;
+  readonly frameDeferred: boolean;
   readonly stage: FramePreparationStage;
   readonly framedReady: boolean;
   readonly hasFramedRun: boolean;
@@ -191,7 +205,7 @@ function framedRunStatusText(args: {
   if (args.frameActive) {
     // A split Frame traces the compiled outline while the exact program is
     // still being prepared (ADR-353); no permit exists until it arrives.
-    return args.stage === 'tracing'
+    return args.frameDeferred
       ? 'Framing the job outline — the exact job is still being prepared…'
       : 'Framing exact job…';
   }

@@ -1,10 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "5cfa9e1b1eb3dbba51b764e90c86419575eda25c",
+  "sinceSourceSha": "d02cfb112a2628396bfddb605f0729851484d596",
   "highlights": [
-    "Browse and search fonts in a scrollable menu with clear font previews.",
-    "Font menus stay inside smaller windows and display long imported font names cleanly.",
-    "Improved keyboard navigation and editing focus when adding or changing text.",
-    "Clearer guidance for laser and CNC jobs when every layer has Output switched off."
+    "Improved framing between a finished job and the next job.",
+    "Corrected Smoothieware framing positions after inch-mode commands.",
+    "Improved CNC Frame completion for safe-height moves and inch position reports.",
+    "Completed-job previews and timers clear when the artwork changes.",
+    "More accurate completion and framing status messages.",
+    "Fixed entering 100% power scale for artwork with mixed previous values."
   ]
 }

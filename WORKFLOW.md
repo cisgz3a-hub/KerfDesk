@@ -1717,6 +1717,12 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
 3. The toggle never hides the approach route, live controller head, completed-route trail, or motion
    status badge.
 
+Smoothieware reports positions in the current G20/G21 parser units. Before preparing a Frame,
+KerfDesk confirms Idle, selects G21 through an acknowledged command, then requires a fresh complete
+millimetre position report. Old position and offset numbers are discarded before the new snapshot
+is used. G21 remains selected, including after Cancel; work offsets and the physical origin are
+not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
+
 #### CNC — safe-Z retract and restore
 1. CNC Frame requires current-session stock-top Work-Z and a fresh known work position because its
    absolute work-frame safe-Z retract/restore program cannot otherwise be constructed (ADR-192,
@@ -1731,6 +1737,11 @@ Status bar messages (toasts that appear in the bar for 3 s) for non-blocking eve
    returns at its own height with no Z move, and click/command point moves skip their safe-Z prefix
    the same way (ADR-192 Amendment 1). Missing Work-Z, unknown return Z, or a driver
    without a safe-Z Frame builder refuses before motion; there is no XY-only CNC fallback.
+   Completion follows the dispatched safe-Z park or nonnegative Z-restore target and the original
+   XY return. With current-session `$102` evidence, Z comparison allows the controller's whole-step
+   resolution and position-report rounding. Without observed Z resolution, the owned dispatched
+   Frame and settled completion remain authoritative; the app does not assume a steps/mm value or
+   add a missing-setting gate. Start compares the actual completed XYZ position in either case.
 3. XY Frame feed is capped by live `$110`/`$111` when reported and Z independently by `$112`; `$13=1`
    positions are converted to millimetres before any G21 restore is built.
 4. CNC dialect, tool identity, probe-plate state, accessories, and overrides remain Job Review

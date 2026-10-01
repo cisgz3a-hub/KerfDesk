@@ -17,6 +17,7 @@ import type { PreparedJobMetrics } from '../laser/prepared-job-metrics';
 import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
 import type { LaserSecondPassChain } from './recovery/laser-second-pass-lineage';
+import { matchesCncFrameReturnWorkZ } from './framed-run-cnc-return-position';
 
 /** The exact executable bundle carried through Frame. Ordinary permits review
  * it at Start; transient-camera candidates may carry prior review evidence. */
@@ -156,7 +157,7 @@ export type FramedRunStartClaim = {
 export const FRAME_CONTROLLER_CHANGED_MESSAGE =
   'Controller or machine setup changed during Frame. No Start permit was issued; review the setup and Frame again.';
 export const FRAME_RETURN_POSITION_CHANGED_MESSAGE =
-  'The machine did not return to its pre-Frame work position. No Start permit was issued; inspect the machine and Frame again.';
+  'The machine did not return to the planned Frame work position. No Start permit was issued; inspect the machine and Frame again.';
 export const FRAME_START_SESSION_CHANGED_MESSAGE =
   'The controller session changed after Frame. Frame the exact job again before starting.';
 export const FRAME_START_ORIGIN_CHANGED_MESSAGE =
@@ -233,12 +234,15 @@ export function mintDeferredFramedRunPermit(
 export function framedRunCompletionIssue(
   candidate: FrameMotionCandidate,
   source: FramedRunControllerSource,
+  expectedReturnWorkZMm?: number,
 ): string | null {
   const completed = framedRunControllerSnapshot(source);
   if (!sameControllerSetup(candidate.controllerBeforeFrame, completed)) {
     return FRAME_CONTROLLER_CHANGED_MESSAGE;
   }
-  if (!sameReportedWorkPosition(candidate.controllerBeforeFrame, completed)) {
+  if (
+    !sameReportedWorkPosition(candidate.controllerBeforeFrame, completed, expectedReturnWorkZMm)
+  ) {
     return FRAME_RETURN_POSITION_CHANGED_MESSAGE;
   }
   return null;
@@ -316,15 +320,23 @@ function sameEffectiveOffset(
 function sameReportedWorkPosition(
   before: FramedRunControllerSnapshot,
   completed: FramedRunControllerSnapshot,
+  expectedWorkZMm?: number,
 ): boolean {
-  const left = reportedWorkPosition(before);
+  const initial = reportedWorkPosition(before);
   const right = reportedWorkPosition(completed);
-  if (left === null || right === null) return false;
-  if ((before.statusReport?.wPos === null) === (completed.statusReport?.wPos === null)) {
+  if (initial === null || right === null) return false;
+  if (expectedWorkZMm !== undefined && !matchesCncFrameReturnWorkZ(completed, expectedWorkZMm)) {
+    return false;
+  }
+  const left = expectedWorkZMm === undefined ? initial : { ...initial, z: right.z };
+  if (hasDirectWorkPosition(before) === hasDirectWorkPosition(completed)) {
     return sameAxesWithinTolerance(left, right);
   }
   // An added WPos field must not hide movement in a directly shared MPos.
-  if (!sameCommonMachinePosition(before, completed)) return false;
+  // CNC Frame ends at its dispatched safe-Z park or nonnegative restore target.
+  // Check that owned target in both reported representations; a new WPos must
+  // not disguise an inconsistent MPos. XY and all later Start checks stay strict.
+  if (!sameCommonMachinePosition(before, completed, expectedWorkZMm)) return false;
   const scale = before.controllerSettings?.reportInches === true ? 25.4 : 1;
   const tick = scale === 1 ? 0.001 : 0.0001 * scale;
   const offset = before.wcoCache;
@@ -342,15 +354,31 @@ function sameReportedWorkPosition(
   });
 }
 
+function hasDirectWorkPosition(snapshot: FramedRunControllerSnapshot): boolean {
+  return snapshot.statusReport?.wPos != null;
+}
+
 function sameCommonMachinePosition(
   before: FramedRunControllerSnapshot,
   completed: FramedRunControllerSnapshot,
+  expectedWorkZMm?: number,
 ): boolean {
   const left = before.statusReport?.mPos;
   const right = completed.statusReport?.mPos;
   if (left == null || right == null) return true;
   const scale = before.controllerSettings?.reportInches === true ? 25.4 : 1;
-  return sameAxesWithinTolerance(scaledAxes(left, scale), scaledAxes(right, scale));
+  const initial = scaledAxes(left, scale);
+  const final = scaledAxes(right, scale);
+  if (
+    expectedWorkZMm !== undefined &&
+    !matchesCncFrameReturnWorkZ(completed, expectedWorkZMm, true)
+  ) {
+    return false;
+  }
+  return sameAxesWithinTolerance(
+    expectedWorkZMm === undefined ? initial : { ...initial, z: final.z },
+    final,
+  );
 }
 
 function reportedWorkPosition(

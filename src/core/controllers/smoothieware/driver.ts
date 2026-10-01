@@ -93,6 +93,7 @@ export const smoothiewareDriver: ControllerDriver = {
     buildJog: buildSmoothieJogCommand,
     buildFrameLines: buildSmoothieFrameLines,
     frameModalState: { push: SMOOTHIE_CMD_PUSH_STATE, pop: SMOOTHIE_CMD_POP_STATE },
+    frameReportUnitsCommand: 'G21',
   },
   classifyLine: classifySmoothieResponse,
   prepareConsoleCommand: prepareSmoothieConsoleCommand,

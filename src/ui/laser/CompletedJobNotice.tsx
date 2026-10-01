@@ -4,9 +4,11 @@ import {
   dismissCompletedJobDisplay,
 } from '../state/completed-job-display';
 import { useLaserStore } from '../state/laser-store';
+import { useTerminalCanvasRunInvalidation } from './terminal-canvas-run-invalidation';
 
 /** A compact completion acknowledgement in the persistent job-actions dock. */
 export function CompletedJobNotice(): JSX.Element | null {
+  useTerminalCanvasRunInvalidation();
   // Subscribe to stable values: trailing status polls keep replacing the run.
   const canDismiss = useLaserStore(completedJobCanBeDismissed);
   const plan = useLaserStore((state) => state.liveCanvasRun?.plan);

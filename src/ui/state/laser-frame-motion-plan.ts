@@ -63,7 +63,7 @@ export function buildFrameDispatchPlan(
     cncJobsSupported: refs.driver.capabilities.cncJobs,
   });
   if (motion.kind === 'blocked') return motion;
-  return { kind: 'ready', lines: [...toolOffLines, ...motion.lines] };
+  return { ...motion, lines: [...toolOffLines, ...motion.lines] };
 }
 
 function frameReturnLine(

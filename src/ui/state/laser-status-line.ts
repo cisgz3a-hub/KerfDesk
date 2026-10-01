@@ -22,7 +22,7 @@ import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { statusBufferPatch } from './laser-rx-capacity-evidence';
 import { statusObservationPatch } from './laser-status-observation';
 import { statusPositionPatch } from './laser-status-position';
-import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
+import { liveCanvasLifecyclePatch, liveCanvasStatusPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
 import { framedRunInterruptionPatch } from './framed-run-interruption';
 import { frameStatusFailurePatch, jogMpgInterruptionPatch } from './frame-status-failure';
@@ -118,7 +118,10 @@ export function handleStatusLine(
     ...nonAlarmReportPatch(state, report),
     ...completedStreamerPatch,
     ...freshToolChangeIdlePatch(streamer, report),
-    ...liveCanvasStatusCompletionPatch(state, report, streamer, jobOverAtIdle),
+    // Idle may release a failed/unowned terminal streamer so the next Frame
+    // is usable. Display completion belongs only to a successful owned settle;
+    // this fallback must preserve unavailable timing after a rejected marker.
+    ...liveCanvasStatusPatch(state, report, streamer),
     ...completionPatch,
     ...frameFailurePatch,
     ...permitInterruptionPatch,

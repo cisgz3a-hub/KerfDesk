@@ -51,6 +51,9 @@ export type LaserStoreActions = {
   /** Owned G54 selection used before preparing Frame so Frame and emitted
    * program resolve coordinates in the same canonical WCS. */
   readonly selectPrimaryWcsForFrame: () => Promise<FrameWcsSelection>;
+  /** Driver-owned report-unit normalization, followed by a fresh mm position.
+   * No-op for drivers whose report units are independent of parser G20/G21. */
+  readonly normalizeFrameReportUnits: (signal?: AbortSignal) => Promise<void>;
   /** One realtime status query outside the periodic poll, so a caller that
    * needs a fresh report after an owned command gets it in one round trip
    * instead of waiting for the next poll tick. Inert to the planner; a no-op

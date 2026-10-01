@@ -74,7 +74,7 @@ describe('cancelling an owned Frame preparation', () => {
       pending: false,
       cancellable: false,
     });
-    expect(lastToast()?.message).toBe('Frame preparation cancelled. Nothing was sent.');
+    expect(lastToast()?.message).toBe('Frame preparation cancelled. No Start permit was issued.');
   });
 
   it('is not offered while the outline trace moves the machine', async () => {

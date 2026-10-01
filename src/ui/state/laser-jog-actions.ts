@@ -211,6 +211,8 @@ async function runFrame(
     0,
     undefined,
     frameSettlementLine,
+    undefined,
+    plan.expectedReturnWorkZMm,
   );
   assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation });

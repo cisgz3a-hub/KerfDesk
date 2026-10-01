@@ -40,6 +40,22 @@ export function assertFramePreparationActive(signal?: AbortSignal): void {
   signal?.throwIfAborted();
 }
 
+/** A driver whose parser units also control position reports must normalize
+ * them before placement or compiler snapshots consume any coordinates. */
+export async function normalizeFrameControllerReportUnits(
+  signal?: AbortSignal,
+): Promise<ReadonlyArray<string>> {
+  try {
+    await useLaserStore.getState().normalizeFrameReportUnits(signal);
+    return [];
+  } catch (error) {
+    signal?.throwIfAborted();
+    return [
+      `Frame could not confirm controller report units: ${error instanceof Error ? error.message : String(error)}`,
+    ];
+  }
+}
+
 /** Select the emitted G54 frame and retain disclosure of any named WCS change.
  *  An unknown WCS is read first; see frame-wcs-selection.ts (audit CG-2). */
 export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNormalization> {

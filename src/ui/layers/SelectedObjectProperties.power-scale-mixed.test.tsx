@@ -14,44 +14,48 @@ import { SelectedObjectProperties } from './SelectedObjectProperties';
 afterEach(resetStore);
 
 describe('SelectedObjectProperties mixed power scale', () => {
-  it('shows Mixed instead of 100 and applies an explicit edit to the selection', async () => {
-    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
-    useStore.getState().selectObject('O1');
-    useStore.getState().toggleSelectObject('O2');
-    useStore.getState().setObjectsPowerScale(['O1'], 50);
-    useStore.getState().setObjectsPowerScale(['O2'], 80);
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    const root = createRoot(host);
-    await act(async () => root.render(<SelectedObjectProperties />));
-    try {
-      const input = host.querySelector('input[aria-label="Power scale for selected objects"]');
-      if (!(input instanceof HTMLInputElement)) throw new Error('power scale input missing');
-      expect(input.value).toBe('');
-      expect(input.placeholder).toBe('Mixed');
-      expect(input.dataset.mixed).toBe('true');
-      expect(input.getAttribute('aria-valuetext')).toBe('Mixed');
+  it.each([50, 60, 100])(
+    'shows Mixed and applies an explicit %s edit to the selection',
+    async (value) => {
+      useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+      useStore.getState().importSvgObject(svgObj('O2', ['#00ff00']));
+      useStore.getState().selectObject('O1');
+      useStore.getState().toggleSelectObject('O2');
+      useStore.getState().setObjectsPowerScale(['O1'], 50);
+      useStore.getState().setObjectsPowerScale(['O2'], 80);
+      const host = document.createElement('div');
+      document.body.appendChild(host);
+      const root = createRoot(host);
+      await act(async () => root.render(<SelectedObjectProperties />));
+      try {
+        const input = host.querySelector('input[aria-label="Power scale for selected objects"]');
+        if (!(input instanceof HTMLInputElement)) throw new Error('power scale input missing');
+        expect(input.value).toBe('');
+        expect(input.placeholder).toBe('Mixed');
+        expect(input.dataset.mixed).toBe('true');
+        expect(input.getAttribute('aria-valuetext')).toBe('Mixed');
 
-      await act(async () => Simulate.blur(input));
-      expect(useStore.getState().project.scene.objects.map((object) => object.powerScale)).toEqual([
-        50, 80,
-      ]);
+        await act(async () => Simulate.blur(input));
+        expect(
+          useStore.getState().project.scene.objects.map((object) => object.powerScale),
+        ).toEqual([50, 80]);
 
-      await act(async () => {
-        input.value = '60';
-        Simulate.change(input);
-      });
-      await act(async () => Simulate.blur(input));
+        await act(async () => {
+          input.value = String(value);
+          Simulate.change(input);
+        });
+        expect(input.value).toBe(String(value));
+        await act(async () => Simulate.blur(input));
 
-      expect(useStore.getState().project.scene.objects.map((object) => object.powerScale)).toEqual([
-        60, 60,
-      ]);
-    } finally {
-      await act(async () => root.unmount());
-      host.remove();
-    }
-  });
+        expect(
+          useStore.getState().project.scene.objects.map((object) => object.powerScale),
+        ).toEqual([value, value]);
+      } finally {
+        await act(async () => root.unmount());
+        host.remove();
+      }
+    },
+  );
 
   it('edits and discloses the effective object override instead of the base operation', async () => {
     useStore.getState().importSvgObject(svgObj('Override', ['#000000']));

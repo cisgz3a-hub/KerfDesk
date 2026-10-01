@@ -113,7 +113,7 @@ function completedFrameProofPatch(
     workZReferenceEpoch: args.state.workZReferenceEpoch,
     workZZeroEvidence: args.state.workZZeroEvidence,
   } as const;
-  const issue = framedRunCompletionIssue(candidate, source);
+  const issue = framedRunCompletionIssue(candidate, source, completedFrame.expectedReturnWorkZMm);
   if (issue !== null) {
     return {
       framedRun: null,
