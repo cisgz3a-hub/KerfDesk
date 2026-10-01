@@ -6,6 +6,7 @@ import { useStore } from '../state';
 import { createFramedRunPermit } from '../state/framed-run';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { useToastStore } from '../state/toast-store';
 import {
   MemoryRecoveryGenerationStore,
   MemoryRecoveryStorageBackend,
@@ -202,5 +203,67 @@ describe('completed Current Position replay', () => {
     expect(replay?.artifact.provenance).toMatchObject({
       workflow: { kind: 'ordinary-start', completedReplaySourceRunId: first.runId },
     });
+  });
+
+  it('refuses a process edit made during replay review but retains Frame for ordinary Start', async () => {
+    const repository = recoveryRepository();
+    await runStartJobFlow(repository);
+    const first = repository.getSnapshot().activeRun;
+    if (first === null) throw new Error('Expected the first active run.');
+    await repository.completeRun(first.runId);
+    const receipt = repository.getSnapshot().lastCompletedReceipt;
+    const framed = useLaserStore.getState().completedFrame;
+    if (receipt === null || framed === null) throw new Error('Expected completed run evidence.');
+    vi.mocked(useLaserStore.getState().startJob).mockClear();
+
+    uninstallAutoReview();
+    let approvals = 0;
+    uninstallAutoReview = installAutoJobReview(() => {
+      approvals += 1;
+      if (approvals === 1) useStore.getState().setLayerParam('red', { power: 37 });
+      return 'confirm';
+    });
+    const warningsBeforeReplay = useToastStore.getState().toasts.length;
+
+    await runCompletedJobAgainFlow(receipt, repository);
+
+    expect(approvals).toBe(2);
+    expect(
+      useToastStore
+        .getState()
+        .toasts.slice(warningsBeforeReplay)
+        .filter(
+          ({ message }) =>
+            message === 'The completed job changed. Use Start job to run the current canvas.',
+        ),
+    ).toHaveLength(1);
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+    expect(repository.getSnapshot()).toMatchObject({
+      activeRun: null,
+      pendingStart: null,
+      lastCompletedReceipt: null,
+    });
+    expect(useLaserStore.getState().framedRunStartClaim).toBeNull();
+    expect(useLaserStore.getState().completedFrame?.candidate.spatialSignature).toBe(
+      framed.candidate.spatialSignature,
+    );
+    expect(useLaserStore.getState().completedFrame).not.toBeNull();
+
+    // No new Frame is installed: ordinary Start reviews the current power
+    // against the spatial evidence retained from the same physical trace.
+    await runStartJobFlow(repository);
+
+    const start = vi.mocked(useLaserStore.getState().startJob);
+    expect(start).toHaveBeenCalledOnce();
+    expect(start.mock.calls[0]?.[0]).toMatch(/S370(?:\s|$)/);
+    const next = repository.getSnapshot().activeRun;
+    expect(next?.artifact.gcode).toBe(start.mock.calls[0]?.[0]);
+    expect(next?.artifact.jobOrigin).toEqual({
+      startFrom: 'current-position',
+      anchor: 'front-left',
+      currentPosition: { x: 120, y: 80 },
+    });
+    expect(next?.artifact.provenance.workflow).toMatchObject({ kind: 'ordinary-start' });
+    expect(next?.artifact.provenance.workflow).not.toHaveProperty('completedReplaySourceRunId');
   });
 });

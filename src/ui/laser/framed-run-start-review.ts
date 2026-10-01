@@ -13,7 +13,6 @@ import {
   rebindReviewedFramedRun,
   revokeOwnedCompletedFrame,
 } from './framed-start-preparation';
-import type { LastCompletedReceipt } from '../state/recovery';
 import { isOutputPreparationAbort } from './output-preparation-errors';
 
 export const FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE =
@@ -27,7 +26,6 @@ export const REVIEW_CHANGED_FRAMED_JOB_MESSAGE =
 // equal execution signatures cannot bring that physical Frame back.
 export async function reviewFramedRunForStart(
   permit: FramedRunPermit,
-  completedReceipt: LastCompletedReceipt | null = null,
 ): Promise<{ readonly permit: FramedRunPermit; readonly review: FramedRunReviewEvidence } | null> {
   const candidate = permit.candidate;
   const initial = await prepareFramedStartReview(permit).catch((error: unknown) => {
@@ -44,7 +42,10 @@ export async function reviewFramedRunForStart(
   };
   const review = await runJobReviewGate({
     initial,
-    completedReceipt,
+    // Run again follows this Frame's resolved placement. Its receipt supplies
+    // provenance and execution-input matching in the outer Start flow, rather
+    // than restoring the previous run's translated origin or fingerprint.
+    completedReceipt: null,
     shouldAbandon,
     onFrameMismatch: () => revokeOwnedCompletedFrame(permit),
     ...(candidate.authorizationContext === 'laser-second-pass'

@@ -3,7 +3,7 @@ import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PAUSE_RESUME_TRANSITION_TIMEOUT_MS } from './laser-pause-resume-transition';
 import { ACTIVE_STREAM_HEARTBEAT_TIMEOUT_MS } from './laser-stream-heartbeat';
 import { useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
 const GRBL_SAFETY_DOOR = '\x84';
 const GRBL_SOFT_RESET = '\x18';
@@ -29,6 +29,7 @@ function makeConnection(
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       writes.push(data);
       await writeOverride?.(data);
       if (
@@ -45,6 +46,7 @@ function makeConnection(
         emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
         emit('ok');
       }
+      acknowledgeStartFence();
     },
     onLine: (handler) => {
       lineHandlers.add(handler);

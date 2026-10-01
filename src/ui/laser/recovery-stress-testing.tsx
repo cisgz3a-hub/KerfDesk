@@ -357,8 +357,9 @@ export async function recoverAndComplete(h: StressHarness, runId: string): Promi
   expect(useLaserStore.getState().streamer).toBeNull();
   expect(useLaserStore.getState().controllerOperation).toBeNull();
   const sent = programLines(h.simulator, outboundBefore);
-  expect(sent.slice(0, expectedSent.length)).toEqual(expectedSent);
-  expect(sent.slice(expectedSent.length)).toEqual(['G4 P0.01']);
+  // Keep both owned control dwells explicit around the unchanged resume program:
+  // Start's acknowledged override fence, then final physical settlement.
+  expect(sent).toEqual(['G4 P0.01', ...expectedSent, 'G4 P0.01']);
   await vi.waitFor(() =>
     expect(h.repository.getSnapshot().lastCompletedReceipt?.runId).toBe(recoveryRunId),
   );

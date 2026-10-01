@@ -116,12 +116,23 @@ export async function runFramedPermitStart(
   const reviewed =
     permit.candidate.review !== undefined && permit.candidate.authorizationContext !== undefined
       ? { permit, review: permit.candidate.review }
-      : await reviewFramedRunForStart(permit, completedReceipt);
+      : await reviewFramedRunForStart(permit);
   if (reviewed === null) return false;
   permit = reviewed.permit;
   const review = reviewed.review;
   if (useLaserStore.getState().framedRun !== permit) {
     useToastStore.getState().pushToast(FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE, 'warning');
+    return false;
+  }
+  // Process edits may retain the spatial Frame while changing the reviewed
+  // job. Replay still requires the completed job's execution inputs; ordinary
+  // Start may use this same Frame for the newly approved process settings.
+  if (replayPermitMismatch(permit, completedReceipt) !== null) {
+    await reportStartAuthorizationRefusal(
+      { kind: 'execution-inputs-changed' },
+      completedReceipt,
+      repository,
+    );
     return false;
   }
   const claim = claimCurrentFramedRunStart(permit);
@@ -179,7 +190,11 @@ export async function runCompletedJobAgainFlow(
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
   const started = await runFreshFramedJobFlow(repository, receipt);
-  if (!started && currentReplayExecutionSignature() !== receipt.artifact.executionSignature) {
+  if (
+    !started &&
+    currentReplayExecutionSignature() !== receipt.artifact.executionSignature &&
+    repository.getSnapshot().lastCompletedReceipt?.runId === receipt.runId
+  ) {
     await reportStartAuthorizationRefusal(
       { kind: 'execution-inputs-changed' },
       receipt,

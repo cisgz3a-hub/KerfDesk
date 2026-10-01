@@ -1900,13 +1900,14 @@ not erased. GRBL's independent `$13` reporting-unit contract is unchanged.
     readable (ADR-221). Runs without a recorded start show no timer.
 
 #### Repeat — Run again
-1. **Run again** follows Start exactly (ADR-372 Amendment 1). The completed job's permit was spent
-   at its Start, so **Run same job again from start** stays greyed out until a clean Frame of this
-   exact job issues a new permit. It never runs a Frame itself and makes no offer. It then streams
-   that permit's bytes, the ones the Frame traced, through the same single Job Review, from line 1
-   with a new run ID, and the run records which completed run it repeats.
-2. A Current Position job therefore runs where the new Frame traced it, not at the first run's
-   frozen origin.
+1. **Run again** follows Start exactly (ADR-372 Amendment 1, amended by ADR-565). An unchanged
+   footprint and placement may reuse the clean completed Frame. The button needs another Frame
+   when that spatial evidence expires; it never runs a Frame itself and makes no offer. Each
+   replay prepares and reviews the current exact program, claims its own execution permit and
+   starts from line 1 with a new run ID. The run records which completed run it repeats.
+2. A Current Position job at a different head position requires another Frame. After that Frame,
+   Run again uses its newly framed placement, not the first run's frozen origin. The current
+   execution inputs must still match the completed job, including after review edits.
 
 #### Error — exact artifact cannot be produced
 1. The persistent blocker surface and error toast show the compile/transport reason. No Frame or job

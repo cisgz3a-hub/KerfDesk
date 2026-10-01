@@ -97,6 +97,13 @@ immutable archive and no-program-write assertions pass. Ordinary Start still cre
 permit for its freshly reviewed program. These are integration repairs, not additional findings
 at the published 1.0.6 baseline.
 
+The complete integration suite also exposed a Current Position replay regression: after moving the
+head and completing a new Frame, review incorrectly reapplied the completed run's old origin and
+fingerprint. Review now follows the newly framed placement. Replay still rechecks the completed
+job's execution inputs after review, before claiming or recording a Start. A power edit during
+replay review refuses the replay and preserves the spatial Frame for ordinary Start; the original
+moved-head replay and provenance assertions remain unchanged.
+
 The expanded focused checks include:
 
 - 93 spatial identity, process edit, repeat, review and UI cases across eight files.
@@ -119,6 +126,16 @@ The expanded focused checks include:
   before any program was sent. They now answer the actual held control fence first. These recovery
   paths are separate from ordinary Start's final fresh-status qualification.
 - E2E type checking and scoped lint/format checks passed after those fixture corrections.
+- The complete suite exposed eight affected fixture/replay files, with 21 failing cases. Besides
+  the Current Position replay repair, the fixtures now acknowledge only the actual Start control
+  fence and advance simulated time through that acknowledgement. Their existing program,
+  Pause/Resume, recovery, advisory and no-wire assertions remain intact. The integrated 13-file
+  slice passed 67 cases; the three Current Position replay cases also passed after checking that
+  a changed-job refusal produces one warning.
+- The final focused Chromium rerun passed the unchanged-placement edited burn/replay and dense
+  Sharp trace after Home with a nonzero work offset. The trace fixture uses the current readiness
+  text and independently asserts that Start is enabled; geometry, worker, repeated-click and
+  no-coordinate-reset assertions remain unchanged. E2E type checking passed with the same files.
 
 Initial focused checks must not be reported as final release qualification. Controller fixtures
 explicitly distinguish the newly acknowledged Start control fence from program and completion

@@ -35,9 +35,12 @@ describe('startJob GRBL line-buffer guard', () => {
 
   it('still starts a line padded past 79 bytes with spaces and a comment', async () => {
     const writes: string[] = [];
-    const connection = makeConnection(async (data) => {
-      writes.push(data);
-    });
+    const connection = makeConnection(
+      async (data) => {
+        writes.push(data);
+      },
+      { autoAckStartFence: true },
+    );
     await connectWith(connection);
     writes.length = 0;
 

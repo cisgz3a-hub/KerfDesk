@@ -165,8 +165,9 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
   // not cancel the real worker while it is preparing this large trace.
   await kerfdesk.emitSerialLine('<Idle|WPos:-200.398,-170.323,0|WCO:200.398,170.323,0|FS:0,0>');
   await expect(
-    page.getByText('Ready to start — framed job unchanged', { exact: true }),
+    page.getByText('Ready to start — framed placement unchanged', { exact: true }),
   ).toBeVisible({ timeout: 180_000 });
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
   expect(outputWorkers.length).toBeGreaterThan(0);
   record('simulated-frame-complete', { outputWorkers });
   await expect(page.getByText(/Background output preparation queue is full/)).toHaveCount(0);
