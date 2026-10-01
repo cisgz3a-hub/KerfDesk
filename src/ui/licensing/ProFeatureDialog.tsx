@@ -154,7 +154,7 @@ function lead(status: LicenceStatus): string {
     case 'updates-expired':
       return 'This version is newer than your licence’s included updates. Renew updates to use Pro in it.';
     case 'activation-required':
-      return `Try every Pro tool free for 30 days on this device, no card needed, or buy Pro for ${PRO_PRICE_LABEL} once. It includes a year of updates and runs on three devices.`;
+      return `Try every Pro tool free for 30 days on this device, no card needed, or buy Pro once for ${PRO_PRICE_LABEL}. It includes a year of updates and runs on three devices.`;
     case 'ready':
     case 'invalid-licence':
     case 'unavailable':

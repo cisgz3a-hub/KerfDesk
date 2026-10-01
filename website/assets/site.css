@@ -275,6 +275,17 @@ kbd {
   margin-top: clamp(1.75rem, 4vw, 2.5rem);
 }
 
+/* ---------- Launch note (until sales open, ADR-524 Amendment 4) ---------- */
+
+.launch-note {
+  margin: 0;
+  padding: 0.55rem 1.25rem;
+  background: var(--text);
+  color: var(--bg);
+  font-weight: 600;
+  text-align: center;
+}
+
 /* ---------- Header ---------- */
 
 .site-header {

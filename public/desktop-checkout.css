@@ -555,3 +555,21 @@ details p {
     scroll-behavior: auto;
   }
 }
+
+#checkout-agreement {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 20px;
+}
+#checkout-agreement label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.5;
+}
+#checkout-agreement input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 3px;
+}

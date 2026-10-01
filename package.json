@@ -4,7 +4,7 @@
   "private": true,
   "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.",
   "author": {
-    "name": "Johann Stolk"
+    "name": "Johannes Stephanus Stolk"
   },
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -26,7 +26,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:release-integrity": "node --test scripts/check-adr-numbers.test.mjs scripts/third-party-closure.test.mjs scripts/generate-release-evidence.test.mjs scripts/report-dependency-audit.test.mjs scripts/verify-github-actions-pinning.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs scripts/report-release-readiness.test.mjs scripts/report-coverage-trend.test.mjs scripts/resolve-web-deploy-identity.test.mjs scripts/list-reverted-in-candidate.test.mjs scripts/run-vitest-coverage.test.mjs scripts/verify-windows-packaged-native-smoke.test.mjs scripts/verify-packaged-desktop.test.mjs scripts/verify-desktop-renderer.test.mjs scripts/verify-asar-integrity-enforced.test.mjs scripts/desktop-release-notes.test.mjs scripts/desktop-preview-cadence.test.mjs scripts/qualify-windows-installer.test.mjs scripts/published-upgrade-installers.test.mjs scripts/verify-upgrade-project.test.mjs scripts/verify-update-publisher.test.mjs scripts/native-smoke-process.test.mjs scripts/native-smoke-runner.test.mjs scripts/native-smoke-evidence.test.mjs scripts/native-smoke-shutdown.test.mjs scripts/publish-stable-release.test.mjs scripts/stable-release-publisher.test.mjs scripts/stable-release-store.test.mjs scripts/unsigned-release-plan.test.mjs scripts/stable-release-artifacts.test.mjs scripts/stable-release-retry.test.mjs scripts/preview-release-publisher.test.mjs scripts/desktop-downloads.test.mjs scripts/desktop-windows-download.test.mjs scripts/desktop-update-notes.test.mjs scripts/reviewed-desktop-update-notes.test.mjs scripts/manual-commercial-publisher.test.mjs scripts/publish-manual-commercial-release.test.mjs scripts/desktop-checkout.test.mjs scripts/prepare-commercial-desktop.test.mjs scripts/prepare-installer-terms.test.mjs scripts/prepare-sandbox-desktop.test.mjs scripts/commercial-release-manifest.test.mjs scripts/commercial-release-package.test.mjs scripts/unsigned-commercial-package.test.mjs scripts/commercial-release-publisher.test.mjs scripts/commercial-release-promotion.test.mjs scripts/release-train-policy.test.mjs scripts/release-train.test.mjs scripts/issue-developer-licences.test.mjs services/desktop-licensing/*.test.mjs scripts/download-stats/*.test.mjs scripts/ci-parallel-gate.test.mjs",
+    "test:release-integrity": "node --test scripts/check-adr-numbers.test.mjs scripts/third-party-closure.test.mjs scripts/generate-release-evidence.test.mjs scripts/report-dependency-audit.test.mjs scripts/verify-github-actions-pinning.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs scripts/report-release-readiness.test.mjs scripts/report-coverage-trend.test.mjs scripts/resolve-web-deploy-identity.test.mjs scripts/list-reverted-in-candidate.test.mjs scripts/run-vitest-coverage.test.mjs scripts/verify-windows-packaged-native-smoke.test.mjs scripts/verify-packaged-desktop.test.mjs scripts/verify-desktop-renderer.test.mjs scripts/verify-asar-integrity-enforced.test.mjs scripts/desktop-release-notes.test.mjs scripts/desktop-preview-cadence.test.mjs scripts/qualify-windows-installer.test.mjs scripts/published-upgrade-installers.test.mjs scripts/verify-upgrade-project.test.mjs scripts/verify-update-publisher.test.mjs scripts/native-smoke-process.test.mjs scripts/native-smoke-runner.test.mjs scripts/native-smoke-evidence.test.mjs scripts/native-smoke-shutdown.test.mjs scripts/publish-stable-release.test.mjs scripts/stable-release-publisher.test.mjs scripts/stable-release-store.test.mjs scripts/unsigned-release-plan.test.mjs scripts/stable-release-artifacts.test.mjs scripts/stable-release-retry.test.mjs scripts/preview-release-publisher.test.mjs scripts/desktop-downloads.test.mjs scripts/desktop-windows-download.test.mjs scripts/desktop-update-notes.test.mjs scripts/reviewed-desktop-update-notes.test.mjs scripts/manual-commercial-publisher.test.mjs scripts/publish-manual-commercial-release.test.mjs scripts/desktop-checkout.test.mjs scripts/prepare-commercial-desktop.test.mjs scripts/prepare-installer-terms.test.mjs scripts/prepare-sandbox-desktop.test.mjs scripts/commercial-release-manifest.test.mjs scripts/commercial-release-package.test.mjs scripts/unsigned-commercial-package.test.mjs scripts/commercial-release-publisher.test.mjs scripts/commercial-release-promotion.test.mjs scripts/release-train-policy.test.mjs scripts/release-train.test.mjs scripts/issue-developer-licences.test.mjs services/desktop-licensing/*.test.mjs scripts/download-stats/*.test.mjs scripts/ci-parallel-gate.test.mjs scripts/generate-site-pages.test.mjs scripts/app-terms-module.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "node scripts/run-vitest-coverage.mjs",
     "report:coverage": "node scripts/report-coverage-trend.mjs",
@@ -55,8 +55,8 @@
     "trace": "node scripts/trace-cli.mjs",
     "build": "pnpm build:web",
     "generate:notices": "node scripts/generate-third-party-notices.mjs",
-    "generate:privacy": "node scripts/generate-privacy-page.mjs",
-    "check:privacy": "node scripts/generate-privacy-page.mjs --check",
+    "generate:privacy": "node scripts/generate-site-pages.mjs",
+    "check:privacy": "node scripts/generate-site-pages.mjs --check",
     "build:web": "pnpm generate:privacy && pnpm generate:notices && pnpm typecheck && pnpm build:bundle",
     "build:bundle": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
     "preview:web": "vite preview",
@@ -69,7 +69,8 @@
     "deploy:web": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=main",
     "deploy:web:preview": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview",
     "build:bundle:desktop": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build --mode desktop",
-    "build:renderer:desktop": "pnpm generate:notices && pnpm typecheck && pnpm build:bundle:desktop"
+    "build:renderer:desktop": "pnpm generate:notices && pnpm typecheck && pnpm build:bundle:desktop",
+    "generate:site-pages": "node scripts/generate-site-pages.mjs"
   },
   "dependencies": {
     "@tabler/icons": "3.43.0",

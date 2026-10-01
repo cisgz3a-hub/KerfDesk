@@ -3,7 +3,8 @@
 // website/README.md.
 
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { site } from '../site.config.mjs';
 import { attrValues, buildToTemp, builtPages, textContent, walk } from './helpers.mjs';
@@ -78,25 +79,17 @@ describe('website copy', () => {
     }
   });
 
-  // KerfDesk is not presented as open source. Only the License page names the
-  // license of the released versions (one factual sentence) and the licenses
-  // of bundled third-party parts. Raw HTML is scanned so titles, meta
+  // KerfDesk is not presented as open source. Only the licence and notices
+  // page, which the app publishes, names the licence of the released versions
+  // and of bundled third-party parts. Raw HTML is scanned so titles, meta
   // descriptions and alt text count too; whitespace is folded because copy
   // wraps across lines.
   it('does not market KerfDesk as open source', () => {
     for (const { file, html } of built) {
       const flat = html.replace(/\s+/g, ' ');
       assert.doesNotMatch(flat, /open[- ]source|free software|source code/i, file);
-      if (file !== 'license/index.html') assert.doesNotMatch(flat, /\bMIT\b/, file);
+      assert.doesNotMatch(flat, /\bMIT\b/, file);
     }
-    // ADR-543: all rights reserved after the mit-final cutoff.
-    const license = pageText('license/index.html');
-    assert.match(license, /© 2026 Johann Stolk\. All rights reserved/);
-    assert.match(
-      license,
-      /up to and including the one tagged “mit-final” in KerfDesk’s source history were published under the MIT License/,
-    );
-    assert.match(license, /Later versions are all rights reserved/);
   });
 
   // The source repository is private (ADR-524 Amendment 1), so no download,
@@ -145,41 +138,50 @@ describe('website copy', () => {
     const stale =
       /paid licen[cs]es? (are|is) planned|free to use today|prices?, terms and timing|nothing is for sale today|no trial timer|every (laser and CNC )?feature, (with no|at no)/i;
     for (const { file, text } of pages) assert.doesNotMatch(text, stale, file);
-    const pricing = pageText('pricing/index.html');
-    assert.match(pricing, /Free has no time limit/);
+    const home = pageText('index.html');
+    assert.match(home, /KerfDesk Free has no time limit/);
     assert.match(
-      pricing,
-      /Pro adds advanced tools to the Windows desktop app for US\$49\.50, paid once\. Purchase opens soon\./,
+      home,
+      /Pro adds advanced tools to the Windows desktop app for US\$49\.50 plus tax, paid once,/,
     );
   });
 
-  // Refund terms belong to the terms of sale, which are published before sales
-  // open; the site only says so.
-  it('writes no refund terms', () => {
+  // Paddle, the reseller, adds the tax where the buyer lives.
+  it('shows every price as before tax', () => {
     for (const { file, text } of pages) {
-      if (!/refund/i.test(text)) continue;
-      assert.match(text, /terms of sale will be published before sales open/, file);
+      for (const [, after] of text.matchAll(/US\$\d+(?:\.\d+)?(.{0,9})/g))
+        assert.match(after, /^ plus tax/, `${file}: a price without "plus tax"`);
+    }
+  });
+
+  // Refund terms are in the Refund Policy, a checked legal text the app
+  // publishes. The site links it and writes none of its own.
+  it('writes no refund terms of its own', () => {
+    for (const { file, text } of pages) {
       assert.doesNotMatch(text, /money[- ]back|refund (window|period)|\d+[- ]day refund/i, file);
     }
   });
 
-  it('tells visitors exactly what licensing and payment involve (privacy)', () => {
-    const privacy = pageText('privacy/index.html');
-    assert.match(privacy, new RegExp(`at ${site.licensingHost.replace(/\./g, '\\.')}`));
-    assert.match(
-      privacy,
-      /installation digest: a one-way hash of your operating system’s installation ID/,
-    );
-    assert.match(privacy, /a generic device label/);
-    assert.match(privacy, /your license key or credential/);
-    assert.match(privacy, /the order details/);
-    assert.match(
-      privacy,
-      /never uploads your projects, drawings, toolpaths, or machine or job data/,
-    );
-    assert.match(privacy, /Licensing adds no analytics, cookies or tracking/);
-    assert.match(privacy, /Paddle, the payment provider, as merchant of record/);
-    assert.match(privacy, /under its own privacy notice/);
+  // The pricing and legal pages are checked texts that the app publishes from
+  // docs/legal (ADR-247 Amendment 2). The site links them and builds no copy,
+  // so it can never show an old or different version.
+  it('links the checked pricing and legal pages from every page and keeps no copy', () => {
+    const legal = [
+      site.pricingUrl,
+      site.termsUrl,
+      site.privacyUrl,
+      site.refundsUrl,
+      site.paiaManualUrl,
+      site.licenseUrl,
+    ];
+    for (const url of legal) assert.equal(new URL(url).origin, site.appUrl, url);
+    for (const { file, html } of built) {
+      const hrefs = attrValues(html, 'a', 'href');
+      for (const url of legal) assert.ok(hrefs.includes(url), `${file} does not link ${url}`);
+      assert.match(textContent(html), /Made and licensed by Johannes Stephanus Stolk/, file);
+    }
+    for (const path of ['pricing', 'terms', 'privacy', 'refunds', 'paia-manual', 'license'])
+      assert.ok(!existsSync(join(outDir, path)), `the site builds its own /${path}/`);
   });
 
   it('carries the safety line in every page footer', () => {

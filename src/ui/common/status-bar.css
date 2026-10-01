@@ -24,3 +24,28 @@
 .lf-status-bar__telemetry:focus-visible {
   outline-offset: -2px;
 }
+
+/* Links to the pricing and policy pages in the web app (ADR-524 Amendment 3).
+   They give way on a narrow bar, so the Update action always stays in view. */
+.lf-status-bar__site-links {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.lf-status-bar__site-links a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.lf-status-bar__site-links a:hover,
+.lf-status-bar__site-links a:focus-visible {
+  color: var(--lf-text);
+  text-decoration: underline;
+}
+
+@media (max-width: 900px) {
+  .lf-status-bar__site-links {
+    display: none;
+  }
+}

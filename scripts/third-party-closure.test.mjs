@@ -245,7 +245,7 @@ test('requires an exact source identity contract on the release CLI', () => {
 test('requires exact fail-closed metadata inside every packaged Preview', () => {
   const valid = {
     version: '0.2.0-preview.1',
-    author: { name: 'Johann Stolk' },
+    author: { name: 'Johannes Stephanus Stolk' },
     kerfdeskDesktopReleaseChannel: 'preview',
     kerfdeskUpdateChannelTrusted: false,
   };

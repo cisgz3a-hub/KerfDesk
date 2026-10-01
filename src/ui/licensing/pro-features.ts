@@ -58,5 +58,7 @@ export function proChoiceLabel(label: string, locked: boolean): string {
   return locked ? `${label} (Pro)` : label;
 }
 
-export const PRO_PRICE_LABEL = 'US$49.50';
-export const RENEWAL_PRICE_LABEL = 'US$20';
+// Prices are before tax: Paddle adds the tax where the buyer lives and shows the
+// total before payment (docs/legal/kerfdesk-pricing.md).
+export const PRO_PRICE_LABEL = 'US$49.50 plus tax';
+export const RENEWAL_PRICE_LABEL = 'US$20 plus tax';

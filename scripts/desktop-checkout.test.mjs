@@ -38,6 +38,7 @@ test('only an exact server-created transaction URL can start checkout', async ()
     });
     assert.equal(requests, 0);
     assert.equal(window.document.getElementById('checkout-open').hidden, true);
+    assert.equal(window.document.getElementById('checkout-agreement').hidden, true);
     assert.match(window.document.getElementById('checkout-status').textContent, /desktop app/u);
     window.close();
   }
@@ -79,7 +80,52 @@ test('oversized or failed public configuration leaves checkout closed', async ()
   }
 });
 
-test('verified configuration opens the exact transaction; browser success never issues a licence', async () => {
+function settle() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function agreementBoxes(window) {
+  return [...window.document.querySelectorAll('input[data-checkout-agreement]')];
+}
+
+function tick(window, box) {
+  box.checked = true;
+  box.dispatchEvent(new window.Event('change'));
+}
+
+test('the buyer agrees to the terms and confirms machine safety before any payment code loads', async () => {
+  const window = page();
+  await startCheckoutPage(window, async () => new Response(JSON.stringify(configuration)));
+  const button = window.document.getElementById('checkout-open');
+  const boxes = agreementBoxes(window);
+  assert.equal(boxes.length, 2);
+  assert.equal(window.document.getElementById('checkout-agreement').hidden, false);
+  assert.equal(button.hidden, false);
+  assert.equal(button.disabled, true);
+  const labels = boxes.map((box) => box.closest('label').textContent.replace(/\s+/gu, ' '));
+  assert.match(labels[0], /agree to the Terms of Service and the Refund Policy/u);
+  assert.match(labels[1], /machine-safety section/u);
+  tick(window, boxes[0]);
+  assert.equal(button.disabled, true);
+  button.click();
+  await settle();
+  assert.equal(window.document.querySelector('script[src^="https://"]'), null);
+  assert.match(window.document.getElementById('checkout-status').textContent, /Tick both boxes/u);
+  window.close();
+});
+
+test('the checkout page names the seller and Paddle as merchant of record, with prices plus tax', () => {
+  const text = new JSDOM(html).window.document.body.textContent.replace(/\s+/gu, ' ');
+  assert.match(text, /Paddle\.com is the Merchant of Record for all our orders/u);
+  assert.match(text, /Johannes Stephanus Stolk/u);
+  assert.match(text, /US\$49\.50/u);
+  assert.match(text, /US\$20/u);
+  assert.match(text, /Plus applicable tax, shown before you pay/u);
+  assert.match(text, /a licence to use the software, not ownership of it/u);
+  assert.doesNotMatch(text, /Make it yours|versions you own/u);
+});
+
+test('after agreeing, the verified configuration opens the exact transaction; browser success never issues a licence', async () => {
   const window = page();
   const calls = [];
   let callback;
@@ -105,6 +151,13 @@ test('verified configuration opens the exact transaction; browser success never 
     assert.equal(options.redirect, 'error');
     return new Response(JSON.stringify(configuration));
   });
+  assert.deepEqual(calls, []);
+  for (const box of agreementBoxes(window)) tick(window, box);
+  const button = window.document.getElementById('checkout-open');
+  assert.equal(button.disabled, false);
+  button.click();
+  await settle();
+  await settle();
   assert.deepEqual(calls, [
     ['environment', 'sandbox'],
     ['initialize', configuration.clientToken],
@@ -116,8 +169,10 @@ test('verified configuration opens the exact transaction; browser success never 
     window.document.getElementById('checkout-status').textContent,
     /Return to KerfDesk.*Check payment/u,
   );
-  window.document.getElementById('checkout-open').click();
+  button.click();
+  await settle();
   assert.deepEqual(calls.at(-1), ['open', opened]);
+  assert.equal(calls.filter(([name]) => name === 'initialize').length, 1);
   window.close();
 });
 
@@ -163,6 +218,7 @@ function browserPage(storage, locks = serialLocks()) {
   return { window, opened, complete: () => completed({ name: 'checkout.completed', data: paid }) };
 }
 async function clickBrowser(window, id) {
+  if (id === 'purchase-open') for (const box of agreementBoxes(window)) tick(window, box);
   window.document.getElementById(id).click();
   for (let tries = 0; tries < 100; tries++) {
     await new Promise((resolve) => setTimeout(resolve, 1));
@@ -173,6 +229,31 @@ async function clickBrowser(window, id) {
 }
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status });
 const pendingResponse = () => response({ error: { code: 'payment_pending' } }, 409);
+
+test('mobile purchase creates no intent or payment until both agreement ticks are selected', async () => {
+  const f = browserPage();
+  const requests = [];
+  await startCheckoutPage(f.window, async (url) => {
+    requests.push(url);
+    return response(configuration);
+  });
+  const buy = f.window.document.getElementById('purchase-open');
+  const boxes = agreementBoxes(f.window);
+  assert.equal(buy.disabled, true);
+  assert.equal(f.window.document.getElementById('checkout-agreement').hidden, false);
+  buy.click();
+  await settle();
+  tick(f.window, boxes[0]);
+  assert.equal(buy.disabled, true);
+  buy.click();
+  await settle();
+  assert.equal(requests.length, 1);
+  assert.equal(f.window.localStorage.getItem(PURCHASE_STORAGE_KEY), null);
+  assert.equal(f.window.document.querySelector('script[src^="https:"]'), null);
+  tick(f.window, boxes[1]);
+  assert.equal(buy.disabled, false);
+  f.window.close();
+});
 
 test('mobile landing keeps disabled sales closed and never loads Paddle or creates an order', async () => {
   const { window, opened } = browserPage();

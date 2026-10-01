@@ -1,10 +1,18 @@
-// support-command-family — Help-menu commands that open KerfDesk's support
-// page on kerfdesk.com. The source repository is private, so customers can no
-// longer reach GitHub Issues or Discussions. The page, not the app, names the
-// current contact route, so it can change without a new release. The invokes
-// open a URL (not a store action), so these builders need no AppCommandContext.
-// The command ids keep their original names so saved shortcuts still resolve.
+// support-command-family — Help-menu commands that open KerfDesk's support,
+// pricing and policy pages on kerfdesk.com. The source repository is private,
+// so customers can no longer reach GitHub Issues or Discussions. The page, not
+// the app, names the current contact route, so it can change without a new
+// release. The invokes open a URL (not a store action), so these builders need
+// no AppCommandContext. The command ids keep their original names so saved
+// shortcuts still resolve.
 
+import {
+  PAIA_MANUAL_URL,
+  PRICING_URL,
+  PRIVACY_URL,
+  REFUNDS_URL,
+  TERMS_URL,
+} from '../common/site-page-urls';
 import { CHECK_UPDATES_EVENT } from '../licensing/update-status-text';
 import { SUPPORT_REPORT_EVENT } from '../support/support-report-event';
 import { enabled, type AppCommand } from './command-types';
@@ -64,6 +72,57 @@ export function discussionsCommand(): AppCommand {
     'Get Help',
     'Open KerfDesk support for questions, ideas and feedback',
     () => openExternalUrl(SUPPORT_URL),
+  );
+}
+
+export function pricingCommand(): AppCommand {
+  return enabled(
+    'help.pricing',
+    'help',
+    'Pricing',
+    'Open the KerfDesk Free and Pro prices, and what each edition includes',
+    () => openExternalUrl(PRICING_URL),
+  );
+}
+
+export function termsCommand(): AppCommand {
+  return enabled(
+    'help.terms',
+    'help',
+    'Terms of Service',
+    'Open the KerfDesk Terms of Service, which link the Refund Policy',
+    () => openExternalUrl(TERMS_URL),
+  );
+}
+
+export function privacyCommand(): AppCommand {
+  return enabled(
+    'help.privacy',
+    'help',
+    'Privacy Notice',
+    'Open the KerfDesk Privacy Notice: what KerfDesk sends over the network, and your rights',
+    () => openExternalUrl(PRIVACY_URL),
+  );
+}
+
+export function refundsCommand(): AppCommand {
+  return enabled(
+    'help.refunds',
+    'help',
+    'Refund Policy',
+    'Open the KerfDesk Refund Policy for Pro licences and update extensions',
+    () => openExternalUrl(REFUNDS_URL),
+  );
+}
+
+// South Africa's access-to-information law asks for the manual on the website.
+export function paiaManualCommand(): AppCommand {
+  return enabled(
+    'help.paia-manual',
+    'help',
+    'PAIA Manual',
+    'Open the KerfDesk PAIA Manual: how to ask for records under South African law',
+    () => openExternalUrl(PAIA_MANUAL_URL),
   );
 }
 

@@ -178,9 +178,9 @@ describe('Desktop release workflow gate (ADR-024/135/142/248)', () => {
   it('uses public KerfDesk names for the stable installer and shortcuts', () => {
     const builder = repoFile('electron-builder.yml');
 
-    expect(packageJson.author?.name).toBe('Johann Stolk');
+    expect(packageJson.author?.name).toBe('Johannes Stephanus Stolk');
     expect(builder).toMatch(/^productName: KerfDesk$/m);
-    expect(builder).toMatch(/^copyright: Copyright © 2026 Johann Stolk$/m);
+    expect(builder).toMatch(/^copyright: Copyright © 2026 Johannes Stephanus Stolk$/m);
     expect(builder).toContain('artifactName: KerfDesk-${version}-windows-${arch}-setup.${ext}');
     expect(builder).toContain('shortcutName: KerfDesk');
     expect(builder).toContain('appId: dev.laserforge.app');

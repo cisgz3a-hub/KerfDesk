@@ -23,7 +23,7 @@ const RENDERER_SURFACES = [
 ];
 const SURFACE_VERSION_RADIUS = 512;
 const VERSION_TOKEN_CHARACTER = /[0-9A-Za-z.-]/;
-const PACKAGE_AUTHOR_NAME = 'Johann Stolk';
+const PACKAGE_AUTHOR_NAME = 'Johannes Stephanus Stolk';
 
 export function verifyPackagedPreviewMetadata(value, expectedVersion) {
   if (typeof value !== 'object' || value === null) {

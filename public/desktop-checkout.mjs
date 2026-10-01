@@ -52,13 +52,23 @@ async function openCheckout(window, config, transaction, onCompleted) {
   });
 }
 
+const UNAVAILABLE =
+  'Checkout is temporarily unavailable. Return to KerfDesk to check an existing payment before trying again.';
 export async function startCheckoutPage(window, fetcher = fetch) {
   const status = window.document.getElementById('checkout-status');
   const button = window.document.getElementById('checkout-open');
-  if (!status || !button) return;
+  const agreement = window.document.getElementById('checkout-agreement');
+  if (!status || !button || !agreement) return;
+  const boxes = [...agreement.querySelectorAll('input[data-checkout-agreement]')];
+  const agreed = () => boxes.length === 2 && boxes.every((box) => box.checked);
   const transaction = checkoutTransaction(window.location.search);
   if (transaction === null) {
-    if (window.location.search === '') return startBrowserPurchase(window, fetcher, openCheckout);
+    if (window.location.search === '')
+      return startBrowserPurchase(window, fetcher, openCheckout, {
+        element: agreement,
+        boxes,
+        agreed,
+      });
     status.textContent =
       'This checkout link is invalid. Reopen it from the desktop app or visit the licence page without a query string.';
     return;
@@ -70,28 +80,34 @@ export async function startCheckoutPage(window, fetcher = fetch) {
         'Checkout is not available yet. Return to KerfDesk to check an existing payment.';
       return;
     }
-    const complete = () => {
-      status.textContent =
-        'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
+    const refresh = () => {
+      button.disabled = !agreed();
     };
-    const open = () => openCheckout(window, config, transaction, complete);
-    await open();
-    button.addEventListener(
-      'click',
-      () =>
-        void open().catch(() => {
-          status.textContent =
-            'Checkout could not reopen. Return to KerfDesk and select Check payment before trying again.';
-        }),
-    );
+    for (const box of boxes) box.addEventListener('change', refresh);
+    // No discount field: the licence service refuses a discounted payment, so a code
+    // entered here would take money without issuing a licence (ADR-523 Amendment 3).
+    button.addEventListener('click', () => {
+      if (!agreed()) return;
+      void (async () => {
+        try {
+          await openCheckout(window, config, transaction, () => {
+            status.textContent =
+              'Return to KerfDesk and select Check payment to confirm and activate your purchase.';
+          });
+        } catch {
+          status.textContent = UNAVAILABLE;
+        }
+      })();
+    });
+    refresh();
+    agreement.hidden = false;
     button.hidden = false;
     status.textContent =
       config.environment === 'sandbox'
-        ? 'Test checkout. No real payment will be taken.'
-        : 'Your secure checkout is ready.';
+        ? 'Test checkout. No real payment will be taken. Tick both boxes to open the checkout.'
+        : 'Tick both boxes to open the secure checkout.';
   } catch {
-    status.textContent =
-      'Checkout is temporarily unavailable. Return to KerfDesk to check an existing payment before trying again.';
+    status.textContent = UNAVAILABLE;
   }
 }
 

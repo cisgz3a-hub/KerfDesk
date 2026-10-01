@@ -123,24 +123,25 @@ export default defineConfig({
         ],
         // Optional lesson pictures must never join the install-time app download.
         // Keep Workbox's default node_modules exclusion when adding our own.
-        // The standalone checkout, download, support and privacy pages, and the modules
+        // The standalone checkout, download and support pages, and the modules
         // and key sets they load, always come from the network (ADR-523): a
         // cached copy could show an outdated price, trust anchor, release or
-        // support contact or privacy notice.
+        // support contact. So do the pricing, legal, machines and safety pages
+        // (ADR-524 Amendment 3): a cached copy could show an outdated price or terms.
         globIgnores: [
           '**/node_modules/**/*',
           '**/tutorial-images/**',
           'buy.html',
           'download.html',
           'support.html',
-          'privacy/**',
           'desktop-*.{mjs,json,css}',
+          '{pricing,privacy,refunds,terms,paia-manual,license,machines,safety}/**',
         ],
         // Their query strings (?_ptxn=, ?version=) never match the precache, and
         // the app-shell fallback would otherwise answer them with the workspace.
         navigateFallbackDenylist: [
           /^[/](?:buy|download|support)(?:[.]html)?(?:[?#]|$)/,
-          /^[/]privacy(?:[/]|[?#]|$)/,
+          /^[/](?:pricing|privacy|refunds|terms|paia-manual|license|machines|safety)(?:[/](?:index[.]html)?)?(?:[?#]|$)/,
         ],
         // The plugin's navigateFallback answers a navigation the precache
         // cannot with index.html. Only the entry at the deploy root, with or

@@ -6,9 +6,16 @@ describe('SAFETY_NOTICE_TEXT', () => {
   // routers. Each check pins a hazard a well-meaning trim must not drop —
   // grounded in laser/CNC safety guidance and the app's own "software cannot
   // guarantee stopping the machine" reality (see the laser safety notices).
-  it('states use-at-own-risk with no warranty', () => {
-    expect(SAFETY_NOTICE_TEXT).toMatch(/OWN RISK/i);
-    expect(SAFETY_NOTICE_TEXT).toMatch(/no warranty/i);
+  it('says KerfDesk is not a safety device and its stops are not emergency stops', () => {
+    expect(SAFETY_NOTICE_TEXT).toMatch(/not a safety device/i);
+    expect(SAFETY_NOTICE_TEXT).toMatch(/not emergency stops/i);
+  });
+
+  // The Terms of Service decide warranty and liability, and they never limit
+  // liability for death or injury our negligence causes.
+  it('leaves warranty and liability to the terms, never waiving them', () => {
+    expect(SAFETY_NOTICE_TEXT).not.toMatch(/own risk|no warranty/i);
+    expect(SAFETY_NOTICE_TEXT).toContain('https://kerfdesk.com/terms/');
   });
 
   it('tells the operator to verify output and know the physical E-stop', () => {
@@ -30,6 +37,6 @@ describe('SAFETY_NOTICE_TEXT', () => {
   });
 
   it('points to the full guide', () => {
-    expect(SAFETY_NOTICE_TEXT).toContain('docs/safety.md');
+    expect(SAFETY_NOTICE_TEXT).toContain('https://kerfdesk.com/safety/');
   });
 });

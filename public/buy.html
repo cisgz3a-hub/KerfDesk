@@ -57,13 +57,34 @@
           <ul class="licence-facts">
             <li><span aria-hidden="true">✓</span> Three active computers</li>
             <li><span aria-hidden="true">✓</span> One year of updates included</li>
-            <li><span aria-hidden="true">✓</span> Keep using the versions you own</li>
+            <li><span aria-hidden="true">✓</span> Keep using your licensed versions</li>
           </ul>
           <div class="purchase-panel" aria-labelledby="checkout-heading">
-            <h3 id="checkout-heading">Make it yours</h3>
+            <h3 id="checkout-heading">Choose your licence</h3>
             <p id="checkout-status" role="status" aria-live="polite">
               Checking purchase availability…
             </p>
+            <div id="checkout-agreement" hidden>
+              <label>
+                <input type="checkbox" data-checkout-agreement />
+                <span
+                  >I have read and agree to the
+                  <a href="/terms/" target="_blank">Terms of Service</a> and the
+                  <a href="/refunds/" target="_blank">Refund Policy</a>, and I have read the
+                  <a href="/privacy/" target="_blank">Privacy Notice</a>.</span
+                >
+              </label>
+              <label>
+                <input type="checkbox" data-checkout-agreement />
+                <span
+                  >I have read the machine-safety section of the terms (<a
+                    href="/terms/#section-2"
+                    target="_blank"
+                    >section 2</a
+                  >), understand the risks, and will operate my machine safely.</span
+                >
+              </label>
+            </div>
             <button
               id="checkout-open"
               type="button"
@@ -231,6 +252,19 @@
         </details>
       </section>
     </main>
+    <p class="seller">
+      Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant
+      of Record for all our orders. Paddle provides all customer service inquiries and handles
+      returns.
+    </p>
+    <p class="seller">
+      KerfDesk is made and licensed by Johannes Stephanus Stolk, trading as KerfDesk. For help with
+      a payment, receipt, invoice or refund, go to
+      <a href="https://paddle.net">paddle.net</a>; for help with KerfDesk or your licence, see
+      <a href="/support.html">Support</a>.
+    </p>
+
+    <p class="seller">You buy a licence to use the software, not ownership of it.</p>
     <footer class="site-footer">
       <p>KerfDesk <span>by Ons Houtkombuis</span></p>
       <nav aria-label="Footer">
