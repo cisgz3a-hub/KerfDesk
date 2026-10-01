@@ -111,6 +111,7 @@ function FontChooser(props: {
           className="lf-input"
           type="search"
           aria-label="Search fonts"
+          title="Search by font name or category."
           placeholder="Search fonts…"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
