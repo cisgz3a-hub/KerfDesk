@@ -43,16 +43,22 @@ export function verifyWorkflowText(file, source) {
   return failures;
 }
 
+function yamlFiles(directory) {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) return yamlFiles(file);
+    return entry.isFile() && /\.ya?ml$/u.test(entry.name) ? [file] : [];
+  });
+}
+
 export function verifyWorkflowDirectory(root) {
-  const workflowDir = path.join(root, '.github', 'workflows');
-  return fs
-    .readdirSync(workflowDir)
-    .filter((name) => /\.ya?ml$/u.test(name))
+  return ['workflows', 'actions']
+    .flatMap((directory) => yamlFiles(path.join(root, '.github', directory)))
     .sort()
-    .flatMap((name) => {
-      const file = path.join(workflowDir, name);
-      return verifyWorkflowText(path.relative(root, file), fs.readFileSync(file, 'utf8'));
-    });
+    .flatMap((file) =>
+      verifyWorkflowText(path.relative(root, file), fs.readFileSync(file, 'utf8')),
+    );
 }
 
 const invoked = process.argv[1] === fileURLToPath(import.meta.url);

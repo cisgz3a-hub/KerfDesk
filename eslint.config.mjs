@@ -85,6 +85,9 @@ export default tseslint.config(
       // Electron main process compiles under its own tsconfig
       // (electron/tsconfig.json) — exclude from the root lint pass.
       'electron/**',
+      // This isolated Worker has its own strict lint, checked by the mandatory
+      // remote-control CI job and release:check.
+      'services/remote-control/**',
     ],
   },
   js.configs.recommended,

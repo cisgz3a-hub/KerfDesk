@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 import {
   REVIEWED_ACTIONS,
@@ -28,4 +31,24 @@ test('mutable, unreviewed, and changed full-SHA references fail independently', 
   assert.match(failures[0] ?? '', /full 40-character commit SHA/u);
   assert.match(failures[1] ?? '', /not reviewed\/allowlisted/u);
   assert.match(failures[2] ?? '', /not the reviewed allowlisted SHA/u);
+});
+
+test('local composite actions cannot hide an unpinned external action', () => {
+  const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-actions-test-'));
+  try {
+    const actionPath = path.join(temporaryRoot, '.github', 'actions', 'nested', 'action.yml');
+    fs.mkdirSync(path.dirname(actionPath), { recursive: true });
+    fs.writeFileSync(
+      actionPath,
+      'runs:\n  using: composite\n  steps:\n    - uses: actions/setup-node@v6\n',
+    );
+    const failures = verifyWorkflowDirectory(temporaryRoot);
+    assert.equal(failures.length, 1);
+    assert.match(failures[0], /nested.*action.yml.*full 40-character commit SHA/u);
+  } finally {
+    const absolute = path.resolve(temporaryRoot);
+    assert.equal(path.dirname(absolute), path.resolve(os.tmpdir()));
+    assert.ok(path.basename(absolute).startsWith('kerfdesk-actions-test-'));
+    fs.rmSync(absolute, { recursive: true, force: true });
+  }
 });

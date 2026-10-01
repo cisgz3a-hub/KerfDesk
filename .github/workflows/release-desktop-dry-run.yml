@@ -68,6 +68,9 @@ jobs:
       - name: Verify canonical release repository
         run: pnpm guard:repo
 
+      - name: Prepare the service checks
+        uses: ./.github/actions/setup-remote-control
+
       - name: Release verification gate
         if: ${{ !inputs.qualify_installer }}
         env:

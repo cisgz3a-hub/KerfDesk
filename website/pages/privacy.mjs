@@ -10,6 +10,7 @@
 
 import { callout, featureGrid, pageHero, section, statusPill, table } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
+import { remotePrivacy } from '../lib/remote-privacy.mjs';
 
 const AT_A_GLANCE = [
   {
@@ -19,8 +20,8 @@ const AT_A_GLANCE = [
   },
   {
     icon: 'user-x',
-    title: 'No account',
-    body: 'KerfDesk has no sign-up or sign-in. A Pro trial or license sends only the few licensing details listed below.',
+    title: 'No account required',
+    body: 'Ordinary desktop use needs no account. Pro licensing sends the few details below. Optional phone and MCP access needs your approval on the computer.',
   },
   {
     icon: 'eye-off',
@@ -30,7 +31,7 @@ const AT_A_GLANCE = [
   {
     icon: 'hard-drive',
     title: 'Your work stays with you',
-    body: 'Your projects, machine details and jobs stay on your computer. KerfDesk doesn’t upload them.',
+    body: 'Saved projects and jobs stay on your computer. If you enable remote access, approved clients receive the summaries and changes described below.',
   },
 ];
 
@@ -86,6 +87,11 @@ function connections(site) {
       'You open the Camera panel or use a network camera in the desktop app',
       'A helper on your own computer, and cameras on your private network',
       'Requests for camera pictures. They stay on your local network. See below.',
+    ],
+    [
+      'You enable approved phone or MCP access',
+      'kerfdesk-phone-control.cisgz3a.workers.dev (Cloudflare)',
+      'An authenticated connection carries approved requests and bounded workspace, machine and recipe summaries. Access starts turned off, and each client needs your approval. See below for permissions, cookies and retention.',
     ],
   ];
 }
@@ -285,8 +291,8 @@ function appPart(site, appPrivacy) {
       rows: connections(site),
     })}
     <div class="prose">
-      ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${cameraHelper()}
-      ${deviceAccess()}
+      ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${remotePrivacy()}
+      ${cameraHelper()} ${deviceAccess()}
       ${callout({
         iconName: 'wifi-off',
         title: 'Working offline',
@@ -318,10 +324,10 @@ export const page = {
   nav: null,
   title: 'Privacy',
   description:
-    'KerfDesk has no account, analytics or cloud sync, and this site sets no cookies. See what the site and the app send, including for Pro licensing.',
+    'KerfDesk needs no account for ordinary use. This site sets no cookies. Read the app disclosures for updates, licensing, downloads and optional phone or MCP access.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-09-30">September 30, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-01">October 1, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

@@ -21,8 +21,8 @@ permissions:
   contents: read
 
 # The release gate runs as parallel jobs rather than one `pnpm release:check`
-# chain (ADR-557). Every command in release:check runs in one of the first
-# three jobs, and the unit tests are split into shards. The last job keeps the
+# chain (ADR-557). Every command in release:check runs in one of these
+# jobs, and the unit tests are split into shards. The last job keeps the
 # gate's check name and passes only when every other job passed, so a required
 # check of that name, and deploy.yml's trigger on a successful CI run, still
 # mean the whole gate passed. scripts/ci-parallel-gate.test.mjs pins both.
@@ -148,9 +148,30 @@ jobs:
       - name: Run this shard of the unit tests
         run: pnpm test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
+  remote-control:
+    name: Phone and MCP service
+    runs-on: ubuntu-latest
+    env:
+      KERFDESK_TEST_BROWSER: chromium
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Prepare the service checks
+        uses: ./.github/actions/setup-remote-control
+
+      - name: Install shared desktop dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check the phone and MCP service
+        run: pnpm check:remote-control
+
   ci:
     name: Lint, typecheck, license, test, build
-    needs: [static-checks, policy-and-build, unit-tests]
+    needs: [static-checks, policy-and-build, unit-tests, remote-control]
     # Runs whatever the jobs above did, so a failed or cancelled job fails
     # this check instead of skipping it: GitHub counts a skipped required
     # check as passed.

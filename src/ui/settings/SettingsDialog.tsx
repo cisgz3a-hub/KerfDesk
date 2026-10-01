@@ -18,6 +18,7 @@ import { SettingsGeneralSection } from './SettingsGeneralSection';
 import { SettingsMachineSection } from './SettingsMachineSection';
 import { useSettingsDialogStore, type SettingsSectionId } from './settings-dialog-store';
 import { settingsNoteStyle } from './settings-styles';
+import { RemoteAccessSection } from '../remote-access/RemoteAccessSection';
 
 type SectionSpec = {
   readonly id: SettingsSectionId;
@@ -25,6 +26,7 @@ type SectionSpec = {
   readonly title: string;
   // Labs holds laser-only workflows (ADR-101): hidden while the project is CNC.
   readonly laserOnly?: boolean;
+  readonly desktopOnly?: boolean;
 };
 
 export const SETTINGS_SECTIONS: ReadonlyArray<SectionSpec> = [
@@ -49,10 +51,21 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SectionSpec> = [
     title: 'Optional laser workflows that are still being hardware-validated',
     laserOnly: true,
   },
+  {
+    id: 'remote',
+    label: 'Phone & MCP',
+    title: 'Approved remote viewing and editing connections',
+    desktopOnly: true,
+  },
 ];
 
 export function visibleSettingsSections(machineKind: MachineKind): ReadonlyArray<SectionSpec> {
-  return SETTINGS_SECTIONS.filter((entry) => entry.laserOnly !== true || machineKind === 'laser');
+  return SETTINGS_SECTIONS.filter(
+    (entry) =>
+      (entry.laserOnly !== true || machineKind === 'laser') &&
+      (entry.desktopOnly !== true ||
+        (typeof location !== 'undefined' && location.protocol === 'app:')),
+  );
 }
 
 export function SettingsDialog(props: { readonly onClose: () => void }): JSX.Element {
@@ -149,6 +162,8 @@ function SectionBody(props: {
       return <SettingsMachineSection machineKind={props.machineKind} onClose={props.onClose} />;
     case 'labs':
       return <LabsFeatureList />;
+    case 'remote':
+      return <RemoteAccessSection />;
   }
 }
 

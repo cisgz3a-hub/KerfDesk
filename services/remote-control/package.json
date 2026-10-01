@@ -1,0 +1,41 @@
+{
+  "name": "@kerfdesk/remote-control",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@11.3.0",
+  "scripts": {
+    "test": "pnpm build && node --test test/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "license-check": "node ../../scripts/check-licenses.mjs && node scripts/generate-notices.mjs --check",
+    "generate:notices": "node scripts/generate-notices.mjs",
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "dev": "wrangler dev",
+    "deploy": "node scripts/preflight-deploy.mjs && wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.1",
+    "@modelcontextprotocol/server": "2.2.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.4",
+    "@playwright/test": "1.61.1",
+    "@modelcontextprotocol/client": "2.2.0",
+    "@types/node": "24.12.0",
+    "eslint": "9.39.4",
+    "eslint-config-prettier": "9.1.2",
+    "globals": "15.15.0",
+    "miniflare": "5.20260930.0-alpha",
+    "prettier": "3.8.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.59.4",
+    "wrangler": "4.145.0"
+  }
+}
