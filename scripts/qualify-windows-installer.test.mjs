@@ -1,12 +1,67 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const script = fileURLToPath(new URL('./qualify-windows-installer.ps1', import.meta.url));
+
+test(
+  'Windows PowerShell qualification children can hash files without inheriting incompatible pwsh modules',
+  { skip: process.platform !== 'win32' },
+  () => {
+    const helper = fileURLToPath(new URL('./windows-powershell-process.ps1', import.meta.url));
+    const root = mkdtempSync(path.join(tmpdir(), 'kerfdesk-winps-modules-'));
+    const file = path.join(root, 'saved project [fixture].lf2');
+    const bytes = Buffer.from([0, 1, 127, 128, 255, 13, 10, 42]);
+    writeFileSync(file, bytes);
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    const child = `
+$ErrorActionPreference = 'Stop'
+@{ hash = (Get-FileHash -LiteralPath ${quoted(file)} -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = (Get-Item -LiteralPath ${quoted(file)}).Length; major = $PSVersionTable.PSVersion.Major; marker = $env:KERFDESK_QUALIFICATION_TEST_MARKER } | ConvertTo-Json -Compress
+`;
+    const command = `
+$ErrorActionPreference = 'Stop'
+. ${quoted(helper)}
+# A direct ProcessStartInfo launch does not receive pwsh's native-command path cleanup.
+$coreModules = Join-Path $PSHOME 'Modules'
+$env:PSModulePath = $coreModules
+$env:KERFDESK_QUALIFICATION_TEST_MARKER = 'retained-marker'
+$info = New-QualificationWindowsPowerShell
+$info.UseShellExecute = $false; $info.CreateNoWindow = $true
+$info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+$info.Arguments = '-NoProfile -NonInteractive -EncodedCommand ${Buffer.from(child, 'utf16le').toString('base64')}'
+$process = [Diagnostics.Process]::Start($info)
+try {
+  $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+  if (-not $process.WaitForExit(15000)) { $process.Kill(); throw 'Read-only hash probe timed out.' }
+  if ($process.ExitCode -ne 0) { throw $stderr.GetAwaiter().GetResult() }
+  @{ child = ($stdout.GetAwaiter().GetResult() | ConvertFrom-Json); childModulePathRemoved = -not $info.EnvironmentVariables.ContainsKey('PSModulePath'); parentUnchanged = $env:PSModulePath -eq $coreModules } | ConvertTo-Json -Depth 4 -Compress
+} finally { $process.Dispose() }
+`;
+    try {
+      const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+        encoding: 'utf8',
+        timeout: 30_000,
+        windowsHide: true,
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, result.stderr);
+      const report = JSON.parse(result.stdout);
+      assert.equal(report.child.hash, createHash('sha256').update(bytes).digest('hex'));
+      assert.equal(report.child.bytes, bytes.length);
+      assert.equal(report.child.major, 5, 'must exercise the native Windows PowerShell host');
+      assert.equal(report.child.marker, 'retained-marker', 'preserve unrelated child variables');
+      assert.equal(report.childModulePathRemoved, true);
+      assert.equal(report.parentUnchanged, true, 'do not rewrite the parent environment');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
 
 test(
   'strict native selectors ignore unsupported descendants without accepting wrong roles or ambiguous owners',
