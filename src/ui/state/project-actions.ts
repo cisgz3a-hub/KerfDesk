@@ -59,7 +59,17 @@ export function projectActions(
     },
     newProject: () =>
       set((state) => {
-        const blankProject = createProject(state.project.device);
+        // Accepted older CNC files can have no device mirror, or an older one.
+        // Carry only CNC hardware into the fresh job seed, including when the
+        // operator currently has Laser selected. Do not carry the parked job.
+        const activeMachine = state.project.machine;
+        const cncHardware =
+          activeMachine?.kind === 'cnc' ? activeMachine : state.project.parkedCncMachine;
+        const device =
+          cncHardware !== undefined
+            ? { ...state.project.device, cncSubProfile: { ...cncHardware.params } }
+            : state.project.device;
+        const blankProject = createProject(device);
         const project = resolveProjectMachineCapability(
           blankProject,
           state.cncLibrary.customTools,
