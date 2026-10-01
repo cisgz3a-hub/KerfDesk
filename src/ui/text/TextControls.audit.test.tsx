@@ -33,9 +33,9 @@ it.each(FONT_REGISTRY)('font picker chooses $displayName and closes', async (fon
   const change = vi.fn();
   const host = await mountControl(<FontPicker value="roboto-regular" onChange={change} />);
   await clickControl(host, 'Open the font picker and choose the text typeface.');
-  await clickControl(host, `Use ${font.displayName} for this text object.`);
+  await clickControl(fontMenu(host), `Use ${font.displayName} for this text object.`);
   expect(change).toHaveBeenCalledExactlyOnceWith(font.key);
-  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  expect(control(host, 'Font').getAttribute('aria-expanded')).toBe('false');
 });
 
 it('font picker chooses an embedded font and closes', async () => {
@@ -48,9 +48,9 @@ it('font picker chooses an embedded font and closes', async () => {
     />,
   );
   await clickControl(host, 'Open the font picker and choose the text typeface.');
-  await clickControl(host, 'Use embedded font Audit.ttf.');
+  await clickControl(fontMenu(host), 'Use embedded font Audit.ttf.');
   expect(change).toHaveBeenLastCalledWith('embedded-audit');
-  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  expect(control(host, 'Font').getAttribute('aria-expanded')).toBe('false');
 });
 
 it('the same font picker reopens between built-in and embedded selections', async () => {
@@ -78,11 +78,11 @@ it('the same font picker reopens between built-in and embedded selections', asyn
   ] as const;
   for (const [index, [title, key]] of selections.entries()) {
     await clickControl(host, 'Open the font picker and choose the text typeface.');
-    expect(host.querySelector('[role="listbox"]')).not.toBeNull();
-    await clickControl(host, title);
+    expect(fontMenu(host).querySelector('[role="listbox"]')).not.toBeNull();
+    await clickControl(fontMenu(host), title);
     expect(change).toHaveBeenCalledTimes(index + 1);
     expect(change).toHaveBeenNthCalledWith(index + 1, key);
-    expect(host.querySelector('[role="listbox"]')).toBeNull();
+    expect(control(host, 'Font').getAttribute('aria-expanded')).toBe('false');
   }
 });
 
@@ -160,7 +160,7 @@ it('formatting radio, weld, path enable/reverse and variable toggles update the 
   expect(latest!.variableEnabled).toBe(true);
   const single = FONT_REGISTRY.find((font) => font.geometry === 'single-line')!;
   await clickControl(host, 'Open the font picker and choose the text typeface.');
-  await clickControl(host, `Use ${single.displayName} for this text object.`);
+  await clickControl(fontMenu(host), `Use ${single.displayName} for this text object.`);
   expect(
     host.querySelector<HTMLInputElement>('[aria-label="Weld overlapping letters"]')?.disabled,
   ).toBe(true);
@@ -229,3 +229,10 @@ it('Add Text Cancel closes without editing the project', async () => {
   expect(useUiStore.getState().textDialog).toBeNull();
   expect(useStore.getState().project).toBe(project);
 });
+
+function fontMenu(host: ParentNode): HTMLElement {
+  const id = control(host, 'Font').getAttribute('aria-controls');
+  const menu = id === null ? null : document.getElementById(id);
+  if (menu === null) throw new Error('Font chooser missing');
+  return menu;
+}

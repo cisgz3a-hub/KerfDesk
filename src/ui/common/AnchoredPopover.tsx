@@ -10,7 +10,10 @@ type PopoverProps = {
   readonly className?: string;
   readonly children: ReactNode;
   readonly initialFocus?: string;
+  /** Keep controls inside their owning modal's focus boundary when needed. */
+  readonly portalHost?: Element | null;
   readonly onClose: () => void;
+  readonly onKeyDownCapture?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   readonly onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
 };
 
@@ -68,6 +71,7 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
       aria-label={props.label}
       className={`lf-anchored-popover ${props.className ?? ''}`}
       style={position}
+      onKeyDownCapture={props.onKeyDownCapture}
       onKeyDown={(event) => {
         if (event.key === 'Escape' || event.key === 'Tab') {
           if (event.key === 'Escape') event.preventDefault();
@@ -81,7 +85,7 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
     >
       {props.children}
     </div>,
-    document.body,
+    props.portalHost ?? document.body,
   );
 }
 

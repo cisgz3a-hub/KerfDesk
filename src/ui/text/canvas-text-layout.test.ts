@@ -65,6 +65,14 @@ describe('canvas text input placement', () => {
 });
 
 describe('canvas text panel placement', () => {
+  it('uses the space above companion lettering in a short window without covering its input', () => {
+    const input = { left: 180, top: 220, width: 180, height: 48 };
+    const panel = canvasTextPanelPosition(input, { width: 620, height: 408 });
+    expect(Number(panel.top)).toBeGreaterThanOrEqual(0);
+    expect(Number(panel.top) + Number(panel.maxHeight)).toBeLessThan(input.top);
+    expect(Number(panel.maxHeight)).toBeGreaterThan(input.height * 3);
+  });
+
   it('docks below lettering when the side rails leave no horizontal space', () => {
     const panel = canvasTextPanelPosition(
       { left: 180, top: 220, width: 180, height: 48 },

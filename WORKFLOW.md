@@ -3171,7 +3171,11 @@ settings and Job Review keep their existing read-only setup references.
 - **Path text** (ADR-480): **Place at** puts the text at the Start, Middle or End of its guide
   path; **Path offset** moves it away from that point. **Text sits** puts the text on top of the
   path, centred on it, or hanging below it. Text that does not fit is reported and not placed.
-- F-D3. Choose font. The picker draws real `Aa` toolpath previews for Relief
+- F-D3. Choose font. The menu keeps readable font names with a separate preview of your
+  first line of text. Search by name or font category, or scroll within the menu without
+  moving the text panel. The selected font is visible when reopening the menu. Arrow keys
+  browse, Home/End in the list reach the first/last font, and Enter chooses; Escape closes only the
+  font menu and returns focus to its button. The picker draws real `Aa` toolpath previews for Relief
   SingleLine, EMS Nixish, EMS Decorous Script, and EMS Casual Hand. These create
   open center strokes, so use **Engrave** or **Profile on path**; V-carve,
   Pocket, and Fill require an outline font with closed regions. Fresh CNC
