@@ -35,12 +35,12 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
   add_text: {
     title: 'Add text artwork',
     description:
-      'Add text using the selected existing font or regular default, in millimetres. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+      'Add text with the bundled regular default font in a Laser workspace, in millimetres. widthMm is a maximum layout width: overflowing text shrinks uniformly and keeps its aspect ratio. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
   },
   add_rectangle: {
     title: 'Add rectangle artwork',
     description:
-      'Add a rectangle in millimetres. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+      'Add a rectangle in a Laser workspace, in millimetres. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
   },
   transform_artwork: {
     title: 'Transform existing artwork',

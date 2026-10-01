@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 
 import { JSON_SCHEMA, load } from 'js-yaml';
@@ -83,6 +83,48 @@ test('CI splits the unit tests into shards', async () => {
   const ci = await readWorkflow('.github/workflows/ci.yml');
 
   shardJobOf(ci, 'pnpm test');
+});
+
+test('every full release gate prepares the isolated service runtime and browser', async () => {
+  const workflowFiles = (await readdir('.github/workflows')).filter((name) =>
+    /\.ya?ml$/u.test(name),
+  );
+  let callers = 0;
+  for (const file of workflowFiles) {
+    const workflow = await readWorkflow(`.github/workflows/${file}`);
+    for (const [jobName, job] of Object.entries(workflow.jobs)) {
+      const steps = job.steps ?? [];
+      const preparation = steps.findIndex(
+        (step) => step.uses === './.github/actions/setup-remote-control',
+      );
+      for (const [index, step] of steps.entries()) {
+        if (!commandsOf({ steps: [step] }).some((command) => command === 'pnpm release:check'))
+          continue;
+        callers += 1;
+        assert.ok(
+          preparation >= 0 && preparation < index,
+          `${file}/${jobName} must prepare its service checks first`,
+        );
+        assert.ok(steps[preparation].if === undefined || steps[preparation].if === step.if);
+      }
+    }
+  }
+  assert.ok(callers >= 7);
+  const action = await readWorkflow('.github/actions/setup-remote-control/action.yml');
+  const nodeSetup = action.runs.steps.find((step) =>
+    String(step.uses).startsWith('actions/setup-node@'),
+  );
+  assert.equal(nodeSetup.with['node-version'], 24);
+  assert.ok(
+    commandsOf({ steps: action.runs.steps }).includes(
+      'pnpm --dir services/remote-control install --frozen-lockfile --ignore-scripts',
+    ),
+  );
+  assert.ok(
+    commandsOf({ steps: action.runs.steps }).includes(
+      'pnpm --dir services/remote-control exec playwright install --with-deps chromium',
+    ),
+  );
 });
 
 test('Browser smoke shards the suite and runs its other checks once', async () => {

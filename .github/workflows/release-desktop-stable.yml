@@ -119,6 +119,9 @@ jobs:
           STABLE_PUBLICATION_GROUP: kerfdesk-stable-publication
         run: node scripts/stable-release-retry.mjs "${{ steps.version.outputs.version }}"
 
+      - name: Prepare the service checks
+        uses: ./.github/actions/setup-remote-control
+
       - name: Release verification gate
         # Same green-gate as the web CI, on Windows. Also builds dist/web and
         # dist-electron, which electron-builder then packages.

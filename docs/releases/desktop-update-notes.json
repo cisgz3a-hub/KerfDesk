@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sinceSourceSha": "a6c7642ffcd784c2f680867b494d29cd71d826ef",
   "highlights": [
-    "Updated the desktop runtime with Chromium and Windows fixes.",
-    "Improved desktop opening order for licence and update checks.",
+    "Connect a phone control page or an MCP client with approval on your computer.",
+    "View workspace details and edit basic laser artwork from approved connections.",
     "Your saved machine and its settings now load automatically on startup.",
     "New canvases start with fresh job settings; saved projects keep their settings.",
-    "Added checks that desktop upgrades retain projects and preferences.",
+    "Improved licence startup order and checks that upgrades retain your projects.",
     "Restored the public privacy notice and improved download statistics reliability."
   ]
 }

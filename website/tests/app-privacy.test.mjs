@@ -30,7 +30,7 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   const document = expected.get('index.html').toString('utf8');
   const text = textContent(document);
   assert.match(document, /href="https:\/\/kerfdesk.com\/privacy\/"/);
-  assert.match(document, /datetime="2026-09-30"/);
+  assert.match(document, /datetime="2026-10-01"/);
   assert.match(text, /No cookies on this page/);
   assert.doesNotMatch(text, /This website sets no cookies/);
   assert.match(text, /grouped by date, app version, platform and request country/);
@@ -41,6 +41,11 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   assert.match(text, /Requests use no cookies/);
   assert.match(text, /The unsigned Windows edition checks for updates/);
   assert.match(text, /installation starts only after you choose Install and close KerfDesk/);
+  assert.match(text, /Remote access starts turned off/);
+  assert.match(text, /sameSite=Strict/i);
+  assert.match(text, /Command arguments and workspace responses are processed in memory/);
+  assert.match(text, /cannot run a machine/);
+  assert.match(text, /There is no promised deletion timer for an idle computer/);
   assert.match(document, /http-equiv="Content-Security-Policy"/);
   assert.match(document, /script-src &#39;none&#39;/);
   assert.doesNotMatch(document, /<script\b|<style\b|\son[a-z]+="|\sstyle="|javascript:/i);
