@@ -183,7 +183,7 @@ test('the licensed Windows trial says it is unreleased while no commercial catal
     await populateCommercialDownload(document, server.fetchRequest);
     assert.match(
       document.querySelector('#commercial-status').textContent,
-      /no licensed Windows edition to download right now/u,
+      /has not been released yet/u,
     );
     for (const link of commercialLinks(document)) {
       assert.equal(link.hidden, true);
