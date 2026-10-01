@@ -63,6 +63,16 @@ function connections(site) {
       'Only the licensing details listed below. See below.',
     ],
     [
+      'The desktop app confirms a saved trial or license',
+      site.licensingHost,
+      'At startup and every 30 minutes while open, the app checks whether a quiet weekly license confirmation is due. When due, it sends the installation digest and saved credential. No project, design, machine or job details.',
+    ],
+    [
+      'The unsigned Windows edition checks for updates',
+      site.downloadHost,
+      'At startup and every 30 minutes while open, a request for the list of released versions. It also checks when you choose Check for Updates. An installer downloads only when you choose Download; installation starts only after you choose Install and close KerfDesk. No project, design, machine or job details.',
+    ],
+    [
       'The signed Windows edition checks for updates',
       site.downloadHost,
       'Requests for the list of released versions and, when a newer one your license covers exists, its update files. No project, design, machine or job details.',
@@ -75,9 +85,13 @@ function connections(site) {
   ];
 }
 
-function websitePart(site) {
+function websitePart(site, appPrivacy) {
   return html`<div class="prose">
-    <p>This site is a set of plain pages. It has:</p>
+    <p>
+      ${appPrivacy
+        ? 'This privacy page is a plain document. It has:'
+        : 'This site is a set of plain pages. It has:'}
+    </p>
     <ul>
       <li>no cookies</li>
       <li>no analytics or visitor tracking</li>
@@ -93,15 +107,20 @@ function websitePart(site) {
     <p>
       Like any website, this one is delivered by a web server. Each time your browser asks for a
       page, it sends the standard details every site receives: your IP address, which browser you
-      use, the page you asked for and the time. That is how the page gets to you. This site adds no
-      tracking of its own.
+      use, the page you asked for and the time. That is how the page gets to you.
+      ${appPrivacy
+        ? 'This privacy page adds no tracking of its own.'
+        : 'This site adds no tracking of its own.'}
     </p>
     <h3>Links to other sites</h3>
     <p>
-      Links that leave this site go to kerfdesk.com: the KerfDesk app, its download page, its
-      support page and its notices. <a href="#app">Part 2</a> covers the app. The download page
-      serves installers from ${site.downloadHost}. Your browser may tell the next site that you came
-      from here, but not which page.
+      ${appPrivacy
+        ? 'Links on this page open other KerfDesk pages:'
+        : 'Links that leave this site go to kerfdesk.com:'}
+      the KerfDesk app, its download page, its support page and its notices.
+      <a href="#app">Part 2</a> covers the app. The download page serves installers from
+      ${site.downloadHost}. Your browser may tell the next site that you came from here, but not
+      which page.
     </p>
     <h3>Download statistics</h3>
     <p>
@@ -137,15 +156,16 @@ function storedLocally() {
     </ul>`;
 }
 
-function previewCheck(site) {
+function previewCheck(site, appPrivacy) {
   return html`<h3>The desktop Preview’s update check</h3>
     <p>
-      When you open a <a href="/download/">desktop Preview</a>, it makes one small request to
-      ${site.downloadHost} to ask whether a newer Preview exists. It sends no project, design,
-      machine, job or device ID, and no token, cookies or referrer. It identifies itself only with a
-      generic “KerfDesk-Desktop-Preview” user agent. ${site.downloadHost} still sees normal
-      connection details, such as your IP address and the time. If you’re offline or the check
-      fails, nothing happens. The web app never makes this check.
+      When you open a
+      <a href="${appPrivacy ? site.downloadPageUrl : '/download/'}">desktop Preview</a>, it makes
+      one small request to ${site.downloadHost} to ask whether a newer Preview exists. It sends no
+      project, design, machine, job or device ID, and no token, cookies or referrer. It identifies
+      itself only with a generic “KerfDesk-Desktop-Preview” user agent. ${site.downloadHost} still
+      sees normal connection details, such as your IP address and the time. If you’re offline or the
+      check fails, nothing happens. The web app never makes this check.
     </p>
     <p>
       If a newer Preview exists, a small Download update link appears in the status bar. KerfDesk
@@ -159,7 +179,7 @@ function previewCheck(site) {
     </p>`;
 }
 
-function licensing(site) {
+function licensing(site, appPrivacy) {
   return html`<h3 id="licensing">Pro trials and licenses</h3>
     <p>
       When you start a Pro trial, or activate or move a license, the KerfDesk desktop app contacts
@@ -180,11 +200,18 @@ function licensing(site) {
       analytics, cookies or tracking. Like any web service, ${site.licensingHost} still sees normal
       connection details, such as your IP address and the time.
     </p>
+    <p>
+      The desktop app also quietly confirms saved trial or license rights about once a week. It
+      checks whether that confirmation is due at startup and every 30 minutes while open, using the
+      same installation digest and saved credential. A failed connection does not interrupt your
+      work; the app continues to enforce the signed trial expiry on your computer.
+    </p>
     <h3>Buying Pro</h3>
     <p>
-      Purchase isn’t open yet, and this website has no checkout. When purchase opens, payments will
-      be handled by Paddle, the payment provider, as merchant of record. Paddle processes the
-      payment and your customer record under its own privacy notice.
+      Purchase isn’t open yet, and ${appPrivacy ? 'this privacy page' : 'this website'} has no
+      checkout. When purchase opens, payments will be handled by Paddle, the payment provider, as
+      merchant of record. Paddle processes the payment and your customer record under its own
+      privacy notice.
     </p>`;
 }
 
@@ -223,7 +250,7 @@ function deviceAccess() {
     </p>`;
 }
 
-function appPart(site) {
+function appPart(site, appPrivacy) {
   return html`<div class="prose">
       <p>
         KerfDesk runs on your computer, in your browser or as a desktop app, with no account and no
@@ -243,7 +270,8 @@ function appPart(site) {
       rows: connections(site),
     })}
     <div class="prose">
-      ${previewCheck(site)} ${licensing(site)} ${cameraHelper()} ${deviceAccess()}
+      ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${cameraHelper()}
+      ${deviceAccess()}
       ${callout({
         iconName: 'wifi-off',
         title: 'Working offline',
@@ -276,27 +304,44 @@ export const page = {
   title: 'Privacy',
   description:
     'KerfDesk has no account, analytics or cloud sync, and this site sets no cookies. See what the site and the app send, including for Pro licensing.',
-  render: ({ site }) =>
+  render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
       eyebrow: html`Last updated <time datetime="2026-09-30">September 30, 2026</time>`,
       title: 'Privacy',
-      lead: 'KerfDesk doesn’t track you. This page covers this website and the KerfDesk app: what each one sends over the network, and what stays on your computer.',
+      lead: appPrivacy
+        ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'
+        : 'KerfDesk doesn’t track you. This page covers this website and the KerfDesk app: what each one sends over the network, and what stays on your computer.',
     })}
-    ${section({ content: featureGrid(AT_A_GLANCE, { columns: 4 }) })}
+    ${section({
+      content: featureGrid(
+        appPrivacy
+          ? AT_A_GLANCE.map((item, index) =>
+              index === 0
+                ? {
+                    ...item,
+                    title: 'No cookies on this page',
+                    body: 'This privacy page sets no cookies and runs no analytics, scripts or ads.',
+                  }
+                : item,
+            )
+          : AT_A_GLANCE,
+        { columns: 4 },
+      ),
+    })}
     ${section({
       id: 'website',
       tone: 'alt',
       narrow: true,
       eyebrow: 'Part 1',
-      title: 'This website',
-      content: websitePart(site),
+      title: appPrivacy ? 'This privacy page' : 'This website',
+      content: websitePart(site, appPrivacy),
     })}
     ${section({
       id: 'app',
       narrow: true,
       eyebrow: 'Part 2',
       title: 'The KerfDesk app',
-      content: appPart(site),
+      content: appPart(site, appPrivacy),
     })}
     ${section({
       id: 'questions',

@@ -64,6 +64,9 @@ jobs:
       - name: Lint the Electron main process
         run: pnpm lint:electron
 
+      - name: Check the published privacy notice
+        run: pnpm check:privacy
+
       - name: Check formatting
         run: pnpm format:check
 
