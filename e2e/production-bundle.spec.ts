@@ -93,6 +93,14 @@ test('loads the hashed production bundle and edits script through its outline wo
   const input = page.getByRole('textbox', { name: 'Text content on canvas' });
   await input.fill('Emma & James');
   await page.getByTitle('Open the font picker and choose the text typeface.').click();
+  // The production bundle loads the shared menu stylesheet after the text
+  // component stylesheet. Font rows must keep their own layout in that order.
+  const fontRows = page
+    .getByRole('dialog', { name: 'Choose a font', exact: true })
+    .locator('.lf-font-picker-option');
+  await expect(fontRows.first()).toHaveCSS('align-items', 'stretch');
+  await expect(fontRows.first()).toHaveCSS('gap', '3px');
+  await expect(fontRows.first()).toHaveCSS('padding', '7px 9px');
   await page.getByRole('button', { name: /^Great Vibes/ }).click();
   await expect(page.getByRole('checkbox', { name: 'Weld overlapping letters' })).toBeChecked();
   const formatting = page.getByRole('region', { name: 'Text formatting' });

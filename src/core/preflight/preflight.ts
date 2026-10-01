@@ -163,14 +163,15 @@ export function runPreflight(
 
   // Modal: raster rows may hold an inherited G1 and pack their words, so the
   // emptiness test has to read motion rather than match on `G1` (ADR-332).
-  if (!hasFeedMotion(gcodeLines)) {
+  // Missing output operations already have the actionable issue above.
+  if (outputLayers.length > 0 && !hasFeedMotion(gcodeLines)) {
     issues.push(emptyOutputIssue(project, outputLayers));
   }
 
   return { ok: issues.length === 0, issues };
 }
 
-// A relief-only scene is the one EXPECTED way a laser compile comes back
+// An enabled relief-only scene is an EXPECTED way a laser compile comes back
 // empty (reliefs are CNC-only geometry) — name that instead of reporting an
 // internal error.
 function emptyOutputIssue(project: Project, outputLayers: ReadonlyArray<Layer>): PreflightIssue {

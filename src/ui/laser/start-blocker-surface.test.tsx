@@ -81,6 +81,7 @@ describe('Start blocker surface', () => {
     expect(host.textContent).toContain('Last Frame attempt blocked');
     expect(host.textContent).not.toContain('Last Start attempt blocked');
     expect(host.textContent).toContain('No output layers. Enable Output on at least one layer.');
+    expect(host.textContent).not.toContain('Internal error');
   });
 
   it('names Start when a Start refusal is retained', async () => {
