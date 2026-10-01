@@ -1,4 +1,5 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
+import type { OAuthResourceContext } from '@cloudflare/workers-oauth-provider';
 import { createKerfDeskMcpServer } from '../../../electron/mcp/server.js';
 import type { mcpOutputSchemas } from '../../../electron/mcp/output-schemas.js';
 import {
@@ -8,19 +9,18 @@ import {
   OAUTH_READ,
   OAUTH_EDIT,
   WRITE_COMMANDS,
-  grantSchema,
+  oauthGrantSchema,
   oauthScopes,
-  type GrantProps,
+  type OAuthGrantProps,
   type RemoteScope,
 } from './protocol.js';
 import { bodyJson, json } from './security.js';
 import { device, relayRequest } from './relay.js';
+import { prepareMcpExchange } from './mcp-wire.js';
 
 async function permittedContext(env: Env, ctx: ExecutionContext) {
-  const context = ctx as ExecutionContext<unknown> & {
-    auth?: { audience?: unknown; scope?: unknown };
-  };
-  const props = grantSchema.safeParse(context.props);
+  const context = ctx as OAuthResourceContext<unknown>;
+  const props = oauthGrantSchema.safeParse(context.props);
   const rawScopes = context.auth?.scope;
   const scopes =
     Array.isArray(rawScopes) && rawScopes.every((item) => typeof item === 'string')
@@ -30,11 +30,13 @@ async function permittedContext(env: Env, ctx: ExecutionContext) {
     !props.success ||
     !scopes ||
     context.auth?.audience !== RESOURCE ||
+    typeof context.auth.clientId !== 'string' ||
+    !context.auth.clientId ||
     !(await device(env, props.data.deviceId).authorize(props.data, scopes))
   )
     return null;
 
-  return { props: props.data, scopes };
+  return { props: props.data, scopes, oauthClientId: context.auth.clientId };
 }
 function isWriteCall(value: unknown): boolean {
   if (
@@ -84,6 +86,7 @@ async function pumpResponse(
   handler: ReturnType<typeof createMcpHandler>,
   exchange: AbortController,
   ready: () => void,
+  release: () => Promise<void>,
 ) {
   try {
     await writer.write(new TextEncoder().encode(': connected\n\n'));
@@ -99,17 +102,24 @@ async function pumpResponse(
     ready();
     await writer.abort(new Error('MCP exchange unavailable.')).catch(() => undefined);
   } finally {
-    await Promise.allSettled([reader.cancel(), handler.close()]);
+    await Promise.allSettled([reader.cancel(), handler.close(), release()]);
   }
 }
 async function streamExchange(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  props: GrantProps,
+  props: OAuthGrantProps,
   scopes: RemoteScope,
+  key?: string,
 ): Promise<Response> {
   const exchange = new AbortController();
+  const release = () =>
+    key
+      ? device(env, props.deviceId)
+          .endMcpRequest(props, key)
+          .catch(() => undefined)
+      : Promise.resolve();
   let ready: () => void = () => undefined;
   const streaming = new Promise<void>((resolve) => {
     ready = resolve;
@@ -128,18 +138,25 @@ async function streamExchange(
             AbortSignal.any([request.signal, exchange.signal, ...(signal ? [signal] : [])]),
             undefined,
             ctx,
+            key,
           );
         },
       }),
     { maxRequestBodySize: MAX_BYTES, keepAliveMs: 1000, responseMode: 'sse' },
   );
   // Both modern (2026-07-28) and legacy stateless Streamable HTTP are supported by the SDK.
-  const response = await handler.fetch(request);
+  let response: Response;
+  try {
+    response = await handler.fetch(request);
+  } catch (error) {
+    await Promise.allSettled([handler.close(), release()]);
+    throw error;
+  }
   if (
     !response.body ||
     response.headers.get('Content-Type')?.split(';')[0].trim() !== 'text/event-stream'
   ) {
-    await handler.close();
+    await Promise.allSettled([handler.close(), release()]);
     return response;
   }
   const reader = response.body.getReader();
@@ -150,7 +167,7 @@ async function streamExchange(
     exchange.abort();
     ready();
   });
-  ctx.waitUntil(pumpResponse(reader, writer, handler, exchange, ready));
+  ctx.waitUntil(pumpResponse(reader, writer, handler, exchange, ready, release));
   return new Response(readable, { status: response.status, headers: response.headers });
 }
 export const protectedHandler = {
@@ -162,6 +179,17 @@ export const protectedHandler = {
         401,
       );
     const challenge = await scopeChallenge(request, permitted.scopes);
-    return challenge ?? streamExchange(request, env, ctx, permitted.props, permitted.scopes);
+    if (challenge) return challenge;
+    const prepared = await prepareMcpExchange(
+      request,
+      env,
+      permitted.props,
+      permitted.scopes,
+      permitted.oauthClientId,
+    );
+    return (
+      prepared.response ??
+      streamExchange(request, env, ctx, permitted.props, permitted.scopes, prepared.key)
+    );
   },
 } satisfies ExportedHandler<Env>;

@@ -15,6 +15,7 @@ import {
 } from './protocol.js';
 import { digest, json, pairingCode, sameDigest } from './security.js';
 import { DeviceApprovals } from './approvals.js';
+import { McpRequests } from './mcp-requests.js';
 type OwnerAttachment = { role: 'desktop'; connectionId: string };
 type Pending = {
   requestId: string;
@@ -22,6 +23,7 @@ type Pending = {
   leaseId: string;
   scopes: RemoteScope;
   sessionDigest?: string;
+  mcpKey?: string;
   name: keyof typeof mcpOutputSchemas;
   connectionId: string;
   resolve: (value: CommandResponse) => void;
@@ -52,6 +54,7 @@ function parseEnvelope(message: string): Record<string, unknown> | null {
 /** Outbound desktop connection and ephemeral, bounded command exchanges. */
 export class RemoteDevice extends DeviceApprovals {
   private readonly pending = new Map<string, Pending>();
+  private readonly mcpRequests = new McpRequests();
   protected owner(): { socket: WebSocket; connectionId: string } | null {
     for (const socket of this.ctx.getWebSockets('desktop')) {
       if (socket.readyState !== WebSocket.OPEN) continue;
@@ -109,12 +112,14 @@ export class RemoteDevice extends DeviceApprovals {
   }
 
   protected revokePending(clientId: string): void {
+    this.mcpRequests.revoke(clientId);
     for (const item of [...this.pending.values()])
       if (item.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
   }
   private finish(item: Pending, result: CommandResponse, cancelDesktop = false): void {
     if (this.pending.get(item.requestId) !== item) return;
     this.pending.delete(item.requestId);
+    if (item.mcpKey) this.mcpRequests.detach(item.mcpKey, item.requestId);
     clearTimeout(item.timer);
     if (cancelDesktop && this.owner()?.connectionId === item.connectionId)
       this.send({ v: 1, type: 'cancel', requestId: item.requestId });
@@ -133,12 +138,28 @@ export class RemoteDevice extends DeviceApprovals {
     if (item?.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
   }
 
+  async beginMcpRequest(props: GrantProps, scopes: RemoteScope, key: string): Promise<boolean> {
+    return (
+      this.isAuthorized(props, scopes) &&
+      this.mcpRequests.begin(key, props, this.owner()?.connectionId ?? null)
+    );
+  }
+
+  async cancelMcpRequest(props: GrantProps, scopes: RemoteScope, key: string): Promise<void> {
+    if (this.isAuthorized(props, scopes)) this.mcpRequests.cancel(key, props);
+  }
+
+  async endMcpRequest(props: GrantProps, key: string): Promise<void> {
+    this.mcpRequests.end(key, props);
+  }
+
   async runCommand(
     props: GrantProps,
     scopes: RemoteScope,
     requestId: string,
     commandJson: string,
     sessionDigest?: string,
+    mcpKey?: string,
   ): Promise<string> {
     if (new TextEncoder().encode(commandJson).byteLength > MAX_BYTES)
       return JSON.stringify(errorResult('invalid_input'));
@@ -148,7 +169,9 @@ export class RemoteDevice extends DeviceApprovals {
     } catch {
       return JSON.stringify(errorResult('invalid_input'));
     }
-    return JSON.stringify(await this.command(props, scopes, requestId, command, sessionDigest));
+    return JSON.stringify(
+      await this.command(props, scopes, requestId, command, sessionDigest, mcpKey),
+    );
   }
 
   private async command(
@@ -157,6 +180,7 @@ export class RemoteDevice extends DeviceApprovals {
     requestId: string,
     command: unknown,
     sessionDigest?: string,
+    mcpKey?: string,
   ): Promise<CommandResponse> {
     const parsed = parseCommand(command);
     if (!parsed || !uuid.safeParse(requestId).success) return errorResult('invalid_input');
@@ -178,12 +202,23 @@ export class RemoteDevice extends DeviceApprovals {
         scopes,
         name: parsed.name,
         sessionDigest,
+        mcpKey,
         connectionId: owner.connectionId,
         resolve,
         timer: setTimeout(() => {
           this.finish(item, errorResult('unavailable'), true);
         }, COMMAND_TIMEOUT_MS),
       };
+      if (
+        mcpKey &&
+        !this.mcpRequests.attach(mcpKey, props, owner.connectionId, requestId, (code) =>
+          this.finish(item, errorResult(code), true),
+        )
+      ) {
+        clearTimeout(item.timer);
+        resolve(errorResult('cancelled'));
+        return;
+      }
       this.pending.set(requestId, item);
       if (
         !this.send({

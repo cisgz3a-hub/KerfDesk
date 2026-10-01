@@ -8,7 +8,7 @@ import {
   MAX_METADATA_BYTES,
   OAUTH_READ,
   OAUTH_EDIT,
-  grantSchema,
+  oauthGrantSchema,
   oauthScopes,
 } from './protocol.js';
 import {
@@ -44,7 +44,7 @@ const provider = new OAuthProvider<Env>({
   clientIdMetadataDocumentEnabled: true,
   cookiePrefix: '__Host-kerfdesk_oauth-',
   async tokenExchangeCallback(options) {
-    const props = grantSchema.safeParse(options.props);
+    const props = oauthGrantSchema.safeParse(options.props);
     const scopes = oauthScopes(options.requestedScope);
     if (
       !props.success ||

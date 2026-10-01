@@ -271,20 +271,24 @@ export async function authorizeMcp(
   requestedScope = 'kerfdesk:read kerfdesk:edit offline_access',
   options = {},
 ) {
-  const register = await poster(worker)('/oauth/register', {
-    client_name: 'Synthetic MCP audit',
-    redirect_uris: ['https://audit-client.example/callback'],
-    token_endpoint_auth_method: 'none',
-    grant_types: ['authorization_code', 'refresh_token'],
-    response_types: ['code'],
-  });
-  if (register.status !== 201) throw new Error(`Synthetic DCR failed (${register.status}).`);
-  const client = await register.json();
+  const redirectUri = options.redirectUri ?? 'https://audit-client.example/callback';
+  let client = { client_id: options.clientId };
+  if (!options.clientId) {
+    const register = await poster(worker)('/oauth/register', {
+      client_name: 'Synthetic MCP audit',
+      redirect_uris: [redirectUri],
+      token_endpoint_auth_method: 'none',
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+    });
+    if (register.status !== 201) throw new Error(`Synthetic DCR failed (${register.status}).`);
+    client = await register.json();
+  }
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const query = new URLSearchParams({
     client_id: client.client_id,
-    redirect_uri: 'https://audit-client.example/callback',
+    redirect_uri: redirectUri,
     response_type: 'code',
     scope: requestedScope,
     resource: `${ORIGIN}/mcp`,
@@ -316,7 +320,7 @@ export async function authorizeMcp(
   const tokenForm = new URLSearchParams({
     grant_type: 'authorization_code',
     client_id: client.client_id,
-    redirect_uri: 'https://audit-client.example/callback',
+    redirect_uri: redirectUri,
     code: redirect.searchParams.get('code'),
     code_verifier: verifier,
     resource: `${ORIGIN}/mcp`,

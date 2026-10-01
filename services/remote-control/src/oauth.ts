@@ -110,7 +110,7 @@ async function decideConsent(
     userId: `${props.deviceId}.${props.clientId}`,
     metadata: {},
     scope: approved.request.scope,
-    props,
+    props: { ...props, mcpGrantId: crypto.randomUUID() },
   });
   const headers = new Headers(approved.headers);
   headers.set('Location', result.redirectTo);

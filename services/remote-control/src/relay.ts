@@ -40,6 +40,7 @@ export async function relayRequest(
   signal?: AbortSignal,
   sessionDigest?: string,
   execution?: ExecutionContext,
+  mcpKey?: string,
 ): Promise<Record<string, unknown>> {
   const command = parseCommand({ name, args });
   if (!command) throw new KerfDeskMcpError('invalid_input');
@@ -60,6 +61,7 @@ export async function relayRequest(
       requestId,
       JSON.stringify(command),
       sessionDigest,
+      mcpKey,
     );
     if (signal?.aborted) throw new KerfDeskMcpError('cancelled');
     return decodeRelayResponse(serialized, command.name);

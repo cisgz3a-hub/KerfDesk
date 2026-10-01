@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { chromium } from '@playwright/test';
 import { ORIGIN, start, connectDesktop, pairPhone, workspace, authorizeMcp } from './support.mjs';
 
@@ -75,7 +76,7 @@ function syntheticDesktop(desktop, commands) {
     desktop.send({ type: 'result', requestId: message.requestId, result });
   });
 }
-async function browserPage(worker, cookies = [], allowSyntheticCallback = false, receipts = []) {
+async function browserPage(worker, cookies = [], callbackOrigin = null, receipts = []) {
   const browser = await chromium.launch({
     ...(process.env.KERFDESK_TEST_BROWSER === 'chromium' ? {} : { channel: 'chrome' }),
     headless: true,
@@ -88,15 +89,8 @@ async function browserPage(worker, cookies = [], allowSyntheticCallback = false,
   if (cookies.length) await context.addCookies(cookies);
   await context.route('**/*', async (route) => {
     const request = route.request();
-    if (
-      allowSyntheticCallback &&
-      request.url().startsWith('https://audit-client.example/callback')
-    ) {
-      await route.fulfill({
-        status: 200,
-        contentType: 'text/html',
-        body: '<html><body>Synthetic MCP callback</body></html>',
-      });
+    if (callbackOrigin && new URL(request.url()).origin === callbackOrigin) {
+      await route.continue();
       return;
     }
     if (!request.url().startsWith(ORIGIN + '/')) {
@@ -206,11 +200,28 @@ test(
     const worker = start();
     let desktop;
     let browser;
+    const callbacks = [];
+    const callbackServer = createServer((request, response) => {
+      const url = new URL(request.url, 'http://127.0.0.1');
+      callbacks.push({
+        method: request.method,
+        path: url.pathname,
+        hasCode: !!url.searchParams.get('code'),
+        referrer: request.headers.referer ?? null,
+      });
+      response.writeHead(url.pathname === '/callback' ? 200 : 404, {
+        'Content-Type': 'text/html',
+      });
+      response.end('<html><body>Synthetic MCP callback</body></html>');
+    });
     try {
+      await new Promise((resolve) => callbackServer.listen(0, '127.0.0.1', resolve));
+      const redirectUri = `http://127.0.0.1:${callbackServer.address().port}/callback`;
       desktop = await connectDesktop(worker);
       const phone = await pairPhone(worker, desktop, ['read']);
       let consentUrl;
       await authorizeMcp(worker, phone, 'kerfdesk:read', {
+        redirectUri,
         beforeConsent(url) {
           consentUrl = url.href;
         },
@@ -220,7 +231,7 @@ test(
       const loaded = await browserPage(
         worker,
         [{ name, value, url: ORIGIN, httpOnly: true, secure: true, sameSite: 'Strict' }],
-        true,
+        new URL(redirectUri).origin,
         receipts,
       );
       browser = loaded.browser;
@@ -231,18 +242,30 @@ test(
       await loaded.page.goto(consentUrl);
       await loaded.page.getByRole('button', { name: 'Allow access', exact: true }).click();
       try {
-        await loaded.page.waitForURL('https://audit-client.example/callback?**', { timeout: 8000 });
+        await loaded.page.waitForURL(
+          (url) => url.origin === new URL(redirectUri).origin && url.pathname === '/callback',
+          { timeout: 8000 },
+        );
       } catch {
         throw new Error(
           `MCP callback did not load. Browser reported a form-action CSP rejection: ${browserErrors.some((message) => message.includes('form-action'))}. Sanitized routes: ${JSON.stringify(receipts)}.`,
         );
       }
       const callback = new URL(loaded.page.url());
+      await loaded.page.getByText('Synthetic MCP callback', { exact: true }).waitFor();
+      assert.equal(
+        callback.searchParams.get('state'),
+        new URL(consentUrl).searchParams.get('state'),
+      );
+      assert.deepEqual(callbacks, [
+        { method: 'GET', path: '/callback', hasCode: true, referrer: null },
+      ]);
       assert.ok(callback.searchParams.get('code'));
       assert.equal(callback.searchParams.get('ownerSecret'), null);
       assert.equal(callback.searchParams.get('access_token'), null);
     } finally {
       await browser?.close();
+      await new Promise((resolve) => callbackServer.close(resolve));
       closeSocket(desktop?.socket);
       await worker.dispose();
     }
