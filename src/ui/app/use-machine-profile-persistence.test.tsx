@@ -136,6 +136,18 @@ describe('application machine persistence', () => {
     expect(loadLastMachineSelection(localStorage)?.profile.cncSubProfile?.safeZMm).toBe(17);
   });
 
+  it('New retains the opened CNC machine without adopting it as the saved application choice', () => {
+    openCncFile(false);
+    const before = useStore.getState();
+    if (before.project.machine?.kind !== 'cnc') throw new Error('Expected CNC file');
+    useStore.getState().newProject();
+    expect(useStore.getState().project.machine).toMatchObject({
+      params: before.project.machine.params,
+    });
+    expect(useStore.getState().projectDocumentEpoch).toBe(before.projectDocumentEpoch + 1);
+    expect(loadLastMachineSelection(localStorage)?.profile).toEqual(saved);
+  });
+
   it('persists an explicit mode change and its undo after Open', () => {
     openCncFile(true);
     useStore.getState().setMachineKind('laser');
