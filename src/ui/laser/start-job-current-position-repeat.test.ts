@@ -213,7 +213,9 @@ describe('completed Current Position replay', () => {
     await repository.completeRun(first.runId);
     const receipt = repository.getSnapshot().lastCompletedReceipt;
     const framed = useLaserStore.getState().completedFrame;
-    if (receipt === null || framed === null) throw new Error('Expected completed run evidence.');
+    if (receipt === null || framed === null || framed === undefined) {
+      throw new Error('Expected completed run evidence.');
+    }
     vi.mocked(useLaserStore.getState().startJob).mockClear();
 
     uninstallAutoReview();
@@ -263,7 +265,7 @@ describe('completed Current Position replay', () => {
       anchor: 'front-left',
       currentPosition: { x: 120, y: 80 },
     });
-    expect(next?.artifact.provenance.workflow).toMatchObject({ kind: 'ordinary-start' });
-    expect(next?.artifact.provenance.workflow).not.toHaveProperty('completedReplaySourceRunId');
+    expect(next?.artifact.provenance).toMatchObject({ workflow: { kind: 'ordinary-start' } });
+    expect(next?.artifact.provenance).not.toHaveProperty('workflow.completedReplaySourceRunId');
   });
 });
