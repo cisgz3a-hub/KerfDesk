@@ -1,0 +1,158 @@
+import { useStore } from '../state/store';
+import { RemoteFault } from './fault';
+import { appStatusProjection, reviewProjection } from './status-projections';
+import { machineProjection, recipesProjection, workspaceProjection } from './projections';
+import { createRevisionTracker } from './revision';
+import { canonicalRequest, validateCommand, type ValidatedCommand } from './validation';
+import { applyRemoteWrite } from './writes';
+import type {
+  RemoteCommandResult,
+  RemoteControlAdapter,
+  RemoteControlOptions,
+  RemoteReadCommand,
+  RemoteWrite,
+} from './types';
+
+type CachedWrite = { readonly fingerprint: string; readonly result: Promise<RemoteCommandResult> };
+const MAX_REQUESTS = 256;
+
+/** Renderer edit authority only. The main-process relay owns pairing and transport authorization. */
+export function createRemoteControlAdapter(options: RemoteControlOptions): RemoteControlAdapter {
+  const store = options.store ?? useStore;
+  const tracker = createRevisionTracker(store);
+  const requests = new Map<string, CachedWrite>();
+  const pending = new Set<AbortController>();
+  let disposed = false;
+  const failure = (cause: unknown): RemoteCommandResult => {
+    const fault = cause instanceof RemoteFault ? cause : new RemoteFault('failed');
+    return {
+      ok: false,
+      revision: tracker.current(),
+      error: {
+        code: fault.code === 'request_limit' ? 'failed' : fault.code,
+        message: fault.message,
+      },
+    };
+  };
+  const context = { options, store, tracker, pending, isDisposed: () => disposed, failure };
+  return {
+    getRevision: tracker.current,
+    execute: async (command, args, execution = {}) => {
+      try {
+        if (disposed) throw new RemoteFault('cancelled');
+        const input = validateCommand(command, args);
+        if (!isWrite(input)) return readResult(input.command, context, execution.signal);
+        const fingerprint = canonicalRequest(input);
+        const cached = requests.get(input.args.requestId);
+        if (cached !== undefined) {
+          if (cached.fingerprint !== fingerprint) throw new RemoteFault('request_conflict');
+          return cached.result;
+        }
+        if (requests.size >= MAX_REQUESTS) throw new RemoteFault('request_limit');
+        // Reserve identity before any async work; never evict an ID and replay its mutation.
+        const result = Promise.resolve().then(() => runWrite(input, context, execution.signal));
+        requests.set(input.args.requestId, { fingerprint, result });
+        return result;
+      } catch (cause) {
+        return failure(cause);
+      }
+    },
+    dispose: () => {
+      disposed = true;
+      tracker.dispose();
+      for (const controller of pending) controller.abort();
+      requests.clear();
+    },
+  };
+}
+type Context = {
+  readonly options: RemoteControlOptions;
+  readonly store: NonNullable<RemoteControlOptions['store']>;
+  readonly tracker: ReturnType<typeof createRevisionTracker>;
+  readonly pending: Set<AbortController>;
+  readonly isDisposed: () => boolean;
+  readonly failure: (cause: unknown) => RemoteCommandResult;
+};
+function isWrite(input: ValidatedCommand): input is RemoteWrite {
+  return 'expectedRevision' in input.args;
+}
+function readResult(
+  command: RemoteReadCommand,
+  context: Context,
+  signal?: AbortSignal,
+): RemoteCommandResult {
+  if (signal?.aborted === true) throw new RemoteFault('cancelled');
+  const state = context.store.getState();
+  const revision = context.tracker.current();
+  const data = (() => {
+    switch (command) {
+      case 'get_workspace':
+        return workspaceProjection(state);
+      case 'get_machine':
+        return machineProjection(state);
+      case 'get_app_status':
+        return appStatusProjection(context.options);
+      case 'list_material_recipes':
+        return recipesProjection(state);
+      case 'review_job':
+        return reviewProjection(context.options, revision, state.project.machine?.kind ?? 'laser');
+    }
+  })();
+  if (context.tracker.current() !== revision) throw new RemoteFault('stale_revision');
+  return { ok: true, revision, data };
+}
+async function runWrite(
+  write: RemoteWrite,
+  context: Context,
+  signal?: AbortSignal,
+): Promise<RemoteCommandResult> {
+  const controller = new AbortController();
+  let committed = false;
+  const assert = () => assertCurrent(write, context, controller.signal);
+  const commit = (action: () => Record<string, unknown>) => {
+    assert();
+    committed = true;
+    return action();
+  };
+  const abort = () => controller.abort();
+  if (signal?.aborted === true) controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  context.pending.add(controller);
+  try {
+    const data = await cancellable(
+      applyRemoteWrite(write, context.store, controller.signal, assert, commit),
+      controller.signal,
+      () => committed,
+    );
+    return { ok: true, revision: context.tracker.current(), data };
+  } catch (cause) {
+    return context.failure(
+      controller.signal.aborted && !committed ? new RemoteFault('cancelled') : cause,
+    );
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    context.pending.delete(controller);
+  }
+}
+function assertCurrent(write: RemoteWrite, context: Context, signal: AbortSignal): void {
+  if (context.isDisposed() || signal.aborted) throw new RemoteFault('cancelled');
+  if (!context.options.canWrite()) throw new RemoteFault('read_only');
+  if (context.options.canEdit?.() === false || context.store.getState().pendingUndo !== null)
+    throw new RemoteFault('busy');
+  if (write.args.expectedRevision !== context.tracker.current())
+    throw new RemoteFault('stale_revision');
+}
+function cancellable<T>(
+  work: Promise<T>,
+  signal: AbortSignal,
+  committed: () => boolean,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      if (!committed()) reject(new RemoteFault('cancelled'));
+    };
+    signal.addEventListener('abort', abort, { once: true });
+    if (signal.aborted) abort();
+    void work.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
