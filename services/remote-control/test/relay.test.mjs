@@ -285,7 +285,25 @@ test('real workerd: official OAuth PKCE flow and SDK clients work in legacy and 
       });
       try {
         await client.connect(transport);
-        assert.equal((await client.listTools()).tools.length, 10);
+        const tools = (await client.listTools()).tools;
+        assert.equal(tools.length, 10);
+        const editTools = [
+          'set_selection',
+          'add_text',
+          'add_rectangle',
+          'transform_artwork',
+          'update_operation',
+        ];
+        for (const tool of tools) {
+          assert.deepEqual(tool._meta?.securitySchemes, [
+            {
+              type: 'oauth2',
+              scopes: editTools.includes(tool.name)
+                ? ['kerfdesk:read', 'kerfdesk:edit']
+                : ['kerfdesk:read'],
+            },
+          ]);
+        }
         const call = client.callTool({ name: 'get_workspace', arguments: {} });
         const command = await desktop.inbox.next('command');
         assert.deepEqual(command.scopes, ['read', 'edit']);
@@ -327,6 +345,12 @@ test('real workerd: official OAuth PKCE flow and SDK clients work in legacy and 
       body: JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'tools/list' }),
     });
     assert.equal(revoked.status, 401);
+    assert.match(revoked.headers.get('WWW-Authenticate'), /Bearer .*error="invalid_token"/);
+    assert.ok(
+      revoked.headers
+        .get('WWW-Authenticate')
+        .includes(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp"`),
+    );
     const refresh = await worker.dispatchFetch(`${ORIGIN}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -705,13 +729,15 @@ test('real workerd: OAuth access expires after 30 minutes and refresh rotation r
     assert.equal((await sendRefresh(refreshForm)).status, 400);
     desktop.send({ type: 'client.revoke', clientId: phone.clientId });
     await desktop.inbox.next('clients', (value) => !value.clients.length);
-    assert.equal(
-      (
-        await worker.dispatchFetch(`${ORIGIN}/mcp`, {
-          headers: { Authorization: `Bearer ${current.access_token}` },
-        })
-      ).status,
-      401,
+    const revoked = await worker.dispatchFetch(`${ORIGIN}/mcp`, {
+      headers: { Authorization: `Bearer ${current.access_token}` },
+    });
+    assert.equal(revoked.status, 401);
+    assert.match(revoked.headers.get('WWW-Authenticate'), /Bearer .*error="invalid_token"/);
+    assert.ok(
+      revoked.headers
+        .get('WWW-Authenticate')
+        .includes(`resource_metadata="${ORIGIN}/.well-known/oauth-protected-resource/mcp"`),
     );
     refreshForm.set('refresh_token', current.refresh_token);
     assert.equal((await sendRefresh(refreshForm)).status, 400);
@@ -756,6 +782,10 @@ test('real workerd: a read-only MCP token receives an edit scope challenge befor
     assert.match(
       response.headers.get('WWW-Authenticate'),
       /insufficient_scope.*kerfdesk:read kerfdesk:edit/,
+    );
+    assert.match(
+      response.headers.get('WWW-Authenticate'),
+      /error_description="Editing requires approval on this computer\."/,
     );
     assert.equal(
       desktop.inbox.queue.some((value) => value.type === 'command'),

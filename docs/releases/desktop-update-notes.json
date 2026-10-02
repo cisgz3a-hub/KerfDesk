@@ -6,6 +6,7 @@
     "Fixed valid phone approval prompts disappearing when the PC clock differs from the service.",
     "Phone approval prompts now wait for an intentional button choice while you are typing.",
     "Find Phone & MCP setup directly from the mobile KerfDesk website.",
-    "Fixed Pro access checks when splitting artwork with Break Apart or Cut Shapes."
+    "Fixed Pro access checks when splitting artwork with Break Apart or Cut Shapes.",
+    "Added clearer ChatGPT connection steps and improved MCP permission renewal."
   ]
 }

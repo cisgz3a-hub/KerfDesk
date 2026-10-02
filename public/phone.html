@@ -147,12 +147,24 @@
         <details id="mcp">
           <summary>How do I connect ChatGPT or another MCP app?</summary>
           <p>
+            In ChatGPT on the web, enable <strong>Developer mode</strong> under
+            <strong>Settings → Security and login</strong>, then create an MCP connection in
+            <strong>Plugins</strong>. Choose <strong>OAuth</strong> authentication and let ChatGPT
+            discover the sign-in settings.
+          </p>
+          <p>
             Use this server address in a client that supports authenticated remote MCP servers:
             <code class="phone-mcp-url"
               >https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp</code
             >
             Create a new pairing code on the PC, enter the Computer ID and code on the client’s
             sign-in page, then approve its requested access on the PC.
+          </p>
+          <p>
+            For editing, include <code>kerfdesk:edit</code> in
+            <strong>Advanced OAuth settings → Base scopes</strong>, and approve
+            <strong>Allow viewing and editing</strong> on the PC. The default
+            <code>kerfdesk:read</code> scope allows viewing. You do not need an OpenAI API key.
           </p>
           <p>
             ChatGPT custom connections depend on your plan, workspace and available client features.
