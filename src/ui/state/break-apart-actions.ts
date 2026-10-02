@@ -37,20 +37,33 @@ type BreakApartMutation = {
   readonly dirty: true;
 };
 
-type BreakApartSet = (fn: (state: BreakApartState) => BreakApartMutation | BreakApartState) => void;
+type BreakApartSet = (
+  fn: (state: BreakApartState) => BreakApartMutation | BreakApartState,
+  onCommitted?: () => void,
+) => unknown;
+type Report = (notify: () => void) => void;
 
 export function breakApartActions(set: BreakApartSet): BreakApartActions {
   return {
-    breakApartSelection: () => set((state) => breakApartSelectionMutation(state)),
+    breakApartSelection: () => {
+      const notifications: Array<() => void> = [];
+      set(
+        (state) => breakApartSelectionMutation(state, (notify) => notifications.push(notify)),
+        () => notifications.forEach((notify) => notify()),
+      );
+    },
   };
 }
 
-function breakApartSelectionMutation(state: BreakApartState): BreakApartMutation | BreakApartState {
+function breakApartSelectionMutation(
+  state: BreakApartState,
+  report: Report,
+): BreakApartMutation | BreakApartState {
   const selectedIds = selectedObjectIds(state);
   if (selectedIds.length === 0) return state;
   const selected = new Set(selectedIds);
   const replacement = buildReplacementObjects(state.project.scene.objects, selected);
-  reportSingleShapeTraces(replacement.singleShapeTraces);
+  report(() => reportSingleShapeTraces(replacement.singleShapeTraces));
   if (!replacement.changed) return state;
   const [primary, ...additional] = replacement.newSelectionIds;
   const expand = (id: string): ReadonlyArray<string> => replacement.idsBySource.get(id) ?? [id];
@@ -67,7 +80,7 @@ function breakApartSelectionMutation(state: BreakApartState): BreakApartMutation
   // A project past its limits saves but cannot be opened again (ADR-307
   // amendment 1): such a Break Apart is refused whole, never made in part.
   if (refuseSceneLimitOverrun(state.project.scene, repaired.scene, BREAK_APART_FEWER)) return state;
-  reportDependencyRepairs(repaired);
+  report(() => reportDependencyRepairs(repaired));
   return {
     project: {
       ...state.project,

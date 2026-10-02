@@ -442,7 +442,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectActions(set, get, initialState),
   ...objectInsertActions(set, get),
   ...imageImportActions(set, get),
-  ...breakApartActions(set),
+  ...breakApartActions(proOperationMutationSetter(set, get)),
   ...rasterAdjustmentActions(set),
   ...reliefParamActions(set),
   ...externalGcodeActions(set),

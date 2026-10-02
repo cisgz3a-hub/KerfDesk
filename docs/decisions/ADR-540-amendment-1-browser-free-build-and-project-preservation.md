@@ -43,6 +43,11 @@ sales, change the approved prices, or assert that a signed installer is availabl
    settings paste, recipes, duplication and arrays. Editing existing desktop
    work remains permitted. A deferred licence prompt may only apply its intended
    edit to the same project and document epoch that requested it.
+   Break Apart and Cut Shapes also ask when their result replaces existing
+   Pro-bound artwork with independent pieces. Removing the original does not
+   exempt a split into multiple objects. Existing operation edits and history
+   restoration still use their ordinary setters. A held split reports its
+   success or dependency repairs only after its admitted commit.
 7. Browser Free offers a first-visit welcome with a Windows download and an
    equally accessible **Continue with Free** choice. Closing or pressing Escape
    continues in Free, and the browser remembers the choice when storage permits.
