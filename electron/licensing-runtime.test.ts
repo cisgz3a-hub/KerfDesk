@@ -637,7 +637,7 @@ describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
     expect((await trial.runtime.startTrial()).message).toContain('about 3 days ahead');
     expect(trial.saved()).toBeNull();
   });
-  it('saves the clock mark only for a trial, and only once it has moved a minute', async () => {
+  it('saves observed trial progress while avoiding unchanged and paid writes', async () => {
     const paid = harness(saved());
     paid.clock(NOW + 3_600_000);
     await paid.runtime.status();
@@ -645,7 +645,10 @@ describe('clock checks and the saved clock mark (ADR-523 Amendment 2)', () => {
     const trial = harness(saved(trialClaims()));
     trial.clock(NOW + 30_000);
     await trial.runtime.status();
-    expect(trial.store.write).not.toHaveBeenCalled();
+    expect(trial.saved()?.lastSeenAt).toBe(NOW / 1000 + 30);
+    expect(trial.store.write).toHaveBeenCalledOnce();
+    await trial.runtime.status();
+    expect(trial.store.write).toHaveBeenCalledOnce();
     trial.clock(NOW + 61_000);
     await trial.runtime.status();
     expect(trial.saved()?.lastSeenAt).toBe(NOW / 1000 + 61);

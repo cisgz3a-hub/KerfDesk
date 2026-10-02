@@ -108,7 +108,8 @@ function claimsTakeRelease(
 ): boolean {
   // An ended trial leaves a Free device too. A paid licence whose updates have
   // ended keeps its covered version, so its Pro tools stay unlocked.
-  if (claims.accessExpiresAt !== null && now >= claims.accessExpiresAt) return true;
+  if (claims.accessExpiresAt !== null && Math.max(now, lastSeenAt) >= claims.accessExpiresAt)
+    return true;
   return validTime(claims, lastSeenAt, now) && licenceCoversRelease(claims, release);
 }
 

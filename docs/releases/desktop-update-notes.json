@@ -1,12 +1,8 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "a03d8b2e3d44ff4eda66acbea78620167c3db0ff",
+  "sinceSourceSha": "c998b4d82971fdacfbb1e2d36cc93c2d30080245",
   "highlights": [
-    "Fixed stale phone pairing codes, PC clock differences and accidental approval while typing.",
-    "Find Phone & MCP setup on the mobile website, with clearer ChatGPT steps and permission renewal.",
-    "Fixed Pro access checks for artwork splits, Boolean results and isolated Weld copies.",
-    "Fixed mismatched laser power when the controller and saved machine use different power ranges.",
-    "Mark the first burn point with a one-second low-power dot, then return the head.",
-    "Choose a centre, side or corner for Line contour starts."
+    "Trying Start during a positioning mark keeps your completed Frame ready for the job.",
+    "Fixed trial time returning after a restart and a small clock correction."
   ]
 }

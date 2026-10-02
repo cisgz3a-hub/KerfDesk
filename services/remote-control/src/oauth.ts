@@ -8,6 +8,11 @@ import {
 } from './protocol.js';
 import { DEFAULT_CSP, RequestFailure, boundedText, escapeHtml, originAllowed } from './security.js';
 import { approvedSession, device } from './relay.js';
+import {
+  saveConsentBinding,
+  matchesConsentBinding,
+  clearConsentBinding,
+} from './consent-binding.js';
 export type AppEnv = Env & { OAUTH_PROVIDER?: OAuthHelpers };
 type ApprovedSession = NonNullable<Awaited<ReturnType<typeof approvedSession>>>;
 function html(title: string, content: string, headers?: Headers): Response {
@@ -32,12 +37,13 @@ function pairFirst(request: Request): Response {
 }
 async function consentPage(
   request: Request,
+  env: Env,
   oauth: OAuthHelpers,
   session: ApprovedSession,
 ): Promise<Response> {
   const authRequest = await oauth.parseAuthRequest(request);
   const description = await oauth.describeConsent(authRequest);
-  const requested = description.scope;
+  const requested = [...new Set(description.scope)];
   if (
     !requested.includes(OAUTH_READ) ||
     requested.some((scope) => ![OAUTH_READ, OAUTH_EDIT, 'offline_access'].includes(scope))
@@ -50,6 +56,7 @@ async function consentPage(
       '<section class="card"><h1>This computer approved read access</h1><p>To let this client edit, pair again and approve read and edit access on the PC. Then reconnect the MCP client.</p></section>',
     );
   const transaction = await oauth.beginConsent(authRequest);
+  await saveConsentBinding(env, transaction.handle, session, requested);
   // Chromium applies form-action to the 303 callback too. Admit only the provider-validated return origin.
   const returnOrigin = new URL(description.redirectUri).origin;
   if (returnOrigin === 'null') throw new RequestFailure(400);
@@ -69,6 +76,21 @@ async function consentPage(
     transaction.headers,
   );
 }
+async function consentForm(
+  request: Request,
+  env: Env,
+  session: ApprovedSession,
+): Promise<URLSearchParams> {
+  const form = new URLSearchParams(await boundedText(request, 16 * 1024));
+  if (
+    form.getAll('handle').length !== 1 ||
+    form.getAll('decision').length !== 1 ||
+    !(await matchesConsentBinding(env, form.get('handle') ?? '', session, form.getAll('scope')))
+  )
+    throw new RequestFailure(403);
+  return form;
+}
+
 async function decideConsent(
   request: Request,
   env: Env,
@@ -82,14 +104,17 @@ async function decideConsent(
       'application/x-www-form-urlencoded'
   )
     throw new RequestFailure(403);
-  const form = new URLSearchParams(await boundedText(request, 16 * 1024));
+  const form = await consentForm(request, env, session);
   const handle = form.get('handle') ?? '';
+  const selectedScopes = form.getAll('scope');
   if (form.get('decision') === 'deny') {
     const denied = await oauth.denyConsent(request, handle);
+    await clearConsentBinding(env, handle);
     return new Response(null, { status: 303, headers: denied.headers });
   }
   if (form.get('decision') !== 'allow') throw new RequestFailure(400);
-  const approved = await oauth.approveConsent(request, handle, { scope: form.getAll('scope') });
+  const approved = await oauth.approveConsent(request, handle, { scope: selectedScopes });
+  await clearConsentBinding(env, handle);
   const scopes = oauthScopes(approved.request.scope);
   if (
     !scopes ||
@@ -122,6 +147,6 @@ export async function authorizePage(request: Request, env: AppEnv): Promise<Resp
   const session = await approvedSession(request, env);
   if (session === null) return pairFirst(request);
   return request.method === 'GET'
-    ? consentPage(request, oauth, session)
+    ? consentPage(request, env, oauth, session)
     : decideConsent(request, env, oauth, session);
 }

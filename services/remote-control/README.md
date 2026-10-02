@@ -15,6 +15,8 @@ No route can start or frame a job, jog a machine, operate a laser or spindle, ac
 
 OAuth clients must support the maintained provider's OAuth discovery, resource audience, S256 PKCE, and either client metadata documents or dynamic registration. Individual hosted clients can impose their own connector or account requirements; local protocol qualification does not certify every external client's product UI.
 
+Consent belongs to the computer, paired client, current approval lease and permissions shown on that page. Changing computers, revoking and pairing again, or requesting additional permissions requires a fresh consent page. A form cannot add permissions that the page did not offer. Existing consent pages opened before the consent-binding deployment must also be reopened; issued tokens and paired clients retain their normal validation.
+
 ## Desktop envelope, version 1
 
 Registration is `POST /api/desktop/register` with `{v:1, deviceId, label, ownerSecret}`. The device ID is a UUID, and the secret is a 43-character base64url encoding of 32 random bytes. An existing ID accepts only its original owner's secret. Only its digest is stored in the Durable Object.
@@ -48,6 +50,7 @@ The shared portable MCP server in `electron/mcp` defines the exact tools, argume
 | OAuth access token | 30 minutes; requires the same live PC approval and audience |
 | OAuth refresh grant | Fixed 30 days only when `offline_access` is explicitly approved; refresh does not renew the PC approval lease |
 | Consent transaction and unexchanged authorization code | Ten minutes, managed by the official OAuth provider |
+| Consent presentation binding | Computer/client/lease, hashed phone session and displayed permissions in the existing OAuth KV; deleted after approval/decline or expires after ten minutes |
 | Dynamically registered OAuth client | 90 days of inactivity; successful token exchanges renew registration after half the idle lifetime |
 | Owner digest and PC label | Retained for subsequent re-enablement; this version has no device-record deletion action |
 | Pending command arguments and results | Memory only, at most 32 concurrent exchanges per PC and a 20-second timeout; no command history or artwork is persisted |
