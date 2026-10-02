@@ -11,6 +11,7 @@ import type { JobStopReason } from './job-stop-request';
 import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { ProbeResult } from './probe-actions';
 import type { WorkZRecoveryConfirmation } from './work-z-recovery-actions';
+import type { JobStartMarkRequest } from './job-start-mark';
 
 export type ControllerWakeOutcome = 'idle' | 'alarm';
 
@@ -64,6 +65,7 @@ export type LaserStoreActions = {
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;
+  readonly markJobStart: (request: JobStartMarkRequest) => Promise<void>;
   readonly cancelJog: () => Promise<void>;
   readonly frame: (
     bounds: {

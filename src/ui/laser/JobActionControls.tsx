@@ -18,6 +18,7 @@ import { useExecutionSignatureAppState } from './use-execution-signature-app-sta
 import { useFrameAction } from './use-frame-action';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
+import { useJobStartMarkPreparation } from './use-job-start-mark';
 
 type Props = {
   readonly disabled: boolean;
@@ -94,11 +95,12 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const progress = useFramePreparationStore((state) => state.progress);
   const stage = useFramePreparationStore((state) => state.stage);
   const cancellable = useFramePreparationStore((state) => state.cancellable);
+  const markPending = useJobStartMarkPreparation((state) => state.pending);
   const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
   const frameDeferred = frameIsDeferred(laser.motionOperation);
   const preparingFrame = framePending && !frameActive;
-  const busy = props.disabled || props.streaming || framePending;
+  const busy = [props.disabled, props.streaming, framePending, markPending].some(Boolean);
   const frame = currentCompletedFrame(laser);
   const framedRunIssue = framedRunReadinessIssue(frame, app, laser);
   const framedReady = framedRunIssue === null;

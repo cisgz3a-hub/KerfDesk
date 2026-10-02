@@ -46,6 +46,8 @@ export type ProjectOptimizationSettings = {
   readonly layerPriority: 'project-order' | 'reverse-project-order';
   readonly pathDirection: 'allow-reverse' | 'preserve';
   readonly startPoint: 'machine-origin' | 'job-lower-left' | 'job-center';
+  /** Opt-in physical region for Line contour entry; absent keeps the planner. */
+  readonly lineStartRegion?: LineStartRegion | undefined;
   /**
    * Where each closed laser shape starts and stops (LBG-C04): where it was
    * drawn, at the vertex nearest the head, or at the nearest corner so the
@@ -68,6 +70,24 @@ export type ProjectJobPlacement = {
     | 'back-center'
     | 'back-right';
 };
+
+export type LineStartRegion = ProjectJobPlacement['anchor'];
+
+export const LINE_START_REGIONS: ReadonlyArray<LineStartRegion> = [
+  'back-left',
+  'back-center',
+  'back-right',
+  'center-left',
+  'center',
+  'center-right',
+  'front-left',
+  'front-center',
+  'front-right',
+];
+
+export function isLineStartRegion(value: unknown): value is LineStartRegion {
+  return LINE_START_REGIONS.some((region) => region === value);
+}
 
 /**
  * ADR-496: the material this laser job runs on. With `autoApplyRecipes` on,

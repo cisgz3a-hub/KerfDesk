@@ -1,4 +1,4 @@
-import { cappedFirePowerS, profileSupportsCapability } from '../../core/devices';
+import { profileSupportsCapability } from '../../core/devices';
 import type { ControllerDriver } from '../../core/controllers';
 import { laserFireRefusal } from '../../core/preflight/laser-module-readiness';
 import { machineKindOf } from '../../core/scene';
@@ -16,6 +16,7 @@ import {
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import type { TranscriptSource } from './laser-transcript';
 import { useStore } from './store';
+import { currentFirePowerS } from './laser-fire-power';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -81,6 +82,13 @@ async function deactivateFire(
   get: GetFn,
   safeWrite: SafeWriteFn,
 ): Promise<void> {
+  if (get().controllerOperation?.kind === 'job-start-mark') {
+    // The timed mark already owns its queued M5 and three terminal ACKs.
+    // A deliberate generic Laser off must cancel through the bound Abort
+    // lifecycle, never insert an unowned ACK into that semantic exchange.
+    await get().stopJob();
+    return;
+  }
   const sessionEpoch = get().controllerSessionEpoch;
   const connectionAttempt = get().connectionAttempt;
   runtime.requestToken += 1;
@@ -179,10 +187,11 @@ function firePowerSettings(
   if (control === undefined) {
     rejectFireActivation(set, get, 'Enable low-power Fire in Device Profile first.');
   }
-  const powerS = cappedFirePowerS(
-    requestedPercent ?? control.maxPowerPercent,
+  const powerS = currentFirePowerS(
+    get(),
     control,
     device.maxPowerS,
+    requestedPercent ?? control.maxPowerPercent,
   );
   if (powerS <= 0) rejectFireActivation(set, get, 'Fire power must resolve to a positive S value.');
   return { powerS, feedMmPerMin: device.framingFeedMmPerMin };
@@ -245,7 +254,10 @@ async function resetFirePowerOverride(
   return false;
 }
 
-function fireActivationBlockMessage(state: LaserState, ignorePendingAcks = false): string | null {
+export function fireActivationBlockMessage(
+  state: LaserState,
+  ignorePendingAcks = false,
+): string | null {
   return (
     fireFeatureBlockMessage(state) ??
     fireControllerStateBlockMessage(state) ??
@@ -301,7 +313,7 @@ function fireBusyBlockMessage(state: LaserState, ignorePendingAcks: boolean): st
 
 function rejectFireActivation(set: SetFn, get: GetFn, message: string): never {
   set({
-    fireActive: false,
+    fireActive: get().controllerOperation?.kind === 'job-start-mark' ? get().fireActive : false,
     lastWriteError: message,
     log: pushLog(get(), `[lf2] Fire command blocked: ${message}`),
   });

@@ -214,6 +214,7 @@ export function completePreparedOutput(
       placed,
       input.sourceProject.optimization,
       input.sourceProject.device.scanningOffsets,
+      input.sourceProject.device.origin,
     ),
     jobOriginOffset: offset,
     advisories: input.advisories,

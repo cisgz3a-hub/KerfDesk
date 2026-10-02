@@ -31,6 +31,7 @@ import {
   clampOverlapMergeTolerance,
   DEFAULT_PROJECT_OPTIMIZATION,
   PROJECT_SCHEMA_VERSION,
+  isLineStartRegion,
 } from '../../core/scene/project';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
@@ -419,12 +420,19 @@ function normalizeOptimization(value: unknown): Project['optimization'] {
       value['startPoint'] === 'job-lower-left' || value['startPoint'] === 'job-center'
         ? value['startPoint']
         : 'machine-origin',
+    ...normalizedLineStartRegion(value['lineStartRegion']),
     // Absent in files written before LBG-C04: they start closed shapes where drawn.
     closedShapeStart:
       value['closedShapeStart'] === 'nearest' || value['closedShapeStart'] === 'nearest-corner'
         ? value['closedShapeStart']
         : 'drawn',
   };
+}
+
+function normalizedLineStartRegion(
+  value: unknown,
+): Pick<Project['optimization'], 'lineStartRegion'> {
+  return isLineStartRegion(value) ? { lineStartRegion: value } : {};
 }
 
 // LBG-C13. Kept absent when a file never set it (every file before the option),

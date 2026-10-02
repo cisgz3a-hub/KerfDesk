@@ -226,7 +226,11 @@ export function disconnectStopCommands(
 ): ReadonlyArray<string> {
   const fireOff = state.fireActive ? ['M5\n'] : [];
   const softReset = driver.realtime.softReset;
-  if (isActiveJob(state.streamer) || state.controllerOperation?.kind === 'probe') {
+  if (
+    isActiveJob(state.streamer) ||
+    state.controllerOperation?.kind === 'probe' ||
+    state.controllerOperation?.kind === 'job-start-mark'
+  ) {
     return softReset === null
       ? [...fireOff, ...noResetStopLines(driver, state)]
       : [softReset, ...fireOff, ...terminated(driver.commands.stopLaserLines)];

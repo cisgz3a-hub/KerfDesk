@@ -77,6 +77,7 @@ import { createSafeWrite } from './laser-safe-write';
 import { bindLiveJobTransportLedger } from './laser-job-transport-ledger';
 import { setupActions } from './laser-setup-actions';
 import { controllerFireActions } from './laser-fire-actions';
+import { jobStartMarkActions } from './laser-job-start-mark-actions';
 import { type SerialTranscriptEntry, type TranscriptSource } from './laser-transcript';
 import { workZRecoveryActions } from './work-z-recovery-actions';
 import type { LaserStoreActions } from './laser-store-action-types';
@@ -535,6 +536,9 @@ export const useLaserStore = create<LaserState>((set, get) => {
     ),
     ...airAssistActions(set, get),
     ...controllerFireActions(set, get, refs, (line, action, source) =>
+      safeWrite(set, get, line, action, source),
+    ),
+    ...jobStartMarkActions(set, get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
     ),
     ...probeActions(set, get, refs, (line, action, source) =>
