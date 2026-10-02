@@ -42,6 +42,7 @@ export function prepareLargeJob(
   prepare: typeof prepareOutput = prepareOutput,
 ): LargeJobPreparation {
   const prepared = prepare(project, {
+    ...(options.laserMaxPowerS === undefined ? {} : { laserMaxPowerS: options.laserMaxPowerS }),
     ...(options.contourEntryBounds === undefined
       ? {}
       : { contourEntryBounds: options.contourEntryBounds }),
@@ -63,6 +64,7 @@ export async function prepareLargeJobAsync(
   prepare: (project: Project, options: PrepareOutputOptions) => Promise<PreparedOutput>,
 ): Promise<LargeJobPreparation> {
   const prepared = await prepare(project, {
+    ...(options.laserMaxPowerS === undefined ? {} : { laserMaxPowerS: options.laserMaxPowerS }),
     ...(options.contourEntryBounds === undefined
       ? {}
       : { contourEntryBounds: options.contourEntryBounds }),

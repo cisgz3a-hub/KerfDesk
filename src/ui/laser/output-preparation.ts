@@ -23,6 +23,10 @@ import { renderVariableText } from '../text/render-variable-text';
 import { detectMachineJobWarnings } from './machine-job-warnings';
 import { finalizeTiledOutput } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
+import {
+  laserPowerPreparationOptions,
+  laserPowerScaleWarnings,
+} from './connected-laser-power-scale';
 
 export type OutputPreparationContext = {
   readonly jobId: string;
@@ -108,18 +112,25 @@ async function prepareSaveOutput(
   project: Project,
   context: OutputPreparationContext,
 ): Promise<OutputPreparationResponse> {
-  const prepared = await prepareWithOptionalSnapshot(project, request, context);
+  const options = {
+    ...request.options,
+    ...laserPowerPreparationOptions(project, request.laserPowerScaleSource),
+  };
+  const prepared = await prepareWithOptionalSnapshot(project, { ...request, options }, context);
   const machineWarnings = prepared.ok
-    ? detectMachineJobWarnings(
-        prepared.project,
-        request.controllerSettings ?? null,
-        request.activeWcs ?? null,
-        prepared,
-      )
+    ? [
+        ...detectMachineJobWarnings(
+          prepared.project,
+          request.controllerSettings ?? null,
+          request.activeWcs ?? null,
+          prepared,
+        ),
+        ...laserPowerScaleWarnings(project, request.laserPowerScaleSource),
+      ]
     : [];
   return {
     kind: 'save',
-    result: emitSavePreparedOutput(prepared, request.options, machineWarnings),
+    result: emitSavePreparedOutput(prepared, options, machineWarnings),
   };
 }
 

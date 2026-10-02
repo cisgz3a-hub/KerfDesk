@@ -14,6 +14,7 @@ import { currentReplayExecutionSignature } from './start-job-execution-tracking'
 import { prepareCurrentStartJob } from './start-job-source';
 import { frameVerificationBounds, reportFrameRefusal } from './frame-dispatch-support';
 import type { ReviewedStartBundle } from './job-review';
+import { laserPowerScaleStillCurrent } from './connected-laser-power-scale';
 
 export const PREPARED_FRAME_COORDINATES_CHANGED_MESSAGE =
   'The current job has different motion coordinates or placement from the completed Frame. Frame the updated job again.';
@@ -124,6 +125,13 @@ export function rebindReviewedFramedRun(
   let rebound: FramedRunPermit | null = null;
   useLaserStore.setState((state) => {
     if (state.framedRun !== permit || framedRunReadinessIssue(permit, undefined, state) !== null)
+      return {};
+    if (
+      !laserPowerScaleStillCurrent(bundle.project, bundle.prepared.laserPowerScale, {
+        ...state,
+        connected: state.connection.kind === 'connected',
+      })
+    )
       return {};
     if (transient) {
       // The tool's Cancel/Edit handler owns this exact immutable permit.

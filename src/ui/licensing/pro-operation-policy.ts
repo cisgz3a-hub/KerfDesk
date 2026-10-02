@@ -23,16 +23,34 @@ export function operationProFeature(operation: Pick<Layer, 'cnc'>): ProFeature |
  */
 export function newlyIntroducedProFeature(before: Project, after: Project): ProFeature | null {
   if (before.scene === after.scene) return null;
-  const previousLayers = new Map(before.scene.layers.map((layer) => [layer.id, layer]));
+  const introducedOperation = newlyIntroducedProOperationFeature(before, after);
+  if (introducedOperation !== null) return introducedOperation;
   const proLayers = new Map<string, ProFeature>();
+  for (const layer of after.scene.layers) {
+    const feature = operationProFeature(layer);
+    if (feature !== null) proLayers.set(layer.id, feature);
+  }
+  return newlyIntroducedObjectFeature(before, after, proLayers);
+}
+
+/**
+ * Geometry edits may replace artwork IDs while preserving the same operations.
+ * Weld uses this narrower check because only its isolated effective-operation
+ * clones introduce independent Pro work; ordinary welding edits existing work.
+ */
+export function newlyIntroducedProOperationFeature(
+  before: Project,
+  after: Project,
+): ProFeature | null {
+  if (before.scene === after.scene) return null;
+  const previousLayers = new Map(before.scene.layers.map((layer) => [layer.id, layer]));
   for (const layer of after.scene.layers) {
     const feature = operationProFeature(layer);
     if (feature === null) continue;
     const previous = previousLayers.get(layer.id);
     if (previous === undefined || operationProFeature(previous) !== feature) return feature;
-    proLayers.set(layer.id, feature);
   }
-  return newlyIntroducedObjectFeature(before, after, proLayers);
+  return null;
 }
 
 function newlyIntroducedObjectFeature(

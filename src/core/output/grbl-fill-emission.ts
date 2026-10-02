@@ -12,12 +12,14 @@ import type { FillSpan } from '../job/fill-sweeps';
 import { offsetForSpeed } from '../job/scan-offset';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatGcodePowerS } from '../gcode/decimal-word';
 import {
   createModalMotionWriter,
   joinMotionWords,
   motionWordStyleFor,
 } from '../gcode/motion-words';
 import { fillRunwayCommentText } from './fill-runway-comment';
+import type { LaserPowerScaleVersion } from './laser-power-scale-version';
 import {
   LINE_END,
   feedComment,
@@ -37,6 +39,7 @@ import {
 } from './grbl-output-cursor';
 
 type FillGroupEmissionContext = {
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   readonly device: DeviceProfile;
   readonly dialect: GrblGcodeDialect;
   readonly cursor: LaserOutputCursor;
@@ -53,7 +56,7 @@ type FillSweepEmissionContext = FillGroupEmissionContext & {
 
 export function emitScanlineFillGroup(group: FillGroup, groupContext: FillGroupEmissionContext) {
   const { device } = groupContext;
-  const s = scaleS(group.power, device.maxPowerS);
+  const s = scaleS(group.power, device.maxPowerS, groupContext.laserPowerScaleVersion);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   const overscanText = fillRunwayCommentText(group, formatGcodeCoordinateMm);
@@ -153,7 +156,13 @@ function sweepSpanLines(
     feedEmitted = true;
     lines.push(
       joinMotionWords(
-        [writer.motion('G1'), writer.axis('X', x), writer.axis('Y', y), feedWord, `S${power}`],
+        [
+          writer.motion('G1'),
+          writer.axis('X', x),
+          writer.axis('Y', y),
+          feedWord,
+          `S${formatGcodePowerS(power, context.laserPowerScaleVersion)}`,
+        ],
         style,
       ),
     );

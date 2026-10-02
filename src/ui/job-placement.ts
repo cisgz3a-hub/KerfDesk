@@ -67,6 +67,7 @@ export function jobPlacementAfterProfileSelection(
 }
 
 export type MachinePlacementSnapshot = NativeBedEvidence & {
+  readonly connected?: boolean;
   readonly statusReport: StatusReport | null;
   readonly workOriginActive?: boolean;
   readonly wcoCache?: WorkCoordinateOffset | null;

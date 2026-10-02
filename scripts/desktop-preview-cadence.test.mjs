@@ -10,6 +10,7 @@ import {
   fetchCompletedPreviewReleases,
 } from './filter-completed-previews.mjs';
 import {
+  MAX_CADENCE_ISSUE_BYTES,
   cadenceIssue,
   newestGreenCommit,
   nextPreviewTag,
@@ -17,6 +18,7 @@ import {
   previewDue,
   publishedPreviews,
 } from './desktop-preview-cadence.mjs';
+import { renderNotes } from './desktop-release-notes.mjs';
 
 test('names the next Preview tag after the newest one', () => {
   assert.equal(nextPreviewTag('v0.2.0-preview.13'), 'v0.2.0-preview.14');
@@ -182,6 +184,72 @@ test('the issue gives the exact annotated tag for the green commit and the notes
   assert.ok(
     body.includes('node scripts/filter-completed-previews.mjs --fetch preview-releases.json'),
   );
+  assert.ok(body.includes(`/compare/v0.2.0-preview.13...${commit}`));
+  assert.doesNotMatch(body, /Draft condensed/);
+});
+
+const LARGE_ISSUE = {
+  lastTag: 'v0.2.0-preview.13',
+  days: 71,
+  nextTag: 'v0.2.0-preview.14',
+  commit: 'a'.repeat(40),
+};
+
+test('a long history fits GitHub without losing the exact range or omission count', () => {
+  const entries = Array.from({ length: 5_000 }, (_, index) => ({
+    pr: 5_000 - index,
+    title: `fix(laser): retained user-facing improvement ${5_000 - index}`,
+  }));
+  const notes = renderNotes(entries);
+  assert.ok(notes.length > 65_536);
+  const body = cadenceIssue({ ...LARGE_ISSUE, userFacingChanges: entries.length, notes });
+  assert.ok(Buffer.byteLength(body) <= MAX_CADENCE_ISSUE_BYTES);
+  const omitted = Number(/(\d+) user-facing changes omitted/u.exec(body)?.[1]);
+  const listed = [...body.matchAll(/^- /gmu)].length;
+  assert.ok(omitted > 0);
+  assert.equal(listed + omitted, entries.length);
+  assert.match(body, /0 titles shortened/);
+  assert.ok(body.includes('/pull/5000)'));
+  assert.ok(body.includes(`/compare/${LARGE_ISSUE.lastTag}...${LARGE_ISSUE.commit}`));
+  assert.ok(body.includes(`git tag -a ${LARGE_ISSUE.nextTag}`));
+  assert.ok(body.includes(`"KerfDesk v0.2.0 Preview 14" ${LARGE_ISSUE.commit}`));
+  assert.ok(body.includes(`git push origin ${LARGE_ISSUE.nextTag}`));
+  assert.ok(body.includes(`draft --releases=preview-releases.json --to=${LARGE_ISSUE.commit}`));
+  assert.equal(renderNotes(entries), notes, 'the full release-notes generator stays unchanged');
+});
+
+test('extreme Unicode titles are shortened at whole graphemes with their PR links intact', () => {
+  const entries = [
+    { pr: 1, title: `fix(laser): ${'👨‍👩‍👧‍👦é激光'.repeat(20_000)}` },
+    { pr: 2, title: `feat(text): ${'字'.repeat(50_000)}` },
+    { pr: 3, title: 'fix(frame): normal short title stays visible' },
+  ];
+  const body = cadenceIssue({
+    ...LARGE_ISSUE,
+    userFacingChanges: entries.length,
+    notes: renderNotes(entries),
+  });
+  assert.ok(Buffer.byteLength(body) <= MAX_CADENCE_ISSUE_BYTES);
+  assert.match(body, /0 user-facing changes omitted; 2 titles shortened/);
+  assert.match(body, /Normal short title stays visible/u);
+  assert.equal(Buffer.from(body).toString('utf8'), body, 'no broken UTF-16 surrogate');
+  for (const pr of [1, 2, 3]) assert.ok(body.includes(`/pull/${pr}))`));
+  const emojiLine = body.split('\n').find((line) => line.startsWith('- **Laser:**'));
+  assert.match(emojiLine, /^- \*\*Laser:\*\* (?:👨‍👩‍👧‍👦é激光)*(?:👨‍👩‍👧‍👦|👨‍👩‍👧‍👦é|👨‍👩‍👧‍👦é激)?… \(/u);
+});
+
+test('Unicode byte growth cannot overflow a body whose character count looks safe', () => {
+  const entries = Array.from({ length: 200 }, (_, index) => ({
+    pr: index + 1,
+    title: `fix(laser): ${'激光'.repeat(80)}`,
+  }));
+  const notes = renderNotes(entries);
+  assert.ok(notes.length < 65_536);
+  assert.ok(Buffer.byteLength(notes) > 65_536);
+  const body = cadenceIssue({ ...LARGE_ISSUE, userFacingChanges: entries.length, notes });
+  assert.ok(Buffer.byteLength(body) <= MAX_CADENCE_ISSUE_BYTES);
+  const omitted = Number(/(\d+) user-facing changes omitted/u.exec(body)?.[1]);
+  assert.equal([...body.matchAll(/^- /gmu)].length + omitted, entries.length);
 });
 
 const SCRIPT = fileURLToPath(new URL('./desktop-preview-cadence.mjs', import.meta.url));
@@ -212,23 +280,28 @@ function repositoryFixture(context) {
   };
   commit('feat: published Preview feature (#1)');
   git('tag', '-a', RELEASE_13.tagName, '-m', 'Preview 13');
-  commit('fix: retained change from failed preview (#2)');
+  const retained = commit('fix: retained change from failed preview (#2)');
   git('tag', '-a', 'v0.2.0-preview.14', '-m', 'Unpublished Preview 14');
   const head = commit('feat: newest candidate change (#3)');
-  const green = join(root, 'green.txt');
-  writeFileSync(green, `${head}\n`);
   return {
-    run(releases) {
+    head,
+    retained,
+    run(releases, greens = [[head]]) {
       const metadata = join(root, 'releases.json');
       const issue = join(root, 'issue.md');
       const output = join(root, 'output.txt');
       writeFileSync(metadata, JSON.stringify(releases));
+      const greenArgs = greens.map((commits, index) => {
+        const green = join(root, `green-${index}.txt`);
+        writeFileSync(green, `${commits.join('\n')}\n`);
+        return `--green=${green}`;
+      });
       const result = spawnSync(
         process.execPath,
         [
           SCRIPT,
           `--releases=${metadata}`,
-          `--green=${green}`,
+          ...greenArgs,
           `--issue=${issue}`,
           `--github-output=${output}`,
           '--now=2026-09-28T10:00:00Z',
@@ -244,6 +317,30 @@ function repositoryFixture(context) {
     },
   };
 }
+
+test('the CLI tags only the newest commit common to all required green histories', (context) => {
+  const fixture = repositoryFixture(context);
+  const result = fixture.run(
+    [RELEASE_13],
+    [[fixture.head, fixture.retained], [fixture.retained], [fixture.head, fixture.retained]],
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.output().includes(`commit=${fixture.retained}\n`));
+  assert.match(result.output(), /due=true/);
+  assert.ok(result.issue().includes(`"KerfDesk v0.2.0 Preview 15" ${fixture.retained}`));
+  assert.ok(result.issue().includes(`/compare/${RELEASE_13.tagName}...${fixture.retained}`));
+  assert.match(result.issue(), /Retained change from failed preview/);
+  assert.doesNotMatch(result.issue(), /Newest candidate change/);
+});
+
+test('the CLI waits without tag instructions when the required histories disagree', (context) => {
+  const fixture = repositoryFixture(context);
+  const result = fixture.run([RELEASE_13], [[fixture.head], [fixture.retained], [fixture.head]]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.output(), /due=waiting/);
+  assert.match(result.issue(), /No main commit .* has passed every check yet/);
+  assert.doesNotMatch(result.issue(), /git tag/);
+});
 
 test('an unpublished tag cannot close the reminder or hide its unshipped changes', (context) => {
   const fixture = repositoryFixture(context);

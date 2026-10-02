@@ -4,6 +4,7 @@ import type { LastCompletedReceipt, RecoveryRepository } from '../state/recovery
 import { laserSecondPassExecutionSignature } from '../state/recovery/laser-second-pass-lineage';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
 import { framedRunStartClaimIsCurrent, type FramedRunStartClaim } from './framed-run-start-claim';
+import { laserPowerScaleStillCurrent } from './connected-laser-power-scale';
 
 export type StartAuthorizationRefusal =
   | { readonly kind: 'completed-receipt-changed' }
@@ -50,11 +51,28 @@ export function currentLaserForAuthorizedStartNow(
     return { ok: false, refusal: { kind: 'execution-inputs-changed' } };
   }
   const current = useLaserStore.getState();
+  const candidate = args.framedRunClaim?.permit.candidate;
+  if (
+    candidate !== undefined &&
+    !laserPowerScaleStillCurrent(candidate.project, candidate.preparedStart.laserPowerScale, {
+      ...current,
+      connected: current.connection.kind === 'connected',
+    })
+  ) {
+    return {
+      ok: false,
+      refusal: {
+        kind: 'blocked',
+        message:
+          'The controller power range changed after this program was reviewed. Press Start again to review power for the current controller. The unchanged spatial Frame remains valid.',
+      },
+    };
+  }
   if (
     controllerStartPreparationStillCurrent(args.preparedAgainst, current, {
-      // ADR-232: a completion-issued ordinary-Start permit survives a later
-      // $30/$32 or $I refresh. Settings and build capability stay advisory;
-      // the wire boundary later checks reviewed evidence and exact M7 shape.
+      // ADR-232/565: the spatial Frame survives settings or build refreshes.
+      // The executable S-range binding is checked separately above; other
+      // settings remain advisory, with reviewed evidence and M7 checked later.
       ignoreAdvisoryControllerEvidence: args.framedRunClaim !== undefined,
     })
   ) {

@@ -83,6 +83,14 @@ const MUTATIONS: SourceMutation[] = [
     apply: (source) => Object.assign(source.prepared.project.device, { maxPowerS: 900 }),
   },
   {
+    name: 'base power version in place',
+    apply: (source) => Object.assign(source.prepared, { laserPowerScaleVersion: 1 }),
+  },
+  {
+    name: 'unknown base power version in place',
+    apply: (source) => Object.assign(source.prepared, { laserPowerScaleVersion: 3 }),
+  },
+  {
     name: 'provenance in place',
     apply: (source) => Object.assign(source.provenance?.controller ?? {}, { sessionEpoch: 99 }),
   },
@@ -157,6 +165,40 @@ describe('second-pass verified preparation ownership', () => {
 });
 
 describe('second-pass worker source ownership', () => {
+  it.each([
+    { phase: 'open', legacy: false },
+    { phase: 'compile', legacy: false },
+    { phase: 'open', legacy: true },
+    { phase: 'compile', legacy: true },
+  ] as const)(
+    'rejects base-version drift during pending $phase, legacy missing field=$legacy',
+    async ({ phase, legacy }) => {
+      const { source, prepared, selection } = await fixture();
+      if (legacy) {
+        const { laserPowerScaleVersion: _version, ...legacyPrepared } = source.prepared;
+        Object.assign(source, { prepared: legacyPrepared });
+      }
+      const { client, worker } = mockWorkerClient();
+      try {
+        const opened = client.open(source);
+        let pending: Promise<unknown> = opened;
+        if (phase === 'compile') {
+          worker.reply({});
+          await opened;
+          pending = client.compile(selection);
+        }
+        // Missing historical version must differ from invalid null; JSON's
+        // array encoding otherwise collapses both undefined and null to null.
+        Object.assign(source.prepared, { laserPowerScaleVersion: legacy ? null : 1 });
+        worker.reply({ prepared, drawing: {}, burnLengthMm: 1 });
+        await expect(pending).rejects.toThrow('source changed');
+        expect(verifiedLaserSecondPassPreparation(source, prepared, selection)).toBeNull();
+      } finally {
+        client.close();
+      }
+    },
+  );
+
   it('does not register a source changed while its worker copy was being verified', async () => {
     const { source } = await fixture();
     const { client, worker } = mockWorkerClient();

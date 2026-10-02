@@ -8,11 +8,23 @@ import { formatGcodeCoordinateMm } from '../gcode';
 import { effectiveGcodeFeedMmPerMin, formatGcodeFeedMmPerMin } from '../gcode/feed-word';
 import { INTENTIONAL_LASER_OFF_MOTION_COMMENT } from '../gcode-comments';
 import { operationProvenanceComment } from './operation-provenance-comment';
+import type { LaserPowerScaleVersion } from './laser-power-scale-version';
 
 export const LINE_END = '\n';
 
-export function scaleS(powerPercent: number, maxPowerS: number): number {
-  return Math.round((powerPercent / 100) * maxPowerS);
+export function scaleS(
+  powerPercent: number,
+  maxPowerS: number,
+  version: LaserPowerScaleVersion = 2,
+): number {
+  // Keep established integer-range output byte-for-byte. A fractional $30
+  // needs a virtual PWM range so 100% reaches that exact maximum and smaller
+  // percentages cannot round straight to zero or above the maximum.
+  return version === 1 || Number.isInteger(maxPowerS)
+    ? Math.round((powerPercent / 100) * maxPowerS)
+    : powerPercent === 100
+      ? maxPowerS
+      : Number(((Math.round(powerPercent * 10) / 1000) * maxPowerS).toPrecision(12));
 }
 
 export function roundedPositiveFeed(speed: number, context: string): number {

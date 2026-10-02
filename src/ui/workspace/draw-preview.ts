@@ -171,6 +171,7 @@ export async function buildPreviewToolpathSnapshot(
     | 'contourEntryBounds'
     | 'absoluteProgramOffset'
     | 'workZeroBedPosition'
+    | 'laserMaxPowerS'
   >,
 ): Promise<PreviewToolpath> {
   // Hydrate before the gates: this path can await, so a page-backed project
@@ -244,7 +245,7 @@ export function buildPreviewToolpathFromPrepared(
       prepared,
       ...(jobOrigin === undefined ? {} : { jobOrigin }),
       jobOriginOffset: prepared.jobOriginOffset,
-      device: project.device,
+      device: prepared.project.device,
       ...(options.emittedProgram === undefined ? {} : { emittedProgram: options.emittedProgram }),
     });
   }

@@ -421,7 +421,7 @@ function buildAcknowledgement(
     return { kind: 'cnc', prompt: cncSetupAttestationPrompt(args.overrides) };
   }
   return laserModeStartAcknowledgementRequired(
-    args.project,
+    args.prepared.prepared.project,
     args.laserModeStartSnapshot,
     args.prepared.gcode,
   )

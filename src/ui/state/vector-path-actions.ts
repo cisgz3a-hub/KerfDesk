@@ -43,7 +43,7 @@ export type VectorPathActions = VectorRepairActions & {
   readonly dogboneSelection: (bitDiameterMm: number) => void;
 };
 
-type VectorPathState = StateSlice & {
+export type VectorPathState = StateSlice & {
   readonly selectedObjectId: string | null;
   readonly selectedPathNode: PathNodeRef | null;
   readonly selectedPathNodes: ReadonlyArray<PathNodeRef>;
@@ -66,12 +66,13 @@ type VectorPathSet = (fn: (state: VectorPathState) => VectorPathMutation | Vecto
 export function vectorPathActions(
   set: VectorPathSet,
   copySet: VectorPathSet = set,
+  weldSet: VectorPathSet = set,
 ): VectorPathActions {
   return {
     ...vectorRepairActions(set),
     convertSelectionToPath: () => set((state) => convertSelectionToPathMutation(state)),
-    weldSelection: () => set((state) => weldSelectionMutation(state)),
-    booleanSelection: (op) => set((state) => booleanSelectionMutation(state, op)),
+    weldSelection: () => weldSet((state) => weldSelectionMutation(state)),
+    booleanSelection: (op) => copySet((state) => booleanSelectionMutation(state, op)),
     offsetSelection: (deltaMm) => copySet((state) => offsetSelectionMutation(state, deltaMm)),
     dogboneSelection: (bitDiameterMm) =>
       set((state) => dogboneSelectionMutation(state, bitDiameterMm)),

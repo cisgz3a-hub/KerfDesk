@@ -6,8 +6,11 @@
 import type { DeviceProfile } from '../devices';
 import type { Job, JobOriginPlacement } from '../job';
 import type { Vec2 } from '../scene';
+import type { LaserPowerScaleVersion } from './laser-power-scale-version';
 
 export type OutputEmitOptions = {
+  /** Exact archived base power semantics (ADR-567); ordinary output uses 2. */
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   /** Explicit beam-off position for the final move. When absent, the selected
    * device dialect keeps its normal finish policy. Null omits a laser park;
    * CNC retains its safe finishing policy. */

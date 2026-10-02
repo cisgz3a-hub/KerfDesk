@@ -70,11 +70,14 @@ export async function createSecondPassExecutionFixture(
   };
   const derived = buildLaserSecondPassProgram(source.gcode, selection);
   if (derived.kind === 'error') throw new Error(derived.message);
+  // The production Worker builds an immutable derived preparation rather
+  // than carrying the original ordinary Start's fresh live-range binding.
+  const { laserPowerScale: _freshPowerScale, ...frozenOriginal } = original;
   return {
     source,
     selection,
     prepared: {
-      ...original,
+      ...frozenOriginal,
       gcode: derived.gcode,
       metrics: {
         ...original.metrics,

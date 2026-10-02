@@ -1,5 +1,6 @@
 // One planned raster sweep, including its controller-grid and modal state.
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatGcodePowerS } from '../gcode/decimal-word';
 import {
   createModalMotionWriter,
   formatMotionCoordinateMm,
@@ -267,7 +268,9 @@ function formatRunG1(
       writer.motion('G1'),
       ...line.axisWords(writer, x),
       isVeryFirstG1 || input.modalFeedrate === false ? `F${formatGcodeFeedMmPerMin(feed)}` : '',
-      s !== prevS || input.emitSOnEveryBurnMove === true ? `S${s}` : '',
+      s !== prevS || input.emitSOnEveryBurnMove === true
+        ? `S${formatGcodePowerS(s, input.laserPowerScaleVersion)}`
+        : '',
     ],
     style,
   );

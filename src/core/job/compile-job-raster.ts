@@ -33,15 +33,18 @@ import {
 import { resolveImageScanDirection } from './scan-direction-policy';
 import { imageScanPassRuns, type ScanPassRun } from './scan-pass-angles';
 import { validatedScanOffsetMm } from './scan-offset';
+import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 
 const WHITE_LUMA_BYTE = 255;
 
 type CompileRasterGroupsOptions = {
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   readonly sceneObjects?: ReadonlyArray<SceneObject>;
   readonly sourceLumaByObjectId?: ReadonlyMap<string, Uint8Array>;
 };
 
 type CompileRasterGroupOptions = {
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   readonly objects: ReadonlyArray<SceneObject>;
   readonly sourceLumaOverride: Uint8Array | undefined;
   readonly scanFrame: RasterScanFrame;
@@ -76,6 +79,7 @@ export function compileRasterGroupsForLayer(
     appendObjectRasterGroups(obj, effectiveLayer, device, out, {
       objects: sceneObjects,
       sourceLumaOverride: options.sourceLumaByObjectId?.get(obj.id),
+      laserPowerScaleVersion: options.laserPowerScaleVersion ?? 2,
     });
   }
   return out;
@@ -149,7 +153,7 @@ function compileRasterGroup(
   const preparedLuma = prepareImageLuma(sourceLuma, obj, layer);
   const powerPercent = effectiveObjectPowerPercent(layer, obj);
   const minPowerPercent = effectiveObjectMinPowerPercent(layer, obj);
-  const compilationMaxS = rasterCompilationPowerScale(device);
+  const compilationMaxS = rasterCompilationPowerScale(device, options.laserPowerScaleVersion);
   const sMax = Math.round((powerPercent / 100) * compilationMaxS);
   const sMin = Math.round((minPowerPercent / 100) * compilationMaxS);
   const bounds = rasterScanBounds(obj, device, options.scanFrame);
@@ -174,6 +178,7 @@ function compileRasterGroup(
     sMax,
     sMin,
     scanFrame: options.scanFrame,
+    laserPowerScaleVersion: options.laserPowerScaleVersion ?? 2,
   };
   const rasterValues = rasterValuesFor(rasterInput);
   return {
@@ -221,7 +226,7 @@ function rasterPassThroughDimensions(
 function rasterValuesFor(
   input: MaterializedRasterInput,
 ): Pick<RasterGroup, 'sValues' | 'rowProvider'> {
-  const compilationMaxS = rasterCompilationPowerScale(input.device);
+  const compilationMaxS = rasterCompilationPowerScale(input.device, input.laserPowerScaleVersion);
   const toDeviceUnits = (values: RasterPowerValues): RasterPowerValues =>
     compilationMaxS === input.device.maxPowerS
       ? values
@@ -262,6 +267,7 @@ function sourceLumaForRaster(
 }
 
 type MaterializedRasterInput = {
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   readonly preparedLuma: Uint8Array;
   readonly obj: RasterImage;
   readonly layer: Layer;
