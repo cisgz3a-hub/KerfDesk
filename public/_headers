@@ -76,6 +76,15 @@
 /desktop-checkout.css
   Cache-Control: no-cache
 
+# Phone setup is a canvas-free public page, with no scripts or session data.
+# Revalidate it and its shared mobile styles when setup instructions change.
+/phone
+  Cache-Control: no-cache
+/phone.html
+  Cache-Control: no-cache
+/phone.css
+  Cache-Control: no-cache
+
 # This static privacy notice supplies a no-script CSP in its document. Cover
 # both the directory route and Pages' clean-URL forms without altering the app.
 # Preserve its readable contact link: edge email obfuscation injects a decoder

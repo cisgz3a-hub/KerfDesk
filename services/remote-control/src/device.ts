@@ -14,7 +14,7 @@ import {
   type McpReservation,
   type RemoteScope,
 } from './protocol.js';
-import { digest, json, pairingCode, sameDigest } from './security.js';
+import { digest, json, pairingCode, remainingPairingMs, sameDigest } from './security.js';
 import { DeviceApprovals } from './approvals.js';
 import { McpRequests } from './mcp-requests.js';
 type OwnerAttachment = { role: 'desktop'; connectionId: string };
@@ -283,7 +283,10 @@ export class RemoteDevice extends DeviceApprovals {
       claimed: false,
     };
     await this.persist();
-    this.send({ v: 1, type: 'pair.offer', requestId, code, expiresAt: this.state.offer.expiresAt });
+    const expiresAt = this.state.offer.expiresAt;
+    const expiresInMs = remainingPairingMs(expiresAt);
+    if (expiresInMs === 0) return;
+    this.send({ v: 1, type: 'pair.offer', requestId, code, expiresAt, expiresInMs });
   }
   private async decidePair(value: Record<string, unknown>): Promise<void> {
     if (!this.state || typeof value.pairingId !== 'string' || typeof value.approved !== 'boolean')

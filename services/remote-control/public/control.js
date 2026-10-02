@@ -1,3 +1,5 @@
+import { pairingDeadline, rejectedMessage } from './pairing.js';
+
 const $ = (selector) => document.querySelector(selector);
 const pairForm = $('#pair-form');
 let session = null;
@@ -45,17 +47,15 @@ async function api(path, body, generation) {
   }
   if (generation !== undefined && generation !== pairGeneration)
     throw new Error(errorMessages.cancelled);
-  if (!response.ok) rejectResponse(response, data);
+  if (!response.ok) rejectResponse(response, data, path);
   return data;
 }
-function rejectResponse(response, data) {
+function rejectResponse(response, data, path) {
   if (response.status === 401) setSession(null);
   if (response.status === 429) throw new Error('Too many requests. Wait a minute, then try again.');
   throw new Error(
     errorMessages[data.error?.code] ??
-      (response.status === 403
-        ? 'The pairing or permission is unavailable. Create a new code on the PC.'
-        : errorMessages.failed),
+      (response.status === 403 ? rejectedMessage(path) : errorMessages.failed),
   );
 }
 function setSession(value) {
@@ -293,7 +293,8 @@ async function pairStatus(deadline, generation) {
       if (generation === pairGeneration && refreshed) notice('This phone is approved.');
       return;
     }
-    if (Date.now() >= deadline) throw new Error('Pairing expired. Create a new code on your PC.');
+    if (performance.now() >= deadline)
+      throw new Error('Pairing expired. Create a new code on your PC.');
     $('#pair-status').textContent = value.online
       ? 'Waiting for your approval on the PC…'
       : 'The PC is offline. Reopen KerfDesk to finish approval.';
@@ -309,7 +310,7 @@ bindForm('#pair-form', async (form) => {
   const generation = ++pairGeneration;
   clearTimeout(poll);
   setSession(null);
-  const deviceId = form.elements.deviceId.value.trim();
+  const deviceId = form.elements.deviceId.value.trim().toLowerCase();
   const code = form.elements.code.value.trim();
   const clientLabel = form.elements.clientLabel.value.trim();
   if (new TextEncoder().encode(JSON.stringify(clientLabel)).byteLength > 66)
@@ -327,7 +328,7 @@ bindForm('#pair-form', async (form) => {
   );
   form.elements.code.value = '';
   notice('Approve this phone in KerfDesk on your PC.');
-  await pairStatus(result.expiresAt, generation);
+  await pairStatus(pairingDeadline(result.expiresInMs), generation);
 });
 bindForm('#text-form', (form) =>
   edit('add_text', {
@@ -390,7 +391,7 @@ void action(async () => {
       if (!continueToMcp()) await refresh();
     } else if (value.status === 'pending') {
       $('#pair-status').textContent = 'Waiting for approval on the PC…';
-      await pairStatus(Date.now() + 300_000, pairGeneration);
+      await pairStatus(pairingDeadline(value.expiresInMs), pairGeneration);
     }
   } catch (error) {
     if (!session) setSession(null);

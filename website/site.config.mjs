@@ -23,6 +23,8 @@ export const site = {
   // run that check or find the newest version itself: its desktop buttons open
   // that page instead of naming a version or linking an installer directly.
   downloadPageUrl: `${APP_URL}/download.html`,
+  // The app's canvas-free phone pairing guide, shipped alongside buy/download.
+  phoneSetupUrl: `${APP_URL}/phone.html`,
   downloadHost: 'dl.kerfdesk.com',
   // Help > Get Help and Help > Report a Problem in the app open this page. It
   // names the current contact route, including the support email address.
@@ -42,6 +44,7 @@ export const primaryNav = [
   { key: 'features', label: 'Features', href: '/features/' },
   { key: 'machines', label: 'Machines', href: '/machines/' },
   { key: 'docs', label: 'Get started', href: '/docs/' },
+  { key: 'phone', label: 'Phone & MCP', href: '/phone/' },
   { key: 'pricing', label: 'Pricing', href: '/pricing/' },
   { key: 'faq', label: 'FAQ', href: '/faq/' },
 ];
@@ -62,6 +65,7 @@ export const footerNav = [
     heading: 'Help',
     links: [
       { label: 'Get started', href: '/docs/' },
+      { label: 'Phone & MCP', href: '/phone/' },
       { label: 'Safety', href: '/safety/' },
       { label: 'FAQ', href: '/faq/' },
       { label: 'Support', href: SUPPORT_URL },

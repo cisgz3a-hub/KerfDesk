@@ -2,6 +2,8 @@
 
 This separate Cloudflare Worker relays approved workspace reads and edits to an open KerfDesk desktop app. It serves a small phone page at `/control?deviceId=<public UUID>` and standard MCP Streamable HTTP at `/mcp`. The public origin is fixed to `https://kerfdesk-phone-control.cisgz3a.workers.dev`.
 
+The first-party website provides the [Phone & MCP setup page](https://kerfdesk.com/phone.html), with a link into these controls. Controls stay in a top-level page so the existing Secure, HttpOnly, SameSite=Strict session and framing protections remain effective.
+
 No route can start or frame a job, jog a machine, operate a laser or spindle, access files, run shell commands, or grant Pro access. Each desktop request still passes the desktop app's current workspace, revision, client permission and existing Pro-tool checks. A disconnected PC reports unavailable. This service does not make the PC available while KerfDesk is closed.
 
 ## Set up a client
@@ -21,7 +23,7 @@ The desktop opens WSS `/api/desktop/connect?deviceId=<public UUID>` with `Author
 
 | Desktop sends | Relay responds or forwards |
 | --- | --- |
-| `{v:1,type:'pair.create',requestId}` | `pair.offer` with the same UUID request ID, code and server expiry |
+| `{v:1,type:'pair.create',requestId}` | `pair.offer` with the same UUID request ID, code, original `expiresAt` and remaining `expiresInMs` |
 | `{v:1,type:'pair.decide',pairingId,approved,scopes}` | Updated `clients` snapshot; approval must be a subset of the requested scopes |
 | `{v:1,type:'clients.list',requestId}` | `clients` snapshot with the same UUID request ID |
 | `{v:1,type:'client.revoke',clientId}` | Updated `clients` snapshot; pending work is cancelled |
@@ -30,6 +32,10 @@ The desktop opens WSS `/api/desktop/connect?deviceId=<public UUID>` with `Author
 | `{v:1,type:'error',requestId,error:{code,message}}` | Fixed public error; the supplied message is discarded |
 
 Relay commands are `{v:1,type:'command',requestId,clientId,scopes,command:{name,args}}`. Cancellation is `{v:1,type:'cancel',requestId}`. Pair requests include `pairingId`, `clientLabel`, `requestedScopes` and `expiresAt`. Unsolicited snapshots have fresh UUID request IDs. A replacement desktop connection cancels pending old work and does not replay commands. Client revocation is checked again immediately before returning results.
+
+Pairing offers, approval requests, phone claim responses and pending phone status include `expiresInMs`, an integer from 1 to 300000 computed from the original server expiry at dispatch. A replayed pending approval includes only its remaining lifetime; reconnect and status requests never renew it. Consumers use a monotonic local deadline so a PC or phone clock offset cannot hide a server-valid approval. `expiresAt` remains on offers, approval requests and claim responses for released 1.0.7 compatibility. The backend still enforces the original absolute expiry according to server time.
+
+If a claim is rejected, check that the PC reports **Connected to the remote service**, that its computer ID matches, and that the latest code matches exactly, including capitals. Another Create request replaces the preceding code immediately. A successful claim consumes its code once. The phone form accepts either spelling of a public UUID by normalising input to lowercase; this does not migrate owner records or relax case-sensitive pairing codes. A generic rejection does not establish which private condition failed.
 
 The shared portable MCP server in `electron/mcp` defines the exact tools, argument schemas and projected output. The read tools are `get_workspace`, `get_machine`, `get_app_status`, `list_material_recipes` and `review_job`. The edit tools are `set_selection`, `add_text`, `add_rectangle`, `transform_artwork` and `update_operation`. Edits include a fresh `expectedRevision` and caller-generated UUID `requestId`.
 

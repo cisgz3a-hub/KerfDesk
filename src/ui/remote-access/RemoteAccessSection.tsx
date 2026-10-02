@@ -71,13 +71,14 @@ function PairingControls(): JSX.Element {
         connection on this computer. Codes expire after five minutes.
       </p>
       <Button
-        disabled={busy || status?.connected !== true}
+        disabled={busy || status?.connected !== true || status.pairingPending}
         onClick={() => {
           void act('pair');
         }}
       >
         Create pairing code
       </Button>
+      {status?.pairingPending === true ? <p role="status">Creating a new pairing code…</p> : null}
       {status?.pairing != null ? (
         <p>
           Pairing code:{' '}

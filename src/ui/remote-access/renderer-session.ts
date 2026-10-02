@@ -142,10 +142,10 @@ export class RemoteRendererSession {
   private lostConnection(owner: string): void {
     if (!this.owns(owner)) return;
     for (const request of this.requests.values()) request.controller.abort();
-    const status = useRemoteAccessStore.getState().status;
-    if (status !== null)
-      this.ui.publish({ ...status, connected: false, clients: [], requests: [] });
-    this.ui.setMessage('Remote access lost its workspace connection. Reopen the app to reconnect.');
+    this.ui.disconnected(
+      owner,
+      'Remote access lost its workspace connection. Reopen the app to reconnect.',
+    );
   }
   private async poll(): Promise<void> {
     const owner = this.session;
@@ -154,7 +154,7 @@ export class RemoteRendererSession {
       const value = await remoteRequest('poll', {}, owner);
       if (!this.owns(owner)) return;
       if (!validPoll(value)) throw new Error('Invalid remote response.');
-      this.ui.publish(value.status);
+      this.ui.publish(value.status, owner);
       for (const id of value.cancelled) this.requests.get(id)?.controller.abort();
       for (const request of value.requests) this.schedule(request, owner);
     } catch {

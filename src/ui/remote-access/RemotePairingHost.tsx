@@ -13,7 +13,7 @@ export function RemotePairingHost(): JSX.Element | null {
     });
   };
   return (
-    <Dialog title="Approve remote connection" onClose={() => decide(false)}>
+    <Dialog title="Approve remote connection" initialFocus="surface" onClose={() => decide(false)}>
       <p>
         <strong>{request.clientLabel}</strong> is asking to connect to this KerfDesk workspace.
       </p>

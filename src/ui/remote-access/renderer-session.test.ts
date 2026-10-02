@@ -28,6 +28,7 @@ vi.mock('../remote-control/adapter', () => ({
 }));
 
 const status: RemoteAccessStatus = {
+  statusRevision: 1,
   available: true,
   enabled: true,
   connected: true,
@@ -35,6 +36,7 @@ const status: RemoteAccessStatus = {
   controlUrl: 'https://example.test/control?deviceId=device',
   mcpUrl: 'https://example.test/mcp',
   pairing: null,
+  pairingPending: false,
   requests: [],
   clients: [{ id: 'client', label: 'Approved', scopes: ['read', 'edit'] }],
   error: null,
@@ -197,5 +199,188 @@ describe('renderer connection owns queued work and cancellation', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(useRemoteAccessStore.getState().status?.connected).toBe(true);
     expect(useRemoteAccessStore.getState().message).toBeNull();
+  });
+
+  it('a delayed pre-Create poll cannot restore a superseded pairing code', async () => {
+    let release!: (response: Response) => void;
+    const held = new Promise<Response>((done) => {
+      release = done;
+    });
+    const old = {
+      ...status,
+      statusRevision: 1,
+      pairing: { code: 'OldCode12345A', expiresAt: Date.now() + 300_000, expiresInMs: 300_000 },
+    };
+    const current = { ...status, statusRevision: 2, pairingPending: true };
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith('/poll')) return held;
+      if (String(input).endsWith('/pair')) return Response.json(current);
+      return original(input, init);
+    });
+    await start();
+    await useRemoteAccessStore.getState().act('pair');
+    expect(useRemoteAccessStore.getState().status?.pairing).toBeNull();
+    release(Response.json({ requests: [], cancelled: [], status: old }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useRemoteAccessStore.getState().status?.pairing).toBeNull();
+    expect(useRemoteAccessStore.getState().status?.pairingPending).toBe(true);
+  });
+
+  it('a delayed action from an old session cannot replace its successor status or busy owner', async () => {
+    let release!: (response: Response) => void;
+    const held = new Promise<Response>((done) => {
+      release = done;
+    });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (String(input).endsWith('/pair') && body.sessionId === 'session-1') return held;
+      return original(input, init);
+    });
+    const old = await start();
+    const action = useRemoteAccessStore.getState().act('pair');
+    await start();
+    old.stop();
+    release(
+      Response.json({
+        ...status,
+        statusRevision: 999,
+        connected: false,
+        pairing: { code: 'OldCode12345A', expiresAt: Date.now() + 300_000, expiresInMs: 300_000 },
+      }),
+    );
+    await action;
+    expect(useRemoteAccessStore.getState().status).toMatchObject({
+      connected: true,
+      pairing: null,
+    });
+    expect(useRemoteAccessStore.getState().message).toBeNull();
+  });
+
+  it('an old action failure cannot clear a successor action busy flag or overwrite its message', async () => {
+    let releaseOld!: (response: Response) => void;
+    let releaseNew!: (response: Response) => void;
+    const heldOld = new Promise<Response>((done) => {
+      releaseOld = done;
+    });
+    const heldNew = new Promise<Response>((done) => {
+      releaseNew = done;
+    });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      if (String(input).endsWith('/pair'))
+        return body.sessionId === 'session-1' ? heldOld : heldNew;
+      return original(input, init);
+    });
+    const old = await start();
+    const oldAction = useRemoteAccessStore.getState().act('pair');
+    await start();
+    old.stop();
+    const newAction = useRemoteAccessStore.getState().act('pair');
+    useRemoteAccessStore.getState().setMessage('Current workspace is waiting for its code.');
+    releaseOld(Response.json({ error: 'unavailable' }, { status: 503 }));
+    await oldAction;
+    expect(useRemoteAccessStore.getState()).toMatchObject({
+      busy: true,
+      message: 'Current workspace is waiting for its code.',
+    });
+    releaseNew(Response.json({ ...status, statusRevision: 2, pairingPending: true }));
+    await newAction;
+    expect(useRemoteAccessStore.getState().busy).toBe(false);
+  });
+
+  it('clears a previous code immediately and fences pre-Create polls while the action response is held', async () => {
+    let releaseAction!: (response: Response) => void;
+    let releasePoll!: (response: Response) => void;
+    const heldAction = new Promise<Response>((done) => {
+      releaseAction = done;
+    });
+    const heldPoll = new Promise<Response>((done) => {
+      releasePoll = done;
+    });
+    await start();
+    const old = {
+      ...status,
+      statusRevision: 2,
+      pairing: { code: 'OldCode12345A', expiresAt: Date.now() + 300_000, expiresInMs: 300_000 },
+    };
+    useRemoteAccessStore.getState().publish(old);
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith('/pair')) return heldAction;
+      if (String(input).endsWith('/poll')) return heldPoll;
+      return original(input, init);
+    });
+    await vi.advanceTimersByTimeAsync(350);
+    const action = useRemoteAccessStore.getState().act('pair');
+    expect(useRemoteAccessStore.getState().status?.pairing).toBeNull();
+    releasePoll(
+      Response.json({ requests: [], cancelled: [], status: { ...old, statusRevision: 3 } }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useRemoteAccessStore.getState().status?.pairing).toBeNull();
+    releaseAction(Response.json({ ...status, statusRevision: 4, pairingPending: true }));
+    await action;
+    expect(useRemoteAccessStore.getState().status?.pairingPending).toBe(true);
+  });
+
+  it('subtracts native route elapsed time so a delayed latest snapshot cannot revive an expired code', async () => {
+    let release!: (response: Response) => void;
+    const held = new Promise<Response>((done) => {
+      release = done;
+    });
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) =>
+      String(input).endsWith('/poll') ? held : original(input, init),
+    );
+    await start();
+    await vi.advanceTimersByTimeAsync(1_000);
+    release(
+      Response.json({
+        requests: [],
+        cancelled: [],
+        status: {
+          ...status,
+          pairing: { code: 'OldCode12345A', expiresAt: Date.now() + 300_000, expiresInMs: 1_000 },
+        },
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useRemoteAccessStore.getState().status?.pairing).toBeNull();
+  });
+
+  it('a same-owner native poll failure fences an already in-flight action response and finally', async () => {
+    let release!: (response: Response) => void;
+    const held = new Promise<Response>((done) => {
+      release = done;
+    });
+    await start();
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      if (String(input).endsWith('/pair')) return held;
+      if (String(input).endsWith('/poll')) return Response.json({ invalid: true });
+      return original(input, init);
+    });
+    const action = useRemoteAccessStore.getState().act('pair');
+    await vi.advanceTimersByTimeAsync(350);
+    expect(useRemoteAccessStore.getState()).toMatchObject({
+      busy: false,
+      status: { connected: false, pairing: null, pairingPending: false },
+    });
+    release(
+      Response.json({
+        ...status,
+        statusRevision: 999,
+        pairing: { code: 'OldCode12345A', expiresAt: Date.now() + 300_000, expiresInMs: 300_000 },
+      }),
+    );
+    await action;
+    expect(useRemoteAccessStore.getState()).toMatchObject({
+      busy: false,
+      status: { connected: false, pairing: null, pairingPending: false },
+    });
+    expect(useRemoteAccessStore.getState().message).toContain('Reopen the app');
   });
 });
