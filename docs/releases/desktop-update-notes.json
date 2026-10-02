@@ -1,12 +1,10 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "d02cfb112a2628396bfddb605f0729851484d596",
+  "sinceSourceSha": "a03d8b2e3d44ff4eda66acbea78620167c3db0ff",
   "highlights": [
-    "Keep a completed Frame for unchanged placement while adjusting power and speed or repeating the job.",
-    "Corrected next-job framing and CNC safe-height completion, including inch-mode position reports.",
-    "Completed previews and timers follow current artwork without losing the second-pass offer.",
-    "Improved completion and recovery handling after cancellation, errors and controller restarts.",
-    "Fixed entering 100% power scale when selected artwork has mixed values.",
-    "Prevented stale power overrides from weakening new burns or increasing momentary Fire power."
+    "Fixed delayed responses showing a replaced phone pairing code.",
+    "Fixed valid phone approval prompts disappearing when the PC clock differs from the service.",
+    "Phone approval prompts now wait for an intentional button choice while you are typing.",
+    "Find Phone & MCP setup directly from the mobile KerfDesk website."
   ]
 }

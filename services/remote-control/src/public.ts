@@ -20,6 +20,7 @@ import {
   csrfToken,
   originAllowed,
   randomSecret,
+  remainingPairingMs,
   removeCookie,
   sessionIdentity,
 } from './security.js';
@@ -60,7 +61,9 @@ async function claimPairing(request: Request, env: Env) {
     await digest(token),
   );
   if (!result) throw new RequestFailure(403);
-  return json({ status: 'pending', expiresAt: result.expiresAt }, 202, {
+  const expiresInMs = remainingPairingMs(result.expiresAt);
+  if (expiresInMs === 0) throw new RequestFailure(403);
+  return json({ status: 'pending', expiresAt: result.expiresAt, expiresInMs }, 202, {
     'Set-Cookie': controlCookie(parsed.data.deviceId, result.clientId, token, 300),
   });
 }
@@ -137,9 +140,14 @@ async function clientRequest(request: Request, env: Env, url: URL, ctx: Executio
 function staticAsset(request: Request, env: Env, url: URL): Promise<Response> | Response {
   if (url.pathname === '/health') return json({ service: 'KerfDesk phone control', protocol: 1 });
   if (
-    !['/', '/control', '/control.js', '/control.css', '/third-party-notices.txt'].includes(
-      url.pathname,
-    )
+    ![
+      '/',
+      '/control',
+      '/control.js',
+      '/pairing.js',
+      '/control.css',
+      '/third-party-notices.txt',
+    ].includes(url.pathname)
   )
     return json({ error: 'not_found' }, 404);
   const target = new URL(url);

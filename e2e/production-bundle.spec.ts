@@ -1,11 +1,12 @@
 import { applicationHeader } from './fixtures/workspace-ui';
 import { expect, test } from '@playwright/test';
 
-test('routes mobile browsers without downloading workspace algorithms', async ({
+test('routes mobile browsers to purchase and phone setup without downloading workspace algorithms', async ({
   browser,
   baseURL,
-}) => {
+}, testInfo) => {
   for (const [width, height, userAgent] of [
+    [320, 740, 'Mozilla/5.0 (Linux; Android 15) Chrome/144 Mobile Safari/537.36'],
     [390, 844, 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Safari/604.1'],
     [844, 390, 'Mozilla/5.0 (Linux; Android 15) Chrome/144 Mobile Safari/537.36'],
     [1024, 1366, 'Mozilla/5.0 (iPad) AppleWebKit/605.1.15 Safari/604.1'],
@@ -33,6 +34,67 @@ test('routes mobile browsers without downloading workspace algorithms', async ({
         page.getByRole('status').filter({ hasText: 'Pro purchases are not open yet' }),
       ).toBeVisible();
       await expect(page.locator('canvas')).toHaveCount(0);
+      const mobileNav = page.getByRole('navigation', { name: 'Product', exact: true });
+      await expect(mobileNav.getByRole('link', { name: 'Windows app' })).toHaveAttribute(
+        'href',
+        '/download.html',
+      );
+      await expect(mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Set up Phone & MCP' })).toBeVisible();
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      if (width === 390) {
+        await testInfo.attach('mobile-home-phone-entry', {
+          body: await page.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+      }
+
+      await mobileNav.getByRole('link', { name: 'Phone & MCP', exact: true }).click();
+      await expect(page).toHaveURL(/\/phone(?:\.html)?$/);
+      await expect(page.getByRole('heading', { name: 'Three steps to connect.' })).toBeVisible();
+      await expect(page.locator('.phone-steps')).toContainText('Edit → Settings… → Phone & MCP');
+      await expect(page.locator('.phone-steps')).toContainText('Connected to the remote service');
+      await expect(page.locator('.phone-steps')).toContainText('Copy the code exactly');
+      await expect(page.locator('.phone-steps')).toContainText('Allow viewing and editing');
+      await expect(page.locator('canvas, iframe, script')).toHaveCount(0);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      await page.getByRole('link', { name: 'Pro licence', exact: true }).first().click();
+      await expect(page).toHaveURL(/\/buy(?:\.html)?$/);
+      await expect(
+        page.getByRole('status').filter({ hasText: 'Pro purchases are not open yet' }),
+      ).toBeVisible();
+      await page.getByRole('link', { name: 'Set up Phone & MCP' }).click();
+      await page.getByText('How do I connect ChatGPT or another MCP app?', { exact: true }).click();
+      await expect(page.locator('.phone-mcp-url')).toHaveText(
+        'https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp',
+      );
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+      ).toBe(true);
+      if (width === 390) {
+        await testInfo.attach('mobile-phone-setup', {
+          body: await page.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+      }
+
+      // This proves first-party top-level navigation, not a real pairing. The
+      // relay's real session and desktop approval have separate service tests.
+      const controlUrl = 'https://kerfdesk-phone-control.cisgz3a.workers.dev/control';
+      await context.route(controlUrl, (route) =>
+        route.fulfill({
+          contentType: 'text/html',
+          body: '<!doctype html><html><head><title>Phone navigation target</title></head><body>Phone control navigation target</body></html>',
+        }),
+      );
+      await page.getByRole('link', { name: 'Connect to your PC', exact: true }).click();
+      await expect(page).toHaveURL(controlUrl);
+      expect(page.frames()).toHaveLength(1);
+      await expect(page.locator('canvas, iframe')).toHaveCount(0);
       expect(modules.some((path) => /\/index-[^/]+\.js$/u.test(path))).toBe(true);
       expect(
         modules.every((path) => /^\/assets\/(?:index|preload-helper)-[^/]+\.js$/u.test(path)),

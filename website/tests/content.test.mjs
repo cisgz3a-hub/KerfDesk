@@ -124,6 +124,19 @@ describe('website copy', () => {
     }
   });
 
+  it('makes phone setup discoverable and keeps pairing on the shipped app page', () => {
+    const phone = built.find(({ file }) => file === 'phone/index.html');
+    assert.ok(phone, 'phone guide is built');
+    assert.ok(attrValues(phone.html, 'a', 'href').includes(site.phoneSetupUrl));
+    assert.match(pageText('phone/index.html'), /Every connection needs your approval on the PC/);
+    assert.match(pageText('phone/index.html'), /copy the code exactly including capital letters/);
+    assert.match(pageText('phone/index.html'), /Machine execution stays on the PC/);
+    for (const { file, html } of built) {
+      assert.ok(attrValues(html, 'a', 'href').includes('/phone/'), `${file} phone navigation`);
+      assert.doesNotMatch(html, /<iframe\b/i, `${file} never embeds a remote session`);
+    }
+  });
+
   // support@kerfdesk.com is live (29 September 2026); no page names any other address.
   it('writes no email address but the support address', () => {
     assert.equal(site.supportEmail, 'support@kerfdesk.com');
