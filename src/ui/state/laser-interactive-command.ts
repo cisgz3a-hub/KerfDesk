@@ -19,6 +19,7 @@ import {
 } from './laser-controller-reset-wait';
 import { armSilenceTimer, type StatusPollScheduleRefs } from './laser-status-poll-schedule';
 import { continueControllerOperation } from './laser-controller-operation';
+export { controllerCommandOwnsStartSettleDwell } from './laser-start-settle-command-owner';
 
 export {
   observeControllerResetBoundary,
@@ -43,6 +44,7 @@ export type ControllerCommandKind =
   | 'post-job-settle'
   | 'probe'
   | 'interactive-command'
+  | 'job-start-mark'
   | 'recovery'
   | 'start-arming'
   | 'work-z-recovery';
@@ -72,6 +74,7 @@ type ControllerCommandRequest = {
   timer: ReturnType<typeof setTimeout>;
   acceptingResponses: boolean;
   terminalAckSeen: boolean;
+  remainingTerminalAcks: number;
   /** Set when the controller skipped the command; its `ok` then refuses it. */
   refusal: string | null;
   sawActiveState: boolean;
@@ -102,6 +105,9 @@ export type StartControllerCommandOptions = {
   readonly timeoutMode?: ControllerCommandTimeoutMode;
   readonly completion?: ControllerCommandCompletion;
   readonly statusOwnership?: ControllerCommandStatusOwnership;
+  /** A bounded owned batch, written together so its off line is already queued.
+   * Every line must acknowledge before the semantic exchange completes. */
+  readonly terminalAckCount?: number;
 };
 
 export type ControllerCommandStatusOwnership =
@@ -158,6 +164,7 @@ export function startControllerCommand(
       reject,
       acceptingResponses: false,
       terminalAckSeen: false,
+      remainingTerminalAcks: options.terminalAckCount ?? 1,
       refusal: null,
       sawActiveState: false,
       activeCycleSettled: false,
@@ -192,14 +199,6 @@ export function activeControllerCommandLine(refs: ControllerLifecycleRefs): stri
   return refs.controllerCommand?.command;
 }
 
-export function controllerCommandOwnsStartSettleDwell(refs: ControllerLifecycleRefs): boolean {
-  return (
-    refs.controllerCommand?.kind === 'start-arming' &&
-    (refs.controllerCommand.statusOwnership === 'cnc-start-settle-dwell' ||
-      refs.controllerCommand.statusOwnership === 'laser-start-override-dwell')
-  );
-}
-
 export function consumeControllerCommandResponse(
   refs: ControllerLifecycleRefs,
   response: ControllerEvent,
@@ -208,6 +207,7 @@ export function consumeControllerCommandResponse(
   const request = refs.controllerCommand;
   if (request === null) return false;
   if (!request.acceptingResponses) {
+    if (response.kind === 'status') keepCommandAliveFromStatus(refs, request, response.report);
     // A fast adapter/controller can deliver a reply before conn.write()'s
     // Promise resolves. The safe-write ledger has already reserved ownership,
     // so retain semantic responses and replay them in wire order once the
@@ -234,6 +234,8 @@ export function consumeControllerCommandResponse(
 }
 
 function acceptTerminalAck(refs: ControllerLifecycleRefs, request: ControllerCommandRequest): void {
+  request.remainingTerminalAcks -= 1;
+  if (request.remainingTerminalAcks > 0) return;
   request.terminalAckSeen = true;
   if (request.refusal !== null) {
     finishControllerCommand(

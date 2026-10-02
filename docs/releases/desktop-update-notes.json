@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "sinceSourceSha": "a03d8b2e3d44ff4eda66acbea78620167c3db0ff",
   "highlights": [
-    "Fixed delayed responses showing a replaced phone pairing code.",
-    "Fixed valid phone approval prompts disappearing when the PC clock differs from the service.",
+    "Fixed stale phone pairing codes and approval prompts affected by PC clock differences.",
     "Phone approval prompts now wait for an intentional button choice while you are typing.",
-    "Find Phone & MCP setup directly from the mobile KerfDesk website.",
+    "Find Phone & MCP setup on the mobile website, with clearer ChatGPT steps and permission renewal.",
     "Fixed Pro access checks when splitting artwork with Break Apart or Cut Shapes.",
-    "Added clearer ChatGPT connection steps and improved MCP permission renewal."
+    "Mark the first burn point with a one-second low-power dot, then return the head.",
+    "Choose a centre, side or corner for Line contour starts."
   ]
 }

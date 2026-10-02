@@ -46,7 +46,7 @@
 //
 // Pure-core compliant: no clock, no random, no I/O.
 
-import type { ScanOffsetPoint } from '../devices';
+import type { Origin, ScanOffsetPoint } from '../devices';
 import type { ProjectOptimizationSettings, Vec2 } from '../scene';
 import { expandFillHatchWithRunways } from './fill-runway';
 import { planFillSweeps } from './fill-sweep-plan';
@@ -59,6 +59,7 @@ import {
   startCursorForSegments,
 } from './segment-order';
 import { removeCutOverlaps } from './remove-cut-overlaps';
+import { isBurningLineGroup, lineStartCursorForJob } from './line-start-region';
 
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
@@ -67,7 +68,7 @@ type PathOptimizationSettings = Pick<
   Partial<
     Pick<
       ProjectOptimizationSettings,
-      'removeOverlappingLines' | 'overlapMergeToleranceMm' | 'closedShapeStart'
+      'removeOverlappingLines' | 'overlapMergeToleranceMm' | 'closedShapeStart' | 'lineStartRegion'
     >
   >;
 const DEFAULT_PATH_OPTIMIZATION: PathOptimizationSettings = {
@@ -82,12 +83,14 @@ export function optimizePaths(
   job: Job,
   settings: PathOptimizationSettings = DEFAULT_PATH_OPTIMIZATION,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint> = [],
+  origin: Origin = 'front-left',
 ): Job {
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
+  const lineStartCursor = lineStartCursorForJob(job, settings.lineStartRegion, origin);
   const ordered =
     settings.travelPolicy === 'source-order'
-      ? prioritized.map((group) => startClosedShapesInSourceOrder(group, settings))
-      : optimizeGroups(prioritized, settings, scanningOffsets);
+      ? prioritized.map((group) => startClosedShapesInSourceOrder(group, settings, lineStartCursor))
+      : optimizeGroups(prioritized, settings, scanningOffsets, lineStartCursor);
   return {
     ...job,
     // Keep containment/ordering decisions on the original contours. Splitting
@@ -147,11 +150,12 @@ function optimizeGroups(
   groups: ReadonlyArray<Group>,
   settings: PathOptimizationSettings,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
+  lineStartCursor: Vec2 | null,
 ): Group[] {
   const out: Group[] = [];
   let i = 0;
   while (i < groups.length) {
-    const group = optimizeGroupAny(groups[i] as Group, settings);
+    const group = optimizeGroupAny(groups[i] as Group, settings, lineStartCursor);
     if (!isIslandFillGroup(group)) {
       out.push(group);
       i += 1;
@@ -161,7 +165,7 @@ function optimizeGroups(
     const run: FillGroup[] = [group];
     i += 1;
     while (i < groups.length) {
-      const next = optimizeGroupAny(groups[i] as Group, settings);
+      const next = optimizeGroupAny(groups[i] as Group, settings, lineStartCursor);
       if (!isCompatibleIslandFillGroup(run[0] as FillGroup, next)) break;
       run.push(next);
       i += 1;
@@ -175,27 +179,56 @@ function optimizeGroups(
 // semantically meaningful: row order, bidirectional scan offset, and overscan
 // all depend on sweep ordering. Island Fill is optimized only as whole groups;
 // Offset/Follow Shape is optimized as contour segments.
-function optimizeGroupAny(group: Group, settings: PathOptimizationSettings): Group {
-  if (group.kind === 'cut') return optimizeGroup(group, settings);
+function optimizeGroupAny(
+  group: Group,
+  settings: PathOptimizationSettings,
+  lineStartCursor: Vec2 | null,
+): Group {
+  if (group.kind === 'cut') return optimizeGroup(group, settings, lineStartCursor);
   if (isOffsetFillGroup(group)) return optimizeOffsetFillGroup(group, settings);
   return group;
 }
 
-function optimizeGroup(group: CutGroup, settings: PathOptimizationSettings): CutGroup {
+function optimizeGroup(
+  group: CutGroup,
+  settings: PathOptimizationSettings,
+  lineStartCursor: Vec2 | null,
+): CutGroup {
   if (group.segments.length === 0) return group;
   // No size ceiling: traced artwork routinely runs to tens of thousands of
   // segments, and those are the jobs with the most travel to recover. The
   // former 2,000 cap silently returned them unoptimized.
   // N=1 still benefits — open polylines can be entered from either
   // endpoint; reversal isn't a no-op when start ≠ origin.
-  const ordered = configuredSegmentOrder(group.segments, settings);
+  // This explicit Line choice works under the drawn/source-order defaults too.
+  // Its local override does not change Fill's saved seed or closed-start policy.
+  const hasLinePreference = lineStartCursor !== null && isBurningLineGroup(group);
+  const lineSettings: PathOptimizationSettings = hasLinePreference
+    ? {
+        ...settings,
+        closedShapeStart:
+          settings.closedShapeStart === 'nearest-corner' ? 'nearest-corner' : 'nearest',
+      }
+    : settings;
+  const ordered = configuredSegmentOrder(
+    group.segments,
+    lineSettings,
+    hasLinePreference ? lineStartCursor : undefined,
+  );
   return { ...group, segments: ordered };
 }
 
 // Keep source order still honours closedShapeStart on the groups the planner
 // would otherwise order (Line cuts, Offset Fill rings). Under 'drawn' each
 // group comes back as the same object, so the output is unchanged.
-function startClosedShapesInSourceOrder(group: Group, settings: PathOptimizationSettings): Group {
+function startClosedShapesInSourceOrder(
+  group: Group,
+  settings: PathOptimizationSettings,
+  lineStartCursor: Vec2 | null,
+): Group {
+  if (group.kind === 'cut' && lineStartCursor !== null && isBurningLineGroup(group)) {
+    return optimizeGroup(group, settings, lineStartCursor);
+  }
   if ((settings.closedShapeStart ?? 'drawn') === 'drawn') return group;
   if (group.kind === 'cut') {
     return { ...group, segments: sourceOrderClosedShapeStarts(group.segments, settings) };

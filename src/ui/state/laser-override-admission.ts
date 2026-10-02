@@ -22,6 +22,9 @@ export function realtimeOverrideBlockMessage(state: LaserState): string | null {
   if (state.controllerOperation?.kind === 'start-arming') {
     return 'Wait for Start to finish establishing the override baseline.';
   }
+  if (state.controllerOperation?.kind === 'job-start-mark') {
+    return 'Wait for the timed start mark to finish before changing overrides.';
+  }
   if (state.fireActive) return 'Release momentary Fire before changing overrides.';
   return state.controllerOperation?.kind === 'probe'
     ? 'Realtime overrides are locked during a probe transaction.'

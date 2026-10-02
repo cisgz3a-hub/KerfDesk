@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ProjectOptimizationSettings } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { OverlapRemovalFields } from './OverlapRemovalFields';
+import { LineBurnStartField } from './LineBurnStartField';
 
 export function OptimizationSettingsDialog(props: {
   readonly settings: ProjectOptimizationSettings;
@@ -42,12 +43,20 @@ function PlannerFields(props: {
 }): JSX.Element {
   const { settings, update } = props;
   const keepsSourceOrder = settings.travelPolicy === 'source-order';
-  const orderingControlTitle = keepsSourceOrder
+  const choosesLineRegion = settings.lineStartRegion !== undefined;
+  const bypassesOrdering = keepsSourceOrder && !choosesLineRegion;
+  const orderingControlTitle = bypassesOrdering
     ? 'Keep source order bypasses this setting. Switch Travel policy to Reduce travel to use it.'
-    : undefined;
+    : keepsSourceOrder
+      ? 'Applies to Line contours with a Line burn start choice. Other operations keep source order.'
+      : undefined;
   // Keep source order still moves closed-shape starts, from Planning start.
   const choosesClosedStarts = settings.closedShapeStart !== 'drawn';
-  const startPointTitle = choosesClosedStarts ? undefined : orderingControlTitle;
+  const startPointTitle = choosesLineRegion
+    ? 'The Line region owns the Line planning start. This saved setting continues to seed other applicable operations.'
+    : choosesClosedStarts
+      ? undefined
+      : orderingControlTitle;
   return (
     <>
       <PlannerSelect
@@ -64,7 +73,7 @@ function PlannerFields(props: {
       />
       <InsideFirstField
         checked={settings.insideFirst}
-        disabled={keepsSourceOrder}
+        disabled={bypassesOrdering}
         title={orderingControlTitle ?? 'Cut enclosed paths before their containing paths.'}
         update={update}
       />
@@ -78,7 +87,7 @@ function PlannerFields(props: {
         label="Path direction"
         name="pathDirection"
         value={settings.pathDirection}
-        disabled={keepsSourceOrder}
+        disabled={bypassesOrdering}
         {...(orderingControlTitle === undefined ? {} : { title: orderingControlTitle })}
         onChange={(pathDirection) =>
           update({ pathDirection: pathDirection as ProjectOptimizationSettings['pathDirection'] })
@@ -88,24 +97,65 @@ function PlannerFields(props: {
           ['preserve', 'Preserve direction'],
         ]}
       />
-      <PlannerSelect
-        label="Planning start"
-        name="startPoint"
+      <PlanningStartField
         value={settings.startPoint}
         disabled={keepsSourceOrder && !choosesClosedStarts}
-        {...(startPointTitle === undefined ? {} : { title: startPointTitle })}
-        onChange={(startPoint) =>
-          update({ startPoint: startPoint as ProjectOptimizationSettings['startPoint'] })
-        }
-        options={[
-          ['machine-origin', 'Machine origin'],
-          ['job-lower-left', 'Job lower-left'],
-          ['job-center', 'Job center'],
-        ]}
+        title={startPointTitle}
+        update={update}
       />
-      <ClosedShapeStartField value={settings.closedShapeStart} update={update} />
+      <LineStartFields settings={settings} update={update} />
       {keepsSourceOrder ? (
-        <SourceOrderPrecedenceNote choosesClosedStarts={choosesClosedStarts} />
+        <SourceOrderPrecedenceNote
+          choosesClosedStarts={choosesClosedStarts}
+          choosesLineRegion={choosesLineRegion}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function PlanningStartField(props: {
+  readonly value: ProjectOptimizationSettings['startPoint'];
+  readonly disabled: boolean;
+  readonly title: string | undefined;
+  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
+}): JSX.Element {
+  return (
+    <PlannerSelect
+      label="Planning start"
+      name="startPoint"
+      value={props.value}
+      disabled={props.disabled}
+      {...(props.title === undefined ? {} : { title: props.title })}
+      onChange={(startPoint) =>
+        props.update({ startPoint: startPoint as ProjectOptimizationSettings['startPoint'] })
+      }
+      options={[
+        ['machine-origin', 'Machine origin'],
+        ['job-lower-left', 'Job lower-left'],
+        ['job-center', 'Job center'],
+      ]}
+    />
+  );
+}
+
+function LineStartFields(props: {
+  readonly settings: ProjectOptimizationSettings;
+  readonly update: (patch: Partial<ProjectOptimizationSettings>) => void;
+}): JSX.Element {
+  return (
+    <>
+      <LineBurnStartField
+        value={props.settings.lineStartRegion}
+        onChange={(lineStartRegion) => props.update({ lineStartRegion })}
+      />
+      <ClosedShapeStartField value={props.settings.closedShapeStart} update={props.update} />
+      {props.settings.lineStartRegion !== undefined &&
+      props.settings.closedShapeStart === 'drawn' ? (
+        <p style={precedenceNoteStyle}>
+          The Line burn start choice moves closed Line starts to nearby eligible points. Where drawn
+          still applies to other operations.
+        </p>
       ) : null}
     </>
   );
@@ -189,7 +239,19 @@ function InsideFirstField(props: {
   );
 }
 
-function SourceOrderPrecedenceNote(props: { readonly choosesClosedStarts: boolean }): JSX.Element {
+function SourceOrderPrecedenceNote(props: {
+  readonly choosesClosedStarts: boolean;
+  readonly choosesLineRegion: boolean;
+}): JSX.Element {
+  if (props.choosesLineRegion) {
+    return (
+      <p style={precedenceNoteStyle} role="status">
+        The Line burn start choice orders Line contours near that region, respecting Inside paths
+        first and Path direction. Other operations keep source order and use the saved Planning
+        start where applicable. Layer priority and enabled Overlap removal still apply.
+      </p>
+    );
+  }
   if (props.choosesClosedStarts) {
     return (
       <p style={precedenceNoteStyle} role="status">

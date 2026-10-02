@@ -2389,6 +2389,15 @@ authorization, Frame proof, controller command, or safety boundary.
 4. Multiline command lists, batched writes, acknowledgement sequencing, connect/startup hooks,
    import/export, and controller-resident macro programs are outside v1.
 
+### F-B13c. Mark the actual job-start burn point (ADR-566)
+
+1. In the Laser panel, **Mark job start · 1 s** remains visible before opt-in. Its disabled tooltip explains **Tools > Labs > Low-power Fire** and **Machine Setup > Options** consent, or the existing controller/busy restriction. The timed mark is qualified in software for Cartesian GRBL-family laser controllers, not rotary, CNC or other firmware.
+2. One click prepares the current exact output and captures its resolved origin and original head position. The mark target is the first emitted powered motion, excluding blank pixels, S0 travel, overscan and contours omitted by rounding. **Job Origin** aligns artwork bounds and is not the actual burn-start point.
+3. The head moves with the beam off, verifies arrival, and the controller receives constant low commanded power, a one-second dwell and M5 shutoff together. The positioning share defaults to 1%, within profile consent and the existing 5% hard cap; a smaller fresh controller S range further lowers it. This is commanded power, not measured optical watts or a guarantee of a visible mark on the material.
+4. The controller must acknowledge all pulse lines before beam-off return and fresh same-session Idle at the original XYZ. Valid slow moves may take longer than a few seconds; live Run activity keeps their owned planner drain alive, but never substitutes for arrival/ACK evidence. **Abort** remains available in Live Motion.
+5. Start and Frame are temporarily unavailable while mark preparation/execution owns the controller. A clean existing Frame remains only after the same owner returns to the same observed position, origin and session. The mark never creates a Frame, restores expired evidence or consumes a Start permit. A refused, cancelled, uncertain or drifting transaction needs fresh physical-coordinate confirmation and Frame as appropriate.
+6. **Line burn start near** chooses an eligible Line contour entry near the selected artwork region, including centre and sides. Layer/inside-first and path-direction priorities stay in force; fill/raster scans keep their existing order. The mark follows the actual final program even when that first point differs from the selected bounds region.
+
 ### F-B14. Machine Settings read-only backup
 
 #### Success — read connected controller settings

@@ -1,3 +1,4 @@
+import { LINE_START_REGIONS } from '../../core/scene/project';
 import {
   firstError,
   isObject,
@@ -25,6 +26,7 @@ export function validateOptimization(value: unknown): string | null {
       'job-lower-left',
       'job-center',
     ]),
+    optionalLiteral(value, 'optimization.lineStartRegion', LINE_START_REGIONS),
     optionalLiteral(value, 'optimization.closedShapeStart', ['drawn', 'nearest', 'nearest-corner']),
   ]);
 }

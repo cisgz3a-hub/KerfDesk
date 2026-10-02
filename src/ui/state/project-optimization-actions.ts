@@ -29,16 +29,24 @@ export function projectOptimizationActions(
       set((state) => ({
         project: {
           ...state.project,
-          optimization: {
-            ...state.project.optimization,
-            ...synchronizeTravelPolicy(patch),
-          },
+          optimization: mergeOptimization(state.project.optimization, patch),
         },
         undoStack: pushUndo(state.project, state.undoStack),
         redoStack: [],
         dirty: true,
       })),
   };
+}
+
+function mergeOptimization(
+  current: ProjectOptimizationSettings,
+  patch: Partial<ProjectOptimizationSettings>,
+): ProjectOptimizationSettings {
+  const { lineStartRegion, ...settings } = {
+    ...current,
+    ...synchronizeTravelPolicy(patch),
+  };
+  return lineStartRegion === undefined ? settings : { ...settings, lineStartRegion };
 }
 
 function synchronizeTravelPolicy(

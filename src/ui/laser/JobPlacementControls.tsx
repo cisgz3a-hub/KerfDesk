@@ -3,6 +3,7 @@ import { controlHelp } from '../help/help-topics';
 import { type JobPlacementSettings } from '../job-placement';
 import { useStore } from '../state';
 import { sectionCaptionStyle } from './JobControls.styles';
+import { LineBurnStartField } from './LineBurnStartField';
 
 const START_FROM_LABELS: Readonly<Record<JobStartMode, string>> = {
   absolute: 'Absolute Coordinates',
@@ -29,6 +30,8 @@ const SELECTION_ORIGIN_HELP_ID = 'control:laser.output-scope.selection-origin';
 export function JobPlacementControls(props: { readonly streaming: boolean }): JSX.Element {
   const placement = useStore((s) => s.jobPlacement);
   const setJobPlacement = useStore((s) => s.setJobPlacement);
+  const lineStartRegion = useStore((s) => s.project.optimization.lineStartRegion);
+  const setProjectOptimization = useStore((s) => s.setProjectOptimization);
   // Placement and output scope are compile settings, not controller commands.
   // Keep them editable while disconnected so Current Position can be changed
   // to Absolute for offline export; only an active machine operation locks them.
@@ -58,6 +61,11 @@ export function JobPlacementControls(props: { readonly streaming: boolean }): JS
         <AnchorPicker placement={placement} disabled={busy || placement.startFrom === 'absolute'} />
         <span style={fieldNameStyle}>Job origin</span>
       </div>
+      <LineBurnStartField
+        value={lineStartRegion}
+        disabled={busy}
+        onChange={(value) => setProjectOptimization({ lineStartRegion: value })}
+      />
       <OutputScopeControls placement={placement} disabled={busy} />
     </div>
   );

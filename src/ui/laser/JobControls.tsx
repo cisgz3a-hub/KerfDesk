@@ -28,6 +28,7 @@ import { RunAgainControl } from './RunAgainControl';
 import { ExecutionArchivePanel } from './ExecutionArchivePanel';
 import { JobActionControls } from './JobActionControls';
 import { JobSetupControls } from './JobSetupControls';
+import { JobStartMarkControl } from './JobStartMarkControl';
 import { jobControlsBusy, jobNeedsRecovery } from './job-controls-busy';
 import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { openMachineSetup } from './device-setup';
@@ -112,6 +113,7 @@ export function JobControls(props: Props): JSX.Element {
         setupLabel={machineKind === 'cnc' ? 'Homing & maintenance' : 'Homing & focus'}
       />
       {!props.dockedJobActions && <StartBlockerNotice />}
+      <JobStartMarkControl disabled={disabled} />
       <AccessoryResetControls
         accessories={accessoryCache}
         controlsBusy={controlsBusy}
