@@ -177,11 +177,12 @@ test(
       const fixture = syntheticDesktop(desktop, commands);
       desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
       const offer = await desktop.inbox.next('pair.offer');
-      const loaded = await browserPage(worker);
+      const receipts = [];
+      const loaded = await browserPage(worker, [], null, receipts);
       browser = loaded.browser;
       const page = loaded.page;
       await page.goto(`${ORIGIN}/control?deviceId=${desktop.deviceId}`);
-      await page.locator('[name=deviceId]').fill(desktop.deviceId);
+      await page.locator('[name=deviceId]').fill(desktop.deviceId.toUpperCase());
       await page.locator('[name=code]').fill(offer.code);
       await page.locator('[name=edit]').check();
       await page.getByRole('button', { name: 'Request PC approval' }).click();
@@ -195,6 +196,12 @@ test(
         scopes: ['read', 'edit'],
       });
       await page.locator('#workspace-area').waitFor({ state: 'visible' });
+      assert.ok(
+        receipts.some(
+          (item) =>
+            item.path === '/api/pair/claim' && item.status === 202 && item.origin === ORIGIN,
+        ),
+      );
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
       await page.locator('#operation-form [name=powerPercent]').waitFor({ state: 'visible' });
       await page.waitForFunction(
@@ -286,6 +293,124 @@ test(
       await page.getByRole('button', { name: 'Disconnect this phone' }).click();
       await page.locator('#pair-card').waitFor({ state: 'visible' });
       assert.equal(await page.locator('#workspace-area').isHidden(), true);
+    } finally {
+      await browser?.close();
+      closeSocket(desktop?.socket);
+      await worker.dispose();
+    }
+  },
+);
+
+test(
+  'mobile Chrome: a rejected fresh code keeps its draft, explains matching the latest code, and allows a retry',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let desktop;
+    let browser;
+    try {
+      desktop = await connectDesktop(worker);
+      syntheticDesktop(desktop, []);
+      desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
+      const superseded = await desktop.inbox.next('pair.offer');
+      desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
+      const latest = await desktop.inbox.next('pair.offer');
+      const receipts = [];
+      const loaded = await browserPage(worker, [], null, receipts);
+      browser = loaded.browser;
+      const page = loaded.page;
+      await page.goto(`${ORIGIN}/control`);
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(
+        await page
+          .getByRole('link', { name: 'Phone & MCP setup on kerfdesk.com' })
+          .getAttribute('href'),
+        'https://kerfdesk.com/phone.html',
+      );
+      await page.locator('[name=deviceId]').fill(desktop.deviceId.toUpperCase());
+      await page.locator('[name=code]').fill(superseded.code);
+      await page.getByRole('button', { name: 'Request PC approval' }).click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      const warning = await page.locator('#notice').textContent();
+      assert.match(warning, /Connected to the remote service/);
+      assert.match(warning, /computer ID and latest pairing code exactly, including capitals/);
+      assert.doesNotMatch(warning, /expired|expire/);
+      assert.equal(await page.locator('[name=code]').inputValue(), superseded.code);
+      assert.equal(
+        desktop.inbox.queue.some((message) => message.type === 'pair.request'),
+        false,
+      );
+      await page.locator('[name=code]').fill(latest.code);
+      await page.getByRole('button', { name: 'Request PC approval' }).click();
+      const request = await desktop.inbox.next('pair.request');
+      desktop.send({
+        type: 'pair.decide',
+        pairingId: request.pairingId,
+        approved: true,
+        scopes: ['read'],
+      });
+      await page.locator('#workspace-area').waitFor({ state: 'visible' });
+      assert.deepEqual(
+        receipts
+          .filter((item) => item.path === '/api/pair/claim')
+          .map(({ status, origin }) => ({ status, origin })),
+        [
+          { status: 403, origin: ORIGIN },
+          { status: 202, origin: ORIGIN },
+        ],
+      );
+    } finally {
+      await browser?.close();
+      closeSocket(desktop?.socket);
+      await worker.dispose();
+    }
+  },
+);
+
+test(
+  'mobile Chrome: phone clock skew does not expire a fresh pending lease and a reload uses its remaining server lifetime',
+  { timeout: 30_000 },
+  async () => {
+    const worker = start();
+    let desktop;
+    let browser;
+    try {
+      desktop = await connectDesktop(worker);
+      syntheticDesktop(desktop, []);
+      desktop.send({ type: 'pair.create', requestId: crypto.randomUUID() });
+      const offer = await desktop.inbox.next('pair.offer');
+      const loaded = await browserPage(worker);
+      browser = loaded.browser;
+      const page = loaded.page;
+      await page.addInitScript(() => {
+        const actual = Date.now.bind(Date);
+        Date.now = () => actual() + 30 * 60_000;
+      });
+      await page.goto(`${ORIGIN}/control`);
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await page.locator('[name=deviceId]').fill(desktop.deviceId);
+      await page.locator('[name=code]').fill(offer.code);
+      await page.getByRole('button', { name: 'Request PC approval' }).click();
+      const request = await desktop.inbox.next('pair.request');
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(
+        await page.locator('#pair-status').textContent(),
+        'Waiting for your approval on the PC…',
+      );
+      assert.equal(await page.locator('#notice').getAttribute('data-kind'), 'info');
+      await page.reload();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(
+        await page.locator('#pair-status').textContent(),
+        'Waiting for your approval on the PC…',
+      );
+      desktop.send({
+        type: 'pair.decide',
+        pairingId: request.pairingId,
+        approved: true,
+        scopes: ['read'],
+      });
+      await page.locator('#workspace-area').waitFor({ state: 'visible' });
     } finally {
       await browser?.close();
       closeSocket(desktop?.socket);

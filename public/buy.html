@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#171714" />
     <meta
       name="description"
-      content="Meet KerfDesk Pro for Windows. Buy a licence on your phone when sales open, then activate it on your computer. Free tools stay free."
+      content="Connect your phone to KerfDesk on your PC, get the Windows app, or buy a desktop Pro licence when sales open. Free tools stay free."
     />
     <meta
       http-equiv="Content-Security-Policy"
@@ -16,13 +16,19 @@
     <title>KerfDesk — Pro for your next project</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/desktop-checkout.css" />
+    <link rel="stylesheet" href="/phone.css" />
     <script type="module" src="/desktop-checkout.mjs"></script>
   </head>
   <body>
     <a class="skip-link" href="#licence">Skip to licence and purchase</a>
     <header class="site-header">
       <a class="brand" href="/buy.html" aria-label="KerfDesk licence page">Kerf<span>Desk</span></a>
-      <a class="header-link" href="/download.html">Windows app <span aria-hidden="true">↗</span></a>
+      <nav class="header-nav" aria-label="Product">
+        <a class="header-link" href="/phone.html">Phone &amp; MCP</a>
+        <a class="header-link" href="/download.html"
+          >Windows app <span aria-hidden="true">↗</span></a
+        >
+      </nav>
     </header>
     <main>
       <section class="hero" aria-labelledby="page-title">
@@ -39,6 +45,19 @@
           >
         </div>
         <p class="hero-caption">DESIGN / ENGRAVE / CARVE</p>
+      </section>
+
+      <section class="phone-entry" aria-labelledby="phone-heading">
+        <div>
+          <p class="eyebrow">ALREADY USING KERFDESK ON YOUR PC?</p>
+          <h2 id="phone-heading">Your workspace. On your phone.</h2>
+          <p>
+            Connect to your open desktop app to view artwork or make edits you approve on the PC.
+          </p>
+        </div>
+        <a class="phone-button" href="/phone.html"
+          >Set up Phone &amp; MCP <span aria-hidden="true">→</span></a
+        >
       </section>
 
       <div class="page-grid">
@@ -197,7 +216,7 @@
             >
             <p class="small">
               The browser workspace is for desktop computers. This mobile page helps you choose and
-              manage your purchase.
+              manage your purchase, or connect your phone to the open desktop app.
             </p>
           </section>
         </div>
@@ -235,7 +254,7 @@
       <p>KerfDesk <span>by Ons Houtkombuis</span></p>
       <nav aria-label="Footer">
         <a href="/support.html">Support</a><a href="/eula.txt">App licence</a
-        ><a href="/download.html">Downloads</a>
+        ><a href="/download.html">Downloads</a><a href="/phone.html">Phone &amp; MCP</a>
       </nav>
     </footer>
   </body>

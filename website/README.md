@@ -50,6 +50,11 @@ project (the app's `laserforge` project must stay on `kerfdesk.com`: installed a
 file and serial permissions and the desktop camera bridge's trusted origin are tied to that
 origin). Pick the site's hostname, then build with `--site-url` and upload `website/dist`.
 
+The website's **Phone & MCP** guide links to `kerfdesk.com/phone.html`, the canvas-free setup page
+shipped with the app's mobile purchase/download landing. Its connection button opens the separate
+KerfDesk remote service as a full page. Keep that navigation: the service uses a host-only session
+cookie and refuses framing. Neither guide creates a pairing or replaces approval on the PC.
+
 ## Editions, prices and opening checkout
 
 The owner has settled the offer (ADR-524 Amendment 1), and `commerce.config.mjs` holds it: a Free

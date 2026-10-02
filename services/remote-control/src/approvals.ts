@@ -6,7 +6,7 @@ import {
   type RemoteScope,
   type StoredClient,
 } from './protocol.js';
-import { digest, sameDigest } from './security.js';
+import { digest, remainingPairingMs, sameDigest } from './security.js';
 type Offer = { id: string; digest: string; expiresAt: number; attempts: number; claimed: boolean };
 type DeviceState = {
   ownerDigest: string;
@@ -16,7 +16,8 @@ type DeviceState = {
 };
 
 export type SessionInfo =
-  | { status: 'unavailable' | 'pending'; online: boolean }
+  | { status: 'unavailable'; online: boolean }
+  | { status: 'pending'; online: boolean; expiresInMs: number }
   | {
       status: 'approved';
       online: boolean;
@@ -80,6 +81,8 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
   }
 
   protected sendPairRequest(client: StoredClient): void {
+    const expiresInMs = remainingPairingMs(client.claimExpiresAt);
+    if (expiresInMs === 0) return;
     this.send({
       v: 1,
       type: 'pair.request',
@@ -87,6 +90,7 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
       clientLabel: client.label,
       requestedScopes: client.scopes,
       expiresAt: client.claimExpiresAt,
+      expiresInMs,
     });
   }
 
@@ -150,7 +154,15 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
       client.leaseExpiresAt <= Date.now()
     )
       return { status: 'unavailable', online: this.owner() !== null };
-    if (client.status === 'pending') return { status: 'pending', online: this.owner() !== null };
+    if (client.status === 'pending') {
+      const expiresInMs = remainingPairingMs(client.claimExpiresAt);
+      if (expiresInMs === 0) return { status: 'unavailable', online: this.owner() !== null };
+      return {
+        status: 'pending',
+        online: this.owner() !== null,
+        expiresInMs,
+      };
+    }
     const { id, label, scopes, createdAt, leaseId } = client;
     return {
       status: 'approved',

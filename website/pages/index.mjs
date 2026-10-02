@@ -11,6 +11,7 @@ import { page as laser } from './laser.mjs';
 import { page as license } from './license.mjs';
 import { page as machines } from './machines.mjs';
 import { page as notFound } from './not-found.mjs';
+import { page as phone } from './phone.mjs';
 import { page as pricing } from './pricing.mjs';
 import { page as privacy } from './privacy.mjs';
 import { page as safety } from './safety.mjs';
@@ -24,6 +25,7 @@ export const pages = [
   download,
   pricing,
   docs,
+  phone,
   safety,
   faq,
   about,

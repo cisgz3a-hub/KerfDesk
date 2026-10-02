@@ -8,45 +8,12 @@ import {
 } from './relay-client.js';
 import {
   REMOTE_ORIGIN,
-  type PairingOffer,
-  type PairingRequest,
   type RemoteAccessStatus,
   type RemoteClient,
   type RemoteScope,
 } from './relay-types.js';
 import type { RemoteRendererQueue } from './renderer-queue.js';
-
-function expires(value: unknown): value is number {
-  return (
-    typeof value === 'number' &&
-    Number.isSafeInteger(value) &&
-    value > Date.now() &&
-    value <= Date.now() + 310_000
-  );
-}
-function parseOffer(message: RelayMessage): PairingOffer | null {
-  return typeof message.code === 'string' &&
-    /^[A-Za-z0-9-]{12,24}$/.test(message.code) &&
-    expires(message.expiresAt)
-    ? { code: message.code, expiresAt: message.expiresAt }
-    : null;
-}
-function parsePairRequest(message: RelayMessage): PairingRequest | null {
-  if (
-    !identifier(message.pairingId) ||
-    typeof message.clientLabel !== 'string' ||
-    message.clientLabel.length > 128 ||
-    !validRemoteScopes(message.requestedScopes) ||
-    !expires(message.expiresAt)
-  )
-    return null;
-  return {
-    pairingId: message.pairingId,
-    clientLabel: message.clientLabel,
-    requestedScopes: message.requestedScopes,
-    expiresAt: message.expiresAt,
-  };
-}
+import { RemotePairingState } from './pairing-state.js';
 function parseClient(value: unknown): RemoteClient | null {
   if (
     !object(value) ||
@@ -81,8 +48,8 @@ class RemoteAccessRuntime {
   private connected = false;
   private initialized = false;
   private error: string | null = null;
-  private pairing: PairingOffer | null = null;
-  private requests: PairingRequest[] = [];
+  private readonly pairing: RemotePairingState;
+  private statusRevision = 0;
   private clients: RemoteClient[] = [];
   private revocationId: string | null = null;
   private waitingClients = false;
@@ -96,7 +63,9 @@ class RemoteAccessRuntime {
   constructor(
     private readonly store: RemoteCredentialStore,
     private readonly queue: RemoteRendererQueue,
+    monotonicNow?: () => number,
   ) {
+    this.pairing = new RemotePairingState(monotonicNow);
     this.relay = createRemoteRelayClient({
       queue,
       canRequest: (clientId, scopes) => this.canRequest(clientId, scopes),
@@ -136,8 +105,7 @@ class RemoteAccessRuntime {
   }
   private connection(open: boolean): void {
     this.connected = open;
-    this.pairing = null;
-    this.requests = [];
+    this.pairing.reset();
     this.clients = [];
     if (!open) {
       this.waitingClients = false;
@@ -158,10 +126,10 @@ class RemoteAccessRuntime {
   private receive(message: RelayMessage): void {
     switch (message.type) {
       case 'pair.offer':
-        this.pairing = parseOffer(message);
+        this.pairing.receiveOffer(message);
         break;
       case 'pair.request':
-        this.receivePair(message);
+        this.pairing.receiveRequest(message);
         break;
       case 'clients': {
         const checked = parseClients(message.clients);
@@ -176,17 +144,6 @@ class RemoteAccessRuntime {
         this.receiveRevocation(message);
         break;
     }
-  }
-  private receivePair(message: RelayMessage): void {
-    const request = parsePairRequest(message);
-    if (
-      request === null ||
-      this.requests.length >= 8 ||
-      this.requests.some((item) => item.pairingId === request.pairingId)
-    )
-      return;
-    this.requests = [...this.requests, request];
-    this.pairing = null;
   }
   private receiveRevocation(message: RelayMessage): void {
     if (message.requestId !== this.revocationId || this.identity === null) return;
@@ -224,7 +181,9 @@ class RemoteAccessRuntime {
     });
   }
   status(): RemoteAccessStatus {
+    const pairing = this.pairing.status();
     return {
+      statusRevision: ++this.statusRevision,
       available: this.available,
       enabled: this.identity?.enabled === true,
       connected: this.connected,
@@ -234,10 +193,11 @@ class RemoteAccessRuntime {
           ? `${REMOTE_ORIGIN}/control`
           : `${REMOTE_ORIGIN}/control?deviceId=${encodeURIComponent(this.identity.deviceId)}`,
       mcpUrl: `${REMOTE_ORIGIN}/mcp`,
-      pairing: this.pairing !== null && this.pairing.expiresAt > Date.now() ? this.pairing : null,
-      requests: this.requests.filter((item) => item.expiresAt > Date.now()),
+      pairing: pairing.pairing,
+      pairingPending: pairing.pairingPending,
+      requests: pairing.requests,
       clients: this.clients,
-      error: this.error,
+      error: this.error ?? pairing.error,
     };
   }
   opened(): Promise<void> {
@@ -289,18 +249,17 @@ class RemoteAccessRuntime {
     });
   }
   pair(): RemoteAccessStatus {
-    if (
-      !this.connected ||
-      !this.relay.send({ type: 'pair.create', requestId: this.relay.requestId() })
-    )
+    if (!this.connected) throw new Error('Remote access is offline.');
+    const requestId = this.relay.requestId();
+    this.pairing.begin(requestId);
+    if (!this.relay.send({ type: 'pair.create', requestId })) {
+      this.pairing.reset();
       throw new Error('Remote access is offline.');
-    this.pairing = null;
+    }
     return this.status();
   }
   decide(pairingId: string, approved: boolean, scopes: RemoteScope[]): RemoteAccessStatus {
-    const request = this.requests.find(
-      (item) => item.pairingId === pairingId && item.expiresAt > Date.now(),
-    );
+    const request = this.pairing.getRequest(pairingId);
     if (
       !this.connected ||
       request === undefined ||
@@ -310,7 +269,7 @@ class RemoteAccessRuntime {
       throw new Error('Pairing is unavailable.');
     if (!this.relay.send({ type: 'pair.decide', pairingId, approved, scopes }))
       throw new Error('Remote access is offline.');
-    this.requests = this.requests.filter((item) => item.pairingId !== pairingId);
+    this.pairing.removeRequest(pairingId);
     if (approved) this.listClients();
     return this.status();
   }
@@ -341,8 +300,7 @@ class RemoteAccessRuntime {
     this.revoking = true;
     this.revocationEpoch += 1;
     this.relay.cancelRequests();
-    this.pairing = null;
-    this.requests = [];
+    this.pairing.reset();
     this.clients = [];
     return this.enqueue(async () => {
       try {
@@ -352,8 +310,7 @@ class RemoteAccessRuntime {
         this.relay.close();
         throw new Error('Remote revocation could not be saved securely.');
       }
-      this.pairing = null;
-      this.requests = [];
+      this.pairing.reset();
       this.clients = [];
       if (this.connected) this.revokeAllConnected();
       return this.status();
@@ -363,5 +320,6 @@ class RemoteAccessRuntime {
 export const createRemoteAccessRuntime = (
   store: RemoteCredentialStore,
   queue: RemoteRendererQueue,
-) => new RemoteAccessRuntime(store, queue);
+  monotonicNow?: () => number,
+) => new RemoteAccessRuntime(store, queue, monotonicNow);
 export type { RemoteAccessRuntime };

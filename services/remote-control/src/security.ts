@@ -1,4 +1,11 @@
-import { COOKIE_NAME, MAX_BYTES, secret, uuid, type SessionIdentity } from './protocol.js';
+import {
+  COOKIE_NAME,
+  MAX_BYTES,
+  PAIR_TTL_MS,
+  secret,
+  uuid,
+  type SessionIdentity,
+} from './protocol.js';
 
 export const DEFAULT_CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
@@ -21,6 +28,10 @@ export function pairingCode(): string {
     }
   }
   return result;
+}
+/** Presentation lifetime only. The original stored expiry remains authoritative. */
+export function remainingPairingMs(expiresAt: number): number {
+  return Math.max(0, Math.min(PAIR_TTL_MS, expiresAt - Date.now()));
 }
 export async function digest(value: string): Promise<string> {
   const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
