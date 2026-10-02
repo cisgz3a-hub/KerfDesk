@@ -39,6 +39,7 @@ import { isAlongXScan, rasterScanFrame } from './raster-scan-frame';
 import type { RasterControllerHead } from './emit-raster-travel';
 import type { RasterRowProviderOrder } from '../job/job';
 import type { RasterPowerValues } from './raster-power-values';
+import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 
 const DECIMAL_PLACES = 3;
 const LINE_END = '\n';
@@ -48,6 +49,7 @@ function fmt(n: number): string {
 }
 
 export type EmitRasterInput = {
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   // Dithered S-values, one per pixel, row-major. Length must equal
   // width * height. Each value is in [0, sMax] — the caller (the
   // dither module) has already applied the power scale.

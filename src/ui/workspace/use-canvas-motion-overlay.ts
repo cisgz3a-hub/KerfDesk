@@ -248,7 +248,7 @@ function idleCanvasMotionPlanRequest(
     placementSettings: input.placementSettings,
     resolvedPlacement: resolved,
     ...(registration === undefined ? {} : { registration }),
-    machine: input.laser,
+    machine: { ...input.laser, connected: input.laser.connection.kind === 'connected' },
     statusQuery: statusQueryFor(input.project, input.laser),
     reportInches: input.laser.controllerSettings?.reportInches === true,
   };

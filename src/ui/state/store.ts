@@ -57,7 +57,7 @@ import {
   type LayerSubLayerPatch,
 } from './layer-actions';
 import { fillSelectionActions, type FillSelectionActions } from './fill-selection-actions';
-import { vectorPathActions, type VectorPathActions } from './vector-path-actions';
+import { vectorPathActions, type VectorPathActions } from './vector-path-pro-admission';
 import { editingToolsActions, type EditingToolsActions } from './editing-tools-actions';
 import {
   closeOpenFillContoursActions,
@@ -452,7 +452,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...machineActions(set, get),
   ...airAssistDefaultActions(set, get),
   ...fillSelectionActions(set),
-  ...vectorPathActions(set, proOperationMutationSetter(set, get)),
+  ...vectorPathActions(set, get),
   ...editingToolsActions(set, proOperationMutationSetter(set, get), get),
   ...closeOpenFillContoursActions(set),
   ...layerDefaultActions(set),

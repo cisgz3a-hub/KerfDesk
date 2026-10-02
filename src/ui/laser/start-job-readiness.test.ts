@@ -88,13 +88,8 @@ function calibratedProject(): Project {
   const project = runnableProject();
   const layer = project.scene.layers[0];
   if (layer === undefined) return project;
-  return {
-    ...project,
-    scene: {
-      ...project.scene,
-      layers: [{ ...layer, power: 10 }],
-    },
-  };
+  const scene = { ...project.scene, layers: [{ ...layer, power: 10 }] };
+  return { ...project, scene };
 }
 
 function rasterProjectWithScanOffset(): Project {
@@ -224,7 +219,10 @@ describe('prepareStartJob', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.gcode).toContain('M4 S0'); // ADR-257: dynamic-power cut default
-      expect(result.warnings).toEqual([UNKNOWN_NATIVE_BED_MESSAGE]);
+      expect(result.warnings).toEqual([
+        UNKNOWN_NATIVE_BED_MESSAGE,
+        'Output power uses saved profile S1000; no current controller power range was verified. 100% means S1000 under that profile assumption, not measured optical power.',
+      ]);
     }
   });
 

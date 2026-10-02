@@ -18,6 +18,7 @@ import type { ControllerKind } from '../../core/devices';
 import type { CanvasJobTimingPlanResult } from './canvas-job-timing-plan';
 import type { LaserSecondPassChain } from './recovery/laser-second-pass-lineage';
 import { matchesCncFrameReturnWorkZ } from './framed-run-cnc-return-position';
+import type { LaserPowerScale } from '../laser/connected-laser-power-scale';
 
 /** The exact executable bundle carried through Frame. Ordinary permits review
  * it at Start; transient-camera candidates may carry prior review evidence. */
@@ -33,6 +34,7 @@ export type PreparedStartProgram = {
   readonly preflightMotionOffset?: PreflightOptions['motionOffset'];
   readonly jobOrigin?: JobOriginPlacement;
   readonly laserSecondPassChain?: LaserSecondPassChain;
+  readonly laserPowerScale?: LaserPowerScale;
 };
 
 /** Review evidence confirmed in the Job Review dialog. An ordinary Frame

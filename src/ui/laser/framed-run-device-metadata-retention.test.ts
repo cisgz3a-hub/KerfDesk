@@ -256,11 +256,22 @@ describe('completed Frame retention across descriptive device metadata', () => {
       expect(rebuilt.canvasPlan.retentionKey).not.toBe(permit.candidate.executionSignature);
       expect(rebuilt.metrics.frameJobBounds).toEqual(framed.metrics.frameJobBounds);
       expect(rebuilt.metrics.frameMotionBounds).toEqual(framed.metrics.frameMotionBounds);
-      if (_field === 'output power' || _field === 'controlled tool-off feed') {
+      if (_field === 'controlled tool-off feed') {
         expect(rebuilt.gcode).not.toBe(framed.gcode);
       } else {
         expect(rebuilt.gcode).toBe(framed.gcode);
-        if (_field === 'no-go warning') {
+        if (_field === 'output power') {
+          expect(rebuilt.prepared.project.device.maxPowerS).toBe(1000);
+          expect(rebuilt.laserPowerScale).toEqual({
+            maxPowerS: 1000,
+            source: 'controller',
+            controllerSessionEpoch: 7,
+          });
+          expect(useStore.getState().project.device.maxPowerS).toBe(2000);
+          expect(rebuilt.warnings.join('\n')).toContain(
+            "Output power uses the connected controller's $30=1000",
+          );
+        } else if (_field === 'no-go warning') {
           expect(framed.warnings.join('\n')).not.toContain('Clamp');
           expect(rebuilt.warnings.join('\n')).toContain('no-go zone "Clamp"');
         } else if (_field === 'cut calibration' || _field === 'travel calibration') {

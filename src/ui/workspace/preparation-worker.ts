@@ -45,6 +45,7 @@ type PreparationOptions = Pick<
   | 'contourEntryBounds'
   | 'absoluteProgramOffset'
   | 'workZeroBedPosition'
+  | 'laserMaxPowerS'
 >;
 
 self.onmessage = (
@@ -82,6 +83,7 @@ self.onmessage = (
 
 function preparationOptions(request: PreparationWorkerRequest): PreparationOptions {
   return {
+    ...(request.laserMaxPowerS === undefined ? {} : { laserMaxPowerS: request.laserMaxPowerS }),
     ...(request.contourEntryBounds === undefined
       ? {}
       : { contourEntryBounds: request.contourEntryBounds }),

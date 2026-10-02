@@ -25,7 +25,7 @@ import {
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { WorkCoordinateOffset } from '../state/origin-actions';
 import type { FrameVerification } from '../state/frame-verification';
-import { cncToolPlan, type CncToolPlanEntry } from '../state/cnc-tool-plan';
+import type { CncToolPlanEntry } from '../state/cnc-tool-plan';
 import type { WorkZZeroEvidence } from '../state/work-z-zero-evidence';
 import {
   DEFAULT_JOB_PLACEMENT,
@@ -37,7 +37,6 @@ import {
 import type { HomingState } from '../state/laser-store';
 import type { SessionObservationStamp } from '../state/laser-controller-observation';
 import type { NativeBedEvidence } from '../state/native-bed-frame';
-import { cncWorkZeroToolStartIssue } from './cnc-start-advisories';
 import { requiredFrameIssueFromPrepared } from './required-frame-readiness';
 import { canvasPlanRetentionKey, type CanvasMotionPlan } from '../state/canvas-motion-plan';
 import {
@@ -68,12 +67,24 @@ import { workOffsetAssumptionWarnings } from './work-offset-assumption';
 import { unknownNativeBedWarning } from './restored-origin-warning';
 import type { LaserSecondPassChain } from '../state/recovery/laser-second-pass-lineage';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
+import {
+  inspectPreparedStart,
+  type PreparedStartInspection,
+} from './start-job-prepared-inspection';
+import {
+  laserPowerPreparationOptions,
+  preparedLaserPowerScaleWarnings,
+  laserPowerScaleBinding,
+  bindPreparedLaserPowerScale,
+  type LaserPowerScale,
+} from './connected-laser-power-scale';
 
 export { STATUS_ALARM_START_MESSAGE } from './start-job-input';
 
 export { CNC_REQUIRES_GRBL_MESSAGE } from './start-job-readiness-policy';
 
 export { CUSTOM_ORIGIN_LOCATION_UNKNOWN_MESSAGE } from '../job-placement';
+export { inspectPreparedStart } from './start-job-prepared-inspection';
 
 export type StartJobPreparation =
   | {
@@ -94,6 +105,7 @@ export type StartJobPreparation =
       // checkpoint stores it so resume reproduces identical bytes (R1).
       readonly jobOrigin?: JobOriginPlacement;
       readonly laserSecondPassChain?: LaserSecondPassChain;
+      readonly laserPowerScale?: LaserPowerScale;
     }
   | {
       readonly ok: false;
@@ -185,6 +197,7 @@ export function prepareStartJob(
   if (!input.ok) return input.result;
   const inspected = inspectPreparedStart(
     prepareOutput(project, {
+      ...laserPowerPreparationOptions(project, machine),
       ...runtimeCoordinatePreparationOptions(
         project.device,
         input.placement,
@@ -209,6 +222,7 @@ export function prepareStartJob(
     canvasPlanKey: canvasPlanRetentionKey(project, outputScope, input.effectivePlacement),
     printCutRegistration: undefined,
     sourceGeometryChecks: 'full',
+    ...laserPowerScaleBinding(project, machine),
   });
 }
 
@@ -250,6 +264,7 @@ export async function prepareStartJobSnapshot(
   const preparationProject = await hydratePagedRasterProject(project);
   const inspected = inspectPreparedStart(
     await prepareOutputSnapshot(preparationProject, {
+      ...laserPowerPreparationOptions(project, machine),
       ...runtimeCoordinatePreparationOptions(project.device, placement, machineWithReportUnits),
       clock: options.clock,
       renderVariableText: options.renderVariableText,
@@ -281,6 +296,7 @@ export async function prepareStartJobSnapshot(
     canvasPlanKey,
     printCutRegistration: options.registration,
     sourceGeometryChecks: 'full',
+    ...laserPowerScaleBinding(project, machine),
   });
 }
 
@@ -300,6 +316,7 @@ type FinalizeStartPreparationOptions = {
   /** The Print-and-Cut registration output applies; undefined when none is active. */
   readonly printCutRegistration: SimilarityTransform | null | undefined;
   readonly sourceGeometryChecks: 'full' | 'compiled-evidence-only';
+  readonly laserPowerScale?: LaserPowerScale;
 };
 
 export function finalizeStartPreparation(
@@ -326,7 +343,7 @@ export function finalizeStartPreparation(
   }
 
   const controller = runControllerReadiness(
-    options.project,
+    prepared.project,
     options.controllerSettings,
     readinessMode(options.machine),
   );
@@ -362,22 +379,26 @@ export function finalizeStartPreparation(
           )),
       ...controllerPolicy.advisories,
       ...controller.warnings.map((issue) => issue.message),
+      ...preparedLaserPowerScaleWarnings(options.project, options.machine, options.laserPowerScale),
     ],
     options.machine.ovCache,
     options.machine.activeWcs,
     prepared,
     options.sourceGeometryChecks,
   );
-  return okPreparation(
-    gcode,
-    warnings,
-    options.placement.jobOrigin,
-    toolPlan,
-    prepared,
-    options.machineWithReportUnits,
-    options.motionOffset,
-    controllerReportsInches(options.controllerSettings),
-    options.canvasPlanKey,
+  return bindPreparedLaserPowerScale(
+    okPreparation(
+      gcode,
+      warnings,
+      options.placement.jobOrigin,
+      toolPlan,
+      prepared,
+      options.machineWithReportUnits,
+      options.motionOffset,
+      controllerReportsInches(options.controllerSettings),
+      options.canvasPlanKey,
+    ),
+    options.laserPowerScale,
   );
 }
 
@@ -424,33 +445,4 @@ function registrationOption(registration: SimilarityTransform | null | undefined
 
 function readinessMode(machine: MachineStartSnapshot): ReadinessSettingsCapability {
   return machine.settingsCapability ?? 'grbl-dollar';
-}
-
-type PreparedStartInspection =
-  | {
-      readonly ok: true;
-      readonly prepared: Extract<PreparedOutput, { readonly ok: true }>;
-      readonly toolPlan: ReadonlyArray<CncToolPlanEntry>;
-      // Frame-first: placement-bounds and tool/Work-Z findings inform the Job
-      // Review instead of refusing the Start the Frame already proved out.
-      readonly advisoryWarnings: ReadonlyArray<string>;
-    }
-  | { readonly ok: false; readonly messages: ReadonlyArray<string> };
-
-export function inspectPreparedStart(
-  prepared: PreparedOutput,
-  machine: MachineStartSnapshot,
-): PreparedStartInspection {
-  if (!prepared.ok) {
-    return { ok: false, messages: prepared.preflight.issues.map((issue) => issue.message) };
-  }
-  const advisoryWarnings: string[] = [];
-  const toolPlan = cncToolPlan(prepared.job);
-  const toolIssue = cncWorkZeroToolStartIssue(
-    prepared.project,
-    machine.workZZeroEvidence,
-    toolPlan[0],
-  );
-  if (toolIssue !== null) advisoryWarnings.push(toolIssue);
-  return { ok: true, prepared, toolPlan, advisoryWarnings };
 }

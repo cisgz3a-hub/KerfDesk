@@ -1,3 +1,5 @@
+import { formatGcodeDecimal } from './decimal-word';
+
 /**
  * Represent a requested feed without exceeding its configured ceiling.
  * Feeds at or above 1 mm/min are floored for stable whole-number output;
@@ -17,19 +19,5 @@ export function effectiveGcodeFeedMmPerMin(feedMmPerMin: number): number {
  * decimal number rather than ECMAScript's `1e-7` spelling.
  */
 export function formatGcodeFeedMmPerMin(feedMmPerMin: number): string {
-  return expandPositiveExponent(effectiveGcodeFeedMmPerMin(feedMmPerMin));
-}
-
-function expandPositiveExponent(value: number): string {
-  const text = String(value);
-  const exponentMarker = text.search(/[eE]/);
-  if (exponentMarker < 0) return text;
-  const coefficient = text.slice(0, exponentMarker);
-  const exponent = Number(text.slice(exponentMarker + 1));
-  const digits = coefficient.replace('.', '');
-  const decimalIndex =
-    (coefficient.indexOf('.') < 0 ? coefficient.length : coefficient.indexOf('.')) + exponent;
-  if (decimalIndex <= 0) return `0.${'0'.repeat(-decimalIndex)}${digits}`;
-  if (decimalIndex >= digits.length) return `${digits}${'0'.repeat(decimalIndex - digits.length)}`;
-  return `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+  return formatGcodeDecimal(effectiveGcodeFeedMmPerMin(feedMmPerMin));
 }

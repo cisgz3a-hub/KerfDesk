@@ -13,12 +13,15 @@
 import type { GrblGcodeDialect } from '../devices';
 import { formatGcodeCoordinateMm } from '../gcode';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatGcodePowerS } from '../gcode/decimal-word';
 import { arcInteriorPoints, type ArcMove } from '../geometry/arc-fit';
 import type { CutSegment } from '../job';
 import { emittedArc, emittedCutArcMoves, type CutArcEmission } from '../job/cut-arc-moves';
 import type { Vec2 } from '../scene';
+import type { LaserPowerScaleVersion } from './laser-power-scale-version';
 
 export type BurnWordContext = {
+  readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
   readonly s: number;
   readonly feed: number;
   readonly dialect: GrblGcodeDialect;
@@ -72,7 +75,10 @@ function arcMoveBurns(
     const first = lines.length === 0;
     const feedWord =
       first || !context.dialect.modalFeedrate ? ` F${formatGcodeFeedMmPerMin(context.feed)}` : '';
-    const sWord = first || context.dialect.emitSOnEveryBurnMove ? ` S${context.s}` : '';
+    const sWord =
+      first || context.dialect.emitSOnEveryBurnMove
+        ? ` S${formatGcodePowerS(context.s, context.laserPowerScaleVersion)}`
+        : '';
     lines.push(`${motion} X${x} Y${y}${offsetWords}${feedWord}${sWord}`);
     firstTarget ??= point;
     headX = x;

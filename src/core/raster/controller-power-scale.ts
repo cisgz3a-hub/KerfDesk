@@ -1,16 +1,30 @@
 import type { DeviceProfile } from '../devices';
 import { resolveMarlinDialect } from '../devices/gcode-dialects';
 import type { RasterPowerValues } from './raster-power-values';
+import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
 
 export const SMOOTHIE_VIRTUAL_MAX_POWER = 1000;
 export const MARLIN_FAN_MAX_POWER = 255;
 
 /** Dither in integer PWM units, then return the compiled job's original S units.
  * Fractional controllers must not round a percentage in a 0..1 domain. */
-export function rasterCompilationPowerScale(device: DeviceProfile): number {
+export function rasterCompilationPowerScale(
+  device: DeviceProfile,
+  version: LaserPowerScaleVersion = 2,
+): number {
   if (device.controllerKind === 'smoothieware') return SMOOTHIE_VIRTUAL_MAX_POWER;
   if (device.controllerKind === 'marlin' && resolveMarlinDialect(device).powerMode === 'fan') {
     return MARLIN_FAN_MAX_POWER;
+  }
+  if (
+    version === 2 &&
+    !Number.isInteger(device.maxPowerS) &&
+    (device.controllerKind === undefined ||
+      device.controllerKind === 'grbl-v1.1' ||
+      device.controllerKind === 'grblhal' ||
+      device.controllerKind === 'fluidnc')
+  ) {
+    return SMOOTHIE_VIRTUAL_MAX_POWER;
   }
   return device.maxPowerS;
 }

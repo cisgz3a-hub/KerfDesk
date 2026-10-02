@@ -147,7 +147,10 @@ export function emitPreparedGcodeWithCncPassSpans(
   // receive the current-position finish so a head-relative job parks back at
   // its own start instead of rapiding to work zero (arbitrary on no-homing),
   // unless preparation placed a laser finish position (ADR-493).
-  const finish = finishOptionsForJob(job, options.jobOrigin);
+  const finish = {
+    ...finishOptionsForJob(job, options.jobOrigin),
+    laserPowerScaleVersion: prepared.laserPowerScaleVersion ?? 2,
+  };
   const emission = materializeProgram(() => {
     const cnc =
       machine !== undefined && machine.kind === 'cnc'

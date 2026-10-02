@@ -44,8 +44,15 @@ import { reliefMaterializationFailure } from './relief-materialization-failure';
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
 import { placeLaserFinish } from '../../core/job/laser-finish';
+import {
+  CURRENT_LASER_POWER_SCALE_VERSION,
+  type LaserPowerScaleVersion,
+} from '../../core/output/laser-power-scale-version';
 
 export type PrepareOutputOptions = {
+  /** Session-resolved laser S range. Applied before raster quantization to an
+   * execution copy; authored project and saved machine settings never change. */
+  readonly laserMaxPowerS?: number;
   readonly jobOrigin?: JobOriginPlacement;
   readonly outputScope?: OutputScope;
   /** Physical entry envelope in the final program frame. Null means unknown.
@@ -65,6 +72,9 @@ export type PreparedOutput =
       readonly ok: true;
       readonly job: Job;
       readonly project: Project;
+      /** Persisted base emission and streamed-raster compilation semantics.
+       * Missing on archived output from before ADR-567, which uses version 1. */
+      readonly laserPowerScaleVersion?: LaserPowerScaleVersion;
       // Translation applyJobOrigin applied (zero for absolute placements).
       // The preview undoes it to register the toolpath with the scene (H3).
       readonly jobOriginOffset: Vec2;
@@ -130,8 +140,9 @@ export function prepareOutputInput(
       },
     };
   }
-  const outputProject =
+  const scopedProject =
     scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
+  const outputProject = withExecutionLaserPowerScale(scopedProject, options.laserMaxPowerS);
   // No size refusal remains here (ADR-241/ADR-243): vector scenes of any
   // segment count compile, and rasters of any pixel size stream row-by-row.
   // Compiled-work size measurements surface as Job Review advisories in the
@@ -167,6 +178,16 @@ export function prepareOutputInput(
     options,
     advisories,
   };
+}
+
+function withExecutionLaserPowerScale(project: Project, maxPowerS: number | undefined): Project {
+  return project.machine?.kind !== 'cnc' &&
+    maxPowerS !== undefined &&
+    Number.isFinite(maxPowerS) &&
+    maxPowerS > 0 &&
+    maxPowerS !== project.device.maxPowerS
+    ? { ...project, device: { ...project.device, maxPowerS } }
+    : project;
 }
 
 /** Ordered final merge boundary shared by synchronous and worker-backed compilers. */
@@ -210,6 +231,7 @@ export function completePreparedOutput(
   return {
     ok: true,
     project: input.project,
+    laserPowerScaleVersion: CURRENT_LASER_POWER_SCALE_VERSION,
     job: optimizePaths(
       placed,
       input.sourceProject.optimization,

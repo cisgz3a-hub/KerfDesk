@@ -19,6 +19,7 @@ type Mutation<State> = State | Partial<State> | ((state: State) => State | Parti
 export function proOperationMutationSetter<State extends ProjectEditState>(
   set: (update: (state: State) => State | Partial<State>) => void,
   get: () => State,
+  featureForEdit = newlyIntroducedProFeature,
 ): (update: Mutation<State>, onCommitted?: () => void) => boolean {
   return (update, onCommitted) => {
     const before = get();
@@ -27,7 +28,7 @@ export function proOperationMutationSetter<State extends ProjectEditState>(
     const feature =
       patch.project === undefined || proFeaturesUnlocked()
         ? null
-        : newlyIntroducedProFeature(before.project, patch.project);
+        : featureForEdit(before.project, patch.project);
     if (feature === null) {
       set(() => patch);
       onCommitted?.();

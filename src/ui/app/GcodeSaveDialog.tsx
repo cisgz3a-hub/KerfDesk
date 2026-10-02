@@ -82,6 +82,7 @@ function saveContext(
     jobPlacement: app.jobPlacement,
     outputScope: currentOutputScope(app),
     machine: {
+      connected: laser.connection.kind === 'connected',
       ...nativeBedEvidenceSnapshot(laser),
       statusReport: laser.statusReport,
       workOriginActive: laser.workOriginActive,

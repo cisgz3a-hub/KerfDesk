@@ -48,6 +48,7 @@ import { refreshControllerIdentityWarnings } from '../controller-identity-warnin
 import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
 import { isOutputPreparationAbort } from '../output-preparation-errors';
 import { ownJobReviewPreparation } from './job-review-preparation-owner';
+import { frozenLaserPowerScaleWarnings } from '../connected-laser-power-scale';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -193,10 +194,20 @@ function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReview
     detected: liveLaser.detectedControllerKind,
     gcode: bundle.prepared.gcode,
   });
+  const frozenPower =
+    bundle.prepared.laserSecondPassChain === undefined
+      ? []
+      : frozenLaserPowerScaleWarnings(bundle.prepared.prepared.project, {
+          ...bundle.laser,
+          connected: bundle.laser.connection.kind === 'connected',
+        });
   const disclosed =
-    fluidnc.length === 0
+    fluidnc.length === 0 && frozenPower.length === 0
       ? baseModel
-      : { ...baseModel, warnings: [...baseModel.warnings, ...fluidnc] };
+      : {
+          ...baseModel,
+          warnings: [...new Set([...baseModel.warnings, ...frozenPower, ...fluidnc])],
+        };
   const warning = bundle.frameWcsNormalizationWarning;
   const framedModel =
     warning === undefined || disclosed.warnings.includes(warning)
@@ -217,7 +228,7 @@ function confirmReviewedStart(
 ): ConfirmedJobReview {
   const machineKind = machineKindOf(bundle.project.machine);
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
-    bundle.project,
+    bundle.prepared.prepared.project,
     bundle.laserModeStartSnapshot,
     () => true,
     bundle.prepared.gcode,
