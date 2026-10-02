@@ -31,8 +31,18 @@ export type DesignToolsActions = ShapeQueryActions &
   OptimizeShapesActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+type CopySetter = (
+  fn: (state: AppState) => AppState | Partial<AppState>,
+  onCommitted?: () => void,
+) => unknown;
 
-export function designToolsActions(set: Setter, copySet: Setter = set): DesignToolsActions {
+export function designToolsActions(
+  set: Setter,
+  copySet: CopySetter = (update, onCommitted) => {
+    set(update);
+    onCommitted?.();
+  },
+): DesignToolsActions {
   return {
     ...shapeQueryActions(set),
     ...pathCleanupActions(set),
@@ -40,7 +50,7 @@ export function designToolsActions(set: Setter, copySet: Setter = set): DesignTo
     ...imageMaskFlattenActions(set),
     ...copyAlongPathActions(copySet),
     ...trimShapesActions(set),
-    ...cutShapesActions(set),
+    ...cutShapesActions(copySet),
     ...warpDeformActions(set),
     ...optimizeShapesActions(set),
   };

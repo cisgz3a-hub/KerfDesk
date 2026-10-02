@@ -23,23 +23,31 @@ export type CutShapesActions = {
   readonly cutSelectedShapes: () => boolean;
 };
 
-type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+type Setter = (
+  fn: (state: AppState) => AppState | Partial<AppState>,
+  onCommitted?: () => void,
+) => unknown;
+type Report = (notify: () => void) => void;
 
 export function cutShapesActions(set: Setter): CutShapesActions {
   return {
     cutSelectedShapes: () => {
       let cut = false;
-      set((state) => {
-        const next = cutShapesMutation(state);
-        cut = next !== state;
-        return next;
-      });
-      return cut;
+      const notifications: Array<() => void> = [];
+      const committed = set(
+        (state) => {
+          const next = cutShapesMutation(state, (notify) => notifications.push(notify));
+          cut = next !== state;
+          return next;
+        },
+        () => notifications.forEach((notify) => notify()),
+      );
+      return committed !== false && cut;
     },
   };
 }
 
-function cutShapesMutation(state: AppState): AppState | Partial<AppState> {
+function cutShapesMutation(state: AppState, report: Report): AppState | Partial<AppState> {
   const ids = new Set(selectedObjectIds(state));
   const scene = state.project.scene;
   const selected = scene.objects.filter((object) => ids.has(object.id));
@@ -48,7 +56,7 @@ function cutShapesMutation(state: AppState): AppState | Partial<AppState> {
     new Set(scene.objects.map((object) => object.id)),
   );
   if (plan.kind === 'error') {
-    useToastStore.getState().pushToast(plan.error.message, 'warning');
+    report(() => useToastStore.getState().pushToast(plan.error.message, 'warning'));
     return state;
   }
   const pieces = plan.value.cuts.flatMap((cut) => cut.pieces.map((piece) => piece.id));
@@ -57,8 +65,10 @@ function cutShapesMutation(state: AppState): AppState | Partial<AppState> {
   // A project past its limits saves but cannot be opened again (ADR-307
   // amendment 1): such a cut is refused whole, never made in part.
   if (refuseSceneLimitOverrun(scene, next, CUT_FEWER)) return state;
-  reportDependencyRepairs(repaired);
-  useToastStore.getState().pushToast(cutMessage(plan.value, selected.length), 'success');
+  report(() => reportDependencyRepairs(repaired));
+  report(() =>
+    useToastStore.getState().pushToast(cutMessage(plan.value, selected.length), 'success'),
+  );
   return {
     project: { ...state.project, scene: next },
     selectedObjectId: pieces[0] ?? null,
