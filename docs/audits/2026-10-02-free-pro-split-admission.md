@@ -59,6 +59,12 @@ native Free status; they do not qualify every Pro entry, paid activation or this
 new repair on an installed commercial app. Source checks are not installed-app
 or physical-machine evidence. Publication and customer update remain separate.
 
+A fresh isolated Chrome session also exercised the live browser's normal first
+visit. Continue with Free opened the workspace; choosing Design Studio displayed
+its Pro download prompt without opening the tool. Dismissing the prompt returned
+to Free. The served HTML hash matched the earlier hosted receipt. This verifies
+one browser Pro entry point, not every Pro tool or an installed desktop build.
+
 A fresh independent review found no production blocker in the split admission,
 ordinary setter composition, project ownership, undo labels or notifications.
 Its incremental callback checks also confirmed that consumed approval cannot
