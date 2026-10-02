@@ -65,12 +65,22 @@ remote service 59; these existing/overlapping cohorts are not a unique scenario
 sum. Independent review found no further attributable blocker in the repaired
 consent path or final serial trial-persistence/renderer contract.
 
-The full `pnpm release:check` is running. TypeScript, root/Electron lint, privacy,
-formatting, ADR numbering, Actions pinning and dependency licence checks have
-passed; the full unit suite has not yet returned a terminal result. Full local
-gate, exact-head CI and publication receipts must be recorded before merge and
-any deployment claim. Focused passes and the prior 1.0.8 release do not substitute
-for those outcomes.
+The complete local `pnpm release:check` passed at `2026-10-02T22:45:21Z`:
+26,941 unit tests passed across 3,476 files; 29 cases in 18 files were marked
+skipped. All 500 release-integrity checks, 39 website checks and 59 phone-service
+checks passed. TypeScript, root/Electron lint, privacy, formatting, ADR numbering,
+Actions pinning, dependency licence/notice checks, production web/Electron builds
+and file-size/export policies passed. The eight new Chrome workflows were run
+separately; they are not part of the unit-test count.
+
+Source and test hashes match the frozen reviewed candidate; only this report was
+completed after the gate. PR #1065 contains the repairs. At this report cut its
+hosted checks are still running, and the green CodeRabbit status represents a
+skipped automatic review, not a completed review. Exact final-head CI and any
+reviews must be inspected before merge. Fresh main CI, Pages publication and
+served-build identity must then be verified separately before claiming a browser
+deployment. Local receipt files retain those later outcomes without changing this
+pre-merge report or minting another installer release.
 
 ## Evidence retained locally
 
@@ -81,6 +91,7 @@ It is separate from the shipped app and contains no customer activation keys.
 | --- | --- |
 | `root/public-state.json` | Fresh public source, signature, static-asset and installer hash observations |
 | `root/dependency-audit.json` | Current dependency advisory result |
+| `root/release-check.log`, `root/release-check-receipt.json` | Complete local release gate and terminal zero exit status |
 | `root/browser-final-run.json`, `root/machine-final-run.json` | Seven numeric passes and the corrected final machine workflow; retained browser traces/screenshots |
 | `root/independent-consent-baseline.json` and `.tap` | Root's independently rebuilt released Worker hash and three reproduced consent failures |
 | `root/trial-regression-baseline.log`, `root/trial-update-baseline.log` | Seven new source regressions against released licensing code |
