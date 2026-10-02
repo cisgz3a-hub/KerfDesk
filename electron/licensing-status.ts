@@ -26,6 +26,8 @@ export type LicenceStatus = {
     | 'clock-error';
   readonly tier: 'trial' | 'paid' | 'developer' | null;
   readonly accessExpiresAt: number | null;
+  /** Current main-process trial budget; the signed original deadline is unchanged. */
+  readonly trialExpiresInMs?: number;
   readonly updatesUntil: number | null;
   readonly perpetualUpdates: boolean;
   /** The saved licence key, so a buyer can activate their other devices. */
@@ -144,7 +146,7 @@ export function evaluateLicence(
       claims,
       'This computer’s clock is earlier than the last licence check, so the Pro tools in your trial are locked. Turn on Set time automatically in Windows’ Date & time settings, then choose Refresh licence.',
     );
-  if (claims.accessExpiresAt !== null && now >= claims.accessExpiresAt)
+  if (claims.accessExpiresAt !== null && Math.max(now, saved.lastSeenAt) >= claims.accessExpiresAt)
     return summary(
       'trial-expired',
       claims,

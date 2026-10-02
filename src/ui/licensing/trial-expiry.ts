@@ -14,12 +14,14 @@ export function trialHasExpired(
 
 export type TrialExpiryClock = ReturnType<typeof createTrialExpiryClock>;
 
-/** Wall-clock rollback cannot extend a trial already observed by this window. */
+/** Cached reads or clock correction cannot extend an observed trial deadline. */
 export function createTrialExpiryClock() {
   let clock: {
     expiresAt: number;
     startedAt: number;
     startedElapsedMs: number;
+    observedElapsedMs: number;
+    nativeDeadlineElapsedMs: number;
     observedAt: number;
   } | null = null;
   const remainingMs = (status: LicenceStatus | null): number => {
@@ -29,14 +31,33 @@ export function createTrialExpiryClock() {
         expiresAt: status.accessExpiresAt,
         startedAt: Date.now(),
         startedElapsedMs: performance.now(),
+        observedElapsedMs: 0,
+        nativeDeadlineElapsedMs: Infinity,
         observedAt: Date.now(),
       };
+    clock.observedElapsedMs = Math.max(
+      clock.observedElapsedMs,
+      Math.max(0, performance.now() - clock.startedElapsedMs),
+    );
+    if (status.trialExpiresInMs !== undefined) {
+      const nativeRemainingMs = Number.isFinite(status.trialExpiresInMs)
+        ? Math.max(0, status.trialExpiresInMs)
+        : 0;
+      // A later read may shorten the bound, but cached rights cannot renew it.
+      clock.nativeDeadlineElapsedMs = Math.min(
+        clock.nativeDeadlineElapsedMs,
+        clock.observedElapsedMs + nativeRemainingMs,
+      );
+    }
     clock.observedAt = Math.max(
       clock.observedAt,
       Date.now(),
-      clock.startedAt + Math.max(0, performance.now() - clock.startedElapsedMs),
+      clock.startedAt + clock.observedElapsedMs,
     );
-    return clock.expiresAt * 1000 - clock.observedAt;
+    return Math.min(
+      clock.expiresAt * 1000 - clock.observedAt,
+      clock.nativeDeadlineElapsedMs - clock.observedElapsedMs,
+    );
   };
   return { remainingMs };
 }

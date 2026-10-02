@@ -307,11 +307,13 @@ function reduceMotionOrModalLine(
     spindle: spindleAfterLine(state.spindle, line, words.spindle),
   };
   const effects: GrblSimEffect[] = [emit('ok', opts)];
-  const isMotionLine = words.hasMotion && (g === 0 || g === 1 || g === null);
+  const isMotionLine =
+    words.hasMotion && (g === 0 || g === 1 || g === null || hasGWord(line, 0) || hasGWord(line, 1));
   if (isMotionLine) {
+    const offset = hasGWord(line, 53) ? SIM_ZERO_VEC3 : totalWco(state);
     next = {
       ...next,
-      mpos: resolveTarget(state.mpos, totalWco(state), words, isAbsolute),
+      mpos: resolveTarget(state.mpos, offset, words, isAbsolute),
       machine: 'Run',
       pendingMotions: state.pendingMotions + 1,
     };

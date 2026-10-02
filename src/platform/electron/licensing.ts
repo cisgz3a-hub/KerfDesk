@@ -42,7 +42,12 @@ function validRights(status: LicenceStatus): boolean {
     (status.tier === null || ['trial', 'paid', 'developer'].includes(status.tier)) &&
     [status.accessExpiresAt, status.updatesUntil].every(
       (time) => time === null || Number.isSafeInteger(time),
-    )
+    ) &&
+    (status.trialExpiresInMs === undefined ||
+      (status.tier === 'trial' &&
+        status.accessExpiresAt !== null &&
+        Number.isSafeInteger(status.trialExpiresInMs) &&
+        status.trialExpiresInMs >= 0))
   );
 }
 
@@ -157,8 +162,15 @@ export function createDesktopLicenceAdapter(
       throw new Error('The desktop licence service is unavailable. Please restart KerfDesk.');
     return response.json() as Promise<unknown>;
   };
-  const request = async (action: string, body?: unknown): Promise<LicenceStatus> =>
-    parseLicenceStatus(await send(action, body));
+  const request = async (action: string, body?: unknown): Promise<LicenceStatus> => {
+    const requestedAt = performance.now();
+    const status = parseLicenceStatus(await send(action, body));
+    if (status.trialExpiresInMs === undefined) return status;
+    // Native status may await durable storage before delivery. Subtract the
+    // whole request conservatively, including any activation/network wait.
+    const elapsedMs = Math.max(0, Math.ceil(performance.now() - requestedAt));
+    return { ...status, trialExpiresInMs: Math.max(0, status.trialExpiresInMs - elapsedMs) };
+  };
   return {
     status: () => request('status'),
     activate: (licenseKey) => request('activate', { licenseKey }),

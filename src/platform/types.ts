@@ -22,6 +22,8 @@ export type LicenceStatus = {
     | 'clock-error';
   readonly tier: 'trial' | 'paid' | 'developer' | null;
   readonly accessExpiresAt: number | null;
+  /** Native remaining trial budget, including retained time; older statuses omit it. */
+  readonly trialExpiresInMs?: number;
   readonly updatesUntil: number | null;
   readonly perpetualUpdates: boolean;
   /** The saved licence key, shown so a buyer can activate their other devices. */

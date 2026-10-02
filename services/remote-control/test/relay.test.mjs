@@ -313,7 +313,8 @@ test('real workerd: official OAuth PKCE flow and SDK clients work in legacy and 
         await client.close();
       }
     }
-    // Consuming a consent handle twice and an authorization code twice is refused by the provider.
+    // The consumed application binding refuses consent replay before provider work;
+    // the provider separately refuses an authorization code replay.
     assert.equal(
       (
         await worker.dispatchFetch(`${ORIGIN}/authorize`, {
@@ -326,7 +327,7 @@ test('real workerd: official OAuth PKCE flow and SDK clients work in legacy and 
           body: credentials.form,
         })
       ).status,
-      503,
+      403,
     );
     const replay = await worker.dispatchFetch(`${ORIGIN}/oauth/token`, {
       method: 'POST',

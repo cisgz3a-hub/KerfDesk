@@ -6,8 +6,6 @@ import type { LicenceClaims } from './licensing-verification.js';
 
 /** How far this computer's clock may differ from the licence service's, in seconds. */
 export const CLOCK_TOLERANCE = 300;
-/** A trial's clock mark is saved again only once it has moved this far forward. */
-const CLOCK_MARK_STEP = 60;
 
 /** True for rights that end at a set time, which only a trial has. */
 export function clockLimited(claims: Pick<LicenceClaims, 'accessExpiresAt'>): boolean {
@@ -28,7 +26,7 @@ export function nextClockMark(
   lastSeenAt: number,
   now: number,
 ): number | null {
-  return clockLimited(rights) && now >= lastSeenAt + CLOCK_MARK_STEP ? now : null;
+  return clockLimited(rights) && now > lastSeenAt ? now : null;
 }
 
 /** A freshly issued grant whose time is too far from this computer's clock. */

@@ -13,6 +13,7 @@ import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { jobStartMarkIsOwned } from '../state/job-start-mark';
 import {
   createRunId,
   recoveryRepository,
@@ -65,6 +66,7 @@ async function runFreshFramedJobFlow(
   completedReceipt: LastCompletedReceipt | null = null,
 ): Promise<boolean> {
   clearStartBlockers();
+  if (refuseStartWhileMarkOwnsController()) return false;
   const permit = currentCompletedFrame();
   const issue = framedRunReadinessIssue(permit) ?? replayPermitMismatch(permit, completedReceipt);
   if (issue !== null) {
@@ -108,6 +110,7 @@ export async function runFramedPermitStart(
   repository: RecoveryRepository = recoveryRepository,
   completedReceipt: LastCompletedReceipt | null = null,
 ): Promise<boolean> {
+  if (refuseStartWhileMarkOwnsController()) return false;
   if (framedRunReadinessIssue(permit) !== null || !armPermitFromCompletedFrame(permit)) {
     return false;
   }
@@ -147,6 +150,17 @@ export async function runFramedPermitStart(
   } finally {
     releaseFramedRunStartClaim(claim);
   }
+}
+
+function refuseStartWhileMarkOwnsController(): boolean {
+  if (!jobStartMarkIsOwned(useLaserStore.getState())) return false;
+  // The mark owns a temporary head excursion and the queued pulse ACKs.
+  // Refuse this transport handoff before comparing the original Frame head
+  // or arming a new execution; its strict return proof settles independently.
+  useToastStore
+    .getState()
+    .pushToast('Wait for the timed start mark to finish before starting the job.', 'warning');
+  return true;
 }
 
 async function streamFramedRun(
