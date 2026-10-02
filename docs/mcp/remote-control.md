@@ -28,6 +28,10 @@ Add this Streamable HTTP MCP URL in a client that supports authenticated remote 
 
 Use the OAuth sign-in page to enter the computer ID and a new pairing code, then approve the requested permissions on the computer. The client receives access to that computer only. The authorization page and the desktop approval both show the requested access.
 
+In ChatGPT's web settings, enable **Developer mode** under **Security and login**, then create a connection from **ChatGPT Plugins** using the MCP URL above and OAuth. Let ChatGPT discover the login addresses. Its current setup defaults to `kerfdesk:read`; for an editing connection, use **Advanced OAuth settings > Base scopes** to request `kerfdesk:read kerfdesk:edit` and approve viewing and editing on the PC. `offline_access` is optional and requests reconnection with that approval for up to 30 days. The exact settings and availability depend on the account and workspace.
+
+Revoked or expired computer approval returns an OAuth reauthorization challenge instead of a bare authorization failure. The new sign-in still requires an available, approved computer connection. Read-only tokens receive a standard permission challenge for editing; a client must request and obtain the additional permission before retrying. Remote tool metadata declares viewing or editing requirements through the SDK's supported OpenAI compatibility field. This metadata grants no access, and the local stdio server does not advertise remote OAuth requirements.
+
 ChatGPT's custom-server controls depend on the current plan, workspace and client. Private developer-mode setup and an approved public plugin are separate distribution paths. A working MCP endpoint does not establish availability in every ChatGPT phone app or approval for the public plugin directory. The separate phone control page works through an ordinary supported mobile browser.
 
 ## What connections can do
@@ -61,10 +65,13 @@ Cloudflare quotas and network outages can interrupt remote access. The service m
 
 Protocol, runtime, native secure-storage, rendered phone-page and live desktop/client checks are distinct evidence. None substitutes for physical-machine qualification. Public ChatGPT plugin review, actual phone-device testing, paid customer activation and Windows reboot/power-loss qualification must be reported separately.
 
+Successful ChatGPT endpoint discovery is separate from OAuth completion, PC approval and authenticated viewing/editing. Automatic ChatGPT scope escalation also needs a live client check; the supported metadata mirror and standard HTTP challenges alone do not establish that its tool-level linking UI will appear.
+
 ## Primary references
 
 - [OpenAI MCP server guide](https://developers.openai.com/plugins/build/mcp-server)
 - [OpenAI authorization guide](https://developers.openai.com/plugins/build/auth)
+- [OpenAI tool metadata reference](https://developers.openai.com/plugins/reference)
 - [Connecting a ChatGPT plugin](https://developers.openai.com/plugins/deploy/connect-chatgpt)
 - [ChatGPT developer mode](https://developers.openai.com/api/docs/guides/developer-mode)
 - [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports)

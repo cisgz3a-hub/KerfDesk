@@ -3,11 +3,8 @@ import type { OAuthResourceContext } from '@cloudflare/workers-oauth-provider';
 import { createKerfDeskMcpServer } from '../../../electron/mcp/server.js';
 import type { mcpOutputSchemas } from '../../../electron/mcp/output-schemas.js';
 import {
-  PUBLIC_ORIGIN,
   RESOURCE,
   MAX_BYTES,
-  OAUTH_READ,
-  OAUTH_EDIT,
   WRITE_COMMANDS,
   oauthGrantSchema,
   oauthScopes,
@@ -18,6 +15,7 @@ import {
 import { bodyJson, json } from './security.js';
 import { device, relayRequest } from './relay.js';
 import { prepareMcpExchange } from './mcp-wire.js';
+import { mcpAuthChallenge, remoteToolMetadata } from './mcp-auth.js';
 
 async function permittedContext(env: Env, ctx: ExecutionContext) {
   const context = ctx as OAuthResourceContext<unknown>;
@@ -74,7 +72,7 @@ async function scopeChallenge(request: Request, scopes: RemoteScope) {
         },
         403,
         {
-          'WWW-Authenticate': `Bearer error="insufficient_scope", scope="${OAUTH_READ} ${OAUTH_EDIT}", resource_metadata="${PUBLIC_ORIGIN}/.well-known/oauth-protected-resource/mcp"`,
+          'WWW-Authenticate': mcpAuthChallenge('insufficient_scope'),
         },
       );
   }
@@ -127,22 +125,25 @@ async function streamExchange(
   });
   const handler = createMcpHandler(
     () =>
-      createKerfDeskMcpServer({
-        async request(name, args, signal) {
-          await streaming;
-          return relayRequest(
-            env,
-            props,
-            scopes,
-            name,
-            args,
-            AbortSignal.any([request.signal, exchange.signal, ...(signal ? [signal] : [])]),
-            undefined,
-            ctx,
-            reservation,
-          );
+      createKerfDeskMcpServer(
+        {
+          async request(name, args, signal) {
+            await streaming;
+            return relayRequest(
+              env,
+              props,
+              scopes,
+              name,
+              args,
+              AbortSignal.any([request.signal, exchange.signal, ...(signal ? [signal] : [])]),
+              undefined,
+              ctx,
+              reservation,
+            );
+          },
         },
-      }),
+        remoteToolMetadata,
+      ),
     { maxRequestBodySize: MAX_BYTES, keepAliveMs: 1000, responseMode: 'sse' },
   );
   // Both modern (2026-07-28) and legacy stateless Streamable HTTP are supported by the SDK.
@@ -178,6 +179,7 @@ export const protectedHandler = {
       return json(
         { error: 'invalid_token', error_description: 'This computer approval is unavailable.' },
         401,
+        { 'WWW-Authenticate': mcpAuthChallenge('invalid_token') },
       );
     const challenge = await scopeChallenge(request, permitted.scopes);
     if (challenge) return challenge;

@@ -141,6 +141,7 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
       expect(tool.outputSchema).toBeDefined();
       expect(tool.annotations?.openWorldHint).toBe(false);
       expect(tool.annotations?.readOnlyHint).toBe(tool.name in readResults);
+      expect(tool._meta).toBeUndefined();
       const result = await client.callTool({
         name: tool.name,
         arguments: toolExamples[tool.name as KerfDeskMcpCommand],

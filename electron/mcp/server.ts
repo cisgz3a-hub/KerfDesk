@@ -16,6 +16,8 @@ import {
 import { mcpOutputSchemas } from './output-schemas.js';
 import { mcpToolAnnotations, mcpToolInfo } from './tool-info.js';
 
+export type KerfDeskMcpToolMetadata = Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>>;
+
 function toolError(error: unknown): CallToolResult {
   const code = mcpErrorCode(error);
   return {
@@ -57,6 +59,7 @@ function registerTool(
   server: McpServer,
   backend: KerfDeskMcpBackend,
   command: KerfDeskMcpCommand,
+  metadata?: Record<string, unknown>,
 ): void {
   // The concrete schemas also export typed args; this shared dispatcher accepts only their parsed objects.
   const input: z.ZodType<Record<string, unknown>> = mcpInputSchemas[command];
@@ -67,13 +70,17 @@ function registerTool(
       inputSchema: mcpInputSchema(input),
       outputSchema: mcpOutputSchemas[command],
       annotations: mcpToolAnnotations(command),
+      ...(metadata === undefined ? {} : { _meta: metadata }),
     },
     (args, context) => callBackend(backend, command, args, context.mcpReq.signal),
   );
 }
 
 /** Build a fresh SDK server for a connected, authenticated desktop bridge. */
-export function createKerfDeskMcpServer(backend: KerfDeskMcpBackend): McpServer {
+export function createKerfDeskMcpServer(
+  backend: KerfDeskMcpBackend,
+  toolMetadata: KerfDeskMcpToolMetadata = {},
+): McpServer {
   const server = new McpServer(
     { name: 'kerfdesk-desktop', version: '1.0.0' },
     {
@@ -83,7 +90,7 @@ export function createKerfDeskMcpServer(backend: KerfDeskMcpBackend): McpServer 
     },
   );
   for (const command of Object.keys(mcpToolInfo) as KerfDeskMcpCommand[]) {
-    registerTool(server, backend, command);
+    registerTool(server, backend, command, toolMetadata[command]);
   }
   return server;
 }
