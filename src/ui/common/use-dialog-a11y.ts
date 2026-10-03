@@ -24,7 +24,11 @@
 //   focus target.
 
 import { useEffect, useRef, type RefObject } from 'react';
-import { recoverDialogFocus, restoreDialogFocus } from './recover-dialog-focus';
+import {
+  dialogControlIsUnavailable,
+  recoverDialogFocus,
+  restoreDialogFocus,
+} from './recover-dialog-focus';
 
 const FOCUSABLE_SELECTOR = [
   'button:not([disabled])',
@@ -78,6 +82,12 @@ export function useDialogA11y(
 
     const onKeyDown = (e: KeyboardEvent): void => {
       if (!isTopmostModal(node)) return;
+      // Escape/Tab can belong to an IME candidate window rather than the modal.
+      // Keep native composition in charge without reaching enclosing shortcuts.
+      if (e.isComposing || e.keyCode === 229) {
+        e.stopPropagation();
+        return;
+      }
       if (e.key === 'Escape' && optionsRef.current.closeOnEscape !== false) {
         e.preventDefault();
         // Closing can remove the modal gate before this event reaches window.
@@ -110,7 +120,9 @@ function initialFocusTarget(node: HTMLElement, options: DialogA11yOptions): HTML
   // Supplemental help stays keyboard reachable without replacing the main control on open.
   return (
     Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).find(
-      (element) => element.closest('[data-dialog-secondary-focus]') === null,
+      (element) =>
+        !dialogControlIsUnavailable(element) &&
+        element.closest('[data-dialog-secondary-focus]') === null,
     ) ?? node
   );
 }
@@ -122,7 +134,7 @@ function isTopmostModal(node: HTMLElement): boolean {
 
 function trapTabWithin(node: HTMLElement, event: KeyboardEvent): void {
   const focusables = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (element) => !element.hasAttribute('aria-hidden') && element.offsetParent !== null,
+    (element) => !dialogControlIsUnavailable(element) && element.offsetParent !== null,
   );
   const first = focusables[0];
   const last = focusables[focusables.length - 1];

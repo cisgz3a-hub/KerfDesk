@@ -8,12 +8,16 @@ type AdjustmentField = 'brightness' | 'contrast' | 'gamma';
 export function SelectedImageAdjustments(props: {
   readonly image: RasterImage | null;
 }): JSX.Element | null {
+  // A replacement file can reuse both the image ID and its scalar values.
+  // Remount its editors so old drafts/timers cannot mutate the new document.
+  const projectDocumentEpoch = useStore((state) => state.projectDocumentEpoch);
   if (props.image === null) return null;
   return (
     <section aria-label="Selected image adjustments" style={sectionStyle}>
       <h3 style={headingStyle}>Image Adjust</h3>
       <EditImageButton image={props.image} />
       <AdjustmentInput
+        key={`${projectDocumentEpoch}:${props.image.id}:brightness`}
         image={props.image}
         field="brightness"
         label="Brightness"
@@ -23,6 +27,7 @@ export function SelectedImageAdjustments(props: {
         fallback={0}
       />
       <AdjustmentInput
+        key={`${projectDocumentEpoch}:${props.image.id}:contrast`}
         image={props.image}
         field="contrast"
         label="Contrast"
@@ -32,6 +37,7 @@ export function SelectedImageAdjustments(props: {
         fallback={0}
       />
       <AdjustmentInput
+        key={`${projectDocumentEpoch}:${props.image.id}:gamma`}
         image={props.image}
         field="gamma"
         label="Gamma"

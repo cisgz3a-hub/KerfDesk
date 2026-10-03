@@ -20,10 +20,10 @@ export function recoverDialogFocus(
     if (focused === null || !node.isConnected || (active !== document.body && active !== focused)) {
       return;
     }
-    if (node.contains(focused) && !isUnavailable(focused)) return;
+    if (node.contains(focused) && !dialogControlIsUnavailable(focused)) return;
     if (!isActiveModal()) return;
     const target = Array.from(node.querySelectorAll<HTMLElement>(selector)).find(
-      (element) => !isUnavailable(element) && element.offsetParent !== null,
+      (element) => !dialogControlIsUnavailable(element) && element.offsetParent !== null,
     );
     (target ?? node).focus();
   });
@@ -40,7 +40,8 @@ export function recoverDialogFocus(
   };
 }
 
-function isUnavailable(element: HTMLElement): boolean {
+/** Includes effective disabled state inherited from a fieldset and hidden ancestors. */
+export function dialogControlIsUnavailable(element: HTMLElement): boolean {
   return element.matches(':disabled') || element.closest(UNAVAILABLE_ANCESTOR) !== null;
 }
 
@@ -52,7 +53,7 @@ export function restoreDialogFocus(node: HTMLElement, target: HTMLElement | null
   const restoredTarget = target.isConnected
     ? target
     : document.getElementById(target.dataset['dialogFocusFallback'] ?? '');
-  if (restoredTarget === null || isUnavailable(restoredTarget)) return;
+  if (restoredTarget === null || dialogControlIsUnavailable(restoredTarget)) return;
   const active = document.activeElement;
   if (active !== null && active !== document.body && !node.contains(active)) return;
   const remaining = Array.from(

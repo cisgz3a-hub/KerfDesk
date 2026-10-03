@@ -11,7 +11,7 @@ import { approvedSession, device } from './relay.js';
 import {
   saveConsentBinding,
   matchesConsentBinding,
-  clearConsentBinding,
+  consumeConsentBinding,
 } from './consent-binding.js';
 export type AppEnv = Env & { OAUTH_PROVIDER?: OAuthHelpers };
 type ApprovedSession = NonNullable<Awaited<ReturnType<typeof approvedSession>>>;
@@ -109,12 +109,12 @@ async function decideConsent(
   const selectedScopes = form.getAll('scope');
   if (form.get('decision') === 'deny') {
     const denied = await oauth.denyConsent(request, handle);
-    await clearConsentBinding(env, handle);
+    await consumeConsentBinding(env, handle, session, selectedScopes);
     return new Response(null, { status: 303, headers: denied.headers });
   }
   if (form.get('decision') !== 'allow') throw new RequestFailure(400);
   const approved = await oauth.approveConsent(request, handle, { scope: selectedScopes });
-  await clearConsentBinding(env, handle);
+  await consumeConsentBinding(env, handle, session, approved.request.scope);
   const scopes = oauthScopes(approved.request.scope);
   if (
     !scopes ||
