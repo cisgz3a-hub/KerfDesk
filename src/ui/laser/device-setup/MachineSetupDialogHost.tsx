@@ -19,10 +19,21 @@ import { DeviceSetupWizard } from './DeviceSetupWizard';
 /** App-level host for every Machine Setup entry point. */
 export function MachineSetupDialogHost(): JSX.Element | null {
   const dialog = useMachineSetupDialogStore((store) => store.state);
+  const documentEpoch = useStore((store) => store.projectDocumentEpoch);
   const close = useMachineSetupDialogStore((store) => store.close);
   const configurationRecorded = useMachineSetupDialogStore((store) => store.configurationRecorded);
   useEffect(() => close, [close]);
   if (dialog.kind !== 'open') return null;
+  const closeDraft = (): void => {
+    // Firmware verification can finish after another document or setup opens.
+    // Only the exact original draft may close; request IDs can be reused later.
+    if (
+      useStore.getState().projectDocumentEpoch === documentEpoch &&
+      useMachineSetupDialogStore.getState().state === dialog
+    ) {
+      close();
+    }
+  };
   const markConfigured = (profile: DeviceProfile): void => {
     persistConfiguredProfile(profile);
     configurationRecorded();
@@ -33,7 +44,7 @@ export function MachineSetupDialogHost(): JSX.Element | null {
       initialStep={machineSetupInitialStep(dialog.target)}
       highlight={machineSetupHighlight(dialog.target)}
       target={dialog.target}
-      onClose={close}
+      onClose={closeDraft}
       onConfigured={markConfigured}
     />
   );

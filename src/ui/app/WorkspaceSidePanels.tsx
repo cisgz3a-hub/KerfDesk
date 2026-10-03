@@ -31,6 +31,8 @@ export function WorkspaceSidePanels(): JSX.Element {
       <section
         aria-label="Workspace side panels"
         data-layout="compact"
+        data-collapsed={collapsed}
+        data-active-panel={active}
         className="lf-workspace-panels lf-workspace-panels--compact"
         style={collapsed ? collapsedCompactPanelStyle : undefined}
       >
