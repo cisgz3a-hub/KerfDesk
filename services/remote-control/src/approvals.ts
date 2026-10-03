@@ -1,12 +1,23 @@
 import { DurableObject } from 'cloudflare:workers';
 import {
   GRANT_TTL_SECONDS,
+  oauthScopes,
   type GrantProps,
   type RemoteClient,
   type RemoteScope,
   type StoredClient,
 } from './protocol.js';
 import { digest, remainingPairingMs, sameDigest } from './security.js';
+import {
+  CONSENT_TTL_SECONDS,
+  CONSENT_STORAGE_PREFIX,
+  MAX_CONSENT_RECORDS,
+  consentBindingSchema,
+  consentDigestSchema,
+  consentRecordSchema,
+  matchesConsent,
+  type ConsentBinding,
+} from './consent-state.js';
 type Offer = { id: string; digest: string; expiresAt: number; attempts: number; claimed: boolean };
 type DeviceState = {
   ownerDigest: string;
@@ -53,8 +64,75 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
     if (this.state !== null) await this.ctx.storage.put('device', this.state);
   }
 
+  private pruneConsents(): void {
+    for (const [key, value] of this.ctx.storage.kv.list({
+      prefix: CONSENT_STORAGE_PREFIX,
+      limit: MAX_CONSENT_RECORDS + 1,
+    })) {
+      const saved = consentRecordSchema.safeParse(value);
+      if (!saved.success || saved.data.expiresAt <= Date.now()) this.ctx.storage.kv.delete(key);
+    }
+  }
+
+  /** Persist a bounded presentation snapshot before returning its consent form. */
+  saveConsent(handleDigest: string, value: ConsentBinding): boolean {
+    const saved = consentBindingSchema.safeParse(value);
+    const scopes = saved.success ? oauthScopes(saved.data.displayedScopes) : null;
+    if (
+      !consentDigestSchema.safeParse(handleDigest).success ||
+      !saved.success ||
+      saved.data.expiresAt <= Date.now() ||
+      saved.data.expiresAt > Date.now() + CONSENT_TTL_SECONDS * 1000 ||
+      !scopes ||
+      !this.isAuthorized(saved.data, scopes) ||
+      this.sessionInfo(saved.data.clientId, saved.data.sessionDigest).status !== 'approved'
+    )
+      return false;
+    return this.ctx.storage.transactionSync(() => {
+      this.pruneConsents();
+      const key = `${CONSENT_STORAGE_PREFIX}${handleDigest}`;
+      if (
+        this.ctx.storage.kv.get(key) !== undefined ||
+        Array.from(
+          this.ctx.storage.kv.list({ prefix: CONSENT_STORAGE_PREFIX, limit: MAX_CONSENT_RECORDS }),
+        ).length >= MAX_CONSENT_RECORDS
+      )
+        return false;
+      this.ctx.storage.kv.put(key, { ...saved.data, consumed: false });
+      return true;
+    });
+  }
+
+  /** No await separates the current approval, immutable snapshot and durable single-use marker. */
+  consumeConsent(
+    handleDigest: string,
+    props: GrantProps,
+    sessionDigest: string,
+    selectedScopes: string[],
+  ): boolean {
+    if (!consentDigestSchema.safeParse(handleDigest).success) return false;
+    return this.ctx.storage.transactionSync(() => {
+      const key = `${CONSENT_STORAGE_PREFIX}${handleDigest}`;
+      const saved = consentRecordSchema.safeParse(this.ctx.storage.kv.get(key));
+      const scopes = oauthScopes(selectedScopes);
+      if (
+        !saved.success ||
+        saved.data.consumed ||
+        !scopes ||
+        !this.isAuthorized(props, scopes) ||
+        this.sessionInfo(props.clientId, sessionDigest).status !== 'approved' ||
+        !matchesConsent(saved.data, props, sessionDigest, selectedScopes)
+      )
+        return false;
+      // Keep the marker until expiry: delayed retries must never recreate a consumed handle.
+      this.ctx.storage.kv.put(key, { ...saved.data, consumed: true });
+      return true;
+    });
+  }
+
   /** Expiry blocks immediately. Physical metadata cleanup happens on the next device interaction. */
   protected async pruneExpired(): Promise<void> {
+    this.ctx.storage.transactionSync(() => this.pruneConsents());
     if (!this.state) return;
     const now = Date.now();
     let changed = false;
@@ -234,6 +312,13 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
 
   protected revoke(clientId: string): void {
     if (this.state) this.state.clients = this.state.clients.filter((item) => item.id !== clientId);
+    for (const [key, value] of this.ctx.storage.kv.list({
+      prefix: CONSENT_STORAGE_PREFIX,
+      limit: MAX_CONSENT_RECORDS,
+    })) {
+      const saved = consentRecordSchema.safeParse(value);
+      if (!saved.success || saved.data.clientId === clientId) this.ctx.storage.kv.delete(key);
+    }
     this.revokePending(clientId);
   }
 }

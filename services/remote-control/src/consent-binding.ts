@@ -1,19 +1,8 @@
-import { z } from 'zod';
-import { grantSchema, OAUTH_READ, OAUTH_EDIT } from './protocol.js';
-import { digest, sameDigest } from './security.js';
-import type { approvedSession } from './relay.js';
+import { digest, RequestFailure } from './security.js';
+import { device, type approvedSession } from './relay.js';
+import { CONSENT_TTL_SECONDS, consentBindingSchema, matchesConsent } from './consent-state.js';
 
 type ApprovedSession = NonNullable<Awaited<ReturnType<typeof approvedSession>>>;
-// Match the pinned provider's consent transaction lifetime; its own handle can expire sooner.
-const CONSENT_TTL_SECONDS = 10 * 60;
-const bindingSchema = grantSchema.extend({
-  sessionDigest: z.string().regex(/^[a-f0-9]{64}$/),
-  displayedScopes: z
-    .array(z.enum([OAUTH_READ, OAUTH_EDIT, 'offline_access']))
-    .min(1)
-    .max(3),
-  expiresAt: z.number().int().positive().safe(),
-});
 const bindingKey = async (handle: string): Promise<string> =>
   `kerfdesk:consent-binding:v1:${await digest(handle)}`;
 
@@ -24,7 +13,7 @@ export async function saveConsentBinding(
   session: ApprovedSession,
   displayedScopes: readonly string[],
 ): Promise<void> {
-  const value = bindingSchema.parse({
+  const value = consentBindingSchema.parse({
     deviceId: session.identity.deviceId,
     clientId: session.identity.clientId,
     leaseId: session.info.leaseId,
@@ -35,6 +24,9 @@ export async function saveConsentBinding(
   await env.OAUTH_KV.put(await bindingKey(handle), JSON.stringify(value), {
     expirationTtl: CONSENT_TTL_SECONDS,
   });
+  // KV remains the presentation check; only this strongly consistent record can be consumed once.
+  if (!(await device(env, value.deviceId).saveConsent(await digest(handle), value)))
+    throw new RequestFailure(503);
 }
 
 /** Only server-owned presentation data can authorize this form; cookie holders cannot rewrite it. */
@@ -45,22 +37,46 @@ export async function matchesConsentBinding(
   selectedScopes: readonly string[],
 ): Promise<boolean> {
   if (handle.length === 0 || handle.length > 128) return false;
-  const saved = bindingSchema.safeParse(await env.OAUTH_KV.get(await bindingKey(handle), 'json'));
+  const saved = consentBindingSchema.safeParse(
+    await env.OAUTH_KV.get(await bindingKey(handle), 'json'),
+  );
   if (!saved.success) return false;
-  const value = saved.data;
-  return (
-    value.expiresAt > Date.now() &&
-    value.deviceId === session.identity.deviceId &&
-    value.clientId === session.identity.clientId &&
-    value.leaseId === session.info.leaseId &&
-    sameDigest(value.sessionDigest, session.identity.digest) &&
-    selectedScopes.includes(OAUTH_READ) &&
-    selectedScopes.length <= 3 &&
-    new Set(selectedScopes).size === selectedScopes.length &&
-    selectedScopes.every((scope) => value.displayedScopes.some((displayed) => displayed === scope))
+  return matchesConsent(
+    saved.data,
+    {
+      deviceId: session.identity.deviceId,
+      clientId: session.identity.clientId,
+      leaseId: session.info.leaseId,
+    },
+    session.identity.digest,
+    selectedScopes,
   );
 }
 
-export async function clearConsentBinding(env: Env, handle: string): Promise<void> {
+/** Call only after the provider has validated the browser cookie and the user's decision. */
+export async function consumeConsentBinding(
+  env: Env,
+  handle: string,
+  session: ApprovedSession,
+  selectedScopes: readonly string[],
+): Promise<void> {
+  if (
+    !(await device(env, session.identity.deviceId).consumeConsent(
+      await digest(handle),
+      {
+        deviceId: session.identity.deviceId,
+        clientId: session.identity.clientId,
+        leaseId: session.info.leaseId,
+      },
+      session.identity.digest,
+      [...selectedScopes],
+    ))
+  )
+    throw new RequestFailure(403);
+  // A failed cleanup still cannot produce a code or redirect, and the durable marker is retained.
+  await clearConsentBinding(env, handle);
+}
+
+async function clearConsentBinding(env: Env, handle: string): Promise<void> {
   await env.OAUTH_KV.delete(await bindingKey(handle));
 }

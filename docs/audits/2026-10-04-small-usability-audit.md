@@ -6,9 +6,11 @@ actions and changing documents. The starting source is
 `codex/small-usability-audit-20261004`; the dirty primary checkout, existing
 worktrees and customer profiles were preserved.
 
-Seven product defects were reproduced and repaired. The new committed coverage
-contains 42 unit scenarios and 25 installed-Chrome renderer workflows: **67
-distinct new scenarios**. Existing tests and repeated before/after runs are not
+Eight product defects were reproduced and repaired: seven UI defects and an MCP
+double-submission race exposed by exact-head CI. The new coverage contains 42
+unit scenarios, 25 installed-Chrome renderer workflows and 17 real-workerd
+service scenarios: **84 distinct introduced scenarios**, comprising 67 UI cases
+and 17 service cases. Existing tests and repeated before/after runs are not
 added to that count. Passing these scenarios does not establish that every
 input, operating system, installer or physical machine has been qualified.
 
@@ -23,10 +25,11 @@ input, operating system, installer or physical machine has been qualified.
 | P2 | Escape during input-method composition discarded a modal text draft; composing Tab was consumed by the dialog focus trap. | `use-dialog-a11y.ts` preserves native composition handling for `isComposing` and the existing legacy 229 compatibility path. The original production text dialog disappeared in the Chrome witness and remains open after repair; ordinary Escape still cancels. Composition events are synthetic, not a native OS candidate-window qualification. |
 | P2 | Disabled-fieldset and attribute-hidden controls were counted as focus targets. In busy Convert to Bitmap, Shift+Tab from the only enabled Cancel action escaped the dialog. | Initial focus and Tab wrapping reuse `dialogControlIsUnavailable` from `recover-dialog-focus.ts`. The original Chrome busy-dialog failure and five unavailable-control unit boundaries are recorded separately from four composition cases. Forward/backward Tab stay on Cancel, and Enter cancels without deleting artwork. |
 | P2 | At 640 x 450, opening a project with a machine-choice notice let the job dock cover the Artwork controls and intercept clicks. | `WorkspaceSidePanels.tsx` exposes the compact collapsed state and active panel. `workspace-layout.css` gives expanded compact panels a minimum usable body, scrolls the rail when needed and prevents the job dock from shrinking over controls. Machine controls scroll their whole rail, including the heading, so they use a smaller minimum than Artwork's fixed header/tabs. Real mouse collapse/expand, tab selection, full Frame/Start button containment, unchanged project state and saved artwork/process equality are checked at 640 x 450 and 1024 x 600. Collapsed/spacious rules retain their previous sizing. |
+| P2 | A double click on MCP Allow could create two code redirects from one consent because the pinned provider's KV get/delete is non-atomic. | Exact-head CI failed the existing single-use test. A deterministic original workerd interleaving returned `[303,303]`; code redemption returned `[200,400]`, so that witness establishes duplicate redirects, not two successful token exchanges. The existing per-PC SQLite Durable Object now marks an authoritative record consumed after the provider validates the browser and before any code or decline redirect. The marker survives restart and remains until expiry; missing or failed storage grants nothing. All 17 new workerd cases pass. |
 
 The shared test helper now chooses Artwork/Machine inside the Side panel tablist;
 an operation editor can also have an Artwork tab. That ambiguity was a test
-fixture correction, not an eighth product defect. Tests also gained explicit
+fixture correction, not an additional product defect. Tests also gained explicit
 waits for asynchronous text Done completion and correct canvas-shortcut focus.
 Those failed assumptions were retained in local receipts rather than reported
 as application failures.
@@ -44,7 +47,7 @@ The scenarios below are deliberately small: pause halfway through typing, clear
 the last character, cancel after editing, change selection, reopen a draft, or
 finish an older action after newer work exists. Fixed means a failure was
 reproduced on the original source; Passed means no additional defect was
-confirmed in the listed scenarios. There are 36 checklist items.
+confirmed in the listed scenarios. There are 37 checklist items.
 
 | ID | What to try | Result and evidence |
 | --- | --- | --- |
@@ -84,6 +87,7 @@ confirmed in the listed scenarios. There are 36 checklist items.
 | W4 | Duplicate, delete all, Undo and Redo. | Passed: selection is cleared when artwork disappears and no stale selection remains. |
 | W5 | Press New, Duplicate, Paste and Delete shortcuts while Settings is open. | Passed: Settings owns them; canvas project, selection and history remain unchanged. |
 | W6 | Resize to 1024 x 600 and 640 x 450; collapse/expand both panels, switch tabs, reach Frame/Start and Save As. | Fixed for short-window overlap; both viewports preserve exact artwork/process settings and saved `43` power. No hardware commands are issued. |
+| R1 | Tap MCP Allow twice, race Allow against Decline, submit stale forms and retry after storage failures. | Fixed: 17 new real-workerd cases cover two/eight concurrent Allow requests, competing Decline, wrong browser/forms, stale KV replay, overwrite prevention, independent PCs/tabs/scopes, object restart, expiry/capacity, captured-session revocation and save/consume/cleanup failures. |
 
 ## Qualification limits
 
@@ -117,22 +121,49 @@ and the [legacy 229 processing definition](https://www.w3.org/TR/uievents/#deter
 Those specifications inform the fixes; the recorded regression scenarios provide
 the application evidence.
 
+The pinned OAuth provider `1.2.1` source explicitly describes consent consumption
+as non-atomic KV get/delete. The repair uses the existing SQLite-backed Durable
+Object's synchronous storage transaction, checked against the current
+[Cloudflare SQLite storage API](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/)
+and [state/concurrency guidance](https://developers.cloudflare.com/durable-objects/api/state/).
+The provider still validates the browser cookie, redirect and PKCE. Missing or
+failed authoritative records cannot grant access; POST cannot recreate them.
+Consent forms opened before this backend repair must be reopened. Existing
+paired sessions and issued grants retain their existing lifecycle.
+
 ## Integrated verification and release boundary
 
 The root combined run passes all 42 new unit scenarios across seven files. The
 final combined Chrome run passes all 42 workflows: the 25 new scenarios and 17
 existing responsive/shell cases, with zero skips, unexpected results or retries.
-Final renderer-test TypeScript checking passes. The 21 production/test/note file
-hashes match the frozen candidate after those checks; only this report was
-completed afterwards. Independent source and evidence/count reviews found no
-further attributable blocker in the repaired boundaries.
+Final renderer-test TypeScript checking passes. The 21 UI production/test/note
+file hashes still match their frozen candidate. The six additional service
+source/test files have a separate frozen receipt. Independent source and
+evidence/count reviews found no further attributable blocker in the repaired
+boundaries.
 
-The full local `pnpm release:check` is still running at this pre-merge report cut;
-its terminal status is recorded separately in `release-check-receipt.json`.
-The completed checklist and narrow results do not substitute for that whole-app
-gate. Exact-head hosted CI, Browser smoke and Desktop package checks must also
-pass before merge. Later receipts record full-gate completion, merge, main checks,
-Pages publication and served identity without changing this pre-merge snapshot.
+The full local app unit suite also passes: 26,983 tests, with 29 existing skips,
+across 3,483 passing files and 18 skipped files. The full local service runtime
+suite passes all 76 scenarios: 17 new and 59 existing, with zero skips. The
+original simultaneous-Allow assertion remains unchanged. Service typecheck, lint,
+formatting, dependency licences and third-party notices pass. Independent review
+confirmed that test-only scheduling, stale-KV, storage-fault and reset methods
+are absent from production source and its built bundle. Provider/configuration,
+dependency versions and the original double-Allow assertion are unchanged.
+
+The full local `pnpm release:check` completed successfully: app static/policy
+checks and unit tests, 500 release-integrity cases, 39 website cases, all 76
+service cases, web/Electron builds, file-size and export checks. Its terminal
+status is in `release-check-receipt.json`. The UI files remained frozen while
+the service repair was made; final service static checks and source/bundle
+hashes were checked separately. The local runtime uses the pinned workerd and
+its existing `2026-09-30` test compatibility date; production remains on
+`2026-10-01`. This is not a live compatibility or cross-region qualification.
+
+Exact-head hosted CI, Browser smoke and Desktop package checks must also pass
+before merge. Later receipts record the final committed revision, merge, main
+checks, Pages publication and served identity without changing this pre-merge
+snapshot.
 
 The next desktop release's six short improvement notes include these repairs.
 This source update does not publish a new installer. The 20-merged-PR cadence
@@ -156,6 +187,8 @@ Receipts are retained under
 | `workspace/integrated-final.json`, `.log` and artifacts | Final combined new renderer workflows and existing responsive/shell checks |
 | `integrated-new-unit.json`, `.log`, `e2e-types-final.log` | Combined 42 new unit scenarios and final renderer-test TypeScript check |
 | `release-check.log`, `release-check-receipt.json` | Full local release gate and terminal exit status |
+| `pr-mcp-failed.log`, `mcp-single-use/original-controlled-race.log` | Exact-head hosted failure and deterministic original workerd single-use witness |
+| `mcp-single-use/fixed-full-runtime-final.log`, final static logs and hash receipt | Final service scenarios, existing coverage and frozen source/bundle identities |
 
 The committed new cases live in four `e2e/small-*.spec.ts` files, two
 `src/ui/layers/*.small-audit.test.tsx` files, two
@@ -163,3 +196,7 @@ The committed new cases live in four `e2e/small-*.spec.ts` files, two
 `src/ui/app/confirm-discard.document-audit.test.ts`,
 `src/ui/laser/device-setup/MachineSetupDialogHost.document-audit.test.tsx` and
 `src/ui/common/use-dialog-a11y.small-usability.audit.test.tsx`.
+The 17 service scenarios are in
+`services/remote-control/test/consent-single-use.test.mjs`; its local scheduling
+and fault witness is `consent-single-use-support.mjs` and is not part of the
+production Worker.
