@@ -108,11 +108,19 @@ test('real workerd: fixed origin, small metadata, no bearer URLs, no machine rou
     assert.equal(page.status, 200);
     assert.match(page.headers.get('Content-Security-Policy'), /img-src 'self' data:;/);
     assert.match(await page.text(), /Approve this phone on the PC/);
-    for (const path of ['/control-edit.js', '/control-model.js', '/control-workspace.js']) {
+    for (const path of [
+      '/control-edit.js',
+      '/control-model.js',
+      '/control-workspace.js',
+      '/control-live.js',
+      '/control-drafts.js',
+      '/control-pairing.js',
+    ]) {
       const asset = await worker.dispatchFetch(`${ORIGIN}${path}`);
       assert.equal(asset.status, 200, path);
       assert.match(asset.headers.get('Content-Type'), /javascript/);
     }
+    assert.equal((await worker.dispatchFetch(`${ORIGIN}/control-unknown.js`)).status, 404);
     const notices = await worker.dispatchFetch(`${ORIGIN}/third-party-notices.txt`);
     assert.equal(notices.status, 200);
     const noticeText = await notices.text();

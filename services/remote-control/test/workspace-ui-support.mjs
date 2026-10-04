@@ -7,6 +7,11 @@ const machineSource = await readFile(
   'utf8',
 );
 const machineUrl = 'data:text/javascript,' + encodeURIComponent(machineSource);
+const liveSource = await readFile(
+  new URL('../../../electron/mcp/workspace-live-ui.ts', import.meta.url),
+  'utf8',
+);
+const liveUrl = 'data:text/javascript,' + encodeURIComponent(liveSource);
 const resourceSource = await readFile(
   new URL('../../../electron/mcp/workspace-ui.ts', import.meta.url),
   'utf8',
@@ -14,17 +19,20 @@ const resourceSource = await readFile(
 const { KERFDESK_WORKSPACE_UI_HTML } = await import(
   'data:text/javascript,' +
     encodeURIComponent(
-      resourceSource.replace("'./workspace-machine-ui.js'", JSON.stringify(machineUrl)),
+      resourceSource
+        .replace("'./workspace-machine-ui.js'", JSON.stringify(machineUrl))
+        .replace("'./workspace-live-ui.js'", JSON.stringify(liveUrl)),
     )
 );
 
-export async function appPage(browser, state = fixtureState(), width = 390) {
+export async function appPage(browser, state = fixtureState(), width = 390, options = {}) {
   const context = await browser.newContext({
     viewport: { width, height: 844 },
     isMobile: true,
     hasTouch: true,
   });
   const page = await context.newPage();
+  if (options.clock) await page.clock.install();
   const errors = [];
   const rpc = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -42,6 +50,11 @@ export async function appPage(browser, state = fixtureState(), width = 390) {
     state.commands.push({ name, args });
     if (state.revoked)
       return { isError: true, structuredContent: { error: { code: 'cancelled' } } };
+    const hooked = await state.readHook?.(name, args);
+    if (hooked)
+      return hooked.error
+        ? { isError: true, structuredContent: { error: hooked.error } }
+        : { structuredContent: hooked.result };
     if (state.machineCommand) {
       const answer = await state.machineCommand(name, args);
       if (answer) {

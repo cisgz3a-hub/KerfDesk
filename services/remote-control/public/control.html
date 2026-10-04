@@ -9,6 +9,7 @@
       content="Read and edit your open KerfDesk workspace from your phone, with approval on your computer."
     />
     <title>Phone control · KerfDesk</title>
+    <script src="/control-pairing.js"></script>
     <link rel="stylesheet" href="/control.css" />
     <script type="module" src="/control.js"></script>
   </head>
@@ -56,7 +57,7 @@
                 spellcheck="false"
                 required
                 minlength="12"
-                maxlength="12"
+                maxlength="24"
                 placeholder="12 characters" /></label
             ><label
               >Name for this phone<input
@@ -89,7 +90,15 @@
           </div>
           <button class="secondary" id="refresh" type="button">Refresh</button>
         </section>
-        <div class="history-controls" id="history-controls" hidden>
+        <div class="live-row">
+          <span id="live-status" class="muted" role="status">Connecting…</span>
+        </div>
+        <nav class="tabs" aria-label="Workspace views">
+          <button type="button" data-view="artwork" aria-pressed="true">Design</button
+          ><button type="button" data-view="machine" aria-pressed="false">Machine</button
+          ><button type="button" data-view="details" aria-pressed="false">Settings</button>
+        </nav>
+        <div class="history-controls" id="history-controls" data-design hidden>
           <button class="secondary" id="undo" type="button" disabled>Undo</button>
           <button class="secondary" id="redo" type="button" disabled>Redo</button>
           <span class="muted" id="history-status">Changes share the PC’s undo history.</span>
@@ -101,21 +110,26 @@
             To edit, pair again with editing permission and approve this phone on the PC.
           </p>
         </section>
-        <nav class="tabs" aria-label="Workspace views">
-          <button type="button" data-view="artwork" aria-pressed="true">Artwork</button
-          ><button type="button" data-view="edit" aria-pressed="false">Edit</button
-          ><button type="button" data-view="machine" aria-pressed="false">Machine</button
-          ><button type="button" data-view="details" aria-pressed="false">Details</button>
-        </nav>
+        <p id="draft-note" class="notice" data-kind="error" data-design hidden>
+          The PC changed. Your unsent drafts are kept.
+          <button id="discard-drafts" type="button" class="secondary">
+            Discard drafts and refresh
+          </button>
+        </p>
         <section class="card preview-card" data-panel="artwork" aria-labelledby="preview-heading">
           <div class="preview-heading">
             <h2 id="preview-heading">Your artwork</h2>
-            <span class="badge">Preview</span>
+            <button type="button" data-view="edit" class="secondary">Edit</button>
           </div>
-          <div class="preview-surface">
+          <div class="preview-surface" id="preview-surface">
             <img id="workspace-preview" alt="Artwork preview from your desktop" hidden />
           </div>
           <p id="preview-message" class="muted">Connect to your PC to view its workspace.</p>
+          <div class="preview-tools" aria-label="Preview zoom">
+            <button id="zoom-out" type="button" class="secondary" aria-label="Zoom out">−</button
+            ><button id="zoom-fit" type="button" class="secondary">Fit</button
+            ><button id="zoom-in" type="button" class="secondary" aria-label="Zoom in">+</button>
+          </div>
           <p id="preview-bounds" class="muted"></p>
         </section>
         <section class="card" data-panel="artwork">
@@ -133,7 +147,10 @@
         </section>
         <div data-panel="edit" hidden>
           <div id="edit-forms" hidden>
-            <details class="card task" id="edit-text-task" open>
+            <p class="muted">
+              Choose a task below. Changes are saved to the open design on your PC.
+            </p>
+            <details class="card task" id="edit-text-task">
               <summary>Edit text</summary>
               <p id="text-sharing-note" class="muted" hidden>
                 Enable artwork sharing in Settings → Phone &amp; MCP on the PC to read existing
@@ -484,14 +501,25 @@
           </div>
         </section>
         <section class="card" data-panel="details" hidden>
-          <h2>Computer and job</h2>
-          <div id="details-list" class="details-list"></div>
+          <h2>Connection and updates</h2>
+          <p><a href="https://kerfdesk.com/phone.html#mcp">ChatGPT &amp; MCP setup</a></p>
+          <label class="check"
+            ><input id="live-updates" type="checkbox" checked /> Keep the design in sync</label
+          >
+          <p class="muted">
+            PC edits appear automatically. Updates pause while this page is hidden. Unsent drafts
+            stay here until you apply or discard them.
+          </p>
+          <details class="task">
+            <summary>Computer and job details</summary>
+            <div id="details-list" class="details-list"></div>
+          </details>
           <p class="muted">
             Machine actions require separate approval on the PC. Review the current job before
             Start.
           </p>
         </section>
-        <details class="card task compact" id="connection-options">
+        <details class="card task compact" id="connection-options" data-panel="details" hidden>
           <summary>Connection options</summary>
           <p>Keep KerfDesk open on the PC. You can revoke access there at any time.</p>
           <button class="secondary" id="disconnect" type="button">Disconnect this phone</button>

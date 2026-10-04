@@ -11,7 +11,7 @@ import { loadOperation, view } from './control-workspace.js';
 
 function selection() {
   const artworkIds = selectedIds();
-  if (!artworkIds.length) throw new Error('Select artwork in the Artwork tab first.');
+  if (!artworkIds.length) throw new Error('Select artwork in Design first.');
   return artworkIds;
 }
 
@@ -72,12 +72,13 @@ function bindAuthoring(update, edit) {
   );
 }
 
-export function bindEditors({ action, edit, command, getWorkspace }) {
+export function bindEditors({ action, edit, command, drafts, getWorkspace, applyWorkspace }) {
   const fonts = createFontPickers();
   let loadedTextId = null;
   let loadedRevision = null;
   let loadedText = null;
-  const update = (id, callback) => bindForm(id, action, callback);
+  const update = (id, callback) =>
+    bindForm(id, action, (form) => drafts.submit(form, () => callback(form)));
   bindAuthoring(update, edit);
   update('#text-edit-form', (form) => {
     if (
@@ -100,6 +101,7 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
     });
 
   function clearText() {
+    drafts.clean('#text-edit-form');
     loadedTextId = null;
     loadedRevision = null;
     loadedText = null;
@@ -116,8 +118,12 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
     const artworkId = $('#text-artwork-list').value;
     if (!artworkId) throw new Error('There is no editable text in this workspace.');
     const before = getWorkspace()?.revision;
-    if (loadedTextId === artworkId && loadedRevision === before) return;
-    const value = await command('get_text', { artworkId });
+    if (
+      loadedTextId === artworkId &&
+      (loadedRevision === before || drafts.dirty('#text-edit-form'))
+    )
+      return;
+    const value = await readSharedText(command, artworkId, applyWorkspace);
     if (value.revision !== before || getWorkspace()?.revision !== before)
       throw new Error('The workspace changed. Refresh before loading the text again.');
     validateText(value, artworkId);
@@ -128,6 +134,7 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
     loadedTextId = artworkId;
     loadedRevision = value.revision;
     loadedText = value;
+    drafts.clean('#text-edit-form');
     $('#text-editor').disabled = false;
     $('#text-editor').hidden = false;
     $('#text-source-controls').hidden = true;
@@ -136,18 +143,31 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
   }
   return {
     setFonts: (value) => fonts.set(value),
+    clearText,
     reset() {
       clearText();
       fonts.set(null);
     },
     workspaceChanged() {
-      if (
-        loadedRevision !== getWorkspace()?.revision ||
-        getWorkspace()?.permissions?.artworkSharingEnabled === false
-      )
-        clearText();
+      if (shouldClearText(getWorkspace(), loadedRevision, drafts)) clearText();
     },
   };
+}
+
+async function readSharedText(command, artworkId, applyWorkspace) {
+  const value = await command('get_text', { artworkId });
+  const latest = await command('get_workspace');
+  applyWorkspace(latest);
+  if (latest.permissions?.artworkSharingEnabled === false)
+    throw new Error('Artwork sharing is off on the PC. Enable it before loading text.');
+  return value;
+}
+
+function shouldClearText(workspace, loadedRevision, drafts) {
+  return (
+    workspace?.permissions?.artworkSharingEnabled === false ||
+    (loadedRevision !== workspace?.revision && !drafts.dirty('#text-edit-form'))
+  );
 }
 
 function bindTextAccess(action, loadText, clearText) {

@@ -356,8 +356,9 @@ function installNavigationPolicy(window: BrowserWindow): void {
     // open in the operator's browser, never as a second app window (ADR-482).
     const browserUrl = externalBrowserUrl(details.url);
     if (browserUrl !== null) {
-      void shell.openExternal(browserUrl).catch((error: unknown) => {
-        console.warn('Could not open the link in the browser:', error);
+      void shell.openExternal(browserUrl).catch(() => {
+        // Native errors can include private pairing fragments or query values.
+        console.warn('Could not open the link in the browser.');
       });
       return { action: 'deny' };
     }

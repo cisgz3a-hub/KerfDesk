@@ -20,6 +20,7 @@ let visible = false,
   timer = null,
   generation = 0,
   sequence = 0;
+let suspended = false;
 
 export function bindMachine(options) {
   environment = options;
@@ -44,7 +45,15 @@ export function bindMachine(options) {
     });
   document.addEventListener('visibilitychange', () => {
     clearTimeout(timer);
-    if (!document.hidden && visible) void check();
+    if (!document.hidden && (visible || ownedWork())) void check();
+  });
+  window.addEventListener('pagehide', () => {
+    suspended = true;
+    clearTimeout(timer);
+  });
+  window.addEventListener('pageshow', () => {
+    suspended = false;
+    if ((visible || ownedWork()) && session?.online) void check();
   });
   render();
   return {
@@ -60,8 +69,10 @@ export function bindMachine(options) {
       document.body.classList.toggle('machine-view', value);
       clearTimeout(timer);
       if (value && session?.online) void check();
+      else if (ownedWork()) schedule();
     },
     reset,
+    isBusy: () => loading || ownedWork(),
   };
 }
 
@@ -92,6 +103,11 @@ function uncertain() {
 function unfinished(item) {
   return (
     item.receipt && !terminal.has(item.receipt.state) && item.receipt.state !== 'awaiting_review'
+  );
+}
+function ownedWork() {
+  return [...attempts.values()].some(
+    (item) => item.admissionPending || item.uncertain || unfinished(item),
   );
 }
 function writable() {
@@ -129,7 +145,7 @@ function render() {
 }
 
 async function check() {
-  if (loading || !session?.online) return;
+  if (loading || !session?.online || suspended || document.hidden) return;
   const before = generation,
     actionSequence = sequence;
   loading = true;
@@ -197,12 +213,15 @@ function confirm(value) {
 }
 function schedule() {
   clearTimeout(timer);
-  if (visible && session?.online && !document.hidden)
+  if ((visible || ownedWork()) && session?.online && !document.hidden && !suspended)
     timer = setTimeout(
       () => {
         void check();
       },
-      status ? 2000 : 5000,
+      Math.max(
+        status ? 2000 : 5000,
+        2000 * (1 + [...attempts.values()].filter(needsReceipt).length),
+      ),
     );
 }
 async function verifyControl(before) {

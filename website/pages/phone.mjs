@@ -30,12 +30,14 @@ export const page = {
             awake and online.`,
         },
         {
-          title: 'Create a code and enter it on your phone',
-          body: html`Click <strong>Create pairing code</strong> on the PC, then open
-            <a href="${site.phoneSetupUrl}">phone setup</a> and choose
-            <strong>Connect to your PC</strong>. Enter the matching Computer ID, copy the code
-            exactly including capital letters, name the phone and request PC approval. A code works
-            once and expires after five minutes.`,
+          title: 'Scan the code or open a pairing link',
+          body: html`Click <strong>Create pairing link</strong> on the PC (older versions say
+            <strong>Create pairing code</strong>). Scan the displayed QR code with your phone or use
+            <strong>Copy pairing link</strong>. The link fills in the computer ID and code; name the
+            phone and request PC approval. For older versions or manual setup, open
+            <a href="${site.phoneSetupUrl}">phone setup</a>, enter the matching Computer ID and copy
+            the code exactly including capital letters. A code works once and expires after five
+            minutes.`,
         },
         {
           title: 'Choose the permission on the PC',
@@ -54,6 +56,11 @@ export const page = {
           recipes, and edition and update status. Editing connections can select, move, rotate or
           resize supported artwork. In Laser workspaces, they can add basic text or rectangles and
           change operation power, speed, passes and enabled state.
+        </p>
+        <p>
+          Updated versions separate Design, Machine and Settings. Changes made on the PC refresh the
+          connected phone view automatically, while unsent phone edits stay intact. Shared previews
+          and text need the separate sharing choice on the PC.
         </p>
         ${callout({
           title: 'Choose machine control separately',

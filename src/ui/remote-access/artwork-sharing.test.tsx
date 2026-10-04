@@ -49,6 +49,17 @@ function button(label: string): HTMLButtonElement {
   if (found === undefined) throw Error(`Button missing: ${label}`);
   return found;
 }
+async function openManualSetup(): Promise<void> {
+  const summary = Array.from(host.querySelectorAll('summary')).find(
+    (item) => item.textContent === 'Manual phone setup',
+  );
+  const details = summary?.parentElement;
+  if (summary === undefined || !(details instanceof HTMLDetailsElement))
+    throw Error('Manual phone setup missing');
+  expect(details.open).toBe(false);
+  await act(async () => summary.click());
+  expect(details.open).toBe(true);
+}
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -141,19 +152,22 @@ describe('desktop artwork-sharing consent', () => {
     expect(artworkSharingEnabled()).toBe(false);
     expect(box.checked).toBe(false);
   });
-  it('copies the pairing code and a phone link that already contains the computer ID', async () => {
+  it('copies the pairing code and computer ID without enabling artwork sharing', async () => {
     const status = connectedStatus();
     const writeText = vi.fn().mockResolvedValue(undefined);
     vi.stubGlobal('navigator', { clipboard: { writeText } });
     useRemoteAccessStore.setState({ status });
     await renderSection();
+    await openManualSetup();
     await act(async () => button('Copy code').click());
     expect(writeText).toHaveBeenNthCalledWith(1, status.pairing!.code);
-    await act(async () => button('Copy phone link').click());
-    expect(writeText).toHaveBeenNthCalledWith(2, status.controlUrl);
+    await act(async () => button('Copy computer ID').click());
+    expect(writeText).toHaveBeenNthCalledWith(2, status.deviceId);
+    expect(writeText).toHaveBeenCalledTimes(2);
     expect(host.textContent).toContain('Ready to pair');
-    expect(host.querySelector('details')?.open).toBe(false);
+    expect(host.querySelector('a[href^="https://example.test"]')).toBeNull();
     expect(sharingBox().checked).toBe(false);
+    expect(artworkSharingEnabled()).toBe(false);
   });
   it('offers the exact value for manual copying when clipboard access is denied', async () => {
     const status = connectedStatus();
@@ -161,10 +175,22 @@ describe('desktop artwork-sharing consent', () => {
     vi.stubGlobal('navigator', { clipboard: { writeText } });
     useRemoteAccessStore.setState({ status });
     await renderSection();
-    await act(async () => button('Copy phone link').click());
+    await openManualSetup();
+    await act(async () => button('Copy computer ID').click());
+    expect(writeText).toHaveBeenNthCalledWith(1, status.deviceId);
     expect(host.textContent).toContain('Copy is unavailable. Select and copy this text:');
-    expect(host.querySelector('code')?.textContent).toBe(status.controlUrl);
-    expect(button('Copy phone link').disabled).toBe(false);
+    expect(host.querySelector('code')?.textContent).toBe(status.deviceId);
+    await act(async () => button('Copy code').click());
+    expect(writeText).toHaveBeenNthCalledWith(2, status.pairing!.code);
+    expect(writeText).toHaveBeenCalledTimes(2);
+    expect(Array.from(host.querySelectorAll('code'), (item) => item.textContent)).toEqual([
+      status.deviceId,
+      status.pairing!.code,
+    ]);
+    expect(button('Copy computer ID').disabled).toBe(false);
+    expect(button('Copy code').disabled).toBe(false);
+    expect(sharingBox().checked).toBe(false);
+    expect(artworkSharingEnabled()).toBe(false);
   });
   it('does not mark a replacement code copied when an older clipboard request finishes', async () => {
     let finish: (() => void) | undefined;
