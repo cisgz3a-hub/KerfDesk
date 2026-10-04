@@ -95,7 +95,12 @@ function ManualPairingDetails({
   const phoneUrl = phoneControlUrl(status.controlUrl);
   return (
     <details>
-      <summary style={{ cursor: 'pointer', padding: '8px 0' }}>Manual phone setup</summary>
+      <summary
+        title="Show the computer ID and pairing code when you cannot scan or open the pairing link."
+        style={{ cursor: 'pointer', padding: '8px 0' }}
+      >
+        Manual phone setup
+      </summary>
       <p style={noteStyle}>Use these details if your phone cannot scan or open the pairing link.</p>
       {phoneUrl === null ? null : (
         <p>
