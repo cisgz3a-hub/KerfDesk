@@ -16,7 +16,7 @@ import { requireNotesBaseline } from './manual-commercial-notes.mjs';
 
 const REPOSITORY = 'cisgz3a-hub/KerfDesk';
 const WORKFLOWS = ['ci.yml', 'e2e.yml', 'desktop-package-check.yml'];
-export const RELEASE_PR_THRESHOLD = 20;
+export const RELEASE_PR_THRESHOLD = 10;
 const SHA = /^[a-f0-9]{40}$/u;
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', windowsHide: true }).trim();
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');

@@ -14,4 +14,4 @@ Use bounded, nonoverlapping read-only refresh while the view is visible. Follow 
 
 ### Evidence boundary
 
-Source and simulated host/browser checks are separate from production Worker deployment, installed desktop upgrades, actual ChatGPT/phone clients and physical machines. The matching desktop and service are required. This amendment does not change the twenty-PR desktop release cadence.
+Source and simulated host/browser checks are separate from production Worker deployment, installed desktop upgrades, actual ChatGPT/phone clients and physical machines. The matching desktop and service are required. This amendment does not change the release cadence governed by [ADR-561 Amendment 4](ADR-561-amendment-4-ten-pr-release-batches.md).

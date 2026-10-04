@@ -12,7 +12,7 @@ The update close retains the ordinary Save, Don't Save and Cancel decision and r
 
 Only completion of the trusted close grants installer authority. The existing quit handoff re-verifies publisher metadata, update eligibility and cached installer bytes and schedules the interactive installer after process exit with no force or silent arguments. Windows session end and unapproved, crashed or forced closure grant no installer authority. Renderer routes take a fixed empty request and never accept an executable path or download URL.
 
-This amends ADR-561 decision 4 only for the explicit **Install and close KerfDesk** action. It changes neither the signed updater nor the 20-PR release cadence. Frame, Start, output, exports and running jobs gain no update or entitlement gate.
+This amends ADR-561 decision 4 only for the explicit **Install and close KerfDesk** action. It changes neither the signed updater nor the release cadence, which is governed by [ADR-561 Amendment 4](ADR-561-amendment-4-ten-pr-release-batches.md). Frame, Start, output, exports and running jobs gain no update or entitlement gate.
 
 ### Evidence boundary
 
