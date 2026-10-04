@@ -10,11 +10,13 @@ import {
   enterMachine,
   machineFixture,
   machineIdle,
+  machineLayoutGeometry,
   motionCommands,
   NEXT_REVIEW_ID,
   noOverflow,
   release,
   REVIEW_ID,
+  widerFixtureFont,
 } from './machine-ui-support.mjs';
 
 let browser;
@@ -48,12 +50,14 @@ for (const [kind, load] of Object.entries(surfaces)) {
       assert.equal(await p.locator('#machine-z').isHidden(), true);
       assert.equal(await p.locator('#machine-review').isDisabled(), true);
       await p.locator('#machine-frame').click();
+      await state.whenAdmitted('frame_job');
       await machineIdle(p);
       assert.match(await p.locator('#machine-state').textContent(), /Preparing Frame/);
       assert.equal(await p.locator('#machine-review').isDisabled(), true);
       completeFrame(state);
       await checkMachine(p);
       await p.locator('#machine-review').click();
+      await state.whenAdmitted('review_machine_job');
       await machineIdle(p);
       assert.equal(await p.locator('#machine-review-card').isVisible(), true);
       assert.match(await p.locator('#machine-acknowledgement').textContent(), /unverified/);
@@ -64,18 +68,21 @@ for (const [kind, load] of Object.entries(surfaces)) {
       );
       state.nextReview = true;
       await p.locator('#machine-start').click();
+      await state.whenAdmitted('start_job');
       await machineIdle(p);
       let starts = motionCommands(state).filter((item) => item.name === 'start_job');
       assert.equal(starts.length, 1);
       assert.equal(starts[0].args.reviewId, REVIEW_ID);
       assert.equal(state.running, false);
       await p.locator('#machine-start').click();
+      await state.whenAdmitted('start_job', 2);
       await machineIdle(p);
       starts = motionCommands(state).filter((item) => item.name === 'start_job');
       assert.equal(starts.length, 2);
       assert.equal(starts[1].args.reviewId, NEXT_REVIEW_ID);
       assert.match(await p.locator('#machine-state').textContent(), /Running.*42%/);
       await p.locator('#machine-abort').click();
+      await state.whenAdmitted('abort_job');
       await machineIdle(p);
       const abort = motionCommands(state).at(-1);
       assert.equal(abort.name, 'abort_job');
@@ -213,12 +220,14 @@ for (const [kind, load] of Object.entries(surfaces)) {
       await loaded.page.clock.install();
       await enterMachine(p);
       await p.locator('#machine-frame').click();
+      await state.whenHeld('frame_job');
       await p.waitForFunction(
         () =>
           globalThis.document.getElementById('machine-panel').getAttribute('aria-busy') === 'true',
       );
       assert.equal(await p.locator('#machine-abort').isDisabled(), false);
       await p.locator('#machine-abort').click();
+      await state.whenHeld('abort_job');
       await p.waitForFunction(
         () => globalThis.document.getElementById('machine-abort').disabled === true,
       );
@@ -287,13 +296,12 @@ for (const [kind, load] of Object.entries(surfaces)) {
           assert.ok(box.height >= 48 && box.width >= 44);
         }
         await capture(loaded.page, `${kind}-machine-${width}-synthetic-host`);
-        const pad = await p.locator('.jog-pad').boundingBox();
-        const stop = await p
-          .locator(kind === 'phone' ? '.machine-stop-bar' : '#machine-stop')
-          .boundingBox();
+        const geometry = await machineLayoutGeometry(p, kind);
         assert.ok(
-          pad.y + pad.height <= stop.y,
-          'All XY jog buttons are visible above Abort at the initial phone scroll position',
+          geometry.pad.bottom <= geometry.stop.y &&
+            geometry.buttons.every((button) => button.y >= 0 && button.bottom <= geometry.stop.y),
+          'All XY jog buttons are visible above Abort at the initial phone scroll position: ' +
+            JSON.stringify(geometry),
         );
         await p.locator('#machine-review').click();
         await machineIdle(p);
@@ -307,6 +315,42 @@ for (const [kind, load] of Object.entries(surfaces)) {
       }
     });
   }
+}
+
+for (const width of [320, 390]) {
+  test(`phone machine layout: wider sans font keeps all jog buttons above Abort at ${width}px`, async () => {
+    const state = machineFixture();
+    state.framed = true;
+    const loaded = await surfaces.phone(state, width);
+    try {
+      const p = loaded.surface;
+      await widerFixtureFont(p);
+      await enterMachine(p);
+      const geometry = await machineLayoutGeometry(p, 'phone');
+      assert.equal(await noOverflow(p), true);
+      assert.ok(
+        geometry.buttons.every(
+          (button) =>
+            button.y >= 0 &&
+            button.bottom <= geometry.stop.y &&
+            button.width >= 44 &&
+            button.height >= 48,
+        ),
+        'Wide-font phone jog targets: ' + JSON.stringify(geometry),
+      );
+      assert.equal(
+        await p
+          .locator('#machine-jog-form input')
+          .first()
+          .evaluate((item) => globalThis.getComputedStyle(item).fontSize),
+        '16px',
+      );
+      await capture(loaded.page, `phone-machine-${width}-wider-font-synthetic-host`);
+      assert.deepEqual(loaded.errors, []);
+    } finally {
+      await loaded.context.close();
+    }
+  });
 }
 
 test('phone machine: polling and panel switches preserve unsent text, font and partial numeric drafts', async () => {

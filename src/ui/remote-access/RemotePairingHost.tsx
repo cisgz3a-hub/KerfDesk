@@ -43,6 +43,7 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
         <label style={{ display: 'flex', gap: 8, padding: '8px 0', alignItems: 'start' }}>
           <input
             type="checkbox"
+            title="Approve artwork and laser-setting edits for this connection."
             checked={edit}
             disabled={busy}
             onChange={(event) => setEdit(event.currentTarget.checked)}
@@ -55,6 +56,7 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
           <label style={{ display: 'flex', gap: 8, padding: '8px 0', alignItems: 'start' }}>
             <input
               type="checkbox"
+              title="Approve this connection to jog, frame, start and abort machine work."
               checked={control}
               disabled={busy}
               onChange={(event) => setControl(event.currentTarget.checked)}

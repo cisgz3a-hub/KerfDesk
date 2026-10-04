@@ -457,14 +457,17 @@ footer a {
   display: none;
 }
 .machine-view .shell {
-  padding-top: 14px;
+  padding-top: 10px;
 }
 .machine-view .workspace-heading {
   padding: 0;
   border: 0;
   background: none;
   box-shadow: none;
-  margin: 12px 0;
+  margin: 8px 0;
+}
+.machine-view .tabs {
+  margin-top: 8px;
 }
 .machine-view #refresh {
   display: none;
@@ -477,12 +480,18 @@ footer a {
   font-size: 18px;
 }
 .machine-view #machine-panel .card {
-  padding: 14px;
-  margin: 12px 0;
+  padding: 12px;
+  margin: 10px 0;
+}
+.machine-view #machine-panel h2 {
+  margin-bottom: 8px;
+}
+.machine-view #machine-panel .preview-heading {
+  margin-bottom: 6px;
 }
 .machine-view #machine-panel p {
   line-height: 1.45;
-  margin: 6px 0;
+  margin: 4px 0;
 }
 .machine-view #machine-panel .preview-heading h2,
 .machine-view #machine-panel .preview-heading p {
@@ -494,7 +503,10 @@ footer a {
 }
 .machine-view .jog-pad {
   gap: 6px;
-  margin: 10px 0;
+  margin: 8px 0;
+}
+.machine-view #machine-jog-form label {
+  gap: 6px;
 }
 .machine-view .jog-pad button {
   min-height: 48px;

@@ -1,4 +1,5 @@
 import { fixtureState } from './phone-workspace-support.mjs';
+import { readFile } from 'node:fs/promises';
 
 const commands = new Set([
   'jog_machine',
@@ -31,6 +32,7 @@ export function machineFixture(scopes = ['read', 'control']) {
     machineMalformed: false,
     legacyMachine: false,
   });
+  const notify = admissionWitness(state);
   state.machineCommand = async (name, args) => {
     if (name === 'get_machine_status') return { result: machineStatus(state) };
     if (name === 'get_control_operation')
@@ -45,14 +47,49 @@ export function machineFixture(scopes = ['read', 'control']) {
     const operation = action(state, name, args);
     state.controlReceipts.set(args.requestId, operation);
     state.latestOperation = operation;
+    notify(name);
     state.afterAction?.(name, args, operation);
     const result = { revision: revision(state), operation: structuredClone(operation) };
     if (state.hold.has(name))
-      return new Promise((resolve) => state.held.set(name, { resolve, result }));
+      return new Promise((resolve) => {
+        state.held.set(name, { resolve, result });
+        notify();
+      });
     if (state.drop.delete(name)) return { drop: true };
     return { result };
   };
   return state;
+}
+
+/** The DOM shows pending intent before RPC dispatch. Wait on actual fixture admission. */
+function admissionWitness(state) {
+  const counts = new Map();
+  const waiters = new Set();
+  function wait(ready, label) {
+    if (ready()) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        waiters.delete(entry);
+        reject(new Error('Fixture did not receive ' + label + ' within 10 seconds.'));
+      }, 10_000);
+      const entry = {
+        ready,
+        done() {
+          clearTimeout(timeout);
+          waiters.delete(entry);
+          resolve();
+        },
+      };
+      waiters.add(entry);
+    });
+  }
+  state.whenAdmitted = (name, count = 1) =>
+    wait(() => (counts.get(name) ?? 0) >= count, name + ' admission');
+  state.whenHeld = (name) => wait(() => state.held.has(name), name + ' held response');
+  return (name) => {
+    if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+    for (const entry of waiters) if (entry.ready()) entry.done();
+  };
 }
 
 function revision(state) {
@@ -218,8 +255,60 @@ export async function machineIdle(surface) {
   await surface.waitForFunction(
     () =>
       globalThis.document.getElementById('machine-panel').getAttribute('aria-busy') === 'false' &&
-      globalThis.document.getElementById('machine-check').disabled === false,
+      globalThis.document.getElementById('machine-check').disabled === false &&
+      !globalThis.document
+        .getElementById('machine-state')
+        .textContent.startsWith('Abort requested'),
   );
+}
+
+export async function widerFixtureFont(surface) {
+  const bytes = await readFile(
+    new URL('../../../src/ui/text/fonts/Poppins-Regular.ttf', import.meta.url),
+  );
+  await surface.evaluate(async (base64) => {
+    const font = new globalThis.FontFace(
+      'McpFixtureSans',
+      'url(data:font/ttf;base64,' + base64 + ')',
+    );
+    globalThis.document.fonts.add(font);
+    await font.load();
+    globalThis.document.documentElement.style.fontFamily = 'McpFixtureSans, sans-serif';
+    await globalThis.document.fonts.ready;
+  }, bytes.toString('base64'));
+}
+
+export function machineLayoutGeometry(surface, kind) {
+  return surface.evaluate((phone) => {
+    const doc = globalThis.document;
+    const geometry = (item) => {
+      const rect = item.getBoundingClientRect();
+      const style = globalThis.getComputedStyle(item);
+      return {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        bottom: rect.bottom,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+      };
+    };
+    return {
+      viewport: { width: globalThis.innerWidth, height: globalThis.innerHeight },
+      scrollY: globalThis.scrollY,
+      panel: geometry(doc.getElementById('machine-panel')),
+      pad: geometry(doc.querySelector('.jog-pad')),
+      buttons: [...doc.querySelectorAll('.jog-pad button')].map((item) => ({
+        label: item.getAttribute('aria-label'),
+        ...geometry(item),
+      })),
+      stop: geometry(doc.querySelector(phone ? '.machine-stop-bar' : '#machine-stop')),
+      abort: geometry(doc.getElementById('machine-abort')),
+      position: geometry(doc.getElementById('machine-position')),
+    };
+  }, kind === 'phone');
 }
 
 export const motionCommands = (state) => state.commands.filter((entry) => commands.has(entry.name));
