@@ -116,6 +116,7 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
     const artworkId = $('#text-artwork-list').value;
     if (!artworkId) throw new Error('There is no editable text in this workspace.');
     const before = getWorkspace()?.revision;
+    if (loadedTextId === artworkId && loadedRevision === before) return;
     const value = await command('get_text', { artworkId });
     if (value.revision !== before || getWorkspace()?.revision !== before)
       throw new Error('The workspace changed. Refresh before loading the text again.');

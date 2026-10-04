@@ -482,6 +482,91 @@ test('phone usability: choosing another text clears the draft and returns keyboa
   }
 });
 
+test('phone draft resume: the same artwork and revision retain text, font and partial numbers without another read', async () => {
+  const loaded = await phonePage(browser);
+  try {
+    const { page, state } = loaded;
+    const form = page.locator('#text-edit-form');
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    await form.locator('[name=text]').fill('DRAFT_UNSENT');
+    await openTask(page, 'text-fonts');
+    await form.locator('[name=fontId]').selectOption('serif');
+    await form.locator('[name=fontSearch]').fill('script');
+    await openTask(page, 'text-spacing');
+    const drafts = { fontSizeMm: '', alignment: 'center', lineHeight: '-.', letterSpacing: '-' };
+    await form.locator('[name=alignment]').selectOption(drafts.alignment);
+    for (const name of ['fontSizeMm', 'lineHeight', 'letterSpacing'])
+      await form.locator(`[name=${name}]`).fill(drafts[name]);
+    await page.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    assert.equal(await form.locator('[name=text]').inputValue(), 'DRAFT_UNSENT');
+    assert.equal(await form.locator('[name=fontId]').inputValue(), 'serif');
+    assert.equal(await form.locator('[name=fontSearch]').inputValue(), 'script');
+    for (const [name, value] of Object.entries(drafts))
+      assert.equal(await form.locator(`[name=${name}]`).inputValue(), value);
+    assert.equal(
+      await form
+        .locator('[name=text]')
+        .evaluate((item) => item === globalThis.document.activeElement),
+      true,
+    );
+    assert.equal(state.commands.filter((item) => item.name === 'get_text').length, 1);
+    assert.equal(state.edits, 0);
+    await page.getByRole('button', { name: 'Choose another text', exact: true }).click();
+    await page.getByRole('button', { name: 'Load text from PC', exact: true }).click();
+    await idle(page);
+    assert.equal(await form.locator('[name=text]').inputValue(), 'MCP test');
+    assert.equal(await form.locator('[name=fontSizeMm]').inputValue(), '10');
+    assert.equal(await form.locator('[name=fontId]').inputValue(), 'sans');
+    assert.equal(state.commands.filter((item) => item.name === 'get_text').length, 2);
+    assert.deepEqual(loaded.errors, []);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('phone draft resume: a different target or refreshed revision loads current text and does not reuse the old draft', async () => {
+  const state = fixtureState();
+  state.extraText = { ...state.text, artworkId: 'text-2', text: 'Second artwork', fontSizeMm: 6 };
+  const loaded = await phonePage(browser, state);
+  try {
+    const { page } = loaded;
+    const form = page.locator('#text-edit-form');
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    await form.locator('[name=text]').fill('First unsent draft');
+    await page.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await page.locator('#artwork-list input[value="text-1"]').uncheck();
+    await page.locator('#artwork-list input[value="text-2"]').check();
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    assert.equal(await form.locator('[name=text]').inputValue(), 'Second artwork');
+    assert.equal(await form.locator('[name=fontSizeMm]').inputValue(), '6');
+    assert.deepEqual(
+      state.commands.filter((item) => item.name === 'get_text').map((item) => item.args.artworkId),
+      ['text-1', 'text-2'],
+    );
+    await form.locator('[name=text]').fill('Second unsent draft');
+    state.revision += 1;
+    state.text.text = 'Changed on PC';
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await idle(page);
+    assert.equal(await page.locator('#text-editor').isHidden(), true);
+    assert.equal(await form.locator('[name=text]').inputValue(), '');
+    await page.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    assert.equal(await form.locator('[name=text]').inputValue(), 'Changed on PC');
+    assert.equal(state.commands.filter((item) => item.name === 'get_text').length, 3);
+    assert.equal(state.edits, 0);
+    assert.deepEqual(loaded.errors, []);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
 test('phone usability: empty, viewing-only, sharing-off and renewed opt-out explain the next step without leaking loaded text', async () => {
   const empty = fixtureState();
   empty.empty = true;

@@ -1,5 +1,5 @@
 const pairingRejectedMessage =
-  'The connection request was not accepted. On the PC, check that Phone & MCP says Connected to the remote service. Match its computer ID and latest pairing code exactly, including capitals. If the code was replaced or already used, create a new one and try again.';
+  'The connection request was not accepted. On the PC, check that Phone & MCP says Ready to pair, or Connected to the remote service in older versions. Match its computer ID and latest pairing code exactly, including capitals. If the code was replaced or already used, create a new one and try again.';
 
 export function rejectedMessage(path) {
   return path === '/api/pair/claim'

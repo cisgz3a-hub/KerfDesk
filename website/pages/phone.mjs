@@ -25,7 +25,8 @@ export const page = {
           title: 'Enable approved remote connections',
           body: html`In KerfDesk, open <strong>Edit → Settings… → Phone &amp; MCP</strong>. Enable
             <strong>Allow approved remote connections</strong> and wait for
-            <strong>Connected to the remote service</strong>. Keep the app open and the computer
+            <strong>Ready to pair</strong> (older versions say
+            <strong>Connected to the remote service</strong>). Keep the app open and the computer
             awake and online.`,
         },
         {

@@ -5,7 +5,7 @@ Remote access connects the desktop workspace to a phone control page and standar
 ## Connect a phone
 
 1. In **KerfDesk on the computer**, open **Edit > Settings… > Phone & MCP** and enable **Allow approved remote connections**.
-2. Wait for **Ready to pair**. Create a pairing code. **Copy code** preserves its exact letter case.
+2. Wait for **Ready to pair** (older versions say **Connected to the remote service**). Create a pairing code. **Copy code** preserves its exact letter case.
 3. Use **Copy phone link** to open the connection page on your phone with the computer ID already filled in. You can also visit **[kerfdesk.com](https://kerfdesk.com)** and choose **Phone & MCP > Connect to your PC**. Enter the matching computer ID if needed, then the latest code.
 4. Approve the named connection on the computer. Choose **Allow viewing** or **Allow viewing and editing**.
 5. The phone page displays the current workspace and its available controls. It does not mount the desktop canvas.

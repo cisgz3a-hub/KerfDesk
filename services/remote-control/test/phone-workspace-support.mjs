@@ -121,10 +121,14 @@ export function workspace(state) {
     delete value.permissions;
     delete value.history;
   }
+  if (state.extraText) {
+    value.artwork.push({ id: state.extraText.artworkId, type: 'text', name: state.extraText.text });
+    value.totalArtwork += 1;
+  }
   return value;
 }
 
-export function readResult(state, name) {
+export function readResult(state, name, args = {}) {
   const revision = `fixture-${state.revision}`;
   if (name === 'get_workspace') return state.malformed ? { revision } : workspace(state);
   if (name === 'get_workspace_preview')
@@ -144,7 +148,13 @@ export function readResult(state, name) {
     };
   if (name === 'list_fonts')
     return { revision, fonts: state.fonts, total: state.fonts.length, truncated: false };
-  if (name === 'get_text') return { revision, ...state.text };
+  if (name === 'get_text')
+    return {
+      revision,
+      ...(state.extraText && args.artworkId === state.extraText.artworkId
+        ? state.extraText
+        : state.text),
+    };
   if (name === 'get_app_status')
     return {
       revision,
@@ -195,7 +205,7 @@ async function json(route, status, body) {
 async function command(route, state) {
   const { name, args } = route.request().postDataJSON();
   state.commands.push({ name, args: structuredClone(args) });
-  const result = readResult(state, name);
+  const result = readResult(state, name, args);
   if (result) return json(route, 200, { result });
   if (!state.scopes.includes('edit')) return json(route, 403, { error: { code: 'forbidden' } });
   if (state.receipts.has(args.requestId))
