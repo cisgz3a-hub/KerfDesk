@@ -26,21 +26,18 @@ for (const kind of ['phone', 'app'])
           assert.ok(box.height >= 44 && box.width >= 44, `${name}: ${JSON.stringify(box)}`);
         }
         assert.equal(await p.locator(loaded.image).evaluate((node) => node.naturalWidth > 0), true);
+        const original = await p.locator(loaded.image).boundingBox();
         await p.locator('#zoom-in').click();
         await p.locator('#zoom-in').click();
-        assert.equal(await p.locator(loaded.image).evaluate((node) => node.style.width), '200%');
+        const zoomed = await p.locator(loaded.image).boundingBox();
+        assert.ok(Math.abs(zoomed.width - original.width * 2) < 0.01);
         assert.equal(
           await p
             .locator('#preview-surface')
             .evaluate((node) => globalThis.getComputedStyle(node).overflowX),
-          'auto',
+          'hidden',
         );
-        assert.equal(
-          await p
-            .locator('#preview-surface')
-            .evaluate((node) => node.scrollWidth > node.clientWidth),
-          true,
-        );
+        assert.equal(await p.locator('#zoom-value').textContent(), '200%');
         await assertNoOverflow(p);
         await p.locator('#zoom-fit').click();
         await assertNoOverflow(p);

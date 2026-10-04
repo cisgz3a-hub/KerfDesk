@@ -167,13 +167,8 @@ for (const kind of ['phone', 'app']) {
       try {
         await loaded.surface.locator('#zoom-in').click();
         await loaded.surface.locator('#zoom-in').click();
-        await loaded.surface.locator('#preview-surface').evaluate((surface) => {
-          surface.scrollLeft = 60;
-          surface.scrollTop = 60;
-        });
-        await loaded.surface.evaluate(
-          () => new Promise((resolve) => globalThis.requestAnimationFrame(resolve)),
-        );
+        await choose(loaded, 'pan');
+        await drag(loaded, [100, 100], [150, 150]);
         await choose(loaded, 'rectangle');
         await drag(loaded, [-20, -20], [30, 30]);
         await applyDraft(loaded);

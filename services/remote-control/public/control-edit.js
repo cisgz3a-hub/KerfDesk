@@ -35,7 +35,8 @@ function textPatch(form, original) {
   return patch;
 }
 
-function bindAuthoring(update, edit) {
+function bindAuthoring(update, edit, getWorkspace) {
+  bindShapeLabel();
   update('#text-form', (form) =>
     edit('add_text', {
       text: form.elements.text.value,
@@ -45,13 +46,16 @@ function bindAuthoring(update, edit) {
       fontSizeMm: positive(form, 'fontSizeMm', 1000),
     }),
   );
-  update('#rectangle-form', (form) =>
-    edit('add_rectangle', {
+  update('#rectangle-form', (form) => {
+    const ellipse = form.elements.shapeType.value === 'ellipse';
+    if (ellipse && getWorkspace()?.capabilities?.touchEditing !== true)
+      throw new Error('Update KerfDesk on the PC and open a Laser workspace to add an ellipse.');
+    return edit(ellipse ? 'add_ellipse' : 'add_rectangle', {
       ...numbers(form, ['xMm', 'yMm']),
       widthMm: positive(form, 'widthMm'),
       heightMm: positive(form, 'heightMm'),
-    }),
-  );
+    });
+  });
   update('#move-form', (form) =>
     edit('transform_artwork', {
       artworkIds: selection(),
@@ -64,12 +68,30 @@ function bindAuthoring(update, edit) {
       transform: { type: 'rotate', angleDeg: number(form, 'angleDeg', -3600, 3600) },
     }),
   );
+  update('#resize-form', (form) =>
+    edit('transform_artwork', {
+      artworkIds: selection(),
+      transform: {
+        type: 'resize',
+        widthMm: positive(form, 'widthMm'),
+        heightMm: positive(form, 'heightMm'),
+      },
+    }),
+  );
   update('#arrange-form', (form) =>
     edit('arrange_artwork', {
       artworkIds: selection(),
       action: form.elements.action.value,
     }),
   );
+}
+
+function bindShapeLabel() {
+  const form = $('#rectangle-form');
+  form.elements.shapeType.addEventListener('change', () => {
+    form.querySelector('button[type="submit"]').textContent =
+      form.elements.shapeType.value === 'ellipse' ? 'Add ellipse' : 'Add rectangle';
+  });
 }
 
 export function bindEditors({ action, edit, command, drafts, getWorkspace, applyWorkspace }) {
@@ -79,7 +101,7 @@ export function bindEditors({ action, edit, command, drafts, getWorkspace, apply
   let loadedText = null;
   const update = (id, callback) =>
     bindForm(id, action, (form) => drafts.submit(form, () => callback(form)));
-  bindAuthoring(update, edit);
+  bindAuthoring(update, edit, getWorkspace);
   update('#text-edit-form', (form) => {
     if (
       loadedTextId !== $('#text-artwork-list').value ||

@@ -19,6 +19,7 @@ import type { RemoteBounds } from './types';
 import { finite } from './validation';
 import {
   validatedPreviewObject,
+  validatedPreviewImageFootprint,
   reservePreviewPoints,
   validPreviewPoint,
   previewTooLarge,
@@ -26,12 +27,14 @@ import {
   PREVIEW_POINT_LIMIT,
   PreviewUnavailable,
   type PreviewPointBudget,
+  type PreviewImageFootprint,
 } from './preview-validation';
 export { PREVIEW_POINT_LIMIT, PreviewUnavailable } from './preview-validation';
 
 export const PREVIEW_OBJECT_LIMIT = 200;
 export type PreviewGeometry = {
   readonly objects: readonly { object: VectorSceneObject; display: ObjectDisplay }[];
+  readonly imageFootprints: readonly PreviewImageFootprint[];
   readonly bounds?: RemoteBounds;
   readonly extent: AABB;
 };
@@ -44,27 +47,24 @@ function emptyPreviewExtent(project: Project): AABB {
   return { minX: 0, minY: 0, maxX: bedWidth, maxY: bedHeight };
 }
 
-/** The same design paths, fills and transforms as the local workspace, with no sampling fallback. */
+/** Real design paths/fills; raster placement is explicitly disclosed as a footprint, not pixels. */
 export function resolvePreviewGeometry(project: Project, sizePx: number): PreviewGeometry {
   const scene = project.scene;
   if (scene.objects.length > PREVIEW_OBJECT_LIMIT || scene.layers.length > PREVIEW_OBJECT_LIMIT)
     throw new PreviewUnavailable('This workspace is too large for a remote artwork preview.');
-  const layers = sceneLayerVisibility.lookup(scene.layers);
-  const budget = { points: 0 };
-  const visible = scene.objects
-    .filter((object) => sceneLayerVisibility.hasObject(object, layers))
-    .map((object) => validatedPreviewObject(object, budget));
+  const { layers, visible, imageFootprints } = visiblePreviewObjects(project);
   let extent: AABB | undefined;
   for (const object of visible) {
     const bounds = transformedBBox(object);
     extent = union(extent, bounds);
   }
+  extent = extendFootprintExtent(imageFootprints, extent);
   const fallbackExtent = extent === undefined ? emptyPreviewExtent(project) : extent;
   const view = previewView(fallbackExtent, sizePx);
   const cache = strictCache();
   const displayBudget = { points: 0 };
   const objects: { object: VectorSceneObject; display: ObjectDisplay }[] = [];
-  let actualExtent: AABB | undefined;
+  let actualExtent = extendFootprintExtent(imageFootprints);
   for (const object of visible) {
     const display = resolveObjectDisplay(object, layers, view, cache, 'design');
     if (display.isSimplified) previewTooLarge();
@@ -75,9 +75,35 @@ export function resolvePreviewGeometry(project: Project, sizePx: number): Previe
   if (actualExtent !== undefined && bounds === undefined) invalidGeometry();
   return {
     objects,
+    imageFootprints,
     ...(bounds === undefined ? {} : { bounds }),
     extent: actualExtent ?? emptyPreviewExtent(project),
   };
+}
+
+function visiblePreviewObjects(project: Project) {
+  const layers = sceneLayerVisibility.lookup(project.scene.layers);
+  const budget = { points: 0 };
+  const visible: VectorSceneObject[] = [];
+  const imageFootprints: PreviewImageFootprint[] = [];
+  for (const object of project.scene.objects.filter((item) =>
+    sceneLayerVisibility.hasObject(item, layers),
+  )) {
+    if (object.kind === 'raster-image')
+      imageFootprints.push(validatedPreviewImageFootprint(object, budget));
+    else visible.push(validatedPreviewObject(object, budget));
+  }
+  return { layers, visible, imageFootprints };
+}
+
+function extendFootprintExtent(
+  footprints: readonly PreviewImageFootprint[],
+  extent?: AABB,
+): AABB | undefined {
+  for (const footprint of footprints)
+    for (const point of footprint.corners)
+      extent = union(extent, { minX: point.x, maxX: point.x, minY: point.y, maxY: point.y });
+  return extent;
 }
 
 function extendDisplayExtent(

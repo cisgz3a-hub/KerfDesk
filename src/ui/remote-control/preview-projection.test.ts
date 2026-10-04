@@ -24,6 +24,9 @@ let context: {
   lineTo: ReturnType<typeof vi.fn>;
   stroke: ReturnType<typeof vi.fn>;
   fill: ReturnType<typeof vi.fn>;
+  save: ReturnType<typeof vi.fn>;
+  restore: ReturnType<typeof vi.fn>;
+  setLineDash: ReturnType<typeof vi.fn>;
 };
 let options: RemoteControlOptions;
 beforeEach(() => {
@@ -45,6 +48,9 @@ beforeEach(() => {
     lineTo: vi.fn(),
     stroke: vi.fn(),
     fill: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    setLineDash: vi.fn(),
   };
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
     context as unknown as CanvasRenderingContext2D,
@@ -228,7 +234,7 @@ describe('remote artwork rendering and disclosure fence', () => {
     expect(result.status).toBe('unavailable');
     expect(result).not.toHaveProperty('viewport');
   });
-  it('refuses unsupported images rather than silently dropping them or loading their URL', async () => {
+  it('discloses image placement frames without loading or returning their URL', async () => {
     seed([
       {
         ...rectangle(),
@@ -239,11 +245,12 @@ describe('remote artwork rendering and disclosure fence', () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
     const result = await run();
-    expect(result).toMatchObject({ status: 'unavailable' });
-    expect(result.message).toContain('Images and reliefs');
+    expect(result).toMatchObject({ status: 'ready' });
+    expect(result.message).toContain('Partial design preview');
+    expect(result.message).toContain('placement only');
     expect(JSON.stringify(result)).not.toContain('private.example');
     expect(fetcher).not.toHaveBeenCalled();
-    expect(context.fillRect).not.toHaveBeenCalled();
+    expect(context.setLineDash).toHaveBeenCalledWith([6, 4]);
   });
   it('refuses text whose geometry is not ready', async () => {
     seed([

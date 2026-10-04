@@ -138,29 +138,3 @@ class LiveSync {
     }
   }
 }
-
-export function bindPreviewZoom() {
-  const surface = document.getElementById('preview-surface');
-  const image = document.getElementById('workspace-preview');
-  let scale = 1;
-  function zoom(next) {
-    scale = Math.min(3, Math.max(1, next));
-    image.style.width = scale * 100 + '%';
-    surface.classList.toggle('preview-zoomed', scale > 1);
-    if (scale === 1) {
-      surface.scrollLeft = 0;
-      surface.scrollTop = 0;
-    }
-  }
-  for (const [id, step] of [
-    ['zoom-in', 0.5],
-    ['zoom-out', -0.5],
-    ['zoom-fit', 0],
-  ])
-    document.getElementById(id).addEventListener('click', () => zoom(step ? scale + step : 1));
-  new MutationObserver(() => {
-    for (const button of document.querySelectorAll('.preview-tools button'))
-      button.disabled = image.hidden;
-    if (image.hidden) zoom(1);
-  }).observe(image, { attributes: true, attributeFilter: ['hidden'] });
-}

@@ -113,10 +113,15 @@ export function resetWorkspace() {
 }
 
 export function view(name) {
-  document.body.dataset.panel = name;
+  document.body.dataset.panel = name === 'edit' ? 'artwork' : name;
   document.body.dataset.view = name === 'edit' ? 'artwork' : name;
   for (const panel of document.querySelectorAll('#workspace-area [data-panel]'))
-    panel.hidden = panel.dataset.panel !== name;
+    panel.hidden =
+      panel.dataset.panel !== name &&
+      !(name === 'edit' && panel.hasAttribute('data-design-canvas'));
+  const historyTarget = name === 'edit' ? '#editor-history' : '#history-home';
+  $(historyTarget).append($('#history-controls'));
+  syncRetryVisibility();
   for (const tab of document.querySelectorAll('button[data-view]'))
     tab.setAttribute(
       'aria-pressed',
@@ -147,6 +152,7 @@ export function renderSession(value) {
   $('#pair-card').hidden = !!value;
   $('.intro').hidden = !!value;
   $('#workspace-area').hidden = !value;
+  document.body.classList.toggle('workspace-connected', !!value);
 }
 function syncReadAccess(session, workspace, admitted, hasEditScope) {
   const unknown = hasEditScope && workspace?.permissions?.canEdit === undefined;
@@ -155,14 +161,22 @@ function syncReadAccess(session, workspace, admitted, hasEditScope) {
     ? 'PC offline'
     : unknown
       ? 'Update the PC app'
-      : session.client.scopes.includes('control')
-        ? 'Workspace editing off'
-        : 'Viewing only';
-  $('#readonly-message').textContent = !session?.online
-    ? 'Open KerfDesk on the PC, then refresh here to reconnect.'
-    : unknown
-      ? 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.'
-      : 'To edit, pair again with editing permission and approve this phone on the PC.';
+      : hasEditScope
+        ? 'PC editing unavailable'
+        : session.client.scopes.includes('control')
+          ? 'Workspace editing off'
+          : 'Viewing only';
+  $('#readonly-message').textContent = readAccessMessage(session, unknown, hasEditScope);
+  $('#editor-access-note').hidden = !session || admitted;
+  $('#editor-access-note').textContent = $('#readonly-message').textContent;
+}
+function readAccessMessage(session, unknown, hasEditScope) {
+  if (!session?.online) return 'Open KerfDesk on the PC, then refresh here to reconnect.';
+  if (unknown)
+    return 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.';
+  if (hasEditScope)
+    return 'The PC is not accepting design edits. Finish any open desktop dialog, check editing access on the PC, then refresh here.';
+  return 'To add text, draw shapes or change artwork, pair again with Request editing permission selected and approve this phone on the PC.';
 }
 function syncSessionAccess(session, workspace, busy, pendingEdit, hasEditScope) {
   $('#edit-forms').hidden = !hasEditScope || workspace?.permissions?.canEdit !== true;
@@ -170,9 +184,15 @@ function syncSessionAccess(session, workspace, busy, pendingEdit, hasEditScope) 
   $('#edit-selected-text').hidden = !hasEditScope;
   for (const button of document.querySelectorAll('#pair-form button, #disconnect, #refresh'))
     button.disabled = busy || !!document.documentElement.dataset.pairingBlocked;
-  $('#retry-edit').hidden = !pendingEdit;
   $('#retry-edit').disabled = busy || !session?.online;
+  $('#editor-retry').disabled = busy || !session?.online;
+  syncRetryVisibility(pendingEdit);
   $('#history-controls').hidden = !hasEditScope;
+}
+function syncRetryVisibility(pending = !$('#retry-edit').hidden || !$('#editor-retry').hidden) {
+  const editing = !$('#editor-sheet').hidden;
+  $('#retry-edit').hidden = !pending || editing;
+  $('#editor-retry').hidden = !pending || !editing;
 }
 
 export function syncEditorControls(workspace) {
@@ -187,6 +207,14 @@ export function syncEditorControls(workspace) {
   $('#operation-form button').disabled ||= !$('#operation-list').options.length;
   $('#load-text').disabled ||= !$('#text-artwork-list').options.length || sharingOff;
   $('#text-sharing-note').hidden = !sharingOff;
+  syncShapeControls(workspace);
+}
+function syncShapeControls(workspace) {
+  const ellipseAvailable = workspace?.capabilities?.touchEditing === true;
+  $('#rectangle-form option[value="ellipse"]').disabled = !ellipseAvailable;
+  $('#shape-availability').hidden = ellipseAvailable;
+  $('#rectangle-form button').disabled ||=
+    $('#rectangle-form').elements.shapeType.value === 'ellipse' && !ellipseAvailable;
 }
 
 export function bindWorkspaceEvents({ live, machine, action, drafts, editors, refresh }) {
@@ -205,6 +233,23 @@ export function bindWorkspaceEvents({ live, machine, action, drafts, editors, re
       machine.setVisible(tab.dataset.view === 'machine');
       if (tab.dataset.view === 'artwork') void live.refresh();
     });
+  for (const button of document.querySelectorAll('[data-editor-task]'))
+    button.addEventListener('click', () => {
+      view('edit');
+      machine.setVisible(false);
+      const task = $('#' + button.dataset.editorTask);
+      task.open = true;
+      task.querySelector('summary').focus({ preventScroll: true });
+      task.scrollIntoView({ block: 'nearest' });
+    });
+  const closeEditor = () => {
+    view('artwork');
+    $('[data-view="edit"]').focus({ preventScroll: true });
+  };
+  $('#close-editor').addEventListener('click', closeEditor);
+  $('#editor-sheet').addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeEditor();
+  });
 }
 
 export function createPreviewController(options) {

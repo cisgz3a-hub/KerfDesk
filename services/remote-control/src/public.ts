@@ -160,6 +160,7 @@ function staticAsset(request: Request, env: Env, url: URL): Promise<Response> | 
       '/control-touch.js',
       '/control-touch-geometry.js',
       '/control-touch-view.js',
+      '/control-touch-viewport.js',
       '/control-touch.css',
       '/control-machine.js',
       '/control-machine-view.js',

@@ -36,12 +36,7 @@ function bindMcpLive({ready,blocked,refresh,changed}) {
     refresh:update,
   };
 }
-function bindMcpPreviewZoom() {
-  const image=document.getElementById('preview'),surface=document.getElementById('preview-surface');let scale=1;
-  function zoom(next){scale=Math.max(1,Math.min(3,next));image.style.width=scale*100+'%';surface.classList.toggle('preview-zoomed',scale>1);if(scale===1){surface.scrollLeft=surface.scrollTop=0;}}
-  for(const [id,step]of [['zoom-in',.5],['zoom-out',-.5],['zoom-fit',0]])document.getElementById(id).addEventListener('click',()=>zoom(step?scale+step:1));
-  new MutationObserver(()=>{for(const button of document.querySelectorAll('.preview-tools button'))button.disabled=image.hidden;if(image.hidden)zoom(1);}).observe(image,{attributes:true,attributeFilter:['hidden']});
-}
+
 `;
 
 export const MCP_DESIGN_STYLE = String.raw`
