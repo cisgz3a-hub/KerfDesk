@@ -11,14 +11,13 @@ export function useTracePreset(
   initialPreset?: string,
 ): { readonly preset: string; readonly selectPreset: (next: string) => void } {
   // A Re-trace opens on the preset recorded with the trace (ADR-408). Otherwise
-  // CNC opens on Smooth, the preset that traces cleanly on a router. It is a
-  // starting selection, not a restriction — every preset stays selectable. An
-  // advanced preset needs Pro (ADR-540), so KerfDesk Free starts on the default.
+  // Pro CNC opens on Smooth. Line Art is the only Free tracer, so a new
+  // Free trace or a recorded Pro preset opens on Line Art on either machine.
   const { pro } = useEdition();
   const [preset, setPreset] = useState<string>(() =>
     initialPreset !== undefined && (pro || !ADVANCED_TRACE_PRESET_NAMES.has(initialPreset))
       ? initialPreset
-      : machineKind === 'cnc'
+      : pro && machineKind === 'cnc'
         ? CNC_TRACE_PRESET_NAME
         : DEFAULT_TRACE_PRESET_NAME,
   );

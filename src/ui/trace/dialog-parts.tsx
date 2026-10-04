@@ -1,7 +1,6 @@
 // Presentational controls; trace requests and commit ownership stay in the dialog.
 import type { TraceOptions } from '../../core/trace';
 import type { RasterImage } from '../../core/scene';
-import { TRACE_PRESETS } from '../../core/trace';
 import { Button, DialogActions as KitDialogActions } from '../kit';
 import { TutorialButton } from '../tutorials/TutorialButton';
 import { useEdition } from '../licensing/edition';
@@ -18,14 +17,12 @@ export const VISIBLE_TRACE_PRESET_NAMES = [
   'Edge Detection',
   'Colour layers',
 ] as const;
-// Advanced tracing is a Pro tool (ADR-540); the other presets are the basic trace.
-export const ADVANCED_TRACE_PRESET_NAMES: ReadonlySet<string> = new Set([
-  'Photo shading',
-  'Centerline',
-  'Colour layers',
-]);
 export const DEFAULT_TRACE_PRESET_NAME = 'Line Art';
-// CNC starts on Smooth; every other preset remains available.
+// Line Art is the only Free tracer (ADR-540 Amendment 4).
+export const ADVANCED_TRACE_PRESET_NAMES: ReadonlySet<string> = new Set(
+  VISIBLE_TRACE_PRESET_NAMES.filter((name) => name !== DEFAULT_TRACE_PRESET_NAME),
+);
+// Pro CNC starts on Smooth; Free CNC starts on Line Art.
 export const CNC_TRACE_PRESET_NAME = 'Smooth';
 export type TraceFillStyle = 'scanline' | 'offset' | 'island';
 export type TraceOutput = 'raster' | 'vector';
@@ -107,13 +104,11 @@ export function PresetPicker(props: {
           value={props.value}
           onChange={(e) => choose(e.target.value)}
         >
-          {VISIBLE_TRACE_PRESET_NAMES.filter((name) => TRACE_PRESETS[name] !== undefined).map(
-            (name) => (
-              <option key={name} value={name}>
-                {proChoiceLabel(name, ADVANCED_TRACE_PRESET_NAMES.has(name) && !edition.pro)}
-              </option>
-            ),
-          )}
+          {VISIBLE_TRACE_PRESET_NAMES.map((name) => (
+            <option key={name} value={name}>
+              {proChoiceLabel(name, ADVANCED_TRACE_PRESET_NAMES.has(name) && !edition.pro)}
+            </option>
+          ))}
         </select>
       </label>
       <div className="lf-trace-preset-description">
@@ -122,7 +117,9 @@ export function PresetPicker(props: {
       </div>
       {props.machineKind === 'cnc' ? (
         <p className="lf-trace-hint">
-          Smooth is the CNC starting preset. All styles are available.
+          {edition.pro
+            ? 'Smooth is the CNC starting preset. All styles are available.'
+            : 'Line Art is the Free starting preset. The other styles need Pro.'}
         </p>
       ) : null}
       {edited || unused.length > 0 ? (

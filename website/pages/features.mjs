@@ -170,7 +170,7 @@ export const page = {
       tone: 'alt',
       eyebrow: 'Images and tracing',
       title: 'Turn pictures into paths or engravings',
-      lead: 'Import PNG and JPG images to trace into vectors or, on a laser, to engrave. Basic tracing is part of Free, and advanced tracing is part of Pro.',
+      lead: 'Import PNG and JPG images to trace into vectors or, on a laser, to engrave. Line Art tracing is part of Free. Every other trace preset is part of Pro.',
       content: featureGrid(IMAGES),
     })}
     ${section({

@@ -45,7 +45,7 @@ export const commerce = {
     includes: [
       'Drawing and text',
       'File import',
-      'Basic tracing',
+      'Line Art tracing',
       'Laser cutting and engraving',
       '2D CNC cuts',
       'All machine control',

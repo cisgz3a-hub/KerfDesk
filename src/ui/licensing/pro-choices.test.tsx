@@ -124,6 +124,16 @@ describe('adaptive clearing choice', () => {
   });
 });
 
+const PRO_TRACE_PRESETS = [
+  'Photo shading',
+  'Smooth',
+  'Sharp',
+  'Centerline',
+  'Line + fill',
+  'Edge Detection',
+  'Colour layers',
+];
+
 describe('advanced trace presets', () => {
   it('are marked Pro and ask before switching in KerfDesk Free', async () => {
     const edition = freeEdition();
@@ -134,15 +144,22 @@ describe('advanced trace presets', () => {
     );
     const field = select(view, 'Trace preset');
     const labels = optionLabels(field);
-    expect(labels).toEqual(
-      expect.arrayContaining(['Photo shading (Pro)', 'Centerline (Pro)', 'Colour layers (Pro)']),
-    );
-    expect(labels).toEqual(expect.arrayContaining(['Line Art', 'Line + fill', 'Edge Detection']));
-    await change(field, 'Centerline');
-    expect(edition.asked).toEqual(['advanced-trace']);
+    expect(labels).toEqual(['Line Art', ...PRO_TRACE_PRESETS.map((name) => `${name} (Pro)`)]);
+    for (const preset of PRO_TRACE_PRESETS) await change(field, preset);
+    expect(edition.asked).toEqual(PRO_TRACE_PRESETS.map(() => 'advanced-trace'));
     expect(onChange).not.toHaveBeenCalled();
-    await change(field, 'Smooth');
-    expect(onChange).toHaveBeenCalledWith('Smooth');
+    await change(field, 'Line Art');
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('Line Art');
+  });
+
+  it('switches to each Pro preset after unlocking Pro', async () => {
+    const onChange = vi.fn();
+    const view = await render(
+      freeEdition(true),
+      <PresetPicker machineKind="cnc" value="Line Art" onChange={onChange} />,
+    );
+    for (const preset of PRO_TRACE_PRESETS) await change(select(view, 'Trace preset'), preset);
+    expect(onChange.mock.calls).toEqual(PRO_TRACE_PRESETS.map((preset) => [preset]));
   });
 
   it('are plain choices with Pro', async () => {
@@ -153,8 +170,8 @@ describe('advanced trace presets', () => {
     );
     const field = select(view, 'Trace preset');
     expect(optionLabels(field).some((label) => label.includes('(Pro)'))).toBe(false);
-    await change(field, 'Photo shading');
-    expect(onChange).toHaveBeenCalledWith('Photo shading');
+    for (const preset of PRO_TRACE_PRESETS) await change(field, preset);
+    expect(onChange.mock.calls).toEqual(PRO_TRACE_PRESETS.map((preset) => [preset]));
   });
 });
 
