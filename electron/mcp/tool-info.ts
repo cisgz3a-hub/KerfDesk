@@ -62,6 +62,16 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
     description:
       'Add a rectangle in a Laser workspace, in millimetres. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
   },
+  add_ellipse: {
+    title: 'Add ellipse artwork',
+    description:
+      'Add an ellipse in a Laser workspace. xMm and yMm are the top-left scene corner of its widthMm/heightMm box. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+  },
+  add_polyline: {
+    title: 'Add drawn line artwork',
+    description:
+      'Add 2 to 512 scene-mm points as ordinary Laser drawing artwork with the same curve fairing as the PC pen. pointsMm use xMm/yMm; closed needs at least three distinct points. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+  },
   transform_artwork: {
     title: 'Transform existing artwork',
     description:
@@ -101,7 +111,11 @@ export function mcpToolAnnotations(command: KerfDeskMcpCommand): ToolAnnotations
   return {
     readOnlyHint: readOnly,
     destructiveHint:
-      control || (!readOnly && !['set_selection', 'add_text', 'add_rectangle'].includes(command)),
+      control ||
+      (!readOnly &&
+        !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
+          command,
+        )),
     idempotentHint: readOnly,
     openWorldHint: false,
   };

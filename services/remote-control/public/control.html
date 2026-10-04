@@ -11,6 +11,8 @@
     <title>Phone control · KerfDesk</title>
     <script src="/control-pairing.js"></script>
     <link rel="stylesheet" href="/control.css" />
+    <link rel="stylesheet" href="/control-scanner.css" />
+    <link rel="stylesheet" href="/control-touch.css" />
     <script type="module" src="/control.js"></script>
   </head>
   <body>
@@ -33,10 +35,16 @@
         <h2>Connect to your computer</h2>
         <ol class="steps">
           <li>Open Settings → Phone &amp; MCP on your PC and enable remote connections.</li>
-          <li>Wait for Ready to pair, then create a pairing code.</li>
-          <li>Enter the same computer ID and latest code below, including capitals in the code.</li>
+          <li>Wait for Ready to pair, then create a pairing link.</li>
+          <li>Scan the PC’s QR code below, or enter its computer ID and latest code.</li>
           <li>Approve this phone on the PC.</li>
         </ol>
+        <button id="scan-pairing" type="button" class="secondary">Scan PC QR code</button>
+        <section id="pair-scanner" hidden aria-label="Scan the pairing QR code">
+          <video id="pair-scanner-video" autoplay muted playsinline></video>
+          <p id="pair-scanner-status" role="status" aria-live="polite"></p>
+          <button id="cancel-pair-scanner" type="button" class="secondary">Cancel scanning</button>
+        </section>
         <form id="pair-form">
           <label
             >Computer ID<input
@@ -79,7 +87,9 @@
           </p>
           <button type="submit">Request PC approval</button>
         </form>
-        <p class="muted" id="pair-status">The code expires after five minutes and works once.</p>
+        <p class="muted" id="pair-status" role="status" aria-live="polite">
+          The code expires after five minutes and works once.
+        </p>
       </section>
       <section id="workspace-area" hidden>
         <section class="card workspace-heading">
@@ -121,6 +131,7 @@
             <h2 id="preview-heading">Your artwork</h2>
             <button type="button" data-view="edit" class="secondary">Edit</button>
           </div>
+          <div id="touch-tools"></div>
           <div class="preview-surface" id="preview-surface">
             <img id="workspace-preview" alt="Artwork preview from your desktop" hidden />
           </div>

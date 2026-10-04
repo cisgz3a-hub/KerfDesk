@@ -44,6 +44,8 @@ const editTools = [
   'set_selection',
   'add_text',
   'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
   'transform_artwork',
   'update_operation',
   'update_text',
@@ -159,7 +161,7 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
   it('keeps read, artwork-edit and machine-control permissions distinct', async () => {
     const client = await clientFor({ request: async () => ({}) }, modern);
     const tools = (await client.listTools()).tools;
-    expect(tools).toHaveLength(24);
+    expect(tools).toHaveLength(26);
     expect(new Set(tools.map((tool) => tool.name))).toEqual(
       new Set([...readTools, ...editTools, ...controlTools]),
     );
@@ -179,7 +181,10 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
         readOnlyHint: readOnly,
         destructiveHint:
           control ||
-          (!readOnly && !['set_selection', 'add_text', 'add_rectangle'].includes(tool.name)),
+          (!readOnly &&
+            !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
+              tool.name,
+            )),
         idempotentHint: readOnly,
         openWorldHint: false,
       });

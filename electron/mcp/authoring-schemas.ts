@@ -53,6 +53,16 @@ export const mcpPermissionsSchema = z.object({
   canEdit: z.boolean(),
   artworkSharingEnabled: z.boolean(),
 });
+export const mcpTouchCapabilitiesSchema = z.object({ touchEditing: z.boolean() });
+const viewportCoordinate = z.number().min(-200_000).max(200_000);
+const viewport = z
+  .object({
+    xMm: viewportCoordinate,
+    yMm: viewportCoordinate,
+    widthMm: z.number().positive().max(200_000),
+    heightMm: z.number().positive().max(200_000),
+  })
+  .refine((value) => value.xMm + value.widthMm <= 200_000 && value.yMm + value.heightMm <= 200_000);
 
 export const mcpAuthoringOutputSchemas = {
   list_fonts: z.object({
@@ -106,7 +116,9 @@ export const mcpAuthoringOutputSchemas = {
           heightMm: z.number().nonnegative().max(100_000),
         })
         .optional(),
+      viewport: viewport.optional(),
       message: z.string().max(2048).optional(),
     })
-    .refine((result) => (result.status === 'ready') === (result.preview !== undefined)),
+    .refine((result) => (result.status === 'ready') === (result.preview !== undefined))
+    .refine((result) => result.status === 'ready' || result.viewport === undefined),
 } as const;

@@ -125,7 +125,13 @@ export default {
       if (await limited(request, env, url))
         return safeResponse(json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' }));
       request = await boundBody(request, url);
-      return safeResponse(await provider.fetch(request, env, ctx));
+      const response = await provider.fetch(request, env, ctx);
+      const camera =
+        request.method === 'GET' &&
+        (url.pathname === '/' || url.pathname === '/control') &&
+        response.status === 200 &&
+        response.headers.get('Content-Type')?.startsWith('text/html') === true;
+      return safeResponse(response, camera);
     } catch (error) {
       const status = error instanceof RequestFailure ? error.status : 503;
       return safeResponse(

@@ -16,6 +16,8 @@ const WRITES = new Set([
   'set_selection',
   'add_text',
   'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
   'transform_artwork',
   'update_operation',
   'update_text',
@@ -83,6 +85,8 @@ export function validateCommand(command: string, args: unknown): ValidatedComman
 const WRITE_FIELDS: Record<RemoteWriteCommand, readonly string[]> = {
   set_selection: ['artworkIds'],
   add_rectangle: ['xMm', 'yMm', 'widthMm', 'heightMm'],
+  add_ellipse: ['xMm', 'yMm', 'widthMm', 'heightMm'],
+  add_polyline: ['pointsMm', 'closed'],
   add_text: ['xMm', 'yMm', 'widthMm', 'text', 'fontSizeMm'],
   transform_artwork: ['artworkIds', 'transform'],
   update_operation: ['operationId', 'patch'],
@@ -113,6 +117,8 @@ function writeValues(command: RemoteWriteCommand, args: RecordValue): boolean {
 const WRITE_VALUES: Record<RemoteWriteCommand, (args: RecordValue) => boolean> = {
   set_selection: (args) => ids(args['artworkIds']),
   add_rectangle: (args) => positionAndWidth(args) && size(args['heightMm']),
+  add_ellipse: (args) => positionAndWidth(args) && size(args['heightMm']),
+  add_polyline: polylineValues,
   add_text: textValues,
   transform_artwork: (args) => ids(args['artworkIds'], 1) && validTransform(args['transform']),
   update_operation: (args) => identifier(args['operationId']) && validPatch(args['patch']),
@@ -122,6 +128,30 @@ const WRITE_VALUES: Record<RemoteWriteCommand, (args: RecordValue) => boolean> =
   undo: () => true,
   redo: () => true,
 };
+function polylineValues(args: RecordValue): boolean {
+  const points = args['pointsMm'];
+  if (
+    typeof args['closed'] !== 'boolean' ||
+    !Array.isArray(points) ||
+    points.length < 2 ||
+    points.length > 512
+  )
+    return false;
+  if (
+    !points.every(
+      (point: unknown) =>
+        record(point) &&
+        keys(point, ['xMm', 'yMm']) &&
+        coordinate(point['xMm']) &&
+        coordinate(point['yMm']),
+    )
+  )
+    return false;
+  const distinct = new Set(
+    points.map((point: { xMm: number; yMm: number }) => `${point.xMm},${point.yMm}`),
+  );
+  return distinct.size >= (args['closed'] ? 3 : 2);
+}
 function textValues(args: RecordValue): boolean {
   return (
     positionAndWidth(args) &&

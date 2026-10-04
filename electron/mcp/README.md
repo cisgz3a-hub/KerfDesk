@@ -33,6 +33,8 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `set_selection` | `artworkIds` | Empty array clears selection. |
 | `add_text` | `xMm`, `yMm`, `widthMm`, `text`, `fontSizeMm`, optional `fontId` | Text is 1–4096 characters; chosen bundled font or regular default. |
 | `add_rectangle` | `xMm`, `yMm`, `widthMm`, `heightMm` | Add normal rectangle artwork. |
+| `add_ellipse`           | `xMm`, `yMm`, `widthMm`, `heightMm` | Add ordinary Laser ellipse artwork. |
+| `add_polyline`          | `pointsMm` (2-512 `{xMm,yMm}` points), `closed` boolean | Add ordinary Laser pen artwork; closed paths need three distinct points. |
 | `transform_artwork` | Nonempty `artworkIds`, `transform` | Relative `{type:'move',dxMm,dyMm}`, grouped-bounds `{type:'resize',widthMm,heightMm}` or grouped-centre `{type:'rotate',angleDeg}`; angle ±36000 degrees. |
 | `update_operation` | `operationId`, nonempty `patch` | Existing ordinary laser operation only: `powerPercent` 0–100, positive `speedMmPerMin` ≤100000, integer `passes` 1–1000, or `enabled` boolean. |
 | `update_text` | `artworkId`, nonempty `patch` | Ordinary text: `text`, bundled `fontId`, positive `fontSizeMm` ≤1000, `alignment` left/center/right, `lineHeight` 0.1–20 or `letterSpacing` −1–20. Spacing is a multiplier of font size. |
@@ -74,7 +76,7 @@ design coordinates; review bounds use output coordinates. Compilation
 readiness and spatial Frame completion are independent facts. No review read
 approves, Frames, starts or dispatches output.
 
-The static `ui://kerfdesk/workspace/v3.html` resource uses
+The static `ui://kerfdesk/workspace/v4.html` resource uses
 `text/html;profile=mcp-app`. Preview and machine tools advertise
 `_meta.ui.resourceUri`; enclosing OAuth metadata is retained. Design, Machine
 and Settings separate the preview, controls and connection options. Visible
@@ -82,7 +84,10 @@ views use bounded read-only refresh; unchanged previews are cached by revision.
 Hidden views pause. Pending selection drafts remain local, and stale edits need
 a current revision. Design refresh waits for an unsettled owned machine action;
 status and receipt reads continue while visible so it can resume on completion.
-The preview remains an image view. The component
+The preview supports touch selection, moving and resizing, plus Laser brush,
+rectangle and ellipse drawing. Gestures remain local until Apply. Exact
+renderer viewport metadata maps the image to scene coordinates; stale drafts
+and lost access cannot commit them. The component
 initializes the MCP Apps host bridge and calls tools through `postMessage`,
 with no independent network or file access. Its external connect/resource
 allowlists are empty. UI permission hints grant no authority. Non-UI hosts
