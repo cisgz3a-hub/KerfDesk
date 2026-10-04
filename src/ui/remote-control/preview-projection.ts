@@ -3,8 +3,14 @@ import { canvasTheme } from '../theme/canvas-theme';
 import { paintObjectDisplay } from '../workspace/object-display';
 import type { RemoteControlOptions } from './types';
 import { RemoteFault } from './fault';
-import { PreviewUnavailable, previewView, resolvePreviewGeometry } from './preview-geometry';
+import {
+  PreviewUnavailable,
+  previewView,
+  previewViewport,
+  resolvePreviewGeometry,
+} from './preview-geometry';
 import type { PreviewGeometry } from './preview-geometry';
+import { paintPreviewImageFootprints } from './preview-image-footprints';
 
 const PNG_PREFIX = 'data:image/png;base64,';
 export const PREVIEW_BASE64_LIMIT = 65_536;
@@ -58,6 +64,7 @@ function renderPreview(
     ctx.fillStyle = canvasTheme.bedFill;
     ctx.fillRect(0, 0, sizePx, sizePx);
     const view = previewView(geometry.extent, sizePx);
+    paintPreviewImageFootprints(ctx, geometry.imageFootprints, view);
     for (const { object, display } of geometry.objects)
       paintObjectDisplay(ctx, object, display, view);
     const encoded = canvas.toDataURL('image/png');
@@ -70,8 +77,12 @@ function renderPreview(
     return {
       status: 'ready',
       preview: { mimeType: 'image/png', data, widthPx: sizePx, heightPx: sizePx },
+      viewport: previewViewport(view, sizePx),
       ...(geometry.bounds === undefined ? {} : { bounds: geometry.bounds }),
-      message: 'Design artwork preview. This is not a toolpath or a machine-position guarantee.',
+      message:
+        geometry.imageFootprints.length > 0
+          ? 'Partial design preview: vectors are shown; dashed image frames show placement only. Image pixels, masks and adjustments remain on the PC. This is not a toolpath or a machine-position guarantee.'
+          : 'Design artwork preview. This is not a toolpath or a machine-position guarantee.',
     };
   }
   throw new PreviewUnavailable('This preview is too large to share. View the artwork on the PC.');

@@ -17,14 +17,15 @@ export type RemoteAccessStatus = {
   readonly requests: readonly {
     readonly pairingId: string;
     readonly clientLabel: string;
-    readonly requestedScopes: readonly ('read' | 'edit')[];
+    readonly requestedScopes: readonly ('read' | 'edit' | 'control')[];
     readonly expiresAt: number;
     readonly expiresInMs: number;
   }[];
   readonly clients: readonly {
     readonly id: string;
     readonly label: string;
-    readonly scopes: readonly ('read' | 'edit')[];
+    readonly scopes: readonly ('read' | 'edit' | 'control')[];
+    readonly controlExpiresInMs?: number;
   }[];
   readonly error: string | null;
 };
@@ -40,12 +41,14 @@ type RemoteState = {
 
 let sessionId: string | null = null;
 let statusRevision = 0;
+let statusPublishedAt = 0;
 let actionSequence = 0;
 let activeAction: number | null = null;
 export const REMOTE_REVOKE_EVENT = 'kerfdesk:remote-revoke';
 export function setRemoteSession(value: string | null): void {
   if (sessionId !== value) {
     statusRevision = 0;
+    statusPublishedAt = 0;
     activeAction = null;
     actionSequence += 1;
     useRemoteAccessStore.setState({ status: null, busy: false, message: null });
@@ -57,6 +60,14 @@ export function clearRemoteSession(owner: string | null): void {
 }
 export function ownsRemoteSession(owner: string): boolean {
   return sessionId === owner;
+}
+
+/** A stalled renderer poll must never extend a previously reported control grant. */
+export function getAgedRemoteAccessStatus(): RemoteAccessStatus | null {
+  const status = useRemoteAccessStore.getState().status;
+  return status === null
+    ? null
+    : ageStatus(status, Math.max(0, Math.ceil(performance.now() - statusPublishedAt)));
 }
 
 export async function remoteRequest(
@@ -98,6 +109,11 @@ function ageStatus(status: RemoteAccessStatus, elapsed: number): RemoteAccessSta
     requests: status.requests
       .filter((item) => item.expiresInMs > elapsed)
       .map((item) => ({ ...item, expiresInMs: item.expiresInMs - elapsed })),
+    clients: status.clients.map((client) =>
+      client.controlExpiresInMs === undefined
+        ? client
+        : { ...client, controlExpiresInMs: Math.max(0, client.controlExpiresInMs - elapsed) },
+    ),
   };
 }
 
@@ -206,7 +222,29 @@ function validCollections(item: Partial<RemoteAccessStatus>): boolean {
     Array.isArray(item.clients) &&
     item.clients.length <= 20 &&
     Array.isArray(item.requests) &&
-    item.requests.length <= 8
+    item.requests.length <= 8 &&
+    item.clients.every(
+      (client) => validScopes(client?.scopes) && validControlLifetime(client?.controlExpiresInMs),
+    ) &&
+    item.requests.every((request) => validScopes(request?.requestedScopes))
+  );
+}
+
+function validControlLifetime(value: number | undefined): boolean {
+  return (
+    value === undefined ||
+    (Number.isSafeInteger(value) && value >= 0 && value <= 30 * 24 * 60 * 60 * 1000)
+  );
+}
+
+function validScopes(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length >= 1 &&
+    value.length <= 3 &&
+    value.includes('read') &&
+    new Set(value).size === value.length &&
+    value.every((scope) => scope === 'read' || scope === 'edit' || scope === 'control')
   );
 }
 
@@ -224,6 +262,7 @@ export const useRemoteAccessStore = create<RemoteState>((set, get) => {
     )
       return;
     statusRevision = status.statusRevision;
+    statusPublishedAt = performance.now();
     set({ status });
   };
   return {

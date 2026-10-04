@@ -48,7 +48,7 @@ test('release planning boots before dependencies are installed', async (t) => {
       '--eval',
       `globalThis.fetch = () => { throw new Error('Unexpected bootstrap network call'); };
      const planner = await import(${JSON.stringify(entry)});
-     if (planner.RELEASE_PR_THRESHOLD !== 20) throw new Error('Missing release policy');
+     if (planner.RELEASE_PR_THRESHOLD !== 10) throw new Error('Missing release policy');
      console.log('BOOTSTRAP_OK');`,
     ],
     { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 10_000 },
@@ -120,13 +120,16 @@ const pull = (number, changes = {}) => ({
 });
 const page = (body, options) => new Response(JSON.stringify(body), options);
 
-test('automatic releases wait for 20 PRs, while only explicit manual release-now bypasses the batch', () => {
-  const nineteen = Array.from({ length: 19 }, (_, n) => n + 1);
-  assert.equal(releaseBatchDecision(true, nineteen, false).publish, false);
-  assert.equal(releaseBatchDecision(true, [...nineteen, 20], false).publish, true);
-  assert.equal(releaseBatchDecision(true, nineteen, true).publish, true);
+test('automatic releases wait for 10 PRs, while only explicit manual release-now bypasses the batch', () => {
+  const nine = Array.from({ length: 9 }, (_, n) => n + 1);
+  const belowThreshold = releaseBatchDecision(true, nine, false);
+  assert.equal(belowThreshold.publish, false);
+  assert.equal(belowThreshold.reason, '9/10 merged PRs since the published source.');
+  assert.equal(releaseBatchDecision(true, [...nine, 10], false).publish, true);
+  assert.equal(releaseBatchDecision(true, [...nine, 10, 11], false).publish, true);
+  assert.equal(releaseBatchDecision(true, nine, true).publish, true);
   assert.equal(releaseBatchDecision(true, [], true).publish, true);
-  assert.equal(releaseBatchDecision(false, [...nineteen, 20], false).publish, false);
+  assert.equal(releaseBatchDecision(false, [...nine, 10], false).publish, false);
   assert.equal(releaseBatchDecision(false, [], true).publish, true);
   const dispatch = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main' };
   assert.equal(releaseNowRequested(dispatch), false);
@@ -314,7 +317,7 @@ test('workflow applies the same batch policy before Windows and rechecks before 
     ),
   );
   assert.deepEqual(workflow.on.workflow_dispatch.inputs.release_now, {
-    description: 'Release now before 20 merged PRs (all checks and trust guards still apply)',
+    description: 'Release now before 10 merged PRs (all checks and trust guards still apply)',
     type: 'boolean',
     default: false,
   });

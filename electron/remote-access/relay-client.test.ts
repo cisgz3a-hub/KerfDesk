@@ -136,6 +136,57 @@ describe('fixed native relay transport', () => {
     expect(JSON.stringify(socket.sent)).not.toContain('secret');
   });
 
+  it('never upgrades edit to control and carries an exact separately approved control envelope', async () => {
+    const socket = await connect();
+    const jogArgs = {
+      expectedRevision: 'r1',
+      requestId: randomUUID(),
+      axis: 'x',
+      direction: 1,
+      distanceMm: 1,
+    };
+    socket.receive({
+      ...command(),
+      scopes: ['read', 'edit'],
+      command: { name: 'jog_machine', args: jogArgs },
+    });
+    await flush();
+    expect(queue.poll(session).requests).toEqual([]);
+    expect(socket.sent).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        error: expect.objectContaining({ code: 'invalid_input' }),
+      }),
+    );
+    socket.receive({
+      ...command(),
+      scopes: ['read', 'control'],
+      command: { name: 'jog_machine', args: jogArgs },
+    });
+    await flush();
+    const delivered = queue.poll(session).requests[0]!;
+    expect(delivered).toMatchObject({ command: 'jog_machine', canWrite: false, canControl: true });
+    queue.complete(session, delivered.id, {
+      revision: 'r1',
+      operation: {
+        operationId: jogArgs.requestId,
+        revision: 'r1',
+        kind: 'jog',
+        state: 'accepted',
+        committed: false,
+      },
+    });
+    await flush();
+    expect(socket.sent).toContainEqual(
+      expect.objectContaining({
+        type: 'result',
+        result: expect.objectContaining({
+          operation: expect.objectContaining({ state: 'accepted' }),
+        }),
+      }),
+    );
+  });
+
   it('projects approved results and strips nested credentials before crossing the network', async () => {
     const socket = await connect();
     const message = command();
@@ -151,6 +202,35 @@ describe('fixed native relay transport', () => {
     expect(socket.sent).toEqual([
       { v: 1, type: 'result', requestId: message.requestId, result: output },
     ]);
+  });
+
+  it('retains read receipts for a read/control token after only its local control deadline expires', async () => {
+    relay = createRemoteRelayClient({
+      queue,
+      onMessage: vi.fn(),
+      onConnection: connection,
+      canRequest: (_clientId, _scopes, requiresControl) => requiresControl !== true,
+    });
+    const socket = await connect();
+    const reading = { ...command(), scopes: ['read', 'control'] };
+    socket.receive(reading);
+    const delivered = queue.poll(session).requests[0]!;
+    expect(delivered).toMatchObject({ command: 'get_app_status', canControl: false });
+    queue.complete(session, delivered.id, output);
+    await flush();
+    expect(socket.sent).toContainEqual({
+      v: 1,
+      type: 'result',
+      requestId: reading.requestId,
+      result: output,
+    });
+    socket.receive({
+      ...command(),
+      scopes: ['read', 'control'],
+      command: { name: 'abort_job', args: { requestId: randomUUID() } },
+    });
+    expect(queue.poll(session).requests).toEqual([]);
+    expect(socket.sent).toContainEqual(expect.objectContaining({ type: 'error' }));
   });
 
   it('checks permission again before returning a result after revocation', async () => {

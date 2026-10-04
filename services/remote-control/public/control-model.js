@@ -1,4 +1,14 @@
 export const $ = (selector) => document.querySelector(selector);
+export const errorMessages = {
+  unavailable: 'The computer is offline. Open KerfDesk on your PC and refresh.',
+  stale_revision: 'The workspace changed on your PC. Refresh before trying the edit again.',
+  needs_pro: 'Choose a trial or licence in the desktop app to use this Pro feature.',
+  unsupported_operation: 'This operation cannot be edited here. Use KerfDesk on your PC.',
+  invalid_input: 'Check the values and try again.',
+  cancelled: 'The request was cancelled or this connection was revoked.',
+  control_limit: 'No action was sent. Pair again and approve machine control on the PC.',
+  failed: 'The change could not be completed. Refresh the workspace and try again.',
+};
 
 export function safeText(value, max = 2048) {
   return typeof value === 'string' ? value.slice(0, max) : '';
@@ -85,7 +95,8 @@ export function renderPreview(value, revision) {
   image.src = 'data:image/png;base64,' + value.preview.data;
   image.hidden = false;
   message.textContent =
-    'Artwork preview. Machine position and toolpaths are shown on the PC. Refresh after PC changes.';
+    safeText(value.message) ||
+    'Design preview from your PC. Machine position and toolpaths stay in the PC view.';
   const box = value.bounds;
   if (box && [box.xMm, box.yMm, box.widthMm, box.heightMm].every(Number.isFinite))
     bounds.textContent = `Artwork bounds: ${box.widthMm.toFixed(2)} × ${box.heightMm.toFixed(2)} mm · X ${box.xMm.toFixed(2)}, Y ${box.yMm.toFixed(2)}`;
@@ -171,4 +182,25 @@ export function createFontPickers() {
       paint(form);
     },
   };
+}
+
+export function continueToMcp() {
+  const target = new URLSearchParams(location.search).get('continue');
+  if (!target || target.length > 4096) return false;
+  try {
+    const parsed = new URL(target, location.origin);
+    if (
+      parsed.origin === location.origin &&
+      parsed.pathname === '/authorize' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.hash
+    ) {
+      location.assign(parsed.href);
+      return true;
+    }
+  } catch {
+    /* Only an exact same-origin consent page is accepted. */
+  }
+  return false;
 }

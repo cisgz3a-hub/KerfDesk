@@ -16,8 +16,18 @@ type Exchange = {
 export class McpRequests {
   private readonly active = new Map<string, Exchange>();
 
-  begin(key: string, props: GrantProps, connectionId: string | null): string | null {
-    if (!/^[a-f0-9]{64}$/.test(key) || this.active.has(key) || this.active.size >= 32) return null;
+  begin(
+    key: string,
+    props: GrantProps,
+    connectionId: string | null,
+    priority = false,
+  ): string | null {
+    if (
+      !/^[a-f0-9]{64}$/.test(key) ||
+      this.active.has(key) ||
+      this.active.size >= (priority ? 36 : 32)
+    )
+      return null;
     const entry: Exchange = {
       id: crypto.randomUUID(),
       clientId: props.clientId,

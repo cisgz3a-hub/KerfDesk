@@ -9,7 +9,7 @@ export const page = {
   nav: 'phone',
   title: 'Phone & MCP',
   description:
-    'Connect your phone or an MCP client to KerfDesk on your PC. Create a pairing code, approve viewing or editing, and keep machine execution on the computer.',
+    'Connect your phone or an MCP client to KerfDesk on your PC. Create a pairing code and separately approve viewing, artwork editing and machine controls.',
   render: ({ site }) =>
     html`${pageHero({
       eyebrow: 'Phone & MCP',
@@ -30,18 +30,21 @@ export const page = {
             awake and online.`,
         },
         {
-          title: 'Create a code and enter it on your phone',
-          body: html`Click <strong>Create pairing code</strong> on the PC, then open
-            <a href="${site.phoneSetupUrl}">phone setup</a> and choose
-            <strong>Connect to your PC</strong>. Enter the matching Computer ID, copy the code
-            exactly including capital letters, name the phone and request PC approval. A code works
-            once and expires after five minutes.`,
+          title: 'Scan the code or open a pairing link',
+          body: html`Click <strong>Create pairing link</strong> on the PC (older versions say
+            <strong>Create pairing code</strong>). Open phone controls and choose
+            <strong>Scan PC QR code</strong>, allow camera access and point at the PC’s QR code. You
+            can also scan with the phone’s camera or use <strong>Copy pairing link</strong>. The
+            link fills in the computer ID and code; name the phone and request PC approval. For
+            older versions or manual setup, open <a href="${site.phoneSetupUrl}">phone setup</a>,
+            enter the matching Computer ID and copy the code exactly including capital letters. A
+            code works once and expires after five minutes.`,
         },
         {
           title: 'Choose the permission on the PC',
-          body: html`Check the phone’s name and choose <strong>Allow viewing</strong> or
-            <strong>Allow viewing and editing</strong>. Manage and revoke connections in the same
-            Settings section.`,
+          body: html`Check the phone’s name. Viewing is the default. Select the requested artwork
+            editing and/or machine-control choices, then <strong>Approve selected access</strong>.
+            Both choices start off. Manage and revoke connections in the same Settings section.`,
         },
       ]),
     })}
@@ -53,14 +56,23 @@ export const page = {
           Viewing connections can read artwork and operation summaries, machine limits, material
           recipes, and edition and update status. Editing connections can select, move, rotate or
           resize supported artwork. In Laser workspaces, they can add basic text or rectangles and
-          change operation power, speed, passes and enabled state.
+          change operation power, speed, passes and enabled state. Updated versions add touch
+          drawing for rectangles, ellipses and freehand strokes, plus selection, moving and
+          resizing. Review the draft and choose Apply or Cancel.
+        </p>
+        <p>
+          Updated versions separate Design, Machine and Settings. Changes made on the PC refresh the
+          connected phone view automatically, while unsent phone edits stay intact. Shared previews
+          and text need the separate sharing choice on the PC.
         </p>
         ${callout({
-          title: 'Machine execution stays on the PC',
+          title: 'Choose machine control separately',
           body: html`<p>
-            Phone and MCP connections have no Frame, Start, movement, console, laser or spindle
-            controls. The desktop keeps the design canvas. Pairing does not activate Pro or use a
-            licence seat, and existing Pro tool rules still apply.
+            Explicitly approved machine-control connections can Jog, Frame, review the current job,
+            Start and Abort through the desktop's ordinary machine flow. The desktop keeps the
+            design canvas. These controls require a desktop release and service that support them;
+            existing viewing/editing approvals gain no motion access. Pairing does not activate Pro
+            or use a licence seat, and existing Pro tool rules still apply.
           </p>`,
         })}
         <p>

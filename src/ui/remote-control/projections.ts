@@ -1,4 +1,4 @@
-import { operationIdsForObject, type Layer } from '../../core/scene';
+import { operationIdsForObject, sceneLayerVisibility, type Layer } from '../../core/scene';
 import { transformedBBox } from '../../core/scene/hit-test';
 import type { AppState } from '../state/store';
 import type { RemoteBounds } from './types';
@@ -45,15 +45,20 @@ export function workspaceProjection(
 ): Record<string, unknown> {
   const { scene } = state.project;
   const mode = state.project.machine?.kind ?? 'laser';
+  const visibility = sceneLayerVisibility.lookup(scene.layers);
   const artwork = scene.objects
     .filter((object) => publicIdentifier(object.id))
     .slice(0, LIMIT)
     .map((object) => {
       const bounds = remoteBounds(transformedBBox(object));
       const operationId = operationIdsForObject(object, scene.layers).find(publicIdentifier);
+      const visible = sceneLayerVisibility.hasObject(object, visibility);
       return {
         id: object.id,
         type: object.kind,
+        visible,
+        // Target-level hint only; caller permission and revision are checked on every write.
+        editable: visible && object.locked !== true,
         ...(bounds === undefined ? {} : { bounds }),
         ...(operationId === undefined ? {} : { operationId }),
       };

@@ -42,6 +42,8 @@ import {
   REPLAY_PERMIT_MISMATCH_MESSAGE,
 } from './framed-run-readiness';
 import { armPermitFromCompletedFrame } from './framed-start-preparation';
+import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
+import type { FramedStartOptions } from './framed-start-options';
 import {
   FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE,
   reviewFramedRunForStart,
@@ -109,18 +111,18 @@ export async function runFramedPermitStart(
   permit: FramedRunPermit,
   repository: RecoveryRepository = recoveryRepository,
   completedReceipt: LastCompletedReceipt | null = null,
+  options: FramedStartOptions = {},
 ): Promise<boolean> {
+  assertMachineExecutionOwner(options.executionOwner);
   if (refuseStartWhileMarkOwnsController()) return false;
   if (framedRunReadinessIssue(permit) !== null || !armPermitFromCompletedFrame(permit)) {
     return false;
   }
   // ADR-237: the single Job Review runs here at Start. Transient camera
   // permits were reviewed before their Frame and carry evidence from birth.
-  const reviewed =
-    permit.candidate.review !== undefined && permit.candidate.authorizationContext !== undefined
-      ? { permit, review: permit.candidate.review }
-      : await reviewFramedRunForStart(permit);
+  const reviewed = await framedReviewForStart(permit, options);
   if (reviewed === null) return false;
+  assertMachineExecutionOwner(options.executionOwner);
   permit = reviewed.permit;
   const review = reviewed.review;
   if (useLaserStore.getState().framedRun !== permit) {
@@ -146,10 +148,15 @@ export async function runFramedPermitStart(
     return false;
   }
   try {
-    return await streamFramedRun(permit, review, claim, repository, completedReceipt);
+    return await streamFramedRun(permit, review, claim, repository, completedReceipt, options);
   } finally {
     releaseFramedRunStartClaim(claim);
   }
+}
+async function framedReviewForStart(permit: FramedRunPermit, options: FramedStartOptions) {
+  if (permit.candidate.review !== undefined && permit.candidate.authorizationContext !== undefined)
+    return { permit, review: permit.candidate.review };
+  return reviewFramedRunForStart(permit, options);
 }
 
 function refuseStartWhileMarkOwnsController(): boolean {
@@ -169,6 +176,7 @@ async function streamFramedRun(
   claim: FramedRunStartClaim,
   repository: RecoveryRepository,
   completedReceipt: LastCompletedReceipt | null,
+  options: FramedStartOptions = {},
 ): Promise<boolean> {
   const authorizationArgs = {
     preparedAgainst: permit.controller,
@@ -179,7 +187,9 @@ async function streamFramedRun(
   } as const;
   const currentLaser = await currentLaserForAuthorizedStart(authorizationArgs);
   if (currentLaser === null) return false;
+  assertMachineExecutionOwner(options.executionOwner);
   return streamPreparedStart({
+    ...options,
     outputScope: permit.candidate.outputScope,
     project: permit.candidate.project,
     laser: currentLaser,
@@ -246,6 +256,12 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<boolean> {
     return false;
   }
   const handoff = await armFreshStartHandoff(args, runId);
+  try {
+    assertMachineExecutionOwner(args.executionOwner);
+  } catch (error) {
+    if (handoff.armed) await args.repository.cancelPendingStart(runId);
+    throw error;
+  }
   if (handoff.blocked) return false;
   const authorizationArgs = {
     preparedAgainst: args.laser,

@@ -1,32 +1,37 @@
 import { pairingDeadline, rejectedMessage } from './pairing.js';
-import { $, bindForm, renderPreview, safeText, validWorkspace } from './control-model.js';
+import { $, bindForm, continueToMcp, errorMessages, safeText } from './control-model.js';
 import { bindEditors } from './control-edit.js';
+import { bindMachine } from './control-machine.js';
+import { bindDrafts } from './control-drafts.js';
+import { bindWorkspaceLive, serialCommand } from './control-live.js';
+import { bindPairingScanner } from './control-scanner.js';
+import { bindTouchCanvas } from './control-touch.js';
+import { bindSessionActions } from './control-actions.js';
 import {
+  createPreviewController,
+  assertWorkspace,
+  workspaceViewChanged,
+  bindWorkspaceEvents,
   refreshDetails,
   renderWorkspace,
   resetWorkspace,
   selectionFeedback,
-  view,
+  syncAccess,
+  syncEditorControls,
+  renderSession,
 } from './control-workspace.js';
 
-const pairForm = $('#pair-form');
 let session = null;
 let workspace = null;
 let poll = null;
 let busy = false;
 let stale = false;
 let pendingEdit = null;
-let fontsLoaded = false;
 let pairGeneration = 0;
-const errorMessages = {
-  unavailable: 'The computer is offline. Open KerfDesk on your PC and refresh.',
-  stale_revision: 'The workspace changed on your PC. Refresh before trying the edit again.',
-  needs_pro: 'Choose a trial or licence in the desktop app to use this Pro feature.',
-  unsupported_operation: 'This operation cannot be edited here. Use KerfDesk on your PC.',
-  invalid_input: 'Check the values and try again.',
-  cancelled: 'The request was cancelled or this connection was revoked.',
-  failed: 'The change could not be completed. Refresh the workspace and try again.',
-};
+let live = null;
+let touch = null;
+const scanner = bindPairingScanner();
+const drafts = bindDrafts(() => workspace?.revision);
 function notice(message, error = false) {
   const target = $('#notice');
   target.textContent = safeText(message);
@@ -37,13 +42,13 @@ function fault(code, message, ambiguous = false) {
   return Object.assign(new Error(message), { code, ambiguous });
 }
 async function api(path, body, generation) {
-  const headers = body === undefined ? {} : { 'Content-Type': 'application/json' };
-  if (body !== undefined && session?.csrf) headers['X-KerfDesk-CSRF'] = session.csrf;
+  assertPairingReady();
+  const clientId = session?.client.id;
   let response;
   try {
     response = await fetch(path, {
       method: body === undefined ? 'GET' : 'POST',
-      headers,
+      headers: requestHeaders(body),
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: 'same-origin',
       cache: 'no-store',
@@ -59,10 +64,27 @@ async function api(path, body, generation) {
   } catch {
     throw fault('failed', errorMessages.failed, true);
   }
-  if (generation !== undefined && generation !== pairGeneration)
-    throw fault('cancelled', errorMessages.cancelled);
+  assertResponseContext(path, generation, clientId);
   if (!response.ok) rejectResponse(response, data, path);
   return data;
+}
+function assertPairingReady() {
+  if (document.documentElement.dataset.pairingBlocked)
+    throw fault(
+      'cancelled',
+      'Open a clean phone control page using the KerfDesk link above, then paste a new code.',
+    );
+}
+function requestHeaders(body) {
+  const headers = body === undefined ? {} : { 'Content-Type': 'application/json' };
+  if (body !== undefined && session?.csrf) headers['X-KerfDesk-CSRF'] = session.csrf;
+  return headers;
+}
+function assertResponseContext(path, generation, clientId) {
+  if (generation !== undefined && generation !== pairGeneration)
+    throw fault('cancelled', errorMessages.cancelled);
+  if (path === '/api/client/command' && clientId !== session?.client.id)
+    throw fault('cancelled', errorMessages.cancelled);
 }
 function rejectResponse(response, data, path) {
   if (response.status === 401) setSession(null);
@@ -84,9 +106,10 @@ function canEdit() {
   );
 }
 function syncControls() {
+  scanner.setEnabled(!busy && !session && !document.documentElement.dataset.pairingBlocked);
   const admitted = canEdit();
   const writable = admitted && !busy && !stale && !pendingEdit;
-  syncReadAccess(admitted);
+  syncAccess({ session, workspace, busy, pendingEdit, admitted });
   for (const input of document.querySelectorAll('#artwork-list input')) input.disabled = !writable;
   for (const input of document.querySelectorAll(
     '#edit-forms input, #edit-forms select, #edit-forms textarea',
@@ -96,74 +119,61 @@ function syncControls() {
     '#save-selection, #edit-forms button, #undo, #redo',
   ))
     button.disabled = !writable;
-  syncEditorControls();
-  syncSessionControls();
+  syncEditorControls(workspace);
   selectionFeedback(workspace, writable);
-}
-function syncReadAccess(admitted) {
-  $('#readonly-note').hidden = !session || admitted;
-  const unknown =
-    !!session?.client.scopes.includes('edit') && workspace?.permissions?.canEdit === undefined;
-  $('#readonly-title').textContent = !session?.online
-    ? 'PC offline'
-    : unknown
-      ? 'Update the PC app'
-      : 'Viewing only';
-  $('#readonly-message').textContent = !session?.online
-    ? 'Open KerfDesk on the PC, then refresh here to reconnect.'
-    : unknown
-      ? 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.'
-      : 'To edit, pair again with editing permission and approve this phone on the PC.';
-}
-function syncEditorControls() {
-  const history = workspace?.history ?? {};
-  const sharingOff = workspace?.permissions?.artworkSharingEnabled === false;
-  $('#undo').disabled ||= !history.canUndo;
-  $('#redo').disabled ||= !history.canRedo;
-  $('#history-status').textContent =
-    history.canUndo || history.canRedo
-      ? 'Changes share the PC’s undo history.'
-      : 'No changes to undo yet.';
-  $('#operation-form button').disabled ||= !$('#operation-list').options.length;
-  $('#load-text').disabled ||= !$('#text-artwork-list').options.length || sharingOff;
-  $('#text-sharing-note').hidden = !sharingOff;
-}
-function syncSessionControls() {
-  const hasEditScope = !!session?.client.scopes.includes('edit');
-  $('#edit-forms').hidden = !hasEditScope || workspace?.permissions?.canEdit !== true;
-  $('#save-selection').hidden = !hasEditScope;
-  $('#edit-selected-text').hidden = !hasEditScope;
-  for (const button of document.querySelectorAll('#pair-form button, #disconnect, #refresh'))
-    button.disabled = busy;
-  $('#retry-edit').hidden = !pendingEdit;
-  $('#retry-edit').disabled = busy || !session?.online;
-  $('#history-controls').hidden = !hasEditScope;
+  drafts.render();
+  touch?.update();
 }
 function setSession(value) {
-  if (!value || value.client.id !== session?.client?.id) {
-    workspace = null;
-    stale = false;
-    pendingEdit = null;
-    fontsLoaded = false;
-    resetWorkspace();
-    editors.reset();
-  }
+  scanner.stop();
+  const previousClient = session?.client?.id;
+  if (!value || value.client.id !== previousClient) resetSessionWorkspace();
   session = value;
-  $('#connection').textContent = value
-    ? value.online
-      ? 'PC connected'
-      : 'PC offline'
-    : 'Not connected';
-  $('#device-name').textContent = safeText(value?.deviceLabel, 64) || 'Connected computer';
-  $('#pair-card').hidden = !!value;
-  $('.intro').hidden = !!value;
-  $('#workspace-area').hidden = !value;
+  machine.sessionChanged(value);
+  renderSession(value);
   syncControls();
+  if (value && value.client.id !== previousClient) live?.start();
+  else if (!value) live?.stop();
+}
+function resetSessionWorkspace() {
+  touch?.reset();
+  workspace = null;
+  stale = false;
+  pendingEdit = null;
+  previews.reset();
+  drafts.reset();
+  for (const form of document.querySelectorAll('#edit-forms form')) form.reset();
+  resetWorkspace();
+  editors.reset();
+  machine.reset();
 }
 async function command(name, args = {}, generation) {
-  return (await api('/api/client/command', { name, args }, generation)).result;
+  return (
+    await api(
+      '/api/client/command',
+      { name, args },
+      generation ?? (args.requestId ? undefined : pairGeneration),
+    )
+  ).result;
 }
-async function refresh(generation, full = true) {
+function applyWorkspace(value, force = false) {
+  assertWorkspace(value);
+  const changed = workspaceViewChanged(value, workspace, force);
+  const restore = drafts.capture();
+  workspace = value;
+  stale = false;
+  if (changed) {
+    renderWorkspace(value, canEdit());
+    restore();
+  }
+  previews.clearIfChanged(value);
+  editors.workspaceChanged();
+  syncControls();
+}
+async function refresh(generation = pairGeneration, full = true) {
+  return live.withRead(() => refreshWorkspace(generation, full));
+}
+async function refreshWorkspace(generation, full) {
   stale = true;
   const current = await api('/api/session', undefined, generation);
   if (current.status !== 'approved') {
@@ -176,34 +186,11 @@ async function refresh(generation, full = true) {
     return false;
   }
   const value = await command('get_workspace', {}, generation);
-  if (!validWorkspace(value))
-    throw fault('failed', 'The workspace response is incomplete. Refresh on the PC.');
-  workspace = value;
-  stale = false;
-  renderWorkspace(value, canEdit());
-  editors.workspaceChanged();
-  syncControls();
-  await refreshPreview(generation);
+  applyWorkspace(value, true);
+  await previews.refresh(generation, full);
   if (full) await refreshDetails(command, generation);
+  live?.confirm();
   return true;
-}
-async function refreshPreview(generation) {
-  let preview;
-  try {
-    preview = await command('get_workspace_preview', {}, generation);
-  } catch (error) {
-    if (!session || error.code === 'cancelled' || error.code === 'forbidden') throw error;
-  }
-  renderPreview(preview, workspace?.revision);
-  if (!fontsLoaded) {
-    try {
-      const fonts = await command('list_fonts', {}, generation);
-      editors.setFonts(fonts);
-      fontsLoaded = Array.isArray(fonts?.fonts);
-    } catch (error) {
-      if (!session || error.code === 'cancelled' || error.code === 'forbidden') throw error;
-    }
-  }
 }
 async function action(callback) {
   if (busy) return;
@@ -220,13 +207,17 @@ async function action(callback) {
     document.body.setAttribute('aria-busy', 'false');
   }
 }
-async function edit(name, args) {
+async function edit(name, args, expectedRevision = workspace?.revision) {
+  if (name === 'set_selection') drafts.assertSelection();
   if (!canEdit() || stale || pendingEdit)
     throw fault('forbidden', 'Refresh a workspace with editing permission first.');
+  if (expectedRevision !== workspace.revision)
+    throw fault('stale_revision', errorMessages.stale_revision);
   pendingEdit = {
     name,
-    args: { expectedRevision: workspace.revision, requestId: crypto.randomUUID(), ...args },
+    args: { ...args, expectedRevision, requestId: crypto.randomUUID() },
     clientId: session.client.id,
+    formId: drafts.submitted()?.id,
   };
   await performPendingEdit();
 }
@@ -239,6 +230,8 @@ async function performPendingEdit() {
     if (!result || typeof result.revision !== 'string')
       throw fault('failed', errorMessages.failed, true);
     pendingEdit = null;
+    if (attempt.formId) drafts.clean(attempt.formId);
+    if (attempt.name === 'set_selection') drafts.clearSelection();
   } catch (error) {
     editFailure(error, attempt);
   }
@@ -267,28 +260,60 @@ function editFailure(error, attempt) {
     setSession({ ...session, client: { ...session.client, scopes: ['read'] } });
   throw error;
 }
-const editors = bindEditors({ action, edit, command, getWorkspace: () => workspace });
+const getWorkspace = () => workspace;
+const editorOptions = { action, edit, command, drafts, getWorkspace, applyWorkspace };
+editorOptions.command = serialCommand(() => live, command);
+const editors = bindEditors(editorOptions);
+const previews = createPreviewController({
+  workspace: () => workspace,
+  session: () => session,
+  active: () => live.active(),
+  blocked: () => busy || !!pendingEdit || !!touch?.hasDraft(),
+  command,
+  apply: applyWorkspace,
+  setFonts: editors.setFonts,
+  changed: () => touch?.update(),
+});
+touch = bindTouchCanvas({
+  surface: $('#preview-surface'),
+  image: $('#workspace-preview'),
+  controls: $('#touch-tools'),
+  getWorkspace: () => workspace,
+  getPreview: () => previews.current(),
+  canEdit,
+  blocked: () => busy || stale || !!pendingEdit,
+  edit,
+  action,
+  notice,
+  onDraftChange: syncControls,
+});
+const machine = bindMachine({
+  command,
+  verifySession: async () => {
+    const value = await api('/api/session');
+    setSession(value.status === 'approved' ? value : null);
+    if (value.status !== 'approved' || !value.online)
+      throw new Error('The PC is offline or this connection is no longer approved.');
+    return value;
+  },
+});
 $('#artwork-list').addEventListener('change', syncControls);
-function continueToMcp() {
-  const target = new URLSearchParams(location.search).get('continue');
-  if (!target || target.length > 4096) return false;
-  try {
-    const parsed = new URL(target, location.origin);
-    if (
-      parsed.origin === location.origin &&
-      parsed.pathname === '/authorize' &&
-      !parsed.username &&
-      !parsed.password &&
-      !parsed.hash
-    ) {
-      location.assign(parsed.href);
-      return true;
-    }
-  } catch {
-    /* Only an exact same-origin consent page is accepted. */
-  }
-  return false;
-}
+live = bindWorkspaceLive({
+  ready: () => !!session,
+  blocked: () => busy || !!pendingEdit || machine.isBusy() || touch.hasDraft(),
+  generation: () => pairGeneration,
+  api,
+  command,
+  setSession,
+  session: () => session,
+  apply: applyWorkspace,
+  previews,
+});
+window.addEventListener('pagehide', () => {
+  pairGeneration++;
+  clearTimeout(poll);
+});
+bindWorkspaceEvents({ live, machine, action, drafts, editors, refresh });
 function schedulePairStatus(deadline, generation) {
   poll = setTimeout(() => {
     if (generation !== pairGeneration) return;
@@ -335,7 +360,10 @@ bindForm('#pair-form', action, async (form) => {
       deviceId: form.elements.deviceId.value.trim().toLowerCase(),
       code: form.elements.code.value.trim(),
       clientLabel,
-      requestedScopes: form.elements.edit.checked ? ['read', 'edit'] : ['read'],
+      requestedScopes: [
+        'read',
+        ...['edit', 'control'].filter((scope) => form.elements[scope].checked),
+      ],
     },
     generation,
   );
@@ -343,48 +371,25 @@ bindForm('#pair-form', action, async (form) => {
   notice('Approve this phone in KerfDesk on your PC.');
   await pairStatus(pairingDeadline(result.expiresInMs), generation);
 });
-$('#retry-edit').addEventListener('click', () => {
-  void action(performPendingEdit);
-});
-$('#refresh').addEventListener('click', () => {
-  void action(async () => {
-    if (await refresh())
-      notice(
-        pendingEdit
-          ? 'Workspace refreshed. Retry the last request to resolve its result.'
-          : 'Workspace refreshed.',
-      );
-  });
-});
-$('#disconnect').addEventListener('click', () => {
-  void action(async () => {
+bindSessionActions({
+  action,
+  notice,
+  touch,
+  scanner,
+  performPendingEdit,
+  refresh,
+  hasPendingEdit: () => !!pendingEdit,
+  syncControls,
+  api,
+  setSession,
+  session: () => session,
+  generation: () => pairGeneration,
+  pairStatus,
+  disconnect: async () => {
     pairGeneration++;
     clearTimeout(poll);
     poll = null;
     await api('/api/client/revoke', {});
     setSession(null);
-    notice('This phone is disconnected.');
-  });
-});
-for (const tab of document.querySelectorAll('[data-view]'))
-  tab.addEventListener('click', () => view(tab.dataset.view));
-const suggestedId = new URLSearchParams(location.search).get('deviceId');
-if (suggestedId && /^[0-9a-f-]{36}$/i.test(suggestedId))
-  pairForm.elements.deviceId.value = suggestedId;
-void action(async () => {
-  let admitted = false;
-  try {
-    const value = await api('/api/session');
-    if (value.status === 'approved') {
-      admitted = true;
-      setSession(value);
-      if (!continueToMcp()) await refresh();
-    } else if (value.status === 'pending') {
-      $('#pair-status').textContent = 'Waiting for approval on the PC…';
-      await pairStatus(pairingDeadline(value.expiresInMs), pairGeneration);
-    }
-  } catch (error) {
-    if (!session) setSession(null);
-    if (admitted) notice(error.message, true);
-  }
+  },
 });

@@ -33,7 +33,7 @@ test('phone workspace: bounded preview, job summary, literal untrusted text, no 
       await page.locator('#artwork-list').textContent(),
       /<script>literal artwork<\/script>/,
     );
-    await page.getByRole('button', { name: 'Details', exact: true }).click();
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
     assert.match(await page.locator('#details-list').textContent(), /Estimated 2 min/);
     assert.match(await page.locator('#details-list').textContent(), /50\.00 × 40\.00 mm/);
     assert.equal(await page.locator('#details-list script').count(), 0);
@@ -59,6 +59,7 @@ test('phone text: searchable bounded fonts, keyboard selection, existing text an
     await page.locator('#text-form [name=fontSearch]').fill('script');
     assert.equal(await font.inputValue(), 'serif', 'Searching does not change the selected font');
     assert.equal(await font.locator('img').count(), 0);
+    await openTask(page, 'edit-text-task');
     await page.getByRole('button', { name: 'Load text from PC', exact: true }).click();
     await idle(page);
     const form = page.locator('#text-edit-form');
@@ -135,6 +136,7 @@ test('phone text: unchanged embedded fonts are preserved and unchanged fields ar
   try {
     const { page } = loaded;
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'edit-text-task');
     await page.getByRole('button', { name: 'Load text from PC', exact: true }).click();
     await idle(page);
     const form = page.locator('#text-edit-form');
@@ -158,6 +160,8 @@ test('phone layout and history: selected IDs, equal-centre distribution, Undo th
     await page.locator('#artwork-list input[value="rectangle-1"]').check();
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await openTask(page, 'arrange-task');
+    assert.equal(await page.locator('#editor-sheet #history-controls').count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Undo', exact: true }).count(), 1);
     await page.locator('#arrange-form [name=action]').selectOption('distribute_horizontal');
     await page.getByRole('button', { name: 'Apply layout action' }).click();
     await idle(page);
@@ -177,6 +181,9 @@ test('phone layout and history: selected IDs, equal-centre distribution, Undo th
         .map((item) => item.name),
       ['undo', 'redo'],
     );
+    await page.locator('#close-editor').click();
+    assert.equal(await page.locator('#history-home #history-controls').count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Undo', exact: true }).isVisible(), true);
   } finally {
     await loaded.context.close();
   }
@@ -201,6 +208,11 @@ test('phone edits: stale response requires refresh and preserves unfinished form
     assert.equal(state.edits, 0);
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
     await idle(page);
+    assert.equal(await page.getByRole('button', { name: 'Move selection' }).isDisabled(), true);
+    assert.equal(await page.locator('#move-form [name=dxMm]').inputValue(), '2.5');
+    await page.getByRole('button', { name: 'Discard drafts and refresh', exact: true }).click();
+    await idle(page);
+    await page.locator('#move-form [name=dxMm]').fill('2.5');
     await page.getByRole('button', { name: 'Move selection' }).click();
     await idle(page);
     assert.equal(state.edits, 1);
@@ -222,11 +234,18 @@ test('phone edits: an uncertain result retains exactly the same ID and args on r
     await page.getByRole('button', { name: 'Add rectangle', exact: true }).click();
     await idle(page);
     assert.equal(state.edits, 1);
-    assert.equal(await page.locator('#retry-edit').isVisible(), true);
+    assert.equal(await page.locator('#editor-retry').isVisible(), true);
+    assert.equal(await page.locator('#retry-edit').isHidden(), true);
     assert.equal(
       await page.getByRole('button', { name: 'Add rectangle', exact: true }).isDisabled(),
       true,
     );
+    await page.locator('#close-editor').click();
+    assert.equal(await page.locator('#retry-edit').isVisible(), true);
+    assert.equal(await page.locator('#editor-retry').isHidden(), true);
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    assert.equal(await page.locator('#retry-edit').isHidden(), true);
+    assert.equal(await page.locator('#editor-retry').isVisible(), true);
     await page.getByRole('button', { name: 'Retry last request', exact: true }).click();
     await idle(page);
     assert.equal(state.edits, 1);
@@ -275,6 +294,7 @@ test('phone sharing off: preview explains opt-in and text cannot be loaded', asy
     assert.equal(await page.locator('#workspace-preview').isHidden(), true);
     assert.match(await page.locator('#preview-message').textContent(), /Sharing|sharing is off/);
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'edit-text-task');
     assert.equal(
       await page.getByRole('button', { name: 'Load text from PC', exact: true }).isDisabled(),
       true,
@@ -372,7 +392,7 @@ test('phone usability: selection leads straight to loaded text, keyboard task di
     assert.match(await page.locator('#selection-status').textContent(), /1 selected/);
     await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
     await idle(page);
-    assert.equal(await page.locator('#workspace-preview').isHidden(), true);
+    assert.equal(await page.locator('#workspace-preview').isVisible(), true);
     assert.equal(await page.locator('#text-editor').isVisible(), true);
     assert.equal(
       await page
@@ -498,7 +518,7 @@ test('phone draft resume: the same artwork and revision retain text, font and pa
     await form.locator('[name=alignment]').selectOption(drafts.alignment);
     for (const name of ['fontSizeMm', 'lineHeight', 'letterSpacing'])
       await form.locator(`[name=${name}]`).fill(drafts[name]);
-    await page.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await page.getByRole('button', { name: 'Design', exact: true }).click();
     await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
     await idle(page);
     assert.equal(await form.locator('[name=text]').inputValue(), 'DRAFT_UNSENT');
@@ -515,6 +535,7 @@ test('phone draft resume: the same artwork and revision retain text, font and pa
     assert.equal(state.commands.filter((item) => item.name === 'get_text').length, 1);
     assert.equal(state.edits, 0);
     await page.getByRole('button', { name: 'Choose another text', exact: true }).click();
+    await openTask(page, 'edit-text-task');
     await page.getByRole('button', { name: 'Load text from PC', exact: true }).click();
     await idle(page);
     assert.equal(await form.locator('[name=text]').inputValue(), 'MCP test');
@@ -527,7 +548,7 @@ test('phone draft resume: the same artwork and revision retain text, font and pa
   }
 });
 
-test('phone draft resume: a different target or refreshed revision loads current text and does not reuse the old draft', async () => {
+test('phone draft resume: target change loads current text and a newer PC revision keeps the unsent draft until explicit discard', async () => {
   const state = fixtureState();
   state.extraText = { ...state.text, artworkId: 'text-2', text: 'Second artwork', fontSizeMm: 6 };
   const loaded = await phonePage(browser, state);
@@ -537,7 +558,7 @@ test('phone draft resume: a different target or refreshed revision loads current
     await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
     await idle(page);
     await form.locator('[name=text]').fill('First unsent draft');
-    await page.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await page.getByRole('button', { name: 'Design', exact: true }).click();
     await page.locator('#artwork-list input[value="text-1"]').uncheck();
     await page.locator('#artwork-list input[value="text-2"]').check();
     await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
@@ -553,9 +574,17 @@ test('phone draft resume: a different target or refreshed revision loads current
     state.text.text = 'Changed on PC';
     await page.getByRole('button', { name: 'Refresh', exact: true }).click();
     await idle(page);
+    assert.equal(await page.locator('#text-editor').isHidden(), false);
+    assert.equal(await form.locator('[name=text]').inputValue(), 'Second unsent draft');
+    assert.equal(
+      await page.getByRole('button', { name: 'Update text', exact: true }).isDisabled(),
+      true,
+    );
+    await page.getByRole('button', { name: 'Discard drafts and refresh', exact: true }).click();
+    await idle(page);
     assert.equal(await page.locator('#text-editor').isHidden(), true);
     assert.equal(await form.locator('[name=text]').inputValue(), '');
-    await page.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await page.getByRole('button', { name: 'Design', exact: true }).click();
     await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
     await idle(page);
     assert.equal(await form.locator('[name=text]').inputValue(), 'Changed on PC');

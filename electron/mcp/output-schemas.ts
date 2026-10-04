@@ -1,10 +1,12 @@
 import { z } from 'zod';
 import { type KerfDeskMcpCommand, MCP_MAX_ITEMS } from './input-schemas.js';
+import { mcpMachineOutputSchemas } from './machine-schemas.js';
 import {
   MCP_TEXT_FIELDS,
   mcpAuthoringOutputSchemas,
   mcpHistorySchema,
   mcpPermissionsSchema,
+  mcpTouchCapabilitiesSchema,
 } from './authoring-schemas.js';
 
 const id = z.string().min(1).max(128);
@@ -55,6 +57,8 @@ export const mcpOutputSchemas = {
           name: label.optional(),
           bounds: bounds.optional(),
           operationId: id.optional(),
+          visible: z.boolean().optional(),
+          editable: z.boolean().optional(),
         }),
       )
       .max(MCP_MAX_ITEMS),
@@ -74,6 +78,7 @@ export const mcpOutputSchemas = {
     truncated: z.boolean(),
     history: mcpHistorySchema.optional(),
     permissions: mcpPermissionsSchema.optional(),
+    capabilities: mcpTouchCapabilitiesSchema.optional(),
   }),
   get_machine: z.object({
     revision,
@@ -149,6 +154,8 @@ export const mcpOutputSchemas = {
   set_selection: mcpWriteResultSchema,
   add_text: mcpWriteResultSchema,
   add_rectangle: mcpWriteResultSchema,
+  add_ellipse: mcpWriteResultSchema,
+  add_polyline: mcpWriteResultSchema,
   transform_artwork: mcpWriteResultSchema,
   update_operation: mcpWriteResultSchema,
   update_text: mcpWriteResultSchema,
@@ -156,6 +163,7 @@ export const mcpOutputSchemas = {
   undo: mcpWriteResultSchema,
   redo: mcpWriteResultSchema,
   ...mcpAuthoringOutputSchemas,
+  ...mcpMachineOutputSchemas,
 } as const;
 
 export type KerfDeskMcpResult<C extends KerfDeskMcpCommand> = z.output<

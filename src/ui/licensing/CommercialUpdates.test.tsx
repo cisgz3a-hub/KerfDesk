@@ -271,4 +271,55 @@ describe('desktop updates in the window (ADR-547)', () => {
       installOnQuit: false,
     });
   });
+  it('offers install-and-close only for a downloaded update and requires its own explicit click', async () => {
+    const installUpdateAndClose = vi.fn(async () => manual('ready', '2026.41.0', true));
+    const adapter = {
+      ...client(manual('available'), manual('ready')),
+      downloadUpdate: vi.fn(async () => manual('downloading')),
+      installUpdateOnQuit: vi.fn(async () => manual('ready', '2026.41.0', true)),
+      installUpdateAndClose,
+    };
+    await mount(adapter);
+    await wait(0);
+    await act(async () => button('Update available')?.click());
+    expect(button('Install and close KerfDesk')).toBeUndefined();
+    expect(installUpdateAndClose).not.toHaveBeenCalled();
+    await act(async () => button('Download update')?.click());
+    expect(installUpdateAndClose).not.toHaveBeenCalled();
+    await wait(3_000);
+    expect(button('Install and close KerfDesk')?.title).toContain(
+      'Active machine work keeps the app open',
+    );
+    expect(button('Install when I close KerfDesk')).toBeDefined();
+    expect(installUpdateAndClose).not.toHaveBeenCalled();
+    await act(async () => button('Install and close KerfDesk')?.click());
+    expect(installUpdateAndClose).toHaveBeenCalledOnce();
+    expect(adapter.installUpdateOnQuit).not.toHaveBeenCalled();
+    // A cancelled save/close leaves the app present and the explicit close choice usable.
+    expect(button('Install and close KerfDesk')?.disabled).toBe(false);
+    expect(host.querySelector('[aria-label="KerfDesk updates"]')).not.toBeNull();
+  });
+  it('does not repeat install-and-close while its verification response is pending', async () => {
+    let finish: (value: CommercialUpdateStatus) => void = () => undefined;
+    const adapter = {
+      ...client(manual('ready')),
+      installUpdateAndClose: vi.fn(
+        () =>
+          new Promise<CommercialUpdateStatus>((resolve) => {
+            finish = resolve;
+          }),
+      ),
+    };
+    await mount(adapter);
+    await wait(0);
+    await act(async () => button('Update ready')?.click());
+    await act(async () => {
+      button('Install and close KerfDesk')?.click();
+      button('Install and close KerfDesk')?.click();
+    });
+    expect(adapter.installUpdateAndClose).toHaveBeenCalledOnce();
+    expect(button('Install and close KerfDesk')?.disabled).toBe(true);
+    await act(async () => finish(manual('failed')));
+    expect(button('Install and close KerfDesk')).toBeUndefined();
+  });
 });

@@ -4,19 +4,19 @@ import {
   COMMAND_TIMEOUT_MS,
   MAX_BYTES,
   MAX_METADATA_BYTES,
-  PAIR_TTL_MS,
-  SESSION_TTL_MS,
-  WRITE_COMMANDS,
-  normalizedScopes,
+  CONTROL_COMMANDS,
+  mcpCommandScope,
   parseCommand,
   uuid,
   type GrantProps,
   type McpReservation,
   type RemoteScope,
 } from './protocol.js';
-import { digest, json, pairingCode, remainingPairingMs, sameDigest } from './security.js';
-import { DeviceApprovals } from './approvals.js';
+import { json, sameDigest } from './security.js';
+import { DevicePairing } from './pairing.js';
 import { McpRequests } from './mcp-requests.js';
+import { ControlActions } from './control-actions.js';
+import { plainObject, metadataBytes, parseEnvelope } from './device-envelope.js';
 type OwnerAttachment = { role: 'desktop'; connectionId: string };
 type Pending = {
   requestId: string;
@@ -27,6 +27,8 @@ type Pending = {
   mcpReservation?: McpReservation;
   name: keyof typeof mcpOutputSchemas;
   connectionId: string;
+  controlId?: string;
+  controlLookupId?: string;
   resolve: (value: CommandResponse) => void;
   timer: ReturnType<typeof setTimeout>;
 };
@@ -39,23 +41,26 @@ const errorResult = (code: KerfDeskMcpErrorCode): CommandResponse => ({
   result: null,
   error: { code, message: mcpErrorMessages[code] },
 });
-const plainObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-const metadataBytes = (value: unknown) =>
-  new TextEncoder().encode(JSON.stringify(value)).byteLength;
-function parseEnvelope(message: string): Record<string, unknown> | null {
-  try {
-    const value: unknown = JSON.parse(message);
-    return plainObject(value) && value.v === 1 && typeof value.type === 'string' ? value : null;
-  } catch {
-    return null;
-  }
+function controlLookupId(parsed: NonNullable<ReturnType<typeof parseCommand>>): string | undefined {
+  return parsed.name === 'get_control_operation' && 'operationId' in parsed.args
+    ? parsed.args.operationId
+    : undefined;
+}
+function unavailableResponse(
+  actions: ControlActions,
+  props: GrantProps,
+  receiptId: string | undefined,
+): CommandResponse {
+  return receiptId
+    ? { result: actions.unknown(props, receiptId), error: null }
+    : errorResult('unavailable');
 }
 
-/** Outbound desktop connection and ephemeral, bounded command exchanges. */
-export class RemoteDevice extends DeviceApprovals {
+/** Outbound desktop connection, bounded command exchanges and durable motion admission. */
+export class RemoteDevice extends DevicePairing {
   private readonly pending = new Map<string, Pending>();
   private readonly mcpRequests = new McpRequests();
+  private readonly controlActions = new ControlActions(this.ctx.storage);
   protected owner(): { socket: WebSocket; connectionId: string } | null {
     for (const socket of this.ctx.getWebSockets('desktop')) {
       if (socket.readyState !== WebSocket.OPEN) continue;
@@ -113,6 +118,7 @@ export class RemoteDevice extends DeviceApprovals {
   }
 
   protected revokePending(clientId: string): void {
+    this.controlActions.revoke(clientId);
     this.mcpRequests.revoke(clientId);
     for (const item of [...this.pending.values()])
       if (item.clientId === clientId) this.finish(item, errorResult('cancelled'), true);
@@ -124,7 +130,24 @@ export class RemoteDevice extends DeviceApprovals {
     clearTimeout(item.timer);
     if (cancelDesktop && this.owner()?.connectionId === item.connectionId)
       this.send({ v: 1, type: 'cancel', requestId: item.requestId });
-    item.resolve(result);
+    item.resolve(this.controlResponse(item, result));
+  }
+
+  private controlResponse(item: Pending, result: CommandResponse): CommandResponse {
+    if (!this.resultAuthorized(item)) return result;
+    const props = { deviceId: '', clientId: item.clientId, leaseId: item.leaseId };
+    if (item.controlId) {
+      const operation = result.result?.operation;
+      if (plainObject(operation) && operation.operationId === item.controlId)
+        this.controlActions.acknowledge(props, item.controlId, operation);
+      else result = { result: this.controlActions.unknown(props, item.controlId), error: null };
+    }
+    if (item.controlLookupId)
+      result = {
+        result: this.controlActions.lookup(props, item.controlLookupId, result.result),
+        error: null,
+      };
+    return result;
   }
 
   private cancelConnection(socket: WebSocket, code: KerfDeskMcpErrorCode): void {
@@ -143,9 +166,15 @@ export class RemoteDevice extends DeviceApprovals {
     props: GrantProps,
     scopes: RemoteScope,
     key: string,
+    priority = false,
   ): Promise<string | null> {
     return this.isAuthorized(props, scopes)
-      ? this.mcpRequests.begin(key, props, this.owner()?.connectionId ?? null)
+      ? this.mcpRequests.begin(
+          key,
+          props,
+          this.owner()?.connectionId ?? null,
+          priority && scopes.includes('control'),
+        )
       : null;
   }
 
@@ -188,16 +217,79 @@ export class RemoteDevice extends DeviceApprovals {
   ): Promise<CommandResponse> {
     const parsed = parseCommand(command);
     if (!parsed || !uuid.safeParse(requestId).success) return errorResult('invalid_input');
-    if (
-      !this.isAuthorized(props, scopes) ||
-      (WRITE_COMMANDS.has(parsed.name) && !scopes.includes('edit'))
-    )
+    if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
       return errorResult('unavailable');
-    if (sessionDigest && this.sessionInfo(props.clientId, sessionDigest).status !== 'approved')
-      return errorResult('unavailable');
+    const control = await this.admitControl(props, scopes, parsed, sessionDigest);
+    if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
+      return errorResult('cancelled');
+    if (control.response) return control.response;
+    const controlId = control.controlId;
+    const lookupId = controlLookupId(parsed);
     const owner = this.owner();
-    if (!owner || this.pending.size >= 32 || this.pending.has(requestId))
-      return errorResult('unavailable');
+    const priority = parsed.name === 'abort_job';
+    if (!owner || this.pending.size >= (priority ? 36 : 32) || this.pending.has(requestId))
+      return unavailableResponse(this.controlActions, props, controlId ?? lookupId);
+    return this.dispatch(
+      props,
+      scopes,
+      requestId,
+      parsed,
+      owner.connectionId,
+      sessionDigest,
+      mcpReservation,
+      controlId,
+      lookupId,
+    );
+  }
+
+  private commandAuthorized(
+    props: GrantProps,
+    scopes: RemoteScope,
+    parsed: NonNullable<ReturnType<typeof parseCommand>>,
+    sessionDigest?: string,
+  ): boolean {
+    return (
+      this.isAuthorized(props, scopes) &&
+      scopes.includes(mcpCommandScope(parsed.name)) &&
+      (!sessionDigest || this.sessionInfo(props.clientId, sessionDigest).status === 'approved')
+    );
+  }
+
+  private async admitControl(
+    props: GrantProps,
+    scopes: RemoteScope,
+    parsed: NonNullable<ReturnType<typeof parseCommand>>,
+    sessionDigest?: string,
+  ): Promise<{ controlId?: string; response?: CommandResponse }> {
+    if (!CONTROL_COMMANDS.has(parsed.name)) return {};
+    const admission = await this.controlActions.reserve(props, parsed.name, parsed.args, () =>
+      this.commandAuthorized(props, scopes, parsed, sessionDigest),
+    );
+    if (!this.commandAuthorized(props, scopes, parsed, sessionDigest))
+      return { response: errorResult('cancelled') };
+    if (admission.state === 'fresh') return { controlId: admission.operationId };
+    if (admission.state === 'replay')
+      return { response: { result: admission.result, error: null } };
+    const code =
+      admission.state === 'conflict'
+        ? 'invalid_input'
+        : admission.state === 'limit'
+          ? 'control_limit'
+          : 'unavailable';
+    return { response: errorResult(code) };
+  }
+
+  private dispatch(
+    props: GrantProps,
+    scopes: RemoteScope,
+    requestId: string,
+    parsed: NonNullable<ReturnType<typeof parseCommand>>,
+    connectionId: string,
+    sessionDigest?: string,
+    mcpReservation?: McpReservation,
+    controlId?: string,
+    controlLookupId?: string,
+  ): Promise<CommandResponse> {
     return new Promise((resolve) => {
       const item: Pending = {
         requestId,
@@ -207,7 +299,9 @@ export class RemoteDevice extends DeviceApprovals {
         name: parsed.name,
         sessionDigest,
         mcpReservation,
-        connectionId: owner.connectionId,
+        connectionId,
+        controlId,
+        controlLookupId,
         resolve,
         timer: setTimeout(() => {
           this.finish(item, errorResult('unavailable'), true);
@@ -215,7 +309,7 @@ export class RemoteDevice extends DeviceApprovals {
       };
       if (
         mcpReservation &&
-        !this.mcpRequests.attach(mcpReservation, props, owner.connectionId, requestId, (code) =>
+        !this.mcpRequests.attach(mcpReservation, props, connectionId, requestId, (code) =>
           this.finish(item, errorResult(code), true),
         )
       ) {
@@ -269,76 +363,6 @@ export class RemoteDevice extends DeviceApprovals {
       (!item.sessionDigest ||
         this.sessionInfo(item.clientId, item.sessionDigest).status === 'approved')
     );
-  }
-  private async createOffer(requestId: string): Promise<void> {
-    if (!this.state) return;
-    for (const item of this.state.clients.filter((client) => client.status === 'pending'))
-      this.revoke(item.id);
-    const code = pairingCode();
-    this.state.offer = {
-      id: crypto.randomUUID(),
-      digest: await digest(code),
-      expiresAt: Date.now() + PAIR_TTL_MS,
-      attempts: 0,
-      claimed: false,
-    };
-    await this.persist();
-    const expiresAt = this.state.offer.expiresAt;
-    const expiresInMs = remainingPairingMs(expiresAt);
-    if (expiresInMs === 0) return;
-    this.send({ v: 1, type: 'pair.offer', requestId, code, expiresAt, expiresInMs });
-  }
-  private async decidePair(value: Record<string, unknown>): Promise<void> {
-    if (!this.state || typeof value.pairingId !== 'string' || typeof value.approved !== 'boolean')
-      return;
-    const client = this.state.clients.find((item) => item.id === value.pairingId);
-    const scopes = Array.isArray(value.scopes) ? normalizedScopes(value.scopes) : null;
-    if (
-      !client ||
-      client.status !== 'pending' ||
-      client.claimExpiresAt <= Date.now() ||
-      !scopes ||
-      !scopes.every((scope) => client.scopes.includes(scope))
-    )
-      return;
-    if (!value.approved) this.revoke(client.id);
-    else {
-      client.status = 'approved';
-      client.scopes = scopes;
-      client.sessionExpiresAt = Date.now() + SESSION_TTL_MS;
-      client.leaseExpiresAt = client.sessionExpiresAt;
-    }
-    await this.persist();
-    this.sendClients();
-  }
-  private async handleMetadata(value: Record<string, unknown>): Promise<void> {
-    if (!this.state) return;
-    switch (value.type) {
-      case 'clients.list':
-        if (uuid.safeParse(value.requestId).success) this.sendClients(value.requestId as string);
-        break;
-      case 'pair.create':
-        if (uuid.safeParse(value.requestId).success)
-          await this.createOffer(value.requestId as string);
-        break;
-      case 'pair.decide':
-        await this.decidePair(value);
-        break;
-      case 'client.revoke':
-        if (typeof value.clientId !== 'string') return;
-        this.revoke(value.clientId);
-        await this.persist();
-        this.sendClients();
-        break;
-      case 'clients.revokeAll':
-        if (!uuid.safeParse(value.requestId).success) return;
-        for (const item of [...this.state.clients]) this.revoke(item.id);
-        this.state.offer = null;
-        await this.persist();
-        this.sendClients();
-        this.send({ v: 1, type: 'clients.revoked', requestId: value.requestId });
-        break;
-    }
   }
   async webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> {
     if (

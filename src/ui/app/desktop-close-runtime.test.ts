@@ -1,11 +1,19 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { rendererCloseRequestScript } from '../../../electron/renderer-close-request';
-import { createStreamer, step } from '../../core/controllers/grbl';
+import { createStreamer, parseStatusReport, step } from '../../core/controllers/grbl';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { installUnloadStop } from './use-unload-stop';
 import { installUnsavedChangesGuard } from './use-unsaved-changes-guard';
 import { desktopCloseController } from './desktop-close-runtime';
+import { useToastStore } from '../state/toast-store';
+import { useFramePreparationStore } from '../state/frame-preparation-store';
+import { statusPositionPatch } from '../state/laser-status-position';
+import {
+  beginJobTransportWrite,
+  bindLiveJobTransportLedger,
+  settleJobTransportWrite,
+} from '../state/laser-job-transport-ledger';
 
 const initialLaser = useLaserStore.getState();
 const initialScene = useStore.getState();
@@ -20,7 +28,10 @@ function install() {
   };
 }
 
-function request(operation: 'prepare' | 'approve' | 'cancel', id = 1): Promise<unknown> {
+function request(
+  operation: 'prepare' | 'prepare-update' | 'approve' | 'cancel',
+  id = 1,
+): Promise<unknown> {
   const result: unknown = window.eval(rendererCloseRequestScript(operation, id));
   return Promise.resolve(result);
 }
@@ -30,9 +41,99 @@ afterEach(() => {
   desktopCloseController.keepOpen();
   useLaserStore.setState(initialLaser);
   useStore.setState(initialScene);
+  useToastStore.setState({ toasts: [] });
+  useFramePreparationStore.setState({ pending: false });
 });
 
 describe('main-to-renderer fixed close protocol with actual unload hooks', () => {
+  it('keeps a running job or latched Fire open for update without sending Stop or Fire-off', async () => {
+    const stopJob = vi.fn(async () => undefined);
+    const setFireActive = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      streamer: step(createStreamer('G1 X1')).state,
+      stopJob,
+      setFireActive,
+    });
+    install();
+    expect(await request('prepare-update')).toEqual({ status: 'cancelled' });
+    useLaserStore.setState({ streamer: null, fireActive: true });
+    expect(await request('prepare-update', 2)).toEqual({ status: 'cancelled' });
+    expect(stopJob).not.toHaveBeenCalled();
+    expect(setFireActive).not.toHaveBeenCalled();
+    expect(desktopCloseController.ownsUnload).toBe(false);
+    expect(
+      useToastStore
+        .getState()
+        .toasts.some((toast) => toast.message.includes('KerfDesk stays open')),
+    ).toBe(true);
+  });
+  it('keeps Frame preparation open and rechecks it after an idle update approval', async () => {
+    const stopJob = vi.fn(async () => undefined);
+    useLaserStore.setState({ streamer: null, fireActive: false, stopJob });
+    install();
+    useFramePreparationStore.setState({ pending: true });
+    expect(await request('prepare-update')).toEqual({ status: 'cancelled' });
+    useFramePreparationStore.setState({ pending: false });
+    expect(await request('prepare-update', 2)).toMatchObject({ status: 'ready' });
+    useFramePreparationStore.setState({ pending: true });
+    expect(await request('approve', 2)).toEqual({ status: 'retry' });
+    expect(stopJob).not.toHaveBeenCalled();
+  });
+  it('retains intermittent spindle observations until a fresh all-off report', async () => {
+    const stopJob = vi.fn(async () => undefined);
+    const setFireActive = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      streamer: null,
+      fireActive: false,
+      accessoryCache: null,
+      stopJob,
+      setFireActive,
+    });
+    const receive = (wire: string) => {
+      const report = parseStatusReport(wire);
+      if (report === null) throw new Error('Invalid status fixture');
+      useLaserStore.setState(statusPositionPatch(useLaserStore.getState(), report));
+    };
+    install();
+    receive('<Idle|MPos:0,0,0|FS:0,12000|Ov:100,100,100|A:S>');
+    receive('<Idle|MPos:0,0,0|FS:0,12000>');
+    expect(useLaserStore.getState().statusReport?.accessories).toBeNull();
+    expect(useLaserStore.getState().accessoryCache?.spindleCw).toBe(true);
+    expect(await request('prepare-update')).toEqual({ status: 'cancelled' });
+    receive('<Idle|MPos:0,0,0|FS:0,0|Ov:100,100,100>');
+    expect(await request('prepare-update', 2)).toMatchObject({ status: 'ready' });
+    receive('<Idle|MPos:0,0,0|FS:0,12000|Ov:100,100,100|A:S>');
+    receive('<Idle|MPos:0,0,0|FS:0,12000>');
+    expect(await request('approve', 2)).toEqual({ status: 'retry' });
+    expect(stopJob).not.toHaveBeenCalled();
+    expect(setFireActive).not.toHaveBeenCalled();
+  });
+  it('keeps an off-store job refill open until its transport write settles', async () => {
+    const refs = { writeEpoch: 3 };
+    bindLiveJobTransportLedger(refs);
+    const epoch = beginJobTransportWrite(refs);
+    const stopJob = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      streamer: null,
+      fireActive: false,
+      pendingTransportWrites: 0,
+      pendingUntrackedAcks: 0,
+      stopJob,
+    });
+    install();
+    try {
+      expect(await request('prepare-update')).toEqual({ status: 'cancelled' });
+      settleJobTransportWrite(refs, epoch);
+      expect(await request('prepare-update', 2)).toMatchObject({ status: 'ready' });
+      const nextEpoch = beginJobTransportWrite(refs);
+      expect(await request('approve', 2)).toEqual({ status: 'retry' });
+      settleJobTransportWrite(refs, nextEpoch);
+      expect(stopJob).not.toHaveBeenCalled();
+    } finally {
+      settleJobTransportWrite(refs, epoch);
+    }
+  });
   it('awaits active handoff, retains dirty confirmation, and never repeats the stop at unload', async () => {
     let complete: () => void = () => undefined;
     const stop = vi.fn(() => new Promise<void>((resolve) => (complete = resolve)));

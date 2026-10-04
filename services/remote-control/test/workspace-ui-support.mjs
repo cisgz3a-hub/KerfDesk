@@ -1,13 +1,50 @@
-import { KERFDESK_WORKSPACE_UI_HTML } from '../../../electron/mcp/workspace-ui.ts';
+import { readFile } from 'node:fs/promises';
 import { UI_ORIGIN, fixtureState, idle, readResult } from './phone-workspace-support.mjs';
 
-export async function appPage(browser, state = fixtureState(), width = 390) {
+// Load the exact static source constants without depending on a previous Electron build.
+const machineSource = await readFile(
+  new URL('../../../electron/mcp/workspace-machine-ui.ts', import.meta.url),
+  'utf8',
+);
+const machineUrl = 'data:text/javascript,' + encodeURIComponent(machineSource);
+const liveSource = await readFile(
+  new URL('../../../electron/mcp/workspace-live-ui.ts', import.meta.url),
+  'utf8',
+);
+const liveUrl = 'data:text/javascript,' + encodeURIComponent(liveSource);
+const touchSource = await readFile(
+  new URL('../../../electron/mcp/workspace-touch-ui.ts', import.meta.url),
+  'utf8',
+);
+const touchUrl = 'data:text/javascript,' + encodeURIComponent(touchSource);
+const authoringSource = await readFile(
+  new URL('../../../electron/mcp/workspace-authoring-ui.ts', import.meta.url),
+  'utf8',
+);
+const authoringUrl = 'data:text/javascript,' + encodeURIComponent(authoringSource);
+const resourceSource = await readFile(
+  new URL('../../../electron/mcp/workspace-ui.ts', import.meta.url),
+  'utf8',
+);
+const { KERFDESK_WORKSPACE_UI_HTML } = await import(
+  'data:text/javascript,' +
+    encodeURIComponent(
+      resourceSource
+        .replace("'./workspace-machine-ui.js'", JSON.stringify(machineUrl))
+        .replace("'./workspace-live-ui.js'", JSON.stringify(liveUrl))
+        .replace("'./workspace-touch-ui.js'", JSON.stringify(touchUrl))
+        .replace("'./workspace-authoring-ui.js'", JSON.stringify(authoringUrl)),
+    )
+);
+
+export async function appPage(browser, state = fixtureState(), width = 390, options = {}) {
   const context = await browser.newContext({
     viewport: { width, height: 844 },
     isMobile: true,
     hasTouch: true,
   });
   const page = await context.newPage();
+  if (options.clock) await page.clock.install();
   const errors = [];
   const rpc = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -25,6 +62,20 @@ export async function appPage(browser, state = fixtureState(), width = 390) {
     state.commands.push({ name, args });
     if (state.revoked)
       return { isError: true, structuredContent: { error: { code: 'cancelled' } } };
+    const hooked = await state.readHook?.(name, args);
+    if (hooked)
+      return hooked.error
+        ? { isError: true, structuredContent: { error: hooked.error } }
+        : { structuredContent: hooked.result };
+    if (state.machineCommand) {
+      const answer = await state.machineCommand(name, args);
+      if (answer) {
+        if (answer.drop) return null;
+        return answer.error
+          ? { isError: true, structuredContent: { error: answer.error } }
+          : { structuredContent: answer.result };
+      }
+    }
     const result = readResult(state, name);
     if (result) return { structuredContent: result };
     if (!state.scopes.includes('edit'))

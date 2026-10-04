@@ -1,5 +1,10 @@
 import { type ToolAnnotations } from '@modelcontextprotocol/server';
-import { MCP_WRITE_COMMANDS, type KerfDeskMcpCommand } from './input-schemas.js';
+import {
+  MCP_WRITE_COMMANDS,
+  MCP_CONTROL_COMMANDS,
+  type KerfDeskMcpCommand,
+} from './input-schemas.js';
+import { mcpMachineToolInfo } from './machine-tool-info.js';
 
 export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; description: string }> = {
   get_workspace: {
@@ -57,6 +62,16 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
     description:
       'Add a rectangle in a Laser workspace, in millimetres. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
   },
+  add_ellipse: {
+    title: 'Add ellipse artwork',
+    description:
+      'Add an ellipse in a Laser workspace. xMm and yMm are the top-left scene corner of its widthMm/heightMm box. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+  },
+  add_polyline: {
+    title: 'Add drawn line artwork',
+    description:
+      'Add 2 to 512 scene-mm points as ordinary Laser drawing artwork with the same curve fairing as the PC pen. pointsMm use xMm/yMm; closed needs at least three distinct points. Requires expectedRevision and UUID requestId; the desktop owns admission and Undo.',
+  },
   transform_artwork: {
     title: 'Transform existing artwork',
     description:
@@ -87,13 +102,20 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
     description:
       'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
   },
+  ...mcpMachineToolInfo,
 };
 
 export function mcpToolAnnotations(command: KerfDeskMcpCommand): ToolAnnotations {
-  const readOnly = !MCP_WRITE_COMMANDS.has(command);
+  const control = MCP_CONTROL_COMMANDS.has(command);
+  const readOnly = !MCP_WRITE_COMMANDS.has(command) && !control;
   return {
     readOnlyHint: readOnly,
-    destructiveHint: !readOnly && !['set_selection', 'add_text', 'add_rectangle'].includes(command),
+    destructiveHint:
+      control ||
+      (!readOnly &&
+        !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
+          command,
+        )),
     idempotentHint: readOnly,
     openWorldHint: false,
   };

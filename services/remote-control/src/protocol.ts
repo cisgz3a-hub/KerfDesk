@@ -2,6 +2,8 @@ import { z } from 'zod';
 import {
   mcpInputSchemas,
   MCP_WRITE_COMMANDS,
+  MCP_CONTROL_COMMANDS,
+  mcpCommandScope,
   type KerfDeskMcpCommand,
 } from '../../../electron/mcp/input-schemas.js';
 
@@ -17,13 +19,16 @@ export const COMMAND_TIMEOUT_MS = 20_000;
 export const COOKIE_NAME = '__Host-kerfdesk_control';
 export const OAUTH_READ = 'kerfdesk:read';
 export const OAUTH_EDIT = 'kerfdesk:edit';
+export const OAUTH_CONTROL = 'kerfdesk:control';
 export const WRITE_COMMANDS = MCP_WRITE_COMMANDS;
+export const CONTROL_COMMANDS = MCP_CONTROL_COMMANDS;
+export { mcpCommandScope };
 export const uuid = z.uuid();
 export const secret = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const scopesSchema = z
-  .array(z.enum(['read', 'edit']))
+  .array(z.enum(['read', 'edit', 'control']))
   .min(1)
-  .max(2)
+  .max(3)
   .refine((value) => value.includes('read') && new Set(value).size === value.length);
 export type RemoteScope = z.output<typeof scopesSchema>;
 export const registerSchema = z.strictObject({
@@ -59,6 +64,7 @@ export type RemoteClient = {
   label: string;
   scopes: RemoteScope;
   createdAt: number;
+  controlExpiresInMs?: number;
 };
 export type StoredClient = RemoteClient & {
   status: 'pending' | 'approved';
@@ -74,8 +80,18 @@ export function normalizedScopes(value: readonly string[]): RemoteScope | null {
   return result.success ? result.data : null;
 }
 export function oauthScopes(scopes: readonly string[]): RemoteScope | null {
-  if (!scopes.includes(OAUTH_READ)) return null;
-  return scopes.includes(OAUTH_EDIT) ? ['read', 'edit'] : ['read'];
+  if (
+    !scopes.includes(OAUTH_READ) ||
+    scopes.some(
+      (scope) => ![OAUTH_READ, OAUTH_EDIT, OAUTH_CONTROL, 'offline_access'].includes(scope),
+    )
+  )
+    return null;
+  return [
+    'read',
+    ...(scopes.includes(OAUTH_EDIT) ? ['edit' as const] : []),
+    ...(scopes.includes(OAUTH_CONTROL) ? ['control' as const] : []),
+  ];
 }
 export function parseCommand(value: unknown) {
   const command = commandSchema.safeParse(value);

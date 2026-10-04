@@ -16,8 +16,13 @@ import { JobControls } from './JobControls';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const originalFrame = useLaserStore.getState().frame;
+let frameDispatch: Promise<void>;
 
 beforeEach(() => {
+  let observeFrameDispatch!: () => void;
+  frameDispatch = new Promise<void>((resolve) => {
+    observeFrameDispatch = resolve;
+  });
   resetStore();
   useLaserStore.setState({
     ...initialLaserState(),
@@ -34,7 +39,7 @@ beforeEach(() => {
     activeWcs: 'G54',
     // Reported zero offset: Frame need not ask for WCO first (ADR-375).
     wcoCache: { x: 0, y: 0, z: 0 },
-    frame: vi.fn(async () => undefined),
+    frame: vi.fn(async () => observeFrameDispatch()),
   });
   useToastStore.setState({ toasts: [] });
   useStore.setState((state) => ({
@@ -120,7 +125,8 @@ describe('JobControls Absolute Coordinates frame-first', () => {
         buttonByText('Frame job').dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      await vi.waitFor(() => expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1));
+      await frameDispatch;
+      expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1);
       expect(useLaserStore.getState().frame).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(Number),
@@ -129,6 +135,8 @@ describe('JobControls Absolute Coordinates frame-first', () => {
             wco: { x: 0, y: 0, z: 0 },
           }),
         }),
+        undefined,
+        undefined,
       );
       // The exact candidate is armed at dispatch, but a mocked trace that has
       // not physically completed earns neither compatibility proof nor permit.

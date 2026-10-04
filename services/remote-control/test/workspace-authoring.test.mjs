@@ -10,6 +10,15 @@ const newWrites = {
   arrange_artwork: { ...admission, artworkIds: ['art-1'], action: 'duplicate' },
   undo: admission,
   redo: admission,
+  add_ellipse: { ...admission, xMm: 2, yMm: 4, widthMm: 10, heightMm: 20 },
+  add_polyline: {
+    ...admission,
+    pointsMm: [
+      { xMm: 2, yMm: 4 },
+      { xMm: 10, yMm: 20 },
+    ],
+    closed: false,
+  },
 };
 
 test('real workerd: every new write refuses read-only OAuth and phone grants before delivery', async () => {
@@ -74,7 +83,7 @@ for (const modern of [false, true]) {
       );
       const tools = (await client.listTools()).tools;
       const preview = tools.find((tool) => tool.name === 'get_workspace_preview');
-      assert.equal(preview._meta.ui.resourceUri, 'ui://kerfdesk/workspace/v1.html');
+      assert.equal(preview._meta.ui.resourceUri, 'ui://kerfdesk/workspace/v5.html');
       assert.deepEqual(preview._meta.securitySchemes, [
         { type: 'oauth2', scopes: ['kerfdesk:read'] },
       ]);
@@ -101,6 +110,7 @@ for (const modern of [false, true]) {
         revision: 'audit-2',
         status: 'ready',
         preview: { mimeType: 'image/png', data: png, widthPx: 1, heightPx: 1 },
+        viewport: { xMm: -16, yMm: -24, widthMm: 256, heightMm: 256 },
       };
       desktop.send({ type: 'result', requestId: command.requestId, result });
       const response = await read;

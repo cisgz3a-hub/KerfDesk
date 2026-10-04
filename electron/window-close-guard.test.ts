@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
 import { WindowCloseGuard } from './window-close-guard.js';
 
-function harness() {
+function harness(updateClose = false) {
   const events = new EventEmitter();
   const webContents = new EventEmitter();
   const allowed = vi.fn();
@@ -24,6 +24,7 @@ function harness() {
     decideUnavailable: vi.fn((): 'leave' | 'stay' => 'stay'),
     forceClose: vi.fn(() => events.emit('closed')),
     isQuitRequested: () => quitting,
+    isUpdateCloseRequested: () => updateClose,
     cancelQuit: vi.fn(() => (quitting = false)),
     quit: vi.fn(() => window.close()),
     reportFailure: vi.fn(),
@@ -33,6 +34,30 @@ function harness() {
 }
 
 describe('ordinary desktop close and quit', () => {
+  it('uses the non-stopping update preparation and keeps busy replies open', async () => {
+    const h = harness(true);
+    h.requestQuit();
+    h.options.request.mockResolvedValueOnce({ status: 'cancelled' });
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.cancelQuit).toHaveBeenCalledOnce());
+    expect(h.options.request.mock.calls.map(([operation]) => operation)).toEqual([
+      'prepare-update',
+      'cancel',
+    ]);
+    expect(h.options.quit).not.toHaveBeenCalled();
+    expect(h.allowed).not.toHaveBeenCalled();
+  });
+  it('never force-closes an unavailable renderer on update consent', async () => {
+    const h = harness(true);
+    h.options.request.mockRejectedValueOnce(new Error('renderer unreachable'));
+    h.options.decideUnavailable.mockReturnValue('leave');
+    h.window.close();
+    await vi.waitFor(() => expect(h.options.cancelQuit).toHaveBeenCalledOnce());
+    expect(h.options.decideUnavailable).not.toHaveBeenCalled();
+    expect(h.options.forceClose).not.toHaveBeenCalled();
+    expect(h.allowed).not.toHaveBeenCalled();
+    expect(h.guard.wasClosedWithApproval()).toBe(false);
+  });
   it('grants update installation authority only after an approved actual close', async () => {
     const h = harness();
     expect(h.guard.wasClosedWithApproval()).toBe(false);

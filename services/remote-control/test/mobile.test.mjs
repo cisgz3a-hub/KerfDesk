@@ -485,14 +485,22 @@ for (const pairedOnStartup of [true, false])
         assert.equal(await page.locator('body').getAttribute('aria-busy'), 'true');
         assert.equal(await apply.isDisabled(), true);
         const power = page.locator('#operation-form [name=powerPercent]');
-        await power.fill('');
-        await power.fill('25');
+        assert.equal(await power.isDisabled(), true);
+        assert.equal(await power.inputValue(), '30');
         assert.equal(
           commands.some((command) => command.name === 'update_operation'),
           false,
         );
         detailDelay.release();
         await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        assert.equal(await apply.isEnabled(), true);
+        await power.fill('');
+        assert.equal(await power.inputValue(), '');
+        await power.fill('25');
+        assert.equal(
+          commands.some((command) => command.name === 'update_operation'),
+          false,
+        );
         await apply.click();
         await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
         const writes = commands.filter((command) => command.name === 'update_operation');

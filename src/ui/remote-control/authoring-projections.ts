@@ -13,6 +13,7 @@ export function workspaceReadProjection(state: AppState, options: RemoteControlO
   return {
     ...workspaceProjection(state, options.canShareArtwork?.() === true),
     history: historyProjection(state),
+    capabilities: { touchEditing: state.project.machine?.kind !== 'cnc' },
     permissions: {
       canEdit: options.canWrite() && options.canEdit?.() !== false && state.pendingUndo === null,
       artworkSharingEnabled: options.canShareArtwork?.() === true,

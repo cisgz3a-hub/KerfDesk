@@ -4,6 +4,7 @@ import {
   MAX_METADATA_BYTES,
   OAUTH_READ,
   OAUTH_EDIT,
+  OAUTH_CONTROL,
   oauthScopes,
 } from './protocol.js';
 import { DEFAULT_CSP, RequestFailure, boundedText, escapeHtml, originAllowed } from './security.js';
@@ -46,15 +47,13 @@ async function consentPage(
   const requested = [...new Set(description.scope)];
   if (
     !requested.includes(OAUTH_READ) ||
-    requested.some((scope) => ![OAUTH_READ, OAUTH_EDIT, 'offline_access'].includes(scope))
+    requested.some(
+      (scope) => ![OAUTH_READ, OAUTH_EDIT, OAUTH_CONTROL, 'offline_access'].includes(scope),
+    )
   )
     throw new RequestFailure(400);
-  const canEdit = session.info.client.scopes.includes('edit');
-  if (requested.includes(OAUTH_EDIT) && !canEdit)
-    return html(
-      'Read access only',
-      '<section class="card"><h1>This computer approved read access</h1><p>To let this client edit, pair again and approve read and edit access on the PC. Then reconnect the MCP client.</p></section>',
-    );
+  const accessNotice = consentAccessNotice(requested, session);
+  if (accessNotice) return accessNotice;
   const transaction = await oauth.beginConsent(authRequest);
   await saveConsentBinding(env, transaction.handle, session, requested);
   // Chromium applies form-action to the 303 callback too. Admit only the provider-validated return origin.
@@ -70,11 +69,33 @@ async function consentPage(
   const editDescription = requested.includes(OAUTH_EDIT)
     ? '<li>Add text and rectangles, select artwork, move or rotate it, and change existing laser operation settings.</li>'
     : '';
+  const controlDescription = requested.includes(OAUTH_CONTROL)
+    ? '<li>Jog the machine, Frame the current job, confirm its exact Job Review and Start cutting, or invoke software Abort. These actions affect the physical machine.</li>'
+    : '';
+  const limitsDescription = requested.includes(OAUTH_CONTROL)
+    ? 'A completed Frame and the exact current Job Review remain required before Start. Software Abort is not a hardware emergency stop.'
+    : 'This access cannot start a job or move a machine.';
   return html(
     'Approve MCP access',
-    `<section class="card"><p class="eyebrow">Computer approval</p><h1>Allow ${escapeHtml(description.clientName)}?</h1><p>This client will connect to <strong>${escapeHtml(session.info.deviceLabel)}</strong>.</p><dl><dt>Client</dt><dd>${escapeHtml(description.clientDomain ?? description.clientId)}</dd><dt>Return address</dt><dd>${escapeHtml(description.redirectHost)}${description.redirectIsLoopback ? ' (local app on this device)' : ''}</dd></dl><p>Only continue if you recognise this client and return address.</p><ul><li>Read the open workspace, machine profile, job review and app status.</li>${editDescription}${requested.includes('offline_access') ? '<li>Reconnect with this approval for up to 30 days. You can revoke access in KerfDesk at any time.</li>' : ''}</ul><p>KerfDesk must be open on the PC. This access cannot start a job, move a machine, open files or change your licence.</p><form method="post" action="/authorize"><input type="hidden" name="handle" value="${escapeHtml(transaction.handle)}">${scopeInputs}<div class="actions"><button name="decision" value="allow">Allow access</button><button class="secondary" name="decision" value="deny">Decline</button></div></form></section>`,
+    `<section class="card"><p class="eyebrow">Computer approval</p><h1>Allow ${escapeHtml(description.clientName)}?</h1><p>This client will connect to <strong>${escapeHtml(session.info.deviceLabel)}</strong>.</p><dl><dt>Client</dt><dd>${escapeHtml(description.clientDomain ?? description.clientId)}</dd><dt>Return address</dt><dd>${escapeHtml(description.redirectHost)}${description.redirectIsLoopback ? ' (local app on this device)' : ''}</dd></dl><p>Only continue if you recognise this client and return address.</p><ul><li>Read the open workspace, machine profile, job review and app status.</li>${editDescription}${controlDescription}${requested.includes('offline_access') ? '<li>Reconnect with this approval for up to 30 days. You can revoke access in KerfDesk at any time.</li>' : ''}</ul><p>KerfDesk must be open on the PC. ${limitsDescription} This access cannot open files or change your licence.</p><form method="post" action="/authorize"><input type="hidden" name="handle" value="${escapeHtml(transaction.handle)}">${scopeInputs}<div class="actions"><button name="decision" value="allow">Allow access</button><button class="secondary" name="decision" value="deny">Decline</button></div></form></section>`,
     transaction.headers,
   );
+}
+function consentAccessNotice(
+  requested: readonly string[],
+  session: ApprovedSession,
+): Response | null {
+  if (requested.includes(OAUTH_EDIT) && !session.info.client.scopes.includes('edit'))
+    return html(
+      'Read access only',
+      '<section class="card"><h1>This computer approved read access</h1><p>To let this client edit, pair again and approve read and edit access on the PC. Then reconnect the MCP client.</p></section>',
+    );
+  if (requested.includes(OAUTH_CONTROL) && !session.info.client.scopes.includes('control'))
+    return html(
+      'Machine control approval required',
+      '<section class="card"><h1>This computer has not approved machine control</h1><p>Pair again, request machine control separately, and approve that exact permission on the PC. Then reconnect the MCP client. Existing viewing or editing approval does not allow motion or Start.</p></section>',
+    );
+  return null;
 }
 async function consentForm(
   request: Request,
@@ -120,7 +141,7 @@ async function decideConsent(
     !scopes ||
     !scopes.every((scope) => session.info.client.scopes.includes(scope)) ||
     approved.request.scope.some(
-      (scope) => ![OAUTH_READ, OAUTH_EDIT, 'offline_access'].includes(scope),
+      (scope) => ![OAUTH_READ, OAUTH_EDIT, OAUTH_CONTROL, 'offline_access'].includes(scope),
     )
   )
     throw new RequestFailure(403);

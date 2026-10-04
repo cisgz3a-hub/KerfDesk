@@ -1,6 +1,7 @@
 import type { GrblState } from '../../core/controllers/grbl';
 import type { FrameVerification } from './frame-verification';
 import type { FrameMotionCandidate } from './framed-run';
+import type { MachineExecutionOwner } from './machine-execution-owner';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
 export type LaserMotionOperationId = number | symbol;
@@ -9,6 +10,7 @@ type LaserMotionOperationCommon = {
   /** Stable owner for every async transport/ack continuation belonging to one
    * physical motion operation. Carried unchanged across all Frame legs. */
   readonly operationId: LaserMotionOperationId;
+  readonly executionOwner?: MachineExecutionOwner;
   readonly sawControllerBusy: boolean;
   readonly idleStatusReports: number;
   readonly dispatchComplete: boolean;
@@ -260,17 +262,20 @@ export function takeNextAcknowledgedFramePrefixLine(
   const [line, ...pendingLines] = operation.pendingLines;
   if (line === undefined) return null;
   return {
-    operation: startMotionOperation(
-      'frame',
-      pendingLines,
-      operation.candidate,
-      Math.max(0, remaining - 1),
-      operation.pendingMotionTransportWrites ?? 0,
-      operation.operationId,
-      operation.settlementLine,
-      operation.verification,
-      operation.expectedReturnWorkZMm,
-    ),
+    operation: {
+      ...startMotionOperation(
+        'frame',
+        pendingLines,
+        operation.candidate,
+        Math.max(0, remaining - 1),
+        operation.pendingMotionTransportWrites ?? 0,
+        operation.operationId,
+        operation.settlementLine,
+        operation.verification,
+        operation.expectedReturnWorkZMm,
+      ),
+      ...executionOwnerPatch(operation),
+    },
     line,
   };
 }
@@ -301,6 +306,7 @@ export function takeNextMotionLine(
   return {
     operation: {
       ...nextOperation,
+      ...executionOwnerPatch(operation),
       ...(operation.mpgInterruptionId === undefined
         ? {}
         : { mpgInterruptionId: operation.mpgInterruptionId }),
@@ -308,6 +314,12 @@ export function takeNextMotionLine(
     },
     line,
   };
+}
+
+function executionOwnerPatch(
+  operation: LaserMotionOperation,
+): Pick<LaserMotionOperationCommon, 'executionOwner'> {
+  return operation.executionOwner === undefined ? {} : { executionOwner: operation.executionOwner };
 }
 
 export function acknowledgeMotionSettlementMarker(

@@ -141,6 +141,7 @@ describe('Frame ownership with a retained finished job display', () => {
         expect.objectContaining({ minX: 64, maxX: 84 }),
         expect.any(Number),
         frame.candidate,
+        undefined,
       );
       expect(useLaserStore.getState().framedRun?.candidate.project).toBe(currentProject);
       expect(useFramePreparationStore.getState().pending).toBe(false);

@@ -21,6 +21,7 @@ const relayResponseSchema = z.strictObject({
         'unsupported_operation',
         'invalid_input',
         'cancelled',
+        'control_limit',
         'failed',
       ]),
       message: z.string().max(2048),

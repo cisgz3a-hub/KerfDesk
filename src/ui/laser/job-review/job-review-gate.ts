@@ -43,11 +43,15 @@ import {
   type PreparedCurrentStart,
 } from './job-review-model';
 import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
-import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
+import { type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
 import { isOutputPreparationAbort } from '../output-preparation-errors';
-import { ownJobReviewPreparation } from './job-review-preparation-owner';
+import {
+  createJobReviewPresentation,
+  type JobReviewPresenter,
+  type JobReviewPresentation,
+} from './job-review-presentation';
 import { frozenLaserPowerScaleWarnings } from '../connected-laser-power-scale';
 import { clearReviewedJobSnapshot, publishReviewedJobSnapshot } from './reviewed-job-snapshot';
 
@@ -84,14 +88,15 @@ export async function runJobReviewGate(args: {
   /** Exact-handoff owner check for a pre-existing permit. */
   readonly shouldAbandon?: () => boolean;
   readonly onFrameMismatch?: () => void;
+  readonly presenter?: JobReviewPresenter;
 }): Promise<ConfirmedJobReview | null> {
   const purpose = args.purpose ?? 'start';
   let current = args.initial;
   let displayedModel = modelFor(current);
-  if (!useJobReviewStore.getState().open(displayedModel, purpose)) return null;
-  const snapshotOwner = useJobReviewStore.getState().requestOwner;
+  const owner = presentReview(displayedModel, purpose, args.presenter);
+  if (owner === null) return null;
+  const snapshotOwner = owner.requestOwner;
   publishReviewedJobSnapshot(current, displayedModel);
-  const owner = ownJobReviewPreparation();
   try {
     for (;;) {
       const signal = await owner.nextSignal();
@@ -100,7 +105,7 @@ export async function runJobReviewGate(args: {
       // fast Confirm can therefore arrive before that request. Re-prepare
       // synchronously at this handoff boundary so approval can never bind to
       // stale bytes or stale live evidence.
-      useJobReviewStore.getState().beginPrepare();
+      owner.beginPrepare();
       const rebuilt = await rebuildReviewedStart(
         args.completedReceipt,
         purpose,
@@ -111,7 +116,7 @@ export async function runJobReviewGate(args: {
       noteFrameMismatch(rebuilt, args);
       if (reviewPreparationWasCancelled(owner.signal, args.shouldAbandon)) return null;
       if (!rebuilt.ok) {
-        if (presentRebuildFailure(rebuilt)) return null;
+        if (presentRebuildFailure(rebuilt, owner)) return null;
         continue;
       }
       const rebuiltModel = modelFor(rebuilt.bundle);
@@ -124,7 +129,7 @@ export async function runJobReviewGate(args: {
       // Changed bytes/evidence need a new affirmative click after display.
       current = rebuilt.bundle;
       displayedModel = rebuiltModel;
-      useJobReviewStore.getState().completePrepare(displayedModel);
+      owner.completePrepare(displayedModel);
       publishReviewedJobSnapshot(current, displayedModel);
     }
   } catch (error) {
@@ -134,6 +139,13 @@ export async function runJobReviewGate(args: {
     clearReviewedJobSnapshot(snapshotOwner);
     owner.dispose();
   }
+}
+function presentReview(
+  model: JobReviewModel,
+  purpose: JobReviewPurpose,
+  presenter?: JobReviewPresenter,
+): JobReviewPresentation | null {
+  return (presenter ?? createJobReviewPresentation)(model, purpose);
 }
 
 function noteFrameMismatch(
@@ -340,18 +352,21 @@ function refreshFrozenReview(bundle: ReviewedStartBundle): RebuiltStart {
   };
 }
 
-function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: false }>): boolean {
+function presentRebuildFailure(
+  rebuilt: Extract<RebuiltStart, { readonly ok: false }>,
+  owner: JobReviewPresentation,
+): boolean {
   if (rebuilt.closeReview === true) {
-    useJobReviewStore.getState().close();
+    owner.close();
     return true;
   }
   // Publish the compiled model first, then the blocker over it: the stats,
   // warnings, and per-operation compiled summaries follow the edit while
   // Confirm stays unavailable until the operator resolves the refusal.
   if (rebuilt.display !== undefined) {
-    useJobReviewStore.getState().completePrepare(modelFor(rebuilt.display));
+    owner.completePrepare(modelFor(rebuilt.display));
   }
-  useJobReviewStore.getState().failPrepare(rebuilt.messages);
+  owner.failPrepare(rebuilt.messages);
   return false;
 }
 

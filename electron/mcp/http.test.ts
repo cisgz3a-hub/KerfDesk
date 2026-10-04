@@ -5,6 +5,35 @@ import { describe, expect, it, vi } from 'vitest';
 import { KerfDeskMcpError } from './backend.js';
 import { createKerfDeskMcpServer } from './server.js';
 
+const expectedToolNames = [
+  'get_workspace',
+  'get_machine',
+  'get_app_status',
+  'list_material_recipes',
+  'review_job',
+  'get_workspace_preview',
+  'list_fonts',
+  'get_text',
+  'set_selection',
+  'add_text',
+  'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
+  'transform_artwork',
+  'update_operation',
+  'update_text',
+  'arrange_artwork',
+  'undo',
+  'redo',
+  'get_machine_status',
+  'get_control_operation',
+  'jog_machine',
+  'frame_job',
+  'review_machine_job',
+  'start_job',
+  'abort_job',
+];
+
 describe.each([false, true])('portable HTTP factory (modern=%s)', (modern) => {
   it('connects an official client and calls through a Web Standard HTTP handler', async () => {
     const request = vi.fn(async () => ({
@@ -26,7 +55,7 @@ describe.each([false, true])('portable HTTP factory (modern=%s)', (modern) => {
         fetch: (url, init) => handler.fetch(new Request(url, init)),
       });
       await client.connect(transport);
-      expect((await client.listTools()).tools).toHaveLength(17);
+      expect((await client.listTools()).tools.map((tool) => tool.name)).toEqual(expectedToolNames);
       const result = await client.callTool({ name: 'get_app_status', arguments: {} });
       expect(result.structuredContent).toMatchObject({ revision: 'workspace-1' });
       expect(JSON.stringify(result)).not.toContain('secret-key');

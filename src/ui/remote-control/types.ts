@@ -1,4 +1,5 @@
 import type { AppState } from '../state/store';
+import type { MachineAuthority, RemoteCaller } from './machine-types';
 
 export type RemoteReadCommand =
   | 'get_workspace'
@@ -13,6 +14,8 @@ export type RemoteWriteCommand =
   | 'set_selection'
   | 'add_text'
   | 'add_rectangle'
+  | 'add_ellipse'
+  | 'add_polyline'
   | 'transform_artwork'
   | 'update_operation'
   | 'update_text'
@@ -98,6 +101,22 @@ export type RemoteWrite =
       };
     }
   | {
+      readonly command: 'add_ellipse';
+      readonly args: WriteAdmission & {
+        readonly xMm: number;
+        readonly yMm: number;
+        readonly widthMm: number;
+        readonly heightMm: number;
+      };
+    }
+  | {
+      readonly command: 'add_polyline';
+      readonly args: WriteAdmission & {
+        readonly pointsMm: readonly { readonly xMm: number; readonly yMm: number }[];
+        readonly closed: boolean;
+      };
+    }
+  | {
       readonly command: 'transform_artwork';
       readonly args: WriteAdmission & {
         readonly artworkIds: readonly string[];
@@ -169,6 +188,7 @@ export type RemoteErrorCode =
   | 'not_found'
   | 'not_editable'
   | 'needs_pro'
+  | 'control_required'
   | 'failed';
 export type RemoteCommandResult =
   | {
@@ -188,6 +208,9 @@ export type RemoteControlOptions = {
   readonly canEdit?: () => boolean;
   /** Separate desktop opt-in for sending text content or artwork pixels to remote clients. */
   readonly canShareArtwork?: () => boolean;
+  /** Captures an approved machine grant; never derive it from editing permission. */
+  readonly captureMachineAuthority?: () => MachineAuthority | null;
+  readonly getRemoteCaller?: () => RemoteCaller | null;
   readonly getReview?: (
     currentRevision: string,
     signal?: AbortSignal,
@@ -198,8 +221,14 @@ export type RemoteControlAdapter = {
   readonly execute: (
     command: string,
     args: unknown,
-    options?: { readonly signal?: AbortSignal },
+    options?: {
+      readonly signal?: AbortSignal;
+      readonly machineAuthority?: MachineAuthority | null;
+      readonly remoteCaller?: RemoteCaller | null;
+    },
   ) => Promise<RemoteCommandResult>;
   readonly getRevision: () => string;
   readonly dispose: () => void;
+  /** Synchronous final disclosure projection before native serialization. */
+  readonly machineDelivery?: (command: string, result: RemoteCommandResult) => RemoteCommandResult;
 };

@@ -13,8 +13,9 @@ change. MCP cancellation stops waiting and forwards the signal; it cannot undo
 a mutation that already committed. A retry after a timeout must retain the
 same UUID `requestId` until its outcome is known.
 
-Every write requires `expectedRevision` (1–200 characters) and a UUID
-`requestId`. IDs are 1–128 characters; arrays are bounded to 200 entries.
+Every artwork write requires `expectedRevision` (1–200 characters) and a UUID
+`requestId`. Machine actions use the same revision fence except Abort, which
+must remain reachable after an artwork change. IDs are 1–128 characters; arrays are bounded to 200 entries.
 Objects reject unrecognised fields, including nested transform/operation
 fields. All numbers must be finite. Coordinates are ±100000 mm, positive
 dimensions at most 100000 mm and positive font sizes at most 1000 mm.
@@ -32,11 +33,20 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 | `set_selection` | `artworkIds` | Empty array clears selection. |
 | `add_text` | `xMm`, `yMm`, `widthMm`, `text`, `fontSizeMm`, optional `fontId` | Text is 1–4096 characters; chosen bundled font or regular default. |
 | `add_rectangle` | `xMm`, `yMm`, `widthMm`, `heightMm` | Add normal rectangle artwork. |
+| `add_ellipse`           | `xMm`, `yMm`, `widthMm`, `heightMm` | Add ordinary Laser ellipse artwork. |
+| `add_polyline`          | `pointsMm` (2-512 `{xMm,yMm}` points), `closed` boolean | Add ordinary Laser pen artwork; closed paths need three distinct points. |
 | `transform_artwork` | Nonempty `artworkIds`, `transform` | Relative `{type:'move',dxMm,dyMm}`, grouped-bounds `{type:'resize',widthMm,heightMm}` or grouped-centre `{type:'rotate',angleDeg}`; angle ±36000 degrees. |
 | `update_operation` | `operationId`, nonempty `patch` | Existing ordinary laser operation only: `powerPercent` 0–100, positive `speedMmPerMin` ≤100000, integer `passes` 1–1000, or `enabled` boolean. |
 | `update_text` | `artworkId`, nonempty `patch` | Ordinary text: `text`, bundled `fontId`, positive `fontSizeMm` ≤1000, `alignment` left/center/right, `lineHeight` 0.1–20 or `letterSpacing` −1–20. Spacing is a multiplier of font size. |
 | `arrange_artwork` | Nonempty `artworkIds`, `action` | Align left/center/right/top/middle/bottom, distribute horizontal/vertical centres, mirror horizontal/vertical, group, ungroup, duplicate or delete. |
 | `undo`, `redo` | Only write admission | Shared desktop history; current edit approval still required. |
+| `get_machine_status` | None | Current connection, labelled work position, actual jog capabilities, Frame, job and action readiness. |
+| `get_control_operation` | `operationId` UUID | This client's bounded operation receipt; no movement or automatic retry. |
+| `jog_machine` | `axis` x/y/z, `direction` -1/1, `distanceMm` 0.01–100, optional `feedMmPerMin` 1–100000 | One canonical discrete jog, using the actual desktop's axis/direction/feed limits. |
+| `frame_job` | Machine write admission | Canonical tool-off Frame, with asynchronous owned operation status. |
+| `review_machine_job` | Machine write admission | Prepare the ordinary exact Job Review with a one-use handle; does not confirm Start. |
+| `start_job` | Machine write admission, `reviewId` UUID | Explicitly confirm the owned current review; changed review facts require another confirmation. |
+| `abort_job` | `requestId` UUID | Canonical network Abort, independently admitted while another command waits; no artwork revision required. |
 
 `arrange_artwork.action` uses `align_left`, `align_center`, `align_right`,
 `align_top`, `align_middle`, `align_bottom`, `distribute_horizontal`,
@@ -66,9 +76,18 @@ design coordinates; review bounds use output coordinates. Compilation
 readiness and spatial Frame completion are independent facts. No review read
 approves, Frames, starts or dispatches output.
 
-The static `ui://kerfdesk/workspace/v1.html` resource uses
-`text/html;profile=mcp-app`. Only the preview tool advertises
-`_meta.ui.resourceUri`; enclosing OAuth metadata is retained. The component
+The static `ui://kerfdesk/workspace/v4.html` resource uses
+`text/html;profile=mcp-app`. Preview and machine tools advertise
+`_meta.ui.resourceUri`; enclosing OAuth metadata is retained. Design, Machine
+and Settings separate the preview, controls and connection options. Visible
+views use bounded read-only refresh; unchanged previews are cached by revision.
+Hidden views pause. Pending selection drafts remain local, and stale edits need
+a current revision. Design refresh waits for an unsettled owned machine action;
+status and receipt reads continue while visible so it can resume on completion.
+The preview supports touch selection, moving and resizing, plus Laser brush,
+rectangle and ellipse drawing. Gestures remain local until Apply. Exact
+renderer viewport metadata maps the image to scene coordinates; stale drafts
+and lost access cannot commit them. The component
 initializes the MCP Apps host bridge and calls tools through `postMessage`,
 with no independent network or file access. Its external connect/resource
 allowlists are empty. UI permission hints grant no authority. Non-UI hosts
@@ -96,8 +115,23 @@ data. Annotations are client hints, never authorisation. This factory performs
 no authentication and binds no network listener. The enclosing connection must
 authenticate and scope the backend to the chosen paired desktop, with bounded
 request bodies, before dispatch. It exposes no shell, file access, raw G-code,
-Frame, Start, machine connection or motion tools. Normal desktop operator
-controls and policy remain responsible for machine work.
+arbitrary laser firing, homing or machine connection controls. Jog, Frame,
+review, Start and Abort require separate `control` approval and current bounded
+grant lifetime, independent of artwork editing (ADR-569). A completed Frame
+for unchanged placement remains the sole ordinary Start policy gate. The
+existing exact-program Job Review and licence policy remain authoritative.
+
+Machine action receipts distinguish admission, preparation, review, handoff,
+running, cancellation and observed completion. `committed: null` means that a
+handoff is unconfirmed; it must not be interpreted as proof that no motion
+occurred. The relay reserves action IDs and payload digests durably before
+dispatch, with 4096 ordinary and 256 reserved Abort actions per client/lease.
+Retries retain the original UUID. Status lookup cannot redispatch an action or
+read another client's receipt. No artwork, review strings, text or G-code is
+retained in that ledger. Revocation, expiry and renderer/controller replacement
+fence later dispatch; a job already handed to the ordinary streamer retains its
+normal run lifecycle. Network Abort requires a working connection and is not a
+physical emergency stop.
 
 The dependency pins are SDK server/client 2.2.0 and Zod 4.4.3. The optional
 OpenAI extensions package is omitted because its current SDK v1 peer contract

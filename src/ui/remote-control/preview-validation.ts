@@ -1,4 +1,10 @@
-import type { ColoredPath, CurveSubpath, SceneObject, Vec2 } from '../../core/scene';
+import {
+  applyTransform,
+  type ColoredPath,
+  type CurveSubpath,
+  type SceneObject,
+  type Vec2,
+} from '../../core/scene';
 import { isVectorSceneObject, type VectorSceneObject } from '../workspace/object-display';
 import { remoteBounds } from './projections';
 import { transformedBBox } from '../../core/scene/hit-test';
@@ -6,6 +12,26 @@ import { transformedBBox } from '../../core/scene/hit-test';
 export const PREVIEW_POINT_LIMIT = 50_000;
 export class PreviewUnavailable extends Error {}
 export type PreviewPointBudget = { points: number };
+export type PreviewImageFootprint = { readonly corners: readonly Vec2[] };
+
+/** Placement only. Never read an image's source, pixels, thumbnail or asset references. */
+export function validatedPreviewImageFootprint(
+  object: Extract<SceneObject, { kind: 'raster-image' }>,
+  budget: PreviewPointBudget,
+): PreviewImageFootprint {
+  validateTransform(object);
+  const { minX, minY, maxX, maxY } = object.bounds;
+  if (![minX, minY, maxX, maxY].every(bounded) || minX > maxX || minY > maxY) invalidGeometry();
+  const corners = [
+    { x: minX, y: minY },
+    { x: maxX, y: minY },
+    { x: maxX, y: maxY },
+    { x: minX, y: maxY },
+  ].map((point) => applyTransform(point, object.transform));
+  if (!corners.every(validPreviewPoint)) invalidGeometry();
+  reservePreviewPoints(budget, corners.length);
+  return { corners };
+}
 
 export function validatedPreviewObject(
   object: SceneObject,
@@ -13,12 +39,9 @@ export function validatedPreviewObject(
 ): VectorSceneObject {
   if (!isVectorSceneObject(object))
     throw new PreviewUnavailable(
-      'Remote previews currently support vector artwork and outlined text. Images and reliefs must be viewed on the PC.',
+      'Remote previews support vector artwork, outlined text and image placement frames. Reliefs must be viewed on the PC.',
     );
-  if (
-    !Object.values(object.transform).every((value) => typeof value === 'boolean' || bounded(value))
-  )
-    invalidGeometry();
+  validateTransform(object);
   if (object.kind === 'text' && object.content.trim() !== '' && object.paths.length === 0)
     throw new PreviewUnavailable(
       'Text outlines are not ready. Finish editing the text on the PC first.',
@@ -29,6 +52,13 @@ export function validatedPreviewObject(
     );
   for (const path of object.paths) validatePath(path, budget);
   return object;
+}
+
+function validateTransform(object: SceneObject): void {
+  if (
+    !Object.values(object.transform).every((value) => typeof value === 'boolean' || bounded(value))
+  )
+    invalidGeometry();
 }
 
 function validatePath(path: ColoredPath, budget: PreviewPointBudget): void {

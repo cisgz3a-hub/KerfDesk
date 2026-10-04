@@ -38,7 +38,7 @@ export type SessionInfo =
       sessionExpiresAt: number;
     };
 
-/** Small per-PC approval metadata only. No artwork or command history is stored. */
+/** Small per-PC approvals. Derived relays separately retain bounded action admission metadata. */
 export abstract class DeviceApprovals extends DurableObject<Env> {
   protected state: DeviceState | null = null;
   constructor(ctx: DurableObjectState, env: Env) {
@@ -51,9 +51,23 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
   protected abstract send(value: unknown): boolean;
   protected abstract revokePending(clientId: string): void;
   private approvedClients(): RemoteClient[] {
+    const now = Date.now();
     return (this.state?.clients ?? [])
-      .filter((item) => item.status === 'approved' && item.leaseExpiresAt > Date.now())
-      .map(({ id, label, scopes, createdAt }) => ({ id, label, scopes, createdAt }));
+      .filter((item) => item.status === 'approved' && item.leaseExpiresAt > now)
+      .map(({ id, label, scopes, createdAt, leaseExpiresAt }) => ({
+        id,
+        label,
+        scopes,
+        createdAt,
+        ...(scopes.includes('control')
+          ? {
+              controlExpiresInMs: Math.min(
+                GRANT_TTL_SECONDS * 1000,
+                Math.max(0, Math.floor(leaseExpiresAt - now)),
+              ),
+            }
+          : {}),
+      }));
   }
 
   protected sendClients(requestId = crypto.randomUUID()): void {
@@ -295,6 +309,7 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
       if (!client) return false;
       client.leaseExpiresAt = Math.max(client.leaseExpiresAt, Date.now() + lifetimeSeconds * 1000);
       await this.persist();
+      this.sendClients();
       return true;
     });
   }
@@ -311,14 +326,19 @@ export abstract class DeviceApprovals extends DurableObject<Env> {
   }
 
   protected revoke(clientId: string): void {
-    if (this.state) this.state.clients = this.state.clients.filter((item) => item.id !== clientId);
-    for (const [key, value] of this.ctx.storage.kv.list({
-      prefix: CONSENT_STORAGE_PREFIX,
-      limit: MAX_CONSENT_RECORDS,
-    })) {
-      const saved = consentRecordSchema.safeParse(value);
-      if (!saved.success || saved.data.clientId === clientId) this.ctx.storage.kv.delete(key);
-    }
-    this.revokePending(clientId);
+    this.ctx.storage.transactionSync(() => {
+      if (this.state) {
+        this.state.clients = this.state.clients.filter((item) => item.id !== clientId);
+        this.ctx.storage.kv.put('device', this.state);
+      }
+      for (const [key, value] of this.ctx.storage.kv.list({
+        prefix: CONSENT_STORAGE_PREFIX,
+        limit: MAX_CONSENT_RECORDS,
+      })) {
+        const saved = consentRecordSchema.safeParse(value);
+        if (!saved.success || saved.data.clientId === clientId) this.ctx.storage.kv.delete(key);
+      }
+      this.revokePending(clientId);
+    });
   }
 }

@@ -20,9 +20,12 @@ import {
   ownsRemoteSession,
   setRemoteSession,
   useRemoteAccessStore,
+  getAgedRemoteAccessStatus,
   type RemoteAccessStatus,
 } from './remote-access-store';
 import { remoteDeliveryResult, releaseRemoteDelivery } from './renderer-delivery';
+import { createRendererMachineAuthorities } from './renderer-machine-authority';
+import type { MachineAuthority } from '../remote-control/machine-types';
 
 type RequestEnvelope = {
   id: string;
@@ -30,11 +33,13 @@ type RequestEnvelope = {
   args: unknown;
   clientId: string;
   canWrite: boolean;
+  canControl: boolean;
 };
 type Active = {
   id: string;
   clientId: string;
   canWrite: boolean;
+  machineAuthority: MachineAuthority | null;
   sharesArtwork: boolean;
   controller: AbortController;
 };
@@ -49,6 +54,7 @@ function validRequest(value: unknown): value is RequestEnvelope {
     typeof value.clientId === 'string' &&
     value.clientId.length <= 128 &&
     typeof value.canWrite === 'boolean' &&
+    typeof value.canControl === 'boolean' &&
     object(value.args)
   );
 }
@@ -79,6 +85,13 @@ export class RemoteRendererSession {
   private readonly adapter: RemoteControlAdapter;
   private readonly options: RemoteControlOptions;
   private readonly ui = useRemoteAccessStore.getState();
+  private readonly authorities = createRendererMachineAuthorities(
+    (owner) => this.owns(owner),
+    getAgedRemoteAccessStatus,
+  );
+  private readonly observeAuthorities = useRemoteAccessStore.subscribe(() =>
+    this.authorities.observe(),
+  );
   constructor() {
     this.options = {
       canWrite: () => this.canWrite(),
@@ -86,6 +99,11 @@ export class RemoteRendererSession {
       getAppStatus: remoteAppStatus,
       canShareArtwork: () => !this.stopped && artworkSharingEnabled(),
       getReview: preparedJobReview,
+      captureMachineAuthority: () => this.active?.machineAuthority ?? null,
+      getRemoteCaller: () =>
+        this.session === null || this.active === null
+          ? null
+          : { clientId: this.active.clientId, sessionId: this.session },
     };
     this.adapter = createRemoteControlAdapter(this.options);
     window.addEventListener(REMOTE_REVOKE_EVENT, this.revoke);
@@ -107,6 +125,7 @@ export class RemoteRendererSession {
   private revoke = (event: Event): void => {
     const detail: unknown = (event as CustomEvent<unknown>).detail;
     const clientId = object(detail) && typeof detail.clientId === 'string' ? detail.clientId : null;
+    this.authorities.revoke(clientId);
     for (const request of this.requests.values())
       if (clientId === null || request.clientId === clientId) request.controller.abort();
   };
@@ -137,19 +156,29 @@ export class RemoteRendererSession {
       if (!this.stopped) this.ui.setMessage('Remote access could not attach to this workspace.');
     }
   }
-  private async run(request: RequestEnvelope, owner: string, current: Active): Promise<void> {
-    if (this.stopped || this.active !== null) return;
-    this.active = current;
+  private async run(
+    request: RequestEnvelope,
+    owner: string,
+    current: Active,
+    priority = false,
+  ): Promise<void> {
+    if (this.stopped || (!priority && this.active !== null)) return;
+    // Priority Abort has explicit invocation authority and cannot lend editing
+    // permission or identity to an ordinary request awaiting another result.
+    if (!priority) this.active = current;
     let result: RemoteCommandResult | undefined;
     let receipt: RemoteCommandResult | undefined;
     try {
       result = await this.adapter.execute(request.command, request.args, {
         signal: current.controller.signal,
+        machineAuthority: current.machineAuthority,
+        remoteCaller: { clientId: current.clientId, sessionId: owner },
       });
       if (this.owns(owner)) {
+        receipt = this.machineDelivery(request.command, result);
         receipt = remoteDeliveryResult(
           request.command,
-          result,
+          receipt,
           current.controller.signal,
           this.adapter.getRevision(),
           this.options,
@@ -173,20 +202,26 @@ export class RemoteRendererSession {
       if (this.requests.get(request.id) === current) this.requests.delete(request.id);
     }
   }
+  private machineDelivery(command: string, result: RemoteCommandResult): RemoteCommandResult {
+    return this.adapter.machineDelivery?.(command, result) ?? result;
+  }
   private schedule(request: RequestEnvelope, owner: string): void {
     const current = {
       id: request.id,
       clientId: request.clientId,
       canWrite: request.canWrite,
+      machineAuthority: this.authorities.capture(owner, request.clientId, request.canControl),
       sharesArtwork: request.command === 'get_workspace_preview' || request.command === 'get_text',
       controller: new AbortController(),
     };
     this.requests.set(request.id, current);
-    this.work = this.work.then(() => this.run(request, owner, current));
+    if (request.command === 'abort_job') void this.run(request, owner, current, true);
+    else this.work = this.work.then(() => this.run(request, owner, current));
   }
   private lostConnection(owner: string): void {
     if (!this.owns(owner)) return;
     for (const request of this.requests.values()) request.controller.abort();
+    this.authorities.dispose();
     this.ui.disconnected(
       owner,
       'Remote access lost its workspace connection. Reopen the app to reconnect.',
@@ -215,6 +250,8 @@ export class RemoteRendererSession {
     this.stopped = true;
     if (this.timer !== null) clearTimeout(this.timer);
     for (const request of this.requests.values()) request.controller.abort();
+    this.authorities.dispose();
+    this.observeAuthorities();
     this.adapter.dispose();
     window.removeEventListener(REMOTE_REVOKE_EVENT, this.revoke);
     window.removeEventListener(ARTWORK_SHARING_EVENT, this.sharingChanged);

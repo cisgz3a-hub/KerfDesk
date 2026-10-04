@@ -3,7 +3,7 @@ import WebSocket from 'ws';
 import { KerfDeskMcpError, mcpErrorCode } from '../mcp/backend.js';
 import {
   mcpInputSchemas,
-  MCP_WRITE_COMMANDS,
+  mcpCommandScope,
   MCP_MAX_RESULT_BYTES,
   type KerfDeskMcpCommand,
 } from '../mcp/input-schemas.js';
@@ -12,7 +12,6 @@ import { REMOTE_ORIGIN, type RemoteScope } from './relay-types.js';
 import type { RemoteIdentity } from './credential-store.js';
 import type { RemoteRendererQueue } from './renderer-queue.js';
 
-const WRITE_COMMANDS = MCP_WRITE_COMMANDS;
 export type RelayMessage = Record<string, unknown>;
 export const object = (value: unknown): value is RelayMessage =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -21,8 +20,8 @@ export const identifier = (value: unknown): value is string =>
 export const validRemoteScopes = (value: unknown): value is RemoteScope[] =>
   Array.isArray(value) &&
   value.length > 0 &&
-  value.length <= 2 &&
-  value.every((scope) => scope === 'read' || scope === 'edit') &&
+  value.length <= 3 &&
+  value.every((scope) => scope === 'read' || scope === 'edit' || scope === 'control') &&
   value.includes('read') &&
   new Set(value).size === value.length;
 
@@ -30,7 +29,11 @@ type Options = {
   readonly queue: RemoteRendererQueue;
   readonly onMessage: (message: RelayMessage) => void;
   readonly onConnection: (connected: boolean) => void;
-  readonly canRequest: (clientId: string, scopes: RemoteScope[]) => boolean;
+  readonly canRequest: (
+    clientId: string,
+    scopes: RemoteScope[],
+    requiresControl?: boolean,
+  ) => boolean;
 };
 type Command = {
   requestId: string;
@@ -56,8 +59,7 @@ function parseCommand(message: RelayMessage): Command | null {
     return null;
   const name = request.name as KerfDeskMcpCommand;
   const parsed = mcpInputSchemas[name].safeParse(request.args);
-  if (!parsed.success || (WRITE_COMMANDS.has(name) && !message.scopes.includes('edit')))
-    return null;
+  if (!parsed.success || !message.scopes.includes(mcpCommandScope(name))) return null;
   return {
     requestId: message.requestId,
     clientId: message.clientId,
@@ -137,8 +139,12 @@ class RemoteRelayClient {
   private acceptsCommand(command: Command): boolean {
     return (
       !this.commands.has(command.requestId) &&
-      this.commands.size < 32 &&
-      this.options.canRequest(command.clientId, command.scopes)
+      this.commands.size < (command.name === 'abort_job' ? 36 : 32) &&
+      this.options.canRequest(
+        command.clientId,
+        command.scopes,
+        mcpCommandScope(command.name) === 'control',
+      )
     );
   }
   private canReply(
@@ -146,11 +152,12 @@ class RemoteRelayClient {
     controller: AbortController,
     clientId: string,
     scopes: RemoteScope[],
+    requiresControl: boolean,
   ): boolean {
     return (
       generation === this.generation &&
       !controller.signal.aborted &&
-      this.options.canRequest(clientId, scopes)
+      this.options.canRequest(clientId, scopes, requiresControl)
     );
   }
   private async command(message: RelayMessage, generation: number): Promise<void> {
@@ -173,6 +180,7 @@ class RemoteRelayClient {
         clientId,
         scopes.includes('edit'),
         controller.signal,
+        scopes.includes('control') && this.options.canRequest(clientId, scopes, true),
       );
       const result = mcpOutputSchemas[name].safeParse(raw);
       if (
@@ -180,7 +188,9 @@ class RemoteRelayClient {
         Buffer.byteLength(JSON.stringify(result.data), 'utf8') > MCP_MAX_RESULT_BYTES
       )
         throw new KerfDeskMcpError('failed');
-      if (this.canReply(generation, controller, clientId, scopes))
+      if (
+        this.canReply(generation, controller, clientId, scopes, mcpCommandScope(name) === 'control')
+      )
         this.send({ type: 'result', requestId, result: result.data });
     } catch (error: unknown) {
       if (generation === this.generation) this.error(requestId, mcpErrorCode(error));

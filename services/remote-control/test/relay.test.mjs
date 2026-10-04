@@ -18,6 +18,74 @@ const closeSocket = (socket) => {
   if (socket && socket.readyState < 2) socket.close();
 };
 
+const readTools = [
+  'get_workspace',
+  'get_machine',
+  'get_app_status',
+  'list_material_recipes',
+  'review_job',
+  'get_workspace_preview',
+  'list_fonts',
+  'get_text',
+  'get_machine_status',
+  'get_control_operation',
+];
+const editTools = [
+  'set_selection',
+  'add_text',
+  'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
+  'transform_artwork',
+  'update_operation',
+  'update_text',
+  'arrange_artwork',
+  'undo',
+  'redo',
+];
+const controlTools = ['jog_machine', 'frame_job', 'review_machine_job', 'start_job', 'abort_job'];
+
+function assertToolCatalogue(tools) {
+  assert.equal(tools.length, 26);
+  assert.deepEqual(
+    tools.map((tool) => tool.name).sort(),
+    [...readTools, ...editTools, ...controlTools].sort(),
+  );
+  for (const tool of tools) {
+    const readOnly = readTools.includes(tool.name);
+    const control = controlTools.includes(tool.name);
+    assert.deepEqual(
+      tool._meta?.securitySchemes,
+      [
+        {
+          type: 'oauth2',
+          scopes: control
+            ? ['kerfdesk:read', 'kerfdesk:control']
+            : readOnly
+              ? ['kerfdesk:read']
+              : ['kerfdesk:read', 'kerfdesk:edit'],
+        },
+      ],
+      `${tool.name} OAuth scopes`,
+    );
+    assert.deepEqual(
+      tool.annotations,
+      {
+        readOnlyHint: readOnly,
+        destructiveHint:
+          control ||
+          (!readOnly &&
+            !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
+              tool.name,
+            )),
+        idempotentHint: readOnly,
+        openWorldHint: false,
+      },
+      `${tool.name} annotations`,
+    );
+  }
+}
+
 test('real workerd: fixed origin, small metadata, no bearer URLs, no machine routes and safe static page', async () => {
   const worker = start();
   try {
@@ -45,11 +113,19 @@ test('real workerd: fixed origin, small metadata, no bearer URLs, no machine rou
     assert.equal(page.status, 200);
     assert.match(page.headers.get('Content-Security-Policy'), /img-src 'self' data:;/);
     assert.match(await page.text(), /Approve this phone on the PC/);
-    for (const path of ['/control-edit.js', '/control-model.js', '/control-workspace.js']) {
+    for (const path of [
+      '/control-edit.js',
+      '/control-model.js',
+      '/control-workspace.js',
+      '/control-live.js',
+      '/control-drafts.js',
+      '/control-pairing.js',
+    ]) {
       const asset = await worker.dispatchFetch(`${ORIGIN}${path}`);
       assert.equal(asset.status, 200, path);
       assert.match(asset.headers.get('Content-Type'), /javascript/);
     }
+    assert.equal((await worker.dispatchFetch(`${ORIGIN}/control-unknown.js`)).status, 404);
     const notices = await worker.dispatchFetch(`${ORIGIN}/third-party-notices.txt`);
     assert.equal(notices.status, 200);
     const noticeText = await notices.text();
@@ -292,28 +368,7 @@ test('real workerd: official OAuth PKCE flow and SDK clients work in legacy and 
       try {
         await client.connect(transport);
         const tools = (await client.listTools()).tools;
-        assert.equal(tools.length, 17);
-        const editTools = [
-          'set_selection',
-          'add_text',
-          'add_rectangle',
-          'transform_artwork',
-          'update_operation',
-          'update_text',
-          'arrange_artwork',
-          'undo',
-          'redo',
-        ];
-        for (const tool of tools) {
-          assert.deepEqual(tool._meta?.securitySchemes, [
-            {
-              type: 'oauth2',
-              scopes: editTools.includes(tool.name)
-                ? ['kerfdesk:read', 'kerfdesk:edit']
-                : ['kerfdesk:read'],
-            },
-          ]);
-        }
+        assertToolCatalogue(tools);
         const call = client.callTool({ name: 'get_workspace', arguments: {} });
         const command = await desktop.inbox.next('command');
         assert.deepEqual(command.scopes, ['read', 'edit']);

@@ -4,7 +4,11 @@ import { InMemoryTransport, type CallToolResult } from '@modelcontextprotocol/se
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KerfDeskMcpError, mcpErrorMessages, type KerfDeskMcpBackend } from './backend.js';
-import { type KerfDeskMcpCommand, MCP_MAX_RESULT_BYTES } from './input-schemas.js';
+import {
+  type KerfDeskMcpCommand,
+  MCP_MAX_RESULT_BYTES,
+  MCP_CONTROL_COMMANDS,
+} from './input-schemas.js';
 import { createKerfDeskMcpServer } from './server.js';
 import { KERFDESK_WORKSPACE_UI_URI } from './workspace-ui.js';
 const writeAdmission = {
@@ -24,6 +28,15 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   set_selection: { ...writeAdmission, artworkIds: ['art-1'] },
   add_text: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, text: 'Hello', fontSizeMm: 5 },
   add_rectangle: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 },
+  add_ellipse: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 },
+  add_polyline: {
+    ...writeAdmission,
+    pointsMm: [
+      { xMm: 10, yMm: 20 },
+      { xMm: 30, yMm: 40 },
+    ],
+    closed: false,
+  },
   transform_artwork: {
     ...writeAdmission,
     artworkIds: ['art-1'],
@@ -34,9 +47,27 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   arrange_artwork: { ...writeAdmission, artworkIds: ['art-1'], action: 'mirror_horizontal' },
   undo: { ...writeAdmission },
   redo: { ...writeAdmission },
+  get_machine_status: {},
+  get_control_operation: { operationId: writeAdmission.requestId },
+  jog_machine: { ...writeAdmission, axis: 'x', direction: 1, distanceMm: 1 },
+  frame_job: { ...writeAdmission },
+  review_machine_job: { ...writeAdmission },
+  start_job: { ...writeAdmission, reviewId: writeAdmission.requestId },
+  abort_job: { requestId: writeAdmission.requestId },
 };
 
 const bounds = { xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 };
+const machineOperation = {
+  revision: 'revision-1',
+  operation: {
+    operationId: writeAdmission.requestId,
+    revision: 'revision-1',
+    kind: 'job',
+    state: 'accepted',
+    committed: false,
+  },
+};
+const readyAction = { available: true };
 const readResults: Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>> = {
   get_workspace: {
     revision: 'revision-1',
@@ -110,17 +141,40 @@ const readResults: Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>> 
     lineHeight: 1.2,
     letterSpacing: 0,
   },
+  get_machine_status: {
+    revision: 'revision-1',
+    permissions: { canControl: true },
+    mode: 'laser',
+    connection: 'connected',
+    controllerState: 'Idle',
+    position: { space: 'work', xMm: 0, yMm: 0 },
+    jog: { xySupported: true, zSupported: false, maxFeedMmPerMin: 3000 },
+    frame: { required: true, complete: false },
+    job: { active: false, state: 'idle' },
+    motion: { kind: 'idle' },
+    availability: {
+      jog: readyAction,
+      frame: readyAction,
+      review: readyAction,
+      start: { available: false },
+      abort: readyAction,
+    },
+  },
+  get_control_operation: machineOperation,
 };
 
 function successfulBackend(): KerfDeskMcpBackend {
   return {
     request: async (command) =>
       structuredClone(
-        readResults[command as KerfDeskMcpCommand] ?? {
-          revision: 'revision-2',
-          changedArtworkIds: ['art-1'],
-          selection: ['art-1'],
-        },
+        readResults[command as KerfDeskMcpCommand] ??
+          (MCP_CONTROL_COMMANDS.has(command as KerfDeskMcpCommand)
+            ? machineOperation
+            : {
+                revision: 'revision-2',
+                changedArtworkIds: ['art-1'],
+                selection: ['art-1'],
+              }),
       ),
   };
 }
@@ -158,7 +212,7 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
     const backend = successfulBackend();
     const request = vi.spyOn(backend, 'request');
     const client = await connectedClient(backend, modern);
-    expect(client.getServerVersion()).toMatchObject({ name: 'kerfdesk-desktop', version: '1.1.0' });
+    expect(client.getServerVersion()).toMatchObject({ name: 'kerfdesk-desktop', version: '1.2.0' });
     const listing = await client.listTools();
     expect(listing.tools.map((tool) => tool.name)).toEqual(Object.keys(toolExamples));
     for (const tool of listing.tools) {
@@ -166,7 +220,18 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
       expect(tool.outputSchema).toBeDefined();
       expect(tool.annotations?.openWorldHint).toBe(false);
       expect(tool.annotations?.readOnlyHint).toBe(tool.name in readResults);
-      if (tool.name === 'get_workspace_preview') {
+      if (
+        [
+          'get_workspace_preview',
+          'get_machine_status',
+          'get_control_operation',
+          'jog_machine',
+          'frame_job',
+          'review_machine_job',
+          'start_job',
+          'abort_job',
+        ].includes(tool.name)
+      ) {
         expect(tool._meta).toEqual({
           ui: { resourceUri: KERFDESK_WORKSPACE_UI_URI, visibility: ['model', 'app'] },
         });

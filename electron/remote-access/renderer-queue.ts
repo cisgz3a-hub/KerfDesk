@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { KerfDeskMcpError } from '../mcp/backend.js';
+import {
+  MCP_CONTROL_COMMANDS,
+  MCP_WRITE_COMMANDS,
+  type KerfDeskMcpCommand,
+} from '../mcp/input-schemas.js';
 
 export type RendererCommand = {
   readonly id: string;
@@ -7,6 +12,7 @@ export type RendererCommand = {
   readonly args: Record<string, unknown>;
   readonly clientId: string;
   readonly canWrite: boolean;
+  readonly canControl: boolean;
 };
 type Pending = {
   readonly request: RendererCommand;
@@ -44,9 +50,10 @@ class RemoteRendererQueue {
   poll(value: string): { requests: RendererCommand[]; cancelled: string[] } {
     if (value !== this.session) throw new KerfDeskMcpError('unavailable');
     const items = [...this.pending.values()];
-    const next = items.some((item) => item.delivered)
-      ? undefined
-      : items.find((item) => !item.delivered);
+    const priority = items.find((item) => !item.delivered && item.request.command === 'abort_job');
+    const next =
+      priority ??
+      (items.some((item) => item.delivered) ? undefined : items.find((item) => !item.delivered));
     if (next !== undefined) next.delivered = true;
     const result = {
       requests: next === undefined ? [] : [next.request],
@@ -71,8 +78,15 @@ class RemoteRendererQueue {
     clientId: string,
     canWrite: boolean,
     signal?: AbortSignal,
+    canControl = false,
   ): Promise<Record<string, unknown>> {
-    if (this.session === null || this.pending.size >= 32)
+    const name = command as KerfDeskMcpCommand;
+    if (
+      (MCP_CONTROL_COMMANDS.has(name) && !canControl) ||
+      (MCP_WRITE_COMMANDS.has(name) && !canWrite)
+    )
+      return Promise.reject(new KerfDeskMcpError('unavailable'));
+    if (this.session === null || this.pending.size >= (command === 'abort_job' ? 36 : 32))
       return Promise.reject(new KerfDeskMcpError('unavailable'));
     if (signal?.aborted === true) return Promise.reject(new KerfDeskMcpError('cancelled'));
     const id = randomUUID();
@@ -89,7 +103,7 @@ class RemoteRendererQueue {
       timer.unref();
       signal?.addEventListener('abort', cancel, { once: true });
       this.pending.set(id, {
-        request: { id, command, args, clientId, canWrite },
+        request: { id, command, args, clientId, canWrite, canControl },
         resolve,
         reject,
         delivered: false,

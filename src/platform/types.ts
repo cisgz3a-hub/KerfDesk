@@ -58,6 +58,8 @@ export type LicenceAdapter = {
   readonly downloadUpdate?: () => Promise<CommercialUpdateStatus>;
   /** Arm a verified installer for the next normal close; never quits now. */
   readonly installUpdateOnQuit?: () => Promise<CommercialUpdateStatus>;
+  /** Verify and arm a manual installer, then request a guarded idle-only app close. */
+  readonly installUpdateAndClose?: () => Promise<CommercialUpdateStatus>;
 };
 
 /**
@@ -88,6 +90,14 @@ export type CommercialUpdateStatus = {
   readonly installOnQuit?: boolean;
   readonly releaseNotes?: readonly string[];
   readonly releaseNotesState?: 'loading' | 'available' | 'unavailable';
+  /** Optional in older native services; bytes count only this verified release's transfer. */
+  readonly downloadProgress?: ManualUpdateDownloadProgress;
+};
+
+export type ManualUpdateDownloadProgress = {
+  readonly phase: 'starting' | 'receiving' | 'verifying';
+  readonly receivedBytes: number;
+  readonly totalBytes: number;
 };
 
 /**

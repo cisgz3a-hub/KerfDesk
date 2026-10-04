@@ -8,6 +8,7 @@ import {
   MAX_METADATA_BYTES,
   OAUTH_READ,
   OAUTH_EDIT,
+  OAUTH_CONTROL,
   oauthGrantSchema,
   oauthScopes,
 } from './protocol.js';
@@ -37,7 +38,7 @@ const provider = new OAuthProvider<Env>({
     bearer_methods_supported: ['header'],
   },
   requiredScopes: [OAUTH_READ],
-  scopesSupported: [OAUTH_READ, OAUTH_EDIT, 'offline_access'],
+  scopesSupported: [OAUTH_READ, OAUTH_EDIT, OAUTH_CONTROL, 'offline_access'],
   accessTokenTTL: ACCESS_TTL_SECONDS,
   refreshTokenTTL: GRANT_TTL_SECONDS,
   clientRegistrationTTL: 90 * 24 * 60 * 60,
@@ -124,7 +125,13 @@ export default {
       if (await limited(request, env, url))
         return safeResponse(json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' }));
       request = await boundBody(request, url);
-      return safeResponse(await provider.fetch(request, env, ctx));
+      const response = await provider.fetch(request, env, ctx);
+      const camera =
+        request.method === 'GET' &&
+        (url.pathname === '/' || url.pathname === '/control') &&
+        response.status === 200 &&
+        response.headers.get('Content-Type')?.startsWith('text/html') === true;
+      return safeResponse(response, camera);
     } catch (error) {
       const status = error instanceof RequestFailure ? error.status : 503;
       return safeResponse(

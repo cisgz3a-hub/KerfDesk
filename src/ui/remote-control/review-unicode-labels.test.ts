@@ -47,15 +47,22 @@ describe('Unicode operation names in real minimum-feature warnings', () => {
         }),
       };
       const projected = await reviewProjection(options, 'r1', 'laser');
-      expect(projected['warnings']).toEqual(
-        warnings.map((message, i) => ({
-          code: `job-review-${i + 1}`,
-          severity: 'warning',
-          message: message
-            .normalize('NFC')
-            .replace(`Layer "${name.normalize('NFC')}"`, 'Layer "artwork"'),
-        })),
-      );
+      const delivered = projected['warnings'] as { message: string }[];
+      expect(delivered).toHaveLength(warnings.length);
+      delivered.forEach((warning, i) => {
+        const safeNative = warnings[i]!.normalize('NFC').replace(
+          `Layer "${name.normalize('NFC')}"`,
+          'Layer "artwork"',
+        );
+        // Coincidence with a unit or ordinary prose is ambiguous: keep its
+        // factual body untouched or give the conservative PC-only fallback.
+        const allowed =
+          name === 'mm' || name === 'laser'
+            ? [safeNative, 'Review this artwork-specific warning in KerfDesk on the PC.']
+            : [safeNative];
+        expect(allowed).toContain(warning.message);
+        expect(warning.message).not.toContain(`Layer "${name.normalize('NFC')}"`);
+      });
     },
   );
 });

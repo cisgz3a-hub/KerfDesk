@@ -6,7 +6,7 @@
     "Fixed trial time returning after restart and number boxes staying invalid after their value was restored.",
     "Image edits stay with their file, and side-panel controls remain reachable in small windows.",
     "Dialogs preserve newer projects, drafts, keyboard focus and text during character selection.",
-    "Paired phones and MCP apps can edit text and fonts, arrange artwork, and use desktop Undo and Redo.",
-    "Added optional shared artwork previews and current job review to Phone & MCP."
+    "Phone & MCP adds QR scanning, touch drawing and resizing, clearer controls and live PC artwork updates.",
+    "Updates show download progress and verification, with Install and close KerfDesk preserving unsaved work and active jobs."
   ]
 }

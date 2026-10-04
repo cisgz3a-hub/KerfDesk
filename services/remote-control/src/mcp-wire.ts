@@ -8,6 +8,7 @@ const toolRequest = z.object({
   jsonrpc: z.literal('2.0'),
   method: z.literal('tools/call'),
   id: wireId,
+  params: z.object({ name: z.string().max(128) }).optional(),
 });
 const cancellation = z.object({
   jsonrpc: z.literal('2.0'),
@@ -58,7 +59,12 @@ export async function prepareMcpExchange(
     await stub.cancelMcpRequest(props, scopes, key);
     return { response: new Response(null, { status: 202 }) };
   }
-  const reservationId = await stub.beginMcpRequest(props, scopes, key);
+  const reservationId = await stub.beginMcpRequest(
+    props,
+    scopes,
+    key,
+    tool.success && tool.data.params?.name === 'abort_job',
+  );
   return reservationId
     ? { reservation: { key, id: reservationId } }
     : { response: json({ error: 'unavailable' }, 503) };

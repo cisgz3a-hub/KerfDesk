@@ -5,7 +5,13 @@ import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KerfDeskMcpError, type KerfDeskMcpBackend } from './backend.js';
 import { MCP_ARRANGE_ACTIONS } from './authoring-schemas.js';
-import { MCP_MAX_RESULT_BYTES, MCP_WRITE_COMMANDS } from './input-schemas.js';
+import {
+  MCP_MAX_RESULT_BYTES,
+  MCP_WRITE_COMMANDS,
+  MCP_CONTROL_COMMANDS,
+  mcpCommandScope,
+  type KerfDeskMcpCommand,
+} from './input-schemas.js';
 import { createKerfDeskMcpServer, type KerfDeskMcpToolMetadata } from './server.js';
 import { KERFDESK_WORKSPACE_UI_MIME, KERFDESK_WORKSPACE_UI_URI } from './workspace-ui.js';
 
@@ -22,6 +28,38 @@ const readyPreview = {
   bounds: { xMm: -2, yMm: 3, widthMm: 20, heightMm: 10 },
 };
 const closers: Array<() => Promise<void>> = [];
+const readTools = [
+  'get_workspace',
+  'get_machine',
+  'get_app_status',
+  'list_material_recipes',
+  'review_job',
+  'get_workspace_preview',
+  'list_fonts',
+  'get_text',
+  'get_machine_status',
+  'get_control_operation',
+] as const;
+const editTools = [
+  'set_selection',
+  'add_text',
+  'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
+  'transform_artwork',
+  'update_operation',
+  'update_text',
+  'arrange_artwork',
+  'undo',
+  'redo',
+] as const;
+const controlTools = [
+  'jog_machine',
+  'frame_job',
+  'review_machine_job',
+  'start_job',
+  'abort_job',
+] as const;
 
 afterEach(async () => {
   for (const close of closers.splice(0).reverse()) await close();
@@ -120,25 +158,36 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
     expect(request).not.toHaveBeenCalled();
   });
 
-  it('classifies every text, layout and history mutation as requiring edit permission', async () => {
+  it('keeps read, artwork-edit and machine-control permissions distinct', async () => {
     const client = await clientFor({ request: async () => ({}) }, modern);
     const tools = (await client.listTools()).tools;
+    expect(tools).toHaveLength(26);
+    expect(new Set(tools.map((tool) => tool.name))).toEqual(
+      new Set([...readTools, ...editTools, ...controlTools]),
+    );
     const writes = tools.filter((tool) => !tool.annotations?.readOnlyHint).map((tool) => tool.name);
-    expect(writes).toEqual([
-      'set_selection',
-      'add_text',
-      'add_rectangle',
-      'transform_artwork',
-      'update_operation',
-      'update_text',
-      'arrange_artwork',
-      'undo',
-      'redo',
-    ]);
-    expect(new Set(writes)).toEqual(MCP_WRITE_COMMANDS);
+    expect(writes).toEqual([...editTools, ...controlTools]);
+    expect(MCP_WRITE_COMMANDS).toEqual(new Set(editTools));
+    expect(MCP_CONTROL_COMMANDS).toEqual(new Set(controlTools));
+    const edits = new Set<string>(editTools);
+    const controls = new Set<string>(controlTools);
     for (const tool of tools) {
-      expect(tool.annotations?.idempotentHint).toBe(tool.annotations?.readOnlyHint);
-      expect(tool.annotations?.openWorldHint).toBe(false);
+      const control = controls.has(tool.name);
+      const readOnly = !control && !edits.has(tool.name);
+      expect(mcpCommandScope(tool.name as KerfDeskMcpCommand)).toBe(
+        control ? 'control' : readOnly ? 'read' : 'edit',
+      );
+      expect(tool.annotations).toEqual({
+        readOnlyHint: readOnly,
+        destructiveHint:
+          control ||
+          (!readOnly &&
+            !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
+              tool.name,
+            )),
+        idempotentHint: readOnly,
+        openWorldHint: false,
+      });
     }
   });
 

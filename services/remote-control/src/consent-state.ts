@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { grantSchema, OAUTH_READ, OAUTH_EDIT, type GrantProps } from './protocol.js';
+import { grantSchema, OAUTH_READ, OAUTH_EDIT, OAUTH_CONTROL, type GrantProps } from './protocol.js';
 import { sameDigest } from './security.js';
 
 // Match the pinned provider's consent lifetime; its own transaction can expire sooner.
@@ -10,9 +10,9 @@ export const consentDigestSchema = z.string().regex(/^[a-f0-9]{64}$/);
 export const consentBindingSchema = grantSchema.extend({
   sessionDigest: consentDigestSchema,
   displayedScopes: z
-    .array(z.enum([OAUTH_READ, OAUTH_EDIT, 'offline_access']))
+    .array(z.enum([OAUTH_READ, OAUTH_EDIT, OAUTH_CONTROL, 'offline_access']))
     .min(1)
-    .max(3),
+    .max(4),
   expiresAt: z.number().int().positive().safe(),
 });
 export type ConsentBinding = z.output<typeof consentBindingSchema>;
@@ -32,7 +32,7 @@ export function matchesConsent(
     value.leaseId === props.leaseId &&
     sameDigest(value.sessionDigest, sessionDigest) &&
     selectedScopes.includes(OAUTH_READ) &&
-    selectedScopes.length <= 3 &&
+    selectedScopes.length <= 4 &&
     new Set(selectedScopes).size === selectedScopes.length &&
     selectedScopes.every((scope) => value.displayedScopes.some((displayed) => displayed === scope))
   );

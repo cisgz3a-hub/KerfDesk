@@ -3,6 +3,7 @@ import { startCollecting } from '../../core/controllers/grbl';
 import { grblDriver } from '../../core/controllers';
 import type { FrameVerification } from './frame-verification';
 import { handleLine, type GetFn, type HandlerRefs, type SetFn } from './laser-line-handler';
+import type { SafeWriteFn } from './laser-line-shared';
 import type { LaserState } from './laser-store';
 
 function makeLaserState(): LaserState {
@@ -208,15 +209,31 @@ describe('handleLine queued Frame writes', () => {
         pendingLines: ['$J=G90 G21 X10.000 Y0.000 F1000\n'],
       },
     });
-    const safeWrite = vi.fn(async () => {
+    let cleanupObserved!: () => void;
+    const cleanup = new Promise<void>((resolve) => {
+      cleanupObserved = resolve;
+    });
+    const observeCleanup: SetFn = (partial) => {
+      set(partial);
+      const state = get();
+      if (state.motionOperation?.cancelRequested === true && state.frameVerification === null)
+        cleanupObserved();
+    };
+    const safeWrite = vi.fn<SafeWriteFn>(async (_line, _action, _source, assertBeforeWrite) => {
+      assertBeforeWrite?.();
       throw new Error('port lost');
     });
 
-    handleLine(set, get, refs, safeWrite, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-    await Promise.resolve();
-    await Promise.resolve();
+    handleLine(observeCleanup, get, refs, safeWrite, '<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await cleanup;
 
-    expect(safeWrite).toHaveBeenCalledWith('$J=G90 G21 X10.000 Y0.000 F1000\n', 'frame');
+    expect(safeWrite).toHaveBeenCalledTimes(1);
+    expect(safeWrite).toHaveBeenCalledWith(
+      '$J=G90 G21 X10.000 Y0.000 F1000\n',
+      'frame',
+      undefined,
+      expect.any(Function),
+    );
     expect(get().motionOperation).toMatchObject({
       kind: 'frame',
       cancelRequested: true,

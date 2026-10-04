@@ -30,7 +30,7 @@ const DESCRIBE: Record<CommercialUpdateStatus['state'], Describe> = {
   checking: () => 'Checking for updates...',
   available: (status) =>
     `KerfDesk ${version(status)} is available. Download it when you are ready.`,
-  downloading: (status) => `Downloading KerfDesk ${version(status)}...`,
+  downloading: downloadText,
   'up-to-date': (status, _until, formatTime) =>
     `KerfDesk is up to date.${checked(status, formatTime)}`,
   ready: readyText,
@@ -43,6 +43,19 @@ const DESCRIBE: Record<CommercialUpdateStatus['state'], Describe> = {
         ? "KerfDesk couldn't check for updates. Check the internet connection, then try again."
         : `KerfDesk ${status.version} couldn't be prepared. KerfDesk tries again next time it opens.`,
 };
+
+function downloadText(status: CommercialUpdateStatus): string {
+  const progress = status.downloadProgress;
+  if (progress?.phase === 'starting') return `Preparing to download KerfDesk ${version(status)}...`;
+  if (progress?.phase === 'verifying')
+    return `Verifying download for KerfDesk ${version(status)}...`;
+  const prefix = `Downloading KerfDesk ${version(status)}...`;
+  if (progress === undefined) return prefix;
+  const percent = Math.floor((progress.receivedBytes / progress.totalBytes) * 100);
+  const received = (progress.receivedBytes / 1_000_000).toFixed(1);
+  const total = (progress.totalBytes / 1_000_000).toFixed(1);
+  return `${prefix} ${percent}% (${received} of ${total} MB).`;
+}
 
 function readyText(status: CommercialUpdateStatus): string {
   const start = `KerfDesk ${version(status)} is ready.`;

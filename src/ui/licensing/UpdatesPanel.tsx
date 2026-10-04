@@ -3,6 +3,7 @@ import type { CommercialUpdateStatus, LicenceAdapter } from '../../platform/type
 import { EarlyUpdatesOption } from './EarlyUpdatesOption';
 import { licenceButtons, licenceMuted } from './LicenceControls';
 import { updateCheckAllowed, updateStatusText } from './update-status-text';
+import { ManualUpdateInstallActions } from './ManualUpdateInstallActions';
 
 type Props = {
   readonly client: LicenceAdapter;
@@ -11,8 +12,10 @@ type Props = {
   readonly updatesUntil: number | null;
   readonly onCheck: () => Promise<void>;
   readonly busy: boolean;
+  readonly feedback?: string | null | undefined;
   readonly onDownload: () => Promise<void>;
   readonly onInstallOnQuit: () => Promise<void>;
+  readonly onInstallAndClose?: (() => Promise<void>) | undefined;
   readonly onClose: () => void;
 };
 
@@ -28,8 +31,10 @@ export function UpdatesPanel({
   updatesUntil,
   onCheck,
   busy: requestBusy,
+  feedback,
   onDownload,
   onInstallOnQuit,
+  onInstallAndClose,
   onClose,
 }: Props): JSX.Element {
   const busy = requestBusy || status?.state === 'checking' || status?.state === 'downloading';
@@ -48,7 +53,12 @@ export function UpdatesPanel({
         </button>
       </div>
       <div style={details} role="region" aria-label="Update details" tabIndex={0}>
-        <UpdateDetails client={client} status={status} updatesUntil={updatesUntil} />
+        <UpdateDetails
+          client={client}
+          status={status}
+          updatesUntil={updatesUntil}
+          feedback={feedback}
+        />
       </div>
       <UpdateActions
         client={client}
@@ -57,6 +67,7 @@ export function UpdatesPanel({
         onCheck={onCheck}
         onDownload={onDownload}
         onInstallOnQuit={onInstallOnQuit}
+        onInstallAndClose={onInstallAndClose}
       />
     </section>
   );
@@ -66,7 +77,8 @@ function UpdateDetails({
   client,
   status,
   updatesUntil,
-}: Pick<Props, 'client' | 'status' | 'updatesUntil'>): JSX.Element {
+  feedback,
+}: Pick<Props, 'client' | 'status' | 'updatesUntil' | 'feedback'>): JSX.Element {
   const updating = status !== null && status.state !== 'unavailable';
   return (
     <>
@@ -76,14 +88,22 @@ function UpdateDetails({
         </p>
       )}
       <p role="status" style={{ lineHeight: 1.5 }}>
-        {updateStatusText(status, updatesUntil)}
+        {feedback ?? updateStatusText(status, updatesUntil)}
       </p>
+      {status?.state === 'downloading' && status.downloadProgress !== undefined ? (
+        <progress
+          aria-label="Update download progress"
+          max={status.downloadProgress.totalBytes}
+          value={status.downloadProgress.receivedBytes}
+          style={{ width: '100%' }}
+        />
+      ) : null}
       <ReleaseSummary status={status} />
       <EarlyUpdatesOption client={client} />
       {updating ? (
         <p style={licenceMuted}>
           {status?.mode === 'manual'
-            ? 'You choose when to download and prepare an installation. KerfDesk stays open while you work.'
+            ? 'Download while you work, then choose Install and close KerfDesk or install when you close later. The app asks about unsaved changes and waits while machine work is active.'
             : 'New versions download in the background and install when you close KerfDesk.'}
         </p>
       ) : null}
@@ -138,9 +158,10 @@ function UpdateActions({
   onCheck,
   onDownload,
   onInstallOnQuit,
+  onInstallAndClose,
 }: Pick<
   Props,
-  'client' | 'status' | 'busy' | 'onCheck' | 'onDownload' | 'onInstallOnQuit'
+  'client' | 'status' | 'busy' | 'onCheck' | 'onDownload' | 'onInstallOnQuit' | 'onInstallAndClose'
 >): JSX.Element | null {
   if (status === null || status.state === 'unavailable') return null;
   return (
@@ -165,17 +186,13 @@ function UpdateActions({
           Download update
         </button>
       ) : null}
-      {status.mode === 'manual' && status.state === 'ready' && status.installOnQuit !== true ? (
-        <button
-          type="button"
-          className="lf-btn lf-btn--primary"
-          disabled={busy || client.installUpdateOnQuit === undefined}
-          onClick={() => void onInstallOnQuit()}
-          title="Prepare the verified installer to open after you close KerfDesk normally. This does not close the app or interrupt a job."
-        >
-          Install when I close KerfDesk
-        </button>
-      ) : null}
+      <ManualUpdateInstallActions
+        client={client}
+        status={status}
+        busy={busy}
+        onInstallOnQuit={onInstallOnQuit}
+        onInstallAndClose={onInstallAndClose}
+      />
     </div>
   );
 }

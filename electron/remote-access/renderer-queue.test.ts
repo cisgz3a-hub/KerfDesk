@@ -6,6 +6,39 @@ import { KerfDeskMcpError } from '../mcp/backend.js';
 afterEach(() => vi.useRealTimers());
 
 describe('native renderer queue ownership', () => {
+  it('never admits a control from an edit-only envelope', async () => {
+    const queue = createRemoteRendererQueue();
+    const session = queue.attach();
+    await expect(queue.request('jog_machine', {}, 'client', true)).rejects.toMatchObject({
+      code: 'unavailable',
+    });
+    expect(queue.poll(session).requests).toEqual([]);
+    const pending = queue.request('frame_job', {}, 'client', false, undefined, true);
+    const request = queue.poll(session).requests[0]!;
+    expect(request).toMatchObject({ canWrite: false, canControl: true });
+    queue.complete(session, request.id, {});
+    await pending;
+    queue.detach();
+  });
+
+  it('reserves priority Abort admission and delivery while normal capacity is full', async () => {
+    const queue = createRemoteRendererQueue();
+    const session = queue.attach();
+    const ordinary = Array.from({ length: 32 }, () =>
+      queue.request('review_job', {}, 'client', false).catch((e) => e),
+    );
+    const first = queue.poll(session).requests[0]!;
+    const abort = queue.request('abort_job', {}, 'client', false, undefined, true);
+    const urgent = queue.poll(session).requests[0]!;
+    expect(urgent.command).toBe('abort_job');
+    expect(urgent.id).not.toBe(first.id);
+    expect(queue.complete(session, urgent.id, { revision: 'r1' })).toBe(true);
+    await expect(abort).resolves.toEqual({ revision: 'r1' });
+    expect(queue.poll(session).requests).toEqual([]);
+    queue.detach();
+    await Promise.all(ordinary);
+  });
+
   it('delivers one request at a time and rejects forged, duplicate or undelivered completions', async () => {
     const queue = createRemoteRendererQueue();
     const session = queue.attach();
