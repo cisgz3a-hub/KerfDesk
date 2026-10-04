@@ -49,6 +49,7 @@ import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-pr
 import { isOutputPreparationAbort } from '../output-preparation-errors';
 import { ownJobReviewPreparation } from './job-review-preparation-owner';
 import { frozenLaserPowerScaleWarnings } from '../connected-laser-power-scale';
+import { clearReviewedJobSnapshot, publishReviewedJobSnapshot } from './reviewed-job-snapshot';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -60,6 +61,8 @@ export type ReviewedStartBundle = {
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly outputScope?: OutputScope;
+  /** Read-only observers may reuse only a preparation-time machine binding. */
+  readonly preparedMachineInputsKey?: string;
   /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
    * after that selection, so they must retain the original named WCS fact. */
   readonly frameWcsNormalizationWarning?: string;
@@ -86,6 +89,8 @@ export async function runJobReviewGate(args: {
   let current = args.initial;
   let displayedModel = modelFor(current);
   if (!useJobReviewStore.getState().open(displayedModel, purpose)) return null;
+  const snapshotOwner = useJobReviewStore.getState().requestOwner;
+  publishReviewedJobSnapshot(current, displayedModel);
   const owner = ownJobReviewPreparation();
   try {
     for (;;) {
@@ -120,11 +125,13 @@ export async function runJobReviewGate(args: {
       current = rebuilt.bundle;
       displayedModel = rebuiltModel;
       useJobReviewStore.getState().completePrepare(displayedModel);
+      publishReviewedJobSnapshot(current, displayedModel);
     }
   } catch (error) {
     if (isOutputPreparationAbort(error)) return null;
     throw error;
   } finally {
+    clearReviewedJobSnapshot(snapshotOwner);
     owner.dispose();
   }
 }
@@ -162,7 +169,7 @@ function sameReviewedArtifact(
   );
 }
 
-function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
+export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
   const liveLaser = useLaserStore.getState();
   const configured = bundle.project.device.controllerKind ?? 'grbl-v1.1';
   const device = bundle.project.device;
@@ -405,6 +412,11 @@ async function rebuildCurrentStart(
     laser,
     prepared,
     laserModeStartSnapshot,
+    ...(prepared === previousBundle.prepared
+      ? previousBundle.preparedMachineInputsKey === undefined
+        ? {}
+        : { preparedMachineInputsKey: previousBundle.preparedMachineInputsKey }
+      : { preparedMachineInputsKey: startMachineInputsKey(app.project, laser, camera) }),
     ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
   };
   const frameRefusal = frameFirstRefusal(purpose, bundle);

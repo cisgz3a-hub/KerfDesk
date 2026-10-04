@@ -32,7 +32,7 @@
         <h2>Connect to your computer</h2>
         <ol class="steps">
           <li>Open Settings → Phone &amp; MCP on your PC and enable remote connections.</li>
-          <li>Wait for Connected to the remote service, then create a pairing code.</li>
+          <li>Wait for Ready to pair, then create a pairing code.</li>
           <li>Enter the same computer ID and latest code below, including capitals in the code.</li>
           <li>Approve this phone on the PC.</li>
         </ol>
@@ -82,29 +82,129 @@
           </div>
           <button class="secondary" id="refresh" type="button">Refresh</button>
         </section>
+        <div class="history-controls" id="history-controls" hidden>
+          <button class="secondary" id="undo" type="button" disabled>Undo</button>
+          <button class="secondary" id="redo" type="button" disabled>Redo</button>
+          <span class="muted" id="history-status">Changes share the PC’s undo history.</span>
+        </div>
+        <button id="retry-edit" type="button" hidden>Retry last request</button>
+        <section class="card" id="readonly-note" hidden>
+          <h2 id="readonly-title">Viewing only</h2>
+          <p id="readonly-message">
+            To edit, pair again with editing permission and approve this phone on the PC.
+          </p>
+        </section>
         <nav class="tabs" aria-label="Workspace views">
           <button type="button" data-view="artwork" aria-pressed="true">Artwork</button
           ><button type="button" data-view="edit" aria-pressed="false">Edit</button
           ><button type="button" data-view="details" aria-pressed="false">Details</button>
         </nav>
+        <section class="card preview-card" data-panel="artwork" aria-labelledby="preview-heading">
+          <div class="preview-heading">
+            <h2 id="preview-heading">Your artwork</h2>
+            <span class="badge">Preview</span>
+          </div>
+          <div class="preview-surface">
+            <img id="workspace-preview" alt="Artwork preview from your desktop" hidden />
+          </div>
+          <p id="preview-message" class="muted">Connect to your PC to view its workspace.</p>
+          <p id="preview-bounds" class="muted"></p>
+        </section>
         <section class="card" data-panel="artwork">
-          <h2>Artwork</h2>
-          <p class="muted">Select items to move or rotate. Changes are made on your PC.</p>
+          <h2>Choose artwork</h2>
+          <p class="muted">Tick the items you want to work with.</p>
           <div id="artwork-list" class="item-list"></div>
+          <p class="muted" id="selection-status" aria-live="polite"></p>
           <p class="muted" id="truncated" hidden></p>
-          <button type="button" id="save-selection" data-edit hidden>Use this selection</button>
+          <div class="selection-actions">
+            <button type="button" id="save-selection" data-edit hidden>Use this selection</button>
+            <button type="button" id="edit-selected-text" class="secondary" hidden>
+              Edit selected text
+            </button>
+          </div>
         </section>
         <div data-panel="edit" hidden>
-          <section class="card" id="readonly-note" hidden>
-            <h2>Read access</h2>
-            <p>
-              This PC approved reading only. Pair again and request editing permission to make
-              changes.
-            </p>
-          </section>
           <div id="edit-forms" hidden>
-            <section class="card">
-              <h2>Add text</h2>
+            <details class="card task" id="edit-text-task" open>
+              <summary>Edit text</summary>
+              <p id="text-sharing-note" class="muted" hidden>
+                Enable artwork sharing in Settings → Phone &amp; MCP on the PC to read existing
+                text.
+              </p>
+              <div id="text-source-controls">
+                <label>Choose text<select id="text-artwork-list"></select></label>
+                <button id="load-text" type="button" class="secondary separated-button">
+                  Load text from PC
+                </button>
+              </div>
+              <button id="change-text" type="button" class="secondary" hidden>
+                Choose another text
+              </button>
+              <p class="muted" id="text-load-status">Choose text, then load it to make changes.</p>
+              <form id="text-edit-form">
+                <fieldset id="text-editor" disabled hidden>
+                  <label
+                    >Text<textarea name="text" rows="3" required maxlength="4096"></textarea>
+                  </label>
+                  <details class="advanced" id="text-fonts">
+                    <summary>Font<span class="current-font"></span></summary>
+                    <div class="font-picker">
+                      <label
+                        >Search fonts<input
+                          name="fontSearch"
+                          type="search"
+                          autocomplete="off"
+                          placeholder="Find a bundled font"
+                      /></label>
+                      <label
+                        >Font<select name="fontId" size="5">
+                          <option value="">Desktop default</option>
+                        </select></label
+                      >
+                      <span class="font-count muted" aria-live="polite"></span>
+                    </div>
+                  </details>
+                  <div class="two">
+                    <label
+                      >Text size (mm)<input
+                        name="fontSizeMm"
+                        type="text"
+                        inputmode="decimal"
+                        required
+                    /></label>
+                    <label
+                      >Text alignment<select name="alignment">
+                        <option value="left">Left</option>
+                        <option value="center">Centre</option>
+                        <option value="right">Right</option>
+                      </select></label
+                    >
+                  </div>
+                  <details class="advanced" id="text-spacing">
+                    <summary>Line and letter spacing</summary>
+                    <div class="two">
+                      <label
+                        >Line height (× size)<input
+                          name="lineHeight"
+                          type="text"
+                          inputmode="decimal"
+                          required
+                      /></label>
+                      <label
+                        >Letter spacing (× size)<input
+                          name="letterSpacing"
+                          type="text"
+                          inputmode="decimal"
+                          required
+                      /></label>
+                    </div>
+                  </details>
+                  <button type="submit">Update text</button>
+                </fieldset>
+              </form>
+            </details>
+            <details class="card task" id="add-text-task">
+              <summary>Add new text</summary>
               <form id="text-form">
                 <label
                   >Text<textarea
@@ -115,42 +215,61 @@
                     placeholder="Your text"
                   ></textarea>
                 </label>
-                <div class="two">
+                <div class="font-picker">
                   <label
-                    >X (mm)<input
-                      name="xMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="0"
-                      required /></label
-                  ><label
-                    >Y (mm)<input
-                      name="yMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="0"
-                      required /></label
-                  ><label
-                    >Width (mm)<input
-                      name="widthMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="50"
-                      required /></label
-                  ><label
-                    >Font size (mm)<input
-                      name="fontSizeMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="10"
-                      required
+                    >Search fonts<input
+                      name="fontSearch"
+                      type="search"
+                      autocomplete="off"
+                      placeholder="Find a bundled font"
                   /></label>
+                  <label
+                    >Font<select name="fontId" size="5">
+                      <option value="">Desktop default</option>
+                    </select></label
+                  >
+                  <span class="font-count muted" aria-live="polite"></span>
                 </div>
+                <label
+                  >Text size (mm)<input
+                    name="fontSizeMm"
+                    inputmode="decimal"
+                    type="text"
+                    value="10"
+                    required
+                /></label>
+                <details class="advanced" id="add-text-position">
+                  <summary>Position and width</summary>
+                  <div class="two">
+                    <label
+                      >X (mm)<input
+                        name="xMm"
+                        inputmode="decimal"
+                        type="text"
+                        value="0"
+                        required /></label
+                    ><label
+                      >Y (mm)<input
+                        name="yMm"
+                        inputmode="decimal"
+                        type="text"
+                        value="0"
+                        required /></label
+                    ><label
+                      >Width (mm)<input
+                        name="widthMm"
+                        inputmode="decimal"
+                        type="text"
+                        value="50"
+                        required
+                    /></label>
+                  </div>
+                </details>
                 <button>Add text</button>
               </form>
-            </section>
-            <section class="card">
-              <h2>Add a rectangle</h2>
+            </details>
+            <details class="card task" id="rectangle-task">
+              <summary>Add a rectangle</summary>
               <form id="rectangle-form">
                 <div class="two">
                   <label
@@ -185,9 +304,10 @@
                 </div>
                 <button>Add rectangle</button>
               </form>
-            </section>
-            <section class="card">
-              <h2>Transform selected artwork</h2>
+            </details>
+            <details class="card task" id="arrange-task">
+              <summary>Move, rotate or arrange</summary>
+              <p class="muted" id="edit-selection-status"></p>
               <form id="move-form">
                 <div class="two">
                   <label
@@ -218,9 +338,33 @@
                     required /></label
                 ><button>Rotate selection</button>
               </form>
-            </section>
-            <section class="card">
-              <h2>Laser operation settings</h2>
+              <form id="arrange-form" class="separated">
+                <label
+                  >Layout action<select name="action">
+                    <option value="align_left">Align left edges</option>
+                    <option value="align_center">Align horizontal centres</option>
+                    <option value="align_right">Align right edges</option>
+                    <option value="align_top">Align top edges</option>
+                    <option value="align_middle">Align vertical centres</option>
+                    <option value="align_bottom">Align bottom edges</option>
+                    <option value="distribute_horizontal">Space horizontal centres equally</option>
+                    <option value="distribute_vertical">Space vertical centres equally</option>
+                    <option value="mirror_horizontal">Mirror horizontally</option>
+                    <option value="mirror_vertical">Mirror vertically</option>
+                    <option value="group">Group</option>
+                    <option value="ungroup">Ungroup</option>
+                    <option value="duplicate">Duplicate</option>
+                    <option value="delete">Delete selected artwork</option>
+                  </select></label
+                >
+                <p class="muted">
+                  Choose items in Artwork first. Undo can reverse a layout change or deletion.
+                </p>
+                <button>Apply layout action</button>
+              </form>
+            </details>
+            <details class="card task" id="operation-task">
+              <summary>Power, speed and passes</summary>
               <p class="muted">
                 Choose an existing laser operation. These settings do not start the machine.
               </p>
@@ -243,7 +387,7 @@
                 </div>
                 <button>Apply settings</button>
               </form>
-            </section>
+            </details>
           </div>
         </div>
         <section class="card" data-panel="details" hidden>
@@ -253,13 +397,11 @@
             Frame and Start remain on the computer. This page cannot control the machine.
           </p>
         </section>
-        <section class="card compact">
-          <p>
-            Keep KerfDesk open on your computer. Disconnect or revoke this connection there whenever
-            you need.
-          </p>
+        <details class="card task compact" id="connection-options">
+          <summary>Connection options</summary>
+          <p>Keep KerfDesk open on the PC. You can revoke access there at any time.</p>
           <button class="secondary" id="disconnect" type="button">Disconnect this phone</button>
-        </section>
+        </details>
       </section>
       <footer>
         <p>Paired by you. Approved on your PC.</p>

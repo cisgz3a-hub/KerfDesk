@@ -5,6 +5,7 @@ import {
   DEFAULT_TEXT_ALIGNMENT,
   DEFAULT_TEXT_LINE_HEIGHT,
   DEFAULT_TEXT_LETTER_SPACING,
+  findFontEntry,
 } from '../../core/text';
 import { renderTextGeometry } from '../text/render-text-geometry';
 import type { RemoteWrite } from './types';
@@ -18,8 +19,10 @@ export async function prepareRemoteText(args: TextArgs, signal: AbortSignal): Pr
   signal.throwIfAborted();
   const content = args.text.normalize('NFC');
   if (content.trim() === '') throw new RemoteFault('invalid_arguments');
+  const fontKey = args.fontId ?? DEFAULT_FONT_KEY;
+  if (findFontEntry(fontKey) === null) throw new RemoteFault('invalid_arguments');
   const geometry = await renderTextGeometry({
-    fontKey: DEFAULT_FONT_KEY,
+    fontKey,
     embeddedFonts: undefined,
     content,
     sizeMm: args.fontSizeMm,
@@ -36,7 +39,7 @@ export async function prepareRemoteText(args: TextArgs, signal: AbortSignal): Pr
     kind: 'text',
     id: crypto.randomUUID(),
     content,
-    fontKey: DEFAULT_FONT_KEY,
+    fontKey,
     sizeMm: args.fontSizeMm,
     alignment: DEFAULT_TEXT_ALIGNMENT,
     lineHeight: DEFAULT_TEXT_LINE_HEIGHT,

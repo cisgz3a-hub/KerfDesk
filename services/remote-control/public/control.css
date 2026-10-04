@@ -21,6 +21,7 @@
 }
 body {
   margin: 0;
+  font-size: 16px;
   background: radial-gradient(ellipse at 85% 0, #173e3d 0, transparent 45%), #0b141c;
   min-height: 100vh;
 }
@@ -33,6 +34,74 @@ textarea,
 select {
   font: inherit;
 }
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+fieldset:disabled {
+  opacity: 0.6;
+}
+.history-controls,
+.selection-actions,
+.preview-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.preview-heading {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.preview-heading h2 {
+  margin: 0;
+}
+.preview-surface:has(img:not([hidden])) {
+  background: #f8faf9;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+.preview-surface img {
+  width: 100%;
+  height: auto;
+  max-height: 350px;
+  object-fit: contain;
+}
+.font-picker {
+  display: grid;
+  gap: 12px;
+}
+.font-picker select {
+  height: 160px;
+  padding: 4px;
+  overscroll-behavior: contain;
+}
+.font-picker option {
+  padding: 8px;
+}
+.font-count {
+  min-height: 20px;
+}
+.separated-button {
+  margin-top: 14px;
+}
+.two > label {
+  min-width: 0;
+}
+#retry-edit {
+  margin-top: 12px;
+}
 button,
 .button {
   border: 0;
@@ -40,7 +109,7 @@ button,
   background: var(--accent);
   color: var(--ink);
   padding: 13px 18px;
-  min-height: 46px;
+  min-height: 48px;
   cursor: pointer;
   font-weight: 650;
   text-decoration: none;
@@ -72,6 +141,37 @@ select:focus-visible {
   outline: 3px solid #8cdbf7;
   outline-offset: 3px;
 }
+summary:focus-visible {
+  outline: 3px solid #8cdbf7;
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+summary {
+  cursor: pointer;
+  min-height: 48px;
+  align-content: center;
+  font-size: 17px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+.task > summary {
+  margin: -8px 0;
+}
+.task[open] > summary {
+  margin-bottom: 18px;
+}
+.advanced {
+  border-top: 1px solid var(--border);
+  padding-top: 4px;
+}
+.advanced > summary {
+  color: var(--muted);
+  font-size: 15px;
+  font-weight: 550;
+}
+.advanced[open] > summary {
+  margin-bottom: 12px;
+}
 .shell {
   max-width: 760px;
   margin: auto;
@@ -84,6 +184,15 @@ select:focus-visible {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+}
+.workspace-heading > div {
+  min-width: 0;
+}
+.workspace-heading h2 {
+  overflow-wrap: anywhere;
+}
+.workspace-heading p {
+  margin-bottom: 0;
 }
 .brand {
   display: flex;
@@ -170,7 +279,7 @@ form {
 label {
   display: grid;
   gap: 8px;
-  font-size: 13px;
+  font-size: 15px;
   color: #d8e5ea;
   font-weight: 550;
 }
@@ -183,7 +292,7 @@ select {
   background: #0c1b24;
   padding: 12px;
   color: #f0f7f8;
-  min-height: 45px;
+  min-height: 48px;
 }
 input::placeholder,
 textarea::placeholder {
@@ -201,6 +310,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-height: 48px;
 }
 .check input {
   width: 19px;
@@ -210,7 +320,7 @@ textarea {
 }
 .muted {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 14px;
 }
 .notice {
   position: sticky;
@@ -231,7 +341,7 @@ textarea {
 .tabs {
   display: flex;
   gap: 7px;
-  margin-top: 24px;
+  margin-top: 16px;
   padding: 5px;
   border: 1px solid var(--border);
   border-radius: 15px;
@@ -259,7 +369,7 @@ textarea {
   border-radius: 12px;
   padding: 13px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
 }
 .item-list input {
@@ -270,12 +380,12 @@ textarea {
 }
 .item-title {
   display: block;
-  font-size: 14px;
+  font-size: 16px;
 }
 .item-description {
   display: block;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
   margin-top: 4px;
 }
@@ -355,7 +465,7 @@ footer a {
     align-items: flex-start;
   }
   .workspace-heading button {
-    font-size: 12px;
+    font-size: 14px;
     padding: 10px;
   }
   .two {
@@ -363,6 +473,13 @@ footer a {
   }
   footer {
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .selection-actions > button {
+    width: 100%;
+  }
+  .preview-surface img {
+    max-height: 240px;
   }
 }
 @media (prefers-reduced-motion: no-preference) {

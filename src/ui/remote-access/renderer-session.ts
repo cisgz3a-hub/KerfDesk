@@ -1,7 +1,17 @@
 import { useStore } from '../state/store';
 import { createRemoteControlAdapter } from '../remote-control/adapter';
-import type { RemoteControlAdapter } from '../remote-control/types';
+import type {
+  RemoteControlAdapter,
+  RemoteControlOptions,
+  RemoteCommandResult,
+} from '../remote-control/types';
 import { remoteAppStatus } from './safe-app-status';
+import { preparedJobReview } from './prepared-job-review';
+import {
+  ARTWORK_SHARING_EVENT,
+  ARTWORK_SHARING_KEY,
+  artworkSharingEnabled,
+} from './artwork-sharing';
 import {
   isRemoteAccessStatus,
   remoteRequest,
@@ -12,6 +22,7 @@ import {
   useRemoteAccessStore,
   type RemoteAccessStatus,
 } from './remote-access-store';
+import { remoteDeliveryResult, releaseRemoteDelivery } from './renderer-delivery';
 
 type RequestEnvelope = {
   id: string;
@@ -20,7 +31,13 @@ type RequestEnvelope = {
   clientId: string;
   canWrite: boolean;
 };
-type Active = { id: string; clientId: string; canWrite: boolean; controller: AbortController };
+type Active = {
+  id: string;
+  clientId: string;
+  canWrite: boolean;
+  sharesArtwork: boolean;
+  controller: AbortController;
+};
 const object = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 function validRequest(value: unknown): value is RequestEnvelope {
@@ -60,14 +77,20 @@ export class RemoteRendererSession {
   private work: Promise<void> = Promise.resolve();
   private readonly requests = new Map<string, Active>();
   private readonly adapter: RemoteControlAdapter;
+  private readonly options: RemoteControlOptions;
   private readonly ui = useRemoteAccessStore.getState();
   constructor() {
-    this.adapter = createRemoteControlAdapter({
+    this.options = {
       canWrite: () => this.canWrite(),
       canEdit: () => useStore.getState().pendingUndo === null,
       getAppStatus: remoteAppStatus,
-    });
+      canShareArtwork: () => !this.stopped && artworkSharingEnabled(),
+      getReview: preparedJobReview,
+    };
+    this.adapter = createRemoteControlAdapter(this.options);
     window.addEventListener(REMOTE_REVOKE_EVENT, this.revoke);
+    window.addEventListener(ARTWORK_SHARING_EVENT, this.sharingChanged);
+    window.addEventListener('storage', this.sharingStorageChanged);
   }
   private canWrite(): boolean {
     if (this.stopped || this.active?.canWrite !== true) return false;
@@ -86,6 +109,14 @@ export class RemoteRendererSession {
     const clientId = object(detail) && typeof detail.clientId === 'string' ? detail.clientId : null;
     for (const request of this.requests.values())
       if (clientId === null || request.clientId === clientId) request.controller.abort();
+  };
+  private sharingChanged = (): void => {
+    if (artworkSharingEnabled()) return;
+    for (const request of this.requests.values())
+      if (request.sharesArtwork) request.controller.abort();
+  };
+  private sharingStorageChanged = (event: StorageEvent): void => {
+    if (event.key === ARTWORK_SHARING_KEY || event.key === null) this.sharingChanged();
   };
   private owns(owner: string): boolean {
     return !this.stopped && this.session === owner && ownsRemoteSession(owner);
@@ -109,11 +140,22 @@ export class RemoteRendererSession {
   private async run(request: RequestEnvelope, owner: string, current: Active): Promise<void> {
     if (this.stopped || this.active !== null) return;
     this.active = current;
+    let result: RemoteCommandResult | undefined;
+    let receipt: RemoteCommandResult | undefined;
     try {
-      const result = await this.adapter.execute(request.command, request.args, {
+      result = await this.adapter.execute(request.command, request.args, {
         signal: current.controller.signal,
       });
-      if (this.owns(owner)) await remoteRequest('complete', { id: request.id, result }, owner);
+      if (this.owns(owner)) {
+        receipt = remoteDeliveryResult(
+          request.command,
+          result,
+          current.controller.signal,
+          this.adapter.getRevision(),
+          this.options,
+        );
+        await remoteRequest('complete', { id: request.id, result: receipt }, owner);
+      }
     } catch {
       if (this.owns(owner))
         await remoteRequest(
@@ -125,6 +167,8 @@ export class RemoteRendererSession {
           owner,
         ).catch(() => undefined);
     } finally {
+      releaseRemoteDelivery(request.command, result);
+      releaseRemoteDelivery(request.command, receipt);
       if (this.active === current) this.active = null;
       if (this.requests.get(request.id) === current) this.requests.delete(request.id);
     }
@@ -134,6 +178,7 @@ export class RemoteRendererSession {
       id: request.id,
       clientId: request.clientId,
       canWrite: request.canWrite,
+      sharesArtwork: request.command === 'get_workspace_preview' || request.command === 'get_text',
       controller: new AbortController(),
     };
     this.requests.set(request.id, current);
@@ -172,6 +217,8 @@ export class RemoteRendererSession {
     for (const request of this.requests.values()) request.controller.abort();
     this.adapter.dispose();
     window.removeEventListener(REMOTE_REVOKE_EVENT, this.revoke);
+    window.removeEventListener(ARTWORK_SHARING_EVENT, this.sharingChanged);
+    window.removeEventListener('storage', this.sharingStorageChanged);
     if (this.session !== null)
       void remoteRequest('detach', {}, this.session).catch(() => undefined);
     clearRemoteSession(this.session);

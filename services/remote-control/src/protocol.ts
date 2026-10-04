@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { mcpInputSchemas, type KerfDeskMcpCommand } from '../../../electron/mcp/input-schemas.js';
+import {
+  mcpInputSchemas,
+  MCP_WRITE_COMMANDS,
+  type KerfDeskMcpCommand,
+} from '../../../electron/mcp/input-schemas.js';
 
 export const PUBLIC_ORIGIN = 'https://kerfdesk-phone-control.cisgz3a.workers.dev';
 export const RESOURCE = `${PUBLIC_ORIGIN}/mcp`;
@@ -13,13 +17,7 @@ export const COMMAND_TIMEOUT_MS = 20_000;
 export const COOKIE_NAME = '__Host-kerfdesk_control';
 export const OAUTH_READ = 'kerfdesk:read';
 export const OAUTH_EDIT = 'kerfdesk:edit';
-export const WRITE_COMMANDS = new Set<KerfDeskMcpCommand>([
-  'set_selection',
-  'add_text',
-  'add_rectangle',
-  'transform_artwork',
-  'update_operation',
-]);
+export const WRITE_COMMANDS = MCP_WRITE_COMMANDS;
 export const uuid = z.uuid();
 export const secret = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const scopesSchema = z

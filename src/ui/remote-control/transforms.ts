@@ -40,10 +40,18 @@ export function prepareTransforms(
     if (result.kind !== 'ok') throw new RemoteFault('unsupported_operation');
     transforms = result.transforms;
   }
-  for (const [index, object] of objects.entries()) {
-    const transform = transforms[index]?.transform;
+  validateTransforms(objects, transforms);
+  return transforms;
+}
+export function validateTransforms(
+  objects: readonly SceneObject[],
+  transforms: readonly SelectionTransformEdit[],
+): void {
+  const byId = new Map(objects.map((object) => [object.id, object]));
+  for (const { id, transform } of transforms) {
+    const object = byId.get(id);
     if (
-      transform === undefined ||
+      object === undefined ||
       ![transform.x, transform.y, transform.scaleX, transform.scaleY, transform.rotationDeg].every(
         Number.isFinite,
       ) ||
@@ -51,7 +59,6 @@ export function prepareTransforms(
     )
       throw new RemoteFault('unsupported_operation');
   }
-  return transforms;
 }
 /** Relative clockwise scene rotation, rigid about the combined world-bounds centre. */
 function rotateGroup(

@@ -1,7 +1,13 @@
 import { useStore } from '../state/store';
 import { RemoteFault } from './fault';
-import { appStatusProjection, reviewProjection } from './status-projections';
-import { machineProjection, recipesProjection, workspaceProjection } from './projections';
+import {
+  appStatusProjection,
+  redactReviewProjection,
+  reviewProjection,
+} from './status-projections';
+import { machineProjection, recipesProjection } from './projections';
+import { fontsProjection, workspaceReadProjection, textProjection } from './authoring-projections';
+import { workspacePreviewProjection } from './preview-projection';
 import { createRevisionTracker } from './revision';
 import { canonicalRequest, validateCommand, type ValidatedCommand } from './validation';
 import { applyRemoteWrite } from './writes';
@@ -9,7 +15,6 @@ import type {
   RemoteCommandResult,
   RemoteControlAdapter,
   RemoteControlOptions,
-  RemoteReadCommand,
   RemoteWrite,
 } from './types';
 
@@ -45,7 +50,7 @@ export function createRemoteControlAdapter(options: RemoteControlOptions): Remot
       try {
         if (disposed) throw new RemoteFault('cancelled');
         const input = validateCommand(command, args);
-        if (!isWrite(input)) return readResult(input.command, context, execution.signal);
+        if (!isWrite(input)) return await readResult(input, context, execution.signal);
         const fingerprint = canonicalRequest(input);
         const cached = requests.get(input.args.requestId);
         if (cached !== undefined) {
@@ -103,18 +108,45 @@ function renewFullRequestWindow(
 function isWrite(input: ValidatedCommand): input is RemoteWrite {
   return 'expectedRevision' in input.args;
 }
-function readResult(
-  command: RemoteReadCommand,
+async function readResult(
+  input: Exclude<ValidatedCommand, RemoteWrite>,
   context: Context,
   signal?: AbortSignal,
-): RemoteCommandResult {
-  if (signal?.aborted === true) throw new RemoteFault('cancelled');
+): Promise<RemoteCommandResult> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted === true) controller.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  context.pending.add(controller);
+  try {
+    return await cancellable(
+      projectRead(input, context, controller.signal),
+      controller.signal,
+      () => false,
+    );
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    context.pending.delete(controller);
+  }
+}
+async function projectRead(
+  input: Exclude<ValidatedCommand, RemoteWrite>,
+  context: Context,
+  signal: AbortSignal,
+): Promise<RemoteCommandResult> {
+  if (context.isDisposed() || signal.aborted) throw new RemoteFault('cancelled');
   const state = context.store.getState();
   const revision = context.tracker.current();
-  const data = (() => {
-    switch (command) {
+  let data = await (async () => {
+    switch (input.command) {
       case 'get_workspace':
-        return workspaceProjection(state);
+        return workspaceReadProjection(state, context.options);
+      case 'get_workspace_preview':
+        return workspacePreviewProjection(state, context.options, signal);
+      case 'list_fonts':
+        return fontsProjection();
+      case 'get_text':
+        return textProjection(state, input.args.artworkId, context.options);
       case 'get_machine':
         return machineProjection(state);
       case 'get_app_status':
@@ -122,9 +154,27 @@ function readResult(
       case 'list_material_recipes':
         return recipesProjection(state);
       case 'review_job':
-        return reviewProjection(context.options, revision, state.project.machine?.kind ?? 'laser');
+        return reviewProjection(
+          context.options,
+          revision,
+          state.project.machine?.kind ?? 'laser',
+          signal,
+        );
     }
   })();
+  if (context.isDisposed() || signal.aborted) throw new RemoteFault('cancelled');
+  // Operation names can contain artwork wording. Re-project this synchronous
+  // snapshot using the current sharing state after the read's async boundary.
+  if (input.command === 'get_workspace') data = workspaceReadProjection(state, context.options);
+  if (input.command === 'review_job') data = redactReviewProjection(data, context.options);
+  if (context.options.canShareArtwork?.() !== true) {
+    if (input.command === 'get_text') throw new RemoteFault('unavailable');
+    if (input.command === 'get_workspace_preview')
+      data = {
+        status: 'disabled',
+        message: 'Enable artwork sharing on the computer to show previews.',
+      };
+  }
   if (context.tracker.current() !== revision) throw new RemoteFault('stale_revision');
   return { ok: true, revision, data };
 }

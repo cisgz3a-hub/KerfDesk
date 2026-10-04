@@ -3,6 +3,7 @@ import WebSocket from 'ws';
 import { KerfDeskMcpError, mcpErrorCode } from '../mcp/backend.js';
 import {
   mcpInputSchemas,
+  MCP_WRITE_COMMANDS,
   MCP_MAX_RESULT_BYTES,
   type KerfDeskMcpCommand,
 } from '../mcp/input-schemas.js';
@@ -11,13 +12,7 @@ import { REMOTE_ORIGIN, type RemoteScope } from './relay-types.js';
 import type { RemoteIdentity } from './credential-store.js';
 import type { RemoteRendererQueue } from './renderer-queue.js';
 
-const WRITE_COMMANDS = new Set([
-  'set_selection',
-  'add_text',
-  'add_rectangle',
-  'transform_artwork',
-  'update_operation',
-]);
+const WRITE_COMMANDS = MCP_WRITE_COMMANDS;
 export type RelayMessage = Record<string, unknown>;
 export const object = (value: unknown): value is RelayMessage =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

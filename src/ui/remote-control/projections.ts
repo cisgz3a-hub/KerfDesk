@@ -39,7 +39,10 @@ export function selectedIds(state: AppState): string[] {
     ]),
   ];
 }
-export function workspaceProjection(state: AppState): Record<string, unknown> {
+export function workspaceProjection(
+  state: AppState,
+  shareArtwork = false,
+): Record<string, unknown> {
   const { scene } = state.project;
   const mode = state.project.machine?.kind ?? 'laser';
   const artwork = scene.objects
@@ -61,7 +64,9 @@ export function workspaceProjection(state: AppState): Record<string, unknown> {
     .map((layer) => ({
       id: layer.id,
       type: mode === 'laser' ? layer.mode : (layer.cnc?.cutType ?? 'cnc'),
-      name: safeLabel(layer.name, 'Operation'),
+      // Operation names have no source provenance: converted text can retain its
+      // old wording here. Labels therefore share the explicit artwork opt-in.
+      name: shareArtwork ? safeLabel(layer.name, 'Operation') : 'Operation',
       enabled: layer.output,
       ...(mode === 'laser' ? operationValues(layer) : {}),
     }));

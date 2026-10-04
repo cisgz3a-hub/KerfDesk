@@ -26,7 +26,7 @@ describe.each([false, true])('portable HTTP factory (modern=%s)', (modern) => {
         fetch: (url, init) => handler.fetch(new Request(url, init)),
       });
       await client.connect(transport);
-      expect((await client.listTools()).tools).toHaveLength(10);
+      expect((await client.listTools()).tools).toHaveLength(17);
       const result = await client.callTool({ name: 'get_app_status', arguments: {} });
       expect(result.structuredContent).toMatchObject({ revision: 'workspace-1' });
       expect(JSON.stringify(result)).not.toContain('secret-key');

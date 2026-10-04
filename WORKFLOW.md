@@ -32,6 +32,13 @@
 
 ## Phase A flows
 
+### F-REMOTE1. Phone and MCP workspace controls (ADR-564/568)
+
+- **Success.** The operator enables remote connections in desktop **Settings > Phone & MCP**, waits for **Ready to pair**, creates a code and approves viewing or viewing and editing on the PC. Copy buttons provide the code and a phone link with its computer ID already filled in; ChatGPT server details are in their own disclosure. Paired clients open directly to the workspace. Editing clients use the ordinary document actions for text, layout and Undo/Redo, with less common tools in expandable sections. A separate **Share artwork previews and text with approved phones and MCP apps** choice enables the preview and existing-text reads; the UI explains AI-provider disclosure. Current job review compiles read-only and reports actual warnings, bounds and timing without confirming or executing a job.
+- **Error.** A stale revision asks the client to refresh. An uncertain edit retains its request ID and arguments when retried. Permission loss, a replaced desktop session or cancellation prevents a pending edit from committing. A Pro copy returns its ordinary admission requirement without creating a deferred edit. Storage errors show a save failure and disable artwork sharing for the current session. Denied clipboard access offers the exact value for manual copying; an old clipboard result cannot mark a replacement code copied.
+- **Empty.** An empty workspace shows no artwork and no Undo/Redo actions. Sharing off explains how to enable it on the PC. Unsupported or oversized preview scenes report unavailable rather than returning a partial scene. Unavailable current preparation explains that review cannot yet be established.
+- **Edge.** New/Open and local edits invalidate pending requests. Numeric drafts may be blank, negative or partial while typing; submission validates them. Font search scrolls inside a bounded list. Path and variable text edits remain on the PC. Turning sharing off fences outgoing reads and redacts artwork-derived labels. Review counts are workspace totals; prepared bounds and timing follow the actual output scope. Machine execution remains in the desktop Frame and Start workflow. Full setup and supported fields are in [Phone and MCP access](docs/mcp/remote-control.md).
+
 ### F-A1. App launch
 
 #### Success — first run (no prior project)

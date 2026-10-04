@@ -1,7 +1,12 @@
-import type { RemoteControlOptions, SafeRemoteJobReview } from './types';
+import type { RemoteBounds, RemoteControlOptions, SafeRemoteJobReview } from './types';
 import { finite } from './validation';
 import { publicIdentifier, safeLabel } from './projections';
 import { RemoteFault } from './fault';
+import { reviewMessageProjector } from './review-message-sharing';
+
+// Keep full warning strings only while their projection is owned by the pending
+// read. A final opt-out fence can redact before truncating, without recompiling.
+const reviewSources = new WeakMap<Record<string, unknown>, SafeRemoteJobReview>();
 
 export function appStatusProjection(options: RemoteControlOptions): Record<string, unknown> {
   const { app, edition, updates } = options.getAppStatus();
@@ -46,12 +51,13 @@ function validTrialEnd(value: unknown): boolean {
     (typeof value === 'string' && value.length <= 128 && Number.isFinite(Date.parse(value)))
   );
 }
-export function reviewProjection(
+export async function reviewProjection(
   options: RemoteControlOptions,
   revision: string,
   mode: 'laser' | 'cnc',
-): Record<string, unknown> {
-  const review = options.getReview?.();
+  signal?: AbortSignal,
+): Promise<Record<string, unknown>> {
+  const review = await options.getReview?.(revision, signal);
   if (
     review === undefined ||
     review === null ||
@@ -67,13 +73,55 @@ export function reviewProjection(
   }
   if (!['ready', 'unavailable', 'preparing'].includes(review.status))
     throw new RemoteFault('unavailable');
+  const projected = projectReview(review, options);
+  reviewSources.set(projected, review);
+  return projected;
+}
+
+/** Final synchronous disclosure fence; it never calls the preparation owner. */
+export function redactReviewProjection(
+  data: Record<string, unknown>,
+  options: RemoteControlOptions,
+): Record<string, unknown> {
+  const source = reviewSources.get(data);
+  if (options.canShareArtwork?.() === true) return data;
+  if (source === undefined) {
+    if (
+      typeof data['message'] === 'string' ||
+      (Array.isArray(data['warnings']) && data['warnings'].length > 0)
+    )
+      throw new RemoteFault('unavailable');
+    return data;
+  }
+  const projected = projectReview(source, options);
+  reviewSources.set(projected, source);
+  return projected;
+}
+
+/** The renderer retires the extra disclosure binding once delivery is complete. */
+export function releaseReviewProjection(data: Record<string, unknown>): void {
+  reviewSources.delete(data);
+}
+
+function projectReview(
+  review: SafeRemoteJobReview,
+  options: RemoteControlOptions,
+): Record<string, unknown> {
+  const projectMessage = reviewMessageProjector(options);
   return {
     status: review.status,
-    mode,
+    mode: review.mode,
+    ...(typeof review.message === 'string'
+      ? { message: projectMessage(review.message, 'Review this job on the PC.') }
+      : {}),
     ...reviewSummary(review),
     warnings: review.warnings.slice(0, 200).map((warning) => ({
+      // The canonical owner supplies static index codes, never artwork wording.
       code: safeLabel(warning.code, 'review-warning', 128) || 'review-warning',
-      message: safeLabel(warning.message, 'Review this warning in KerfDesk.', 512),
+      message: projectMessage(
+        warning.message,
+        'Review this artwork-specific warning in KerfDesk on the PC.',
+      ),
       ...(['info', 'warning', 'error'].includes(warning.severity ?? '')
         ? { severity: warning.severity }
         : {}),
@@ -81,7 +129,7 @@ export function reviewProjection(
     })),
     frame: {
       required: true,
-      complete: review.status === 'ready' && review.frame.complete === true,
+      complete: review.frame.complete === true,
     },
   };
 }
@@ -89,6 +137,7 @@ function reviewSummary(review: SafeRemoteJobReview): Record<string, unknown> {
   const summary = review.summary;
   if (summary === undefined || !count(summary.artworkCount) || !count(summary.operationCount))
     return {};
+  const bounds = projectBounds(summary.bounds);
   return {
     summary: {
       artworkCount: summary.artworkCount,
@@ -96,8 +145,27 @@ function reviewSummary(review: SafeRemoteJobReview): Record<string, unknown> {
       ...(finite(summary.estimatedSeconds, 0, Number.MAX_SAFE_INTEGER)
         ? { estimatedSeconds: summary.estimatedSeconds }
         : {}),
-      // Bounds are omitted here; the existing review owner still shows its exact preview locally.
+      ...(bounds === undefined ? {} : { bounds }),
     },
+  };
+}
+function projectBounds(value: unknown): RemoteBounds | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const bounds = value as Record<string, unknown>;
+  if (
+    !(
+      finite(bounds['xMm'], -100_000, 100_000) &&
+      finite(bounds['yMm'], -100_000, 100_000) &&
+      finite(bounds['widthMm'], 0, 100_000) &&
+      finite(bounds['heightMm'], 0, 100_000)
+    )
+  )
+    return undefined;
+  return {
+    xMm: bounds['xMm'],
+    yMm: bounds['yMm'],
+    widthMm: bounds['widthMm'],
+    heightMm: bounds['heightMm'],
   };
 }
 function count(value: number): boolean {

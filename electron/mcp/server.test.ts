@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { KerfDeskMcpError, mcpErrorMessages, type KerfDeskMcpBackend } from './backend.js';
 import { type KerfDeskMcpCommand, MCP_MAX_RESULT_BYTES } from './input-schemas.js';
 import { createKerfDeskMcpServer } from './server.js';
+import { KERFDESK_WORKSPACE_UI_URI } from './workspace-ui.js';
 const writeAdmission = {
   expectedRevision: 'revision-1',
   requestId: '12345678-1234-4234-8234-123456789abc',
@@ -17,6 +18,9 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   get_app_status: {},
   list_material_recipes: {},
   review_job: {},
+  get_workspace_preview: {},
+  list_fonts: {},
+  get_text: { artworkId: 'art-1' },
   set_selection: { ...writeAdmission, artworkIds: ['art-1'] },
   add_text: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, text: 'Hello', fontSizeMm: 5 },
   add_rectangle: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 },
@@ -26,6 +30,10 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
     transform: { type: 'move', dxMm: -5, dyMm: 3 },
   },
   update_operation: { ...writeAdmission, operationId: 'op-1', patch: { powerPercent: 30 } },
+  update_text: { ...writeAdmission, artworkId: 'art-1', patch: { text: 'Updated' } },
+  arrange_artwork: { ...writeAdmission, artworkIds: ['art-1'], action: 'mirror_horizontal' },
+  undo: { ...writeAdmission },
+  redo: { ...writeAdmission },
 };
 
 const bounds = { xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 };
@@ -85,6 +93,23 @@ const readResults: Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>> 
     warnings: [{ code: 'user-check', message: 'Review the material setup.', severity: 'warning' }],
     frame: { required: true, complete: false },
   },
+  get_workspace_preview: { revision: 'revision-1', status: 'disabled' },
+  list_fonts: {
+    revision: 'revision-1',
+    fonts: [{ id: 'Inter', name: 'Inter', geometry: 'outline', style: 'sans' }],
+    total: 1,
+    truncated: false,
+  },
+  get_text: {
+    revision: 'revision-1',
+    artworkId: 'art-1',
+    text: 'Hello',
+    fontId: 'Inter',
+    fontSizeMm: 5,
+    alignment: 'left',
+    lineHeight: 1.2,
+    letterSpacing: 0,
+  },
 };
 
 function successfulBackend(): KerfDeskMcpBackend {
@@ -133,7 +158,7 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
     const backend = successfulBackend();
     const request = vi.spyOn(backend, 'request');
     const client = await connectedClient(backend, modern);
-    expect(client.getServerVersion()).toMatchObject({ name: 'kerfdesk-desktop', version: '1.0.0' });
+    expect(client.getServerVersion()).toMatchObject({ name: 'kerfdesk-desktop', version: '1.1.0' });
     const listing = await client.listTools();
     expect(listing.tools.map((tool) => tool.name)).toEqual(Object.keys(toolExamples));
     for (const tool of listing.tools) {
@@ -141,7 +166,11 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
       expect(tool.outputSchema).toBeDefined();
       expect(tool.annotations?.openWorldHint).toBe(false);
       expect(tool.annotations?.readOnlyHint).toBe(tool.name in readResults);
-      expect(tool._meta).toBeUndefined();
+      if (tool.name === 'get_workspace_preview') {
+        expect(tool._meta).toEqual({
+          ui: { resourceUri: KERFDESK_WORKSPACE_UI_URI, visibility: ['model', 'app'] },
+        });
+      } else expect(tool._meta).toBeUndefined();
       const result = await client.callTool({
         name: tool.name,
         arguments: toolExamples[tool.name as KerfDeskMcpCommand],
@@ -152,7 +181,7 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
       });
       expect(JSON.parse(responseText(result))).toEqual(result.structuredContent);
     }
-    expect(request).toHaveBeenCalledTimes(10);
+    expect(request).toHaveBeenCalledTimes(Object.keys(toolExamples).length);
     expect(request.mock.calls.every((call) => call[2] instanceof AbortSignal)).toBe(true);
   });
 

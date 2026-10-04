@@ -1,11 +1,22 @@
 import { pairingDeadline, rejectedMessage } from './pairing.js';
+import { $, bindForm, renderPreview, safeText, validWorkspace } from './control-model.js';
+import { bindEditors } from './control-edit.js';
+import {
+  refreshDetails,
+  renderWorkspace,
+  resetWorkspace,
+  selectionFeedback,
+  view,
+} from './control-workspace.js';
 
-const $ = (selector) => document.querySelector(selector);
 const pairForm = $('#pair-form');
 let session = null;
 let workspace = null;
 let poll = null;
 let busy = false;
+let stale = false;
+let pendingEdit = null;
+let fontsLoaded = false;
 let pairGeneration = 0;
 const errorMessages = {
   unavailable: 'The computer is offline. Open KerfDesk on your PC and refresh.',
@@ -18,9 +29,12 @@ const errorMessages = {
 };
 function notice(message, error = false) {
   const target = $('#notice');
-  target.textContent = message;
+  target.textContent = safeText(message);
   target.hidden = !message;
   target.dataset.kind = error ? 'error' : 'info';
+}
+function fault(code, message, ambiguous = false) {
+  return Object.assign(new Error(message), { code, ambiguous });
 }
 async function api(path, body, generation) {
   const headers = body === undefined ? {} : { 'Content-Type': 'application/json' };
@@ -37,155 +51,120 @@ async function api(path, body, generation) {
       signal: AbortSignal.timeout(25_000),
     });
   } catch {
-    throw new Error(errorMessages.unavailable);
+    throw fault('unavailable', errorMessages.unavailable, true);
   }
   let data;
   try {
     data = await response.json();
   } catch {
-    throw new Error(errorMessages.failed);
+    throw fault('failed', errorMessages.failed, true);
   }
   if (generation !== undefined && generation !== pairGeneration)
-    throw new Error(errorMessages.cancelled);
+    throw fault('cancelled', errorMessages.cancelled);
   if (!response.ok) rejectResponse(response, data, path);
   return data;
 }
 function rejectResponse(response, data, path) {
   if (response.status === 401) setSession(null);
-  if (response.status === 429) throw new Error('Too many requests. Wait a minute, then try again.');
-  throw new Error(
-    errorMessages[data.error?.code] ??
-      (response.status === 403 ? rejectedMessage(path) : errorMessages.failed),
+  if (response.status === 429)
+    throw fault('rate_limited', 'Too many requests. Wait a minute, then try again.');
+  const code = response.status === 403 ? 'forbidden' : data?.error?.code;
+  throw fault(
+    code,
+    errorMessages[code] ?? (response.status === 403 ? rejectedMessage(path) : errorMessages.failed),
+    response.status >= 500,
   );
 }
+function canEdit() {
+  return (
+    !!workspace &&
+    !!session?.online &&
+    session.client.scopes.includes('edit') &&
+    workspace.permissions?.canEdit === true
+  );
+}
+function syncControls() {
+  const admitted = canEdit();
+  const writable = admitted && !busy && !stale && !pendingEdit;
+  syncReadAccess(admitted);
+  for (const input of document.querySelectorAll('#artwork-list input')) input.disabled = !writable;
+  for (const input of document.querySelectorAll(
+    '#edit-forms input, #edit-forms select, #edit-forms textarea',
+  ))
+    input.disabled = !writable;
+  for (const button of document.querySelectorAll(
+    '#save-selection, #edit-forms button, #undo, #redo',
+  ))
+    button.disabled = !writable;
+  syncEditorControls();
+  syncSessionControls();
+  selectionFeedback(workspace, writable);
+}
+function syncReadAccess(admitted) {
+  $('#readonly-note').hidden = !session || admitted;
+  const unknown =
+    !!session?.client.scopes.includes('edit') && workspace?.permissions?.canEdit === undefined;
+  $('#readonly-title').textContent = !session?.online
+    ? 'PC offline'
+    : unknown
+      ? 'Update the PC app'
+      : 'Viewing only';
+  $('#readonly-message').textContent = !session?.online
+    ? 'Open KerfDesk on the PC, then refresh here to reconnect.'
+    : unknown
+      ? 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.'
+      : 'To edit, pair again with editing permission and approve this phone on the PC.';
+}
+function syncEditorControls() {
+  const history = workspace?.history ?? {};
+  const sharingOff = workspace?.permissions?.artworkSharingEnabled === false;
+  $('#undo').disabled ||= !history.canUndo;
+  $('#redo').disabled ||= !history.canRedo;
+  $('#history-status').textContent =
+    history.canUndo || history.canRedo
+      ? 'Changes share the PC’s undo history.'
+      : 'No changes to undo yet.';
+  $('#operation-form button').disabled ||= !$('#operation-list').options.length;
+  $('#load-text').disabled ||= !$('#text-artwork-list').options.length || sharingOff;
+  $('#text-sharing-note').hidden = !sharingOff;
+}
+function syncSessionControls() {
+  const hasEditScope = !!session?.client.scopes.includes('edit');
+  $('#edit-forms').hidden = !hasEditScope || workspace?.permissions?.canEdit !== true;
+  $('#save-selection').hidden = !hasEditScope;
+  $('#edit-selected-text').hidden = !hasEditScope;
+  for (const button of document.querySelectorAll('#pair-form button, #disconnect, #refresh'))
+    button.disabled = busy;
+  $('#retry-edit').hidden = !pendingEdit;
+  $('#retry-edit').disabled = busy || !session?.online;
+  $('#history-controls').hidden = !hasEditScope;
+}
 function setSession(value) {
-  if (!value || value.client.id !== session?.client?.id) resetWorkspace();
+  if (!value || value.client.id !== session?.client?.id) {
+    workspace = null;
+    stale = false;
+    pendingEdit = null;
+    fontsLoaded = false;
+    resetWorkspace();
+    editors.reset();
+  }
   session = value;
-  const canEdit = value ? value.client.scopes.includes('edit') : false;
-  $('#readonly-note').hidden = !value || canEdit;
-  $('#edit-forms').hidden = !canEdit;
-  $('#save-selection').hidden = !canEdit;
-  for (const input of document.querySelectorAll('#artwork-list input')) input.disabled = !canEdit;
   $('#connection').textContent = value
     ? value.online
       ? 'PC connected'
       : 'PC offline'
     : 'Not connected';
-  $('#device-name').textContent = value?.deviceLabel ?? 'Connected computer';
+  $('#device-name').textContent = safeText(value?.deviceLabel, 64) || 'Connected computer';
   $('#pair-card').hidden = !!value;
+  $('.intro').hidden = !!value;
   $('#workspace-area').hidden = !value;
-  return canEdit;
-}
-function resetWorkspace() {
-  workspace = null;
-  const cleared = '#workspace-name,#workspace-meta,#artwork-list,#operation-list,#details-list';
-  for (const target of document.querySelectorAll(cleared)) target.replaceChildren();
-  $('#truncated').hidden = true;
-  loadOperation();
-}
-function view(name) {
-  for (const panel of document.querySelectorAll('[data-panel]'))
-    panel.hidden = panel.dataset.panel !== name;
-  for (const tab of document.querySelectorAll('[data-view]'))
-    tab.setAttribute('aria-pressed', String(tab.dataset.view === name));
-}
-function selectedIds() {
-  return [...document.querySelectorAll('#artwork-list input:checked')].map((item) => item.value);
-}
-function number(form, name) {
-  const value = form.elements.namedItem(name).value.trim();
-  if (!value) throw new Error('Enter a value in each required number field.');
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) throw new Error('Use a valid number.');
-  return parsed;
-}
-function numbers(form, names) {
-  return Object.fromEntries(names.map((name) => [name, number(form, name)]));
-}
-function admission() {
-  if (!workspace || !session?.client?.scopes.includes('edit'))
-    throw new Error('Refresh a workspace with editing permission first.');
-  return { expectedRevision: workspace.revision, requestId: crypto.randomUUID() };
+  syncControls();
 }
 async function command(name, args = {}, generation) {
   return (await api('/api/client/command', { name, args }, generation)).result;
 }
-function renderWorkspace(value) {
-  workspace = value;
-  $('#workspace-name').textContent = value.name || 'Untitled workspace';
-  $('#workspace-meta').textContent =
-    `${value.mode === 'cnc' ? 'CNC' : 'Laser'} · ${value.totalArtwork} artwork · ${value.totalOperations} operations${value.dirty ? ' · Unsaved changes' : ''}`;
-  const canEdit = setSession(session);
-  const list = $('#artwork-list');
-  list.replaceChildren();
-  for (const item of value.artwork) {
-    const label = document.createElement('label');
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.value = item.id;
-    input.checked = value.selection.includes(item.id);
-    input.disabled = !canEdit;
-    const description = document.createElement('span');
-    const title = document.createElement('span');
-    title.className = 'item-title';
-    title.textContent = item.name || item.type;
-    const info = document.createElement('span');
-    info.className = 'item-description';
-    info.textContent = item.bounds
-      ? `${item.type} · ${item.bounds.widthMm.toFixed(2)} × ${item.bounds.heightMm.toFixed(2)} mm`
-      : item.type;
-    description.append(title, info);
-    label.append(input, description);
-    list.append(label);
-  }
-  if (!value.artwork.length) {
-    const empty = document.createElement('p');
-    empty.className = 'muted';
-    empty.textContent = 'There is no artwork in this workspace yet.';
-    list.append(empty);
-  }
-  $('#truncated').hidden = !value.truncated;
-  $('#truncated').textContent =
-    'This page shows up to 200 items. Use the PC for the complete workspace.';
-  const operations = $('#operation-list');
-  const selectedOperation = operations.value;
-  operations.replaceChildren();
-  // The desktop validates actual operation support; the phone never modifies CNC settings.
-  for (const item of value.mode === 'laser' ? value.operations : []) {
-    const option = document.createElement('option');
-    option.value = item.id;
-    option.textContent = item.name || item.type;
-    operations.append(option);
-  }
-  if ([...operations.options].some((option) => option.value === selectedOperation))
-    operations.value = selectedOperation;
-  updateApplyButton();
-  loadOperation();
-}
-function updateApplyButton() {
-  $('#operation-form').querySelector('button').disabled =
-    busy || !$('#operation-list').options.length;
-}
-function loadOperation() {
-  const form = $('#operation-form');
-  const item = workspace?.operations.find(
-    (operation) => operation.id === form.elements.operationId.value,
-  );
-  for (const name of ['powerPercent', 'speedMmPerMin', 'passes'])
-    form.elements[name].value = item?.[name] ?? '';
-  form.elements.enabled.checked = item?.enabled ?? true;
-}
-function detail(title, text) {
-  const item = document.createElement('div');
-  item.className = 'detail';
-  const heading = document.createElement('h3');
-  heading.textContent = title;
-  const content = document.createElement('p');
-  content.textContent = text;
-  item.append(heading, content);
-  $('#details-list').append(item);
-}
-async function refresh(generation) {
+async function refresh(generation, full = true) {
+  stale = true;
   const current = await api('/api/session', undefined, generation);
   if (current.status !== 'approved') {
     setSession(null);
@@ -196,42 +175,40 @@ async function refresh(generation) {
     notice(errorMessages.unavailable, true);
     return false;
   }
-  renderWorkspace(await command('get_workspace', {}, generation));
-  $('#details-list').replaceChildren();
-  const status = await command('get_app_status', {}, generation);
-  detail('Desktop app', `${status.app.name} ${status.app.version} · ${status.edition.mode}`);
-  if (status.updates.available)
-    detail(
-      'Update available on the PC',
-      `${status.updates.version ?? 'New version'}${status.updates.highlights?.length ? ': ' + status.updates.highlights.join(' · ') : ''}`,
-    );
-  const machine = (await command('get_machine', {}, generation)).machine;
-  detail(
-    'Machine profile',
-    `${machine.name} · ${machine.bedWidthMm} × ${machine.bedHeightMm} mm${machine.controller ? ' · ' + machine.controller : ''}`,
-  );
-  const review = await command('review_job', {}, generation);
-  detail(
-    'Job review',
-    `${review.status} · ${review.frame.complete ? 'Frame completed' : 'Frame required on the PC'}`,
-  );
-  for (const warning of review.warnings) detail('Job review warning', warning.message);
-  const recipes = await command('list_material_recipes', {}, generation);
-  detail(
-    'Material recipes',
-    recipes.recipes.length
-      ? recipes.recipes.map((recipe) => recipe.name).join(' · ')
-      : 'No saved recipes.',
-  );
+  const value = await command('get_workspace', {}, generation);
+  if (!validWorkspace(value))
+    throw fault('failed', 'The workspace response is incomplete. Refresh on the PC.');
+  workspace = value;
+  stale = false;
+  renderWorkspace(value, canEdit());
+  editors.workspaceChanged();
+  syncControls();
+  await refreshPreview(generation);
+  if (full) await refreshDetails(command, generation);
   return true;
+}
+async function refreshPreview(generation) {
+  let preview;
+  try {
+    preview = await command('get_workspace_preview', {}, generation);
+  } catch (error) {
+    if (!session || error.code === 'cancelled' || error.code === 'forbidden') throw error;
+  }
+  renderPreview(preview, workspace?.revision);
+  if (!fontsLoaded) {
+    try {
+      const fonts = await command('list_fonts', {}, generation);
+      editors.setFonts(fonts);
+      fontsLoaded = Array.isArray(fonts?.fonts);
+    } catch (error) {
+      if (!session || error.code === 'cancelled' || error.code === 'forbidden') throw error;
+    }
+  }
 }
 async function action(callback) {
   if (busy) return;
   busy = true;
-  const controls = document.querySelectorAll(
-    '#pair-form button, #disconnect, #refresh, #save-selection, #edit-forms button',
-  );
-  for (const button of controls) button.disabled = true;
+  syncControls();
   document.body.setAttribute('aria-busy', 'true');
   try {
     await callback();
@@ -239,21 +216,59 @@ async function action(callback) {
     notice(error.message || errorMessages.failed, true);
   } finally {
     busy = false;
-    for (const button of controls) button.disabled = false;
-    updateApplyButton();
+    syncControls();
     document.body.setAttribute('aria-busy', 'false');
   }
 }
 async function edit(name, args) {
-  await command(name, { ...admission(), ...args });
-  if (await refresh()) notice('Updated on your computer.');
+  if (!canEdit() || stale || pendingEdit)
+    throw fault('forbidden', 'Refresh a workspace with editing permission first.');
+  pendingEdit = {
+    name,
+    args: { expectedRevision: workspace.revision, requestId: crypto.randomUUID(), ...args },
+    clientId: session.client.id,
+  };
+  await performPendingEdit();
 }
-function bindForm(id, callback) {
-  $(id).addEventListener('submit', (event) => {
-    event.preventDefault();
-    void action(() => callback(event.currentTarget));
-  });
+async function performPendingEdit() {
+  const attempt = pendingEdit;
+  if (!attempt) return;
+  try {
+    await verifyEditingClient(attempt);
+    const result = await command(attempt.name, attempt.args);
+    if (!result || typeof result.revision !== 'string')
+      throw fault('failed', errorMessages.failed, true);
+    pendingEdit = null;
+  } catch (error) {
+    editFailure(error, attempt);
+  }
+  if (await refresh(undefined, false)) notice('Updated on your computer.');
 }
+async function verifyEditingClient(attempt) {
+  const current = await api('/api/session');
+  if (current.status !== 'approved' || current.client.id !== attempt.clientId) {
+    setSession(current.status === 'approved' ? current : null);
+    throw fault('forbidden', 'The connection changed. Refresh before editing the new workspace.');
+  }
+  setSession(current);
+  if (!canEdit())
+    throw fault('forbidden', 'Editing permission is no longer available. Refresh or pair again.');
+}
+function editFailure(error, attempt) {
+  if (error.ambiguous && session?.client.id === attempt.clientId)
+    throw fault(
+      'unavailable',
+      'The result is uncertain. Retry the last request to check it safely; it will not make a second copy.',
+      true,
+    );
+  pendingEdit = null;
+  if (error.code === 'stale_revision') stale = true;
+  if (error.code === 'forbidden' && session)
+    setSession({ ...session, client: { ...session.client, scopes: ['read'] } });
+  throw error;
+}
+const editors = bindEditors({ action, edit, command, getWorkspace: () => workspace });
+$('#artwork-list').addEventListener('change', syncControls);
 function continueToMcp() {
   const target = new URLSearchParams(location.search).get('continue');
   if (!target || target.length > 4096) return false;
@@ -306,12 +321,10 @@ async function pairStatus(deadline, generation) {
     poll = null;
   }
 }
-bindForm('#pair-form', async (form) => {
+bindForm('#pair-form', action, async (form) => {
   const generation = ++pairGeneration;
   clearTimeout(poll);
   setSession(null);
-  const deviceId = form.elements.deviceId.value.trim().toLowerCase();
-  const code = form.elements.code.value.trim();
   const clientLabel = form.elements.clientLabel.value.trim();
   if (new TextEncoder().encode(JSON.stringify(clientLabel)).byteLength > 66)
     throw new Error('Use a shorter phone name.');
@@ -319,8 +332,8 @@ bindForm('#pair-form', async (form) => {
     '/api/pair/claim',
     {
       v: 1,
-      deviceId,
-      code,
+      deviceId: form.elements.deviceId.value.trim().toLowerCase(),
+      code: form.elements.code.value.trim(),
       clientLabel,
       requestedScopes: form.elements.edit.checked ? ['read', 'edit'] : ['read'],
     },
@@ -330,40 +343,17 @@ bindForm('#pair-form', async (form) => {
   notice('Approve this phone in KerfDesk on your PC.');
   await pairStatus(pairingDeadline(result.expiresInMs), generation);
 });
-bindForm('#text-form', (form) =>
-  edit('add_text', {
-    text: form.elements.text.value,
-    ...numbers(form, ['xMm', 'yMm', 'widthMm', 'fontSizeMm']),
-  }),
-);
-bindForm('#rectangle-form', (form) =>
-  edit('add_rectangle', numbers(form, ['xMm', 'yMm', 'widthMm', 'heightMm'])),
-);
-bindForm('#move-form', (form) =>
-  edit('transform_artwork', {
-    artworkIds: selectedIds(),
-    transform: { type: 'move', dxMm: number(form, 'dxMm'), dyMm: number(form, 'dyMm') },
-  }),
-);
-bindForm('#rotate-form', (form) =>
-  edit('transform_artwork', {
-    artworkIds: selectedIds(),
-    transform: { type: 'rotate', angleDeg: number(form, 'angleDeg') },
-  }),
-);
-bindForm('#operation-form', (form) => {
-  const patch = { enabled: form.elements.enabled.checked };
-  for (const name of ['powerPercent', 'speedMmPerMin', 'passes'])
-    if (form.elements[name].value.trim()) patch[name] = number(form, name);
-  return edit('update_operation', { operationId: form.elements.operationId.value, patch });
-});
-$('#operation-list').addEventListener('change', loadOperation);
-$('#save-selection').addEventListener('click', () => {
-  void action(() => edit('set_selection', { artworkIds: selectedIds() }));
+$('#retry-edit').addEventListener('click', () => {
+  void action(performPendingEdit);
 });
 $('#refresh').addEventListener('click', () => {
   void action(async () => {
-    if (await refresh()) notice('Workspace refreshed.');
+    if (await refresh())
+      notice(
+        pendingEdit
+          ? 'Workspace refreshed. Retry the last request to resolve its result.'
+          : 'Workspace refreshed.',
+      );
   });
 });
 $('#disconnect').addEventListener('click', () => {
