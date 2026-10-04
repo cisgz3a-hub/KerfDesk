@@ -74,9 +74,15 @@ design coordinates; review bounds use output coordinates. Compilation
 readiness and spatial Frame completion are independent facts. No review read
 approves, Frames, starts or dispatches output.
 
-The static `ui://kerfdesk/workspace/v2.html` resource uses
-`text/html;profile=mcp-app`. Only the preview tool advertises
-`_meta.ui.resourceUri`; enclosing OAuth metadata is retained. The component
+The static `ui://kerfdesk/workspace/v3.html` resource uses
+`text/html;profile=mcp-app`. Preview and machine tools advertise
+`_meta.ui.resourceUri`; enclosing OAuth metadata is retained. Design, Machine
+and Settings separate the preview, controls and connection options. Visible
+views use bounded read-only refresh; unchanged previews are cached by revision.
+Hidden views pause. Pending selection drafts remain local, and stale edits need
+a current revision. Design refresh waits for an unsettled owned machine action;
+status and receipt reads continue while visible so it can resume on completion.
+The preview remains an image view. The component
 initializes the MCP Apps host bridge and calls tools through `postMessage`,
 with no independent network or file access. Its external connect/resource
 allowlists are empty. UI permission hints grant no authority. Non-UI hosts

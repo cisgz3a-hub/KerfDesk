@@ -12,6 +12,7 @@ type Props = {
   readonly updatesUntil: number | null;
   readonly onCheck: () => Promise<void>;
   readonly busy: boolean;
+  readonly feedback?: string | null | undefined;
   readonly onDownload: () => Promise<void>;
   readonly onInstallOnQuit: () => Promise<void>;
   readonly onInstallAndClose?: (() => Promise<void>) | undefined;
@@ -30,6 +31,7 @@ export function UpdatesPanel({
   updatesUntil,
   onCheck,
   busy: requestBusy,
+  feedback,
   onDownload,
   onInstallOnQuit,
   onInstallAndClose,
@@ -51,7 +53,12 @@ export function UpdatesPanel({
         </button>
       </div>
       <div style={details} role="region" aria-label="Update details" tabIndex={0}>
-        <UpdateDetails client={client} status={status} updatesUntil={updatesUntil} />
+        <UpdateDetails
+          client={client}
+          status={status}
+          updatesUntil={updatesUntil}
+          feedback={feedback}
+        />
       </div>
       <UpdateActions
         client={client}
@@ -70,7 +77,8 @@ function UpdateDetails({
   client,
   status,
   updatesUntil,
-}: Pick<Props, 'client' | 'status' | 'updatesUntil'>): JSX.Element {
+  feedback,
+}: Pick<Props, 'client' | 'status' | 'updatesUntil' | 'feedback'>): JSX.Element {
   const updating = status !== null && status.state !== 'unavailable';
   return (
     <>
@@ -80,8 +88,16 @@ function UpdateDetails({
         </p>
       )}
       <p role="status" style={{ lineHeight: 1.5 }}>
-        {updateStatusText(status, updatesUntil)}
+        {feedback ?? updateStatusText(status, updatesUntil)}
       </p>
+      {status?.state === 'downloading' && status.downloadProgress !== undefined ? (
+        <progress
+          aria-label="Update download progress"
+          max={status.downloadProgress.totalBytes}
+          value={status.downloadProgress.receivedBytes}
+          style={{ width: '100%' }}
+        />
+      ) : null}
       <ReleaseSummary status={status} />
       <EarlyUpdatesOption client={client} />
       {updating ? (

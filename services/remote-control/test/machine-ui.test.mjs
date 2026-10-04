@@ -373,7 +373,7 @@ test('phone machine: polling and panel switches preserve unsent text, font and p
     await checkMachine(p);
     await loaded.page.clock.install();
     await loaded.page.clock.fastForward(6001);
-    await p.getByRole('button', { name: 'Artwork', exact: true }).click();
+    await p.getByRole('button', { name: 'Design', exact: true }).click();
     await p.getByRole('button', { name: 'Edit selected text', exact: true }).click();
     await idle(p);
     for (const [name, value] of Object.entries({
@@ -385,7 +385,12 @@ test('phone machine: polling and panel switches preserve unsent text, font and p
     }))
       assert.equal(await form.locator(`[name=${name}]`).inputValue(), value);
     assert.equal(state.commands.filter((item) => item.name === 'get_text').length, 1);
-    assert.equal(state.commands.filter((item) => item.name === 'get_workspace').length, 1);
+    assert.ok(state.commands.filter((item) => item.name === 'get_workspace').length >= 2);
+    assert.equal(
+      state.commands.filter((item) => item.name === 'get_workspace_preview').length,
+      1,
+      'Status and navigation reads reuse the unchanged design image',
+    );
     assert.equal(state.edits, 0);
     assert.deepEqual(loaded.errors, []);
   } finally {

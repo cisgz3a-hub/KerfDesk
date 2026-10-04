@@ -3,6 +3,8 @@ import { lstat, mkdir, open, opendir, rename, unlink, type FileHandle } from 'no
 import { join } from 'node:path';
 import { manualDownloadUrl } from '../public/desktop-manual-download.mjs';
 import type { ManualCandidate, UpdateFetch } from './manual-update-manifest.js';
+import type { UpdateDownloadProgress } from './update-status.js';
+import { manualDownloadDeadline } from './manual-update-transfer.js';
 
 export type StagedManualUpdate = ManualCandidate & { readonly path: string };
 
@@ -11,6 +13,7 @@ export async function downloadManualInstaller(
   candidate: ManualCandidate,
   userDataPath: string,
   fetch: UpdateFetch,
+  onProgress?: (progress: UpdateDownloadProgress) => void,
 ): Promise<StagedManualUpdate> {
   const folder = join(userDataPath, 'manual-updates');
   await mkdir(folder, { recursive: true });
@@ -18,7 +21,7 @@ export async function downloadManualInstaller(
   const path = join(folder, `${candidate.release.version}-${randomUUID()}.exe`);
   const temporary = `${path}.partial`;
   try {
-    await receive(candidate, temporary, fetch);
+    await receive(candidate, temporary, fetch, onProgress);
     await rename(temporary, path);
     return { ...candidate, path };
   } catch (error) {
@@ -60,34 +63,59 @@ async function receive(
   candidate: ManualCandidate,
   path: string,
   fetch: UpdateFetch,
+  onProgress?: (progress: UpdateDownloadProgress) => void,
 ): Promise<void> {
   const { name, bytes, sha256 } = candidate.release.artifacts[0];
   const url = manualDownloadUrl(candidate.release.version, name);
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(10 * 60_000),
-    redirect: 'error',
-    credentials: 'omit',
-    cache: 'no-store',
-  });
-  const body = installerBody(response, url, bytes);
+  const deadline = manualDownloadDeadline();
+  try {
+    onProgress?.({ phase: 'starting', receivedBytes: 0, totalBytes: bytes });
+    const response = await deadline.wait(
+      fetch(url, {
+        signal: deadline.signal,
+        redirect: 'error',
+        credentials: 'omit',
+        cache: 'no-store',
+      }),
+    );
+    const body = installerBody(response, url, bytes);
+    await receiveBody(body, path, bytes, sha256, deadline, onProgress);
+  } finally {
+    deadline.dispose();
+  }
+}
+
+async function receiveBody(
+  body: NonNullable<Response['body']>,
+  path: string,
+  bytes: number,
+  sha256: string,
+  deadline: ReturnType<typeof manualDownloadDeadline>,
+  onProgress?: (progress: UpdateDownloadProgress) => void,
+): Promise<void> {
   const file = await open(path, 'wx', 0o600);
   const reader = body.getReader();
   const hash = createHash('sha256');
   let total = 0;
   try {
     for (;;) {
-      const chunk = await reader.read();
+      const chunk = await deadline.wait(reader.read());
       if (chunk.done) break;
       total += chunk.value.byteLength;
       if (total > bytes) throw new Error('Installer exceeds signed size');
       hash.update(chunk.value);
       await writeChunk(file, chunk.value);
+      deadline.signal.throwIfAborted();
+      onProgress?.({ phase: 'receiving', receivedBytes: total, totalBytes: bytes });
     }
-    if (total !== bytes || hash.digest('hex') !== sha256)
-      throw new Error('Installer checksum mismatch');
+    if (total !== bytes) throw new Error('Installer checksum mismatch');
+    onProgress?.({ phase: 'verifying', receivedBytes: total, totalBytes: bytes });
+    if (hash.digest('hex') !== sha256) throw new Error('Installer checksum mismatch');
     await file.sync();
+    deadline.signal.throwIfAborted();
   } finally {
-    await reader.cancel().catch(() => undefined);
+    // A broken stream's cancellation promise cannot hold failure/retry forever.
+    void reader.cancel().catch(() => undefined);
     reader.releaseLock();
     await file.close();
   }

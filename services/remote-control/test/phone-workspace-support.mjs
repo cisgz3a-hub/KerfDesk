@@ -7,6 +7,10 @@ export const ONE_PIXEL_PNG =
 const publicRoot = new URL('../public/', import.meta.url);
 
 export async function openTask(page, id) {
+  if (id === 'connection-options')
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  if (id === 'edit-text-task' && (await page.locator('div[data-panel=edit]').isHidden()))
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
   const details = page.locator('#' + id);
   if ((await details.getAttribute('open')) === null)
     await details.locator(':scope > summary').click();
@@ -95,7 +99,7 @@ export function workspace(state) {
     operations: [
       {
         id: 'laser-1',
-        name: 'Mark artwork',
+        name: state.sharing ? 'Mark artwork' : 'Operation',
         type: 'laser_vector',
         enabled: true,
         powerPercent: 25,
@@ -205,6 +209,13 @@ async function json(route, status, body) {
 async function command(route, state) {
   const { name, args } = route.request().postDataJSON();
   state.commands.push({ name, args: structuredClone(args) });
+  const hooked = await state.readHook?.(name, args);
+  if (hooked)
+    return json(
+      route,
+      hooked.status ?? 200,
+      hooked.error ? { error: hooked.error } : { result: hooked.result },
+    );
   if (state.machineCommand) {
     const answer = await state.machineCommand(name, args);
     if (answer) {
@@ -237,19 +248,23 @@ async function command(route, state) {
   return json(route, 200, { result: changed });
 }
 
-export async function phonePage(browser, state = fixtureState(), width = 390) {
+export async function phonePage(browser, state = fixtureState(), width = 390, options = {}) {
   const context = await browser.newContext({
     viewport: { width, height: 844 },
     isMobile: true,
     hasTouch: true,
   });
   const page = await context.newPage();
+  if (options.clock) await page.clock.install();
+  if (options.init) await page.addInitScript(options.init);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await context.route('**/*', async (route) => {
     const url = new URL(route.request().url());
     if (url.origin !== UI_ORIGIN) return route.abort();
     if (url.pathname === '/api/session') {
+      state.sessionReads = (state.sessionReads ?? 0) + 1;
+      if (state.unpaired) return json(route, 200, { status: 'none' });
       if (state.revoked) return json(route, 401, { error: { code: 'unauthorized' } });
       return json(route, 200, {
         status: 'approved',
@@ -278,7 +293,7 @@ export async function phonePage(browser, state = fixtureState(), width = 390) {
       body: await readFile(new URL(file, publicRoot), 'utf8'),
     });
   });
-  await page.goto(UI_ORIGIN + '/control');
+  await page.goto(UI_ORIGIN + '/control' + (options.suffix ?? ''));
   await idle(page);
   return { context, page, state, errors };
 }
@@ -291,5 +306,9 @@ export async function capture(page, name) {
   const directory = process.env.KERFDESK_MCP_UI_EVIDENCE;
   if (!directory) return;
   await mkdir(directory, { recursive: true });
-  await page.screenshot({ path: join(directory, `${name}.png`), fullPage: false });
+  await page.screenshot({
+    path: join(directory, `${name}.png`),
+    fullPage: false,
+    animations: 'disabled',
+  });
 }

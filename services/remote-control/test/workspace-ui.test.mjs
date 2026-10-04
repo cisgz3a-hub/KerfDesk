@@ -2,7 +2,14 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 import { appPage, notification } from './workspace-ui-support.mjs';
-import { capture, fixtureState, idle, visualState, workspace } from './phone-workspace-support.mjs';
+import {
+  capture,
+  fixtureState,
+  idle,
+  readResult,
+  visualState,
+  workspace,
+} from './phone-workspace-support.mjs';
 
 let browser;
 before(async () => {
@@ -260,6 +267,62 @@ test('MCP Apps: revocation clears private preview, text and selection controls',
   }
 });
 
+test('MCP Apps privacy: cancelled access rejects late image/workspace notifications until a fresh permitted RPC read', async () => {
+  const loaded = await appPage(browser, undefined, 390, { clock: true });
+  try {
+    const { page, frame, state } = loaded;
+    const preview = readResult(state, 'get_workspace_preview');
+    await page.evaluate(() =>
+      globalThis.document.getElementById('widget').contentWindow.postMessage(
+        {
+          jsonrpc: '2.0',
+          method: 'ui/notifications/tool-result',
+          params: { isError: true, structuredContent: { error: { code: 'cancelled' } } },
+        },
+        '*',
+      ),
+    );
+    await frame.locator('#summary').filter({ hasText: 'Refresh' }).waitFor();
+    await notification(page, preview);
+    await frame
+      .locator('#preview-message')
+      .filter({ hasText: 'Access needs refreshing' })
+      .waitFor();
+    assert.equal(await frame.locator('#preview').getAttribute('src'), null);
+    await notification(page, workspace(state));
+    await frame.locator('#title').filter({ hasText: 'Phone workspace fixture' }).waitFor();
+    assert.equal(await frame.locator('#select').isDisabled(), true);
+    await notification(page, preview);
+    assert.equal(await frame.locator('#preview').getAttribute('src'), null);
+    await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await idle(frame);
+    assert.equal(await frame.locator('#preview').isVisible(), true);
+    assert.equal(await frame.locator('#select').isEnabled(), true);
+    assert.equal(state.edits, 0);
+    assert.deepEqual(loaded.errors, []);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('MCP Apps privacy: an initial display-only host can still show its first permitted preview without a workspace call', async () => {
+  const state = fixtureState();
+  state.displayOnly = true;
+  const loaded = await appPage(browser, state);
+  try {
+    await notification(loaded.page, readResult(state, 'get_workspace_preview'));
+    await loaded.frame.locator('#preview').waitFor();
+    assert.equal(
+      await loaded.frame.locator('#preview').evaluate((node) => node.naturalWidth > 0),
+      true,
+    );
+    assert.equal(state.commands.length, 0);
+    assert.deepEqual(loaded.errors, []);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
 test('MCP Apps: malformed image and unsupported initialization remain inert', async () => {
   const loaded = await appPage(browser);
   try {
@@ -366,6 +429,9 @@ test('MCP Apps usability: a stale edit explains refresh and retains the selected
     assert.equal(state.edits, 0);
     await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
     await idle(frame);
+    assert.equal(await frame.locator('input[value="rectangle-1"]').isChecked(), true);
+    assert.equal(await frame.locator('#select').isDisabled(), true);
+    await frame.getByRole('button', { name: 'Use the PC selection', exact: true }).click();
     assert.equal(await frame.locator('#select').isEnabled(), true);
     await frame.locator('input[value="rectangle-1"]').check();
     await frame.getByRole('button', { name: 'Use this selection', exact: true }).click();

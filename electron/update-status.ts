@@ -29,6 +29,13 @@ export type UpdateStatus = {
   /** Verified, release-bound plain text; absent in older update services. */
   readonly releaseNotes?: readonly string[];
   readonly releaseNotesState?: 'loading' | 'available' | 'unavailable';
+  readonly downloadProgress?: UpdateDownloadProgress;
+};
+
+export type UpdateDownloadProgress = {
+  readonly phase: 'starting' | 'receiving' | 'verifying';
+  readonly receivedBytes: number;
+  readonly totalBytes: number;
 };
 
 export type DesktopUpdates = {

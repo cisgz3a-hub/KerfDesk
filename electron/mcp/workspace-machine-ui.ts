@@ -33,7 +33,7 @@ function bindMcpMachine(environment) {
   const states = new Set(['accepted','preparing','awaiting_review','starting','running','unknown',...terminal]);
   const actions = {jog_machine:'jog',frame_job:'frame',review_machine_job:'review',start_job:'start',abort_job:'abort'};
   const attempts=new Map();
-  let status=null, operation=null, reading=false, visible=false, timer=null, generation=0, sequence=0;
+  let status=null, operation=null, reading=false, visible=false, timer=null, generation=0, sequence=0,suspended=false;
   function note(value) { q('message').textContent=text(value); }
   function validStatus(value) { return !!value && typeof value.revision==='string' && value.revision.length>0 && value.revision.length<=200 && ['connected','disconnected','connecting'].includes(value.connection) && typeof value.job?.active==='boolean' && ['idle','jog','frame','unknown'].includes(value.motion?.kind) && typeof value.frame?.complete==='boolean'; }
   function validOperation(value) { return !!value && uuid.test(value.operationId) && ['jog','frame','job','abort'].includes(value.kind) && states.has(value.state) && typeof value.revision==='string' && (typeof value.committed==='boolean'||value.committed===null); }
@@ -45,6 +45,7 @@ function bindMcpMachine(environment) {
   function inFlight(abort){return [...attempts.values()].some(item=>item.abort===abort&&item.admissionPending);}
   function uncertain(){return [...attempts.values()].some(item=>item.uncertain);}
   function unfinished(item){return item.receipt&&!terminal.has(item.receipt.state)&&item.receipt.state!=='awaiting_review';}
+  function ownedWork(){return [...attempts.values()].some(item=>item.admissionPending||item.uncertain||unfinished(item));}
   function writable() { return control() && !inFlight(false) && !inFlight(true) && !uncertain() && ![...attempts.values()].some(unfinished); }
   function reviewReady() { return validReview(operation?.review) && operation.state==='awaiting_review' && (!status||operation.review.revision===status.revision); }
   function available(name) { return status?.availability?.[actions[name]]?.available===true; }
@@ -93,17 +94,18 @@ function bindMcpMachine(environment) {
     for(const item of review.operations) for(const summary of Array.isArray(item.summaries)?item.summaries.slice(0,20):[]) row(q('review-operations'),'Operation',summary);
     q('acknowledgement').textContent=text(review.acknowledgement.prompt)||(review.acknowledgement.kind==='laser-verified'?'The current controller laser mode is verified.':'Confirm this current review before Start.');
   }
-  function schedule() { clearTimeout(timer); if(visible&&environment.available()&&!document.hidden) timer=setTimeout(()=>{void check();},status?2000:5000); }
+  function needsReceipt(item){return item.uncertain||(unfinished(item)&&item.requestId!==status?.operation?.operationId);}
+  function schedule() { clearTimeout(timer); if((visible||ownedWork())&&environment.available()&&!document.hidden&&!suspended) timer=setTimeout(()=>{void check();},Math.max(status?2000:5000,2000*(1+[...attempts.values()].filter(needsReceipt).length))); }
   function confirm(value){const item=attempts.get(value.operationId);if(!item)return;item.receipt=value;item.uncertain=value.state==='unknown';if(!item.admissionPending&&terminal.has(value.state))attempts.delete(item.requestId);}
   async function readReceipts(before,actionSequence){
-    for(const item of [...attempts.values()].filter(item=>item.uncertain||(unfinished(item)&&item.requestId!==status?.operation?.operationId))){
+    for(const item of [...attempts.values()].filter(needsReceipt)){
       const value=await environment.tool('get_control_operation',{operationId:item.requestId});if(before!==generation||actionSequence!==sequence)return;
       if(!validOperation(value?.operation)||value.operation.operationId!==item.requestId)throw new Error('The PC could not confirm the action. Check status.');confirm(value.operation);
       if(!validOperation(status?.operation)&&item.sequence===sequence)operation=value.operation;
     }
   }
   async function check() {
-    if(reading||!environment.available())return;
+    if(reading||!environment.available()||suspended||document.hidden)return;
     const before=generation, actionSequence=sequence; reading=true;render();
     try {
       const value=await environment.tool('get_machine_status'); if(before!==generation||actionSequence!==sequence)return;
@@ -135,12 +137,14 @@ function bindMcpMachine(environment) {
   for(const [button,name]of [['frame','frame_job'],['review','review_machine_job'],['abort','abort_job']])q(button).addEventListener('click',()=>{void submit(name);});
   q('start').addEventListener('click',()=>{void submit('start_job',{reviewId:operation?.review?.reviewId});});q('check').addEventListener('click',()=>{void check();});
   q('jog-form').addEventListener('submit',event=>event.preventDefault());for(const button of q('jog-form').querySelectorAll('[data-axis]'))button.addEventListener('click',()=>{void jog(button);});
-  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(visible&&!document.hidden)void check();});
+  document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if((visible||ownedWork())&&!document.hidden)void check();});
+  window.addEventListener('pagehide',()=>{suspended=true;clearTimeout(timer);});window.addEventListener('pageshow',()=>{suspended=false;if(visible||ownedWork())void check();});
   render();
   return {
     ready(){render();if(visible&&environment.available())void check();},
-    show(value){visible=value;document.body.classList.toggle('machine-view',value);clearTimeout(timer);if(value)void check();},
+    show(value){visible=value;document.body.classList.toggle('machine-view',value);clearTimeout(timer);if(value)void check();else if(ownedWork())schedule();},
     reset(){generation++;clearTimeout(timer);status=operation=null;attempts.clear();note('');render();},
+    isBusy(){return reading||ownedWork();},
     receive(value){
       if(validStatus(value)) {status=value;if(validOperation(value.operation))operation=value.operation;render();return;}
       if(validOperation(value?.operation)) {operation=value.operation;render();return;}

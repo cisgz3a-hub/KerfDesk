@@ -439,6 +439,62 @@ footer {
 footer a {
   color: #a5c8bd;
 }
+.live-row {
+  margin: 8px 0;
+}
+body[data-view='machine'] [data-design],
+body[data-view='details'] [data-design] {
+  display: none;
+}
+.machine-view .live-row {
+  display: none;
+}
+.preview-tools {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 12px;
+}
+.preview-tools button {
+  min-width: 48px;
+  padding: 10px;
+}
+.preview-surface {
+  max-height: 420px;
+  overflow: auto;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+.preview-surface:has(img:not([hidden])) {
+  display: block;
+  overflow: auto;
+}
+.preview-surface img {
+  max-width: none;
+}
+.preview-surface.preview-zoomed img {
+  max-height: none;
+}
+#draft-note button {
+  margin-top: 8px;
+  width: 100%;
+}
+#workspace-area > .workspace-heading {
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  margin: 16px 0 8px;
+}
+#workspace-area > .workspace-heading h2 {
+  font-size: 19px;
+  margin-bottom: 4px;
+}
+#workspace-meta {
+  font-size: 13px;
+}
+.preview-card {
+  padding: 16px;
+}
 [hidden] {
   display: none !important;
 }

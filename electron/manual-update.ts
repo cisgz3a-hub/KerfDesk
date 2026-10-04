@@ -15,7 +15,12 @@ import {
   type StagedManualUpdate,
 } from './manual-update-download.js';
 import type { PublicKeys } from './licensing-verification.js';
-import type { DesktopUpdates, UpdateState, UpdateStatus } from './update-status.js';
+import type {
+  DesktopUpdates,
+  UpdateState,
+  UpdateStatus,
+  UpdateDownloadProgress,
+} from './update-status.js';
 
 export type ManualUpdates = DesktopUpdates & {
   readonly prepareInstall: () => Promise<string | null>;
@@ -152,12 +157,18 @@ class ManualUpdateService implements ManualUpdates {
       return this.value;
     const candidate = this.candidate;
     this.set('downloading', candidate.release.version);
+    this.progress({
+      phase: 'starting',
+      receivedBytes: 0,
+      totalBytes: candidate.release.artifacts[0].bytes,
+    });
     this.start(async () => {
       if (!(await this.valid(candidate))) throw new Error('Release no longer covered');
       const staged = await downloadManualInstaller(
         candidate,
         this.options.userDataPath,
         this.options.fetch,
+        (progress) => this.progress(progress),
       );
       try {
         if (!(await this.valid(staged))) throw new Error('Release no longer covered');
@@ -170,6 +181,10 @@ class ManualUpdateService implements ManualUpdates {
     });
     return this.value;
   };
+  private progress(progress: UpdateDownloadProgress): void {
+    if (this.value.state === 'downloading')
+      this.value = { ...this.value, downloadProgress: { ...progress } };
+  }
   readonly installOnQuit = async (): Promise<UpdateStatus> => {
     if (this.busy || this.staged === null || this.value.state !== 'ready') return this.value;
     this.start(async () => {
