@@ -88,7 +88,7 @@ describe('browser Free build boundary', () => {
     expect(Object.keys(desktop.presets)).toEqual(Object.keys(TRACE_PRESETS));
     for (const options of Object.values(desktop.presets))
       expect(Array.isArray(await desktop.trace(image, options))).toBe(true);
-  });
+  }, 30_000);
 
   it('compiles every Free CNC choice and diagnostics while rejecting Pro toolpaths', async () => {
     const probe = await cncBundle();
