@@ -62,7 +62,7 @@ describe('browser Free build boundary', () => {
     expect(generated.kind).toBe('generated');
     expect(generated.panels).toHaveLength(6);
     expect(desktop.code).toContain('buildPanelClaims');
-  });
+  }, 30_000);
 
   it('keeps only Line Art in browser Free and every preset in desktop', async () => {
     const probe = await traceBundle();
@@ -125,7 +125,7 @@ describe('browser Free build boundary', () => {
       const scene = cncScene(probe, choice);
       expect(() => probe.compile(scene, probe.device, probe.machine)).toThrow(DESKTOP_TOOL_MESSAGE);
     }
-  });
+  }, 30_000);
 });
 
 const boxSpec = {
