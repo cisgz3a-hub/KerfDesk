@@ -1,3 +1,4 @@
+import { saveProjectAs } from './project-save';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { TestInfo } from '@playwright/test';
@@ -65,7 +66,7 @@ export async function captureDocumentState(page: Page, info: TestInfo, name: str
 export async function saveReopenDocument(page: Page, fixture: KerfDeskFixture, info: TestInfo) {
   const original = (await composedSvgSnapshot(page)).project;
   const saves = (await fixture.events()).filter((event) => event.kind === 'file-saved').length;
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, fixture);
   await expect
     .poll(
       async () => (await fixture.events()).filter((event) => event.kind === 'file-saved').length,

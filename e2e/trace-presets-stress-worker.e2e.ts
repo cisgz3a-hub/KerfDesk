@@ -1,3 +1,4 @@
+import { saveProjectAs } from './fixtures/project-save';
 import { toolbarCommand } from './fixtures/workspace-ui';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -501,7 +502,7 @@ async function importDragon(page: Page): Promise<void> {
 }
 
 async function saveProject(page: Page, fixture: KerfDeskFixture): Promise<Project> {
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, fixture);
   await expect
     .poll(async () => Object.keys(await fixture.savedFiles()).some((name) => name.endsWith('.lf2')))
     .toBe(true);

@@ -1,4 +1,4 @@
-import { toolbarCommand } from './fixtures/workspace-ui';
+import { saveProjectAs } from './fixtures/project-save';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { Page } from '@playwright/test';
 import type { AppState } from '../src/ui/state/store';
@@ -60,7 +60,7 @@ test('welds Dancing Script joins, retains editing and saves the setting with und
   );
   expect(welded.undo).toBe(raw.undo + 1);
   await page.screenshot({ path: testInfo.outputPath('script-after.png') });
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   await expect
     .poll(async () =>
       Object.values(await kerfdesk.savedFiles()).some((file) =>
