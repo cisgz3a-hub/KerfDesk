@@ -147,6 +147,8 @@ function staticAsset(request: Request, env: Env, url: URL): Promise<Response> | 
       '/control-edit.js',
       '/control-model.js',
       '/control-workspace.js',
+      '/control-machine.js',
+      '/control-machine-view.js',
       '/pairing.js',
       '/control.css',
       '/third-party-notices.txt',

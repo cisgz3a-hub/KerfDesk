@@ -57,7 +57,10 @@ test('routes mobile browsers to purchase and phone setup without downloading wor
       await expect(page.locator('.phone-steps')).toContainText('Edit → Settings… → Phone & MCP');
       await expect(page.locator('.phone-steps')).toContainText('Connected to the remote service');
       await expect(page.locator('.phone-steps')).toContainText('Copy the code exactly');
-      await expect(page.locator('.phone-steps')).toContainText('Allow viewing and editing');
+      await expect(page.locator('.phone-steps')).toContainText('Allow viewing');
+      await expect(page.locator('.phone-steps')).toContainText('machine-control');
+      await expect(page.locator('.phone-steps')).toContainText('Approve selected access');
+      await expect(page.locator('.phone-steps')).toContainText('Both choices start off.');
       await expect(page.locator('canvas, iframe, script')).toHaveCount(0);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

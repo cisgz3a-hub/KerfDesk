@@ -36,7 +36,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 type ReviewGateArgs = {
   readonly initial: ReviewedStartBundle;
   readonly completedReceipt: null;
-  readonly purpose?: 'start' | 'frame';
+  readonly purpose?: 'start' | 'frame' | 'laser-second-pass';
 };
 
 const originalStartJob = useLaserStore.getState().startJob;
@@ -154,8 +154,8 @@ describe('reviewFramedRunForStart', () => {
     expect(args.initial.project).toBe(permit.candidate.project);
     expect(args.initial.frameWcsNormalizationWarning).toBe(disclosure);
     expect(args.completedReceipt).toBeNull();
-    // Omitted purpose defaults to 'start' inside the gate.
-    expect(args.purpose).toBeUndefined();
+    // Ordinary Start supplies its purpose explicitly to both native and remote presenters.
+    expect(args.purpose).toBe('start');
     expect(vi.mocked(useLaserStore.getState().startJob)).not.toHaveBeenCalled();
     expect(useLaserStore.getState().framedRun).toBe(permit);
   });

@@ -1,4 +1,5 @@
 import type { JogParams, RealtimeOverrideByte } from '../../core/controllers/grbl';
+import type { MachineExecutionOwner } from './machine-execution-owner';
 import type { ControllerCommandSet, ControllerKind } from '../../core/devices/device-profile';
 import type { Project } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
@@ -51,17 +52,20 @@ export type LaserStoreActions = {
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   /** Owned G54 selection used before preparing Frame so Frame and emitted
    * program resolve coordinates in the same canonical WCS. */
-  readonly selectPrimaryWcsForFrame: () => Promise<FrameWcsSelection>;
+  readonly selectPrimaryWcsForFrame: (owner?: MachineExecutionOwner) => Promise<FrameWcsSelection>;
   /** Driver-owned report-unit normalization, followed by a fresh mm position.
    * No-op for drivers whose report units are independent of parser G20/G21. */
-  readonly normalizeFrameReportUnits: (signal?: AbortSignal) => Promise<void>;
+  readonly normalizeFrameReportUnits: (
+    signal?: AbortSignal,
+    owner?: MachineExecutionOwner,
+  ) => Promise<void>;
   /** One realtime status query outside the periodic poll, so a caller that
    * needs a fresh report after an owned command gets it in one round trip
    * instead of waiting for the next poll tick. Inert to the planner; a no-op
    * without a realtime query or while a controller operation owns polling. */
   readonly requestControllerStatus: () => Promise<void>;
   readonly clearTranscript: () => void;
-  readonly jog: (params: JogParams) => Promise<void>;
+  readonly jog: (params: JogParams, owner?: MachineExecutionOwner) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;
   readonly setFireActive: (active: boolean, requestedPercent?: number) => Promise<void>;
@@ -79,6 +83,7 @@ export type LaserStoreActions = {
     /** The job being framed when no run candidate is passed (a recovery
      * Frame). Laser or CNC Frame motion follows this job, not the open canvas. */
     jobProject?: Project,
+    owner?: MachineExecutionOwner,
   ) => Promise<void>;
   /** Physically trace a job's bounds before its exact program exists. Same
    * motion and completion boundary as `frame`, but a clean completion records
@@ -93,6 +98,7 @@ export type LaserStoreActions = {
     },
     feed: number,
     candidate: FrameTraceCandidate,
+    owner?: MachineExecutionOwner,
   ) => Promise<void>;
   readonly startJob: (gcode: string, options?: StartJobOptions) => Promise<void>;
   readonly pauseJob: () => Promise<void>;

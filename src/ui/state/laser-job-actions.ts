@@ -1,3 +1,4 @@
+import { transmitInitialWindow } from './laser-initial-job-transmission';
 // laser-job-actions — Start / Pause / Resume / Abort (laser-job-stop.ts),
 // extracted from laser-store.ts when it hit the ADR-015 size cap. Same shape as the other
 // action modules (autofocus-action, origin-actions): a factory that receives
@@ -44,6 +45,7 @@ import {
 import { steppedStreamerPatch } from './tool-change-hold-entry';
 import type { LaserState, StartJobOptions } from './laser-store';
 import { normalizeStartJobOptions } from './laser-job-options';
+import { ownedMachineWrite } from './machine-execution-owner';
 import { effectiveStartStreamOptions } from './laser-job-effective-stream-options';
 import { validatedStartJobTimingPlan } from './laser-job-timing-handoff';
 import { liveCanvasExecutionAcceptedPatch, liveCanvasStartPatch } from './live-canvas-run';
@@ -61,7 +63,6 @@ import {
 } from './laser-start-override-reset';
 import { armHostedRefill, releaseHostedRefill } from './laser-hosted-refill';
 import { captureHostedRefillStream } from './laser-hosted-refill-owner';
-import { createJobStartWriteAttempt } from './laser-start-transmission-error';
 import { createStartArmingCompletion } from './laser-start-arming-completion';
 import type { TranscriptSource } from './laser-transcript';
 
@@ -73,10 +74,11 @@ type SafeWriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 type DriverFn = () => ControllerDriver;
 type StartSetupEpoch = CncControllerEpoch;
-type JobActionContext = {
+export type JobActionContext = {
   readonly set: SetFn;
   readonly get: GetFn;
   readonly refs: JobStopContext['refs'];
@@ -120,6 +122,10 @@ async function runStartJob(
   options: StartJobOptions,
 ): Promise<void> {
   const { set, get } = context;
+  const preparationContext = {
+    ...context,
+    safeWrite: ownedMachineWrite(context.safeWrite, options.executionOwner),
+  };
   assertProgramHasSendableLine(gcode);
   assertStartAllowed(set, get);
   const setupEpoch: StartSetupEpoch = cncControllerEpochOf(get());
@@ -129,11 +135,16 @@ async function runStartJob(
     ...(options.framedRunPermit === undefined ? frameProofReset() : {}),
   });
   try {
-    const effectiveOptions = await prepareStartBoundary(context, gcode, options, setupEpoch);
+    const effectiveOptions = await prepareStartBoundary(
+      preparationContext,
+      gcode,
+      options,
+      setupEpoch,
+    );
     const overrideReset = laserStartOverrideReset(options.machineKind ?? 'laser', get()); // ADR-355
     const { stepped, labels, toolIds } = prepareInitialStream(gcode, effectiveOptions);
     await prepareStartHandoff(
-      context,
+      preparationContext,
       options,
       stepped.toSend,
       overrideReset.bytes,
@@ -141,42 +152,12 @@ async function runStartJob(
     );
     assertStartHandoff(context, options, setupEpoch, completion.assertCurrent);
     consumeClaimedFramedRun(set, get, options.framedRunPermit);
-    const entersHoldNow = stepped.state.status === 'tool-change';
-    const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
-    // Seed this run's tool queue first: a short first section can reach its M0
-    // synchronously, and the shared hold entry then consumes the queue head.
-    const toolQueue = {
-      toolChangeLabels: labels,
-      toolChangeToolIds: toolIds,
-      pendingToolLabel: null,
-      pendingToolId: null,
-    };
-    set((state) => ({
-      ...toolQueue,
-      ...steppedStreamerPatch({ ...state, ...toolQueue }, null, stepped.state),
-      streamerEpoch: writeOwner.streamerEpoch,
-      activeRunId: options.runId ?? null,
-      completedFrameRunOwner:
-        options.framedRunPermit !== undefined && state.completedFrame === options.framedRunPermit
-          ? {
-              frame: options.framedRunPermit,
-              streamerEpoch: writeOwner.streamerEpoch,
-              runId: options.runId ?? null,
-            }
-          : null,
-      ...liveCanvasStartPatch(
-        options.canvasPlan,
-        Date.now(),
-        validatedStartJobTimingPlan(gcode, options, state),
-        entersHoldNow && stepped.toSend.length === 0 ? 'tool-change' : 'running',
-        stepped.state.queued,
-        gcode,
-      ),
-      accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
-      activeJobMachineKind: options.machineKind ?? 'laser',
-    }));
+    const writeOwner = installInitialStream(context, gcode, options, { stepped, labels, toolIds });
     completion.streamStarted(writeOwner, options.runId ?? null);
-    if (stepped.toSend.length === 0) return;
+    if (stepped.toSend.length === 0) {
+      options.onStartCommitted?.(options.runId ?? '', writeOwner.streamerEpoch);
+      return;
+    }
     await transmitInitialWindow(
       context,
       overrideReset,
@@ -184,44 +165,10 @@ async function runStartJob(
       completion,
       writeOwner,
       options.runId ?? null,
+      options,
     );
   } finally {
     completion.finish();
-  }
-}
-
-async function transmitInitialWindow(
-  context: JobActionContext,
-  overrideReset: ReturnType<typeof laserStartOverrideReset>,
-  firstWindow: string,
-  completion: ReturnType<typeof createStartArmingCompletion>,
-  writeOwner: ReturnType<typeof streamWriteOwner>,
-  runId: string | null,
-): Promise<void> {
-  const { set, get, safeWrite } = context;
-  const attempt = createJobStartWriteAttempt(runId);
-  try {
-    await overrideReset.send(
-      firstWindow,
-      safeWrite,
-      completion.ownsCurrent,
-      attempt.markProgramAttempted,
-    );
-    attempt.assertProgramAttempted();
-    if (!completion.ownsCurrent()) return;
-    set((state) => overrideReset.accepted(state, liveCanvasExecutionAcceptedPatch(state)));
-    // The first window is accounted for. A capable transport may now own
-    // refill; an unsupported transport or superseded stream is a no-op.
-    await armHostedRefill(context.refs, () => (completion.ownsCurrent() ? get().streamer : null));
-    completion.accept();
-  } catch (error) {
-    const state = get();
-    const ackedLines =
-      state.streamerEpoch === writeOwner.streamerEpoch ? (state.streamer?.completed ?? 0) : 0;
-    containActiveStreamWriteFailure(set, context.refs, safeWrite, 'start', writeOwner);
-    // Keep actual program-prefix uncertainty independently of live state.
-    // A rejected reset or cancelled reset continuation attempted no program.
-    throw attempt.failure(error, ackedLines);
   }
 }
 
@@ -432,4 +379,47 @@ async function runContinueToolChange(context: JobActionContext): Promise<void> {
       throw err;
     }
   }
+}
+
+function installInitialStream(
+  { set, get }: JobActionContext,
+  gcode: string,
+  options: StartJobOptions,
+  { stepped, labels, toolIds }: ReturnType<typeof prepareInitialStream>,
+): ReturnType<typeof streamWriteOwner> {
+  const entersHoldNow = stepped.state.status === 'tool-change';
+  const writeOwner = { ...streamWriteOwner(get()), streamerEpoch: get().streamerEpoch + 1 };
+  // Seed this run's tool queue first: a short first section can reach its M0
+  // synchronously, and the shared hold entry then consumes the queue head.
+  const toolQueue = {
+    toolChangeLabels: labels,
+    toolChangeToolIds: toolIds,
+    pendingToolLabel: null,
+    pendingToolId: null,
+  };
+  set((state) => ({
+    ...toolQueue,
+    ...steppedStreamerPatch({ ...state, ...toolQueue }, null, stepped.state),
+    streamerEpoch: writeOwner.streamerEpoch,
+    activeRunId: options.runId ?? null,
+    completedFrameRunOwner:
+      options.framedRunPermit !== undefined && state.completedFrame === options.framedRunPermit
+        ? {
+            frame: options.framedRunPermit,
+            streamerEpoch: writeOwner.streamerEpoch,
+            runId: options.runId ?? null,
+          }
+        : null,
+    ...liveCanvasStartPatch(
+      options.canvasPlan,
+      Date.now(),
+      validatedStartJobTimingPlan(gcode, options, state),
+      entersHoldNow && stepped.toSend.length === 0 ? 'tool-change' : 'running',
+      stepped.state.queued,
+      gcode,
+    ),
+    accessoryCache: invalidateAccessoryObservation(state.accessoryCache),
+    activeJobMachineKind: options.machineKind ?? 'laser',
+  }));
+  return writeOwner;
 }

@@ -130,7 +130,11 @@ describe('website copy', () => {
     assert.ok(attrValues(phone.html, 'a', 'href').includes(site.phoneSetupUrl));
     assert.match(pageText('phone/index.html'), /Every connection needs your approval on the PC/);
     assert.match(pageText('phone/index.html'), /copy the code exactly including capital letters/);
-    assert.match(pageText('phone/index.html'), /Machine execution stays on the PC/);
+    assert.match(pageText('phone/index.html'), /Choose machine control separately/);
+    assert.match(
+      pageText('phone/index.html'),
+      /existing viewing\/editing approvals gain no motion access/,
+    );
     for (const { file, html } of built) {
       assert.ok(attrValues(html, 'a', 'href').includes('/phone/'), `${file} phone navigation`);
       assert.doesNotMatch(html, /<iframe\b/i, `${file} never embeds a remote session`);

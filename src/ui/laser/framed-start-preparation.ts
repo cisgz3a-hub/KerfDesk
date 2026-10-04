@@ -52,6 +52,7 @@ export function revokeOwnedCompletedFrame(permit: FramedRunPermit): void {
  * This refreshes F/S, warnings, timing and the actual head approach together. */
 export async function prepareFramedStartReview(
   permit: FramedRunPermit,
+  signal?: AbortSignal,
 ): Promise<ReviewedStartBundle | null> {
   const app = useStore.getState();
   const laser = useLaserStore.getState();
@@ -64,6 +65,7 @@ export async function prepareFramedStartReview(
           useCameraStore.getState(),
           candidate.preparedStart.jobOrigin,
           false,
+          signal,
         )
       : candidate.preparedStart;
   if (useLaserStore.getState().framedRun !== permit) return null;

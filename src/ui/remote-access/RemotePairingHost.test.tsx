@@ -6,6 +6,7 @@ import { RemotePairingHost } from './RemotePairingHost';
 import {
   setRemoteSession,
   useRemoteAccessStore,
+  isRemoteAccessStatus,
   type RemoteAccessStatus,
 } from './remote-access-store';
 
@@ -68,10 +69,105 @@ describe('unsolicited remote approval focus', () => {
     );
     expect(fetcher).not.toHaveBeenCalled();
     const buttons = host.querySelectorAll('button');
-    expect([...buttons].map((button) => button.textContent)).toEqual([
-      'Reject',
-      'Allow viewing',
-      'Allow viewing and editing',
-    ]);
+    expect([...buttons].map((button) => button.textContent)).toEqual(['Reject', 'Allow viewing']);
+  });
+});
+
+async function renderRequest(
+  scopes: RemoteAccessStatus['requests'][number]['requestedScopes'],
+): Promise<HTMLElement> {
+  setRemoteSession('synthetic-session');
+  useRemoteAccessStore.setState({
+    status: { ...status, requests: [{ ...status.requests[0]!, requestedScopes: scopes }] },
+  });
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  root = createRoot(host);
+  await act(async () => root?.render(<RemotePairingHost />));
+  return host;
+}
+
+function approveFetcher(): ReturnType<typeof vi.fn> {
+  const fetcher = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ ...status, statusRevision: 2, requests: [] }), { status: 200 }),
+  );
+  vi.stubGlobal('fetch', fetcher);
+  return fetcher;
+}
+
+async function clickApprove(host: HTMLElement): Promise<void> {
+  const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+    (item) =>
+      item.textContent === 'Allow viewing' || item.textContent === 'Approve selected access',
+  );
+  expect(button).toBeDefined();
+  await act(async () => button?.click());
+}
+
+describe('explicit machine-control pairing permission', () => {
+  it('defaults a full access request to viewing without granting editing or motion', async () => {
+    const fetcher = approveFetcher();
+    const host = await renderRequest(['read', 'edit', 'control']);
+    const checkboxes = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+    expect(checkboxes).toHaveLength(2);
+    expect(checkboxes.every((input) => !input.checked)).toBe(true);
+    await clickApprove(host);
+    const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ approved: true, scopes: ['read'] });
+  });
+
+  it('can grant machine control without granting artwork editing', async () => {
+    const fetcher = approveFetcher();
+    const host = await renderRequest(['read', 'edit', 'control']);
+    const control = [...host.querySelectorAll<HTMLLabelElement>('label')]
+      .find((label) => label.textContent?.includes('Allow Jog'))
+      ?.querySelector<HTMLInputElement>('input');
+    expect(control).toBeDefined();
+    await act(async () => control?.click());
+    await clickApprove(host);
+    const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ approved: true, scopes: ['read', 'control'] });
+  });
+
+  it('does not offer machine control to an existing read/edit request', async () => {
+    const host = await renderRequest(['read', 'edit']);
+    expect(host.textContent).not.toContain('Allow Jog, Frame, Start and Abort');
+    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
+  });
+
+  it('clears permission choices when the pending phone request is replaced', async () => {
+    const host = await renderRequest(['read', 'control']);
+    const control = host.querySelector<HTMLInputElement>('input[type="checkbox"]');
+    await act(async () => control?.click());
+    expect(control?.checked).toBe(true);
+    await act(async () =>
+      useRemoteAccessStore.setState({
+        status: {
+          ...status,
+          requests: [
+            {
+              ...status.requests[0]!,
+              pairingId: 'replacement-request',
+              requestedScopes: ['read', 'control'],
+            },
+          ],
+        },
+      }),
+    );
+    expect(host.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+    expect(host.textContent).toContain('Allow viewing');
+  });
+
+  it('accepts explicit control scopes and rejects duplicate or unknown grants', () => {
+    const withScopes = (scopes: unknown) => ({
+      ...status,
+      clients: [{ id: 'synthetic-client', label: 'Synthetic phone', scopes }],
+    });
+    expect(isRemoteAccessStatus(withScopes(['read', 'control']))).toBe(true);
+    expect(isRemoteAccessStatus(withScopes(['read', 'edit', 'control']))).toBe(true);
+    expect(isRemoteAccessStatus(withScopes(['read', 'control', 'control']))).toBe(false);
+    expect(isRemoteAccessStatus(withScopes(['read', 'shell']))).toBe(false);
+    expect(isRemoteAccessStatus(withScopes(['control']))).toBe(false);
   });
 });

@@ -31,7 +31,15 @@ const captured = vi.hoisted(() => ({
 vi.mock('../remote-control/adapter', () => ({
   createRemoteControlAdapter: (options: RemoteControlOptions) => {
     captured.options = options;
-    return { execute: captured.execute, dispose: vi.fn(), getRevision: () => captured.revision };
+    return {
+      execute: (command: string, args: unknown, execution?: { signal?: AbortSignal }) => {
+        const pending = captured.execute(command, args, execution);
+        witness(admissions, command).resolve();
+        return pending;
+      },
+      dispose: vi.fn(),
+      getRevision: () => captured.revision,
+    };
   },
 }));
 const status: RemoteAccessStatus = {
@@ -55,9 +63,12 @@ const envelope = (command: string, id = command) => ({
   args: {},
   clientId: 'client',
   canWrite: true,
+  canControl: false,
 });
 let polls: unknown[];
 let completions: RemoteCommandResult[];
+let admissions: Map<string, Deferred<void>>;
+let deliveries: Map<string, Deferred<RemoteCommandResult>>;
 let session: RemoteRendererSession;
 beforeEach(() => {
   vi.useFakeTimers();
@@ -69,16 +80,21 @@ beforeEach(() => {
   setArtworkSharingEnabled(true);
   polls = [];
   completions = [];
-  captured.execute.mockResolvedValue(result);
+  admissions = new Map();
+  deliveries = new Map();
+  captured.execute.mockReset().mockResolvedValue(result);
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const action = String(input).split('/').at(-1);
-      const body = JSON.parse(String(init?.body)) as { result?: RemoteCommandResult };
+      const body = JSON.parse(String(init?.body)) as { id?: string; result?: RemoteCommandResult };
       if (action === 'attach') return Response.json({ sessionId: 'session' });
       if (action === 'poll')
         return Response.json(polls.shift() ?? { status, requests: [], cancelled: [] });
-      if (action === 'complete' && body.result !== undefined) completions.push(body.result);
+      if (action === 'complete' && body.id !== undefined && body.result !== undefined) {
+        completions.push(body.result);
+        witness(deliveries, body.id).resolve(body.result);
+      }
       return Response.json({ accepted: true });
     }),
   );
@@ -92,15 +108,25 @@ afterEach(() => {
 async function start(command: string): Promise<void> {
   polls.push({ status, requests: [envelope(command)], cancelled: [] });
   await session.start();
-  await vi.advanceTimersByTimeAsync(0);
+  await witness(admissions, command).promise;
 }
-function deferred() {
-  let resolve!: (value: RemoteCommandResult) => void;
-  const promise = new Promise<RemoteCommandResult>((done) => {
+type Deferred<T> = { promise: Promise<T>; resolve: (value: T) => void };
+function deferred<T = RemoteCommandResult>(): Deferred<T> {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
     resolve = done;
   });
   return { promise, resolve };
 }
+function witness<T>(witnesses: Map<string, Deferred<T>>, id: string): Deferred<T> {
+  let item = witnesses.get(id);
+  if (item === undefined) {
+    item = deferred<T>();
+    witnesses.set(id, item);
+  }
+  return item;
+}
+const delivered = (id: string) => witness(deliveries, id).promise;
 function namedOperation(name: string): void {
   const state = useStore.getState();
   useStore.setState({
@@ -121,9 +147,13 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
     await start('get_workspace_preview');
     polls.push({ status, requests: [envelope('get_text')], cancelled: [] });
     await vi.advanceTimersByTimeAsync(350);
+    expect(polls).toHaveLength(0);
+    expect(captured.execute).toHaveBeenCalledTimes(1);
     setArtworkSharingEnabled(false);
     held.resolve(result);
-    await vi.advanceTimersByTimeAsync(0);
+    await Promise.all([delivered('get_workspace_preview'), delivered('get_text')]);
+    expect(captured.execute).toHaveBeenCalledTimes(2);
+    expect(completions).toHaveLength(2);
     expect(captured.execute.mock.calls.every((call) => call[2]!.signal!.aborted)).toBe(true);
     expect(completions.every((item) => !item.ok)).toBe(true);
   });
@@ -139,7 +169,7 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
       revision: 'r1',
       data: { operations: [{ name: 'Private converted text' }] },
     });
-    await vi.advanceTimersByTimeAsync(0);
+    await delivered('get_workspace');
     expect(completions[0]?.ok).toBe(true);
     expect(JSON.stringify(completions)).not.toContain('Private converted text');
     expect(JSON.stringify(completions)).toContain('Operation');
@@ -160,7 +190,10 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
     );
     expect(captured.execute.mock.calls[0]![2]!.signal!.aborted).toBe(true);
     held.resolve(result);
-    await vi.advanceTimersByTimeAsync(0);
+    expect(await delivered('get_workspace_preview')).toMatchObject({
+      ok: false,
+      error: { code: 'cancelled' },
+    });
   });
   it.each(['get_text', 'get_workspace_preview'])(
     'refuses %s if opt-out arrives after adapter resolution',
@@ -174,6 +207,7 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
         };
       });
       await start(command);
+      await delivered(command);
       expect(captured.execute.mock.calls[0]![2]!.signal!.aborted).toBe(true);
       expect(completions[0]).toMatchObject({ ok: false, error: { code: 'cancelled' } });
       expect(JSON.stringify(completions)).not.toContain('PRIVATE');
@@ -190,6 +224,7 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
       };
     });
     await start('get_workspace');
+    await delivered('get_workspace');
     expect(completions[0]?.ok).toBe(true);
     expect(JSON.stringify(completions)).not.toContain('PRIVATE');
   });
@@ -220,6 +255,7 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
       return { ok: true, revision: 'r1', data };
     });
     await start('review_job');
+    await delivered('review_job');
     expect(completions[0]).toMatchObject({
       ok: true,
       data: {
@@ -239,6 +275,7 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
       return { ok: true, revision: 'r1', data: { artworkId: 'created' } };
     });
     await start('add_text');
+    await delivered('add_text');
     expect(captured.execute.mock.calls[0]![2]!.signal!.aborted).toBe(true);
     expect(completions[0]).toEqual({ ok: true, revision: 'r1', data: { artworkId: 'created' } });
   });
@@ -250,6 +287,7 @@ describe('artwork disclosure is fenced at renderer delivery', () => {
       return result;
     });
     await start('get_workspace');
+    await delivered('get_workspace');
     expect(completions[0]).toMatchObject({
       ok: false,
       revision: 'r2',

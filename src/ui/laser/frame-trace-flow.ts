@@ -38,6 +38,10 @@ import type { StartJobPreparation } from './start-job-readiness';
 import { prepareCurrentStartJob } from './start-job-source';
 import { STALE_START_PREPARATION_MESSAGE } from './start-preparation-owner';
 import type { StartPreparationPlacement } from './start-preparation-coordinate-key';
+import {
+  assertMachineExecutionOwner,
+  type MachineExecutionOwner,
+} from '../state/machine-execution-owner';
 
 /**
  * The split Frame (ADR-353). A dense job's outline is known as soon as the
@@ -58,6 +62,7 @@ export type FrameContext = {
   readonly camera: ReturnType<typeof useCameraStore.getState>;
   readonly jobOrigin: JobOriginPlacement | undefined;
   readonly wcsNormalizationWarning?: string;
+  readonly executionOwner?: MachineExecutionOwner;
 };
 
 export type ExactFramePreparation = {
@@ -126,6 +131,7 @@ export async function dispatchTracedFrame(
   try {
     prepared = await preparation.program;
     preparation.signal.throwIfAborted();
+    assertMachineExecutionOwner(context.executionOwner);
   } catch (error) {
     discardTrace(trace);
     throw error;
@@ -140,6 +146,7 @@ async function traceFrameOutline(
 ): Promise<FrameTrace | null> {
   if (!(await requireFrameControllerQueue(preparation.signal))) return null;
   preparation.signal.throwIfAborted();
+  assertMachineExecutionOwner(context.executionOwner);
   const currentLaser = useLaserStore.getState();
   if (
     !frameInputsAreCurrent({
@@ -168,6 +175,7 @@ async function traceFrameOutline(
       deviceForActiveHead(context.app.project.device, context.app.project.machine)
         .framingFeedMmPerMin,
       candidate,
+      context.executionOwner,
     );
   } catch (error) {
     completion.cancel();

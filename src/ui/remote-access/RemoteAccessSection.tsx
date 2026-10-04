@@ -69,7 +69,8 @@ function RemoteConsent(): JSX.Element {
       </p>
       <p style={remoteNoteStyle}>
         Viewing shows workspace summaries, machine limits, recipes and job review. Editing lets an
-        approved connection change artwork and laser settings. Frame and Start stay on the PC.
+        approved connection change artwork and laser settings. Separately approving machine control
+        enables Jog, Frame, Start and Abort from that connection.
       </p>
       <p style={remoteNoteStyle}>
         Requests and these summaries pass through KerfDesk’s Cloudflare service. An MCP client may
@@ -105,7 +106,7 @@ function PairingControls(): JSX.Element {
       <ol style={{ ...remoteNoteStyle, paddingLeft: 20 }}>
         <li>Create a code below.</li>
         <li>Open the phone link on your phone and enter the code.</li>
-        <li>Return here to approve viewing or editing.</li>
+        <li>Return here to choose viewing, editing and machine-control permissions.</li>
       </ol>
       <Button
         variant="primary"
@@ -258,7 +259,8 @@ function ApprovedClients(): JSX.Element {
       {status?.clients.map((client) => (
         <div key={client.id} style={settingsRowStyle}>
           <span>
-            {client.label} · {client.scopes.includes('edit') ? 'View and edit' : 'View only'}
+            {client.label} · {client.scopes.includes('edit') ? 'View and edit' : 'View'}
+            {client.scopes.includes('control') ? ' · Machine control' : ''}
           </span>
           <Button
             disabled={busy || !status.connected}
