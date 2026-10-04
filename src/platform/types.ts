@@ -58,6 +58,8 @@ export type LicenceAdapter = {
   readonly downloadUpdate?: () => Promise<CommercialUpdateStatus>;
   /** Arm a verified installer for the next normal close; never quits now. */
   readonly installUpdateOnQuit?: () => Promise<CommercialUpdateStatus>;
+  /** Verify and arm a manual installer, then request a guarded idle-only app close. */
+  readonly installUpdateAndClose?: () => Promise<CommercialUpdateStatus>;
 };
 
 /**

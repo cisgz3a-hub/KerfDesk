@@ -7,6 +7,7 @@ interface DesktopCloseOptions {
   isTrustedRenderer(url: string): boolean;
   isWorkspaceAdmitted?(): boolean;
   isQuitRequested(): boolean;
+  isUpdateCloseRequested?(): boolean;
   cancelQuit(): void;
   quit(): void;
 }
@@ -29,7 +30,7 @@ export function installDesktopWindowClose(
         return { status: 'unavailable' };
       }
       if (options.isWorkspaceAdmitted?.() === false) {
-        if (operation === 'prepare') {
+        if (operation === 'prepare' || operation === 'prepare-update') {
           gatePreparedId = requestId;
           return { status: 'ready', dirty: false };
         }

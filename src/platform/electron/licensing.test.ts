@@ -84,8 +84,9 @@ describe('desktop update status (ADR-547)', () => {
     const adapter = createDesktopLicenceAdapter(fetchLicence);
     expect(await adapter.downloadUpdate?.()).toEqual(manual);
     expect(await adapter.installUpdateOnQuit?.()).toEqual(manual);
+    expect(await adapter.installUpdateAndClose?.()).toEqual(manual);
     expect(fetchLicence.mock.calls).toEqual(
-      ['download-update', 'install-update-on-quit'].map((action) => [
+      ['download-update', 'install-update-on-quit', 'install-update-and-close'].map((action) => [
         `./api/licensing/${action}`,
         expect.objectContaining({
           method: 'POST',

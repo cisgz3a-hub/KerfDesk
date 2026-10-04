@@ -189,5 +189,7 @@ export function createDesktopLicenceAdapter(
     downloadUpdate: async () => parseCommercialUpdateStatus(await send('download-update', {})),
     installUpdateOnQuit: async () =>
       parseCommercialUpdateStatus(await send('install-update-on-quit', {})),
+    installUpdateAndClose: async () =>
+      parseCommercialUpdateStatus(await send('install-update-and-close', {})),
   };
 }

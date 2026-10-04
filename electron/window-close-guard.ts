@@ -24,6 +24,7 @@ interface CloseOptions {
   decideUnavailable(): WindowUnloadDecision;
   forceClose(): void;
   isQuitRequested(): boolean;
+  isUpdateCloseRequested?(): boolean;
   cancelQuit(): void;
   quit(): void;
   reportFailure(error: unknown): void;
@@ -38,6 +39,7 @@ export class WindowCloseGuard {
   private rendererUnavailable = false;
   private requestId = 0;
   private approvedClose = false;
+  private updateClose = false;
 
   constructor(
     private readonly window: CloseTarget,
@@ -92,6 +94,7 @@ export class WindowCloseGuard {
     this.approvedClose = false;
     if (this.preparing || this.closed) return;
     this.preparing = true;
+    this.updateClose = this.options.isUpdateCloseRequested?.() === true;
     const id = ++this.requestId;
     if (this.rendererUnavailable) {
       void this.unavailable(id, new Error('Renderer controls are unavailable.'));
@@ -102,7 +105,7 @@ export class WindowCloseGuard {
 
   private async prepareAndClose(id: number): Promise<void> {
     try {
-      const reply = rendererCloseReply(await this.options.request('prepare', id));
+      const reply = rendererCloseReply(await this.options.request(this.preparationOperation(), id));
       if (!this.isCurrent(id)) return;
       if (reply.status !== 'ready') {
         if (reply.status !== 'cancelled') {
@@ -134,6 +137,10 @@ export class WindowCloseGuard {
     }
   }
 
+  private preparationOperation(): RendererCloseOperation {
+    return this.updateClose ? 'prepare-update' : 'prepare';
+  }
+
   /**
    * Save, Don't Save or Cancel for unsaved changes (ADR-549). Resolves true
    * when the close goes on; otherwise the close has ended here. A save changes
@@ -155,6 +162,11 @@ export class WindowCloseGuard {
     this.approvedClose = false;
     if (!this.isCurrent(id)) return;
     this.options.reportFailure(error);
+    // Update consent never authorises force-close recovery or stopping a machine.
+    if (this.updateClose) {
+      await this.cancel(id, ownedId);
+      return;
+    }
     if (this.options.decideUnavailable() === 'stay') {
       await this.cancel(id, ownedId);
       return;

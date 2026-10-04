@@ -7966,6 +7966,13 @@ behavior or create a second product implementation.
 
 ### F-DESK2. Desktop updates and ordinary shutdown
 
+#### Success - explicit install and close for an unsigned Windows update (ADR-561 Amendment 3)
+
+1. After **Download update** finishes verification, choose **Install and close KerfDesk** to request closing and open the interactive installer after exit. **Install when I close KerfDesk** remains available for later. Showing an update notice or downloading never closes the app.
+2. Unsaved work gets the usual Save, Don't Save or Cancel question. Cancel or a failed save keeps KerfDesk open. The close rechecks the current document and machine state after saving and before unload.
+3. An update close waits for active jobs, Fire, owned machine work, pending Frame/Job Review, observed external motion or spindle-on state. It never sends Abort or forces an unavailable window closed. Finish work and choose the action again; there is no delayed automatic close.
+4. Only approved actual closure can launch the reverified installer. Windows shutdown, close failure, changed owners or bad update verification do not authorise execution. The installer remains interactive and unsigned, and may show Windows publisher warnings.
+
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
    Main verifies the signed envelope against its packaged Preview public keys and

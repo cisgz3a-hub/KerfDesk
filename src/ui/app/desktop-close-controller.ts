@@ -22,6 +22,8 @@ export interface DesktopCloseSnapshot {
   readonly dirty: boolean;
   readonly warning: string | null;
   readonly document: object;
+  /** Update-only close waits for transient preparation and observed external machine work. */
+  readonly updateBlocked?: boolean;
 }
 
 interface CloseAttempt {
@@ -37,6 +39,7 @@ interface CloseAttempt {
   preparedControllerOwner: DesktopCloseSnapshot['controllerOwner'];
   stoppedOwners: DesktopCloseSnapshot;
   approved: boolean;
+  updateOnly: boolean;
 }
 
 /** Owns application stop handoff only; a settled write is not a physical stop. */
@@ -64,7 +67,7 @@ export class DesktopCloseController {
     return this.attempt !== null;
   }
 
-  prepare(id: number): Promise<DesktopCloseReply> {
+  prepare(id: number, updateOnly = false): Promise<DesktopCloseReply> {
     if (this.attempt !== null) return this.attempt.promise;
     let resolve: (reply: DesktopCloseReply) => void = () => undefined;
     const promise = new Promise<DesktopCloseReply>((done) => (resolve = done));
@@ -86,11 +89,28 @@ export class DesktopCloseController {
       preparedControllerOwner: null,
       stoppedOwners: snapshot,
       approved: false,
+      updateOnly,
     };
     this.attempt = attempt;
     if (attempt.wasActive) void this.stopForAttempt(attempt);
     else this.prepareResult(attempt);
     return promise;
+  }
+
+  /** An update's explicit close choice may save work, but never initiates Abort. */
+  prepareForUpdate(id: number): Promise<DesktopCloseReply> {
+    const snapshot = this.read();
+    if (
+      this.attempt !== null ||
+      this.stopFlight !== null ||
+      snapshot.active ||
+      snapshot.fireLatched === true ||
+      hasOwnedMotion(snapshot) ||
+      snapshot.warning !== null ||
+      snapshot.updateBlocked === true
+    )
+      return Promise.resolve({ status: 'cancelled' });
+    return this.prepare(id, true);
   }
 
   /** Keep open cancels the close intention, not an Abort already being sent. */
@@ -278,6 +298,7 @@ export class DesktopCloseController {
     return (
       attempt.preparedEpoch === snapshot.epoch &&
       !snapshot.active &&
+      (!attempt.updateOnly || snapshot.updateBlocked !== true) &&
       attempt.preparedWarning === snapshot.warning &&
       attempt.preparedDirty === snapshot.dirty &&
       attempt.preparedDocument === snapshot.document &&

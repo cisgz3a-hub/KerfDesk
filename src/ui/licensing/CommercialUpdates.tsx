@@ -18,7 +18,8 @@ export function CommercialUpdates({
   readonly client: LicenceAdapter;
   readonly updatesUntil: number | null;
 }): JSX.Element | null {
-  const { status, busy, check, download, installOnQuit } = useCommercialUpdateStatus(client);
+  const { status, busy, check, download, installOnQuit, installAndClose } =
+    useCommercialUpdateStatus(client);
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
@@ -43,6 +44,7 @@ export function CommercialUpdates({
         busy={busy}
         onDownload={download}
         onInstallOnQuit={installOnQuit}
+        onInstallAndClose={installAndClose}
         onClose={close}
       />
     </div>
