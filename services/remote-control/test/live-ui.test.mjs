@@ -77,7 +77,8 @@ for (const kind of ['phone', 'app']) {
         assert.equal(await p.locator('#text-edit-form [name=text]').inputValue(), '');
       }
       state.revoked = true;
-      await tick(loaded);
+      // Revocation hides the workspace and its live status; observe the visible disconnect notice.
+      await loaded.page.clock.runFor(5001);
       await p
         .locator(kind === 'phone' ? '#connection' : '#summary')
         .filter({ hasText: kind === 'phone' ? 'Not connected' : 'Refresh' })
