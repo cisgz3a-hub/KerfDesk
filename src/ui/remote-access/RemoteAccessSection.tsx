@@ -28,6 +28,7 @@ function ArtworkSharingConsent(): JSX.Element {
       <label style={settingsRowStyle}>
         <input
           type="checkbox"
+          title="Allow approved connections to receive artwork previews and existing text."
           checked={sharing}
           disabled={!available}
           onChange={(event) => {
