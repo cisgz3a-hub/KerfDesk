@@ -14,4 +14,4 @@ Offer Pan, Select, Move, Resize, Brush, Rectangle and Ellipse. Draft gestures re
 
 ### Evidence boundary
 
-Source, local browser/workerd checks and installed customer behaviour remain separate. Physical-phone cameras, ChatGPT hosts and physical machines require their own qualification. The matching desktop and service builds are required. The twenty-PR desktop release rule is unchanged.
+Source, local browser/workerd checks and installed customer behaviour remain separate. Physical-phone cameras, ChatGPT hosts and physical machines require their own qualification. The matching desktop and service builds are required. The release rule is governed by [ADR-561 Amendment 4](ADR-561-amendment-4-ten-pr-release-batches.md).
