@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { type KerfDeskMcpCommand, MCP_MAX_ITEMS } from './input-schemas.js';
+import { mcpMachineOutputSchemas } from './machine-schemas.js';
 import {
   MCP_TEXT_FIELDS,
   mcpAuthoringOutputSchemas,
@@ -156,6 +157,7 @@ export const mcpOutputSchemas = {
   undo: mcpWriteResultSchema,
   redo: mcpWriteResultSchema,
   ...mcpAuthoringOutputSchemas,
+  ...mcpMachineOutputSchemas,
 } as const;
 
 export type KerfDeskMcpResult<C extends KerfDeskMcpCommand> = z.output<

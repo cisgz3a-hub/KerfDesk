@@ -172,3 +172,24 @@ export function createFontPickers() {
     },
   };
 }
+
+export function continueToMcp() {
+  const target = new URLSearchParams(location.search).get('continue');
+  if (!target || target.length > 4096) return false;
+  try {
+    const parsed = new URL(target, location.origin);
+    if (
+      parsed.origin === location.origin &&
+      parsed.pathname === '/authorize' &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.hash
+    ) {
+      location.assign(parsed.href);
+      return true;
+    }
+  } catch {
+    /* Only an exact same-origin consent page is accepted. */
+  }
+  return false;
+}

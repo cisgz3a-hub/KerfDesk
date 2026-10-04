@@ -44,7 +44,11 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   assert.match(text, /Remote access starts turned off/);
   assert.match(text, /sameSite=Strict/i);
   assert.match(text, /Command arguments and workspace responses are processed in memory/);
-  assert.match(text, /cannot run a machine/);
+  assert.match(text, /Separately approved machine-control clients can/);
+  assert.match(
+    text,
+    /These records contain no artwork, text contents, job review or executable G-code/,
+  );
   assert.match(text, /There is no promised deletion timer for an idle computer/);
   assert.match(document, /http-equiv="Content-Security-Policy"/);
   assert.match(document, /script-src &#39;none&#39;/);

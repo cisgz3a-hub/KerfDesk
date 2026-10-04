@@ -14,6 +14,8 @@ export const mcpErrorMessages = {
   unsupported_operation: 'This tool cannot edit that operation.',
   invalid_input: 'The tool arguments are invalid.',
   cancelled: 'The request was cancelled.',
+  control_limit:
+    'No machine action was dispatched. This approval has reached its action limit. Create a new pairing and approve machine control on the PC.',
   failed: 'The desktop request could not be completed.',
 } as const;
 

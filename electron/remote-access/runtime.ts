@@ -14,6 +14,7 @@ import {
 } from './relay-types.js';
 import type { RemoteRendererQueue } from './renderer-queue.js';
 import { RemotePairingState } from './pairing-state.js';
+import { RemoteControlLease, validControlLifetime } from './control-lease.js';
 function parseClient(value: unknown): RemoteClient | null {
   if (
     !object(value) ||
@@ -29,7 +30,15 @@ function parseClient(value: unknown): RemoteClient | null {
     value.createdAt < 0
   )
     return null;
-  return { id: value.id, label: value.label, scopes: value.scopes, createdAt: value.createdAt };
+  return {
+    id: value.id,
+    label: value.label,
+    scopes: value.scopes,
+    createdAt: value.createdAt,
+    ...(value.scopes.includes('control') && validControlLifetime(value.controlExpiresInMs)
+      ? { controlExpiresInMs: value.controlExpiresInMs }
+      : {}),
+  };
 }
 function parseClients(value: unknown): RemoteClient[] | null {
   if (!Array.isArray(value) || value.length > 20) return null;
@@ -49,6 +58,7 @@ class RemoteAccessRuntime {
   private initialized = false;
   private error: string | null = null;
   private readonly pairing: RemotePairingState;
+  private readonly controlLease: RemoteControlLease;
   private statusRevision = 0;
   private clients: RemoteClient[] = [];
   private revocationId: string | null = null;
@@ -66,14 +76,20 @@ class RemoteAccessRuntime {
     monotonicNow?: () => number,
   ) {
     this.pairing = new RemotePairingState(monotonicNow);
+    this.controlLease = new RemoteControlLease(monotonicNow);
     this.relay = createRemoteRelayClient({
       queue,
-      canRequest: (clientId, scopes) => this.canRequest(clientId, scopes),
+      canRequest: (clientId, scopes, requiresControl) =>
+        this.canRequest(clientId, scopes, requiresControl),
       onConnection: (open) => this.connection(open),
       onMessage: (message) => this.receive(message),
     });
   }
-  private canRequest(clientId: string, scopes: RemoteScope[]): boolean {
+  private canRequest(
+    clientId: string,
+    scopes: RemoteScope[],
+    requiresControl = scopes.includes('control'),
+  ): boolean {
     return (
       this.connected &&
       !this.revoking &&
@@ -81,6 +97,7 @@ class RemoteAccessRuntime {
       this.identity?.enabled === true &&
       !this.identity.revokeOnConnect &&
       !this.waitingClients &&
+      (!requiresControl || this.controlLease.remaining(clientId) > 0) &&
       this.clients.some(
         (item) => item.id === clientId && scopes.every((scope) => item.scopes.includes(scope)),
       )
@@ -97,7 +114,9 @@ class RemoteAccessRuntime {
   }
   private listClients(): void {
     this.waitingClients = true;
-    this.relay.send({ type: 'clients.list', requestId: this.relay.requestId() });
+    const requestId = this.relay.requestId();
+    this.controlLease.begin(requestId);
+    this.relay.send({ type: 'clients.list', requestId });
   }
   private revokeAllConnected(): void {
     this.revocationId = this.relay.requestId();
@@ -106,6 +125,7 @@ class RemoteAccessRuntime {
   private connection(open: boolean): void {
     this.connected = open;
     this.pairing.reset();
+    this.controlLease.reset();
     this.clients = [];
     if (!open) {
       this.waitingClients = false;
@@ -131,19 +151,21 @@ class RemoteAccessRuntime {
       case 'pair.request':
         this.pairing.receiveRequest(message);
         break;
-      case 'clients': {
-        const checked = parseClients(message.clients);
-        if (checked !== null) {
-          this.clients = checked;
-          this.waitingClients = false;
-          this.finishClientRevocations(checked);
-        }
+      case 'clients':
+        this.receiveClients(message);
         break;
-      }
       case 'clients.revoked':
         this.receiveRevocation(message);
         break;
     }
+  }
+  private receiveClients(message: RelayMessage): void {
+    const checked = parseClients(message.clients);
+    if (checked === null) return;
+    this.clients = checked;
+    this.waitingClients = false;
+    this.finishClientRevocations(checked);
+    if (this.controlLease.receive(message.requestId, checked)) this.listClients();
   }
   private receiveRevocation(message: RelayMessage): void {
     if (message.requestId !== this.revocationId || this.identity === null) return;
@@ -196,7 +218,7 @@ class RemoteAccessRuntime {
       pairing: pairing.pairing,
       pairingPending: pairing.pairingPending,
       requests: pairing.requests,
-      clients: this.clients,
+      clients: this.controlLease.project(this.clients),
       error: this.error ?? pairing.error,
     };
   }
@@ -301,6 +323,7 @@ class RemoteAccessRuntime {
     this.revocationEpoch += 1;
     this.relay.cancelRequests();
     this.pairing.reset();
+    this.controlLease.reset();
     this.clients = [];
     return this.enqueue(async () => {
       try {

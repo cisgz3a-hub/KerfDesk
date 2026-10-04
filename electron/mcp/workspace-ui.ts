@@ -1,5 +1,11 @@
-/** Portable MCP Apps resource. No network, credentials, dependencies or machine controls. */
-export const KERFDESK_WORKSPACE_UI_URI = 'ui://kerfdesk/workspace/v1.html';
+import {
+  MCP_MACHINE_MARKUP,
+  MCP_MACHINE_SCRIPT,
+  MCP_MACHINE_STYLE,
+} from './workspace-machine-ui.js';
+
+/** Portable MCP Apps resource. No network, credentials or dependencies. */
+export const KERFDESK_WORKSPACE_UI_URI = 'ui://kerfdesk/workspace/v2.html';
 export const KERFDESK_WORKSPACE_UI_MIME = 'text/html;profile=mcp-app';
 export const KERFDESK_WORKSPACE_UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -17,9 +23,12 @@ input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-si
 summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#selection-status{margin:10px 0}#access-note{padding:12px;border:1px solid #ccdcd5;border-radius:10px}#select{width:100%}
 #message[data-error=true]{background:#fbe5e8;color:#803140}[hidden]{display:none!important}
 @media(prefers-color-scheme:dark){:root{color:#e4f2eb;background:#16241e}.muted{color:#b2c8bd}label,.preview{border-color:#3d5648}button{background:#254b36;color:#dff8e9;border-color:#456954}#message{background:#244132}}
+${MCP_MACHINE_STYLE}
 </style></head><body>
 <header><h1 id="title">KerfDesk workspace</h1><button id="refresh" type="button" disabled>Refresh</button></header>
 <p id="summary" class="muted">Connecting to the host…</p>
+<nav class="tabs" aria-label="Workspace views"><button id="workspace-tab" type="button" aria-pressed="true">Artwork</button><button id="machine-tab" type="button" aria-pressed="false">Machine</button></nav>
+<section id="workspace-panel">
 <p id="access-note" class="muted" hidden></p>
 <div class="actions"><button id="undo" type="button" disabled>Undo</button><button id="redo" type="button" disabled>Redo</button><button id="retry" type="button" hidden>Retry last request</button></div>
 <p id="history-status" class="muted"></p>
@@ -29,10 +38,13 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
 <div id="items" class="items" aria-label="Workspace artwork"></div>
 <p id="selection-status" class="muted" aria-live="polite"></p>
 <div class="actions"><button id="select" type="button" disabled>Use this selection</button></div>
+</section>
+${MCP_MACHINE_MARKUP}
 <p id="message" role="status" aria-live="polite">Connecting to your open workspace…</p>
-<details><summary>About this view</summary><p class="muted">Keep KerfDesk open on the paired PC. Ask the assistant to add text, change fonts or arrange artwork. Frame and Start stay on the PC.</p></details>
+<details><summary>About this view</summary><p class="muted">Keep KerfDesk open on the paired PC. Ask the assistant to add text, change fonts or arrange artwork. Machine control needs separate approval on the PC. Frame the current job, then review it before Start.</p></details>
 <script>
 (() => {
+  ${MCP_MACHINE_SCRIPT}
   const $ = (id) => document.getElementById(id);
   const text = (value, max = 2048) => typeof value === 'string' ? value.slice(0, max) : '';
   let sequence = 0, workspace = null, connected = false, toolCallsAvailable = false, disposed = false, busy = false, pendingEdit = null, hostOrigin = '*';
@@ -42,6 +54,7 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
     needs_pro: 'Choose a trial or licence on the PC to use this Pro feature.',
     cancelled: 'Access was revoked or the request was cancelled. Reconnect through the host.',
     forbidden: 'Editing permission is unavailable. Approve access on the PC and reconnect through the host.',
+    control_limit: 'No action was sent. Pair again and approve machine control on the PC.',
     invalid_input: 'The request could not be applied. Refresh the workspace and check your selection.',
   };
   function message(value, error = false) {
@@ -108,6 +121,7 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
     const value = unwrap(result);
     if (Array.isArray(value.artwork)) renderWorkspace(value);
     if (['ready', 'disabled', 'unavailable'].includes(value.status)) renderPreview(value);
+    if (value.connection || value.operation) { machine.receive(value); chooseView('machine'); }
     return value;
   }
   async function tool(name, args = {}) {
@@ -157,6 +171,7 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
     return typeof value.revision === 'string' && value.revision.length > 0 && value.revision.length <= 200 && ids(value.artwork) && ids(value.operations) && Array.isArray(value.selection) && value.selection.length <= 200;
   }
   function clearWorkspace() {
+    machine.reset();
     workspace = null; $('items').replaceChildren(); $('preview').hidden = true; $('preview').removeAttribute('src');
     $('title').textContent = 'KerfDesk workspace'; $('summary').textContent = 'Refresh the workspace through the host.'; controls();
   }
@@ -217,6 +232,20 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
   for (const name of ['undo', 'redo']) $(name).addEventListener('click', () => { void run(() => mutate(name, {})); });
   $('retry').addEventListener('click', () => { void run(retry); });
   $('items').addEventListener('change', selectionFeedback);
+  const machine = bindMcpMachine({tool: machineTool,available:()=>connected&&toolCallsAvailable&&!disposed});
+  async function machineTool(name,args={}) {
+    try { return unwrap(await request('tools/call',{name,arguments:args})); }
+    catch(error) {
+      if(['host_refused','cancelled','forbidden'].includes(error.code))clearWorkspace();
+      throw error;
+    }
+  }
+  function chooseView(name) {
+    $('workspace-panel').hidden=name!=='workspace';$('machine-panel').hidden=name!=='machine';
+    for(const tab of ['workspace','machine'])$(tab+'-tab').setAttribute('aria-pressed',String(tab===name));
+    machine.show(name==='machine');
+  }
+  for(const name of ['workspace','machine']) $(name+'-tab').addEventListener('click',()=>chooseView(name));
   void run(async () => {
     if (window.parent === window) throw new Error('Open this view in an MCP Apps compatible host.');
     const initialized = await request('ui/initialize', { appInfo: { name: 'kerfdesk-workspace', version: '1.0.0' }, appCapabilities: {}, protocolVersion: '2026-01-26' });
@@ -224,6 +253,7 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
     connected = true;
     toolCallsAvailable = !!initialized.hostCapabilities && typeof initialized.hostCapabilities.serverTools === 'object' && initialized.hostCapabilities.serverTools !== null && !Array.isArray(initialized.hostCapabilities.serverTools);
     send({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} });
+    machine.ready();
     if (toolCallsAvailable) { await refresh(); message('Changes here are saved to the open workspace on your PC.'); }
     else message('This host can display tool results. Ask the assistant to refresh or edit; this view cannot call tools.');
   });

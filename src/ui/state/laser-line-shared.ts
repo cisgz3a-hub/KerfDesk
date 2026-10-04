@@ -52,6 +52,7 @@ export type SafeWriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 
 // Who a terminal ok/error belongs to. 'stream' routes it into the streamer's

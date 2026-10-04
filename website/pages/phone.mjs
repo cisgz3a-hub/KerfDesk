@@ -9,7 +9,7 @@ export const page = {
   nav: 'phone',
   title: 'Phone & MCP',
   description:
-    'Connect your phone or an MCP client to KerfDesk on your PC. Create a pairing code, approve viewing or editing, and keep machine execution on the computer.',
+    'Connect your phone or an MCP client to KerfDesk on your PC. Create a pairing code and separately approve viewing, artwork editing and machine controls.',
   render: ({ site }) =>
     html`${pageHero({
       eyebrow: 'Phone & MCP',
@@ -39,9 +39,9 @@ export const page = {
         },
         {
           title: 'Choose the permission on the PC',
-          body: html`Check the phone’s name and choose <strong>Allow viewing</strong> or
-            <strong>Allow viewing and editing</strong>. Manage and revoke connections in the same
-            Settings section.`,
+          body: html`Check the phone’s name. Viewing is the default. Select the requested artwork
+            editing and/or machine-control choices, then <strong>Approve selected access</strong>.
+            Both choices start off. Manage and revoke connections in the same Settings section.`,
         },
       ]),
     })}
@@ -56,11 +56,13 @@ export const page = {
           change operation power, speed, passes and enabled state.
         </p>
         ${callout({
-          title: 'Machine execution stays on the PC',
+          title: 'Choose machine control separately',
           body: html`<p>
-            Phone and MCP connections have no Frame, Start, movement, console, laser or spindle
-            controls. The desktop keeps the design canvas. Pairing does not activate Pro or use a
-            licence seat, and existing Pro tool rules still apply.
+            Explicitly approved machine-control connections can Jog, Frame, review the current job,
+            Start and Abort through the desktop's ordinary machine flow. The desktop keeps the
+            design canvas. These controls require a desktop release and service that support them;
+            existing viewing/editing approvals gain no motion access. Pairing does not activate Pro
+            or use a licence seat, and existing Pro tool rules still apply.
           </p>`,
         })}
         <p>

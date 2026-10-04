@@ -1,11 +1,13 @@
 export const REMOTE_ORIGIN = 'https://kerfdesk-phone-control.cisgz3a.workers.dev';
 export const REMOTE_PAIR_TTL_MS = 300_000;
-export type RemoteScope = 'read' | 'edit';
+export const REMOTE_CONTROL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export type RemoteScope = 'read' | 'edit' | 'control';
 export type RemoteClient = {
   readonly id: string;
   readonly label: string;
   readonly scopes: RemoteScope[];
   readonly createdAt: number;
+  readonly controlExpiresInMs?: number;
 };
 export type PairingRequest = {
   readonly pairingId: string;

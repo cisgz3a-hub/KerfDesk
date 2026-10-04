@@ -130,7 +130,7 @@ async function writeJogCancel(context: CancelContext): Promise<unknown | undefin
   const jogCancel = context.refs.driver.realtime.jogCancel;
   if (jogCancel === null) return undefined;
   try {
-    await context.safeWrite(jogCancel, 'jog');
+    await context.safeWrite(jogCancel, 'jog', undefined, () => assertCancelContext(context));
     return undefined;
   } catch (error) {
     return error;

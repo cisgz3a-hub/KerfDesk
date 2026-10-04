@@ -205,6 +205,17 @@ async function json(route, status, body) {
 async function command(route, state) {
   const { name, args } = route.request().postDataJSON();
   state.commands.push({ name, args: structuredClone(args) });
+  if (state.machineCommand) {
+    const answer = await state.machineCommand(name, args);
+    if (answer) {
+      if (answer.drop) return route.abort('failed');
+      return json(
+        route,
+        answer.status ?? 200,
+        answer.error ? { error: answer.error } : { result: answer.result },
+      );
+    }
+  }
   const result = readResult(state, name, args);
   if (result) return json(route, 200, { result });
   if (!state.scopes.includes('edit')) return json(route, 403, { error: { code: 'forbidden' } });
@@ -254,7 +265,7 @@ export async function phonePage(browser, state = fixtureState(), width = 390) {
       return json(route, 200, { ok: true });
     }
     const file = url.pathname === '/control' ? 'control.html' : url.pathname.slice(1);
-    if (!/^control(?:-[a-z]+)?\.(?:html|js|css)$/.test(file) && file !== 'pairing.js')
+    if (!/^control(?:-[a-z]+)*\.(?:html|js|css)$/.test(file) && file !== 'pairing.js')
       return route.abort();
     const type = file.endsWith('.js')
       ? 'text/javascript'

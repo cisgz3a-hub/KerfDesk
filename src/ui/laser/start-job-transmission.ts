@@ -25,13 +25,15 @@ import {
 } from './start-job-authorization-reporting';
 import { reportStartBlockers } from './start-blocker-invalidation';
 import type { FramedRunStartClaim } from './framed-run-start-claim';
+import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
+import type { FramedStartOptions } from './framed-start-options';
 import { isJobStartTransmissionError } from '../state/laser-start-transmission-error';
 import {
   observeFreshExecutionRetention,
   type FreshExecutionRetention,
 } from './start-job-retained-execution';
 
-export type PreparedStartArgs = {
+export type PreparedStartArgs = FramedStartOptions & {
   readonly outputScope: OutputScope;
   readonly project: Project;
   readonly laser: ReturnType<typeof useLaserStore.getState>;
@@ -55,9 +57,13 @@ export async function transmitPreparedStart(input: {
 }): Promise<boolean> {
   let { handoffArmed } = input;
   let boundaryRefusal: StartAuthorizationRefusal | null = null;
-  const assertion = finalStartAssertion(input.authorizationArgs, (refusal) => {
+  const canonicalAssertion = finalStartAssertion(input.authorizationArgs, (refusal) => {
     boundaryRefusal = refusal;
   });
+  const assertion = () => {
+    assertMachineExecutionOwner(input.args.executionOwner);
+    canonicalAssertion();
+  };
   // Observe before the first possible stream transition. A short program may
   // settle while startJob or recovery persistence is still awaiting a write.
   const advancement = armVariableStreamAdvancement(
@@ -171,6 +177,8 @@ function preparedStartOptions(
   return {
     runId,
     assertFinalStartAuthorized,
+    ...(args.executionOwner === undefined ? {} : { executionOwner: args.executionOwner }),
+    ...(args.onStartCommitted === undefined ? {} : { onStartCommitted: args.onStartCommitted }),
     streamingMode: streamingModeForController(
       args.project.device.controllerKind,
       args.project.device.streamingMode,

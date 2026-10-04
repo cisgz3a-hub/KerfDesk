@@ -1,4 +1,5 @@
 import type { AppState } from '../state/store';
+import type { MachineAuthority, RemoteCaller } from './machine-types';
 
 export type RemoteReadCommand =
   | 'get_workspace'
@@ -169,6 +170,7 @@ export type RemoteErrorCode =
   | 'not_found'
   | 'not_editable'
   | 'needs_pro'
+  | 'control_required'
   | 'failed';
 export type RemoteCommandResult =
   | {
@@ -188,6 +190,9 @@ export type RemoteControlOptions = {
   readonly canEdit?: () => boolean;
   /** Separate desktop opt-in for sending text content or artwork pixels to remote clients. */
   readonly canShareArtwork?: () => boolean;
+  /** Captures an approved machine grant; never derive it from editing permission. */
+  readonly captureMachineAuthority?: () => MachineAuthority | null;
+  readonly getRemoteCaller?: () => RemoteCaller | null;
   readonly getReview?: (
     currentRevision: string,
     signal?: AbortSignal,
@@ -198,8 +203,14 @@ export type RemoteControlAdapter = {
   readonly execute: (
     command: string,
     args: unknown,
-    options?: { readonly signal?: AbortSignal },
+    options?: {
+      readonly signal?: AbortSignal;
+      readonly machineAuthority?: MachineAuthority | null;
+      readonly remoteCaller?: RemoteCaller | null;
+    },
   ) => Promise<RemoteCommandResult>;
   readonly getRevision: () => string;
   readonly dispose: () => void;
+  /** Synchronous final disclosure projection before native serialization. */
+  readonly machineDelivery?: (command: string, result: RemoteCommandResult) => RemoteCommandResult;
 };

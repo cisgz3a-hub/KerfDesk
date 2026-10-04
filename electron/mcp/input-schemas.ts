@@ -1,6 +1,7 @@
 import { type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { MCP_ARRANGE_ACTIONS, mcpTextPatchSchema } from './authoring-schemas.js';
+import { mcpMachineInputSchemas } from './machine-schemas.js';
 
 export const MCP_MAX_ITEMS = 200;
 export const MCP_MAX_RESULT_BYTES = 256 * 1024;
@@ -67,17 +68,38 @@ export const mcpInputSchemas = {
   }),
   undo: z.strictObject(writeAdmission),
   redo: z.strictObject(writeAdmission),
+  ...mcpMachineInputSchemas,
 } as const;
 
 export type KerfDeskMcpCommand = keyof typeof mcpInputSchemas;
 export type KerfDeskMcpArgs<C extends KerfDeskMcpCommand> = z.output<(typeof mcpInputSchemas)[C]>;
 
 /** One classification is used by the portable tools, relay and native admission checks. */
-export const MCP_WRITE_COMMANDS = new Set<KerfDeskMcpCommand>(
-  (Object.keys(mcpInputSchemas) as KerfDeskMcpCommand[]).filter((command) =>
-    Object.hasOwn(mcpInputSchemas[command].shape, 'expectedRevision'),
-  ),
-);
+export const MCP_WRITE_COMMANDS = new Set<KerfDeskMcpCommand>([
+  'set_selection',
+  'add_text',
+  'add_rectangle',
+  'transform_artwork',
+  'update_operation',
+  'update_text',
+  'arrange_artwork',
+  'undo',
+  'redo',
+]);
+
+/** Physical control is independent of document editing, including revision-bearing controls. */
+export const MCP_CONTROL_COMMANDS = new Set<KerfDeskMcpCommand>([
+  'jog_machine',
+  'frame_job',
+  'review_machine_job',
+  'start_job',
+  'abort_job',
+]);
+
+export function mcpCommandScope(command: KerfDeskMcpCommand): 'read' | 'edit' | 'control' {
+  if (MCP_CONTROL_COMMANDS.has(command)) return 'control';
+  return MCP_WRITE_COMMANDS.has(command) ? 'edit' : 'read';
+}
 
 /** Keep SDK validation errors bounded and avoid echoing untrusted arguments or object keys. */
 export function mcpInputSchema<S extends z.ZodType>(

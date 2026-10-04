@@ -1,5 +1,22 @@
-import { KERFDESK_WORKSPACE_UI_HTML } from '../../../electron/mcp/workspace-ui.ts';
+import { readFile } from 'node:fs/promises';
 import { UI_ORIGIN, fixtureState, idle, readResult } from './phone-workspace-support.mjs';
+
+// Load the exact static source constants without depending on a previous Electron build.
+const machineSource = await readFile(
+  new URL('../../../electron/mcp/workspace-machine-ui.ts', import.meta.url),
+  'utf8',
+);
+const machineUrl = 'data:text/javascript,' + encodeURIComponent(machineSource);
+const resourceSource = await readFile(
+  new URL('../../../electron/mcp/workspace-ui.ts', import.meta.url),
+  'utf8',
+);
+const { KERFDESK_WORKSPACE_UI_HTML } = await import(
+  'data:text/javascript,' +
+    encodeURIComponent(
+      resourceSource.replace("'./workspace-machine-ui.js'", JSON.stringify(machineUrl)),
+    )
+);
 
 export async function appPage(browser, state = fixtureState(), width = 390) {
   const context = await browser.newContext({
@@ -25,6 +42,15 @@ export async function appPage(browser, state = fixtureState(), width = 390) {
     state.commands.push({ name, args });
     if (state.revoked)
       return { isError: true, structuredContent: { error: { code: 'cancelled' } } };
+    if (state.machineCommand) {
+      const answer = await state.machineCommand(name, args);
+      if (answer) {
+        if (answer.drop) return null;
+        return answer.error
+          ? { isError: true, structuredContent: { error: answer.error } }
+          : { structuredContent: answer.result };
+      }
+    }
     const result = readResult(state, name);
     if (result) return { structuredContent: result };
     if (!state.scopes.includes('edit'))

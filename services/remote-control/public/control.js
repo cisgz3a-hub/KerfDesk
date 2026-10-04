@@ -1,6 +1,14 @@
 import { pairingDeadline, rejectedMessage } from './pairing.js';
-import { $, bindForm, renderPreview, safeText, validWorkspace } from './control-model.js';
+import {
+  $,
+  bindForm,
+  continueToMcp,
+  renderPreview,
+  safeText,
+  validWorkspace,
+} from './control-model.js';
 import { bindEditors } from './control-edit.js';
+import { bindMachine } from './control-machine.js';
 import {
   refreshDetails,
   renderWorkspace,
@@ -25,6 +33,7 @@ const errorMessages = {
   unsupported_operation: 'This operation cannot be edited here. Use KerfDesk on your PC.',
   invalid_input: 'Check the values and try again.',
   cancelled: 'The request was cancelled or this connection was revoked.',
+  control_limit: 'No action was sent. Pair again and approve machine control on the PC.',
   failed: 'The change could not be completed. Refresh the workspace and try again.',
 };
 function notice(message, error = false) {
@@ -104,16 +113,17 @@ function syncReadAccess(admitted) {
   $('#readonly-note').hidden = !session || admitted;
   const unknown =
     !!session?.client.scopes.includes('edit') && workspace?.permissions?.canEdit === undefined;
-  $('#readonly-title').textContent = !session?.online
-    ? 'PC offline'
-    : unknown
-      ? 'Update the PC app'
-      : 'Viewing only';
+  $('#readonly-title').textContent = readAccessTitle(unknown);
   $('#readonly-message').textContent = !session?.online
     ? 'Open KerfDesk on the PC, then refresh here to reconnect.'
     : unknown
       ? 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.'
       : 'To edit, pair again with editing permission and approve this phone on the PC.';
+}
+function readAccessTitle(unknown) {
+  if (!session?.online) return 'PC offline';
+  if (unknown) return 'Update the PC app';
+  return session.client.scopes.includes('control') ? 'Workspace editing off' : 'Viewing only';
 }
 function syncEditorControls() {
   const history = workspace?.history ?? {};
@@ -147,8 +157,10 @@ function setSession(value) {
     fontsLoaded = false;
     resetWorkspace();
     editors.reset();
+    machine.reset();
   }
   session = value;
+  machine.sessionChanged(value);
   $('#connection').textContent = value
     ? value.online
       ? 'PC connected'
@@ -268,27 +280,17 @@ function editFailure(error, attempt) {
   throw error;
 }
 const editors = bindEditors({ action, edit, command, getWorkspace: () => workspace });
+const machine = bindMachine({
+  command,
+  verifySession: async () => {
+    const value = await api('/api/session');
+    setSession(value.status === 'approved' ? value : null);
+    if (value.status !== 'approved' || !value.online)
+      throw new Error('The PC is offline or this connection is no longer approved.');
+    return value;
+  },
+});
 $('#artwork-list').addEventListener('change', syncControls);
-function continueToMcp() {
-  const target = new URLSearchParams(location.search).get('continue');
-  if (!target || target.length > 4096) return false;
-  try {
-    const parsed = new URL(target, location.origin);
-    if (
-      parsed.origin === location.origin &&
-      parsed.pathname === '/authorize' &&
-      !parsed.username &&
-      !parsed.password &&
-      !parsed.hash
-    ) {
-      location.assign(parsed.href);
-      return true;
-    }
-  } catch {
-    /* Only an exact same-origin consent page is accepted. */
-  }
-  return false;
-}
 function schedulePairStatus(deadline, generation) {
   poll = setTimeout(() => {
     if (generation !== pairGeneration) return;
@@ -335,7 +337,10 @@ bindForm('#pair-form', action, async (form) => {
       deviceId: form.elements.deviceId.value.trim().toLowerCase(),
       code: form.elements.code.value.trim(),
       clientLabel,
-      requestedScopes: form.elements.edit.checked ? ['read', 'edit'] : ['read'],
+      requestedScopes: [
+        'read',
+        ...['edit', 'control'].filter((scope) => form.elements[scope].checked),
+      ],
     },
     generation,
   );
@@ -367,7 +372,10 @@ $('#disconnect').addEventListener('click', () => {
   });
 });
 for (const tab of document.querySelectorAll('[data-view]'))
-  tab.addEventListener('click', () => view(tab.dataset.view));
+  tab.addEventListener('click', () => {
+    view(tab.dataset.view);
+    machine.setVisible(tab.dataset.view === 'machine');
+  });
 const suggestedId = new URLSearchParams(location.search).get('deviceId');
 if (suggestedId && /^[0-9a-f-]{36}$/i.test(suggestedId))
   pairForm.elements.deviceId.value = suggestedId;

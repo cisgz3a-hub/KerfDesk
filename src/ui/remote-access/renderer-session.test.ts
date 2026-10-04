@@ -50,6 +50,7 @@ const envelope = (id: string, canWrite = true) => ({
   args: {},
   clientId: 'client',
   canWrite,
+  canControl: false,
 });
 let polls: unknown[];
 let calls: { action: string; body: Record<string, unknown> }[];

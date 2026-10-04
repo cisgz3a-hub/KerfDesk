@@ -1,5 +1,10 @@
 import { type ToolAnnotations } from '@modelcontextprotocol/server';
-import { MCP_WRITE_COMMANDS, type KerfDeskMcpCommand } from './input-schemas.js';
+import {
+  MCP_WRITE_COMMANDS,
+  MCP_CONTROL_COMMANDS,
+  type KerfDeskMcpCommand,
+} from './input-schemas.js';
+import { mcpMachineToolInfo } from './machine-tool-info.js';
 
 export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; description: string }> = {
   get_workspace: {
@@ -87,13 +92,16 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
     description:
       'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
   },
+  ...mcpMachineToolInfo,
 };
 
 export function mcpToolAnnotations(command: KerfDeskMcpCommand): ToolAnnotations {
-  const readOnly = !MCP_WRITE_COMMANDS.has(command);
+  const control = MCP_CONTROL_COMMANDS.has(command);
+  const readOnly = !MCP_WRITE_COMMANDS.has(command) && !control;
   return {
     readOnlyHint: readOnly,
-    destructiveHint: !readOnly && !['set_selection', 'add_text', 'add_rectangle'].includes(command),
+    destructiveHint:
+      control || (!readOnly && !['set_selection', 'add_text', 'add_rectangle'].includes(command)),
     idempotentHint: readOnly,
     openWorldHint: false,
   };

@@ -69,7 +69,14 @@
           </div>
           <label class="check"
             ><input name="edit" type="checkbox" /> Request editing permission</label
-          ><button type="submit">Request PC approval</button>
+          ><label class="check"
+            ><input name="control" type="checkbox" /> Request machine control</label
+          >
+          <p class="muted">
+            Machine control can move the head, Frame and start jobs. Approve it separately on the
+            PC.
+          </p>
+          <button type="submit">Request PC approval</button>
         </form>
         <p class="muted" id="pair-status">The code expires after five minutes and works once.</p>
       </section>
@@ -97,6 +104,7 @@
         <nav class="tabs" aria-label="Workspace views">
           <button type="button" data-view="artwork" aria-pressed="true">Artwork</button
           ><button type="button" data-view="edit" aria-pressed="false">Edit</button
+          ><button type="button" data-view="machine" aria-pressed="false">Machine</button
           ><button type="button" data-view="details" aria-pressed="false">Details</button>
         </nav>
         <section class="card preview-card" data-panel="artwork" aria-labelledby="preview-heading">
@@ -390,11 +398,97 @@
             </details>
           </div>
         </div>
+        <section id="machine-panel" data-panel="machine" hidden>
+          <section class="card">
+            <div class="preview-heading">
+              <div>
+                <h2>Machine</h2>
+                <p id="machine-state" role="status" aria-live="polite">
+                  Open this view to check the PC.
+                </p>
+              </div>
+              <button type="button" class="secondary" id="machine-check">Check status</button>
+            </div>
+            <p id="machine-access" class="muted"></p>
+            <p id="machine-position" class="muted">Work position unavailable.</p>
+            <p id="machine-message" class="muted" role="status" aria-live="polite"></p>
+          </section>
+          <section class="card">
+            <h2>Position the head</h2>
+            <p class="muted">One tap moves one step.</p>
+            <form id="machine-jog-form">
+              <div class="two">
+                <label
+                  >Step (mm)<input name="distanceMm" type="text" inputmode="decimal" value="1"
+                /></label>
+                <label
+                  >Feed (mm/min)<input
+                    name="feedMmPerMin"
+                    type="text"
+                    inputmode="decimal"
+                    value=""
+                    placeholder="PC default"
+                /></label>
+              </div>
+            </form>
+            <div class="jog-pad" aria-label="XY jog pad">
+              <button type="button" data-jog-axis="y" data-jog-direction="1" aria-label="Jog up">
+                ↑
+              </button>
+              <button type="button" data-jog-axis="x" data-jog-direction="-1" aria-label="Jog left">
+                ←
+              </button>
+              <span aria-hidden="true">XY</span>
+              <button type="button" data-jog-axis="x" data-jog-direction="1" aria-label="Jog right">
+                →
+              </button>
+              <button type="button" data-jog-axis="y" data-jog-direction="-1" aria-label="Jog down">
+                ↓
+              </button>
+            </div>
+            <div id="machine-z" class="selection-actions" hidden>
+              <button type="button" data-jog-axis="z" data-jog-direction="1">Z up</button>
+              <button type="button" data-jog-axis="z" data-jog-direction="-1">Z down</button>
+            </div>
+          </section>
+          <section class="card">
+            <h2>Frame, review and start</h2>
+            <p id="machine-frame-state" class="muted">Frame status unavailable.</p>
+            <div class="machine-job-actions">
+              <button id="machine-frame" type="button">Frame job</button
+              ><button id="machine-review" type="button" class="secondary">Review job</button>
+            </div>
+            <section
+              id="machine-review-card"
+              class="separated"
+              aria-labelledby="machine-review-heading"
+              hidden
+            >
+              <h3 id="machine-review-heading">Current job review</h3>
+              <div id="machine-review-stats" class="details-list"></div>
+              <details id="machine-warnings">
+                <summary id="machine-warning-count">Warnings</summary>
+                <div id="machine-review-warnings" class="details-list"></div>
+              </details>
+              <div id="machine-review-operations" class="details-list"></div>
+              <p id="machine-acknowledgement"></p>
+              <p class="muted">Start job confirms this exact review and starts the machine.</p>
+              <button id="machine-start" type="button">Start job</button>
+            </section>
+          </section>
+          <div class="machine-stop-bar">
+            <button id="machine-abort" type="button" class="danger">Abort job</button
+            ><span class="muted"
+              >Requires a PC connection. Use the machine’s own stop control if disconnected.</span
+            >
+          </div>
+        </section>
         <section class="card" data-panel="details" hidden>
           <h2>Computer and job</h2>
           <div id="details-list" class="details-list"></div>
           <p class="muted">
-            Frame and Start remain on the computer. This page cannot control the machine.
+            Machine actions require separate approval on the PC. Review the current job before
+            Start.
           </p>
         </section>
         <details class="card task compact" id="connection-options">

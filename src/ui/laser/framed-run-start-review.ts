@@ -14,6 +14,8 @@ import {
   revokeOwnedCompletedFrame,
 } from './framed-start-preparation';
 import { isOutputPreparationAbort } from './output-preparation-errors';
+import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
+import type { FramedStartOptions } from './framed-start-options';
 
 export const FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE =
   'The framed coordinates or machine setup changed during review. Frame the job again.';
@@ -26,16 +28,22 @@ export const REVIEW_CHANGED_FRAMED_JOB_MESSAGE =
 // equal execution signatures cannot bring that physical Frame back.
 export async function reviewFramedRunForStart(
   permit: FramedRunPermit,
+  options: FramedStartOptions = {},
 ): Promise<{ readonly permit: FramedRunPermit; readonly review: FramedRunReviewEvidence } | null> {
   const candidate = permit.candidate;
-  const initial = await prepareFramedStartReview(permit).catch((error: unknown) => {
-    if (isOutputPreparationAbort(error)) return null;
-    throw error;
-  });
+  assertMachineExecutionOwner(options.executionOwner);
+  const initial = await prepareFramedStartReview(permit, options.executionOwner?.signal).catch(
+    (error: unknown) => {
+      if (isOutputPreparationAbort(error)) return null;
+      throw error;
+    },
+  );
   if (initial === null) return null;
+  assertMachineExecutionOwner(options.executionOwner);
   const shouldAbandon = (): boolean => {
     const liveLaser = useLaserStore.getState();
     return (
+      options.executionOwner?.signal?.aborted === true ||
       liveLaser.framedRun !== permit ||
       framedRunReadinessIssue(permit, undefined, liveLaser) !== null
     );
@@ -48,9 +56,8 @@ export async function reviewFramedRunForStart(
     completedReceipt: null,
     shouldAbandon,
     onFrameMismatch: () => revokeOwnedCompletedFrame(permit),
-    ...(candidate.authorizationContext === 'laser-second-pass'
-      ? { purpose: 'laser-second-pass' }
-      : {}),
+    ...presenterOptions(options),
+    purpose: candidate.authorizationContext === 'laser-second-pass' ? 'laser-second-pass' : 'start',
   });
   if (review === null) {
     if (shouldAbandon()) {
@@ -58,6 +65,7 @@ export async function reviewFramedRunForStart(
     }
     return null;
   }
+  assertMachineExecutionOwner(options.executionOwner);
   const rebound = rebindReviewedFramedRun(permit, review.bundle);
   if (rebound === null) {
     if (
@@ -81,4 +89,7 @@ export async function reviewFramedRunForStart(
         : { cncSetupAttestation: review.cncSetupAttestation }),
     },
   };
+}
+function presenterOptions(options: FramedStartOptions) {
+  return options.presenter === undefined ? {} : { presenter: options.presenter };
 }

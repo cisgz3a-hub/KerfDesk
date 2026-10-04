@@ -34,8 +34,8 @@
         <p class="eyebrow">PHONE &amp; MCP</p>
         <h1 id="page-title">Keep your ideas<br /><span>within reach.</span></h1>
         <p class="phone-lead">
-          View the workspace on your PC, or make artwork and laser setting edits from your phone.
-          You choose the access on the computer.
+          View your PC workspace, edit artwork, or use separately approved machine controls from
+          your phone. You choose the access on the computer.
         </p>
         <a class="phone-button" href="https://kerfdesk-phone-control.cisgz3a.workers.dev/control"
           >Connect to your PC <span aria-hidden="true">→</span></a
@@ -92,7 +92,8 @@
               <h3>Approve this phone on the PC</h3>
               <p>
                 Check the phone’s name in the desktop approval prompt, then choose
-                <strong>Allow viewing</strong> or <strong>Allow viewing and editing</strong>. The
+                <strong>Allow viewing</strong>, or select the requested editing and machine-control
+                choices and <strong>Approve selected access</strong>. Both choices start off. The
                 phone page opens the approved workspace.
               </p>
               <p class="phone-step-note">
@@ -126,9 +127,12 @@
           </article>
         </div>
         <p class="phone-boundary">
-          <strong>Frame, Start and machine movement stay on the PC.</strong> This phone page keeps
-          the design canvas on your computer. Remote access does not activate Pro or use a licence
-          seat; the app’s existing Pro tool rules still apply.
+          <strong>Machine control needs its own PC approval.</strong> Approved connections can Jog,
+          Frame, review the job, Start and Abort through the desktop. These controls require a
+          desktop release and service that support them; existing viewing/editing approvals gain no
+          motion access. This phone page keeps the design canvas on your computer. Remote access
+          does not activate Pro or use a licence seat; the app’s existing Pro tool rules still
+          apply.
         </p>
       </section>
 
@@ -163,9 +167,9 @@
             sign-in page, then approve its requested access on the PC.
           </p>
           <p>
-            For editing, include <code>kerfdesk:edit</code> in
-            <strong>Advanced OAuth settings → Base scopes</strong>, and approve
-            <strong>Allow viewing and editing</strong> on the PC. The default
+            In <strong>Advanced OAuth settings → Base scopes</strong>, add
+            <code>kerfdesk:edit</code> for artwork editing and <code>kerfdesk:control</code> for
+            machine controls, then explicitly approve those choices on the PC. The default
             <code>kerfdesk:read</code> scope allows viewing. You do not need an OpenAI API key.
           </p>
           <p>

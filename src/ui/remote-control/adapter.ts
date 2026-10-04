@@ -11,6 +11,7 @@ import { workspacePreviewProjection } from './preview-projection';
 import { createRevisionTracker } from './revision';
 import { canonicalRequest, validateCommand, type ValidatedCommand } from './validation';
 import { applyRemoteWrite } from './writes';
+import { createMachineControl } from './machine-control';
 import type {
   RemoteCommandResult,
   RemoteControlAdapter,
@@ -29,6 +30,7 @@ const MAX_REQUESTS = 256;
 export function createRemoteControlAdapter(options: RemoteControlOptions): RemoteControlAdapter {
   const store = options.store ?? useStore;
   const tracker = createRevisionTracker(store);
+  const machine = createMachineControl({ ...options, store }, tracker.current);
   const requests = new Map<string, CachedWrite>();
   const pending = new Set<AbortController>();
   let disposed = false;
@@ -46,9 +48,11 @@ export function createRemoteControlAdapter(options: RemoteControlOptions): Remot
   const context = { options, store, tracker, pending, isDisposed: () => disposed, failure };
   return {
     getRevision: tracker.current,
+    machineDelivery: machine.delivery,
     execute: async (command, args, execution = {}) => {
       try {
         if (disposed) throw new RemoteFault('cancelled');
+        if (machine.handles(command)) return machine.execute(command, args, execution);
         const input = validateCommand(command, args);
         if (!isWrite(input)) return await readResult(input, context, execution.signal);
         const fingerprint = canonicalRequest(input);
@@ -69,6 +73,7 @@ export function createRemoteControlAdapter(options: RemoteControlOptions): Remot
     dispose: () => {
       disposed = true;
       tracker.dispose();
+      machine.dispose();
       for (const controller of pending) controller.abort();
       requests.clear();
     },

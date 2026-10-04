@@ -20,6 +20,8 @@ const READS = new Set([
   'get_app_status',
   'list_material_recipes',
   'review_job',
+  'get_machine_status',
+  'get_control_operation',
 ]);
 
 /** Last synchronous fence before JSON serialization into the native completion route. */

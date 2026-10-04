@@ -1,11 +1,11 @@
 import { createMcpHandler } from '@modelcontextprotocol/server';
 import type { OAuthResourceContext } from '@cloudflare/workers-oauth-provider';
 import { createKerfDeskMcpServer } from '../../../electron/mcp/server.js';
-import type { mcpOutputSchemas } from '../../../electron/mcp/output-schemas.js';
+import { mcpOutputSchemas } from '../../../electron/mcp/output-schemas.js';
+import { mcpCommandScope, type KerfDeskMcpCommand } from '../../../electron/mcp/input-schemas.js';
 import {
   RESOURCE,
   MAX_BYTES,
-  WRITE_COMMANDS,
   oauthGrantSchema,
   oauthScopes,
   type OAuthGrantProps,
@@ -37,7 +37,7 @@ async function permittedContext(env: Env, ctx: ExecutionContext) {
 
   return { props: props.data, scopes, oauthClientId: context.auth.clientId };
 }
-function isWriteCall(value: unknown): boolean {
+function callScope(value: unknown): 'read' | 'edit' | 'control' {
   if (
     typeof value !== 'object' ||
     value === null ||
@@ -45,34 +45,40 @@ function isWriteCall(value: unknown): boolean {
     value.method !== 'tools/call' ||
     !('params' in value)
   )
-    return false;
+    return 'read';
   const params = value.params;
-  return (
+  const valid =
     typeof params === 'object' &&
     params !== null &&
     'name' in params &&
     typeof params.name === 'string' &&
-    WRITE_COMMANDS.has(params.name as keyof typeof mcpOutputSchemas)
-  );
+    Object.hasOwn(mcpOutputSchemas, params.name);
+  return valid ? mcpCommandScope((params as { name: KerfDeskMcpCommand }).name) : 'read';
 }
 async function scopeChallenge(request: Request, scopes: RemoteScope) {
   if (
     request.method === 'POST' &&
-    !scopes.includes('edit') &&
+    (!scopes.includes('edit') || !scopes.includes('control')) &&
     request.headers.get('Content-Type')?.split(';')[0].trim() === 'application/json'
   ) {
     const message = await bodyJson(request.clone());
     const messages = Array.isArray(message) ? message : [message];
-    const writeRequested = messages.some(isWriteCall);
-    if (writeRequested)
+    const required = [
+      ...new Set(
+        messages.map(callScope).filter((scope): scope is 'edit' | 'control' => scope !== 'read'),
+      ),
+    ];
+    if (required.some((scope) => !scopes.includes(scope)))
       return json(
         {
           error: 'insufficient_scope',
-          error_description: 'Editing requires approval on this computer.',
+          error_description: required.includes('control')
+            ? 'Machine control requires separate approval on this computer.'
+            : 'Editing requires approval on this computer.',
         },
         403,
         {
-          'WWW-Authenticate': mcpAuthChallenge('insufficient_scope'),
+          'WWW-Authenticate': mcpAuthChallenge('insufficient_scope', required),
         },
       );
   }

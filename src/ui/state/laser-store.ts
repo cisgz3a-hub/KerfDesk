@@ -73,7 +73,7 @@ import type {
   SessionObservationStamp,
 } from './laser-controller-observation';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
-import { createSafeWrite } from './laser-safe-write';
+import { createSafeWrite, type SafeWrite } from './laser-safe-write';
 import { bindLiveJobTransportLedger } from './laser-job-transport-ledger';
 import { setupActions } from './laser-setup-actions';
 import { controllerFireActions } from './laser-fire-actions';
@@ -400,8 +400,9 @@ async function safeWrite(
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ): Promise<void> {
-  await createSafeWrite(set, get, refs)(line, action, source);
+  await createSafeWrite(set, get, refs)(line, action, source, assertBeforeWrite);
 }
 
 type SetFn = (
@@ -519,21 +520,19 @@ function detectedSettingsActions(
 }
 
 export const useLaserStore = create<LaserState>((set, get) => {
+  const write: SafeWrite = (line, action, source, assertBeforeWrite) =>
+    safeWrite(set, get, line, action, source, assertBeforeWrite);
   const settingsActions = grblSettingsActions(set, get, refs, (line, action, source) =>
     safeWrite(set, get, line, action, source),
   );
   refs.runControllerQualification = settingsActions.readMachineSettings;
   return {
     ...initialLaserState(),
-    ...connectionActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
-    ),
+    ...connectionActions(set, get, refs, write),
     ...autofocusActions(set, get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
     ),
-    ...jogActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
-    ),
+    ...jogActions(set, get, refs, write),
     ...airAssistActions(set, get),
     ...controllerFireActions(set, get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
@@ -545,19 +544,11 @@ export const useLaserStore = create<LaserState>((set, get) => {
       safeWrite(set, get, line, action, source),
     ),
     ...controllerOverrideActions((line) => safeWrite(set, get, line), get),
-    ...jobActions(
-      set,
-      get,
-      refs,
-      (line, action, source) => safeWrite(set, get, line, action, source),
-      () => refs.driver,
-    ),
+    ...jobActions(set, get, refs, write, () => refs.driver),
     ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
     ...settingsActions,
     retryControllerQualification: settingsActions.readMachineSettings,
-    ...consoleActions(set, get, refs, (line, action, source) =>
-      safeWrite(set, get, line, action, source),
-    ),
+    ...consoleActions(set, get, refs, write),
     ...statusRequestActions(get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
     ),
