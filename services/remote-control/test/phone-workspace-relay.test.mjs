@@ -79,9 +79,17 @@ test(
         await page.locator('#workspace-preview').evaluate((image) => image.naturalWidth),
         1,
       );
-      for (const path of ['/control-edit.js', '/control-model.js', '/control-workspace.js'])
+      for (const path of [
+        '/control-edit.js',
+        '/control-model.js',
+        '/control-workspace.js',
+        '/control-live.js',
+        '/control-drafts.js',
+        '/control-pairing.js',
+      ])
         assert.ok(paths.some((entry) => entry.path === path && entry.status === 200));
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await openTask(page, 'edit-text-task');
       await page.getByRole('button', { name: 'Load text from PC', exact: true }).click();
       await idle(page);
       await page.locator('#text-edit-form [name=text]').fill('Real relay edited text');
