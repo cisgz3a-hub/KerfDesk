@@ -82,6 +82,23 @@
           </div>
           <button class="secondary" id="refresh" type="button">Refresh</button>
         </section>
+        <div class="history-controls" id="history-controls" hidden>
+          <button class="secondary" id="undo" type="button" disabled>Undo</button>
+          <button class="secondary" id="redo" type="button" disabled>Redo</button>
+          <span class="muted">Shared with the desktop history</span>
+        </div>
+        <button id="retry-edit" type="button" hidden>Retry last request</button>
+        <section class="card preview-card" aria-labelledby="preview-heading">
+          <div class="preview-heading">
+            <h2 id="preview-heading">Workspace preview</h2>
+            <span class="badge">View only</span>
+          </div>
+          <div class="preview-surface">
+            <img id="workspace-preview" alt="Artwork preview from your desktop" hidden />
+          </div>
+          <p id="preview-message" class="muted">Connect to your PC to view its workspace.</p>
+          <p id="preview-bounds" class="muted"></p>
+        </section>
         <nav class="tabs" aria-label="Workspace views">
           <button type="button" data-view="artwork" aria-pressed="true">Artwork</button
           ><button type="button" data-view="edit" aria-pressed="false">Edit</button
@@ -115,6 +132,21 @@
                     placeholder="Your text"
                   ></textarea>
                 </label>
+                <div class="font-picker">
+                  <label
+                    >Search fonts<input
+                      name="fontSearch"
+                      type="search"
+                      autocomplete="off"
+                      placeholder="Find a bundled font"
+                  /></label>
+                  <label
+                    >Font<select name="fontId" size="5">
+                      <option value="">Desktop default</option>
+                    </select></label
+                  >
+                  <span class="font-count muted" aria-live="polite"></span>
+                </div>
                 <div class="two">
                   <label
                     >X (mm)<input
@@ -147,6 +179,73 @@
                   /></label>
                 </div>
                 <button>Add text</button>
+              </form>
+            </section>
+            <section class="card">
+              <h2>Edit existing text</h2>
+              <p id="text-sharing-note" class="muted" hidden>
+                Enable artwork sharing in Settings → Phone &amp; MCP on the PC to read existing
+                text.
+              </p>
+              <label>Text artwork<select id="text-artwork-list"></select></label>
+              <button id="load-text" type="button" class="secondary separated-button">
+                Load text from PC
+              </button>
+              <p class="muted" id="text-load-status">
+                Load the selected text from the PC before editing.
+              </p>
+              <form id="text-edit-form">
+                <fieldset id="text-editor" disabled>
+                  <label
+                    >Text<textarea name="text" rows="3" required maxlength="4096"></textarea>
+                  </label>
+                  <div class="font-picker">
+                    <label
+                      >Search fonts<input
+                        name="fontSearch"
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Find a bundled font"
+                    /></label>
+                    <label
+                      >Font<select name="fontId" size="5">
+                        <option value="">Desktop default</option>
+                      </select></label
+                    >
+                    <span class="font-count muted" aria-live="polite"></span>
+                  </div>
+                  <div class="two">
+                    <label
+                      >Font size (mm)<input
+                        name="fontSizeMm"
+                        type="text"
+                        inputmode="decimal"
+                        required
+                    /></label>
+                    <label
+                      >Text alignment<select name="alignment">
+                        <option value="left">Left</option>
+                        <option value="center">Centre</option>
+                        <option value="right">Right</option>
+                      </select></label
+                    >
+                    <label
+                      >Line height (× size)<input
+                        name="lineHeight"
+                        type="text"
+                        inputmode="decimal"
+                        required
+                    /></label>
+                    <label
+                      >Letter spacing (× size)<input
+                        name="letterSpacing"
+                        type="text"
+                        inputmode="decimal"
+                        required
+                    /></label>
+                  </div>
+                  <button type="submit">Update text</button>
+                </fieldset>
               </form>
             </section>
             <section class="card">
@@ -217,6 +316,30 @@
                     value="0"
                     required /></label
                 ><button>Rotate selection</button>
+              </form>
+              <form id="arrange-form" class="separated">
+                <label
+                  >Layout action<select name="action">
+                    <option value="align_left">Align left edges</option>
+                    <option value="align_center">Align horizontal centres</option>
+                    <option value="align_right">Align right edges</option>
+                    <option value="align_top">Align top edges</option>
+                    <option value="align_middle">Align vertical centres</option>
+                    <option value="align_bottom">Align bottom edges</option>
+                    <option value="distribute_horizontal">Space horizontal centres equally</option>
+                    <option value="distribute_vertical">Space vertical centres equally</option>
+                    <option value="mirror_horizontal">Mirror horizontally</option>
+                    <option value="mirror_vertical">Mirror vertically</option>
+                    <option value="group">Group</option>
+                    <option value="ungroup">Ungroup</option>
+                    <option value="duplicate">Duplicate</option>
+                    <option value="delete">Delete selected artwork</option>
+                  </select></label
+                >
+                <p class="muted">
+                  Choose items in Artwork first. Undo can reverse a layout change or deletion.
+                </p>
+                <button>Apply layout action</button>
               </form>
             </section>
             <section class="card">

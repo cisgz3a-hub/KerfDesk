@@ -22,8 +22,9 @@ support@kerfdesk.com.
 ## What we never collect
 
 - The licensing service does not upload your projects, drawings, toolpaths, or machine or job data.
-  Optional phone and MCP access sends approved summaries through a separate service as described
-  in the general privacy page; it is initially off and requires approval on the computer.
+  Optional phone and MCP access sends approved summaries and, with a separate artwork-sharing
+  opt-in, bounded previews and text through a separate service as described in the general privacy
+  page; it is initially off and requires approval on the computer.
 - KerfDesk has no analytics, telemetry, automatic crash reporting, advertising or tracking.
 - Licensing needs no account or password.
 - The desktop app keeps a log of its own problems on your computer. It stays there unless you

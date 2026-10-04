@@ -14,6 +14,7 @@ const MESSAGES: Record<RemoteErrorCode, string> = {
   unavailable: 'This information is not currently available.',
   not_found: 'The requested artwork or operation is no longer present.',
   not_editable: 'The requested artwork is locked or hidden.',
+  needs_pro: 'This copy requires Pro. Unlock Pro on the computer, then make a new request.',
   failed: 'The remote command could not be completed.',
 };
 export class RemoteFault extends Error {

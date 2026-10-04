@@ -33,6 +33,68 @@ textarea,
 select {
   font: inherit;
 }
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+fieldset:disabled {
+  opacity: 0.6;
+}
+.history-controls,
+.preview-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.preview-heading {
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.preview-heading h2 {
+  margin: 0;
+}
+.preview-surface:has(img:not([hidden])) {
+  background: #f8faf9;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+}
+.preview-surface img {
+  width: 100%;
+  height: auto;
+  max-height: 350px;
+  object-fit: contain;
+}
+.font-picker {
+  display: grid;
+  gap: 12px;
+}
+.font-picker select {
+  height: 160px;
+  padding: 4px;
+  overscroll-behavior: contain;
+}
+.font-picker option {
+  padding: 8px;
+}
+.font-count {
+  min-height: 20px;
+}
+.separated-button {
+  margin-top: 14px;
+}
+.two > label {
+  min-width: 0;
+}
+#retry-edit {
+  margin-top: 12px;
+}
 button,
 .button {
   border: 0;

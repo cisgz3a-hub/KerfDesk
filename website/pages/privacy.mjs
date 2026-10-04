@@ -31,7 +31,7 @@ const AT_A_GLANCE = [
   {
     icon: 'hard-drive',
     title: 'Your work stays with you',
-    body: 'Saved projects and jobs stay on your computer. If you enable remote access, approved clients receive the summaries and changes described below.',
+    body: 'Saved projects and jobs stay on your computer. Approved remote clients receive summaries and edits; a separate opt-in allows artwork previews and text, as described below.',
   },
 ];
 
@@ -91,7 +91,7 @@ function connections(site) {
     [
       'You enable approved phone or MCP access',
       'kerfdesk-phone-control.cisgz3a.workers.dev (Cloudflare)',
-      'An authenticated connection carries approved requests and bounded workspace, machine and recipe summaries. Access starts turned off, and each client needs your approval. See below for permissions, cookies and retention.',
+      'An authenticated connection carries approved requests and bounded workspace, machine and recipe summaries. Separate artwork-sharing opt-in allows PNG previews and text contents. Access starts turned off, and each client needs your approval. See below for permissions, cookies and retention.',
     ],
   ];
 }
@@ -327,7 +327,7 @@ export const page = {
     'KerfDesk needs no account for ordinary use. This site sets no cookies. Read the app disclosures for updates, licensing, downloads and optional phone or MCP access.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-01">October 1, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-04">October 4, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

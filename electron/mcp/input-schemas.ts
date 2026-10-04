@@ -1,5 +1,6 @@
 import { type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { MCP_ARRANGE_ACTIONS, mcpTextPatchSchema } from './authoring-schemas.js';
 
 export const MCP_MAX_ITEMS = 200;
 export const MCP_MAX_RESULT_BYTES = 256 * 1024;
@@ -28,6 +29,9 @@ export const mcpInputSchemas = {
   get_app_status: z.strictObject({}),
   list_material_recipes: z.strictObject({}),
   review_job: z.strictObject({}),
+  get_workspace_preview: z.strictObject({}),
+  list_fonts: z.strictObject({}),
+  get_text: z.strictObject({ artworkId: id }),
   set_selection: z.strictObject({ ...writeAdmission, artworkIds }),
   add_text: z.strictObject({
     ...writeAdmission,
@@ -36,6 +40,7 @@ export const mcpInputSchemas = {
     widthMm: size,
     text: z.string().min(1).max(4096),
     fontSizeMm: z.number().positive().max(1000),
+    fontId: id.optional(),
   }),
   add_rectangle: z.strictObject({
     ...writeAdmission,
@@ -54,10 +59,25 @@ export const mcpInputSchemas = {
     ]),
   }),
   update_operation: z.strictObject({ ...writeAdmission, operationId: id, patch: operationPatch }),
+  update_text: z.strictObject({ ...writeAdmission, artworkId: id, patch: mcpTextPatchSchema }),
+  arrange_artwork: z.strictObject({
+    ...writeAdmission,
+    artworkIds: artworkIds.min(1),
+    action: z.enum(MCP_ARRANGE_ACTIONS),
+  }),
+  undo: z.strictObject(writeAdmission),
+  redo: z.strictObject(writeAdmission),
 } as const;
 
 export type KerfDeskMcpCommand = keyof typeof mcpInputSchemas;
 export type KerfDeskMcpArgs<C extends KerfDeskMcpCommand> = z.output<(typeof mcpInputSchemas)[C]>;
+
+/** One classification is used by the portable tools, relay and native admission checks. */
+export const MCP_WRITE_COMMANDS = new Set<KerfDeskMcpCommand>(
+  (Object.keys(mcpInputSchemas) as KerfDeskMcpCommand[]).filter((command) =>
+    Object.hasOwn(mcpInputSchemas[command].shape, 'expectedRevision'),
+  ),
+);
 
 /** Keep SDK validation errors bounded and avoid echoing untrusted arguments or object keys. */
 export function mcpInputSchema<S extends z.ZodType>(

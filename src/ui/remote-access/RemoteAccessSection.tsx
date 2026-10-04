@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Button } from '../kit';
+import { setArtworkSharingEnabled, useArtworkSharing } from './artwork-sharing';
 import {
   settingsGroupStyle,
   settingsHeadingStyle,
@@ -11,9 +13,36 @@ export function RemoteAccessSection(): JSX.Element {
   return (
     <>
       <RemoteConsent />
+      <ArtworkSharingConsent />
       <PairingControls />
       <ApprovedClients />
     </>
+  );
+}
+function ArtworkSharingConsent(): JSX.Element {
+  const sharing = useArtworkSharing();
+  const available = useRemoteAccessStore((state) => state.status?.available === true);
+  const [failed, setFailed] = useState(false);
+  return (
+    <section style={settingsGroupStyle}>
+      <label style={settingsRowStyle}>
+        <input
+          type="checkbox"
+          checked={sharing}
+          disabled={!available}
+          onChange={(event) => {
+            setFailed(!setArtworkSharingEnabled(event.currentTarget.checked));
+          }}
+        />
+        <span>Share artwork previews and text with approved phones and MCP apps</span>
+      </label>
+      <p style={settingsNoteStyle}>
+        This is off by default. Turning it on lets approved connections see your artwork and read
+        its text. An MCP app can send this content to its AI provider. Turn it off to stop sharing
+        future previews and text; it cannot erase content already received by a client.
+      </p>
+      {failed ? <p role="alert">Artwork sharing could not be saved and is off.</p> : null}
+    </section>
   );
 }
 function connectionText(status: RemoteAccessStatus | null): string {
@@ -31,9 +60,10 @@ function RemoteConsent(): JSX.Element {
         stay open and the computer must stay awake and online.
       </p>
       <p style={settingsNoteStyle}>
-        Connected clients can read artwork summaries, machine limits and recipes. An approved
-        editing connection can select and transform artwork, add text or rectangles in Laser
-        workspaces and change laser operation settings. Machine execution remains on the desktop.
+        Connected clients can read artwork summaries, machine limits, recipes and job review facts.
+        An approved editing connection can add or edit text, arrange artwork, undo or redo its edits
+        and change laser operation settings in Laser workspaces. Machine execution remains on the
+        desktop.
       </p>
       <p style={settingsNoteStyle}>
         Requests and these summaries pass through KerfDesk’s Cloudflare service. An MCP client may

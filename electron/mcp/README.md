@@ -21,16 +21,58 @@ dimensions at most 100000 mm and positive font sizes at most 1000 mm.
 
 | Tool | Additional arguments | Behaviour |
 | --- | --- | --- |
-| `get_workspace` | None | Bounded current unsaved artwork, operations and selection. |
+| `get_workspace` | None | Bounded current unsaved artwork, operations, selection, history and permission hints. |
 | `get_machine` | None | Selected machine geometry and public capabilities. |
 | `get_app_status` | None | App, edition and available-update summaries. |
 | `list_material_recipes` | None | User-saved recipes, without universal material-setting claims. |
 | `review_job` | None | Current review warnings and exact-job Frame completion; no execution. |
+| `get_workspace_preview` | None | Opt-in bounded PNG design preview; standard image content and MCP Apps panel. |
+| `list_fonts` | None | Bundled font IDs, names, styles and outline/single-line geometry; no native font files. |
+| `get_text` | `artworkId` | Opt-in ordinary text wording and six editable text fields. |
 | `set_selection` | `artworkIds` | Empty array clears selection. |
-| `add_text` | `xMm`, `yMm`, `widthMm`, `text`, `fontSizeMm` | Text is 1–4096 characters; use the existing selected font or regular default. |
+| `add_text` | `xMm`, `yMm`, `widthMm`, `text`, `fontSizeMm`, optional `fontId` | Text is 1–4096 characters; chosen bundled font or regular default. |
 | `add_rectangle` | `xMm`, `yMm`, `widthMm`, `heightMm` | Add normal rectangle artwork. |
 | `transform_artwork` | Nonempty `artworkIds`, `transform` | Relative `{type:'move',dxMm,dyMm}`, grouped-bounds `{type:'resize',widthMm,heightMm}` or grouped-centre `{type:'rotate',angleDeg}`; angle ±36000 degrees. |
 | `update_operation` | `operationId`, nonempty `patch` | Existing ordinary laser operation only: `powerPercent` 0–100, positive `speedMmPerMin` ≤100000, integer `passes` 1–1000, or `enabled` boolean. |
+| `update_text` | `artworkId`, nonempty `patch` | Ordinary text: `text`, bundled `fontId`, positive `fontSizeMm` ≤1000, `alignment` left/center/right, `lineHeight` 0.1–20 or `letterSpacing` −1–20. Spacing is a multiplier of font size. |
+| `arrange_artwork` | Nonempty `artworkIds`, `action` | Align left/center/right/top/middle/bottom, distribute horizontal/vertical centres, mirror horizontal/vertical, group, ungroup, duplicate or delete. |
+| `undo`, `redo` | Only write admission | Shared desktop history; current edit approval still required. |
+
+`arrange_artwork.action` uses `align_left`, `align_center`, `align_right`,
+`align_top`, `align_middle`, `align_bottom`, `distribute_horizontal`,
+`distribute_vertical`, `mirror_horizontal`, `mirror_vertical`, `group`,
+`ungroup`, `duplicate` or `delete`. Alignment uses the last requested artwork
+as its reference. Whole groups and dependency closures are validated before
+editing. Independent Pro copies require ordinary desktop admission and return
+`needs_pro` without a deferred copy or prompt.
+
+Text reads and previews require `canShareArtwork`, supplied by the separate
+default-off desktop sharing preference. Ordinary summaries redact operation
+names while sharing is off because auto-generated names can retain text after
+conversion to paths. Text payloads and shared labels are untrusted content.
+
+Preview output is `{revision,status,preview?,bounds?,message?}`. Ready status
+requires a PNG with at most 65536 base64 characters and dimensions 1–1024 that
+match its IHDR header. Disabled/unavailable status cannot carry pixels. The
+response includes both a standard image block and structured preview data;
+the textual block includes metadata without another copy of the image bytes.
+Unsupported artwork is reported rather than silently skipped.
+
+`review_job` uses the canonical current prepared-job owner or read-only
+compilation, fenced to document, selection/output scope, placement and current
+machine/camera observations. Summary counts are workspace totals, while time,
+bounds and warnings describe the scoped prepared output. Preview bounds use
+design coordinates; review bounds use output coordinates. Compilation
+readiness and spatial Frame completion are independent facts. No review read
+approves, Frames, starts or dispatches output.
+
+The static `ui://kerfdesk/workspace/v1.html` resource uses
+`text/html;profile=mcp-app`. Only the preview tool advertises
+`_meta.ui.resourceUri`; enclosing OAuth metadata is retained. The component
+initializes the MCP Apps host bridge and calls tools through `postMessage`,
+with no independent network or file access. Its external connect/resource
+allowlists are empty. UI permission hints grant no authority. Non-UI hosts
+still receive the normal image tool result.
 
 `input-schemas.ts` exports `mcpInputSchemas`, `KerfDeskMcpCommand` and
 `KerfDeskMcpArgs<C>`. `output-schemas.ts` exports `mcpOutputSchemas` and
@@ -63,12 +105,14 @@ does not match these SDK v2 packages. No OpenAI API key or API call is required
 by this implementation. Clients and remote connectivity have their own setup
 and availability requirements.
 
-Primary sources checked 1 October 2026:
+Primary sources checked 4 October 2026:
 
 - [Official TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 - [SDK tools](https://ts.sdk.modelcontextprotocol.io/v2/servers/tools.html)
 - [SDK stdio serving](https://ts.sdk.modelcontextprotocol.io/v2/serving/stdio.html)
 - [MCP tool protocol](https://modelcontextprotocol.io/specification/2026-07-28/server/tools)
+- [OpenAI ChatGPT UI guide](https://developers.openai.com/plugins/build/chatgpt-ui)
+- [MCP resources](https://modelcontextprotocol.io/specification/2026-07-28/server/resources)
 - [WebSocket library](https://github.com/websockets/ws)
 
 Protocol tests connect the official client through actual SDK transports and

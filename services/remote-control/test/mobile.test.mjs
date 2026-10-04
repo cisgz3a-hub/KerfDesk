@@ -44,7 +44,13 @@ function syntheticDesktop(desktop, commands, suppliedOperations) {
         operations: structuredClone(operations),
         totalArtwork: 1,
         totalOperations: operations.length,
+        permissions: { canEdit: true, artworkSharingEnabled: false },
+        history: { canUndo: false, canRedo: false },
       };
+    else if (name === 'get_workspace_preview')
+      result = { revision: `audit-${revision}`, status: 'disabled' };
+    else if (name === 'list_fonts')
+      result = { revision: `audit-${revision}`, fonts: [], total: 0, truncated: false };
     else if (name === 'get_app_status')
       result = {
         revision: `audit-${revision}`,

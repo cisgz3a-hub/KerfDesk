@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import { type KerfDeskMcpCommand, MCP_MAX_ITEMS } from './input-schemas.js';
+import {
+  MCP_TEXT_FIELDS,
+  mcpAuthoringOutputSchemas,
+  mcpHistorySchema,
+  mcpPermissionsSchema,
+} from './authoring-schemas.js';
 
 const id = z.string().min(1).max(128);
 const label = z.string().max(512);
@@ -26,9 +32,10 @@ export const mcpWriteResultSchema = z.object({
   selection: z.array(id).max(MCP_MAX_ITEMS).optional(),
   operationId: id.optional(),
   changedFields: z
-    .array(z.enum(['powerPercent', 'speedMmPerMin', 'passes', 'enabled']))
-    .max(4)
+    .array(z.enum(['powerPercent', 'speedMmPerMin', 'passes', 'enabled', ...MCP_TEXT_FIELDS]))
+    .max(10)
     .optional(),
+  history: mcpHistorySchema.optional(),
   message: z.string().max(2048).optional(),
 });
 
@@ -65,6 +72,8 @@ export const mcpOutputSchemas = {
     totalArtwork: count,
     totalOperations: count,
     truncated: z.boolean(),
+    history: mcpHistorySchema.optional(),
+    permissions: mcpPermissionsSchema.optional(),
   }),
   get_machine: z.object({
     revision,
@@ -116,6 +125,7 @@ export const mcpOutputSchemas = {
     revision,
     status: z.enum(['ready', 'unavailable', 'preparing']),
     mode,
+    message: z.string().max(2048).optional(),
     summary: z
       .object({
         artworkCount: count,
@@ -141,6 +151,11 @@ export const mcpOutputSchemas = {
   add_rectangle: mcpWriteResultSchema,
   transform_artwork: mcpWriteResultSchema,
   update_operation: mcpWriteResultSchema,
+  update_text: mcpWriteResultSchema,
+  arrange_artwork: mcpWriteResultSchema,
+  undo: mcpWriteResultSchema,
+  redo: mcpWriteResultSchema,
+  ...mcpAuthoringOutputSchemas,
 } as const;
 
 export type KerfDeskMcpResult<C extends KerfDeskMcpCommand> = z.output<

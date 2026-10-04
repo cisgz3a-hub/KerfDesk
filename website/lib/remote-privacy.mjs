@@ -12,11 +12,21 @@ export function remotePrivacy() {
     <p>
       Approved requests and responses pass through this service. Responses contain bounded artwork
       and operation summaries, machine limits, edition and update status, and material recipes.
-      Editing clients can change supported artwork and ordinary laser operation settings. They
-      cannot run a machine, send console commands, start a job or read arbitrary files. Licence and
-      payment credentials, serial-port identities, saved file paths and source artwork payloads are
-      excluded. An MCP client may also send these summaries to its AI provider under that provider's
-      privacy terms. Remote access does not upload or synchronize complete project files.
+      Editing clients can change supported artwork and ordinary laser operation settings, including
+      text, layout and the shared Undo/Redo history. They cannot run a machine, send console
+      commands, start a job or read arbitrary files. Licence and payment credentials, serial-port
+      identities, saved file paths and complete project files are excluded.
+    </p>
+    <p>
+      A separate setting,
+      <strong>Share artwork previews and text with approved phones and MCP apps</strong>, starts
+      turned off. If you enable it on the PC, approved clients can request a bounded PNG artwork
+      preview and existing text contents. Pairing or granting editing permission alone does not
+      enable sharing. Operation labels and artwork-derived warning wording are hidden while sharing
+      is off because they can contain the design's text. An MCP client may send approved summaries,
+      shared previews and text to its AI provider under that provider's privacy terms. Turning
+      sharing off prevents later preview/text reads, but cannot retrieve content already received by
+      a client. Remote access does not synchronize complete project files.
     </p>
     <p>
       The computer saves its remote identity, opt-in and credentials in a separate file encrypted

@@ -1,8 +1,12 @@
 import type { RemoteWriteCommand, RemoteReadCommand, RemoteWrite } from './types';
+import { validTextPatch } from './text-validation';
 import { RemoteFault } from './fault';
 
 const READS = new Set([
   'get_workspace',
+  'get_workspace_preview',
+  'list_fonts',
+  'get_text',
   'get_machine',
   'get_app_status',
   'list_material_recipes',
@@ -14,11 +18,19 @@ const WRITES = new Set([
   'add_rectangle',
   'transform_artwork',
   'update_operation',
+  'update_text',
+  'arrange_artwork',
+  'undo',
+  'redo',
 ]);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 type RecordValue = Record<string, unknown>;
 export type ValidatedCommand =
-  | { readonly command: RemoteReadCommand; readonly args: Record<string, never> }
+  | {
+      readonly command: Exclude<RemoteReadCommand, 'get_text'>;
+      readonly args: Record<string, never>;
+    }
+  | { readonly command: 'get_text'; readonly args: { readonly artworkId: string } }
   | RemoteWrite;
 
 export function record(value: unknown): value is RecordValue {
@@ -35,7 +47,7 @@ export function finite(value: unknown, min: number, max: number): value is numbe
 export function identifier(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= 128;
 }
-function keys(value: RecordValue, expected: readonly string[]): boolean {
+export function keys(value: RecordValue, expected: readonly string[]): boolean {
   return (
     Object.keys(value).length === expected.length &&
     expected.every((key) => Object.hasOwn(value, key))
@@ -59,7 +71,9 @@ export function validateCommand(command: string, args: unknown): ValidatedComman
   if (!READS.has(command) && !WRITES.has(command)) throw new RemoteFault('unsupported_command');
   if (!record(args)) throw new RemoteFault('invalid_arguments');
   const valid = READS.has(command)
-    ? keys(args, [])
+    ? command === 'get_text'
+      ? keys(args, ['artworkId']) && identifier(args['artworkId'])
+      : keys(args, [])
     : validWrite(command as RemoteWriteCommand, args);
   if (!valid) throw new RemoteFault('invalid_arguments');
   // Detach from callers before any async font work or dedup bookkeeping.
@@ -72,6 +86,10 @@ const WRITE_FIELDS: Record<RemoteWriteCommand, readonly string[]> = {
   add_text: ['xMm', 'yMm', 'widthMm', 'text', 'fontSizeMm'],
   transform_artwork: ['artworkIds', 'transform'],
   update_operation: ['operationId', 'patch'],
+  update_text: ['artworkId', 'patch'],
+  arrange_artwork: ['artworkIds', 'action'],
+  undo: [],
+  redo: [],
 };
 function validWrite(command: RemoteWriteCommand, args: RecordValue): boolean {
   if (
@@ -80,34 +98,57 @@ function validWrite(command: RemoteWriteCommand, args: RecordValue): boolean {
     args['expectedRevision'].length > 200 ||
     typeof args['requestId'] !== 'string' ||
     !UUID.test(args['requestId']) ||
-    !keys(args, [...admissionKeys, ...WRITE_FIELDS[command]])
+    !keys(args, [
+      ...admissionKeys,
+      ...WRITE_FIELDS[command],
+      ...(command === 'add_text' && Object.hasOwn(args, 'fontId') ? ['fontId'] : []),
+    ])
   )
     return false;
   return writeValues(command, args);
 }
 function writeValues(command: RemoteWriteCommand, args: RecordValue): boolean {
-  switch (command) {
-    case 'set_selection':
-      return ids(args['artworkIds']);
-    case 'add_rectangle':
-      return positionAndWidth(args) && size(args['heightMm']);
-    case 'add_text':
-      return textValues(args);
-    case 'transform_artwork':
-      return ids(args['artworkIds'], 1) && validTransform(args['transform']);
-    case 'update_operation':
-      return identifier(args['operationId']) && validPatch(args['patch']);
-  }
+  return WRITE_VALUES[command](args);
 }
+const WRITE_VALUES: Record<RemoteWriteCommand, (args: RecordValue) => boolean> = {
+  set_selection: (args) => ids(args['artworkIds']),
+  add_rectangle: (args) => positionAndWidth(args) && size(args['heightMm']),
+  add_text: textValues,
+  transform_artwork: (args) => ids(args['artworkIds'], 1) && validTransform(args['transform']),
+  update_operation: (args) => identifier(args['operationId']) && validPatch(args['patch']),
+  update_text: (args) => identifier(args['artworkId']) && validTextPatch(args['patch']),
+  arrange_artwork: (args) =>
+    ids(args['artworkIds'], 1) && ARRANGE_ACTIONS.has(args['action'] as string),
+  undo: () => true,
+  redo: () => true,
+};
 function textValues(args: RecordValue): boolean {
   return (
     positionAndWidth(args) &&
     typeof args['text'] === 'string' &&
     args['text'].length > 0 &&
     args['text'].length <= 4096 &&
-    finite(args['fontSizeMm'], Number.MIN_VALUE, 1000)
+    finite(args['fontSizeMm'], Number.MIN_VALUE, 1000) &&
+    (args['fontId'] === undefined || identifier(args['fontId']))
   );
 }
+
+const ARRANGE_ACTIONS = new Set([
+  'align_left',
+  'align_center',
+  'align_right',
+  'align_top',
+  'align_middle',
+  'align_bottom',
+  'distribute_horizontal',
+  'distribute_vertical',
+  'mirror_horizontal',
+  'mirror_vertical',
+  'group',
+  'ungroup',
+  'duplicate',
+  'delete',
+]);
 function positionAndWidth(args: RecordValue): boolean {
   return coordinate(args['xMm']) && coordinate(args['yMm']) && size(args['widthMm']);
 }

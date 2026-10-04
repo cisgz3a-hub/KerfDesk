@@ -1,0 +1,170 @@
+import {
+  $,
+  bindForm,
+  createFontPickers,
+  number,
+  numbers,
+  positive,
+  selectedIds,
+} from './control-model.js';
+import { loadOperation } from './control-workspace.js';
+
+function selection() {
+  const artworkIds = selectedIds();
+  if (!artworkIds.length) throw new Error('Select artwork in the Artwork tab first.');
+  return artworkIds;
+}
+
+function font(form) {
+  return form.elements.fontId.value ? { fontId: form.elements.fontId.value } : {};
+}
+
+function textPatch(form, original) {
+  const values = {
+    text: form.elements.text.value,
+    ...font(form),
+    fontSizeMm: positive(form, 'fontSizeMm', 1000),
+    alignment: form.elements.alignment.value,
+    lineHeight: number(form, 'lineHeight', 0.1, 20),
+    letterSpacing: number(form, 'letterSpacing', -1, 20),
+  };
+  const patch = Object.fromEntries(
+    Object.entries(values).filter(([name, value]) => value !== original[name]),
+  );
+  if (!Object.keys(patch).length) throw new Error('There are no text changes to apply.');
+  return patch;
+}
+
+function bindAuthoring(update, edit) {
+  update('#text-form', (form) =>
+    edit('add_text', {
+      text: form.elements.text.value,
+      ...font(form),
+      ...numbers(form, ['xMm', 'yMm']),
+      widthMm: positive(form, 'widthMm'),
+      fontSizeMm: positive(form, 'fontSizeMm', 1000),
+    }),
+  );
+  update('#rectangle-form', (form) =>
+    edit('add_rectangle', {
+      ...numbers(form, ['xMm', 'yMm']),
+      widthMm: positive(form, 'widthMm'),
+      heightMm: positive(form, 'heightMm'),
+    }),
+  );
+  update('#move-form', (form) =>
+    edit('transform_artwork', {
+      artworkIds: selection(),
+      transform: { type: 'move', dxMm: number(form, 'dxMm'), dyMm: number(form, 'dyMm') },
+    }),
+  );
+  update('#rotate-form', (form) =>
+    edit('transform_artwork', {
+      artworkIds: selection(),
+      transform: { type: 'rotate', angleDeg: number(form, 'angleDeg', -3600, 3600) },
+    }),
+  );
+  update('#arrange-form', (form) =>
+    edit('arrange_artwork', {
+      artworkIds: selection(),
+      action: form.elements.action.value,
+    }),
+  );
+}
+
+export function bindEditors({ action, edit, command, getWorkspace }) {
+  const fonts = createFontPickers();
+  let loadedTextId = null;
+  let loadedRevision = null;
+  let loadedText = null;
+  const update = (id, callback) => bindForm(id, action, callback);
+  bindAuthoring(update, edit);
+  update('#text-edit-form', (form) => {
+    if (
+      loadedTextId !== $('#text-artwork-list').value ||
+      loadedRevision !== getWorkspace()?.revision
+    )
+      throw new Error('Load this text from the PC before editing it.');
+    return edit('update_text', { artworkId: loadedTextId, patch: textPatch(form, loadedText) });
+  });
+  bindOperation(update, edit);
+  $('#operation-list').addEventListener('change', () => loadOperation(getWorkspace()));
+  $('#text-artwork-list').addEventListener('change', clearText);
+  $('#load-text').addEventListener('click', () => {
+    void action(loadText);
+  });
+  $('#save-selection').addEventListener('click', () => {
+    void action(() => edit('set_selection', { artworkIds: selectedIds() }));
+  });
+  for (const name of ['undo', 'redo'])
+    $('#' + name).addEventListener('click', () => {
+      void action(() => edit(name, {}));
+    });
+
+  function clearText() {
+    loadedTextId = null;
+    loadedRevision = null;
+    loadedText = null;
+    $('#text-edit-form').reset();
+    $('#text-editor').disabled = true;
+    $('#text-load-status').textContent = 'Load the selected text from the PC before editing.';
+  }
+  async function loadText() {
+    const artworkId = $('#text-artwork-list').value;
+    if (!artworkId) throw new Error('There is no editable text in this workspace.');
+    const before = getWorkspace()?.revision;
+    const value = await command('get_text', { artworkId });
+    if (value.revision !== before || getWorkspace()?.revision !== before)
+      throw new Error('The workspace changed. Refresh before loading the text again.');
+    validateText(value, artworkId);
+    const form = $('#text-edit-form');
+    for (const name of ['text', 'fontSizeMm', 'alignment', 'lineHeight', 'letterSpacing'])
+      form.elements[name].value = value[name];
+    fonts.choose(form, value.fontId);
+    loadedTextId = artworkId;
+    loadedRevision = value.revision;
+    loadedText = value;
+    $('#text-editor').disabled = false;
+    $('#text-load-status').textContent =
+      'Text loaded from the PC. Changes apply when you choose Update text.';
+  }
+  return {
+    setFonts: (value) => fonts.set(value),
+    reset() {
+      clearText();
+      fonts.set(null);
+    },
+    workspaceChanged() {
+      if (loadedRevision !== getWorkspace()?.revision) clearText();
+    },
+  };
+}
+
+function validateText(value, artworkId) {
+  if (
+    value.artworkId !== artworkId ||
+    typeof value.text !== 'string' ||
+    value.text.length > 4096 ||
+    typeof value.fontId !== 'string' ||
+    value.fontId.length > 128 ||
+    !['left', 'center', 'right'].includes(value.alignment) ||
+    ![value.fontSizeMm, value.lineHeight, value.letterSpacing].every(Number.isFinite)
+  )
+    throw new Error('This text cannot be edited here. Use the PC.');
+}
+
+function bindOperation(update, edit) {
+  update('#operation-form', (form) => {
+    const patch = { enabled: form.elements.enabled.checked };
+    if (form.elements.powerPercent.value.trim())
+      patch.powerPercent = number(form, 'powerPercent', 0, 100);
+    if (form.elements.speedMmPerMin.value.trim())
+      patch.speedMmPerMin = positive(form, 'speedMmPerMin');
+    if (form.elements.passes.value.trim()) {
+      const passes = number(form, 'passes', 1, 1000);
+      if (!Number.isInteger(passes)) throw new Error('Passes must be a whole number.');
+      patch.passes = passes;
+    }
+    return edit('update_operation', { operationId: form.elements.operationId.value, patch });
+  });
+}

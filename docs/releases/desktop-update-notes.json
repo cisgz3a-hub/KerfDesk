@@ -3,10 +3,10 @@
   "sinceSourceSha": "c998b4d82971fdacfbb1e2d36cc93c2d30080245",
   "highlights": [
     "Trying Start during a positioning mark keeps your completed Frame ready for the job.",
-    "Fixed trial time returning after a restart and a small clock correction.",
-    "Fixed number boxes that stayed invalid after their value was restored.",
+    "Fixed trial time returning after restart and number boxes staying invalid after their value was restored.",
     "Image edits stay with their file, and side-panel controls remain reachable in small windows.",
-    "Save and machine setup dialogs keep newer projects and drafts intact.",
-    "Dialogs keep keyboard focus and preserve text during character selection."
+    "Dialogs preserve newer projects, drafts, keyboard focus and text during character selection.",
+    "Paired phones and MCP apps can edit text and fonts, arrange artwork, and use desktop Undo and Redo.",
+    "Added optional shared artwork previews and current job review to Phone & MCP."
   ]
 }

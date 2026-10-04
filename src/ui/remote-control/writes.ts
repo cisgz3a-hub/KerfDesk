@@ -6,6 +6,8 @@ import type { RemoteAppStore, RemoteOperationPatch, RemoteWrite } from './types'
 import { RemoteFault } from './fault';
 import { editableArtwork, prepareTransforms } from './transforms';
 import { prepareRemoteText } from './text';
+import { editableText, prepareTextEdit } from './text-edit';
+import { applyHistory, prepareArrange } from './arrange';
 import { publicIdentifier, selectedIds } from './projections';
 
 export async function applyRemoteWrite(
@@ -44,6 +46,25 @@ export async function applyRemoteWrite(
     }
     case 'update_operation':
       return commit(() => updateOperation(state, write.args.operationId, write.args.patch));
+    case 'update_text': {
+      const object = editableText(state, write.args.artworkId);
+      const prepared = await prepareTextEdit(state, object, write.args.patch, signal);
+      return commit(() => {
+        if (prepared.changedFields.length > 0)
+          store.getState().upsertTextObject(prepared.object, undefined, { placement: 'canvas' });
+        return {
+          changedArtworkIds: prepared.changedFields.length > 0 ? [object.id] : [],
+          changedFields: prepared.changedFields,
+        };
+      });
+    }
+    case 'arrange_artwork': {
+      const action = prepareArrange(state, store, write.args.artworkIds, write.args.action);
+      return commit(action);
+    }
+    case 'undo':
+    case 'redo':
+      return commit(() => applyHistory(state, store, write.command));
   }
 }
 function requireLaser(state: AppState): void {

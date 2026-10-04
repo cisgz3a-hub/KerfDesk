@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RemoteControlOptions, RemoteCommandResult } from '../remote-control/types';
 import { RemoteRendererSession } from './renderer-session';
+import { preparedJobReview } from './prepared-job-review';
+import { setArtworkSharingEnabled } from './artwork-sharing';
 import {
   REMOTE_REVOKE_EVENT,
   setRemoteSession,
@@ -58,6 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   setRemoteSession(null);
   useRemoteAccessStore.setState({ status: null, message: null, busy: false });
+  setArtworkSharingEnabled(false);
   polls = [];
   calls = [];
   sessions = [];
@@ -143,7 +146,7 @@ describe('renderer connection owns queued work and cancellation', () => {
     expect(captured.execute.mock.calls.every((call) => call[2]!.signal!.aborted)).toBe(true);
   });
 
-  it('checks the current client grant at execution and does not wire fabricated job review', async () => {
+  it('checks the current client grant and wires the actual prepared review owner', async () => {
     let permission: boolean | undefined;
     captured.execute.mockImplementationOnce(async () => {
       permission = captured.options!.canWrite();
@@ -152,7 +155,8 @@ describe('renderer connection owns queued work and cancellation', () => {
     polls.push({ status, requests: [envelope('read-only', false)], cancelled: [] });
     await start();
     expect(permission).toBe(false);
-    expect(captured.options!.getReview).toBeUndefined();
+    expect(captured.options!.getReview).toBe(preparedJobReview);
+    expect(captured.options!.canShareArtwork?.()).toBe(false);
     expect(captured.options!.canWrite()).toBe(false);
   });
 

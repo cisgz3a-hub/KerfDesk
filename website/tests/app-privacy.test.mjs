@@ -30,7 +30,7 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   const document = expected.get('index.html').toString('utf8');
   const text = textContent(document);
   assert.match(document, /href="https:\/\/kerfdesk.com\/privacy\/"/);
-  assert.match(document, /datetime="2026-10-01"/);
+  assert.match(document, /datetime="2026-10-04"/);
   assert.match(text, /No cookies on this page/);
   assert.doesNotMatch(text, /This website sets no cookies/);
   assert.match(text, /grouped by date, app version, platform and request country/);

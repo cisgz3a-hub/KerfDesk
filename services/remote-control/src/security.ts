@@ -8,7 +8,7 @@ import {
 } from './protocol.js';
 
 export const DEFAULT_CSP =
-  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
+  "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'self'";
 
 export function randomSecret(bytes = 32): string {
   const value = crypto.getRandomValues(new Uint8Array(bytes));
