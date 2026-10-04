@@ -1,5 +1,59 @@
 /** DOM-only controls and overlays shared by phone and portable MCP views. */
 export class TouchView {
+  bindCanvasEvents() {
+    this.listen(this.surface, 'pointerdown', (event) => this.down(event));
+    this.listen(this.surface, 'pointermove', (event) => this.move(event));
+    this.listen(this.surface, 'pointerup', (event) => this.up(event));
+    this.listen(this.surface, 'pointercancel', () =>
+      this.reset('Gesture cancelled. Nothing was applied.'),
+    );
+    this.listen(
+      document,
+      'pointerdown',
+      (event) => {
+        if (
+          this.gesture &&
+          event.pointerId !== this.gesture.id &&
+          !this.surface.contains(event.target)
+        )
+          this.reset('Gesture cancelled outside the canvas. Nothing was applied.');
+      },
+      true,
+    );
+    this.listen(this.surface, 'lostpointercapture', (event) => {
+      if (
+        this.gesture?.id === event.pointerId ||
+        (this.viewport.pointers.has(event.pointerId) &&
+          !this.surface.hasPointerCapture(event.pointerId))
+      )
+        this.reset('Gesture cancelled. Nothing was applied.');
+    });
+    this.listen(this.surface, 'keydown', (event) => this.key(event));
+    this.listen(
+      window,
+      'scroll',
+      () => {
+        if (this.gesture) this.reset('View moved. Draw or drag again.');
+        this.paint();
+      },
+      true,
+    );
+    this.watchImage();
+    this.listen(document, 'visibilitychange', () => {
+      if (document.hidden) this.reset('Draft cancelled while this page was hidden.');
+    });
+    this.listen(window, 'pagehide', () => this.reset());
+    this.resize = new ResizeObserver(() => {
+      const rect = this.geometry.imageRect(this.image);
+      if (
+        this.gesture &&
+        (rect?.width !== this.gesture.rect.width || rect?.height !== this.gesture.rect.height)
+      )
+        this.reset('View resized. Draw or drag again.');
+      this.paint();
+    });
+    this.resize.observe(this.image);
+  }
   watchImage() {
     this.listen(this.image, 'load', () => this.update());
     this.listen(this.image, 'error', () => this.update());
@@ -32,7 +86,9 @@ export class TouchView {
       button.type = 'button';
       button.dataset.touchTool = mode;
       this.listen(button, 'click', () => {
-        this.reset();
+        const keepDraft =
+          this.draft && !this.gesture && (mode === 'pan' || mode === this.draft.mode);
+        if (!keepDraft) this.reset();
         this.mode = mode;
         this.update();
       });

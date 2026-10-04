@@ -95,6 +95,7 @@ export function renderPreview(value, revision) {
   image.src = 'data:image/png;base64,' + value.preview.data;
   image.hidden = false;
   message.textContent =
+    safeText(value.message) ||
     'Design preview from your PC. Machine position and toolpaths stay in the PC view.';
   const box = value.bounds;
   if (box && [box.xMm, box.yMm, box.widthMm, box.heightMm].every(Number.isFinite))

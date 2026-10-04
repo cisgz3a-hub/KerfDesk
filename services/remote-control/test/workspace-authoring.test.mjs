@@ -83,7 +83,7 @@ for (const modern of [false, true]) {
       );
       const tools = (await client.listTools()).tools;
       const preview = tools.find((tool) => tool.name === 'get_workspace_preview');
-      assert.equal(preview._meta.ui.resourceUri, 'ui://kerfdesk/workspace/v4.html');
+      assert.equal(preview._meta.ui.resourceUri, 'ui://kerfdesk/workspace/v5.html');
       assert.deepEqual(preview._meta.securitySchemes, [
         { type: 'oauth2', scopes: ['kerfdesk:read'] },
       ]);

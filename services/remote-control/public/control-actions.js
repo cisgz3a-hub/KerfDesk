@@ -6,10 +6,13 @@ import { pairingDeadline } from './pairing.js';
 export function bindSessionActions(options) {
   const { action, notice, touch, scanner } = options;
   for (const tab of document.querySelectorAll('button[data-view]'))
-    tab.addEventListener('click', () => touch.reset());
-  $('#retry-edit').addEventListener('click', () => {
-    void action(options.performPendingEdit);
-  });
+    tab.addEventListener('click', () => {
+      if (!['artwork', 'edit'].includes(tab.dataset.view)) touch.reset();
+    });
+  for (const button of document.querySelectorAll('#retry-edit,#editor-retry'))
+    button.addEventListener('click', () => {
+      void action(options.performPendingEdit);
+    });
   $('#refresh').addEventListener('click', () => {
     touch.reset();
     void action(async () => {

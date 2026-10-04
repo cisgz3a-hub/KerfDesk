@@ -80,7 +80,7 @@ export function touchRead(state, name, args) {
   return readResult(state, name, args);
 }
 export async function compactTouchScript() {
-  const modules = ['geometry', 'view', ''];
+  const modules = ['geometry', 'viewport', 'view', ''];
   let source = '';
   for (const suffix of modules)
     source +=
@@ -99,11 +99,13 @@ export async function touchExports() {
   );
   return import('data:text/javascript,' + encodeURIComponent(source));
 }
-export async function loadTouch(browser, kind, state = touchFixture(), width = 390) {
+export async function loadTouch(browser, kind, state = touchFixture(), width = 390, options = {}) {
   const loaded =
     kind === 'phone'
       ? await phonePage(browser, state, width, { clock: true })
-      : await touchAppPage(browser, state, width);
+      : await touchAppPage(browser, state, width, options);
+  if (kind === 'phone' && options.height)
+    await loaded.page.setViewportSize({ width, height: options.height });
   loaded.surface = kind === 'phone' ? loaded.page : loaded.frame;
   loaded.image = kind === 'phone' ? '#workspace-preview' : '#preview';
   await loaded.surface.locator('[data-touch-tool=rectangle]').waitFor();
@@ -113,7 +115,7 @@ export async function loadTouch(browser, kind, state = touchFixture(), width = 3
     );
   return loaded;
 }
-async function touchAppPage(browser, state, width) {
+async function touchAppPage(browser, state, width, options = {}) {
   const { outputFiles } = await build({
     entryPoints: [
       new URL('../../../electron/mcp/workspace-ui.ts', import.meta.url).pathname.replace(
@@ -130,7 +132,7 @@ async function touchAppPage(browser, state, width) {
     'data:text/javascript,' + encodeURIComponent(outputFiles[0].text)
   );
   const context = await browser.newContext({
-    viewport: { width, height: 844 },
+    viewport: { width, height: options.height ?? 844 },
     isMobile: true,
     hasTouch: true,
   });
@@ -180,7 +182,10 @@ async function touchAppPage(browser, state, width) {
     if (url.pathname === '/host')
       return route.fulfill({
         contentType: 'text/html',
-        body: '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0"><iframe id="widget" src="/widget" style="width:100%;height:844px;display:block;border:0"></iframe><script>const frame=document.getElementById("widget");window.addEventListener("message",async event=>{if(event.source!==frame.contentWindow||!event.data.id)return;const result=await window.touchRequest(event.data);if(result!==null)frame.contentWindow.postMessage({jsonrpc:"2.0",id:event.data.id,result},"*");});</script></body></html>',
+        body:
+          '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0"><iframe id="widget" src="/widget" style="width:100%;height:' +
+          (options.height ?? 844) +
+          'px;display:block;border:0"></iframe><script>const frame=document.getElementById("widget");window.addEventListener("message",async event=>{if(event.source!==frame.contentWindow||!event.data.id)return;const result=await window.touchRequest(event.data);if(result!==null)frame.contentWindow.postMessage({jsonrpc:"2.0",id:event.data.id,result},"*");});</script></body></html>',
       });
     return route.abort();
   });
@@ -192,10 +197,15 @@ async function touchAppPage(browser, state, width) {
 export async function scenePoint(loaded, xMm, yMm) {
   const viewport = loaded.state.viewport;
   const box = await loaded.surface.locator(loaded.image).boundingBox();
-  const size = Math.min(box.width, box.height);
+  const natural = await loaded.surface
+    .locator(loaded.image)
+    .evaluate((image) => ({ width: image.naturalWidth, height: image.naturalHeight }));
+  const scale = Math.min(box.width / natural.width, box.height / natural.height);
+  const width = natural.width * scale,
+    height = natural.height * scale;
   return {
-    x: box.x + (box.width - size) / 2 + ((xMm - viewport.xMm) * size) / viewport.widthMm,
-    y: box.y + (box.height - size) / 2 + ((yMm - viewport.yMm) * size) / viewport.heightMm,
+    x: box.x + (box.width - width) / 2 + ((xMm - viewport.xMm) * width) / viewport.widthMm,
+    y: box.y + (box.height - height) / 2 + ((yMm - viewport.yMm) * height) / viewport.heightMm,
   };
 }
 export async function drag(loaded, from, to, steps = 5) {

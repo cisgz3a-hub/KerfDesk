@@ -3,7 +3,7 @@ import { $, bindForm, continueToMcp, errorMessages, safeText } from './control-m
 import { bindEditors } from './control-edit.js';
 import { bindMachine } from './control-machine.js';
 import { bindDrafts } from './control-drafts.js';
-import { bindWorkspaceLive, bindPreviewZoom, serialCommand } from './control-live.js';
+import { bindWorkspaceLive, serialCommand } from './control-live.js';
 import { bindPairingScanner } from './control-scanner.js';
 import { bindTouchCanvas } from './control-touch.js';
 import { bindSessionActions } from './control-actions.js';
@@ -32,7 +32,6 @@ let live = null;
 let touch = null;
 const scanner = bindPairingScanner();
 const drafts = bindDrafts(() => workspace?.revision);
-bindPreviewZoom();
 function notice(message, error = false) {
   const target = $('#notice');
   target.textContent = safeText(message);

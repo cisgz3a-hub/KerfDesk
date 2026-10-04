@@ -108,11 +108,6 @@
           ><button type="button" data-view="machine" aria-pressed="false">Machine</button
           ><button type="button" data-view="details" aria-pressed="false">Settings</button>
         </nav>
-        <div class="history-controls" id="history-controls" data-design hidden>
-          <button class="secondary" id="undo" type="button" disabled>Undo</button>
-          <button class="secondary" id="redo" type="button" disabled>Redo</button>
-          <span class="muted" id="history-status">Changes share the PC’s undo history.</span>
-        </div>
         <button id="retry-edit" type="button" hidden>Retry last request</button>
         <section class="card" id="readonly-note" hidden>
           <h2 id="readonly-title">Viewing only</h2>
@@ -126,156 +121,245 @@
             Discard drafts and refresh
           </button>
         </p>
-        <section class="card preview-card" data-panel="artwork" aria-labelledby="preview-heading">
-          <div class="preview-heading">
-            <h2 id="preview-heading">Your artwork</h2>
-            <button type="button" data-view="edit" class="secondary">Edit</button>
-          </div>
-          <div id="touch-tools"></div>
-          <div class="preview-surface" id="preview-surface">
-            <img id="workspace-preview" alt="Artwork preview from your desktop" hidden />
-          </div>
-          <p id="preview-message" class="muted">Connect to your PC to view its workspace.</p>
-          <div class="preview-tools" aria-label="Preview zoom">
-            <button id="zoom-out" type="button" class="secondary" aria-label="Zoom out">−</button
-            ><button id="zoom-fit" type="button" class="secondary">Fit</button
-            ><button id="zoom-in" type="button" class="secondary" aria-label="Zoom in">+</button>
-          </div>
-          <p id="preview-bounds" class="muted"></p>
-        </section>
-        <section class="card" data-panel="artwork">
-          <h2>Choose artwork</h2>
-          <p class="muted">Tick the items you want to work with.</p>
-          <div id="artwork-list" class="item-list"></div>
-          <p class="muted" id="selection-status" aria-live="polite"></p>
-          <p class="muted" id="truncated" hidden></p>
-          <div class="selection-actions">
-            <button type="button" id="save-selection" data-edit hidden>Use this selection</button>
-            <button type="button" id="edit-selected-text" class="secondary" hidden>
-              Edit selected text
-            </button>
-          </div>
-        </section>
-        <div data-panel="edit" hidden>
-          <div id="edit-forms" hidden>
-            <p class="muted">
-              Choose a task below. Changes are saved to the open design on your PC.
-            </p>
-            <details class="card task" id="edit-text-task">
-              <summary>Edit text</summary>
-              <p id="text-sharing-note" class="muted" hidden>
-                Enable artwork sharing in Settings → Phone &amp; MCP on the PC to read existing
-                text.
-              </p>
-              <div id="text-source-controls">
-                <label>Choose text<select id="text-artwork-list"></select></label>
-                <button id="load-text" type="button" class="secondary separated-button">
-                  Load text from PC
+        <div class="design-workspace" data-design>
+          <section
+            class="card preview-card"
+            data-panel="artwork"
+            data-design-canvas
+            aria-labelledby="preview-heading"
+          >
+            <div class="preview-heading design-actions">
+              <h2 id="preview-heading">Your artwork</h2>
+              <div class="creation-actions" aria-label="Add artwork">
+                <button type="button" data-editor-task="add-text-task" aria-controls="editor-sheet">
+                  Add text
+                </button>
+                <button
+                  type="button"
+                  data-editor-task="rectangle-task"
+                  aria-controls="editor-sheet"
+                >
+                  Add shape
                 </button>
               </div>
-              <button id="change-text" type="button" class="secondary" hidden>
-                Choose another text
+              <button
+                type="button"
+                data-view="edit"
+                class="secondary"
+                aria-controls="editor-sheet"
+                title="Properties and design tools"
+              >
+                Edit
               </button>
-              <p class="muted" id="text-load-status">Choose text, then load it to make changes.</p>
-              <form id="text-edit-form">
-                <fieldset id="text-editor" disabled hidden>
-                  <label
-                    >Text<textarea name="text" rows="3" required maxlength="4096"></textarea>
-                  </label>
-                  <details class="advanced" id="text-fonts">
-                    <summary>Font<span class="current-font"></span></summary>
-                    <div class="font-picker">
-                      <label
-                        >Search fonts<input
-                          name="fontSearch"
-                          type="search"
-                          autocomplete="off"
-                          placeholder="Find a bundled font"
-                      /></label>
-                      <label
-                        >Font<select name="fontId" size="5">
-                          <option value="">Desktop default</option>
-                        </select></label
-                      >
-                      <span class="font-count muted" aria-live="polite"></span>
-                    </div>
-                  </details>
-                  <div class="two">
+            </div>
+            <div class="preview-surface" id="preview-surface">
+              <img id="workspace-preview" alt="Artwork preview from your desktop" hidden />
+            </div>
+            <div id="touch-tools"></div>
+            <p id="preview-message" class="muted">Connect to your PC to view its workspace.</p>
+            <div class="preview-tools" aria-label="Preview zoom">
+              <button id="zoom-out" type="button" class="secondary" aria-label="Zoom out">−</button
+              ><button id="zoom-fit" type="button" class="secondary">Fit</button
+              ><button id="zoom-in" type="button" class="secondary" aria-label="Zoom in">+</button>
+            </div>
+            <div id="history-home">
+              <div class="history-controls" id="history-controls" data-design hidden>
+                <button class="secondary" id="undo" type="button" disabled>Undo</button>
+                <button class="secondary" id="redo" type="button" disabled>Redo</button>
+                <span class="muted" id="history-status">Changes share the PC’s undo history.</span>
+              </div>
+            </div>
+            <p id="preview-bounds" class="muted"></p>
+          </section>
+          <section class="card artwork-card" data-panel="artwork">
+            <h2>Choose artwork</h2>
+            <p class="muted">Tick the items you want to work with.</p>
+            <div id="artwork-list" class="item-list"></div>
+            <p class="muted" id="selection-status" aria-live="polite"></p>
+            <p class="muted" id="truncated" hidden></p>
+            <div class="selection-actions">
+              <button type="button" id="save-selection" data-edit hidden>Use this selection</button>
+              <button type="button" id="edit-selected-text" class="secondary" hidden>
+                Edit selected text
+              </button>
+            </div>
+          </section>
+          <div
+            class="editor-sheet"
+            id="editor-sheet"
+            data-panel="edit"
+            role="region"
+            aria-labelledby="editor-heading"
+            hidden
+          >
+            <div class="sheet-heading">
+              <h2 id="editor-heading">Design tools</h2>
+              <button type="button" class="secondary" id="close-editor">Close</button>
+            </div>
+            <div id="editor-history"></div>
+            <p class="muted" id="editor-access-note" role="status" hidden></p>
+            <button type="button" id="editor-retry" hidden>Retry last request</button>
+            <div id="edit-forms" hidden>
+              <p class="muted">
+                Choose a task below. Changes are saved to the open design on your PC.
+              </p>
+              <details class="card task" id="edit-text-task">
+                <summary>Edit text</summary>
+                <p id="text-sharing-note" class="muted" hidden>
+                  Enable artwork sharing in Settings → Phone &amp; MCP on the PC to read existing
+                  text.
+                </p>
+                <div id="text-source-controls">
+                  <label>Choose text<select id="text-artwork-list"></select></label>
+                  <button id="load-text" type="button" class="secondary separated-button">
+                    Load text from PC
+                  </button>
+                </div>
+                <button id="change-text" type="button" class="secondary" hidden>
+                  Choose another text
+                </button>
+                <p class="muted" id="text-load-status">
+                  Choose text, then load it to make changes.
+                </p>
+                <form id="text-edit-form">
+                  <fieldset id="text-editor" disabled hidden>
                     <label
-                      >Text size (mm)<input
-                        name="fontSizeMm"
-                        type="text"
-                        inputmode="decimal"
-                        required
-                    /></label>
-                    <label
-                      >Text alignment<select name="alignment">
-                        <option value="left">Left</option>
-                        <option value="center">Centre</option>
-                        <option value="right">Right</option>
-                      </select></label
-                    >
-                  </div>
-                  <details class="advanced" id="text-spacing">
-                    <summary>Line and letter spacing</summary>
+                      >Text<textarea name="text" rows="3" required maxlength="4096"></textarea>
+                    </label>
+                    <details class="advanced" id="text-fonts">
+                      <summary>Font<span class="current-font"></span></summary>
+                      <div class="font-picker">
+                        <label
+                          >Search fonts<input
+                            name="fontSearch"
+                            type="search"
+                            autocomplete="off"
+                            placeholder="Find a bundled font"
+                        /></label>
+                        <label
+                          >Font<select name="fontId" size="5">
+                            <option value="">Desktop default</option>
+                          </select></label
+                        >
+                        <span class="font-count muted" aria-live="polite"></span>
+                      </div>
+                    </details>
                     <div class="two">
                       <label
-                        >Line height (× size)<input
-                          name="lineHeight"
+                        >Text size (mm)<input
+                          name="fontSizeMm"
                           type="text"
                           inputmode="decimal"
                           required
                       /></label>
                       <label
-                        >Letter spacing (× size)<input
-                          name="letterSpacing"
-                          type="text"
+                        >Text alignment<select name="alignment">
+                          <option value="left">Left</option>
+                          <option value="center">Centre</option>
+                          <option value="right">Right</option>
+                        </select></label
+                      >
+                    </div>
+                    <details class="advanced" id="text-spacing">
+                      <summary>Line and letter spacing</summary>
+                      <div class="two">
+                        <label
+                          >Line height (× size)<input
+                            name="lineHeight"
+                            type="text"
+                            inputmode="decimal"
+                            required
+                        /></label>
+                        <label
+                          >Letter spacing (× size)<input
+                            name="letterSpacing"
+                            type="text"
+                            inputmode="decimal"
+                            required
+                        /></label>
+                      </div>
+                    </details>
+                    <button type="submit">Update text</button>
+                  </fieldset>
+                </form>
+              </details>
+              <details class="card task" id="add-text-task">
+                <summary>Add new text</summary>
+                <form id="text-form">
+                  <label
+                    >Text<textarea
+                      name="text"
+                      rows="3"
+                      required
+                      maxlength="4096"
+                      placeholder="Your text"
+                    ></textarea>
+                  </label>
+                  <div class="font-picker">
+                    <label
+                      >Search fonts<input
+                        name="fontSearch"
+                        type="search"
+                        autocomplete="off"
+                        placeholder="Find a bundled font"
+                    /></label>
+                    <label
+                      >Font<select name="fontId" size="5">
+                        <option value="">Desktop default</option>
+                      </select></label
+                    >
+                    <span class="font-count muted" aria-live="polite"></span>
+                  </div>
+                  <label
+                    >Text size (mm)<input
+                      name="fontSizeMm"
+                      inputmode="decimal"
+                      type="text"
+                      value="10"
+                      required
+                  /></label>
+                  <details class="advanced" id="add-text-position">
+                    <summary>Position and width</summary>
+                    <div class="two">
+                      <label
+                        >X (mm)<input
+                          name="xMm"
                           inputmode="decimal"
+                          type="text"
+                          value="0"
+                          required /></label
+                      ><label
+                        >Y (mm)<input
+                          name="yMm"
+                          inputmode="decimal"
+                          type="text"
+                          value="0"
+                          required /></label
+                      ><label
+                        >Width (mm)<input
+                          name="widthMm"
+                          inputmode="decimal"
+                          type="text"
+                          value="50"
                           required
                       /></label>
                     </div>
                   </details>
-                  <button type="submit">Update text</button>
-                </fieldset>
-              </form>
-            </details>
-            <details class="card task" id="add-text-task">
-              <summary>Add new text</summary>
-              <form id="text-form">
-                <label
-                  >Text<textarea
-                    name="text"
-                    rows="3"
-                    required
-                    maxlength="4096"
-                    placeholder="Your text"
-                  ></textarea>
-                </label>
-                <div class="font-picker">
+                  <button>Add text</button>
+                </form>
+              </details>
+              <details class="card task" id="rectangle-task">
+                <summary>Add a rectangle or ellipse</summary>
+                <form id="rectangle-form">
                   <label
-                    >Search fonts<input
-                      name="fontSearch"
-                      type="search"
-                      autocomplete="off"
-                      placeholder="Find a bundled font"
-                  /></label>
-                  <label
-                    >Font<select name="fontId" size="5">
-                      <option value="">Desktop default</option>
+                    >Shape<select name="shapeType">
+                      <option value="rectangle">Rectangle</option>
+                      <option value="ellipse">Ellipse / circle</option>
                     </select></label
                   >
-                  <span class="font-count muted" aria-live="polite"></span>
-                </div>
-                <label
-                  >Text size (mm)<input
-                    name="fontSizeMm"
-                    inputmode="decimal"
-                    type="text"
-                    value="10"
-                    required
-                /></label>
-                <details class="advanced" id="add-text-position">
-                  <summary>Position and width</summary>
+                  <p class="muted" id="shape-availability" hidden>
+                    Use a Laser workspace and update KerfDesk on the PC to add ellipses.
+                  </p>
                   <div class="two">
                     <label
                       >X (mm)<input
@@ -296,134 +380,117 @@
                         name="widthMm"
                         inputmode="decimal"
                         type="text"
-                        value="50"
+                        value="40"
+                        required /></label
+                    ><label
+                      >Height (mm)<input
+                        name="heightMm"
+                        inputmode="decimal"
+                        type="text"
+                        value="30"
                         required
                     /></label>
                   </div>
-                </details>
-                <button>Add text</button>
-              </form>
-            </details>
-            <details class="card task" id="rectangle-task">
-              <summary>Add a rectangle</summary>
-              <form id="rectangle-form">
-                <div class="two">
+                  <button>Add rectangle</button>
+                </form>
+              </details>
+              <details class="card task" id="arrange-task">
+                <summary>Move, rotate or arrange</summary>
+                <p class="muted" id="edit-selection-status"></p>
+                <form id="move-form">
+                  <div class="two">
+                    <label
+                      >Move X (mm)<input
+                        name="dxMm"
+                        inputmode="decimal"
+                        type="text"
+                        value="0"
+                        required /></label
+                    ><label
+                      >Move Y (mm)<input
+                        name="dyMm"
+                        inputmode="decimal"
+                        type="text"
+                        value="0"
+                        required
+                    /></label>
+                  </div>
+                  <button>Move selection</button>
+                </form>
+                <form id="resize-form" class="separated">
+                  <div class="two">
+                    <label
+                      >Width (mm)<input name="widthMm" inputmode="decimal" type="text" required
+                    /></label>
+                    <label
+                      >Height (mm)<input name="heightMm" inputmode="decimal" type="text" required
+                    /></label>
+                  </div>
+                  <button>Resize selection</button>
+                </form>
+                <form id="rotate-form" class="separated">
                   <label
-                    >X (mm)<input
-                      name="xMm"
+                    >Rotation (degrees)<input
+                      name="angleDeg"
                       inputmode="decimal"
                       type="text"
                       value="0"
                       required /></label
-                  ><label
-                    >Y (mm)<input
-                      name="yMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="0"
-                      required /></label
-                  ><label
-                    >Width (mm)<input
-                      name="widthMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="40"
-                      required /></label
-                  ><label
-                    >Height (mm)<input
-                      name="heightMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="30"
-                      required
-                  /></label>
-                </div>
-                <button>Add rectangle</button>
-              </form>
-            </details>
-            <details class="card task" id="arrange-task">
-              <summary>Move, rotate or arrange</summary>
-              <p class="muted" id="edit-selection-status"></p>
-              <form id="move-form">
-                <div class="two">
+                  ><button>Rotate selection</button>
+                </form>
+                <form id="arrange-form" class="separated">
                   <label
-                    >Move X (mm)<input
-                      name="dxMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="0"
-                      required /></label
-                  ><label
-                    >Move Y (mm)<input
-                      name="dyMm"
-                      inputmode="decimal"
-                      type="text"
-                      value="0"
-                      required
-                  /></label>
-                </div>
-                <button>Move selection</button>
-              </form>
-              <form id="rotate-form" class="separated">
-                <label
-                  >Rotation (degrees)<input
-                    name="angleDeg"
-                    inputmode="decimal"
-                    type="text"
-                    value="0"
-                    required /></label
-                ><button>Rotate selection</button>
-              </form>
-              <form id="arrange-form" class="separated">
-                <label
-                  >Layout action<select name="action">
-                    <option value="align_left">Align left edges</option>
-                    <option value="align_center">Align horizontal centres</option>
-                    <option value="align_right">Align right edges</option>
-                    <option value="align_top">Align top edges</option>
-                    <option value="align_middle">Align vertical centres</option>
-                    <option value="align_bottom">Align bottom edges</option>
-                    <option value="distribute_horizontal">Space horizontal centres equally</option>
-                    <option value="distribute_vertical">Space vertical centres equally</option>
-                    <option value="mirror_horizontal">Mirror horizontally</option>
-                    <option value="mirror_vertical">Mirror vertically</option>
-                    <option value="group">Group</option>
-                    <option value="ungroup">Ungroup</option>
-                    <option value="duplicate">Duplicate</option>
-                    <option value="delete">Delete selected artwork</option>
-                  </select></label
-                >
-                <p class="muted">
-                  Choose items in Artwork first. Undo can reverse a layout change or deletion.
-                </p>
-                <button>Apply layout action</button>
-              </form>
-            </details>
-            <details class="card task" id="operation-task">
-              <summary>Power, speed and passes</summary>
-              <p class="muted">
-                Choose an existing laser operation. These settings do not start the machine.
-              </p>
-              <form id="operation-form">
-                <label
-                  >Operation<select name="operationId" id="operation-list" required></select
-                ></label>
-                <div class="two">
-                  <label
-                    >Power (%)<input name="powerPercent" inputmode="decimal" type="text" /></label
-                  ><label
-                    >Speed (mm/min)<input
-                      name="speedMmPerMin"
-                      inputmode="decimal"
-                      type="text" /></label
-                  ><label>Passes<input name="passes" inputmode="numeric" type="text" /></label
-                  ><label class="check"
-                    ><input name="enabled" type="checkbox" checked /> Enabled</label
+                    >Layout action<select name="action">
+                      <option value="align_left">Align left edges</option>
+                      <option value="align_center">Align horizontal centres</option>
+                      <option value="align_right">Align right edges</option>
+                      <option value="align_top">Align top edges</option>
+                      <option value="align_middle">Align vertical centres</option>
+                      <option value="align_bottom">Align bottom edges</option>
+                      <option value="distribute_horizontal">
+                        Space horizontal centres equally
+                      </option>
+                      <option value="distribute_vertical">Space vertical centres equally</option>
+                      <option value="mirror_horizontal">Mirror horizontally</option>
+                      <option value="mirror_vertical">Mirror vertically</option>
+                      <option value="group">Group</option>
+                      <option value="ungroup">Ungroup</option>
+                      <option value="duplicate">Duplicate</option>
+                      <option value="delete">Delete selected artwork</option>
+                    </select></label
                   >
-                </div>
-                <button>Apply settings</button>
-              </form>
-            </details>
+                  <p class="muted">
+                    Choose items in Artwork first. Undo can reverse a layout change or deletion.
+                  </p>
+                  <button>Apply layout action</button>
+                </form>
+              </details>
+              <details class="card task" id="operation-task">
+                <summary>Power, speed and passes</summary>
+                <p class="muted">
+                  Choose an existing laser operation. These settings do not start the machine.
+                </p>
+                <form id="operation-form">
+                  <label
+                    >Operation<select name="operationId" id="operation-list" required></select
+                  ></label>
+                  <div class="two">
+                    <label
+                      >Power (%)<input name="powerPercent" inputmode="decimal" type="text" /></label
+                    ><label
+                      >Speed (mm/min)<input
+                        name="speedMmPerMin"
+                        inputmode="decimal"
+                        type="text" /></label
+                    ><label>Passes<input name="passes" inputmode="numeric" type="text" /></label
+                    ><label class="check"
+                      ><input name="enabled" type="checkbox" checked /> Enabled</label
+                    >
+                  </div>
+                  <button>Apply settings</button>
+                </form>
+              </details>
+            </div>
           </div>
         </div>
         <section id="machine-panel" data-panel="machine" hidden>

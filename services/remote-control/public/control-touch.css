@@ -1,10 +1,17 @@
 .touch-surface {
   position: relative;
+  overflow: hidden !important;
+  touch-action: none !important;
+  min-height: 240px;
+  background: #f3f5f7;
 }
-.touch-surface[data-touch-mode]:not([data-touch-mode='pan']) {
-  touch-action: none;
+.touch-surface[data-touch-mode='pan'] {
+  cursor: grab;
 }
 .touch-surface img {
+  position: absolute;
+  max-width: none;
+  max-height: none !important;
   user-select: none;
   -webkit-user-drag: none;
 }
@@ -39,7 +46,7 @@
   vector-effect: non-scaling-stroke;
 }
 .touch-controls {
-  margin-top: 12px;
+  margin-top: 8px;
 }
 .touch-controls .touch-modes {
   display: grid;
@@ -65,12 +72,15 @@
   border-color: #0869b6;
 }
 .touch-controls .touch-hint {
-  margin: 10px 0;
-  font-size: 14px;
-  line-height: 1.5;
+  margin: 6px 0;
+  font-size: 12px;
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
 .touch-confirm {
+  position: sticky;
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 4;
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
@@ -79,6 +89,32 @@
   border-radius: 12px;
   background: #dff6ed;
   color: #154536;
+}
+#zoom-value {
+  min-width: 44px;
+  align-self: center;
+  text-align: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.canvas-navigation {
+  margin: 4px 0;
+  font-size: 13px;
+}
+.canvas-navigation summary {
+  min-height: 48px;
+  align-content: center;
+  cursor: pointer;
+}
+.canvas-navigation > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.canvas-navigation button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 6px;
 }
 .touch-confirm .touch-summary {
   grid-column: 1/-1;

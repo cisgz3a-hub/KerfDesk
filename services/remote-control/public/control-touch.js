@@ -1,5 +1,6 @@
 import { createTouchGeometry } from './control-touch-geometry.js';
 import { TouchView } from './control-touch-view.js';
+import { CanvasViewport } from './control-touch-viewport.js';
 
 /** A gesture is local until Apply. The owner supplies revision-fenced, idempotent edits. */
 export function bindTouchCanvas(options) {
@@ -31,49 +32,19 @@ export class TouchCanvas extends TouchView {
     this.overlay.setAttribute('aria-hidden', 'true');
     this.surface.append(this.overlay);
     this.buildControls();
-    this.listen(this.surface, 'pointerdown', (event) => this.down(event));
-    this.listen(this.surface, 'pointermove', (event) => this.move(event));
-    this.listen(this.surface, 'pointerup', (event) => this.up(event));
-    this.listen(this.surface, 'pointercancel', () =>
-      this.reset('Gesture cancelled. Nothing was applied.'),
-    );
-    this.listen(
-      document,
-      'pointerdown',
-      (event) => {
-        if (this.gesture && event.pointerId !== this.gesture.id)
-          this.reset('Use one finger to edit. The draft was cancelled.');
-      },
-      true,
-    );
-    this.listen(this.surface, 'lostpointercapture', () => {
-      if (this.gesture) this.reset('Gesture cancelled. Nothing was applied.');
-    });
-    this.listen(this.surface, 'keydown', (event) => this.key(event));
-    this.listen(
-      window,
-      'scroll',
-      () => {
-        if (this.gesture) this.reset('View moved. Draw or drag again.');
+    this.viewport = new CanvasViewport({
+      surface: this.surface,
+      image: this.image,
+      listen: (...args) => this.listen(...args),
+      changed: () => {
+        this.syncDraft(this.readiness());
         this.paint();
       },
-      true,
-    );
-    this.watchImage();
-    this.listen(document, 'visibilitychange', () => {
-      if (document.hidden) this.reset('Draft cancelled while this page was hidden.');
+      cancelStroke: () => {
+        if (this.gesture) this.reset('Stroke cancelled for navigation. Nothing was applied.', true);
+      },
     });
-    this.listen(window, 'pagehide', () => this.reset());
-    this.resize = new ResizeObserver(() => {
-      const rect = this.geometry.imageRect(this.image);
-      if (
-        this.gesture &&
-        (rect?.width !== this.gesture.rect.width || rect?.height !== this.gesture.rect.height)
-      )
-        this.reset('View resized. Draw or drag again.');
-      this.paint();
-    });
-    this.resize.observe(this.image);
+    this.bindCanvasEvents();
     this.update();
   }
   listen(target, type, callback, options) {
@@ -121,6 +92,7 @@ export class TouchCanvas extends TouchView {
   }
   update() {
     if (this.disposed) return;
+    this.viewport.sync(this.options.getPreview());
     const ready = this.readiness();
     if (
       this.draft &&
@@ -156,6 +128,7 @@ export class TouchCanvas extends TouchView {
     this.applyButton.disabled =
       !this.draft ||
       !!this.gesture ||
+      !!this.viewport.navigation ||
       this.applying ||
       this.options.blocked() ||
       !ready.workspace ||
@@ -165,7 +138,7 @@ export class TouchCanvas extends TouchView {
   }
   modeHint(workspace) {
     const hints = {
-      pan: 'Pan to look around. Choose a tool to change the design.',
+      pan: 'Drag to pan. Pinch with two fingers to zoom in any tool.',
       select: 'Tap artwork to select it, then Apply. Selection uses its bounding box.',
       move: 'Drag selected artwork, then Apply. Arrow keys move by 1 mm; Shift uses 10 mm.',
       resize: 'Drag the blue lower-right handle, then Apply. The upper-left corner stays fixed.',
@@ -203,16 +176,19 @@ export class TouchCanvas extends TouchView {
     this.update();
     if (before !== this.hasDraft()) this.options.onDraftChange?.(this.hasDraft());
   }
+  pointerCanEdit(event) {
+    return (
+      !this.gesture &&
+      (!this.draft || !this.geometry.mutation(this.draft)) &&
+      event.isPrimary &&
+      event.button === 0 &&
+      this.mode !== 'pan' &&
+      !this.applying &&
+      !this.options.blocked()
+    );
+  }
   down(event) {
-    if (this.gesture) return;
-    if (
-      !event.isPrimary ||
-      event.button !== 0 ||
-      this.mode === 'pan' ||
-      this.applying ||
-      this.options.blocked()
-    )
-      return;
+    if (this.viewport.down(event, this.mode === 'pan') || !this.pointerCanEdit(event)) return;
     const ready = this.readiness();
     if (!ready.workspace || !ready.rect) return;
     const start = this.geometry.point(event, ready.rect, ready.preview.viewport);
@@ -272,6 +248,7 @@ export class TouchCanvas extends TouchView {
     );
   }
   move(event) {
+    if (this.viewport.move(event)) return;
     if (!this.gesture || event.pointerId !== this.gesture.id || !this.draft) return;
     event.preventDefault();
     if (!this.geometry.sameRect(this.geometry.imageRect(this.image), this.gesture.rect)) {
@@ -299,6 +276,7 @@ export class TouchCanvas extends TouchView {
     else this.draft.points.push(point);
   }
   up(event) {
+    if (this.viewport.up(event)) return;
     if (!this.gesture || event.pointerId !== this.gesture.id) return;
     this.move(event);
     if (!this.gesture) return;
@@ -340,7 +318,14 @@ export class TouchCanvas extends TouchView {
   apply() {
     const draft = this.draft;
     const ready = this.readiness();
-    if (!draft || this.gesture || this.applying || this.options.blocked() || !ready.workspace)
+    if (
+      !draft ||
+      this.gesture ||
+      this.viewport.navigation ||
+      this.applying ||
+      this.options.blocked() ||
+      !ready.workspace
+    )
       return;
     if (
       ready.workspace.revision !== draft.revision ||
@@ -365,18 +350,22 @@ export class TouchCanvas extends TouchView {
       }
     });
   }
-  reset(reason) {
+  reset(reason, keepNavigation = false) {
     const before = this.hasDraft();
     this.epoch++;
-    const id = this.gesture?.id;
-    this.gesture = null;
+    this.releaseGesture(keepNavigation);
     this.draft = null;
-    if (id !== undefined && this.surface.hasPointerCapture(id))
-      this.surface.releasePointerCapture(id);
     this.overlay.replaceChildren();
     if (!this.disposed) this.update();
     if (reason && before) this.options.notice?.(reason);
     if (before !== this.hasDraft()) this.options.onDraftChange?.(this.hasDraft());
+  }
+  releaseGesture(keepNavigation) {
+    const id = this.gesture?.id;
+    this.gesture = null;
+    if (!keepNavigation) this.viewport.cancel();
+    if (id !== undefined && this.surface.hasPointerCapture(id))
+      this.surface.releasePointerCapture(id);
   }
   hasDraft() {
     return !!this.draft || !!this.gesture || this.applying;
@@ -385,6 +374,7 @@ export class TouchCanvas extends TouchView {
     this.reset();
     this.disposed = true;
     this.resize.disconnect();
+    this.viewport.destroy();
     for (const remove of this.listeners) remove();
     this.overlay.remove();
     this.confirm.remove();

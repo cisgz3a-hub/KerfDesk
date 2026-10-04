@@ -160,6 +160,8 @@ test('phone layout and history: selected IDs, equal-centre distribution, Undo th
     await page.locator('#artwork-list input[value="rectangle-1"]').check();
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await openTask(page, 'arrange-task');
+    assert.equal(await page.locator('#editor-sheet #history-controls').count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Undo', exact: true }).count(), 1);
     await page.locator('#arrange-form [name=action]').selectOption('distribute_horizontal');
     await page.getByRole('button', { name: 'Apply layout action' }).click();
     await idle(page);
@@ -179,6 +181,9 @@ test('phone layout and history: selected IDs, equal-centre distribution, Undo th
         .map((item) => item.name),
       ['undo', 'redo'],
     );
+    await page.locator('#close-editor').click();
+    assert.equal(await page.locator('#history-home #history-controls').count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Undo', exact: true }).isVisible(), true);
   } finally {
     await loaded.context.close();
   }
@@ -229,11 +234,18 @@ test('phone edits: an uncertain result retains exactly the same ID and args on r
     await page.getByRole('button', { name: 'Add rectangle', exact: true }).click();
     await idle(page);
     assert.equal(state.edits, 1);
-    assert.equal(await page.locator('#retry-edit').isVisible(), true);
+    assert.equal(await page.locator('#editor-retry').isVisible(), true);
+    assert.equal(await page.locator('#retry-edit').isHidden(), true);
     assert.equal(
       await page.getByRole('button', { name: 'Add rectangle', exact: true }).isDisabled(),
       true,
     );
+    await page.locator('#close-editor').click();
+    assert.equal(await page.locator('#retry-edit').isVisible(), true);
+    assert.equal(await page.locator('#editor-retry').isHidden(), true);
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    assert.equal(await page.locator('#retry-edit').isHidden(), true);
+    assert.equal(await page.locator('#editor-retry').isVisible(), true);
     await page.getByRole('button', { name: 'Retry last request', exact: true }).click();
     await idle(page);
     assert.equal(state.edits, 1);
@@ -380,7 +392,7 @@ test('phone usability: selection leads straight to loaded text, keyboard task di
     assert.match(await page.locator('#selection-status').textContent(), /1 selected/);
     await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
     await idle(page);
-    assert.equal(await page.locator('#workspace-preview').isHidden(), true);
+    assert.equal(await page.locator('#workspace-preview').isVisible(), true);
     assert.equal(await page.locator('#text-editor').isVisible(), true);
     assert.equal(
       await page

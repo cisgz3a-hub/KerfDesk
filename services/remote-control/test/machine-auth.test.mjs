@@ -192,7 +192,7 @@ for (const modern of [false, true]) {
           idempotentHint: false,
           openWorldHint: false,
         });
-        assert.equal(tool._meta.ui.resourceUri, 'ui://kerfdesk/workspace/v4.html');
+        assert.equal(tool._meta.ui.resourceUri, 'ui://kerfdesk/workspace/v5.html');
       }
       assert.match(
         tools.find((tool) => tool.name === 'start_job').description,

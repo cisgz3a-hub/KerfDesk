@@ -1,4 +1,10 @@
 import {
+  MCP_AUTHORING_ACTIONS_MARKUP,
+  MCP_AUTHORING_MARKUP,
+  MCP_AUTHORING_SCRIPT,
+  MCP_AUTHORING_STYLE,
+} from './workspace-authoring-ui.js';
+import {
   MCP_MACHINE_MARKUP,
   MCP_MACHINE_SCRIPT,
   MCP_MACHINE_STYLE,
@@ -7,7 +13,7 @@ import { MCP_DESIGN_STYLE, MCP_LIVE_SCRIPT, MCP_SETTINGS_MARKUP } from './worksp
 import { MCP_TOUCH_MARKUP, MCP_TOUCH_STYLE, MCP_TOUCH_SCRIPT } from './workspace-touch-ui.js';
 
 /** Portable MCP Apps resource. No network, credentials or dependencies. */
-export const KERFDESK_WORKSPACE_UI_URI = 'ui://kerfdesk/workspace/v4.html';
+export const KERFDESK_WORKSPACE_UI_URI = 'ui://kerfdesk/workspace/v5.html';
 export const KERFDESK_WORKSPACE_UI_MIME = 'text/html;profile=mcp-app';
 export const KERFDESK_WORKSPACE_UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -28,6 +34,7 @@ summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#sele
 ${MCP_MACHINE_STYLE}
 ${MCP_DESIGN_STYLE}
 ${MCP_TOUCH_STYLE}
+${MCP_AUTHORING_STYLE}
 </style></head><body>
 <header><h1 id="title">KerfDesk workspace</h1><button id="refresh" type="button" disabled>Refresh</button></header>
 <p id="summary" class="muted">Connecting to the host…</p>
@@ -35,12 +42,14 @@ ${MCP_TOUCH_STYLE}
 <nav class="tabs" aria-label="Workspace views"><button id="workspace-tab" type="button" aria-pressed="true">Design</button><button id="machine-tab" type="button" aria-pressed="false">Machine</button><button id="settings-tab" type="button" aria-pressed="false">Settings</button></nav>
 <section id="workspace-panel">
 <p id="access-note" class="muted" hidden></p>
-<div class="design-toolbar"><button id="undo" type="button" disabled>Undo</button><button id="redo" type="button" disabled>Redo</button><button id="retry" type="button" hidden>Retry last request</button></div>
-<p id="history-status" class="muted"></p>
-${MCP_TOUCH_MARKUP}
+${MCP_AUTHORING_ACTIONS_MARKUP}
 <div class="preview" id="preview-surface"><img id="preview" alt="Artwork preview from KerfDesk on your PC" hidden></div>
+${MCP_TOUCH_MARKUP}
 <p id="preview-message" class="muted">Artwork previews and text sharing are controlled on the PC.</p>
 <div class="preview-tools" aria-label="Preview zoom"><button id="zoom-out" type="button" aria-label="Zoom out">−</button><button id="zoom-fit" type="button">Fit</button><button id="zoom-in" type="button" aria-label="Zoom in">+</button></div>
+<div class="design-toolbar"><button id="undo" type="button" disabled>Undo</button><button id="redo" type="button" disabled>Redo</button><button id="retry" type="button" hidden>Retry last request</button></div>
+<p id="history-status" class="muted"></p>
+${MCP_AUTHORING_MARKUP}
 <details id="artwork-choices" open><summary>Choose artwork</summary>
 <div id="items" class="items" aria-label="Workspace artwork"></div>
 <p id="selection-status" class="muted" aria-live="polite"></p>
@@ -61,7 +70,6 @@ ${MCP_SETTINGS_MARKUP}
   let sequence = 0, workspace = null, connected = false, toolCallsAvailable = false, disposed = false, busy = false, pendingEdit = null, hostOrigin = '*';
   const requests = new Map();
   let live = null, previewRevision = null, acceptedPreview = null, touch = null, selectionDirty = false, selectionRevision = null, epoch = 0, privateBlocked = false;
-  bindMcpPreviewZoom();
   const errorText = {
     stale_revision: 'The workspace changed on the PC. Refresh, review it, then try again.',
     needs_pro: 'Choose a trial or licence on the PC to use this Pro feature.',
@@ -159,6 +167,7 @@ ${MCP_SETTINGS_MARKUP}
     for (const input of $('items').querySelectorAll('input')) input.disabled = !enabled;
     $('retry').hidden = !pendingEdit;
     $('retry').disabled = busy || !connected || !toolCallsAvailable || !canEdit();
+    authoringControls(enabled);
     touch?.update();
   }
   function selectionFeedback() {
@@ -221,7 +230,7 @@ ${MCP_SETTINGS_MARKUP}
     } else if (value.status === 'ready' && validImage(value.preview)) {
       image.src = 'data:image/png;base64,' + value.preview.data; image.hidden = false;
       acceptedPreview = value;
-      $('preview-message').textContent = 'Design preview from your PC. Machine position and toolpaths stay in the PC view.';
+      $('preview-message').textContent = text(value.message) || 'Design preview from your PC. Machine position and toolpaths stay in the PC view.';
     } else $('preview-message').textContent = text(value.message) || 'Preview unavailable. Your artwork stays on the PC.';
     touch?.update();
   }
@@ -280,7 +289,7 @@ ${MCP_SETTINGS_MARKUP}
   async function retry() {
     if (!pendingEdit || !canEdit()) return;
     const attempt = pendingEdit;
-    try { await tool(attempt.name, attempt.args); pendingEdit = null; selectionDirty=false; selectionRevision=null; }
+    try { await tool(attempt.name, attempt.args); pendingEdit = null; selectionDirty=false; selectionRevision=null; if(submittedForm){authoringDrafts.delete(submittedForm.id);submittedForm=null;} }
     catch (error) {
       if (error.ambiguous) { throw Object.assign(new Error('The result is uncertain. Retry last request to check it safely without applying it twice.'), {ambiguous:true}); }
       pendingEdit = null;
@@ -295,6 +304,7 @@ ${MCP_SETTINGS_MARKUP}
   $('retry').addEventListener('click', () => { void run(retry); });
   $('items').addEventListener('change',()=>{selectionDirty=true;selectionRevision??=workspace?.revision;selectionFeedback();controls();});
   $('discard-selection').addEventListener('click',()=>{selectionDirty=false;selectionRevision=null;for(const input of $('items').querySelectorAll('input'))input.checked=workspace?.selection.includes(input.value);controls();});
+  ${MCP_AUTHORING_SCRIPT}
   const machine = bindMcpMachine({tool: machineTool,available:()=>connected&&toolCallsAvailable&&!disposed&&!privateBlocked});
   touch = bindMcpTouchCanvas({surface:$('preview-surface'),image:$('preview'),controls:$('touch-tools'),getWorkspace:()=>workspace,getPreview:()=>acceptedPreview,canEdit:()=>connected&&toolCallsAvailable&&!disposed&&canEdit(),blocked:()=>busy||!!pendingEdit,edit:mutate,action:run,notice:message,onDraftChange:controls});
   async function machineTool(name,args={}) {
