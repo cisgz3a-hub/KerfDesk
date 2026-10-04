@@ -14,6 +14,8 @@ export type RemoteWriteCommand =
   | 'set_selection'
   | 'add_text'
   | 'add_rectangle'
+  | 'add_ellipse'
+  | 'add_polyline'
   | 'transform_artwork'
   | 'update_operation'
   | 'update_text'
@@ -96,6 +98,22 @@ export type RemoteWrite =
         readonly yMm: number;
         readonly widthMm: number;
         readonly heightMm: number;
+      };
+    }
+  | {
+      readonly command: 'add_ellipse';
+      readonly args: WriteAdmission & {
+        readonly xMm: number;
+        readonly yMm: number;
+        readonly widthMm: number;
+        readonly heightMm: number;
+      };
+    }
+  | {
+      readonly command: 'add_polyline';
+      readonly args: WriteAdmission & {
+        readonly pointsMm: readonly { readonly xMm: number; readonly yMm: number }[];
+        readonly closed: boolean;
       };
     }
   | {

@@ -9,6 +9,7 @@ import { prepareRemoteText } from './text';
 import { editableText, prepareTextEdit } from './text-edit';
 import { applyHistory, prepareArrange } from './arrange';
 import { publicIdentifier, selectedIds } from './projections';
+import { prepareRemoteShape } from './touch-shapes';
 
 export async function applyRemoteWrite(
   write: RemoteWrite,
@@ -28,6 +29,14 @@ export async function applyRemoteWrite(
       });
     case 'add_rectangle':
       return commit(() => addRectangle(state, write.args));
+    case 'add_ellipse':
+    case 'add_polyline': {
+      const object = prepareRemoteShape(state, write);
+      return commit(() => {
+        store.getState().drawShape(object);
+        return { changedArtworkIds: [object.id] };
+      });
+    }
     case 'add_text': {
       requireLaser(state);
       const object = await prepareRemoteText(write.args, signal);

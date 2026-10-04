@@ -12,6 +12,10 @@ const coordinate = z.number().min(-100_000).max(100_000);
 const size = z.number().positive().max(100_000);
 const writeAdmission = { expectedRevision: revision, requestId: z.uuid() };
 const artworkIds = z.array(id).max(MCP_MAX_ITEMS);
+const pointsMm = z
+  .array(z.strictObject({ xMm: coordinate, yMm: coordinate }))
+  .min(2)
+  .max(512);
 const operationPatch = z
   .strictObject({
     powerPercent: z.number().min(0).max(100).optional(),
@@ -50,6 +54,21 @@ export const mcpInputSchemas = {
     widthMm: size,
     heightMm: size,
   }),
+  add_ellipse: z.strictObject({
+    ...writeAdmission,
+    xMm: coordinate,
+    yMm: coordinate,
+    widthMm: size,
+    heightMm: size,
+  }),
+  add_polyline: z
+    .strictObject({ ...writeAdmission, pointsMm, closed: z.boolean() })
+    .refine(
+      (value) =>
+        new Set(value.pointsMm.map((point) => `${point.xMm},${point.yMm}`)).size >=
+        (value.closed ? 3 : 2),
+      'Provide distinct drawing points.',
+    ),
   transform_artwork: z.strictObject({
     ...writeAdmission,
     artworkIds: artworkIds.min(1),
@@ -79,6 +98,8 @@ export const MCP_WRITE_COMMANDS = new Set<KerfDeskMcpCommand>([
   'set_selection',
   'add_text',
   'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
   'transform_artwork',
   'update_operation',
   'update_text',

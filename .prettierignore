@@ -7,6 +7,7 @@ coverage
 pnpm-lock.yaml
 services/remote-control/pnpm-lock.yaml
 services/remote-control/worker-configuration.d.ts
+services/remote-control/public/control-scanner-decoder.js
 src/core/text/cnc-stroke-font-data.ts
 .claude
 references

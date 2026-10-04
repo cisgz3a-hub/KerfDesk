@@ -3,7 +3,12 @@ import { canvasTheme } from '../theme/canvas-theme';
 import { paintObjectDisplay } from '../workspace/object-display';
 import type { RemoteControlOptions } from './types';
 import { RemoteFault } from './fault';
-import { PreviewUnavailable, previewView, resolvePreviewGeometry } from './preview-geometry';
+import {
+  PreviewUnavailable,
+  previewView,
+  previewViewport,
+  resolvePreviewGeometry,
+} from './preview-geometry';
 import type { PreviewGeometry } from './preview-geometry';
 
 const PNG_PREFIX = 'data:image/png;base64,';
@@ -70,6 +75,7 @@ function renderPreview(
     return {
       status: 'ready',
       preview: { mimeType: 'image/png', data, widthPx: sizePx, heightPx: sizePx },
+      viewport: previewViewport(view, sizePx),
       ...(geometry.bounds === undefined ? {} : { bounds: geometry.bounds }),
       message: 'Design artwork preview. This is not a toolpath or a machine-position guarantee.',
     };

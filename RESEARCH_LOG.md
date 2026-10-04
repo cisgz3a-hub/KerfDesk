@@ -1568,3 +1568,12 @@ above are no longer current output behavior.
   canvas edge is removed with an exact parent/version pnpm override, keeping native canvas out
   of the runtime closure. PDF resource gzip contribution is 2,201,129 bytes before decoder chunks;
   ADR-357 records the alternatives and retained offline precache tradeoff.
+
+### 2026-10-04 - Local phone QR scanning (ADR-569 Amendment 2)
+
+- Evaluator: Codex. Requested use case: scan the PC pairing code from the phone control page without typing the full computer ID. The camera and decoded pairing text stay in the page; scanning never performs authorization.
+- Selected runtime library: `@nuintun/qrcode@5.0.3`, MIT, published 2026-02-06. The installed full LICENSE and lockfile distribution integrity were inspected. Recent issue activity was checked in the upstream repository; issue 346 was answered and closed within thirteen minutes in May 2026. The service's production advisory audit reports no known vulnerabilities at evaluation. Sources: https://github.com/nuintun/qrcode and https://registry.npmjs.org/@nuintun%2fqrcode.
+- Native `BarcodeDetector` remains the preferred reader when available. It is not supported consistently across phone browsers, so a pure JavaScript fallback is needed. `jsqr@1.4.0` was evaluated but rejected because its April 2021 release fails ADR-017's twelve-month maintenance requirement. `@zxing/library@0.23.0` was evaluated as a broader maintained barcode alternative; only QR decoding is needed here. No WASM, CDN, fetch, microphone or persistent camera state is introduced.
+- The fallback is built reproducibly with the service's pinned `esbuild@0.28.1` (the already-installed Wrangler toolchain version), tree shaking unused encoders. The generated local ESM decoder is 42,975 bytes raw / 15,566 bytes gzip and loads only when a scan needs it. The MIT notices for the decoder and its `tslib` dependency are retained in `/third-party-notices.txt`. Build, format and deploy preflight verify the committed generated asset against the pinned package and first-party pixel adapter.
+- Relevant platform documentation: https://developer.mozilla.org/en-US/docs/Web/API/BarcodeDetector and https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia. Pointer capture and touch gestures follow https://developer.mozilla.org/en-US/docs/Web/API/Pointer_events/Using_Pointer_Events. Camera/QR fixtures, rendered browser controls and a physical phone remain separate evidence.
+- Re-verify by: 2027-04-04, or earlier if decoder advisories or supported phone browsers change.

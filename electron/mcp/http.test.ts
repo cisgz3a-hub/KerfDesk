@@ -17,6 +17,8 @@ const expectedToolNames = [
   'set_selection',
   'add_text',
   'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
   'transform_artwork',
   'update_operation',
   'update_text',

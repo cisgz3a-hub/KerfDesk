@@ -28,6 +28,15 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   set_selection: { ...writeAdmission, artworkIds: ['art-1'] },
   add_text: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, text: 'Hello', fontSizeMm: 5 },
   add_rectangle: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 },
+  add_ellipse: { ...writeAdmission, xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 },
+  add_polyline: {
+    ...writeAdmission,
+    pointsMm: [
+      { xMm: 10, yMm: 20 },
+      { xMm: 30, yMm: 40 },
+    ],
+    closed: false,
+  },
   transform_artwork: {
     ...writeAdmission,
     artworkIds: ['art-1'],

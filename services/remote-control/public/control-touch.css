@@ -1,0 +1,104 @@
+.touch-surface {
+  position: relative;
+}
+.touch-surface[data-touch-mode]:not([data-touch-mode='pan']) {
+  touch-action: none;
+}
+.touch-surface img {
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.touch-overlay {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+}
+.touch-outline {
+  fill: #2085d51a;
+  stroke: #0869b6;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.touch-ghost {
+  fill: #12a67922;
+  stroke: #047a55;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  vector-effect: non-scaling-stroke;
+}
+.touch-stroke {
+  fill: none;
+  stroke: #047a55;
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+.touch-handle {
+  fill: #0869b6;
+  stroke: white;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+.touch-controls {
+  margin-top: 12px;
+}
+.touch-controls .touch-modes {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 6px;
+}
+.touch-controls button {
+  grid-column: span 3;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 4px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.touch-controls [data-touch-tool='brush'],
+.touch-controls [data-touch-tool='rectangle'],
+.touch-controls [data-touch-tool='ellipse'] {
+  grid-column: span 4;
+}
+.touch-controls button[aria-pressed='true'] {
+  color: #fff;
+  background: #0869b6;
+  border-color: #0869b6;
+}
+.touch-controls .touch-hint {
+  margin: 10px 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.touch-confirm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #3d9782;
+  border-radius: 12px;
+  background: #dff6ed;
+  color: #154536;
+}
+.touch-confirm .touch-summary {
+  grid-column: 1/-1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.touch-confirm button {
+  min-height: 48px;
+  font-size: 15px;
+}
+.touch-confirm .touch-apply {
+  color: #fff;
+  background: #047a55;
+  border-color: #047a55;
+}
+@media (prefers-color-scheme: dark) {
+  .touch-confirm {
+    background: #183e32;
+    color: #dff6ed;
+  }
+}

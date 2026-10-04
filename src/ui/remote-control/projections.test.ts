@@ -90,6 +90,8 @@ describe('remote snapshots expose only the agreed metadata', () => {
       {
         id: 'art',
         type: 'shape',
+        visible: true,
+        editable: true,
         bounds: { xMm: 0, yMm: 0, widthMm: 10, heightMm: 20 },
         operationId: 'operation',
       },
@@ -200,6 +202,8 @@ describe('remote snapshots expose only the agreed metadata', () => {
       },
     });
     expect(await read('get_machine')).toMatchObject({ machine: { name: 'Selected machine' } });
-    expect((await read('get_workspace'))['artwork']).toEqual([{ id: 'art', type: 'shape' }]);
+    expect((await read('get_workspace'))['artwork']).toEqual([
+      { id: 'art', type: 'shape', visible: true, editable: true },
+    ]);
   });
 });

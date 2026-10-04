@@ -16,6 +16,7 @@ import type { DisplayPolylineCache, DisplayPolylines } from '../workspace/displa
 import type { ViewTransform } from '../workspace/view-transform';
 import { remoteBounds } from './projections';
 import type { RemoteBounds } from './types';
+import { finite } from './validation';
 import {
   validatedPreviewObject,
   reservePreviewPoints,
@@ -34,7 +35,14 @@ export type PreviewGeometry = {
   readonly bounds?: RemoteBounds;
   readonly extent: AABB;
 };
-const EMPTY_EXTENT = { minX: 0, minY: 0, maxX: 1, maxY: 1 };
+function emptyPreviewExtent(project: Project): AABB {
+  const { bedWidth, bedHeight } = project.device;
+  // Scene coordinates follow the same 0..device dimensions as local drawBed;
+  // machine origin/homing conventions never alter this design mapping.
+  if (!finite(bedWidth, Number.MIN_VALUE, 100_000) || !finite(bedHeight, Number.MIN_VALUE, 100_000))
+    invalidGeometry();
+  return { minX: 0, minY: 0, maxX: bedWidth, maxY: bedHeight };
+}
 
 /** The same design paths, fills and transforms as the local workspace, with no sampling fallback. */
 export function resolvePreviewGeometry(project: Project, sizePx: number): PreviewGeometry {
@@ -51,7 +59,8 @@ export function resolvePreviewGeometry(project: Project, sizePx: number): Previe
     const bounds = transformedBBox(object);
     extent = union(extent, bounds);
   }
-  const view = previewView(extent ?? EMPTY_EXTENT, sizePx);
+  const fallbackExtent = extent === undefined ? emptyPreviewExtent(project) : extent;
+  const view = previewView(fallbackExtent, sizePx);
   const cache = strictCache();
   const displayBudget = { points: 0 };
   const objects: { object: VectorSceneObject; display: ObjectDisplay }[] = [];
@@ -67,7 +76,7 @@ export function resolvePreviewGeometry(project: Project, sizePx: number): Previe
   return {
     objects,
     ...(bounds === undefined ? {} : { bounds }),
-    extent: actualExtent ?? EMPTY_EXTENT,
+    extent: actualExtent ?? emptyPreviewExtent(project),
   };
 }
 
@@ -99,6 +108,23 @@ export function previewView(extent: AABB, sizePx: number): ViewTransform {
     offsetX: (sizePx - width * scale) / 2 - extent.minX * scale,
     offsetY: (sizePx - height * scale) / 2 - extent.minY * scale,
   };
+}
+
+/** Inverse of the actual image transform, including its whole padded square. */
+export function previewViewport(view: ViewTransform, sizePx: number): RemoteBounds {
+  const xMm = -view.offsetX / view.scale;
+  const yMm = -view.offsetY / view.scale;
+  const widthMm = sizePx / view.scale;
+  const heightMm = widthMm;
+  if (
+    !finite(xMm, -200_000, 200_000) ||
+    !finite(yMm, -200_000, 200_000) ||
+    !finite(widthMm, Number.MIN_VALUE, 200_000) ||
+    !finite(xMm + widthMm, -200_000, 200_000) ||
+    !finite(yMm + heightMm, -200_000, 200_000)
+  )
+    invalidGeometry();
+  return { xMm, yMm, widthMm, heightMm };
 }
 
 function strictCache(): DisplayPolylineCache {

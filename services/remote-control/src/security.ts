@@ -147,7 +147,7 @@ export function escapeHtml(value: string): string {
       character,
   );
 }
-export function safeResponse(response: Response): Response {
+export function safeResponse(response: Response, camera = false): Response {
   if (response.status === 101) return response;
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-store, no-transform');
@@ -156,9 +156,16 @@ export function safeResponse(response: Response): Response {
     'Referrer-Policy',
     headers.get('Referrer-Policy') === 'same-origin' ? 'same-origin' : 'no-referrer',
   );
-  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  headers.set(
+    'Permissions-Policy',
+    `camera=${camera ? '(self)' : '()'}, microphone=(), geolocation=()`,
+  );
   headers.set('X-Frame-Options', 'DENY');
-  headers.set('Content-Security-Policy', headers.get('Content-Security-Policy') ?? DEFAULT_CSP);
+  headers.set(
+    'Content-Security-Policy',
+    headers.get('Content-Security-Policy') ??
+      (camera ? DEFAULT_CSP + '; media-src blob:' : DEFAULT_CSP),
+  );
   // OAuth's provider handles protocol CORS. The phone API never grants it.
   return new Response(response.body, {
     status: response.status,

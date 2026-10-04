@@ -4,6 +4,9 @@ import { bindEditors } from './control-edit.js';
 import { bindMachine } from './control-machine.js';
 import { bindDrafts } from './control-drafts.js';
 import { bindWorkspaceLive, bindPreviewZoom, serialCommand } from './control-live.js';
+import { bindPairingScanner } from './control-scanner.js';
+import { bindTouchCanvas } from './control-touch.js';
+import { bindSessionActions } from './control-actions.js';
 import {
   createPreviewController,
   assertWorkspace,
@@ -16,7 +19,6 @@ import {
   syncAccess,
   syncEditorControls,
   renderSession,
-  routeSetupHint,
 } from './control-workspace.js';
 
 let session = null;
@@ -27,6 +29,8 @@ let stale = false;
 let pendingEdit = null;
 let pairGeneration = 0;
 let live = null;
+let touch = null;
+const scanner = bindPairingScanner();
 const drafts = bindDrafts(() => workspace?.revision);
 bindPreviewZoom();
 function notice(message, error = false) {
@@ -103,6 +107,7 @@ function canEdit() {
   );
 }
 function syncControls() {
+  scanner.setEnabled(!busy && !session && !document.documentElement.dataset.pairingBlocked);
   const admitted = canEdit();
   const writable = admitted && !busy && !stale && !pendingEdit;
   syncAccess({ session, workspace, busy, pendingEdit, admitted });
@@ -118,8 +123,10 @@ function syncControls() {
   syncEditorControls(workspace);
   selectionFeedback(workspace, writable);
   drafts.render();
+  touch?.update();
 }
 function setSession(value) {
+  scanner.stop();
   const previousClient = session?.client?.id;
   if (!value || value.client.id !== previousClient) resetSessionWorkspace();
   session = value;
@@ -130,6 +137,7 @@ function setSession(value) {
   else if (!value) live?.stop();
 }
 function resetSessionWorkspace() {
+  touch?.reset();
   workspace = null;
   stale = false;
   pendingEdit = null;
@@ -200,13 +208,15 @@ async function action(callback) {
     document.body.setAttribute('aria-busy', 'false');
   }
 }
-async function edit(name, args) {
+async function edit(name, args, expectedRevision = workspace?.revision) {
   if (name === 'set_selection') drafts.assertSelection();
   if (!canEdit() || stale || pendingEdit)
     throw fault('forbidden', 'Refresh a workspace with editing permission first.');
+  if (expectedRevision !== workspace.revision)
+    throw fault('stale_revision', errorMessages.stale_revision);
   pendingEdit = {
     name,
-    args: { expectedRevision: workspace.revision, requestId: crypto.randomUUID(), ...args },
+    args: { ...args, expectedRevision, requestId: crypto.randomUUID() },
     clientId: session.client.id,
     formId: drafts.submitted()?.id,
   };
@@ -259,10 +269,24 @@ const previews = createPreviewController({
   workspace: () => workspace,
   session: () => session,
   active: () => live.active(),
-  blocked: () => busy || !!pendingEdit,
+  blocked: () => busy || !!pendingEdit || !!touch?.hasDraft(),
   command,
   apply: applyWorkspace,
   setFonts: editors.setFonts,
+  changed: () => touch?.update(),
+});
+touch = bindTouchCanvas({
+  surface: $('#preview-surface'),
+  image: $('#workspace-preview'),
+  controls: $('#touch-tools'),
+  getWorkspace: () => workspace,
+  getPreview: () => previews.current(),
+  canEdit,
+  blocked: () => busy || stale || !!pendingEdit,
+  edit,
+  action,
+  notice,
+  onDraftChange: syncControls,
 });
 const machine = bindMachine({
   command,
@@ -277,7 +301,7 @@ const machine = bindMachine({
 $('#artwork-list').addEventListener('change', syncControls);
 live = bindWorkspaceLive({
   ready: () => !!session,
-  blocked: () => busy || !!pendingEdit || machine.isBusy(),
+  blocked: () => busy || !!pendingEdit || machine.isBusy() || touch.hasDraft(),
   generation: () => pairGeneration,
   api,
   command,
@@ -348,52 +372,25 @@ bindForm('#pair-form', action, async (form) => {
   notice('Approve this phone in KerfDesk on your PC.');
   await pairStatus(pairingDeadline(result.expiresInMs), generation);
 });
-$('#retry-edit').addEventListener('click', () => {
-  void action(performPendingEdit);
-});
-$('#refresh').addEventListener('click', () => {
-  void action(async () => {
-    if (await refresh())
-      notice(
-        pendingEdit
-          ? 'Workspace refreshed. Retry the last request to resolve its result.'
-          : 'Workspace refreshed.',
-      );
-  });
-});
-$('#disconnect').addEventListener('click', () => {
-  void action(async () => {
+bindSessionActions({
+  action,
+  notice,
+  touch,
+  scanner,
+  performPendingEdit,
+  refresh,
+  hasPendingEdit: () => !!pendingEdit,
+  syncControls,
+  api,
+  setSession,
+  session: () => session,
+  generation: () => pairGeneration,
+  pairStatus,
+  disconnect: async () => {
     pairGeneration++;
     clearTimeout(poll);
     poll = null;
     await api('/api/client/revoke', {});
     setSession(null);
-    notice('This phone is disconnected.');
-  });
-});
-routeSetupHint();
-if (document.documentElement.dataset.pairingBlocked) {
-  notice(
-    'Open a clean phone control page using the KerfDesk link above, then paste a new code.',
-    true,
-  );
-  syncControls();
-}
-void action(async () => {
-  const generation = pairGeneration;
-  let admitted = false;
-  try {
-    const value = await api('/api/session', undefined, generation);
-    if (value.status === 'approved') {
-      admitted = true;
-      setSession(value);
-      if (!continueToMcp()) await refresh(generation);
-    } else if (value.status === 'pending') {
-      $('#pair-status').textContent = 'Waiting for approval on the PC…';
-      await pairStatus(pairingDeadline(value.expiresInMs), pairGeneration);
-    }
-  } catch (error) {
-    if (!session) setSession(null);
-    if (admitted) notice(error.message, true);
-  }
+  },
 });

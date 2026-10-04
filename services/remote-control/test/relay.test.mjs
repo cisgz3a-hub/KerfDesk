@@ -34,6 +34,8 @@ const editTools = [
   'set_selection',
   'add_text',
   'add_rectangle',
+  'add_ellipse',
+  'add_polyline',
   'transform_artwork',
   'update_operation',
   'update_text',
@@ -44,7 +46,7 @@ const editTools = [
 const controlTools = ['jog_machine', 'frame_job', 'review_machine_job', 'start_job', 'abort_job'];
 
 function assertToolCatalogue(tools) {
-  assert.equal(tools.length, 24);
+  assert.equal(tools.length, 26);
   assert.deepEqual(
     tools.map((tool) => tool.name).sort(),
     [...readTools, ...editTools, ...controlTools].sort(),
@@ -72,7 +74,10 @@ function assertToolCatalogue(tools) {
         readOnlyHint: readOnly,
         destructiveHint:
           control ||
-          (!readOnly && !['set_selection', 'add_text', 'add_rectangle'].includes(tool.name)),
+          (!readOnly &&
+            !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
+              tool.name,
+            )),
         idempotentHint: readOnly,
         openWorldHint: false,
       },

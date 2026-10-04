@@ -11,6 +11,8 @@ export default tseslint.config(
       '.wrangler/**',
       'worker-configuration.d.ts',
       'test-results/**',
+      // Reproducible, reviewed third-party output; checked against the pinned npm source.
+      'public/control-scanner-decoder.js',
     ],
   },
   js.configs.recommended,

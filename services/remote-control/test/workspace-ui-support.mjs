@@ -12,6 +12,11 @@ const liveSource = await readFile(
   'utf8',
 );
 const liveUrl = 'data:text/javascript,' + encodeURIComponent(liveSource);
+const touchSource = await readFile(
+  new URL('../../../electron/mcp/workspace-touch-ui.ts', import.meta.url),
+  'utf8',
+);
+const touchUrl = 'data:text/javascript,' + encodeURIComponent(touchSource);
 const resourceSource = await readFile(
   new URL('../../../electron/mcp/workspace-ui.ts', import.meta.url),
   'utf8',
@@ -21,7 +26,8 @@ const { KERFDESK_WORKSPACE_UI_HTML } = await import(
     encodeURIComponent(
       resourceSource
         .replace("'./workspace-machine-ui.js'", JSON.stringify(machineUrl))
-        .replace("'./workspace-live-ui.js'", JSON.stringify(liveUrl)),
+        .replace("'./workspace-live-ui.js'", JSON.stringify(liveUrl))
+        .replace("'./workspace-touch-ui.js'", JSON.stringify(touchUrl)),
     )
 );
 

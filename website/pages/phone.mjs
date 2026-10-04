@@ -32,12 +32,13 @@ export const page = {
         {
           title: 'Scan the code or open a pairing link',
           body: html`Click <strong>Create pairing link</strong> on the PC (older versions say
-            <strong>Create pairing code</strong>). Scan the displayed QR code with your phone or use
-            <strong>Copy pairing link</strong>. The link fills in the computer ID and code; name the
-            phone and request PC approval. For older versions or manual setup, open
-            <a href="${site.phoneSetupUrl}">phone setup</a>, enter the matching Computer ID and copy
-            the code exactly including capital letters. A code works once and expires after five
-            minutes.`,
+            <strong>Create pairing code</strong>). Open phone controls and choose
+            <strong>Scan PC QR code</strong>, allow camera access and point at the PC’s QR code. You
+            can also scan with the phone’s camera or use <strong>Copy pairing link</strong>. The
+            link fills in the computer ID and code; name the phone and request PC approval. For
+            older versions or manual setup, open <a href="${site.phoneSetupUrl}">phone setup</a>,
+            enter the matching Computer ID and copy the code exactly including capital letters. A
+            code works once and expires after five minutes.`,
         },
         {
           title: 'Choose the permission on the PC',
@@ -55,7 +56,9 @@ export const page = {
           Viewing connections can read artwork and operation summaries, machine limits, material
           recipes, and edition and update status. Editing connections can select, move, rotate or
           resize supported artwork. In Laser workspaces, they can add basic text or rectangles and
-          change operation power, speed, passes and enabled state.
+          change operation power, speed, passes and enabled state. Updated versions add touch
+          drawing for rectangles, ellipses and freehand strokes, plus selection, moving and
+          resizing. Review the draft and choose Apply or Cancel.
         </p>
         <p>
           Updated versions separate Design, Machine and Settings. Changes made on the PC refresh the

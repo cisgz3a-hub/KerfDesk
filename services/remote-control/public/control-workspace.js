@@ -212,19 +212,30 @@ export function createPreviewController(options) {
 }
 class PreviewController {
   revision = null;
+  value = null;
   fontsLoaded = false;
   constructor(options) {
     this.options = options;
   }
   reset() {
     this.revision = null;
+    this.value = null;
     this.fontsLoaded = false;
+    this.options.changed?.();
+  }
+  current() {
+    return this.value;
   }
   clearIfChanged(value) {
     if (value.permissions?.artworkSharingEnabled === false) {
       this.revision = null;
+      this.value = null;
       renderPreview({ status: 'disabled', revision: value.revision }, value.revision);
-    } else if (this.revision !== value.revision) renderPreview(null, value.revision);
+    } else if (this.revision !== value.revision) {
+      this.value = null;
+      renderPreview(null, value.revision);
+    }
+    this.options.changed?.();
   }
   canDeliver(background) {
     return (
@@ -252,6 +263,8 @@ class PreviewController {
     this.options.apply(latest);
     if (latest.permissions?.artworkSharingEnabled === false || latest.revision !== revision) return;
     renderPreview(preview, latest.revision);
+    this.value = !$('#workspace-preview').hidden ? preview : null;
+    this.options.changed?.();
     if (
       preview?.revision === latest.revision &&
       ['ready', 'disabled', 'unavailable'].includes(preview.status)

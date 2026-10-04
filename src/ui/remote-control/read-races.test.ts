@@ -25,6 +25,7 @@ afterEach(() => adapter.dispose());
 const pixels = {
   status: 'ready',
   preview: { mimeType: 'image/png', dataBase64: 'PRIVATE_PIXELS', width: 10, height: 10 },
+  viewport: { xMm: -10, yMm: -10, widthMm: 100, heightMm: 100 },
 };
 async function rendering() {
   await vi.waitFor(() => expect(preview).toHaveBeenCalledTimes(1));
@@ -75,6 +76,7 @@ describe('asynchronous read snapshots fail closed', () => {
     const result = await pending;
     expect(result).toMatchObject({ ok: true, data: { status: 'disabled' } });
     expect(JSON.stringify(result)).not.toContain('PRIVATE_PIXELS');
+    expect(result.ok && result.data).not.toHaveProperty('viewport');
   });
 
   it.each(['document', 'dispose', 'abort'] as const)('rejects preview after %s', async (action) => {

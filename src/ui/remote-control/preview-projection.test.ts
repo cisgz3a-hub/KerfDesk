@@ -6,7 +6,7 @@ import { useStore } from '../state/store';
 import { workspacePreviewProjection, PREVIEW_BASE64_LIMIT } from './preview-projection';
 import { PREVIEW_POINT_LIMIT, previewView, resolvePreviewGeometry } from './preview-geometry';
 import { RemoteFault } from './fault';
-import type { RemoteControlOptions } from './types';
+import type { RemoteBounds, RemoteControlOptions } from './types';
 
 const PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==';
@@ -113,6 +113,13 @@ describe('remote artwork rendering and disclosure fence', () => {
     );
     expect(context.lineTo.mock.calls.length).toBeGreaterThanOrEqual(4);
     expect(context.stroke).toHaveBeenCalled();
+    const viewport = projection.viewport as RemoteBounds;
+    expect(viewport.widthMm).toBeCloseTo(768 / view.scale);
+    expect(viewport.xMm).toBeCloseTo(-view.offsetX / view.scale);
+    expect(viewport.yMm).toBeCloseTo(-view.offsetY / view.scale);
+    const [pixelX, pixelY] = context.moveTo.mock.calls[0]! as [number, number];
+    expect(viewport.xMm + (pixelX / 768) * viewport.widthMm).toBeCloseTo(30);
+    expect(viewport.yMm + (pixelY / 768) * viewport.heightMm).toBeCloseTo(40);
   });
   it('renders canonical curved geometry and precomputed text outlines without fetching fonts', async () => {
     const circle = createEllipse({
@@ -183,6 +190,43 @@ describe('remote artwork rendering and disclosure fence', () => {
     expect(result.status).toBe('ready');
     expect(result).not.toHaveProperty('bounds');
     expect(context.stroke).not.toHaveBeenCalled();
+    const { bedWidth, bedHeight } = useStore.getState().project.device;
+    const viewport = result.viewport as RemoteBounds;
+    expect(viewport.widthMm).toBeGreaterThan(Math.max(bedWidth, bedHeight));
+    expect(viewport.xMm + viewport.widthMm / 2).toBeCloseTo(bedWidth / 2);
+    expect(viewport.yMm + viewport.heightMm / 2).toBeCloseTo(bedHeight / 2);
+  });
+  it('maps a blank preview to the actual rectangular profile bed in scene coordinates for any origin', async () => {
+    seed([]);
+    const state = useStore.getState();
+    useStore.setState({
+      project: {
+        ...state.project,
+        device: {
+          ...state.project.device,
+          bedWidth: 431.75,
+          bedHeight: 312.25,
+          origin: 'rear-right',
+        },
+      },
+    });
+    const result = await run();
+    const viewport = result.viewport as RemoteBounds;
+    expect(result.status).toBe('ready');
+    expect(viewport.xMm + viewport.widthMm / 2).toBeCloseTo(431.75 / 2);
+    expect(viewport.yMm + viewport.heightMm / 2).toBeCloseTo(312.25 / 2);
+    expect(viewport.widthMm).toBeCloseTo((431.75 * 768) / 736);
+    expect(result).not.toHaveProperty('bounds');
+  });
+  it('does not invent a drawing bed when the empty profile geometry is malformed', async () => {
+    seed([]);
+    const state = useStore.getState();
+    useStore.setState({
+      project: { ...state.project, device: { ...state.project.device, bedWidth: NaN } },
+    });
+    const result = await run();
+    expect(result.status).toBe('unavailable');
+    expect(result).not.toHaveProperty('viewport');
   });
   it('refuses unsupported images rather than silently dropping them or loading their URL', async () => {
     seed([
@@ -249,11 +293,17 @@ describe('remote artwork rendering and disclosure fence', () => {
     vi.mocked(HTMLCanvasElement.prototype.toDataURL).mockReturnValueOnce(
       `data:image/png;base64,iVBORw0KGgo${'A'.repeat(PREVIEW_BASE64_LIMIT)}`,
     );
-    expect(await run()).toMatchObject({
+    const result = await run();
+    expect(result).toMatchObject({
       status: 'ready',
       preview: { widthPx: 512, heightPx: 512 },
     });
     expect(context.stroke).toHaveBeenCalledTimes(2);
+    const viewport = result.viewport as RemoteBounds;
+    const [pixelX, pixelY] = context.moveTo.mock.calls.at(-1)! as [number, number];
+    expect(viewport.widthMm).toBeCloseTo((20 * 512) / 480);
+    expect(viewport.xMm + (pixelX / 512) * viewport.widthMm).toBeCloseTo(0);
+    expect(viewport.yMm + (pixelY / 512) * viewport.heightMm).toBeCloseTo(0);
   });
   it('refuses a PNG that cannot fit even at the minimum size', async () => {
     vi.mocked(HTMLCanvasElement.prototype.toDataURL).mockReturnValue(
@@ -293,6 +343,7 @@ describe('remote artwork rendering and disclosure fence', () => {
     const result = await run();
     expect(result.status).toBe('disabled');
     expect(result).not.toHaveProperty('preview');
+    expect(result).not.toHaveProperty('viewport');
   });
   it('does not expose source paths, text or private project metadata alongside pixels', async () => {
     const state = useStore.getState();
