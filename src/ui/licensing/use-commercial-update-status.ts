@@ -33,7 +33,8 @@ export function useCommercialUpdateStatus(client: LicenceAdapter) {
   const check = useCallback(() => run(client.checkForUpdates), [client, run]);
   const download = useCallback(() => run(client.downloadUpdate), [client, run]);
   const installOnQuit = useCallback(() => run(client.installUpdateOnQuit), [client, run]);
-  return { status, busy, check, download, installOnQuit };
+  const installAndClose = useCallback(() => run(client.installUpdateAndClose), [client, run]);
+  return { status, busy, check, download, installOnQuit, installAndClose };
 }
 
 function useUpdatePolling(

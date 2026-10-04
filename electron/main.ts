@@ -72,9 +72,8 @@ import {
   PREVIEW_UPDATE_API_PATH,
 } from './preview-update.js';
 import * as updateTrust from './update-channel-trust.js';
-import { createManualCloseApproval } from './manual-update-quit.js';
+import { createDesktopUpdateClose } from './desktop-update-close.js';
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
-import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
 import { installDesktopSerialPorts } from './desktop-serial-ports.js';
@@ -136,7 +135,7 @@ let desktopWindowReady = false;
 let quitRequested = false;
 let prepareLicenceQuit: (() => void) | null = null;
 const remoteAccess = createDesktopRemoteAccess(DESKTOP_DATA_PATH);
-const manualCloseApproval = createManualCloseApproval();
+const manualCloseApproval = createDesktopUpdateClose(app, () => BrowserWindow.getAllWindows());
 const reopenDesktopWindow = createDesktopWindowReopener({
   isReady: () => desktopWindowReady,
   isQuitting: () => quitRequested,
@@ -397,7 +396,7 @@ async function createWindow(): Promise<void> {
   nativeSmoke.installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
   installDesktopContextMenu(window);
-  const closeGuard = installDesktopWindowClose(window, {
+  const closeGuard = manualCloseApproval.install(window, {
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
@@ -405,7 +404,6 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
-  manualCloseApproval.observe(window, closeGuard);
   // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548),
   // and the taskbar button shows the job's progress (ADR-553).
   installSessionEndGuard(window);
@@ -529,6 +527,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
         updater: autoUpdater,
         canInstallManualUpdate: manualCloseApproval.canInstall,
+        requestManualUpdateClose: manualCloseApproval.request,
       });
       prepareLicenceQuit = licence.prepareQuit;
       const startup = createDesktopBackgroundStartup(licence, autoUpdater, {

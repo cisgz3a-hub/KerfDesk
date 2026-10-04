@@ -13,6 +13,7 @@ export function withLicensingRoutes(
   runtime: LicensingRuntime,
   earlyUpdates?: EarlyUpdates,
   updates?: DesktopUpdates,
+  requestUpdateClose?: () => void,
 ): ProtocolHandler {
   return async (request) => {
     const url = new URL(request.url);
@@ -21,11 +22,15 @@ export function withLicensingRoutes(
     const action = url.pathname.slice(PREFIX.length);
     if (action === 'early-updates') return earlyUpdateRoute(request, earlyUpdates);
     if (
-      ['update-status', 'check-updates', 'download-update', 'install-update-on-quit'].includes(
-        action,
-      )
+      [
+        'update-status',
+        'check-updates',
+        'download-update',
+        'install-update-on-quit',
+        'install-update-and-close',
+      ].includes(action)
     )
-      return updateRoute(action, request, updates);
+      return updateRoute(action, request, updates, requestUpdateClose);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
     if (!jsonPost(request)) return missing();
     const body = await readBody(request);
@@ -69,6 +74,7 @@ async function updateRoute(
   action: string,
   request: Request,
   updates: DesktopUpdates | undefined,
+  requestUpdateClose: (() => void) | undefined,
 ): Promise<Response> {
   if (updates === undefined) return missing();
   if (action === 'update-status')
@@ -80,8 +86,25 @@ async function updateRoute(
   if (action === 'check-updates') return response(updates.check());
   if (action === 'download-update')
     return updates.download === undefined ? missing() : response(updates.download());
+  return installUpdateRoute(action, updates, requestUpdateClose);
+}
+
+async function installUpdateRoute(
+  action: string,
+  updates: DesktopUpdates,
+  requestUpdateClose: (() => void) | undefined,
+): Promise<Response> {
   if (updates.installOnQuit === undefined) return missing();
-  return response(await updates.installOnQuit());
+  if (action === 'install-update-and-close' && requestUpdateClose === undefined) return missing();
+  const status = await updates.installOnQuit();
+  if (
+    action === 'install-update-and-close' &&
+    status.mode === 'manual' &&
+    status.state === 'ready' &&
+    status.installOnQuit === true
+  )
+    setTimeout(() => requestUpdateClose?.(), 0);
+  return response(status);
 }
 
 async function dispatch(

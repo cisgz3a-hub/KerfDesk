@@ -1,4 +1,4 @@
-export type RendererCloseOperation = 'prepare' | 'save' | 'approve' | 'cancel';
+export type RendererCloseOperation = 'prepare' | 'prepare-update' | 'save' | 'approve' | 'cancel';
 
 /** Fixed renderer-only operation; no renderer-to-main IPC or privileged API. */
 export function rendererCloseRequestScript(
