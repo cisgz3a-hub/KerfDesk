@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { chromium } from '@playwright/test';
 import { ORIGIN, start, connectDesktop, pairPhone, workspace, authorizeMcp } from './support.mjs';
+import { openTask } from './phone-workspace-support.mjs';
 
 const closeSocket = (socket) => {
   if (socket && socket.readyState < 2) socket.close();
@@ -209,6 +210,7 @@ test(
         ),
       );
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
       await page.locator('#operation-form [name=powerPercent]').waitFor({ state: 'visible' });
       await page.waitForFunction(
         () => document.querySelector('#operation-form [name=powerPercent]').value === '30',
@@ -227,6 +229,8 @@ test(
       assert.equal(fixture.getOperation('op-1').powerPercent, 25);
       assert.equal(await power.inputValue(), '25');
       const text = page.locator('#text-form');
+      await openTask(page, 'add-text-task');
+      await openTask(page, 'add-text-position');
       await text.locator('[name=text]').fill('Audit text');
       await text.locator('[name=xMm]').fill('-');
       await text.locator('button').click();
@@ -257,6 +261,7 @@ test(
       );
       assert.equal(addedText.args.expectedRevision, 'audit-2');
       const rectangle = page.locator('#rectangle-form');
+      await openTask(page, 'rectangle-task');
       await rectangle.locator('[name=xMm]').fill('');
       await rectangle.locator('button').click();
       assert.equal(
@@ -296,6 +301,7 @@ test(
       assert.ok(await page.getByText('<script>synthetic</script>', { exact: true }).count());
       await page.reload();
       await page.locator('#workspace-area').waitFor({ state: 'visible' });
+      await openTask(page, 'connection-options');
       await page.getByRole('button', { name: 'Disconnect this phone' }).click();
       await page.locator('#pair-card').waitFor({ state: 'visible' });
       assert.equal(await page.locator('#workspace-area').isHidden(), true);
@@ -474,6 +480,7 @@ for (const pairedOnStartup of [true, false])
         }
         await detailDelay.reached;
         await page.getByRole('button', { name: 'Edit', exact: true }).click();
+        if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
         const apply = page.getByRole('button', { name: 'Apply settings' });
         assert.equal(await page.locator('body').getAttribute('aria-busy'), 'true');
         assert.equal(await apply.isDisabled(), true);
@@ -560,6 +567,7 @@ for (const failure of ['offline PC', 'workspace error', 'second session error'])
         assert.equal(await page.locator('#workspace-area').isVisible(), true);
         assert.equal(await page.locator('#pair-card').isHidden(), true);
         await page.getByRole('button', { name: 'Edit', exact: true }).click();
+        if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
         assert.equal(await page.locator('#edit-forms').isHidden(), true);
         assert.equal(await page.locator('#readonly-note').isVisible(), true);
         assert.equal(await page.locator('#save-selection').isHidden(), true);
@@ -617,7 +625,9 @@ test(
       assert.ok(await page.locator('#artwork-list label').count());
       assert.ok(await page.locator('#details-list .detail').count());
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
       await page.locator('#operation-form [name=powerPercent]').fill('55');
+      await openTask(page, 'connection-options');
       await page.locator('#disconnect').click();
       await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
       assert.ok(receipts.some((item) => item.path === '/api/client/revoke' && item.status === 200));
@@ -711,6 +721,7 @@ test(
       await page.goto(`${ORIGIN}/control`);
       await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
       await page.locator('#operation-form [name=powerPercent]').fill('55');
       assert.equal(await page.locator('#workspace-name').textContent(), 'Previous PC workspace');
       replacement = await connectDesktop(worker);
@@ -860,6 +871,7 @@ test(
       await page.locator('#workspace-area').waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
       const selection = page.locator('#operation-list');
       await selection.selectOption('op-score');
       const power = page.locator('#operation-form [name=powerPercent]');
@@ -1060,6 +1072,7 @@ for (const pairedOnStartup of [true, false])
         }
         await workspaceDelay.reached;
         await page.getByRole('button', { name: 'Edit', exact: true }).click();
+        if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
         assert.equal(await page.locator('body').getAttribute('aria-busy'), 'true');
         assert.equal(await page.locator('#edit-forms').isHidden(), true);
         assert.equal(await page.locator('#readonly-note').isVisible(), true);

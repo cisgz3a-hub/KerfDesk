@@ -1,8 +1,12 @@
 import { KERFDESK_WORKSPACE_UI_HTML } from '../../../electron/mcp/workspace-ui.ts';
 import { UI_ORIGIN, fixtureState, idle, readResult } from './phone-workspace-support.mjs';
 
-export async function appPage(browser, state = fixtureState()) {
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+export async function appPage(browser, state = fixtureState(), width = 390) {
+  const context = await browser.newContext({
+    viewport: { width, height: 844 },
+    isMobile: true,
+    hasTouch: true,
+  });
   const page = await context.newPage();
   const errors = [];
   const rpc = [];
@@ -49,8 +53,8 @@ export async function appPage(browser, state = fixtureState()) {
     if (url.pathname === '/host')
       return route.fulfill({
         contentType: 'text/html',
-        body: `<!doctype html><html><body>
-      <iframe id="widget" src="/widget" style="width:100%;height:760px;border:0"></iframe>
+        body: `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0">
+      <iframe id="widget" src="/widget" style="display:block;width:100%;height:844px;border:0"></iframe>
       <script>
       const frame = document.getElementById('widget');
       window.addEventListener('message', async (event) => {

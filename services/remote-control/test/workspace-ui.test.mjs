@@ -2,7 +2,7 @@ import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 import { appPage, notification } from './workspace-ui-support.mjs';
-import { capture, fixtureState, idle, workspace } from './phone-workspace-support.mjs';
+import { capture, fixtureState, idle, visualState, workspace } from './phone-workspace-support.mjs';
 
 let browser;
 before(async () => {
@@ -151,6 +151,11 @@ test('MCP Apps: viewing-only and absent permission hints cannot issue writes', a
         .isDisabled(),
       true,
     );
+    assert.match(
+      await loaded.frame.locator('#access-note').textContent(),
+      /cannot confirm editing access.*Update KerfDesk/,
+    );
+    assert.match(await loaded.frame.locator('#summary').textContent(), /Editing unavailable/);
     assert.equal(state.edits, 0);
   } finally {
     await loaded.context.close();
@@ -323,3 +328,87 @@ test('MCP Apps: graceful host teardown acknowledges its ID and prevents later re
     await loaded.context.close();
   }
 });
+
+test('MCP Apps usability: empty history, empty workspace and viewing-only explain their next step', async () => {
+  const state = fixtureState();
+  state.empty = true;
+  state.history = { canUndo: false, canRedo: false };
+  const loaded = await appPage(browser, state);
+  try {
+    assert.match(await loaded.frame.locator('#items').textContent(), /Ask the assistant to add/);
+    assert.match(await loaded.frame.locator('#history-status').textContent(), /No changes/);
+    assert.equal(await loaded.frame.locator('#access-note').isHidden(), true);
+    state.scopes = ['read'];
+    await notification(loaded.page, workspace(state));
+    assert.match(
+      await loaded.frame.locator('#access-note').textContent(),
+      /Viewing only.*editing permission/,
+    );
+    assert.equal(await loaded.frame.locator('#items input:enabled').count(), 0);
+    assert.equal(state.edits, 0);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('MCP Apps usability: a stale edit explains refresh and retains the selected draft until refreshed', async () => {
+  const loaded = await appPage(browser);
+  try {
+    const { frame, state } = loaded;
+    await frame.locator('input[value="rectangle-1"]').check();
+    assert.match(await frame.locator('#selection-status').textContent(), /2 selected/);
+    state.revision += 1;
+    await frame.getByRole('button', { name: 'Use this selection', exact: true }).click();
+    await idle(frame);
+    assert.match(await frame.locator('#message').textContent(), /workspace changed.*Refresh/);
+    assert.equal(await frame.locator('input[value="rectangle-1"]').isChecked(), true);
+    assert.equal(await frame.locator('#select').isDisabled(), true);
+    assert.equal(state.edits, 0);
+    await frame.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await idle(frame);
+    assert.equal(await frame.locator('#select').isEnabled(), true);
+    await frame.locator('input[value="rectangle-1"]').check();
+    await frame.getByRole('button', { name: 'Use this selection', exact: true }).click();
+    await idle(frame);
+    const writes = state.commands.filter((item) => item.name === 'set_selection');
+    assert.equal(writes[1].args.expectedRevision, 'fixture-2');
+    assert.notEqual(writes[0].args.requestId, writes[1].args.requestId);
+    assert.equal(state.edits, 1);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+for (const width of [320, 390])
+  test(`MCP Apps usability: ${width}px layout has readable rows, comfortable taps and keyboard selection`, async () => {
+    const loaded = await appPage(browser, await visualState(), width);
+    try {
+      const { frame, state } = loaded;
+      await frame.waitForFunction(
+        () => globalThis.document.getElementById('preview').naturalWidth > 0,
+      );
+      assert.equal(
+        await frame.locator('#preview').evaluate((item) => item.naturalWidth),
+        state.preview?.widthPx ?? 1,
+      );
+      assert.ok(
+        await frame.evaluate(
+          () =>
+            globalThis.document.documentElement.scrollWidth <=
+            globalThis.document.documentElement.clientWidth,
+        ),
+      );
+      for (const selector of ['#refresh', '#undo', '#select', '#items label'])
+        assert.ok((await frame.locator(selector).first().boundingBox()).height >= 48);
+      const rectangle = frame.locator('input[value="rectangle-1"]');
+      await rectangle.focus();
+      await rectangle.press('Space');
+      assert.equal(await rectangle.isChecked(), true);
+      assert.match(await frame.locator('#selection-status').textContent(), /2 selected/);
+      assert.equal(state.edits, 0);
+      await capture(loaded.page, `portable-mcp-app-${width}-layout-fixture`);
+      assert.deepEqual(loaded.errors, []);
+    } finally {
+      await loaded.context.close();
+    }
+  });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
 import { ORIGIN, start, connectDesktop, pairPhone } from './support.mjs';
-import { capture, fixtureState, idle, readResult } from './phone-workspace-support.mjs';
+import { capture, fixtureState, idle, openTask, readResult } from './phone-workspace-support.mjs';
 
 test(
   'workerd phone page: approved frontend modules, CSP-rendered PNG, text edit and revoke',
@@ -85,6 +85,7 @@ test(
       await page.getByRole('button', { name: 'Load text from PC', exact: true }).click();
       await idle(page);
       await page.locator('#text-edit-form [name=text]').fill('Real relay edited text');
+      await openTask(page, 'text-spacing');
       await page.locator('#text-edit-form [name=letterSpacing]').fill('.25');
       await page.getByRole('button', { name: 'Update text', exact: true }).click();
       await idle(page);
@@ -94,6 +95,7 @@ test(
       assert.equal(await page.locator('canvas').count(), 0);
       assert.deepEqual(errors, []);
       await capture(page, 'workerd-phone-edit-fixture');
+      await openTask(page, 'connection-options');
       await page.getByRole('button', { name: 'Disconnect this phone', exact: true }).click();
       await idle(page);
       assert.equal(await page.locator('#workspace-area').isHidden(), true);

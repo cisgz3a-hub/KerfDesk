@@ -1,7 +1,14 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium } from '@playwright/test';
-import { capture, fixtureState, idle, phonePage } from './phone-workspace-support.mjs';
+import {
+  capture,
+  fixtureState,
+  idle,
+  openTask,
+  phonePage,
+  visualState,
+} from './phone-workspace-support.mjs';
 
 let browser;
 before(async () => {
@@ -41,6 +48,7 @@ test('phone text: searchable bounded fonts, keyboard selection, existing text an
   try {
     const { page, state } = loaded;
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'add-text-task');
     await page.locator('#text-form [name=fontSearch]').fill('serif');
     const font = page.locator('#text-form [name=fontId]');
     assert.equal(await font.locator('option').count(), 2);
@@ -55,8 +63,10 @@ test('phone text: searchable bounded fonts, keyboard selection, existing text an
     await idle(page);
     const form = page.locator('#text-edit-form');
     assert.equal(await form.locator('[name=text]').inputValue(), 'MCP test');
+    await openTask(page, 'text-fonts');
     await form.locator('[name=fontSearch]').fill('serif');
     await form.locator('[name=fontId]').selectOption('serif');
+    await openTask(page, 'text-spacing');
     const spacing = form.locator('[name=letterSpacing]');
     for (const draft of ['', '-', '-.', '-.5']) {
       await spacing.fill(draft);
@@ -85,6 +95,7 @@ test('phone number fields: first digit deletion, empty replacement and submit-on
   try {
     const { page, state } = loaded;
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'operation-task');
     const power = page.locator('#operation-form [name=powerPercent]');
     await power.press('Home');
     await power.press('Delete');
@@ -146,6 +157,7 @@ test('phone layout and history: selected IDs, equal-centre distribution, Undo th
     const { page, state } = loaded;
     await page.locator('#artwork-list input[value="rectangle-1"]').check();
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'arrange-task');
     await page.locator('#arrange-form [name=action]').selectOption('distribute_horizontal');
     await page.getByRole('button', { name: 'Apply layout action' }).click();
     await idle(page);
@@ -175,6 +187,8 @@ test('phone edits: stale response requires refresh and preserves unfinished form
   try {
     const { page, state } = loaded;
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'arrange-task');
+    await openTask(page, 'rectangle-task');
     await page.locator('#move-form [name=dxMm]').fill('2.5');
     await page.locator('#rectangle-form [name=widthMm]').fill('-');
     state.revision += 1;
@@ -203,6 +217,7 @@ test('phone edits: an uncertain result retains exactly the same ID and args on r
   try {
     const { page, state } = loaded;
     await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(page, 'rectangle-task');
     state.dropNextWrite = true;
     await page.getByRole('button', { name: 'Add rectangle', exact: true }).click();
     await idle(page);
@@ -230,6 +245,7 @@ for (const change of ['revoke', 'view-only', 'replace-client'])
     try {
       const { page, state } = loaded;
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await openTask(page, 'rectangle-task');
       if (change === 'revoke') state.revoked = true;
       if (change === 'view-only') state.scopes = ['read'];
       if (change === 'replace-client') state.clientId = 'replacement-fixture';
@@ -309,6 +325,7 @@ test('phone malformed workspace: fails closed and cannot edit a retained old sna
     await idle(loaded.page);
     assert.match(await loaded.page.locator('#notice').textContent(), /response is incomplete/);
     await loaded.page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await openTask(loaded.page, 'rectangle-task');
     assert.equal(
       await loaded.page.getByRole('button', { name: 'Add rectangle', exact: true }).isDisabled(),
       true,
@@ -330,6 +347,7 @@ for (const width of [320, 390, 768])
       }));
       assert.ok(size.scroll <= size.client);
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await openTask(page, 'add-text-task');
       const search = page.locator('#text-form [name=fontSearch]');
       await search.focus();
       await search.press('Tab');
@@ -341,6 +359,211 @@ for (const width of [320, 390, 768])
       );
       assert.ok((await page.locator('#text-form [name=fontId]').boundingBox()).height <= 160);
       if (width === 390) await capture(page, 'phone-mobile-layout-fixture');
+    } finally {
+      await loaded.context.close();
+    }
+  });
+
+test('phone usability: selection leads straight to loaded text, keyboard task disclosure and hidden invalid fields recover', async () => {
+  const loaded = await phonePage(browser);
+  try {
+    const { page, state } = loaded;
+    assert.equal(await page.locator('.intro').isHidden(), true);
+    assert.match(await page.locator('#selection-status').textContent(), /1 selected/);
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    assert.equal(await page.locator('#workspace-preview').isHidden(), true);
+    assert.equal(await page.locator('#text-editor').isVisible(), true);
+    assert.equal(
+      await page
+        .locator('#text-edit-form [name=text]')
+        .evaluate((item) => item === globalThis.document.activeElement),
+      true,
+    );
+    assert.equal(state.commands.filter((item) => item.name === 'get_text').length, 1);
+    assert.equal(state.edits, 0);
+    const summary = page.locator('#text-spacing > summary');
+    await summary.focus();
+    await summary.press('Enter');
+    const lineHeight = page.locator('#text-edit-form [name=lineHeight]');
+    await lineHeight.fill('');
+    await summary.click();
+    assert.equal(await lineHeight.isHidden(), true);
+    await page.getByRole('button', { name: 'Update text', exact: true }).click();
+    assert.equal(await lineHeight.isVisible(), true);
+    assert.equal(
+      await lineHeight.evaluate((item) => item === globalThis.document.activeElement),
+      true,
+    );
+    assert.equal(await lineHeight.inputValue(), '');
+    assert.equal(state.edits, 0);
+    await lineHeight.fill('-.');
+    await page.getByRole('button', { name: 'Update text', exact: true }).click();
+    await idle(page);
+    assert.equal(await lineHeight.inputValue(), '-.');
+    assert.match(await page.locator('#notice').textContent(), /valid number/);
+    assert.equal(state.edits, 0);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('phone usability: a long font list scrolls inside its picker and keeps the chosen font when searching', async () => {
+  const state = fixtureState();
+  state.fonts = Array.from({ length: 80 }, (_, index) => ({
+    id: `font-${index}`,
+    name: `Bundled font ${String(index).padStart(2, '0')}`,
+    style: 'sans',
+    geometry: 'outline',
+  }));
+  const loaded = await phonePage(browser, state, 320);
+  try {
+    const { page } = loaded;
+    await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(page);
+    await openTask(page, 'text-fonts');
+    const font = page.locator('#text-edit-form [name=fontId]');
+    await font.selectOption('font-40');
+    await font.focus();
+    await font.press('End');
+    assert.equal(await font.inputValue(), 'font-79');
+    assert.ok(await font.evaluate((element) => element.scrollTop > 0));
+    assert.ok((await font.boundingBox()).height <= 160);
+    await page.locator('#text-edit-form [name=fontSearch]').fill('font 01');
+    assert.equal(await font.inputValue(), 'font-79');
+    assert.equal(await font.locator('option').count(), 3);
+    assert.equal(state.edits, 0);
+    assert.deepEqual(loaded.errors, []);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('phone usability: older desktop permission hints do not grant edits and clearly request a PC update', async () => {
+  const state = fixtureState();
+  state.oldDesktop = true;
+  const loaded = await phonePage(browser, state);
+  try {
+    assert.equal(await loaded.page.locator('#readonly-note').isVisible(), true);
+    assert.equal(await loaded.page.locator('#readonly-title').textContent(), 'Update the PC app');
+    assert.match(
+      await loaded.page.locator('#readonly-message').textContent(),
+      /cannot confirm editing access.*Update KerfDesk/,
+    );
+    assert.equal(await loaded.page.locator('#artwork-list input:enabled').count(), 0);
+    await loaded.page.getByRole('button', { name: 'Edit', exact: true }).click();
+    assert.equal(await loaded.page.locator('#edit-forms').isHidden(), true);
+    assert.equal(state.edits, 0);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('phone usability: choosing another text clears the draft and returns keyboard focus to the chooser', async () => {
+  const loaded = await phonePage(browser);
+  try {
+    await loaded.page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(loaded.page);
+    assert.equal(await loaded.page.locator('#text-source-controls').isHidden(), true);
+    await loaded.page.locator('#text-edit-form [name=text]').fill('Draft only');
+    await loaded.page.getByRole('button', { name: 'Choose another text', exact: true }).click();
+    assert.equal(await loaded.page.locator('#text-source-controls').isVisible(), true);
+    assert.equal(await loaded.page.locator('#text-editor').isHidden(), true);
+    assert.equal(await loaded.page.locator('#text-edit-form [name=text]').inputValue(), '');
+    assert.equal(
+      await loaded.page
+        .locator('#text-artwork-list')
+        .evaluate((item) => item === globalThis.document.activeElement),
+      true,
+    );
+    assert.equal(loaded.state.edits, 0);
+  } finally {
+    await loaded.context.close();
+  }
+});
+
+test('phone usability: empty, viewing-only, sharing-off and renewed opt-out explain the next step without leaking loaded text', async () => {
+  const empty = fixtureState();
+  empty.empty = true;
+  empty.history = { canUndo: false, canRedo: false };
+  const loaded = await phonePage(browser, empty);
+  try {
+    assert.match(await loaded.page.locator('#artwork-list').textContent(), /Open Edit/);
+    assert.match(await loaded.page.locator('#history-status').textContent(), /No changes/);
+    await loaded.page.getByRole('button', { name: 'Edit', exact: true }).click();
+    assert.match(await loaded.page.locator('#text-load-status').textContent(), /No text yet/);
+    assert.equal(await loaded.page.locator('#text-editor').isHidden(), true);
+  } finally {
+    await loaded.context.close();
+  }
+  const state = fixtureState();
+  state.scopes = ['read'];
+  const readonly = await phonePage(browser, state);
+  try {
+    assert.equal(await readonly.page.locator('#readonly-note').isVisible(), true);
+    assert.match(
+      await readonly.page.locator('#readonly-message').textContent(),
+      /editing permission/,
+    );
+    assert.equal(await readonly.page.locator('#edit-selected-text').isHidden(), true);
+    assert.equal(state.edits, 0);
+  } finally {
+    await readonly.context.close();
+  }
+  const optOut = await phonePage(browser);
+  try {
+    await optOut.page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+    await idle(optOut.page);
+    optOut.state.sharing = false;
+    await optOut.page.getByRole('button', { name: 'Refresh', exact: true }).click();
+    await idle(optOut.page);
+    assert.equal(await optOut.page.locator('#text-editor').isHidden(), true);
+    assert.equal(await optOut.page.locator('#text-edit-form [name=text]').inputValue(), '');
+    assert.equal(await optOut.page.locator('#text-sharing-note').isVisible(), true);
+    assert.equal(await optOut.page.locator('#load-text').isDisabled(), true);
+    assert.equal(optOut.state.edits, 0);
+  } finally {
+    await optOut.context.close();
+  }
+});
+
+for (const width of [320, 390])
+  test(`phone usability: readable controls, comfortable taps and task layouts fit ${width}px`, async () => {
+    const loaded = await phonePage(browser, await visualState(), width);
+    try {
+      const { page, state } = loaded;
+      await page.waitForFunction(
+        () => globalThis.document.getElementById('workspace-preview').naturalWidth > 0,
+      );
+      assert.equal(
+        await page.locator('#workspace-preview').evaluate((item) => item.naturalWidth),
+        state.preview?.widthPx ?? 1,
+      );
+      assert.ok((await page.locator('.workspace-heading').boundingBox()).y < 120);
+      for (const selector of ['#refresh', '#undo', '[data-view=edit]', '#edit-selected-text'])
+        assert.ok((await page.locator(selector).boundingBox()).height >= 48);
+      await capture(page, `phone-artwork-${width}-layout-fixture`);
+      await page.getByRole('button', { name: 'Edit selected text', exact: true }).click();
+      await idle(page);
+      assert.equal(await page.locator('#add-text-task').getAttribute('open'), null);
+      assert.equal(await page.locator('#rectangle-task').getAttribute('open'), null);
+      for (const selector of ['#text-edit-form [name=text]', '#text-edit-form [name=fontSizeMm]'])
+        assert.ok(
+          await page
+            .locator(selector)
+            .evaluate((element) => parseFloat(globalThis.getComputedStyle(element).fontSize) >= 16),
+        );
+      assert.ok(
+        await page.evaluate(
+          () =>
+            globalThis.document.documentElement.scrollWidth <=
+            globalThis.document.documentElement.clientWidth,
+        ),
+      );
+      await capture(page, `phone-edit-${width}-layout-fixture`);
+      await openTask(page, 'text-fonts');
+      await capture(page, `phone-fonts-${width}-layout-fixture`);
+      assert.deepEqual(loaded.errors, []);
     } finally {
       await loaded.context.close();
     }

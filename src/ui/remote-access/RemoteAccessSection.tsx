@@ -9,12 +9,18 @@ import {
 } from '../settings/settings-styles';
 import { useRemoteAccessStore, type RemoteAccessStatus } from './remote-access-store';
 
+const remoteNoteStyle: React.CSSProperties = {
+  ...settingsNoteStyle,
+  fontSize: 13,
+  lineHeight: 1.5,
+};
+
 export function RemoteAccessSection(): JSX.Element {
   return (
     <>
       <RemoteConsent />
-      <ArtworkSharingConsent />
       <PairingControls />
+      <ArtworkSharingConsent />
       <ApprovedClients />
     </>
   );
@@ -37,7 +43,7 @@ function ArtworkSharingConsent(): JSX.Element {
         />
         <span>Share artwork previews and text with approved phones and MCP apps</span>
       </label>
-      <p style={settingsNoteStyle}>
+      <p style={remoteNoteStyle}>
         This is off by default. Turning it on lets approved connections see your artwork and read
         its text. An MCP app can send this content to its AI provider. Turn it off to stop sharing
         future previews and text; it cannot erase content already received by a client.
@@ -47,8 +53,9 @@ function ArtworkSharingConsent(): JSX.Element {
   );
 }
 function connectionText(status: RemoteAccessStatus | null): string {
+  if (status === null) return 'Loading connection status…';
   if (status?.enabled !== true) return 'Remote access is off';
-  return status.connected ? 'Connected to the remote service' : 'Waiting for the remote service';
+  return status.connected ? 'Ready to pair' : 'Connecting to the remote service…';
 }
 /** This consent never prevents ordinary desktop use. */
 function RemoteConsent(): JSX.Element {
@@ -56,17 +63,15 @@ function RemoteConsent(): JSX.Element {
   return (
     <section style={settingsGroupStyle}>
       <h3 style={settingsHeadingStyle}>Phone & MCP access</h3>
-      <p style={settingsNoteStyle}>
-        Connect a phone control page, ChatGPT or another MCP client to this computer. KerfDesk must
-        stay open and the computer must stay awake and online.
+      <p style={remoteNoteStyle}>
+        Use your phone, ChatGPT or another MCP app with this workspace. Keep KerfDesk open and this
+        computer awake and online.
       </p>
-      <p style={settingsNoteStyle}>
-        Connected clients can read artwork summaries, machine limits, recipes and job review facts.
-        An approved editing connection can add or edit text, arrange artwork, undo or redo its edits
-        and change laser operation settings in Laser workspaces. Machine execution remains on the
-        desktop.
+      <p style={remoteNoteStyle}>
+        Viewing shows workspace summaries, machine limits, recipes and job review. Editing lets an
+        approved connection change artwork and laser settings. Frame and Start stay on the PC.
       </p>
-      <p style={settingsNoteStyle}>
+      <p style={remoteNoteStyle}>
         Requests and these summaries pass through KerfDesk’s Cloudflare service. An MCP client may
         send them to its AI provider. Licence keys, serial ports and saved file paths are excluded.
       </p>
@@ -83,7 +88,7 @@ function RemoteConsent(): JSX.Element {
         <span>Allow approved remote connections</span>
       </label>
       <p role="status">{connectionText(status)}</p>
-      <p style={settingsNoteStyle}>
+      <p style={remoteNoteStyle}>
         Turning this off disconnects clients immediately and revokes their access when this computer
         next connects.
       </p>
@@ -96,12 +101,14 @@ function PairingControls(): JSX.Element {
   const { status, busy, act } = useRemoteAccessStore();
   return (
     <section style={settingsGroupStyle}>
-      <h3 style={settingsHeadingStyle}>Connect a phone or MCP client</h3>
-      <p style={settingsNoteStyle}>
-        Create a one-use pairing code, enter it on the phone or MCP sign-in page, then approve the
-        connection on this computer. Codes expire after five minutes.
-      </p>
+      <h3 style={settingsHeadingStyle}>Connect your phone</h3>
+      <ol style={{ ...remoteNoteStyle, paddingLeft: 20 }}>
+        <li>Create a code below.</li>
+        <li>Open the phone link on your phone and enter the code.</li>
+        <li>Return here to approve viewing or editing.</li>
+      </ol>
       <Button
+        variant="primary"
         disabled={busy || status?.connected !== true || status.pairingPending}
         onClick={() => {
           void act('pair');
@@ -109,24 +116,55 @@ function PairingControls(): JSX.Element {
       >
         Create pairing code
       </Button>
+      <PairingReadiness status={status} />
       {status?.pairingPending === true ? <p role="status">Creating a new pairing code…</p> : null}
       {status?.pairing != null ? (
-        <p>
-          Pairing code:{' '}
-          <strong style={{ fontFamily: 'monospace', letterSpacing: 2 }}>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <p style={remoteNoteStyle}>Pairing code</p>
+          <strong
+            style={{ fontFamily: 'monospace', fontSize: 22, letterSpacing: 2, userSelect: 'all' }}
+          >
             {status.pairing.code}
           </strong>
-        </p>
+          <CopyConnectionValue
+            key={status.pairing.code}
+            value={status.pairing.code}
+            label="Copy code"
+          />
+          <p style={remoteNoteStyle}>The code works once and expires after five minutes.</p>
+        </div>
       ) : null}
-      {status?.enabled === true && status.deviceId !== null ? (
-        <p>
-          <a href={status.controlUrl} target="_blank" rel="noreferrer">
-            Open the phone control page
-          </a>
-        </p>
-      ) : null}
+      <PhoneLink status={status} />
       <ConnectionUrls status={status} />
     </section>
+  );
+}
+function PairingReadiness({
+  status,
+}: {
+  readonly status: RemoteAccessStatus | null;
+}): JSX.Element | null {
+  if (status?.enabled !== true)
+    return <p style={remoteNoteStyle}>Turn on remote connections above to create a code.</p>;
+  if (!status.connected)
+    return <p style={remoteNoteStyle}>Wait for Ready to pair before creating a code.</p>;
+  return null;
+}
+function PhoneLink({ status }: { readonly status: RemoteAccessStatus | null }): JSX.Element | null {
+  if (status?.enabled !== true || status.deviceId === null) return null;
+  return (
+    <>
+      <p>
+        <a href={status.controlUrl} target="_blank" rel="noreferrer">
+          Open the phone control page
+        </a>
+      </p>
+      <CopyConnectionValue
+        key={status.controlUrl}
+        value={status.controlUrl}
+        label="Copy phone link"
+      />
+    </>
   );
 }
 function ConnectionUrls({
@@ -136,23 +174,75 @@ function ConnectionUrls({
 }): JSX.Element | null {
   if (status === null) return null;
   return (
-    <>
-      <p style={{ ...settingsNoteStyle, overflowWrap: 'anywhere' }}>
-        Phone page: {status.controlUrl}
+    <details>
+      <summary
+        title="Show the server URL and sign-in steps for ChatGPT or another MCP app."
+        style={{ cursor: 'pointer', padding: '8px 0' }}
+      >
+        Connect ChatGPT or another MCP app
+      </summary>
+      <p style={remoteNoteStyle}>
+        Add this server URL in your MCP app’s connection settings. Create a code above, enter it
+        during sign-in, then approve the connection on this PC.
       </p>
-      <p style={{ ...settingsNoteStyle, overflowWrap: 'anywhere' }}>
-        MCP server URL: {status.mcpUrl}
+      <p style={{ ...remoteNoteStyle, overflowWrap: 'anywhere', userSelect: 'all' }}>
+        {status.mcpUrl}
       </p>
+      <CopyConnectionValue key={status.mcpUrl} value={status.mcpUrl} label="Copy server URL" />
       {status.deviceId !== null ? (
-        <p style={{ ...settingsNoteStyle, overflowWrap: 'anywhere' }}>
-          Computer ID: {status.deviceId}
-        </p>
+        <>
+          <p style={{ ...remoteNoteStyle, overflowWrap: 'anywhere', userSelect: 'all' }}>
+            Computer ID: {status.deviceId}
+          </p>
+          <CopyConnectionValue
+            key={status.deviceId}
+            value={status.deviceId}
+            label="Copy computer ID"
+          />
+        </>
       ) : null}
-      <p style={settingsNoteStyle}>
+      <p style={remoteNoteStyle}>
         ChatGPT custom connections depend on your plan, workspace and available client features.
-        Public plugin listing requires OpenAI review.
       </p>
-    </>
+    </details>
+  );
+}
+
+function CopyConnectionValue({
+  value,
+  label,
+}: {
+  readonly value: string;
+  readonly label: string;
+}): JSX.Element {
+  const [result, setResult] = useState<'copied' | 'failed' | null>(null);
+  const [copying, setCopying] = useState(false);
+  const copy = async (): Promise<void> => {
+    setCopying(true);
+    setResult(null);
+    try {
+      await navigator.clipboard.writeText(value);
+      setResult('copied');
+    } catch {
+      setResult('failed');
+    } finally {
+      setCopying(false);
+    }
+  };
+  return (
+    <div style={{ display: 'grid', gap: 4, justifyItems: 'start' }}>
+      <Button disabled={copying} onClick={() => void copy()}>
+        {label}
+      </Button>
+      {result === null ? null : (
+        <p role="status" style={remoteNoteStyle}>
+          {result === 'copied' ? 'Copied.' : 'Copy is unavailable. Select and copy this text:'}
+        </p>
+      )}
+      {result === 'failed' ? (
+        <code style={{ overflowWrap: 'anywhere', userSelect: 'all' }}>{value}</code>
+      ) : null}
+    </div>
   );
 }
 function ApprovedClients(): JSX.Element {
@@ -161,7 +251,9 @@ function ApprovedClients(): JSX.Element {
     <section style={settingsGroupStyle}>
       <h3 style={settingsHeadingStyle}>Approved connections</h3>
       {(status?.clients.length ?? 0) === 0 ? (
-        <p style={settingsNoteStyle}>No approved connections.</p>
+        <p style={remoteNoteStyle}>
+          No approved connections yet. Connect a phone or MCP app above.
+        </p>
       ) : null}
       {status?.clients.map((client) => (
         <div key={client.id} style={settingsRowStyle}>

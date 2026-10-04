@@ -5,8 +5,8 @@ Remote access connects the desktop workspace to a phone control page and standar
 ## Connect a phone
 
 1. In **KerfDesk on the computer**, open **Edit > Settings… > Phone & MCP** and enable **Allow approved remote connections**.
-2. Wait for **Connected to the remote service**. Create a pairing code.
-3. On the phone, visit **[kerfdesk.com](https://kerfdesk.com)** and choose **Phone & MCP > Connect to your PC**, or open the phone-page address shown in desktop Settings. Enter the matching computer ID and copy the pairing code exactly, including letter case. A link opened from Settings already includes the public computer ID.
+2. Wait for **Ready to pair**. Create a pairing code. **Copy code** preserves its exact letter case.
+3. Use **Copy phone link** to open the connection page on your phone with the computer ID already filled in. You can also visit **[kerfdesk.com](https://kerfdesk.com)** and choose **Phone & MCP > Connect to your PC**. Enter the matching computer ID if needed, then the latest code.
 4. Approve the named connection on the computer. Choose **Allow viewing** or **Allow viewing and editing**.
 5. The phone page displays the current workspace and its available controls. It does not mount the desktop canvas.
 
@@ -18,7 +18,7 @@ The relay enforces the real expiry. Its messages retain the absolute expiry for 
 
 The setup page opens the controls as a full-page navigation to KerfDesk's existing remote service. Its first-party session cookie remains Secure, HttpOnly and SameSite Strict; control-page framing remains disabled. The mobile setup page itself has no scripts or session data. PWA navigation never substitutes the machining canvas for the phone setup page.
 
-If the phone reports that pairing is unavailable and nothing appears on the PC, first check **Connected to the remote service**, the matching Computer ID and the newest exact-case code. A rejection does not by itself prove the code expired: a disconnected PC, replaced code or permission limit can also reject the request before any desktop prompt. Do not share codes or licence keys when requesting support.
+If the phone reports that pairing is unavailable and nothing appears on the PC, first check **Ready to pair**, the matching Computer ID and the newest exact-case code. A rejection does not by itself prove the code expired: a disconnected PC, replaced code or permission limit can also reject the request before any desktop prompt. Do not share codes or licence keys when requesting support.
 
 ## Connect ChatGPT or another MCP app
 
@@ -26,7 +26,7 @@ Add this Streamable HTTP MCP URL in a client that supports authenticated remote 
 
 `https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp`
 
-Use the OAuth sign-in page to enter the computer ID and a new pairing code, then approve the requested permissions on the computer. The client receives access to that computer only. The authorization page and the desktop approval both show the requested access.
+In desktop Settings, expand **Connect ChatGPT or another MCP app** to copy the server URL and computer ID. Use the OAuth sign-in page to enter that computer ID and a new pairing code, then approve the requested permissions on the computer. The client receives access to that computer only. The authorization page and the desktop approval both show the requested access. If clipboard access is unavailable, the desktop displays the exact value for manual copying.
 
 In ChatGPT's web settings, enable **Developer mode** under **Security and login**, then create a connection from **ChatGPT Plugins** using the MCP URL above and OAuth. Let ChatGPT discover the login addresses. Its current setup defaults to `kerfdesk:read`; for an editing connection, use **Advanced OAuth settings > Base scopes** to request `kerfdesk:read kerfdesk:edit` and approve viewing and editing on the PC. `offline_access` is optional and requests reconnection with that approval for up to 30 days. The exact settings and availability depend on the account and workspace.
 
@@ -50,7 +50,7 @@ Editing connections can also:
 
 New text uses a chosen bundled font, or the bundled regular font when no font is supplied. Its requested width is a maximum layout width; overflow shrinks uniformly. Line height and letter spacing are multipliers of font size. Existing path text and variable text can be reviewed on the PC; this phase does not edit them remotely. Layout alignment uses the last requested artwork as its reference, and distribution spaces group centres equally. CNC creation and CNC operation settings are not included. Existing desktop Pro rules still apply; duplicating independent Pro artwork requires the ordinary Pro admission and leaves no delayed remote edit.
 
-The phone control page includes a bounded preview, a scrollable font search, an existing-text editor, layout actions and Undo/Redo. Numeric fields allow a blank or partial value while you type and validate when you submit. A compatible MCP Apps host can show the workspace preview panel when `get_workspace_preview` is called; other MCP clients receive the standard image result. Public ChatGPT plugin approval and UI support on each client remain separate from server implementation.
+The paired phone page opens directly to **Artwork**, **Edit** and **Details**. Select one text item and choose **Edit selected text** to load and focus its editor. Fonts, spacing and less common actions stay in expandable sections, with larger touch targets and inputs for small screens. Numeric fields allow a blank or partial value while you type and validate when you submit. A compatible MCP Apps host can show the workspace preview panel with selection and Undo/Redo when `get_workspace_preview` is called; other MCP clients receive the standard image result. Public ChatGPT plugin approval and UI support on each client remain separate from server implementation.
 
 Edits use the existing Undo, dirty-state and autosave behaviour. Each change carries the current document revision and a unique request ID. Local edits, Undo/Redo and opening a different document invalidate an old revision. A client must read the current workspace before retrying a stale change.
 

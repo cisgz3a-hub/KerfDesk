@@ -1,4 +1,4 @@
-import { $, fillOptions, safeText, validWorkspace } from './control-model.js';
+import { $, fillOptions, safeText, selectedIds, validWorkspace } from './control-model.js';
 
 export function renderWorkspace(value, canEdit) {
   if (!validWorkspace(value))
@@ -12,7 +12,9 @@ export function renderWorkspace(value, canEdit) {
   if (!value.artwork.length) {
     const empty = document.createElement('p');
     empty.className = 'muted';
-    empty.textContent = 'There is no artwork in this workspace yet.';
+    empty.textContent = canEdit
+      ? 'No artwork yet. Open Edit to add text or a rectangle.'
+      : 'No artwork yet. Add artwork on the PC to see it here.';
     list.append(empty);
   }
   $('#truncated').hidden = !value.truncated;
@@ -24,6 +26,23 @@ export function renderWorkspace(value, canEdit) {
     value.artwork.filter((item) => item.type === 'text'),
   );
   loadOperation(value);
+  selectionFeedback(value, canEdit);
+}
+
+export function selectionFeedback(workspace, writable) {
+  const ids = selectedIds();
+  const selectedText = workspace?.artwork.find(
+    (item) => item.id === ids[0] && item.type === 'text',
+  );
+  const summary = ids.length ? `${ids.length} selected` : 'No items selected';
+  $('#selection-status').textContent = summary;
+  $('#edit-selection-status').textContent =
+    `${summary}. Choose items in Artwork before arranging them.`;
+  $('#edit-selected-text').disabled =
+    !writable ||
+    ids.length !== 1 ||
+    !selectedText ||
+    workspace?.permissions?.artworkSharingEnabled === false;
 }
 
 function artworkItem(item, selection, canEdit) {
@@ -61,7 +80,7 @@ export function loadOperation(workspace) {
 
 export function resetWorkspace() {
   for (const target of document.querySelectorAll(
-    '#workspace-name,#workspace-meta,#artwork-list,#operation-list,#text-artwork-list,#details-list,#preview-bounds',
+    '#workspace-name,#workspace-meta,#artwork-list,#operation-list,#text-artwork-list,#details-list,#preview-bounds,#selection-status,#edit-selection-status',
   ))
     target.replaceChildren();
   $('#truncated').hidden = true;
@@ -69,6 +88,7 @@ export function resetWorkspace() {
   $('#workspace-preview').removeAttribute('src');
   $('#preview-message').textContent = 'Connect to your PC to view its workspace.';
   $('#text-editor').disabled = true;
+  $('#text-editor').hidden = true;
   $('#text-edit-form').reset();
   loadOperation(null);
 }

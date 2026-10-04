@@ -6,6 +6,29 @@ export const ONE_PIXEL_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO/aRvsAAAAASUVORK5CYII=';
 const publicRoot = new URL('../public/', import.meta.url);
 
+export async function openTask(page, id) {
+  const details = page.locator('#' + id);
+  if ((await details.getAttribute('open')) === null)
+    await details.locator(':scope > summary').click();
+}
+
+export async function visualState() {
+  const state = fixtureState();
+  const path = process.env.KERFDESK_MCP_PREVIEW_IMAGE;
+  if (!path) return state;
+  const png = await readFile(path);
+  state.preview = {
+    mimeType: 'image/png',
+    data: png.toString('base64'),
+    widthPx: png.readUInt32BE(16),
+    heightPx: png.readUInt32BE(20),
+  };
+  state.visual = true;
+  state.text.text = 'MCP controls';
+  state.fonts[2].name = 'Handwritten Script';
+  return state;
+}
+
 export function fixtureState() {
   return {
     clientId: 'client-fixture',
@@ -44,7 +67,7 @@ export function fixtureState() {
 }
 
 export function workspace(state) {
-  return {
+  const value = {
     revision: `fixture-${state.revision}`,
     name: 'Phone workspace fixture',
     mode: 'laser',
@@ -81,6 +104,24 @@ export function workspace(state) {
       },
     ],
   };
+  if (state.empty)
+    Object.assign(value, {
+      artwork: [],
+      operations: [],
+      selection: [],
+      totalArtwork: 0,
+      totalOperations: 0,
+    });
+  if (state.visual) {
+    value.name = 'MCP controls';
+    value.artwork[0].name = 'MCP controls';
+    value.artwork[1].name = 'Rectangle';
+  }
+  if (state.oldDesktop) {
+    delete value.permissions;
+    delete value.history;
+  }
+  return value;
 }
 
 export function readResult(state, name) {

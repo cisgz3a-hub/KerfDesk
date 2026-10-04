@@ -7,7 +7,7 @@ import {
   positive,
   selectedIds,
 } from './control-model.js';
-import { loadOperation } from './control-workspace.js';
+import { loadOperation, view } from './control-workspace.js';
 
 function selection() {
   const artworkIds = selectedIds();
@@ -90,9 +90,7 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
   bindOperation(update, edit);
   $('#operation-list').addEventListener('change', () => loadOperation(getWorkspace()));
   $('#text-artwork-list').addEventListener('change', clearText);
-  $('#load-text').addEventListener('click', () => {
-    void action(loadText);
-  });
+  bindTextAccess(action, loadText, clearText);
   $('#save-selection').addEventListener('click', () => {
     void action(() => edit('set_selection', { artworkIds: selectedIds() }));
   });
@@ -107,7 +105,12 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
     loadedText = null;
     $('#text-edit-form').reset();
     $('#text-editor').disabled = true;
-    $('#text-load-status').textContent = 'Load the selected text from the PC before editing.';
+    $('#text-editor').hidden = true;
+    $('#text-source-controls').hidden = false;
+    $('#change-text').hidden = true;
+    $('#text-load-status').textContent = $('#text-artwork-list').options.length
+      ? 'Choose text, then load it to make changes.'
+      : 'No text yet. Open Add new text below, or add text on the PC.';
   }
   async function loadText() {
     const artworkId = $('#text-artwork-list').value;
@@ -125,8 +128,10 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
     loadedRevision = value.revision;
     loadedText = value;
     $('#text-editor').disabled = false;
-    $('#text-load-status').textContent =
-      'Text loaded from the PC. Changes apply when you choose Update text.';
+    $('#text-editor').hidden = false;
+    $('#text-source-controls').hidden = true;
+    $('#change-text').hidden = false;
+    $('#text-load-status').textContent = 'Update text saves your changes on the PC.';
   }
   return {
     setFonts: (value) => fonts.set(value),
@@ -135,9 +140,45 @@ export function bindEditors({ action, edit, command, getWorkspace }) {
       fonts.set(null);
     },
     workspaceChanged() {
-      if (loadedRevision !== getWorkspace()?.revision) clearText();
+      if (
+        loadedRevision !== getWorkspace()?.revision ||
+        getWorkspace()?.permissions?.artworkSharingEnabled === false
+      )
+        clearText();
     },
   };
+}
+
+function bindTextAccess(action, loadText, clearText) {
+  async function read() {
+    await action(loadText);
+    if (!$('#text-editor').disabled) $('#text-edit-form [name=text]').focus();
+  }
+  $('#load-text').addEventListener('click', () => {
+    void read();
+  });
+  $('#change-text').addEventListener('click', () => {
+    clearText();
+    $('#text-artwork-list').focus();
+  });
+  $('#edit-selected-text').addEventListener('click', () => {
+    $('#text-artwork-list').value = selectedIds()[0] ?? '';
+    $('#edit-text-task').open = true;
+    view('edit');
+    void read();
+  });
+  document.addEventListener(
+    'invalid',
+    (event) => {
+      for (
+        let details = event.target.closest('details');
+        details;
+        details = details.parentElement.closest('details')
+      )
+        details.open = true;
+    },
+    true,
+  );
 }
 
 function validateText(value, artworkId) {

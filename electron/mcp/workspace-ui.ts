@@ -5,26 +5,32 @@ export const KERFDESK_WORKSPACE_UI_HTML = String.raw`<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>KerfDesk workspace</title>
 <style>
-:root{font-family:system-ui,sans-serif;color-scheme:light dark;color:#172e29;background:#f7faf8}
+:root{font-family:system-ui,sans-serif;font-size:16px;color-scheme:light dark;color:#172e29;background:#f7faf8}
 *{box-sizing:border-box}body{margin:0;padding:20px}header,.actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-header{justify-content:space-between}h1{font-size:20px;margin:0}p{line-height:1.5;overflow-wrap:anywhere}
-.muted{font-size:13px;color:#4d665e}.preview{background:#fff;border:1px solid #ccdcd5;border-radius:14px;overflow:hidden}
-img{width:100%;max-height:360px;object-fit:contain;display:block}button{font:inherit;min-height:44px;padding:10px 14px;border:1px solid #adc5b9;border-radius:10px;background:#d8f3e5;color:#163b2b;cursor:pointer}
-button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible{outline:3px solid #257cb7;outline-offset:2px}
+header{justify-content:space-between}h1{font-size:20px;margin:0;overflow-wrap:anywhere;min-width:0;flex:1}h2{font-size:17px;margin:20px 0 8px}p{line-height:1.5;overflow-wrap:anywhere}
+.muted{font-size:14px;color:#4d665e}.preview{background:#fff;border:1px solid #ccdcd5;border-radius:14px;overflow:hidden}
+img{width:100%;max-height:280px;object-fit:contain;display:block}button{font:inherit;min-height:48px;padding:10px 14px;border:1px solid #adc5b9;border-radius:10px;background:#d8f3e5;color:#163b2b;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}button:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid #257cb7;outline-offset:2px}
 .actions{margin:12px 0}.items{display:grid;gap:8px;max-height:240px;overflow:auto;overscroll-behavior:contain}
-label{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #ccdcd5;border-radius:10px;font-size:14px;overflow-wrap:anywhere}
-input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-size:13px;padding:10px;border-radius:10px;background:#e7f1eb}
+label{display:flex;gap:10px;align-items:center;padding:12px;min-height:48px;border:1px solid #ccdcd5;border-radius:10px;font-size:15px;overflow-wrap:anywhere}
+input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-size:14px;padding:12px;border-radius:10px;background:#e7f1eb}
+summary{cursor:pointer;min-height:48px;align-content:center;font-size:14px}#selection-status{margin:10px 0}#access-note{padding:12px;border:1px solid #ccdcd5;border-radius:10px}#select{width:100%}
 #message[data-error=true]{background:#fbe5e8;color:#803140}[hidden]{display:none!important}
 @media(prefers-color-scheme:dark){:root{color:#e4f2eb;background:#16241e}.muted{color:#b2c8bd}label,.preview{border-color:#3d5648}button{background:#254b36;color:#dff8e9;border-color:#456954}#message{background:#244132}}
 </style></head><body>
 <header><h1 id="title">KerfDesk workspace</h1><button id="refresh" type="button" disabled>Refresh</button></header>
 <p id="summary" class="muted">Connecting to the host…</p>
+<p id="access-note" class="muted" hidden></p>
+<div class="actions"><button id="undo" type="button" disabled>Undo</button><button id="redo" type="button" disabled>Redo</button><button id="retry" type="button" hidden>Retry last request</button></div>
+<p id="history-status" class="muted"></p>
 <div class="preview"><img id="preview" alt="Artwork preview from KerfDesk on your PC" hidden></div>
 <p id="preview-message" class="muted">Artwork previews and text sharing are controlled on the PC.</p>
-<div class="actions"><button id="undo" type="button" disabled>Undo</button><button id="redo" type="button" disabled>Redo</button><button id="retry" type="button" hidden>Retry last request</button></div>
+<h2>Choose artwork</h2>
 <div id="items" class="items" aria-label="Workspace artwork"></div>
+<p id="selection-status" class="muted" aria-live="polite"></p>
 <div class="actions"><button id="select" type="button" disabled>Use this selection</button></div>
-<p id="message" role="status" aria-live="polite">Open KerfDesk on the paired computer. Frame and Start remain on the PC.</p>
+<p id="message" role="status" aria-live="polite">Connecting to your open workspace…</p>
+<details><summary>About this view</summary><p class="muted">Keep KerfDesk open on the paired PC. Ask the assistant to add text, change fonts or arrange artwork. Frame and Start stay on the PC.</p></details>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -116,16 +122,24 @@ input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-si
     const history = workspace && workspace.history || {};
     $('undo').disabled = !enabled || !history.canUndo;
     $('redo').disabled = !enabled || !history.canRedo;
+    $('history-status').textContent = workspace ? history.canUndo || history.canRedo ? 'Undo and Redo share the PC’s history.' : 'No changes to undo yet.' : '';
+    $('access-note').hidden = !workspace || (canEdit() && toolCallsAvailable);
+    $('access-note').textContent = !toolCallsAvailable ? 'This host displays results only. Ask the assistant to refresh or edit your workspace.' : !workspace || !workspace.permissions || typeof workspace.permissions.canEdit !== 'boolean' ? 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.' : 'Viewing only. To edit, request editing permission and approve access on the PC.';
+    selectionFeedback();
     for (const input of $('items').querySelectorAll('input')) input.disabled = !enabled;
     $('retry').hidden = !pendingEdit;
     $('retry').disabled = busy || !connected || !toolCallsAvailable || !canEdit();
+  }
+  function selectionFeedback() {
+    const count = $('items').querySelectorAll('input:checked').length;
+    $('selection-status').textContent = workspace ? count ? count + ' selected' : 'No items selected' : '';
   }
   function renderWorkspace(value) {
     if (!validWorkspace(value))
       throw new Error('The workspace response is incomplete.');
     workspace = value;
     $('title').textContent = text(value.name, 512) || 'Untitled workspace';
-    $('summary').textContent = String(value.totalArtwork) + ' artwork · ' + String(value.totalOperations) + ' operations · ' + (canEdit() ? 'Editing approved' : 'Viewing only');
+    $('summary').textContent = String(value.totalArtwork) + ' artwork · ' + String(value.totalOperations) + ' operations · ' + (canEdit() ? 'Editing approved' : value.permissions && typeof value.permissions.canEdit === 'boolean' ? 'Viewing only' : 'Editing unavailable');
     $('items').replaceChildren();
     for (const item of value.artwork) {
       if (!item || typeof item.id !== 'string' || item.id.length > 128) continue;
@@ -134,7 +148,7 @@ input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-si
       title.textContent = text(item.name || item.type, 512) || 'Artwork';
       label.append(input, title); $('items').append(label);
     }
-    if (!value.artwork.length) $('items').textContent = 'There is no artwork in this workspace yet.';
+    if (!value.artwork.length) $('items').textContent = canEdit() ? 'No artwork yet. Ask the assistant to add text or a rectangle.' : 'No artwork yet. Add artwork on the PC to see it here.';
     $('preview').hidden = true; $('preview').removeAttribute('src');
     controls();
   }
@@ -158,10 +172,10 @@ input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-si
     const image = $('preview'); image.hidden = true; image.removeAttribute('src');
     if (workspace && value.revision !== workspace.revision) { $('preview-message').textContent = 'Refresh to see the current workspace preview.'; return; }
     if (value.status === 'disabled') {
-      $('preview-message').textContent = 'Sharing is off. On the PC enable “Share artwork previews and text with approved phones and MCP apps” in Settings → Phone & MCP.';
+      $('preview-message').textContent = 'Sharing is off. To see your artwork, open Settings → Phone & MCP on the PC and enable artwork previews and text sharing.';
     } else if (value.status === 'ready' && validImage(value.preview)) {
       image.src = 'data:image/png;base64,' + value.preview.data; image.hidden = false;
-      $('preview-message').textContent = 'Design preview, not a toolpath or live machine position. Refresh after changes on the PC.';
+      $('preview-message').textContent = 'Artwork preview. Machine position and toolpaths are shown on the PC. Refresh after PC changes.';
     } else $('preview-message').textContent = text(value.message) || 'Preview unavailable. Your artwork stays on the PC.';
   }
   async function refresh() {
@@ -202,6 +216,7 @@ input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-si
   $('select').addEventListener('click', () => { void run(() => mutate('set_selection', { artworkIds: [...$('items').querySelectorAll('input:checked')].map((input) => input.value) })); });
   for (const name of ['undo', 'redo']) $(name).addEventListener('click', () => { void run(() => mutate(name, {})); });
   $('retry').addEventListener('click', () => { void run(retry); });
+  $('items').addEventListener('change', selectionFeedback);
   void run(async () => {
     if (window.parent === window) throw new Error('Open this view in an MCP Apps compatible host.');
     const initialized = await request('ui/initialize', { appInfo: { name: 'kerfdesk-workspace', version: '1.0.0' }, appCapabilities: {}, protocolVersion: '2026-01-26' });
@@ -209,7 +224,7 @@ input{width:20px;height:20px;flex-shrink:0;accent-color:#277f57}#message{font-si
     connected = true;
     toolCallsAvailable = !!initialized.hostCapabilities && typeof initialized.hostCapabilities.serverTools === 'object' && initialized.hostCapabilities.serverTools !== null && !Array.isArray(initialized.hostCapabilities.serverTools);
     send({ jsonrpc: '2.0', method: 'ui/notifications/initialized', params: {} });
-    if (toolCallsAvailable) { await refresh(); message('Connected to KerfDesk. Frame and Start remain on the PC.'); }
+    if (toolCallsAvailable) { await refresh(); message('Changes here are saved to the open workspace on your PC.'); }
     else message('This host can display tool results. Ask the assistant to refresh or edit; this view cannot call tools.');
   });
 })();

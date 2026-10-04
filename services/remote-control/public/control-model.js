@@ -85,7 +85,7 @@ export function renderPreview(value, revision) {
   image.src = 'data:image/png;base64,' + value.preview.data;
   image.hidden = false;
   message.textContent =
-    'Design preview, not a toolpath or live machine position. Refresh after changes on the PC.';
+    'Artwork preview. Machine position and toolpaths are shown on the PC. Refresh after PC changes.';
   const box = value.bounds;
   if (box && [box.xMm, box.yMm, box.widthMm, box.heightMm].every(Number.isFinite))
     bounds.textContent = `Artwork bounds: ${box.widthMm.toFixed(2)} × ${box.heightMm.toFixed(2)} mm · X ${box.xMm.toFixed(2)}, Y ${box.yMm.toFixed(2)}`;
@@ -131,6 +131,9 @@ export function createFontPickers() {
     const query = form.elements.fontSearch.value.trim().toLocaleLowerCase();
     const matching = fonts.filter((font) => font.name.toLocaleLowerCase().includes(query));
     const current = fonts.find((font) => font.id === chosen);
+    const caption = form.querySelector('.current-font');
+    if (caption)
+      caption.textContent = current ? ` · ${safeText(current.name, 128)}` : ' · Keep current';
     const visible = current && !matching.includes(current) ? [current, ...matching] : matching;
     fillOptions(
       select,

@@ -1,7 +1,13 @@
 import { pairingDeadline, rejectedMessage } from './pairing.js';
 import { $, bindForm, renderPreview, safeText, validWorkspace } from './control-model.js';
 import { bindEditors } from './control-edit.js';
-import { refreshDetails, renderWorkspace, resetWorkspace, view } from './control-workspace.js';
+import {
+  refreshDetails,
+  renderWorkspace,
+  resetWorkspace,
+  selectionFeedback,
+  view,
+} from './control-workspace.js';
 
 const pairForm = $('#pair-form');
 let session = null;
@@ -74,13 +80,13 @@ function canEdit() {
     !!workspace &&
     !!session?.online &&
     session.client.scopes.includes('edit') &&
-    workspace.permissions?.canEdit !== false
+    workspace.permissions?.canEdit === true
   );
 }
 function syncControls() {
   const admitted = canEdit();
   const writable = admitted && !busy && !stale && !pendingEdit;
-  $('#readonly-note').hidden = !session || admitted;
+  syncReadAccess(admitted);
   for (const input of document.querySelectorAll('#artwork-list input')) input.disabled = !writable;
   for (const input of document.querySelectorAll(
     '#edit-forms input, #edit-forms select, #edit-forms textarea',
@@ -92,20 +98,41 @@ function syncControls() {
     button.disabled = !writable;
   syncEditorControls();
   syncSessionControls();
+  selectionFeedback(workspace, writable);
+}
+function syncReadAccess(admitted) {
+  $('#readonly-note').hidden = !session || admitted;
+  const unknown =
+    !!session?.client.scopes.includes('edit') && workspace?.permissions?.canEdit === undefined;
+  $('#readonly-title').textContent = !session?.online
+    ? 'PC offline'
+    : unknown
+      ? 'Update the PC app'
+      : 'Viewing only';
+  $('#readonly-message').textContent = !session?.online
+    ? 'Open KerfDesk on the PC, then refresh here to reconnect.'
+    : unknown
+      ? 'The PC app cannot confirm editing access. Update KerfDesk on the PC, then refresh here.'
+      : 'To edit, pair again with editing permission and approve this phone on the PC.';
 }
 function syncEditorControls() {
   const history = workspace?.history ?? {};
   const sharingOff = workspace?.permissions?.artworkSharingEnabled === false;
   $('#undo').disabled ||= !history.canUndo;
   $('#redo').disabled ||= !history.canRedo;
+  $('#history-status').textContent =
+    history.canUndo || history.canRedo
+      ? 'Changes share the PC’s undo history.'
+      : 'No changes to undo yet.';
   $('#operation-form button').disabled ||= !$('#operation-list').options.length;
   $('#load-text').disabled ||= !$('#text-artwork-list').options.length || sharingOff;
   $('#text-sharing-note').hidden = !sharingOff;
 }
 function syncSessionControls() {
   const hasEditScope = !!session?.client.scopes.includes('edit');
-  $('#edit-forms').hidden = !hasEditScope || workspace?.permissions?.canEdit === false;
+  $('#edit-forms').hidden = !hasEditScope || workspace?.permissions?.canEdit !== true;
   $('#save-selection').hidden = !hasEditScope;
+  $('#edit-selected-text').hidden = !hasEditScope;
   for (const button of document.querySelectorAll('#pair-form button, #disconnect, #refresh'))
     button.disabled = busy;
   $('#retry-edit').hidden = !pendingEdit;
@@ -129,6 +156,7 @@ function setSession(value) {
     : 'Not connected';
   $('#device-name').textContent = safeText(value?.deviceLabel, 64) || 'Connected computer';
   $('#pair-card').hidden = !!value;
+  $('.intro').hidden = !!value;
   $('#workspace-area').hidden = !value;
   syncControls();
 }
@@ -240,6 +268,7 @@ function editFailure(error, attempt) {
   throw error;
 }
 const editors = bindEditors({ action, edit, command, getWorkspace: () => workspace });
+$('#artwork-list').addEventListener('change', syncControls);
 function continueToMcp() {
   const target = new URLSearchParams(location.search).get('continue');
   if (!target || target.length > 4096) return false;

@@ -8,7 +8,7 @@ import {
   setArtworkSharingEnabled,
 } from './artwork-sharing';
 import { RemoteAccessSection } from './RemoteAccessSection';
-import { useRemoteAccessStore } from './remote-access-store';
+import { useRemoteAccessStore, type RemoteAccessStatus } from './remote-access-store';
 
 let root: Root | null = null;
 let host: HTMLDivElement;
@@ -25,6 +25,29 @@ function sharingBox(): HTMLInputElement {
   const input = label?.querySelector('input');
   if (!(input instanceof HTMLInputElement)) throw Error('Sharing checkbox missing');
   return input;
+}
+function connectedStatus(code = 'ExampleCode1'): RemoteAccessStatus {
+  return {
+    statusRevision: 1,
+    available: true,
+    enabled: true,
+    connected: true,
+    deviceId: '11111111-1111-4111-8111-111111111111',
+    controlUrl: 'https://example.test/control?device=11111111-1111-4111-8111-111111111111',
+    mcpUrl: 'https://example.test/mcp',
+    pairing: { code, expiresAt: Date.now() + 300_000, expiresInMs: 300_000 },
+    pairingPending: false,
+    requests: [],
+    clients: [],
+    error: null,
+  };
+}
+function button(label: string): HTMLButtonElement {
+  const found = Array.from(host.querySelectorAll('button')).find(
+    (item) => item.textContent === label,
+  );
+  if (found === undefined) throw Error(`Button missing: ${label}`);
+  return found;
 }
 
 beforeEach(() => {
@@ -117,5 +140,51 @@ describe('desktop artwork-sharing consent', () => {
     await act(async () => box.click());
     expect(artworkSharingEnabled()).toBe(false);
     expect(box.checked).toBe(false);
+  });
+  it('copies the pairing code and a phone link that already contains the computer ID', async () => {
+    const status = connectedStatus();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    useRemoteAccessStore.setState({ status });
+    await renderSection();
+    await act(async () => button('Copy code').click());
+    expect(writeText).toHaveBeenNthCalledWith(1, status.pairing!.code);
+    await act(async () => button('Copy phone link').click());
+    expect(writeText).toHaveBeenNthCalledWith(2, status.controlUrl);
+    expect(host.textContent).toContain('Ready to pair');
+    expect(host.querySelector('details')?.open).toBe(false);
+    expect(sharingBox().checked).toBe(false);
+  });
+  it('offers the exact value for manual copying when clipboard access is denied', async () => {
+    const status = connectedStatus();
+    const writeText = vi.fn().mockRejectedValue(Error('clipboard denied'));
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    useRemoteAccessStore.setState({ status });
+    await renderSection();
+    await act(async () => button('Copy phone link').click());
+    expect(host.textContent).toContain('Copy is unavailable. Select and copy this text:');
+    expect(host.querySelector('code')?.textContent).toBe(status.controlUrl);
+    expect(button('Copy phone link').disabled).toBe(false);
+  });
+  it('does not mark a replacement code copied when an older clipboard request finishes', async () => {
+    let finish: (() => void) | undefined;
+    const writeText = vi.fn().mockReturnValue(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    vi.stubGlobal('navigator', { clipboard: { writeText } });
+    useRemoteAccessStore.setState({ status: connectedStatus('OriginalCode') });
+    await renderSection();
+    await act(async () => button('Copy code').click());
+    expect(button('Copy code').disabled).toBe(true);
+    await act(async () =>
+      useRemoteAccessStore.setState({ status: connectedStatus('NewCodeValue') }),
+    );
+    await act(async () => finish?.());
+    expect(host.textContent).toContain('NewCodeValue');
+    expect(host.textContent).not.toContain('OriginalCode');
+    expect(host.textContent).not.toContain('Copied.');
+    expect(button('Copy code').disabled).toBe(false);
   });
 });
