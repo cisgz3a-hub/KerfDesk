@@ -99,21 +99,29 @@ async function pose(loaded) {
     pageScale: await loaded.page.evaluate(() => globalThis.visualViewport.scale),
   };
 }
-async function projectedBox(loaded, selector) {
-  return loaded.surface.locator(selector).evaluate((outline) => {
-    const bounds = outline.getBBox();
-    const matrix = outline.getScreenCTM();
-    const from = new globalThis.DOMPoint(bounds.x, bounds.y).matrixTransform(matrix);
-    const to = new globalThis.DOMPoint(
-      bounds.x + bounds.width,
-      bounds.y + bounds.height,
-    ).matrixTransform(matrix);
-    return { x: from.x, y: from.y, width: to.x - from.x, height: to.y - from.y };
-  });
+async function alignmentSnapshot(loaded, selector) {
+  // Resize and scroll repaint the SVG children. Query and measure the live pair in one task.
+  return loaded.surface.evaluate(
+    ({ image, selector }) => {
+      const preview = globalThis.document.querySelector(image).getBoundingClientRect();
+      const outline = globalThis.document.querySelector(selector);
+      const bounds = outline.getBBox();
+      const matrix = outline.getScreenCTM();
+      const from = new globalThis.DOMPoint(bounds.x, bounds.y).matrixTransform(matrix);
+      const to = new globalThis.DOMPoint(
+        bounds.x + bounds.width,
+        bounds.y + bounds.height,
+      ).matrixTransform(matrix);
+      return {
+        image: { x: preview.x, y: preview.y, width: preview.width, height: preview.height },
+        box: { x: from.x, y: from.y, width: to.x - from.x, height: to.y - from.y },
+      };
+    },
+    { image: loaded.image, selector },
+  );
 }
 async function assertAligned(loaded, selector, bounds) {
-  const image = await loaded.surface.locator(loaded.image).boundingBox();
-  const box = await projectedBox(loaded, selector);
+  const { image, box } = await alignmentSnapshot(loaded, selector);
   const viewport = loaded.state.viewport;
   for (const [key, value] of Object.entries({
     x: image.x + ((bounds.xMm - viewport.xMm) * image.width) / viewport.widthMm,
