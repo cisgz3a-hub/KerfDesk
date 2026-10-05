@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "c998b4d82971fdacfbb1e2d36cc93c2d30080245",
+  "sinceSourceSha": "132ad4364d966fffa62f0d6f5aa7456e7493159c",
   "highlights": [
-    "Trying Start during a positioning mark keeps your completed Frame ready for the job.",
-    "Fixed trial time returning after restart and number boxes staying invalid after their value was restored.",
-    "Image edits stay with their file, and side-panel controls remain reachable in small windows.",
-    "Dialogs preserve newer projects, drafts, keyboard focus and text during character selection.",
-    "Phone & MCP adds QR scanning, touch drawing and resizing, clearer controls and live PC artwork updates.",
-    "Updates show download progress and verification, with Install and close KerfDesk preserving unsaved work and active jobs."
+    "Phone & MCP puts shape and text creation beside the canvas, with clearer drawing, panning, zooming and resizing controls.",
+    "Phone and MCP number fields accept decimal commas and retain unfinished entries when the view refreshes.",
+    "Completed touch drawings survive cancelled navigation, and arrow keys no longer disturb a held Move.",
+    "Moving, resizing and rotating grouped artwork from a paired client keeps the group together.",
+    "Long paired editing sessions recover Job Review while keeping completed Frame evidence for unchanged placement."
   ]
 }
