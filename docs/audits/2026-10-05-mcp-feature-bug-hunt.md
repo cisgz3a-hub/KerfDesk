@@ -36,6 +36,17 @@ Production changes are in `services/remote-control/public/control-model.js`, `co
 | Phone pre-dispatch cancellation race | Unverified. The service investigation was stopped after platform review; the attempted fixture did not execute that scenario. No claim of a defect or passing check. |
 | Physical phone, actual ChatGPT host, installed customer upgrade, power loss and real controller/material | Not qualified in this audit. |
 
+## Dependency advisory triage
+
+A fresh full/production dependency scan at `2026-10-05T11:46:55Z`, classified with the repository's `report-dependency-audit.mjs`, found zero runtime-reachable registry advisories, one release-build-only advisory and one build/test-only advisory. The classification includes the packaged Electron host even though Electron is declared as a dev dependency. This snapshot does not prove the absence of vulnerabilities.
+
+| Package and published advisory | Verified dependency path | Status |
+| --- | --- | --- |
+| `http-cache-semantics@4.2.0`, [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp), high | `electron-builder > app-builder-lib > @electron/get > got > cacheable-request` | Release build tooling. The registry lists no patched version. The [maintainer disputed the report and closed it on 4 October](https://github.com/kornelski/http-cache-semantics/issues/56#issuecomment-5975759591), explaining the distinction between cache freshness and privacy. The registry alert remains open; neither its severity label nor the dispute alone demonstrates this application's exposure. |
+| `braces@3.0.3`, [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), high | `eslint-plugin-boundaries > micromatch`, also via `@boundaries/elements` | Lint tooling. The registry lists no patched version. No runtime dependency path or product reproduction was found in this audit. |
+
+These remain dependency-maintenance follow-ups. No exploit probe, speculative patch or unsupported version override was used to erase an alert. Raw registry snapshots, exit codes and the classified report are saved in the audit evidence directory.
+
 ## Feature research and recommended order
 
 These are proposals, not features completed by this repair.
@@ -59,9 +70,9 @@ Final combined local verification passed:
 - Desktop remote-control and Electron MCP integration: 28 test files, 342 tests.
 - Complete remote-control service suite, including Chromium phone and embedded UI scenarios: 376 tests, zero failures or skips. Its build used the existing Wrangler dry-run script; no Worker version was published.
 - App, Electron and service TypeScript checks.
-- Service lint/format, generated shared-touch and scanner parity, production dependency licence policy and current service notices.
+- Repository, Electron and service lint; repository/service formatting; generated shared-touch and scanner parity; production dependency licence policy and current service notices; file-size backstop, soft-size policy and public-export ratchet.
 - Independent scoped review of all five fixes found no additional actionable correctness regression.
 
-There are 41 new regression scenarios across four files. The root repository lint/format and size-policy checks are recorded with the final delivery. Evidence logs and reproduction fixtures are under `D:/LaserForge/mcp-feature-audit-evidence-20261005/`; they are development artifacts, not customer content.
+There are 41 new regression scenarios across four files. Evidence logs and reproduction fixtures are under `D:/LaserForge/mcp-feature-audit-evidence-20261005/`; they are development artifacts, not customer content.
 
 These repairs require updated service UI assets and an updated desktop build for their respective behavior. Source verification or a merged PR does not establish that either installed or live version contains them. This task does not manufacture a new Windows installer or claim live ChatGPT/phone/hardware qualification.
