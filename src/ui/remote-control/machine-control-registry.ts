@@ -10,6 +10,7 @@ import {
   ownMachineOperation,
   recordMachineOperationFailure,
   currentMachineReviewForApproval,
+  rebuildMachineReviewIfStale,
   type MachineAction,
   type BackgroundMachineAction,
 } from './machine-owned-operation';
@@ -273,6 +274,10 @@ export class MachineControlRegistry {
     const source = this.sources.get(value.data);
     if (source === undefined) throw new RemoteFault('unavailable');
     return this.result(source.caller, source.id, source.operation, source.status);
+  };
+  readonly revisionRenewed = (): void => {
+    for (const operation of new Set(this.operations.values()))
+      rebuildMachineReviewIfStale(operation, this.revision());
   };
   readonly dispose = (): void => {
     this.disposed = true;

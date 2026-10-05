@@ -4,9 +4,7 @@ export class TouchView {
     this.listen(this.surface, 'pointerdown', (event) => this.down(event));
     this.listen(this.surface, 'pointermove', (event) => this.move(event));
     this.listen(this.surface, 'pointerup', (event) => this.up(event));
-    this.listen(this.surface, 'pointercancel', () =>
-      this.reset('Gesture cancelled. Nothing was applied.'),
-    );
+    this.listen(this.surface, 'pointercancel', (event) => this.cancelPointer(event));
     this.listen(
       document,
       'pointerdown',
@@ -21,12 +19,7 @@ export class TouchView {
       true,
     );
     this.listen(this.surface, 'lostpointercapture', (event) => {
-      if (
-        this.gesture?.id === event.pointerId ||
-        (this.viewport.pointers.has(event.pointerId) &&
-          !this.surface.hasPointerCapture(event.pointerId))
-      )
-        this.reset('Gesture cancelled. Nothing was applied.');
+      if (!this.surface.hasPointerCapture(event.pointerId)) this.cancelPointer(event);
     });
     this.listen(this.surface, 'keydown', (event) => this.key(event));
     this.listen(

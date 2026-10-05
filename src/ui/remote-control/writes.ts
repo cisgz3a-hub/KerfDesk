@@ -4,7 +4,7 @@ import { DEFAULT_TEXT_COLOR } from '../../core/text';
 import type { AppState } from '../state/store';
 import type { RemoteAppStore, RemoteOperationPatch, RemoteWrite } from './types';
 import { RemoteFault } from './fault';
-import { editableArtwork, prepareTransforms } from './transforms';
+import { editableArtwork, expandedArtworkGroupIds, prepareTransforms } from './transforms';
 import { prepareRemoteText } from './text';
 import { editableText, prepareTextEdit } from './text-edit';
 import { applyHistory, prepareArrange } from './arrange';
@@ -46,11 +46,12 @@ export async function applyRemoteWrite(
       });
     }
     case 'transform_artwork': {
-      const objects = editableArtwork(state, write.args.artworkIds);
+      const ids = expandedArtworkGroupIds(state, write.args.artworkIds);
+      const objects = editableArtwork(state, ids);
       const transforms = prepareTransforms(objects, write.args.transform);
       return commit(() => {
         state.applySelectionTransforms(transforms);
-        return { changedArtworkIds: [...write.args.artworkIds] };
+        return { changedArtworkIds: ids };
       });
     }
     case 'update_operation':

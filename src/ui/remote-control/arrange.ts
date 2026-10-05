@@ -15,7 +15,7 @@ import { newlyIntroducedProFeature } from '../licensing/pro-operation-policy';
 import { proFeaturesUnlocked } from '../licensing/edition';
 import { withUndoStepName } from '../state/undo-step-names';
 import { historyProjection } from './authoring-projections';
-import { editableArtwork, validateTransforms } from './transforms';
+import { editableArtwork, expandedArtworkGroupIds, validateTransforms } from './transforms';
 import { publicIdentifier, selectedIds } from './projections';
 import { RemoteFault } from './fault';
 import type { RemoteArrangeAction, RemoteAppStore } from './types';
@@ -45,7 +45,7 @@ export function prepareArrange(
   requested: readonly string[],
   action: RemoteArrangeAction,
 ): PreparedArrange {
-  const ids = expandedGroupIds(state, requested);
+  const ids = expandedArtworkGroupIds(state, requested);
   const objects = editableArtwork(state, ids);
   const referenceId = requested.at(-1);
   if (referenceId === undefined) throw new RemoteFault('invalid_arguments');
@@ -104,30 +104,6 @@ function assertSelectionOwner(before: AppState, current: AppState, ids: readonly
   const selected = new Set(selectedIds(current));
   if (selected.size !== ids.length || !ids.every((id) => selected.has(id)))
     throw new RemoteFault('stale_revision');
-}
-
-function expandedGroupIds(state: AppState, requested: readonly string[]): string[] {
-  const ids = new Set(requested);
-  const memberships = new Map<string, (readonly string[])[]>();
-  for (const group of state.project.scene.groups ?? []) {
-    for (const id of group.objectIds) {
-      const groups = memberships.get(id) ?? [];
-      groups.push(group.objectIds);
-      memberships.set(id, groups);
-    }
-  }
-  const pending = [...ids];
-  for (const id of pending) {
-    for (const members of memberships.get(id) ?? []) {
-      for (const member of members) {
-        if (ids.has(member)) continue;
-        if (ids.size >= 200) throw new RemoteFault('unsupported_operation');
-        ids.add(member);
-        pending.push(member);
-      }
-    }
-  }
-  return [...ids];
 }
 
 function arrangeTransforms(
