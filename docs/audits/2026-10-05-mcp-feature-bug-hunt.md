@@ -38,14 +38,14 @@ Production changes are in `services/remote-control/public/control-model.js`, `co
 
 ## Dependency advisory triage
 
-A fresh full/production dependency scan at `2026-10-05T11:46:55Z`, classified with the repository's `report-dependency-audit.mjs`, found zero runtime-reachable registry advisories, one release-build-only advisory and one build/test-only advisory. The classification includes the packaged Electron host even though Electron is declared as a dev dependency. This snapshot does not prove the absence of vulnerabilities.
+A full/production dependency scan at `2026-10-05T11:46:55Z`, classified with the repository's `report-dependency-audit.mjs`, initially found zero runtime-reachable registry advisories, one release-build-only advisory and one build/test-only advisory. After the scoped cache update below, the `2026-10-05T12:03:14Z` scan found zero runtime, zero release-build-only and one build/test-only advisory. The classification includes the packaged Electron host even though Electron is declared as a dev dependency. These snapshots do not prove the absence of vulnerabilities.
 
 | Package and published advisory | Verified dependency path | Status |
 | --- | --- | --- |
-| `http-cache-semantics@4.2.0`, [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp), high | `electron-builder > app-builder-lib > @electron/get > got > cacheable-request` | Release build tooling. The registry lists no patched version. The [maintainer disputed the report and closed it on 4 October](https://github.com/kornelski/http-cache-semantics/issues/56#issuecomment-5975759591), explaining the distinction between cache freshness and privacy. The registry alert remains open; neither its severity label nor the dispute alone demonstrates this application's exposure. |
+| `http-cache-semantics@4.2.0`, [GHSA-ch52-4w7c-c8xp](https://github.com/advisories/GHSA-ch52-4w7c-c8xp), high | `electron-builder > app-builder-lib > @electron/get > got > cacheable-request` | Updated this build-only edge to compatible `4.3.0`, outside the recorded affected range. The registry lists no first-patched version. The [maintainer disputed the report and closed it on 4 October](https://github.com/kornelski/http-cache-semantics/issues/56#issuecomment-5975759591). The updated local scan no longer flags this package; this does not establish a security fix or prior application exposure. |
 | `braces@3.0.3`, [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), high | `eslint-plugin-boundaries > micromatch`, also via `@boundaries/elements` | Lint tooling. The registry lists no patched version. No runtime dependency path or product reproduction was found in this audit. |
 
-These remain dependency-maintenance follow-ups. No exploit probe, speculative patch or unsupported version override was used to erase an alert. Raw registry snapshots, exit codes and the classified report are saved in the audit evidence directory.
+The `4.3.0` update is cache-correctness maintenance: its small [upstream source comparison](https://github.com/kornelski/http-cache-semantics/compare/f01112e954b83cfa8765b633ba880e5e980aa54c...b1d4bd682fbab0252985de45219f4e7497c0067c) changes Vary matching and adds status reporting; the disputed max-stale logic is unchanged. The [published package](https://registry.npmjs.org/http-cache-semantics/4.3.0) retains CommonJS, the same licence bytes, no runtime dependencies or installation scripts, and the parent accepts its `^4.0.0` range. The pin in `pnpm-workspace.yaml` applies only to `cacheable-request@7.0.4`; `package.json` and production dependencies are unchanged. Lockfile regeneration changed only this override, integrity/resolution, snapshot and parent edge. Installed parent API/serialization checks, frozen installation, 27 package/dependency regressions and Electron compilation passed. Braces remains dependency-maintenance follow-up work. No exploit probe or unsupported dependency override was used. Raw snapshots, exit codes and the classified reports are saved in the evidence directory.
 
 ## Feature research and recommended order
 
@@ -72,6 +72,7 @@ Final combined local verification passed:
 - App, Electron and service TypeScript checks.
 - Repository, Electron and service lint; repository/service formatting; generated shared-touch and scanner parity; production dependency licence policy and current service notices; file-size backstop, soft-size policy and public-export ratchet.
 - Independent scoped review of all five fixes found no additional actionable correctness regression.
+- The later build-only dependency update also passed its installed parent API/serialization checks, 27 package/dependency regressions, frozen installation, licence policy, changed-YAML formatting and Electron compilation. Application and service source were unchanged by this update.
 
 There are 41 new regression scenarios across four files. Evidence logs and reproduction fixtures are under `D:/LaserForge/mcp-feature-audit-evidence-20261005/`; they are development artifacts, not customer content.
 

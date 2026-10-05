@@ -110,3 +110,6 @@ overrides:
   undici@>=6.0.0 <6.28.1: 6.28.1
   undici@>=7.0.0 <7.29.1: 7.29.1
   postcss@<8.5.28: 8.5.28
+  # Build-only cache correctness update; preserve the parent's ^4.0.0 API.
+  # The max-stale advisory is disputed, so this is not a verified security fix.
+  'cacheable-request@7.0.4>http-cache-semantics': 4.3.0
