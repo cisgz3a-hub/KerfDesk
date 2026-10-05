@@ -10,6 +10,31 @@ import type { RemoteTransform } from './types';
 import { RemoteFault } from './fault';
 import { publicIdentifier, remoteBounds } from './projections';
 
+/** Persistent groups form one target, including transitive overlapping memberships. */
+export function expandedArtworkGroupIds(state: AppState, requested: readonly string[]): string[] {
+  const ids = new Set(requested);
+  const memberships = new Map<string, (readonly string[])[]>();
+  for (const group of state.project.scene.groups ?? []) {
+    for (const id of group.objectIds) {
+      const groups = memberships.get(id) ?? [];
+      groups.push(group.objectIds);
+      memberships.set(id, groups);
+    }
+  }
+  const pending = [...ids];
+  for (const id of pending) {
+    for (const members of memberships.get(id) ?? []) {
+      for (const member of members) {
+        if (ids.has(member)) continue;
+        if (ids.size >= 200) throw new RemoteFault('unsupported_operation');
+        ids.add(member);
+        pending.push(member);
+      }
+    }
+  }
+  return [...ids];
+}
+
 export function editableArtwork(state: AppState, ids: readonly string[]): SceneObject[] {
   return ids.map((id) => {
     if (!publicIdentifier(id)) throw new RemoteFault('unsupported_operation');

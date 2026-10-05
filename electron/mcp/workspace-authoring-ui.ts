@@ -88,7 +88,7 @@ export const MCP_AUTHORING_SCRIPT = String.raw`  let submittedForm = null, fonts
   $('authoring-sheet').addEventListener('change',trackAuthoring);
   $('review-authoring').addEventListener('click',()=>{if(!canEdit()||busy||pendingEdit)return;for(const form of currentAuthoringForms())if(authoringDrafts.has(form.id))authoringDrafts.set(form.id,workspace.revision);controls();message('Your values are kept. Review the current canvas and selection, then apply.');});
   function fieldNumber(form,name,min=-100000,max=100000) {
-    const value=form.elements[name].value.trim();
+    const value=form.elements[name].value.trim().replace(',','.');
     if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value))throw new Error('Enter a valid number in each required field. Empty fields are kept until you enter a value.');
     const number=Number(value);
     if(!Number.isFinite(number)||number<min||number>max)throw new Error('Use a number between '+min+' and '+max+'.');

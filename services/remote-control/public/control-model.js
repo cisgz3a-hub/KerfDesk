@@ -36,9 +36,9 @@ export function selectedIds() {
 }
 
 export function number(form, name, min = -100_000, max = 100_000) {
-  const value = form.elements.namedItem(name).value.trim();
+  const value = form.elements.namedItem(name).value.trim().replace(',', '.');
   if (!value) throw new Error('Enter a value in each required number field.');
-  // Drafts stay untouched while typing, including an empty value, minus and decimal point.
+  // Parse either decimal key supplied by a phone keyboard; never rewrite the local draft.
   if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)) throw new Error('Use a valid number.');
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < min || parsed > max)

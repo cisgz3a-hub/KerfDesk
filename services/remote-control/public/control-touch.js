@@ -229,7 +229,7 @@ export class TouchCanvas extends TouchView {
       ids,
       bounds,
       start,
-      last: start,
+      last: { ...start },
       points: [start],
     };
   }
@@ -285,6 +285,15 @@ export class TouchCanvas extends TouchView {
     if (this.surface.hasPointerCapture(id)) this.surface.releasePointerCapture(id);
     this.update();
   }
+  cancelPointer(event) {
+    if (this.gesture?.id === event.pointerId) {
+      this.reset('Gesture cancelled. Nothing was applied.');
+    } else if (this.viewport.pointers.has(event.pointerId)) {
+      // Only local navigation ended; a finished scene-coordinate draft still belongs to the PC view.
+      this.viewport.cancel();
+      this.update();
+    }
+  }
   key(event) {
     if (event.key === 'Escape') {
       this.reset('Draft cancelled. Nothing was applied.');
@@ -297,6 +306,13 @@ export class TouchCanvas extends TouchView {
       ArrowDown: [0, 1],
     }[event.key];
     if (!direction || this.mode !== 'move' || this.applying || this.options.blocked()) return;
+    if (this.gesture || this.viewport.navigation) {
+      event.preventDefault();
+      return;
+    }
+    this.nudge(event, direction);
+  }
+  nudge(event, direction) {
     const ready = this.readiness();
     const bounds = ready.workspace && this.geometry.combined(ready.artwork, this.ids);
     if (!bounds) return;

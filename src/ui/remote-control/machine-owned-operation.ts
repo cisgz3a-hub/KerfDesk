@@ -93,13 +93,7 @@ export function ownMachineOperation(
       cancelMachineOperation(operation);
       return;
     }
-    const review = operation.review;
-    if (
-      review !== undefined &&
-      review.revision !== revision() &&
-      useJobReviewStore.getState().requestOwner === review.presentation.requestOwner
-    )
-      useJobReviewStore.getState().requestRebuild();
+    rebuildMachineReviewIfStale(operation, revision());
   });
   operation.cleanup = () => {
     authority.signal.removeEventListener('abort', revoked);
@@ -107,6 +101,21 @@ export function ownMachineOperation(
   };
   return operation;
 }
+
+/** Namespace renewal and ordinary document edits use the same canonical review owner. */
+export function rebuildMachineReviewIfStale(
+  operation: OwnedMachineOperation,
+  revision: string,
+): void {
+  const review = operation.review;
+  if (
+    review !== undefined &&
+    review.revision !== revision &&
+    useJobReviewStore.getState().requestOwner === review.presentation.requestOwner
+  )
+    useJobReviewStore.getState().requestRebuild();
+}
+
 export function recordMachineOperationFailure(
   operation: OwnedMachineOperation,
   error: unknown,

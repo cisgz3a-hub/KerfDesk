@@ -45,7 +45,18 @@ export function createRemoteControlAdapter(options: RemoteControlOptions): Remot
       },
     };
   };
-  const context = { options, store, tracker, pending, isDisposed: () => disposed, failure };
+  const context = {
+    options,
+    store,
+    tracker,
+    pending,
+    isDisposed: () => disposed,
+    failure,
+    renewRevision: () => {
+      tracker.renew();
+      machine.revisionRenewed();
+    },
+  };
   return {
     getRevision: tracker.current,
     machineDelivery: machine.delivery,
@@ -86,6 +97,7 @@ type Context = {
   readonly pending: Set<AbortController>;
   readonly isDisposed: () => boolean;
   readonly failure: (cause: unknown) => RemoteCommandResult;
+  readonly renewRevision: () => void;
 };
 function cachedWrite(fingerprint: string, result: Promise<RemoteCommandResult>): CachedWrite {
   const receipt = { fingerprint, result, settled: false };
@@ -106,7 +118,7 @@ function renewFullRequestWindow(
   if ([...requests.values()].some((receipt) => !receipt.settled))
     throw new RemoteFault('request_limit');
   // A fresh namespace retires every serialized old write before forgetting receipts.
-  context.tracker.renew();
+  context.renewRevision();
   requests.clear();
   throw new RemoteFault('stale_revision');
 }
