@@ -68,6 +68,49 @@ export type LaserControllerOperation =
 // Keep this identity outside the public state/persistence schema.
 const operationOwners = new WeakMap<LaserControllerOperation, object>();
 
+export type ControllerRecoveryResetEvidence = {
+  readonly sessionEpoch: number;
+  readonly writeEpoch: number;
+  readonly statusSequence: number;
+};
+
+// A canonical Abort can issue another reset while the same recovery still
+// awaits Idle. Keep that deliberate reset with its private owner; ordinary
+// phase/status updates and new operations cannot transfer this evidence.
+const recoveryResetEvidence = new WeakMap<
+  object,
+  { readonly evidence: ControllerRecoveryResetEvidence; readonly isCurrent: () => boolean }
+>();
+
+export function registerControllerRecoveryReset(
+  operation: LaserControllerOperation,
+  evidence: ControllerRecoveryResetEvidence,
+  isCurrent: () => boolean,
+): void {
+  recoveryResetEvidence.set(controllerOperationOwner(operation), { evidence, isCurrent });
+}
+
+export function recordControllerRecoveryReset(
+  operation: LaserControllerOperation | null,
+  evidence: ControllerRecoveryResetEvidence,
+): void {
+  if (operation?.kind === 'recovery') {
+    const owner = controllerOperationOwner(operation);
+    const current = recoveryResetEvidence.get(owner);
+    // Abort must still execute for an invalid owner, but cannot revive its
+    // obsolete Wake by lending it the new reset's session evidence.
+    if (current?.isCurrent() === true) {
+      recoveryResetEvidence.set(owner, { ...current, evidence });
+    }
+  }
+}
+
+export function controllerRecoveryResetEvidence(
+  operation: LaserControllerOperation,
+): ControllerRecoveryResetEvidence | undefined {
+  return recoveryResetEvidence.get(controllerOperationOwner(operation))?.evidence;
+}
+
 export function controllerOperationOwner(operation: LaserControllerOperation): object {
   return operationOwners.get(operation) ?? operation;
 }

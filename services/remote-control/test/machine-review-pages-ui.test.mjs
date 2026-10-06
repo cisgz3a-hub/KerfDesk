@@ -94,6 +94,20 @@ function fixture() {
   });
   state.latestOperation = operation();
   state.controlReceipts.set(id, state.latestOperation);
+  const heldPage = Promise.withResolvers();
+  state.whenPageHeld = async () => {
+    let timer;
+    try {
+      return await Promise.race([
+        heldPage.promise,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('Review page was not captured.')), 10_000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   state.readHook = async (name, args) => {
     if (name !== 'get_control_operation' || !args.reviewPage) return null;
     assert.equal(args.operationId, id);
@@ -104,6 +118,8 @@ function fixture() {
     if (state.holdPage)
       return new Promise((resolve) => {
         state.releasePage = () => resolve(value);
+        // UI intent precedes iframe/HTTP dispatch; witness the actual captured reply.
+        heldPage.resolve(structuredClone(review));
       });
     return value;
   };
@@ -209,6 +225,7 @@ for (const [kind, load] of Object.entries(surfaces)) {
       await enterMachine(p);
       state.holdPage = true;
       await p.locator('#machine-review-next').click();
+      await state.whenPageHeld();
       await p.waitForFunction(() =>
         globalThis.document
           .getElementById('machine-review-page-info')
@@ -281,6 +298,9 @@ for (const [kind, load] of Object.entries(surfaces)) {
       await enterMachine(p);
       state.holdPage = true;
       await p.locator('#machine-review-next').click();
+      const captured = await state.whenPageHeld();
+      assert.equal(captured.artworkShared, true);
+      assert.match(JSON.stringify(captured.warnings), /Narrow feature warning 61/);
       await p.waitForFunction(() =>
         globalThis.document
           .getElementById('machine-review-page-info')

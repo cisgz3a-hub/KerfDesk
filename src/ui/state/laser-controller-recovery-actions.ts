@@ -25,6 +25,8 @@ import { pushLog } from './laser-store-helpers';
 import {
   continueControllerOperation,
   controllerOperationOwner,
+  controllerRecoveryResetEvidence,
+  registerControllerRecoveryReset,
 } from './laser-controller-operation';
 
 type SetFn = (
@@ -217,22 +219,32 @@ function beginOwnedRecovery(
     ...invalidateControllerSessionEvidence(state),
     controllerOperation: operation,
   }));
-  const sessionEpoch = get().controllerSessionEpoch;
-  const statusSequence = get().statusSequence;
-  const observedReset = () => get().controllerSessionEpoch === sessionEpoch + 1;
+  const initialEvidence = {
+    sessionEpoch: get().controllerSessionEpoch,
+    writeEpoch,
+    statusSequence: get().statusSequence,
+  };
+  const resetEvidence = () => controllerRecoveryResetEvidence(operation) ?? initialEvidence;
+  const observedReset = () => get().controllerSessionEpoch === resetEvidence().sessionEpoch + 1;
   const observedAlarm = () => {
     const state = get();
-    const expectedWriteEpoch = writeEpoch + (observedReset() ? 1 : 0);
+    const evidence = resetEvidence();
+    const expectedWriteEpoch = evidence.writeEpoch + (observedReset() ? 1 : 0);
+    const currentWriteEpoch = refs.writeEpoch ?? 0;
     // A numbered Alarm advances the write epoch. A pure status Alarm is
     // equally terminal, even when repeating an Alarm that preceded Wake.
+    // Neither can pardon an unrelated write/session epoch change.
     return (
       controllerReportsAlarm(state) &&
-      ((refs.writeEpoch ?? 0) === expectedWriteEpoch + 1 ||
-        (state.statusReport?.state === 'Alarm' && state.statusSequence > statusSequence))
+      (currentWriteEpoch === expectedWriteEpoch + 1 ||
+        (currentWriteEpoch === expectedWriteEpoch &&
+          state.statusReport?.state === 'Alarm' &&
+          state.statusSequence > evidence.statusSequence))
     );
   };
   const owns = () => {
     const state = get();
+    const evidence = resetEvidence();
     return (
       state.connection.kind === 'connected' &&
       refs.connection === connection &&
@@ -240,10 +252,12 @@ function beginOwnedRecovery(
       driver() === controller &&
       state.controllerOperation !== null &&
       controllerOperationOwner(state.controllerOperation) === operation &&
-      (state.controllerSessionEpoch === sessionEpoch || observedReset()) &&
-      ((refs.writeEpoch ?? 0) === writeEpoch + (observedReset() ? 1 : 0) || observedAlarm())
+      (state.controllerSessionEpoch === evidence.sessionEpoch || observedReset()) &&
+      ((refs.writeEpoch ?? 0) === evidence.writeEpoch + (observedReset() ? 1 : 0) ||
+        observedAlarm())
     );
   };
+  registerControllerRecoveryReset(operation, initialEvidence, owns);
   return {
     owns,
     observedReset: () => owns() && observedReset(),

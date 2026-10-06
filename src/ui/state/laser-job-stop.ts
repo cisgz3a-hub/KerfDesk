@@ -19,6 +19,7 @@ import type { SerialConnection } from '../../platform/types';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { streamResetRecord, type JobStopReason } from './job-stop-request';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
+import { recordControllerRecoveryReset } from './laser-controller-operation';
 import {
   requalifyAfterHaltingReset,
   type ControllerQualificationScheduleRefs,
@@ -199,21 +200,30 @@ async function stopWithReset(
   // fails, the controller may still be executing its old buffer; keeping an
   // errored (active) streamer leaves Abort visible without sending more job
   // bytes. Arm cleanup first so an immediate boot banner cannot outrun it.
-  set((state) => ({
-    ...invalidateControllerSessionEvidence(state),
-    streamer: state.streamer === null ? null : markErrored(state.streamer),
-    // Recovery reads this beside the errored stream so the saved cause is
-    // the requested stop, not an unexplained end (ADR-341 Amendment 3).
-    ...(reason === undefined || state.streamer === null
-      ? {}
-      : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
-    // And whether the reset may kill the steppers mid-motion (ADR-215
-    // Amendment 1): decided now, because ALARM:3 arrives after the stream
-    // is recorded as stopped.
-    ...(state.streamer === null
-      ? {}
-      : { streamReset: streamResetRecord(state, pauseResumeSettling) }),
-  }));
+  set((state) => {
+    const evidence = invalidateControllerSessionEvidence(state);
+    const invalidated = { ...state, ...evidence };
+    recordControllerRecoveryReset(state.controllerOperation, {
+      sessionEpoch: invalidated.controllerSessionEpoch,
+      writeEpoch: resetWriteEpoch,
+      statusSequence: state.statusSequence,
+    });
+    return {
+      ...evidence,
+      streamer: state.streamer === null ? null : markErrored(state.streamer),
+      // Recovery reads this beside the errored stream so the saved cause is
+      // the requested stop, not an unexplained end (ADR-341 Amendment 3).
+      ...(reason === undefined || state.streamer === null
+        ? {}
+        : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
+      // And whether the reset may kill the steppers mid-motion (ADR-215
+      // Amendment 1): decided now, because ALARM:3 arrives after the stream
+      // is recorded as stopped.
+      ...(state.streamer === null
+        ? {}
+        : { streamReset: streamResetRecord(state, pauseResumeSettling) }),
+    };
+  });
   requalifyAfterHaltingReset(set, context.get, refs, driver().capabilities);
   armResetCleanup(refs, safeWrite, cleanupLines);
   // The reset goes to the transport before the hosted refill is taken back.
