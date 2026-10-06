@@ -22,9 +22,7 @@ export function workspaceViewChanged(value, previous, force) {
 export function renderWorkspace(value, canEdit) {
   if (!validWorkspace(value))
     throw new Error('The workspace response is incomplete. Refresh on the PC.');
-  $('#workspace-name').textContent = safeText(value.name, 512) || 'Untitled workspace';
-  $('#workspace-meta').textContent =
-    `${value.mode === 'cnc' ? 'CNC' : 'Laser'} · ${value.totalArtwork} artwork · ${value.totalOperations} operations${value.dirty ? ' · Unsaved changes' : ''}`;
+  renderWorkspaceMeta(value);
   const list = $('#artwork-list');
   list.replaceChildren();
   for (const item of value.artwork) list.append(artworkItem(item, value.selection, canEdit));
@@ -46,6 +44,13 @@ export function renderWorkspace(value, canEdit) {
   );
   loadOperation(value);
   selectionFeedback(value, canEdit);
+}
+
+/** Saving does not retire edit authority or replace any focused form controls. */
+export function renderWorkspaceMeta(value) {
+  $('#workspace-name').textContent = safeText(value.name, 512) || 'Untitled workspace';
+  $('#workspace-meta').textContent =
+    `${value.mode === 'cnc' ? 'CNC' : 'Laser'} · ${value.totalArtwork} artwork · ${value.totalOperations} operations${value.dirty ? ' · Unsaved changes' : ''}`;
 }
 
 export function selectionFeedback(workspace, writable) {
@@ -217,8 +222,21 @@ function syncShapeControls(workspace) {
     $('#rectangle-form').elements.shapeType.value === 'ellipse' && !ellipseAvailable;
 }
 
-export function bindWorkspaceEvents({ live, machine, action, drafts, editors, refresh }) {
-  $('#live-updates').addEventListener('change', (event) => live.pause(!event.target.checked));
+export function bindWorkspaceEvents({ live, machine, action, drafts, editors, refresh, details }) {
+  const showDetails = () => {
+    details.shown();
+    if (!details.visible()) return;
+    if (live.active()) void live.refresh();
+    else void action(refresh);
+  };
+  $('#details-list').closest('details').addEventListener('toggle', showDetails);
+  $('#live-updates').addEventListener('change', (event) => {
+    const paused = !event.target.checked;
+    if (paused)
+      details.clear('Automatic updates paused. Open Settings or use Refresh to check again.');
+    else if (details.visible()) details.shown();
+    live.pause(paused);
+  });
   $('#discard-drafts').addEventListener('click', () => {
     void action(async () => {
       drafts.reset();
@@ -231,6 +249,10 @@ export function bindWorkspaceEvents({ live, machine, action, drafts, editors, re
     tab.addEventListener('click', () => {
       view(tab.dataset.view);
       machine.setVisible(tab.dataset.view === 'machine');
+      if (tab.dataset.view === 'details') {
+        showDetails();
+        return;
+      }
       if (tab.dataset.view === 'artwork') void live.refresh();
     });
   for (const button of document.querySelectorAll('[data-editor-task]'))
@@ -330,57 +352,4 @@ class PreviewController {
       return null;
     }
   }
-}
-
-function detail(title, text) {
-  const item = document.createElement('div');
-  item.className = 'detail';
-  const heading = document.createElement('h3');
-  heading.textContent = title;
-  const content = document.createElement('p');
-  content.textContent = safeText(text, 4096);
-  item.append(heading, content);
-  $('#details-list').append(item);
-}
-
-export async function refreshDetails(command, generation) {
-  $('#details-list').replaceChildren();
-  const status = await command('get_app_status', {}, generation);
-  detail('Desktop app', `${status.app.name} ${status.app.version} · ${status.edition.mode}`);
-  if (status.updates.available)
-    detail(
-      'Update available on the PC',
-      `${status.updates.version ?? 'New version'}${status.updates.highlights?.length ? ': ' + status.updates.highlights.join(' · ') : ''}`,
-    );
-  const machine = (await command('get_machine', {}, generation)).machine;
-  detail(
-    'Machine profile',
-    `${machine.name} · ${machine.bedWidthMm} × ${machine.bedHeightMm} mm${machine.controller ? ' · ' + machine.controller : ''}`,
-  );
-  const review = await command('review_job', {}, generation);
-  detail(
-    'Job review',
-    `${review.status} · ${review.frame.complete ? 'Frame completed' : 'Frame required on the PC'}`,
-  );
-  if (review.summary) {
-    const summary = review.summary;
-    detail(
-      'Workspace totals and prepared duration',
-      `Workspace artwork: ${summary.artworkCount} · Workspace operations: ${summary.operationCount}${Number.isFinite(summary.estimatedSeconds) ? ' · Estimated ' + Math.ceil(summary.estimatedSeconds / 60) + ' min' : ''}`,
-    );
-    if (summary.bounds)
-      detail(
-        'Prepared output bounds',
-        `${summary.bounds.widthMm.toFixed(2)} × ${summary.bounds.heightMm.toFixed(2)} mm · X ${summary.bounds.xMm.toFixed(2)}, Y ${summary.bounds.yMm.toFixed(2)}`,
-      );
-  }
-  for (const warning of review.warnings.slice(0, 200))
-    detail('Job review warning', warning.message);
-  const recipes = await command('list_material_recipes', {}, generation);
-  detail(
-    'Material recipes',
-    recipes.recipes.length
-      ? recipes.recipes.map((recipe) => safeText(recipe.name, 512)).join(' · ')
-      : 'No saved recipes.',
-  );
 }

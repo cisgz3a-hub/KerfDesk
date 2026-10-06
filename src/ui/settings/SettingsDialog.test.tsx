@@ -7,6 +7,7 @@ import { useMachineSetupDialogStore } from '../laser/device-setup/machine-setup-
 import { DEFAULT_NUDGE_STEPS, NUDGE_STEPS_KEY, useNudgeStore } from '../state/nudge-preferences';
 import { SNAP_SETTINGS_KEY } from '../state/snap-preferences';
 import { useStore } from '../state/store';
+import { usePreferencePersistenceStore } from '../state/preference-persistence';
 import { resetStore } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
 import {
@@ -65,6 +66,7 @@ function buttonNamed(text: string): HTMLButtonElement {
 
 beforeEach(() => {
   localStorage.clear();
+  usePreferencePersistenceStore.setState({ pending: new Map() });
   resetStore();
   useSettingsDialogStore.setState({ open: true, section: 'general' });
 });
@@ -73,6 +75,8 @@ afterEach(async () => {
   if (root !== null) await act(async () => root?.unmount());
   root = null;
   document.body.innerHTML = '';
+  vi.restoreAllMocks();
+  usePreferencePersistenceStore.setState({ pending: new Map() });
   useNudgeStore.getState().resetNudgeSteps();
   useUiStore.getState().setSnapSettings(initialSnap);
   useWorkspaceLayoutStore.getState().setPreference(initialLayout);
@@ -83,6 +87,23 @@ afterEach(async () => {
 });
 
 describe('Settings window (LBG-F18)', () => {
+  it('shows an honest failed-save state and retries the visible choice', async () => {
+    await render();
+    const denied = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Synthetic preference quota refusal', 'QuotaExceededError');
+    });
+    await act(async () => inputInLabel('Dark').click());
+    expect(document.querySelector('[role="status"]')?.textContent).toContain(
+      'Some settings could not be saved',
+    );
+    expect(document.body.textContent).not.toContain('Changes apply at once and are kept');
+    expect(appThemePreference()).toBe('dark');
+    denied.mockRestore();
+    await act(async () => buttonNamed('Retry saving settings').click());
+    expect(localStorage.getItem('kerfdesk.theme.v1')).toBe('dark');
+    expect(document.querySelector('[role="status"]')).toBeNull();
+    expect(document.body.textContent).toContain('Changes apply at once and are kept');
+  });
   it('has General, Canvas, Machine & materials and, for a laser only, Labs', async () => {
     await render();
     expect(tabLabels()).toEqual(['General', 'Canvas', 'Machine & materials', 'Labs']);

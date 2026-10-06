@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Field, NumberInput } from '../kit';
+import { usePreferencePersistenceStore } from '../state/preference-persistence';
 import { clampRecentProjectLimit, MAX_RECENT_PROJECT_LIMIT } from './recent-project-model';
+import { RECENT_PROJECT_LIMIT_KEY } from './recent-project-storage';
 import { useRecentProjectsStore } from './recent-projects-store';
 
 /** How many unpinned projects Recent Projects keeps (ADR-378). Commits on
  * Enter or when the field loses focus; anything unusable reverts. */
 export function RecentProjectLimitField(): JSX.Element {
   const limit = useRecentProjectsStore((state) => state.limit);
+  const savePending = usePreferencePersistenceStore((state) =>
+    state.pending.has(RECENT_PROJECT_LIMIT_KEY),
+  );
   const [draft, setDraft] = useState(String(limit));
   useEffect(() => setDraft(String(limit)), [limit]);
   const commit = (): void => {
@@ -38,6 +43,12 @@ export function RecentProjectLimitField(): JSX.Element {
         1 to {MAX_RECENT_PROJECT_LIMIT}. Pinned projects are kept as well. This list stays on this
         computer and is never saved in a project.
       </span>
+      {savePending && (
+        <span style={noteStyle}>
+          The new limit takes effect after it is saved. Your existing history is kept. Retry saving
+          in Settings.
+        </span>
+      )}
     </div>
   );
 }

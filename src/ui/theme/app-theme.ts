@@ -14,6 +14,8 @@
 // — so the preference is cached in module state rather than re-read from
 // storage per frame.
 
+import { saveComputerPreference } from '../state/preference-persistence';
+
 export type AppThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
 
@@ -86,11 +88,7 @@ function stampResolvedTheme(): void {
 export function setAppThemePreference(next: AppThemePreference): void {
   preference = next;
   preferenceLoaded = true;
-  try {
-    localStorage.setItem(STORAGE_KEY, next);
-  } catch {
-    // Storage unavailable: the choice simply won't survive reload.
-  }
+  saveComputerPreference(STORAGE_KEY, next);
   stampResolvedTheme();
   listeners.forEach((listener) => listener());
 }

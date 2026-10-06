@@ -151,7 +151,12 @@ async function check() {
   loading = true;
   render();
   try {
-    await readStatus(before, actionSequence);
+    const read = () => {
+      if (!currentRead(before, actionSequence)) return;
+      return readStatus(before, actionSequence);
+    };
+    if (environment.withRead) await environment.withRead(read);
+    else await read();
   } catch (error) {
     if (before !== generation || actionSequence !== sequence) return;
     status = null;
@@ -162,12 +167,21 @@ async function check() {
     schedule();
   }
 }
+function currentRead(before, actionSequence) {
+  return (
+    before === generation &&
+    actionSequence === sequence &&
+    session?.online &&
+    !suspended &&
+    !document.hidden
+  );
+}
 async function readStatus(before, actionSequence) {
   const original = session?.client.id;
   const current = await environment.verifySession();
-  if (before !== generation || current?.client.id !== original) return;
+  if (!currentRead(before, actionSequence) || current?.client.id !== original) return;
   const value = await environment.command('get_machine_status');
-  if (before !== generation || actionSequence !== sequence) return;
+  if (!currentRead(before, actionSequence)) return;
   if (!validStatus(value))
     throw new Error('Machine status is incomplete. Update the PC app and check again.');
   status = value;
@@ -189,10 +203,11 @@ function receiptMessage() {
 async function readReceipts(before, actionSequence) {
   const unresolved = [...attempts.values()].filter((item) => needsReceipt(item));
   for (const item of unresolved) {
+    if (!currentRead(before, actionSequence)) return;
     const value = await environment.command('get_control_operation', {
       operationId: item.requestId,
     });
-    if (before !== generation || actionSequence !== sequence) return;
+    if (!currentRead(before, actionSequence)) return;
     if (!validOperation(value?.operation) || value.operation.operationId !== item.requestId)
       throw new Error('The PC could not confirm the action. Check status.');
     confirm(value.operation);

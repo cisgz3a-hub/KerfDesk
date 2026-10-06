@@ -12,8 +12,8 @@ import {
   assertWorkspace,
   workspaceViewChanged,
   bindWorkspaceEvents,
-  refreshDetails,
   renderWorkspace,
+  renderWorkspaceMeta,
   resetWorkspace,
   selectionFeedback,
   syncAccess,
@@ -129,6 +129,7 @@ function setSession(value) {
   const previousClient = session?.client?.id;
   if (!value || value.client.id !== previousClient) resetSessionWorkspace();
   session = value;
+  live?.details.sessionChanged(value);
   machine.sessionChanged(value);
   renderSession(value);
   syncControls();
@@ -141,6 +142,7 @@ function resetSessionWorkspace() {
   stale = false;
   pendingEdit = null;
   previews.reset();
+  live?.details.reset();
   drafts.reset();
   for (const form of document.querySelectorAll('#edit-forms form')) form.reset();
   resetWorkspace();
@@ -160,12 +162,13 @@ function applyWorkspace(value, force = false) {
   assertWorkspace(value);
   const changed = workspaceViewChanged(value, workspace, force);
   const restore = drafts.capture();
+  live?.details.workspaceChanged(value, workspace);
   workspace = value;
   stale = false;
   if (changed) {
     renderWorkspace(value, canEdit());
     restore();
-  }
+  } else renderWorkspaceMeta(value);
   previews.clearIfChanged(value);
   editors.workspaceChanged();
   syncControls();
@@ -187,8 +190,8 @@ async function refreshWorkspace(generation, full) {
   }
   const value = await command('get_workspace', {}, generation);
   applyWorkspace(value, true);
-  await previews.refresh(generation, full);
-  if (full) await refreshDetails(command, generation);
+  await previews.refresh(generation, full, document.body.dataset.panel === 'details');
+  if (full) await live.details.refresh(generation);
   live?.confirm();
   return true;
 }
@@ -289,6 +292,7 @@ touch = bindTouchCanvas({
 });
 const machine = bindMachine({
   command,
+  withRead: (callback) => live.withRead(callback),
   verifySession: async () => {
     const value = await api('/api/session');
     setSession(value.status === 'approved' ? value : null);
@@ -306,6 +310,7 @@ live = bindWorkspaceLive({
   command,
   setSession,
   session: () => session,
+  workspace: getWorkspace,
   apply: applyWorkspace,
   previews,
 });
@@ -313,7 +318,7 @@ window.addEventListener('pagehide', () => {
   pairGeneration++;
   clearTimeout(poll);
 });
-bindWorkspaceEvents({ live, machine, action, drafts, editors, refresh });
+bindWorkspaceEvents({ live, machine, action, drafts, editors, refresh, details: live.details });
 function schedulePairStatus(deadline, generation) {
   poll = setTimeout(() => {
     if (generation !== pairGeneration) return;

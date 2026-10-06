@@ -698,6 +698,11 @@ destination and cannot overwrite the template source.
    materials (links to Machine Setup, the Bit Library, Materials or Recipes) and Labs (laser only).
    Changes apply at once and belong to this computer, not the project. Each setting also stays
    where it was before.
+   If computer storage refuses a preference write, ordinary display and editing choices still
+   apply for this session. A pending Recent Projects limit takes effect only after it is saved,
+   so a failed save does not trim history.
+   Settings shows the failed-save state and **Retry saving settings**; retry keeps the latest
+   requested choices. The saved message returns only after all pending preference writes succeed.
 5. **Alt+arrows** align the selection left, right, top or bottom; **Alt+PgUp** and **Alt+PgDn**
    centre it on X or Y; **Alt+Shift+H** and **Alt+Shift+V** distribute spacing. Aligning needs two
    or more objects and distributing three or more; a group counts as one. Each is one undo step.
@@ -1404,6 +1409,9 @@ the completed physical Frame is the spatial source of truth.
   **Remove** (one entry), **Clear unpinned** and **Clear all** change only the list, never the
   files.
 - **Keep N recent projects**: 10 by default, 1 to 24, with pinned projects kept as well.
+- If the limit cannot be saved, its session choice remains visible but the existing history is
+  not trimmed. New recent entries use the last saved limit until **Retry saving settings** saves
+  the requested limit and applies its trim. Project files are never removed by this choice.
 - Available during a job, like `File → Open`.
 
 #### Edge — a recent project's file is gone, or reading it is refused

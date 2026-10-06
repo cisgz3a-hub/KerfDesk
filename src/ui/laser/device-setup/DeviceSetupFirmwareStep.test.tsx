@@ -81,6 +81,38 @@ describe('DeviceSetupFirmwareStep capability labels', () => {
 });
 
 describe('DeviceSetupFirmwareStep comparison evidence', () => {
+  it.each([1e-8, 1.1e-7, 0.01050001])(
+    'offers a compactly representable profile maximum %s for Save',
+    async (maxPowerS) => {
+      setConnectedReadback(matchingLaserReadback());
+      const state = initDeviceSetup({ ...DEFAULT_DEVICE_PROFILE, maxPowerS }, null);
+      const view = await renderStep(state);
+      try {
+        expect(view.host.textContent).toContain('Queue $30 for Save');
+        expect(view.host.textContent).not.toContain('profile value');
+        expect(state.draft.maxPowerS).toBe(maxPowerS);
+      } finally {
+        await view.unmount();
+      }
+    },
+  );
+
+  it('explains an unrepresentable profile value without blaming the valid readback or queueing a write', async () => {
+    setConnectedReadback(matchingLaserReadback());
+    const state = initDeviceSetup({ ...DEFAULT_DEVICE_PROFILE, maxPowerS: 1e-9 }, null);
+    const view = await renderStep(state);
+    try {
+      expect(view.host.textContent).toContain('$30 profile value 1e-9 cannot be sent:');
+      expect(view.host.textContent).toContain('would store this non-zero decimal as zero');
+      expect(view.host.textContent).not.toContain('Invalid readback:');
+      expect(view.host.textContent).not.toContain('Queue $30 for Save');
+      expect(view.host.textContent).toContain('Firmware comparison is incomplete.');
+      expect(state.draft.maxPowerS).toBe(1e-9);
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it.each([
     ['empty readback', {}],
     ['invalid supported value', { 30: 'corrupt' }],

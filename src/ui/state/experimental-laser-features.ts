@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { saveComputerPreference } from './preference-persistence';
 
 export type ExperimentalLaserFeature = 'lowPowerFire' | 'printAndCut';
 
@@ -59,13 +60,9 @@ function withFeatureDependency(
 
 function writeExperimentalLaserFeatures(
   features: ExperimentalLaserFeatures,
-  storage: Pick<Storage, 'setItem'> | null = browserStorage(),
+  storage?: Pick<Storage, 'setItem'> | null,
 ): void {
-  try {
-    storage?.setItem(STORAGE_KEY, JSON.stringify(features));
-  } catch {
-    // Storage can be unavailable in private or embedded contexts; keep session state.
-  }
+  saveComputerPreference(STORAGE_KEY, JSON.stringify(features), { storage });
 }
 
 function browserStorage(): Storage | null {
