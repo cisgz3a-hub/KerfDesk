@@ -41,6 +41,7 @@ import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
 import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
+import { ProjectSaveDialog } from '../app/ProjectSaveDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 import { SettingsWindowHost } from '../settings/SettingsWindowHost';
@@ -156,6 +157,7 @@ function StoreOpenedDialogs(): JSX.Element {
   return (
     <>
       <GcodeSaveDialogHost />
+      <ProjectSaveDialog />
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />

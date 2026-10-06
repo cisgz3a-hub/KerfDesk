@@ -131,7 +131,7 @@ describe('Trace Image workflow controls', () => {
     });
   });
 
-  it('opens CNC on Smooth while leaving every preset selectable', async () => {
+  it('opens Pro CNC on Smooth while leaving every preset selectable', async () => {
     const prior = useStore.getState().project;
     useStore.setState({ project: { ...prior, machine: DEFAULT_CNC_MACHINE_CONFIG } });
     try {
@@ -139,8 +139,8 @@ describe('Trace Image workflow controls', () => {
         const select = presetSelect(host);
         // Smooth is the recommended CNC starting point (bench result).
         expect(select.value).toBe('Smooth');
-        // Rule 7 / ADR-228 pin: recommending a preset must never disable the
-        // others. Greying them out would be a new guard on an available input.
+        // Pro exposes every tracer. Free exposes only Line Art for selection
+        // without a Pro request (ADR-540 Amendment 4).
         const options = Array.from(select.options);
         expect(options.map((option) => option.value)).toContain('Colour layers');
         expect(options.filter((option) => option.disabled)).toEqual([]);

@@ -1294,15 +1294,18 @@ the completed physical Frame is the spatial source of truth.
 
 #### Success — first save
 1. `File → Save` (`Cmd/Ctrl+S`).
-2. OS Save dialog opens.
+2. For a large project, **Save project** shows `Preparing <name>…` while validation runs.
+   When it is ready, click **Choose file…** to open the OS Save dialog. Smaller projects open
+   the OS dialog directly after validation. Cancel leaves the project unsaved and changes no file.
 3. Default name: `untitled.lf2`, default location: Documents.
-4. On confirm, project serialized to JSON, written to disk.
+4. On confirm, the captured, validated project JSON is written to disk.
 5. Window title updates: `KerfDesk — <project-name>`.
 6. Dirty indicator (`*`) cleared from title.
 
 #### Success — subsequent save
 1. `File → Save` or `Cmd/Ctrl+S`.
-2. **No dialog.** File written to known path.
+2. **No dialog.** Large projects prepare in the background, then the captured bytes are written
+   to the known path. The canvas thread does not run the full project validation.
 3. Toast briefly: `Saved`.
 
 #### Success — Save after Open (ADR-550)
@@ -1320,6 +1323,8 @@ the completed physical Frame is the spatial source of truth.
 #### Success — Save As
 1. `File → Save As` (`Cmd/Ctrl+Shift+S`).
 2. Always shows dialog. Default name: current project name.
+   A large project first shows **Save project**, then **Choose file…** opens the native picker
+   after validation is complete, using that click's file access permission.
 
 #### Error — save failure
 - Error toast: `Could not save project: <reason>`. Project remains dirty, user can retry.
@@ -1337,6 +1342,9 @@ the completed physical Frame is the spatial source of truth.
   version as authorization to discard them.
 
 #### Edge — concurrent Save / Save As requests
+- A newer document or Save request cancels an older large preparation or ready prompt that has
+  no selected destination. Cancel stops its worker and does not clear recovery. A retained target
+  is already selected at Save-click time; its captured write still completes independently.
 - File pickers and writes to destinations proven distinct remain independent; an unresolved earlier
   picker or file write does not delay a later selected destination.
 - Every selected target starts writing its captured bytes immediately, including selections later

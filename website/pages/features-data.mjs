@@ -39,7 +39,7 @@ export const OVERVIEW = [
     icon: 'scan-eye',
     title: 'Images and tracing',
     href: '#images',
-    body: 'Five trace presets, image masks and crop, and the Image Studio editor. Advanced tracing is in Pro.',
+    body: 'Line Art tracing, image masks and crop, and the Image Studio editor. Every other trace preset is in Pro.',
   },
   {
     icon: 'package',
@@ -102,7 +102,7 @@ export const IMAGES = [
   {
     icon: 'scan-line',
     title: 'Trace to vectors',
-    body: 'Five presets: Line Art, Smooth, Sharp, Centerline and Edge Detection. Centerline traces a pen stroke as a single line, not two outlines.',
+    body: 'Line Art is included in Free. Pro adds Smooth, Sharp, Centerline, Line + fill, Edge Detection, Photo shading and Colour layers. Centerline traces a pen stroke as a single line.',
   },
   {
     icon: 'files',

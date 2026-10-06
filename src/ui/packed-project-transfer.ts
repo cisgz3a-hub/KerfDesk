@@ -29,6 +29,7 @@ import {
   type Project,
   type SceneObject,
 } from '../core/scene';
+import { copyPackedGeometryForTransfer } from './packed-project-transfer-buffer';
 
 /** Below this many vertices the ordinary structured clone is sent unchanged. */
 export const PACK_MIN_POINTS = 5_000;
@@ -96,21 +97,21 @@ export function isPackedProjectMessage(message: ProjectMessage): message is Pack
 
 export function packProjectMessage(project: Project): ProjectTransfer {
   if (countVectorPoints(project) < PACK_MIN_POINTS) return { message: project, transfer: [] };
-  const transfer: ArrayBuffer[] = [];
   const geometry: PackedObjectGeometry[] = [];
   const objects = project.scene.objects.map((object, index) => {
     if (!hasPaths(object) || object.paths.length === 0) return object;
-    const paths = packedPathsFor(object.paths).map((path) => copyForTransfer(path, transfer));
+    const paths = packedPathsFor(object.paths);
     geometry.push({ index, paths });
     return { ...object, paths: [] };
   });
+  const copied = copyPackedGeometryForTransfer(geometry);
   return {
     message: {
       kind: 'packed-project',
       project: { ...project, scene: { ...project.scene, objects } },
-      geometry,
+      geometry: copied.geometry,
     },
-    transfer,
+    transfer: copied.transfer,
   };
 }
 
@@ -287,35 +288,6 @@ function curveDerivedFromPolyline(curve: CurveSubpath, polyline: Polyline): bool
       segment.to.y === point.y
     );
   });
-}
-
-function copyForTransfer(path: PackedColoredPath, transfer: ArrayBuffer[]): PackedColoredPath {
-  const polylines: PackedPolylines = {
-    xy: copyArray(path.polylines.xy, transfer),
-    starts: copyArray(path.polylines.starts, transfer),
-    closed: copyArray(path.polylines.closed, transfer),
-  };
-  if (path.curves === undefined) return { ...path, polylines };
-  if (path.curves.derived) return { ...path, polylines, curves: path.curves };
-  const curves: PackedCurves = {
-    derived: false,
-    start: copyArray(path.curves.start, transfer),
-    closed: copyArray(path.curves.closed, transfer),
-    segmentStarts: copyArray(path.curves.segmentStarts, transfer),
-    kinds: copyArray(path.curves.kinds, transfer),
-    flags: copyArray(path.curves.flags, transfer),
-    values: copyArray(path.curves.values, transfer),
-  };
-  return { ...path, polylines, curves };
-}
-
-function copyArray<T extends Float64Array | Uint32Array | Uint8Array>(
-  source: T,
-  transfer: ArrayBuffer[],
-): T {
-  const copy = source.slice() as T;
-  transfer.push(copy.buffer as ArrayBuffer);
-  return copy;
 }
 
 function unpackColoredPath(packed: PackedColoredPath): ColoredPath {

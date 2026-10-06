@@ -1,3 +1,4 @@
+import { saveProjectAs } from './fixtures/project-save';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Project } from '../src/core/scene';
@@ -13,6 +14,7 @@ test.use({ trace: 'off', viewport: { width: 1366, height: 768 } });
 for (const detail of [60, 100]) {
   test(`full Photo shading at Detail ${detail} commits through the bitmap worker`, async ({
     page,
+    kerfdesk,
   }, testInfo) => {
     test.setTimeout(180_000);
     const errors: string[] = [];
@@ -46,7 +48,7 @@ for (const detail of [60, 100]) {
     await expect(dialog.getByText(/Trace ready/)).toBeVisible({ timeout: 60_000 });
     await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
     await expect(dialog).toBeHidden({ timeout: 60_000 });
-    await (await toolbarCommand(page, 'Save As...')).click();
+    await saveProjectAs(page, kerfdesk, { expectPreparation: true });
     await page.waitForFunction(() => {
       const saved = (
         window as typeof window & { __KERFDESK_E2E__: { savedFiles: Record<string, string> } }

@@ -1,4 +1,4 @@
-import { toolbarCommand } from './fixtures/workspace-ui';
+import { saveProjectAs } from './fixtures/project-save';
 import { CANVAS_PADDING_PX } from '../src/ui/workspace/canvas-layout';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { Page } from '@playwright/test';
@@ -71,7 +71,7 @@ test('places and formats multiline text directly on the canvas in one saved undo
     0,
   );
   expect(saved.undo).toBe(1);
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   await expect
     .poll(async () =>
       Object.values(await kerfdesk.savedFiles()).some((file) => file.includes('Made with care')),
