@@ -342,7 +342,10 @@ function handleInvalidatingStatus(
     ...mpgOwnershipPatch(report, state),
     ...originUnknownAfterControllerReset(state),
     motionOperation: null,
-    controllerOperation: null,
+    // A reset from Sleep normally ends in Alarm; its Wake continuation must
+    // still be able to identify and release its exact recovery owner.
+    controllerOperation:
+      alarm && state.controllerOperation?.kind === 'recovery' ? state.controllerOperation : null,
     fireActive: false,
     frameVerification: null,
     framedRun: null,

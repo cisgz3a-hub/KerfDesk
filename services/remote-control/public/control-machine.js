@@ -21,6 +21,7 @@ let visible = false,
   generation = 0,
   sequence = 0;
 let suspended = false;
+let pageReading = false;
 
 export function bindMachine(options) {
   environment = options;
@@ -37,6 +38,12 @@ export function bindMachine(options) {
     });
   q('start').addEventListener('click', () => {
     void submit('start_job', { reviewId: operation?.review?.reviewId });
+  });
+  q('review-first').addEventListener('click', () => {
+    void loadReviewPage(0);
+  });
+  q('review-next').addEventListener('click', () => {
+    void loadReviewPage(operation?.review?.pagination?.nextOffset);
   });
   q('jog-form').addEventListener('submit', (event) => event.preventDefault());
   for (const button of document.querySelectorAll('[data-jog-axis]'))
@@ -72,12 +79,13 @@ export function bindMachine(options) {
       else if (ownedWork()) schedule();
     },
     reset,
-    isBusy: () => loading || ownedWork(),
+    isBusy: () => loading || pageReading || ownedWork(),
   };
 }
 
 function reset() {
   generation++;
+  pageReading = false;
   clearTimeout(timer);
   status = operation = null;
   attempts.clear();
@@ -141,6 +149,7 @@ function render() {
     canControl: canControl(),
     writable: writable(),
     reviewReady: reviewReady(),
+    pageReading,
   });
 }
 
@@ -186,7 +195,7 @@ async function readStatus(before, actionSequence) {
     throw new Error('Machine status is incomplete. Update the PC app and check again.');
   status = value;
   if (validOperation(value.operation)) {
-    operation = value.operation;
+    adoptOperation(value.operation);
     confirm(value.operation);
   }
   try {
@@ -212,7 +221,72 @@ async function readReceipts(before, actionSequence) {
       throw new Error('The PC could not confirm the action. Check status.');
     confirm(value.operation);
     if (!validOperation(status?.operation) && item.sequence === sequence)
+      adoptOperation(value.operation);
+  }
+}
+function adoptOperation(value) {
+  const previous = operation?.review,
+    next = value.review;
+  if (
+    value.operationId === operation?.operationId &&
+    sameReview(next, previous) &&
+    typeof next.artworkShared === 'boolean' &&
+    previous.pagination?.offset > 0
+  )
+    value = { ...value, review: previous };
+  operation = value;
+}
+function sameReview(left, right) {
+  if (!left || !right) return false;
+  return (
+    left.reviewId === right.reviewId &&
+    left.revision === right.revision &&
+    left.artworkShared === right.artworkShared
+  );
+}
+function matchesReviewPage(value, original, offset) {
+  const next = value?.operation;
+  return (
+    !!next &&
+    next.operationId === original.operationId &&
+    validReview(next.review) &&
+    sameReview(next.review, original.review) &&
+    sameReview(next.review, operation?.review) &&
+    next.review.pagination?.offset === offset
+  );
+}
+async function loadReviewPage(offset) {
+  const original = operation;
+  if (pageReading || !Number.isSafeInteger(offset) || offset < 0 || !reviewReady()) return;
+  const before = generation,
+    actionSequence = sequence,
+    review = original.review;
+  pageReading = true;
+  render();
+  try {
+    const read = async () => {
+      if (!currentRead(before, actionSequence)) return;
+      const value = await environment.command('get_control_operation', {
+        operationId: original.operationId,
+        reviewPage: { reviewId: review.reviewId, offset },
+      });
+      if (!currentRead(before, actionSequence) || operation?.review?.reviewId !== review.reviewId)
+        return;
+      if (!matchesReviewPage(value, original, offset))
+        throw new Error('The job review changed. Check status and review the current job.');
       operation = value.operation;
+      message('');
+    };
+    // A pinned page is read-only. Keep status/permission refresh and Abort independent.
+    await read();
+  } catch (error) {
+    if (currentRead(before, actionSequence)) {
+      operation = null;
+      message(error.message || 'Review page unavailable. Check status before Start.');
+    }
+  } finally {
+    if (before === generation) pageReading = false;
+    render();
   }
 }
 function needsReceipt(item) {
@@ -271,6 +345,7 @@ async function jog(button) {
 function admitted(name, abort) {
   if (!available(name)) return false;
   if (abort) return canControl() && !inFlight(true);
+  if (name === 'start_job' && pageReading) return false;
   return writable() && (name !== 'start_job' || reviewReady());
 }
 async function submit(name, args = {}) {

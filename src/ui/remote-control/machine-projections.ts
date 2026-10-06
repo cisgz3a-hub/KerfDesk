@@ -18,7 +18,9 @@ import { useJobReviewStore } from '../laser/job-review/job-review-store';
 import { reviewMessageProjector } from './review-message-sharing';
 import type { OwnedMachineOperation } from './machine-operation-state';
 import type { RemoteControlOptions } from './types';
-import type { MachineOperation, MachineReview } from './machine-types';
+import type { MachineOperation, MachineReview, MachineReviewPageRequest } from './machine-types';
+import { machineReviewPage } from './machine-review-pages';
+import { RemoteFault } from './fault';
 
 type Laser = ReturnType<typeof useLaserStore.getState>;
 type App = ReturnType<typeof useStore.getState>;
@@ -141,7 +143,13 @@ export function machineOperationProjection(
   operation: OwnedMachineOperation | undefined,
   revision: string,
   options: RemoteControlOptions,
+  page?: MachineReviewPageRequest,
 ): MachineOperation {
+  if (
+    page !== undefined &&
+    (operation?.review?.id !== page.reviewId || operation.review.revision !== revision)
+  )
+    throw new RemoteFault('stale_revision');
   if (operation === undefined)
     return {
       operationId: id,
@@ -169,38 +177,25 @@ export function machineOperationProjection(
         }),
     ...(operation.review === undefined
       ? {}
-      : { review: reviewProjection(operation.review, options) }),
+      : { review: reviewProjection(operation.review, options, page) }),
   };
 }
 function reviewProjection(
   review: NonNullable<OwnedMachineOperation['review']>,
   options: RemoteControlOptions,
+  page?: MachineReviewPageRequest,
 ): MachineReview {
-  const projectMessage =
-    options.canShareArtwork?.() === true
-      ? reviewMessageProjector(options)
-      : (review.projectPrivateMessage ?? ((_value, fallback) => fallback));
+  const artworkShared = options.canShareArtwork?.() === true;
+  const projectMessage = artworkShared
+    ? reviewMessageProjector(options)
+    : (review.projectPrivateMessage ?? ((_value, fallback) => fallback));
   const model = review.model;
   return {
     reviewId: review.id,
     revision: review.revision,
     mode: model.machineKind,
-    stats: model.stats.slice(0, 16).map((stat) => ({
-      label: projectMessage(stat.label, 'Job fact'),
-      value: projectMessage(stat.value, 'See PC'),
-      detail: projectMessage(stat.detail, 'Review this fact on the PC.'),
-      ...(stat.emphasis === undefined ? {} : { emphasis: stat.emphasis }),
-    })),
-    warnings: model.warnings.slice(0, 200).map((message, index) => ({
-      code: `review-${index + 1}`,
-      message: projectMessage(message, 'Review this artwork-specific warning on the PC.'),
-    })),
-    operations: model.effectiveOperations.slice(0, 200).map((item) => ({
-      operationId: item.layerId,
-      summaries: item.summaries
-        .slice(0, 20)
-        .map((summary) => projectMessage(summary, 'Review this operation summary on the PC.')),
-    })),
+    artworkShared,
+    ...machineReviewPage(model, projectMessage, page),
     acknowledgement: model.acknowledgement,
     frame: { required: true, complete: framedRunReadinessIssue(currentCompletedFrame()) === null },
   };

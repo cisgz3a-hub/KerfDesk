@@ -7,13 +7,14 @@ import type { DesktopUpdates } from './update-status.js';
 const PREFIX = '/api/licensing/';
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 export type ProtocolHandler = (request: Request) => Promise<Response>;
+export type RequestUpdateClose = (cancelInstall: () => void) => void;
 
 export function withLicensingRoutes(
   fallback: ProtocolHandler,
   runtime: LicensingRuntime,
   earlyUpdates?: EarlyUpdates,
   updates?: DesktopUpdates,
-  requestUpdateClose?: () => void,
+  requestUpdateClose?: RequestUpdateClose,
 ): ProtocolHandler {
   return async (request) => {
     const url = new URL(request.url);
@@ -74,7 +75,7 @@ async function updateRoute(
   action: string,
   request: Request,
   updates: DesktopUpdates | undefined,
-  requestUpdateClose: (() => void) | undefined,
+  requestUpdateClose: RequestUpdateClose | undefined,
 ): Promise<Response> {
   if (updates === undefined) return missing();
   if (action === 'update-status')
@@ -92,10 +93,14 @@ async function updateRoute(
 async function installUpdateRoute(
   action: string,
   updates: DesktopUpdates,
-  requestUpdateClose: (() => void) | undefined,
+  requestUpdateClose: RequestUpdateClose | undefined,
 ): Promise<Response> {
   if (updates.installOnQuit === undefined) return missing();
-  if (action === 'install-update-and-close' && requestUpdateClose === undefined) return missing();
+  if (
+    action === 'install-update-and-close' &&
+    (requestUpdateClose === undefined || updates.cancelInstallOnQuit === undefined)
+  )
+    return missing();
   const status = await updates.installOnQuit();
   if (
     action === 'install-update-and-close' &&
@@ -103,7 +108,7 @@ async function installUpdateRoute(
     status.state === 'ready' &&
     status.installOnQuit === true
   )
-    setTimeout(() => requestUpdateClose?.(), 0);
+    setTimeout(() => requestUpdateClose?.(() => updates.cancelInstallOnQuit?.(status)), 0);
   return response(status);
 }
 

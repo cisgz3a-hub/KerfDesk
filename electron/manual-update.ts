@@ -24,6 +24,7 @@ import type {
 
 export type ManualUpdates = DesktopUpdates & {
   readonly prepareInstall: () => Promise<string | null>;
+  readonly cancelInstallOnQuit: (armed: UpdateStatus) => void;
 };
 type Options = {
   readonly currentVersion: string;
@@ -193,6 +194,11 @@ class ManualUpdateService implements ManualUpdates {
     });
     await this.running;
     return this.value;
+  };
+  readonly cancelInstallOnQuit = (armed: UpdateStatus): void => {
+    // A newer explicit deferred-install choice owns its own arm. Cancelling an
+    // older close must not retire that permission (ADR-561 Amendment 3).
+    if (this.value === armed) this.value = { ...this.value, installOnQuit: false };
   };
   readonly prepareInstall = async (): Promise<string | null> => {
     if (this.busy || this.value.installOnQuit !== true) return null;

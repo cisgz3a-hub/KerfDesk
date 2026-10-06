@@ -6,6 +6,7 @@ import {
   registerSchema,
   claimSchema,
   parseCommand,
+  mcpCommandScope,
   uuid,
   secret,
   type GrantProps,
@@ -26,6 +27,7 @@ import {
 } from './security.js';
 import { device, approvedSession, relayRequest } from './relay.js';
 import { authorizePage, type AppEnv } from './oauth.js';
+import { clientLimited, rateLimited } from './limits.js';
 async function registerOwner(request: Request, env: Env) {
   const parsed = registerSchema.safeParse(await bodyJson(request, MAX_METADATA_BYTES));
   if (!parsed.success) throw new RequestFailure(400);
@@ -116,6 +118,11 @@ async function clientRequest(request: Request, env: Env, url: URL, ctx: Executio
     clientId: session.identity.clientId,
     leaseId: session.info.leaseId,
   };
+  if (
+    session.info.client.scopes.includes(mcpCommandScope(command.name)) &&
+    (await clientLimited(env, props, command.name === 'abort_job'))
+  )
+    return rateLimited();
   try {
     return json({
       result: await relayRequest(

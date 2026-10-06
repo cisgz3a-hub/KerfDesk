@@ -16,6 +16,7 @@ import { bodyJson, json } from './security.js';
 import { device, relayRequest } from './relay.js';
 import { prepareMcpExchange } from './mcp-wire.js';
 import { mcpAuthChallenge, remoteToolMetadata } from './mcp-auth.js';
+import { abortRequest, clientLimited, rateLimited } from './limits.js';
 
 async function permittedContext(env: Env, ctx: ExecutionContext) {
   const context = ctx as OAuthResourceContext<unknown>;
@@ -189,6 +190,8 @@ export const protectedHandler = {
       );
     const challenge = await scopeChallenge(request, permitted.scopes);
     if (challenge) return challenge;
+    const abort = await abortRequest(request, '/mcp');
+    if (await clientLimited(env, permitted.props, abort)) return rateLimited();
     const prepared = await prepareMcpExchange(
       request,
       env,

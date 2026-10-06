@@ -20,7 +20,7 @@ export const MCP_MACHINE_MARKUP = String.raw`
 <div class="jog-pad" aria-label="XY jog pad"><button type="button" data-axis="y" data-direction="1" aria-label="Jog up">↑</button><button type="button" data-axis="x" data-direction="-1" aria-label="Jog left">←</button><span>XY</span><button type="button" data-axis="x" data-direction="1" aria-label="Jog right">→</button><button type="button" data-axis="y" data-direction="-1" aria-label="Jog down">↓</button></div>
 <div id="machine-z" class="machine-actions" hidden><button type="button" data-axis="z" data-direction="1">Raise Z</button><button type="button" data-axis="z" data-direction="-1">Lower Z</button></div></form></div>
 <div class="machine-card"><h2>Run the current job</h2><p id="machine-frame-state" class="muted">Frame this job before Start.</p><div class="machine-actions"><button id="machine-frame" type="button">Frame job</button><button id="machine-review" type="button">Review job</button></div>
-<div id="machine-review-card" hidden><h2>Current job review</h2><div id="machine-review-stats"></div><details><summary id="machine-warning-count">Warnings</summary><div id="machine-review-warnings"></div></details><div id="machine-review-operations"></div><p id="machine-acknowledgement"></p><p class="muted">Start job confirms this exact review and starts the machine.</p><button id="machine-start" type="button">Start job</button></div></div>
+<div id="machine-review-card" hidden><h2>Current job review</h2><p id="machine-review-page-info" class="muted" role="status"></p><div id="machine-review-pages" class="machine-actions" hidden><button id="machine-review-first" type="button">First review page</button><button id="machine-review-next" type="button">Next review facts</button></div><div id="machine-review-stats"></div><details><summary id="machine-warning-count">Warnings</summary><div id="machine-review-warnings"></div></details><div id="machine-review-operations"></div><p id="machine-acknowledgement"></p><p class="muted">Start job confirms this exact review and starts the machine.</p><button id="machine-start" type="button">Start job</button></div></div>
 <div id="machine-stop"><button id="machine-abort" type="button">Abort job</button><p class="muted">Requires a PC connection. Use the machine’s own stop control if disconnected.</p></div>
 </section>`;
 
@@ -33,13 +33,17 @@ function bindMcpMachine(environment) {
   const states = new Set(['accepted','preparing','awaiting_review','starting','running','unknown',...terminal]);
   const actions = {jog_machine:'jog',frame_job:'frame',review_machine_job:'review',start_job:'start',abort_job:'abort'};
   const attempts=new Map();
-  let status=null, operation=null, reading=false, visible=false, timer=null, generation=0, sequence=0,suspended=false;
+  let status=null, operation=null, reading=false, visible=false, timer=null, generation=0, sequence=0,suspended=false,pageReading=false;
   function note(value) { q('message').textContent=text(value); }
   function validStatus(value) { return !!value && typeof value.revision==='string' && value.revision.length>0 && value.revision.length<=200 && ['connected','disconnected','connecting'].includes(value.connection) && typeof value.job?.active==='boolean' && ['idle','jog','frame','unknown'].includes(value.motion?.kind) && typeof value.frame?.complete==='boolean'; }
   function validOperation(value) { return !!value && uuid.test(value.operationId) && ['jog','frame','job','abort'].includes(value.kind) && states.has(value.state) && typeof value.revision==='string' && (typeof value.committed==='boolean'||value.committed===null); }
   function validReview(value) {
     const bounded=(items,max)=>Array.isArray(items)&&items.length<=max&&items.every(item=>item&&typeof item==='object');
-    return !!value && uuid.test(value.reviewId) && typeof value.revision==='string' && ['laser','cnc'].includes(value.mode) && bounded(value.stats,16) && bounded(value.warnings,200) && bounded(value.operations,200) && ['laser-verified','laser-unverified','cnc'].includes(value.acknowledgement?.kind) && value.frame?.complete===true;
+    return !!value && uuid.test(value.reviewId) && typeof value.revision==='string' && ['laser','cnc'].includes(value.mode) && (value.artworkShared===undefined||typeof value.artworkShared==='boolean') && bounded(value.stats,16) && bounded(value.warnings,200) && bounded(value.operations,200) && validPagination(value) && ['laser-verified','laser-unverified','cnc'].includes(value.acknowledgement?.kind) && value.frame?.complete===true;
+  }
+  function validPagination(value) {
+    const p=value.pagination;if(p===undefined)return true;
+    return ['offset','totalFacts','totalWarnings','totalOperations','totalStats','totalSummaries'].every(key=>Number.isSafeInteger(p?.[key])&&p[key]>=0) && p.offset<=p.totalFacts && (p.nextOffset===null||(Number.isSafeInteger(p.nextOffset)&&p.nextOffset>p.offset&&p.nextOffset<p.totalFacts)) && p.totalWarnings>=value.warnings.length && p.totalOperations>=value.operations.length && p.totalStats>=value.stats.length;
   }
   function control() { return environment.available() && status?.permissions?.canControl===true; }
   function inFlight(abort){return [...attempts.values()].some(item=>item.abort===abort&&item.admissionPending);}
@@ -71,6 +75,7 @@ function bindMcpMachine(environment) {
     if(control()&&!status.availability)q('access').textContent='The PC app cannot confirm action readiness. Update KerfDesk on the PC, then check status.';
     position(); q('frame-state').textContent=status?.frame?.complete?'Frame completed. Review the current job before Start.':'Frame this job before Start.'; q('frame').textContent=status?.frame?.complete?'Frame again':'Frame job';
     readyButton('frame',writable()); readyButton('review',writable()&&status?.frame?.complete); readyButton('start',writable()&&status?.frame?.complete&&reviewReady()); readyButton('abort',control()&&!inFlight(true));
+    if(pageReading)q('start').disabled=true;
     q('abort').textContent=['preparing','awaiting_review'].includes(operation?.state)?'Cancel preparation':'Abort job';
     const jog=status?.jog||{}, hint=status?.availability?.jog||{}; q('z').hidden=jog.zSupported!==true;
     for(const button of q('jog-form').querySelectorAll('[data-axis]')) { button.disabled=!writable()||hint.available!==true||(button.dataset.axis==='z'?jog.zSupported:jog.xySupported)!==true; button.title=text(hint.reason); }
@@ -86,10 +91,13 @@ function bindMcpMachine(environment) {
   function renderReview() {
     const ready=reviewReady(); q('review-card').hidden=!ready;
     for(const name of ['review-stats','review-warnings','review-operations']) q(name).replaceChildren(); q('acknowledgement').textContent='';
+    q('review-page-info').textContent='';q('review-pages').hidden=true;
     if(!ready)return;
     const review=operation.review;
+    const p=review.pagination;q('review-pages').hidden=!p||(p.offset===0&&p.nextOffset===null);q('review-first').disabled=pageReading||!p||p.offset===0;q('review-next').disabled=pageReading||!p||p.nextOffset===null;
+    q('review-page-info').textContent=!p?'This PC version does not report complete review counts. Check all details on the PC or update KerfDesk.':pageReading?'Reading more facts from this same job review…':'Review facts '+(p.totalFacts?p.offset+1:0)+'–'+(p.nextOffset??p.totalFacts)+' of '+p.totalFacts+' · '+p.totalWarnings+' warnings · '+p.totalOperations+' operations. Inspect the remaining pages before confirming Start.';
     for(const item of review.stats) row(q('review-stats'),item.label,text(item.value)+(item.detail?' · '+text(item.detail):''));
-    q('warning-count').textContent='Warnings ('+review.warnings.length+')';
+    q('warning-count').textContent=p?'Warnings ('+p.totalWarnings+' total · '+review.warnings.length+' on this page)':'Warnings ('+review.warnings.length+' shown)';
     for(const warning of review.warnings) row(q('review-warnings'),'Warning',warning.message);
     for(const item of review.operations) for(const summary of Array.isArray(item.summaries)?item.summaries.slice(0,20):[]) row(q('review-operations'),'Operation',summary);
     q('acknowledgement').textContent=text(review.acknowledgement.prompt)||(review.acknowledgement.kind==='laser-verified'?'The current controller laser mode is verified.':'Confirm this current review before Start.');
@@ -101,7 +109,7 @@ function bindMcpMachine(environment) {
     for(const item of [...attempts.values()].filter(needsReceipt)){
       const value=await environment.tool('get_control_operation',{operationId:item.requestId});if(before!==generation||actionSequence!==sequence)return;
       if(!validOperation(value?.operation)||value.operation.operationId!==item.requestId)throw new Error('The PC could not confirm the action. Check status.');confirm(value.operation);
-      if(!validOperation(status?.operation)&&item.sequence===sequence)operation=value.operation;
+      if(!validOperation(status?.operation)&&item.sequence===sequence)adoptOperation(value.operation);
     }
   }
   async function check() {
@@ -111,7 +119,7 @@ function bindMcpMachine(environment) {
       const value=await environment.tool('get_machine_status'); if(before!==generation||actionSequence!==sequence)return;
       if(!validStatus(value))throw new Error('Machine status is incomplete. Update the PC app and check again.');
       status=value;
-      if(validOperation(value.operation)){operation=value.operation;confirm(value.operation);}
+      if(validOperation(value.operation)){adoptOperation(value.operation);confirm(value.operation);}
       try {
         await readReceipts(before,actionSequence);
         if(uncertain())note('Result not confirmed. Check status; no action will be sent again.');else if(operation?.message)note(operation.message);
@@ -119,9 +127,24 @@ function bindMcpMachine(environment) {
     }catch(error){if(before===generation&&actionSequence===sequence){status=null;note(error.message);}}
     finally {reading=false;render();schedule();}
   }
+  function adoptOperation(value) {
+    if(value.operationId===operation?.operationId&&value.review?.reviewId===operation?.review?.reviewId&&value.review?.revision===operation?.review?.revision&&typeof value.review?.artworkShared==='boolean'&&value.review.artworkShared===operation?.review?.artworkShared&&operation?.review?.pagination?.offset>0)value={...value,review:operation.review};
+    operation=value;
+  }
+  async function loadReviewPage(offset) {
+    const original=operation;if(pageReading||!Number.isSafeInteger(offset)||offset<0||!reviewReady())return;
+    const before=generation,actionSequence=sequence,review=original.review;pageReading=true;render();
+    try {
+      const value=await environment.tool('get_control_operation',{operationId:original.operationId,reviewPage:{reviewId:review.reviewId,offset}});
+      if(before!==generation||actionSequence!==sequence||operation?.review?.reviewId!==review.reviewId)return;
+      if(value?.operation?.operationId!==original.operationId||!validReview(value.operation.review)||value.operation.review.reviewId!==review.reviewId||value.operation.review.revision!==review.revision||value.operation.review.artworkShared!==operation?.review?.artworkShared||value.operation.review.pagination?.offset!==offset)throw new Error('The job review changed. Check status and review the current job.');
+      operation=value.operation;note('');
+    }catch(error){if(before===generation&&actionSequence===sequence){operation=null;note(error.message||'Review page unavailable. Check status before Start.');}}
+    finally{if(before===generation)pageReading=false;render();}
+  }
   async function submit(name,args={}) {
     const abort=name==='abort_job';
-    if(!available(name)||(abort?!control()||inFlight(true):!writable())||(name==='start_job'&&!reviewReady()))return;
+    if(!available(name)||(abort?!control()||inFlight(true):!writable())||(name==='start_job'&&(!reviewReady()||pageReading)))return;
     const before=generation, requestId=crypto.randomUUID(), request={requestId,...(abort?{}:{expectedRevision:status.revision}),...args};
     const item={requestId,sequence:++sequence,abort,admissionPending:true,uncertain:false};attempts.set(requestId,item);
     note(abort?'Sending Abort to the PC…':'Sending request to the PC…');render();
@@ -136,6 +159,7 @@ function bindMcpMachine(environment) {
   async function jog(button) {if(!writable())return;try {const args={axis:button.dataset.axis,direction:Number(button.dataset.direction),distanceMm:numeric('distanceMm',0.01,100)};if(q('jog-form').elements.feedMmPerMin.value.trim())args.feedMmPerMin=numeric('feedMmPerMin',1,100000);await submit('jog_machine',args);}catch(error){note(error.message);}}
   for(const [button,name]of [['frame','frame_job'],['review','review_machine_job'],['abort','abort_job']])q(button).addEventListener('click',()=>{void submit(name);});
   q('start').addEventListener('click',()=>{void submit('start_job',{reviewId:operation?.review?.reviewId});});q('check').addEventListener('click',()=>{void check();});
+  q('review-first').addEventListener('click',()=>{void loadReviewPage(0);});q('review-next').addEventListener('click',()=>{void loadReviewPage(operation?.review?.pagination?.nextOffset);});
   q('jog-form').addEventListener('submit',event=>event.preventDefault());for(const button of q('jog-form').querySelectorAll('[data-axis]'))button.addEventListener('click',()=>{void jog(button);});
   document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if((visible||ownedWork())&&!document.hidden)void check();});
   window.addEventListener('pagehide',()=>{suspended=true;clearTimeout(timer);});window.addEventListener('pageshow',()=>{suspended=false;if(visible||ownedWork())void check();});
@@ -143,11 +167,11 @@ function bindMcpMachine(environment) {
   return {
     ready(){render();if(visible&&environment.available())void check();},
     show(value){visible=value;document.body.classList.toggle('machine-view',value);clearTimeout(timer);if(value)void check();else if(ownedWork())schedule();},
-    reset(){generation++;clearTimeout(timer);status=operation=null;attempts.clear();note('');render();},
-    isBusy(){return reading||ownedWork();},
+    reset(){generation++;pageReading=false;clearTimeout(timer);status=operation=null;attempts.clear();note('');render();},
+    isBusy(){return reading||pageReading||ownedWork();},
     receive(value){
-      if(validStatus(value)) {status=value;if(validOperation(value.operation))operation=value.operation;render();return;}
-      if(validOperation(value?.operation)) {operation=value.operation;render();return;}
+      if(validStatus(value)) {status=value;if(validOperation(value.operation))adoptOperation(value.operation);render();return;}
+      if(validOperation(value?.operation)) {adoptOperation(value.operation);render();return;}
       generation++;status=operation=null;attempts.clear();note('Machine response is incomplete. Check status before using controls.');render();
     }
   };

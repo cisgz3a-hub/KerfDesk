@@ -2,7 +2,11 @@ import { app, net, Notification, safeStorage, shell } from 'electron';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
 import { isLicenceCheckoutUrl } from './licensing-commerce.js';
 import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
-import { withLicensingRoutes, type ProtocolHandler } from './licensing-routes.js';
+import {
+  withLicensingRoutes,
+  type ProtocolHandler,
+  type RequestUpdateClose,
+} from './licensing-routes.js';
 import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime, type LicensingRuntime } from './licensing-runtime.js';
 import { scheduleLicenceChecks } from './licensing-schedule.js';
@@ -43,7 +47,7 @@ type Options = {
   readonly trustedUpdates: boolean;
   readonly updater: CommercialUpdater;
   readonly canInstallManualUpdate?: () => boolean;
-  readonly requestManualUpdateClose?: () => void;
+  readonly requestManualUpdateClose?: RequestUpdateClose;
 };
 
 export function createDesktopLicensing(options: Options) {

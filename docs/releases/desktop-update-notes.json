@@ -1,11 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "132ad4364d966fffa62f0d6f5aa7456e7493159c",
+  "sinceSourceSha": "6c62d5a6bfd16210a9c6fa340e60722dba4edad0",
   "highlights": [
-    "Phone & MCP puts shape and text creation beside the canvas, with clearer drawing, panning, zooming and resizing controls.",
-    "Phone and MCP number fields accept decimal commas and retain unfinished entries when the view refreshes.",
-    "Completed touch drawings survive cancelled navigation, and arrow keys no longer disturb a held Move.",
-    "Moving, resizing and rotating grouped artwork from a paired client keeps the group together.",
-    "Long paired editing sessions recover Job Review while keeping completed Frame evidence for unchanged placement."
+    "Cancelled Install and close requests no longer trigger an installer later; Free updates remain available after a failed trial request.",
+    "Phone & MCP keeps a separate Abort allowance and lets you read every Job Review warning and operation across pages.",
+    "grblHAL whole-number settings keep their intended values; reconnecting no longer leaves an old Wake error on the new connection.",
+    "Line Art is the free tracing option; the other tracing modes ask for desktop Pro access.",
+    "Large projects save in the background, with cancellation preserving your unsaved edits.",
+    "Material recipes fit MCP responses, and closing a dialog returns focus to the control that opened it."
   ]
 }

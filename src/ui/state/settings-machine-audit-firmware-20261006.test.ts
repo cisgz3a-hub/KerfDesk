@@ -14,12 +14,17 @@ import type { LaserState } from './laser-store';
 beforeEach(resetStore);
 afterEach(resetStore);
 
-function settingWriteHarness(readback: string, driver: ControllerDriver = grblDriver) {
+function settingWriteHarness(
+  readback: string,
+  driver: ControllerDriver = grblDriver,
+  interpretSetting?: (wireValue: string) => string,
+) {
   const rows = settingsMapToRows(
     new Map([
       [30, '1000'],
       [11, '0.010'],
       [32, '1'],
+      [1, '255'],
     ]),
   );
   let state = {
@@ -51,6 +56,7 @@ function settingWriteHarness(readback: string, driver: ControllerDriver = grblDr
     controllerIdleWait: null,
   } as Parameters<typeof grblSettingsActions>[2];
   let writtenId = 30;
+  let observedReadback = readback;
   // Only plain decimal setting commands receive a terminal acknowledgement.
   // The simulated $$ read is separate from that acknowledgement, and retains
   // stock GRBL's rounded report precision (e.g. a tiny $30 is printed as 0).
@@ -58,16 +64,17 @@ function settingWriteHarness(readback: string, driver: ControllerDriver = grblDr
     if (line === '$$\n') {
       state = {
         ...state,
-        grblSettingsRows: settingsMapToRows(new Map([[writtenId, readback]])),
+        grblSettingsRows: settingsMapToRows(new Map([[writtenId, observedReadback]])),
         controllerQualification: { kind: 'qualified', epoch: 1, settings: 'verified' },
         lastSettingsReadAt: Date.now(),
       };
       refs.settingsCollector = idleCollector();
       refs.settingsCollectorSessionEpoch = null;
     } else {
-      const setting = /^\$(\d+)=[+-]?(?:\d+(?:\.\d*)?|\.\d+)\n$/.exec(line);
+      const setting = /^\$(\d+)=([+-]?(?:\d+(?:\.\d*)?|\.\d+))\n$/.exec(line);
       if (setting === null) throw new Error('Stock GRBL invalid-statement refusal');
       writtenId = Number(setting[1]);
+      observedReadback = interpretSetting?.(setting[2]!) ?? readback;
     }
     consumeControllerCommandResponse(refs, { kind: 'ok' }, 'ok');
   });
@@ -175,6 +182,32 @@ describe('machine settings audit: profile number spelling at the firmware bounda
     await expect(harness.actions.writeGrblSetting(30, input)).rejects.toThrow(reason);
     expect(harness.wire).not.toHaveBeenCalled();
     expect(harness.getState().controllerOperation).toBeNull();
+    expect(harness.getState().controllerQualification).toBe(qualification);
+    expect(harness.getState().grblSettingsRows).toBe(harness.rows);
+  });
+
+  it.each(['25.0', '25.00', '25.000'])(
+    'stores requested HAL integer %s before readback verification',
+    async (input) => {
+      // The pinned HAL read_uint multiplies its accumulator for fractional
+      // zeroes too. This independent oracle would turn 25.0 into 250 if sent.
+      const harness = settingWriteHarness('255', grblHalDriver, (wire) =>
+        String(Number(wire.replace('.', ''))),
+      );
+      await expect(harness.actions.writeGrblSetting(1, input)).resolves.toBeUndefined();
+      expect(harness.wire.mock.calls.map((call) => call[0])).toEqual(['$1=25\n', '$$\n']);
+      expect(harness.getState().grblSettingsRows[0]?.numericValue).toBe(25);
+      expect(harness.getState().lastWriteError).toBeNull();
+    },
+  );
+
+  it('refuses a genuinely fractional HAL integer before any transport or durable setting change', async () => {
+    const harness = settingWriteHarness('255', grblHalDriver);
+    const qualification = harness.getState().controllerQualification;
+    await expect(harness.actions.writeGrblSetting(1, '25.00000000000000000001')).rejects.toThrow(
+      'integer',
+    );
+    expect(harness.wire).not.toHaveBeenCalled();
     expect(harness.getState().controllerQualification).toBe(qualification);
     expect(harness.getState().grblSettingsRows).toBe(harness.rows);
   });

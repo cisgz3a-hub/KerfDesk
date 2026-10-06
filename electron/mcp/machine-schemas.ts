@@ -4,10 +4,12 @@ const revision = z.string().min(1).max(200);
 const message = z.string().max(2048);
 const admission = { expectedRevision: revision, requestId: z.uuid() };
 const frame = z.object({ required: z.literal(true), complete: z.boolean() });
+const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const review = z.object({
   reviewId: z.uuid(),
   revision,
   mode: z.enum(['laser', 'cnc']),
+  artworkShared: z.boolean().optional(),
   stats: z
     .array(
       z.object({
@@ -21,9 +23,26 @@ const review = z.object({
   warnings: z.array(z.object({ code: z.string().min(1).max(128), message })).max(200),
   operations: z
     .array(
-      z.object({ operationId: z.string().min(1).max(128), summaries: z.array(message).max(20) }),
+      z.object({
+        operationId: z.string().min(1).max(128),
+        summaries: z.array(message).max(20),
+        index: count.optional(),
+        summaryOffset: count.optional(),
+        summaryTotal: count.optional(),
+      }),
     )
     .max(200),
+  pagination: z
+    .object({
+      offset: count,
+      nextOffset: count.nullable(),
+      totalFacts: count,
+      totalWarnings: count,
+      totalOperations: count,
+      totalStats: count,
+      totalSummaries: count,
+    })
+    .optional(),
   acknowledgement: z.object({
     kind: z.enum(['laser-verified', 'laser-unverified', 'cnc']),
     prompt: message.optional(),
@@ -34,7 +53,10 @@ const review = z.object({
 /** Bounded machine commands; no arbitrary console, G-code, homing or file exchange. */
 export const mcpMachineInputSchemas = {
   get_machine_status: z.strictObject({}),
-  get_control_operation: z.strictObject({ operationId: z.uuid() }),
+  get_control_operation: z.strictObject({
+    operationId: z.uuid(),
+    reviewPage: z.strictObject({ reviewId: z.uuid(), offset: count }).optional(),
+  }),
   jog_machine: z.strictObject({
     ...admission,
     axis: z.enum(['x', 'y', 'z']),

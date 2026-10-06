@@ -7,7 +7,7 @@ export const mcpMachineToolInfo = {
   get_control_operation: {
     title: 'Check a machine operation',
     description:
-      'Read the outcome of your own operationId. Use the original requestId as operationId after a lost or timed-out action reply. Unknown means the outcome is unconfirmed; never automatically send another motion or job with a new ID.',
+      'Read the outcome of your own operationId. Use the original requestId as operationId after a lost or timed-out action reply. Canonical Job Review facts are bounded pages: pagination counts describe the complete same review; fetch each nextOffset with reviewPage {reviewId, offset} to inspect all warnings, statistics and operation summaries. A changed reviewId invalidates old pages. Unknown means the outcome is unconfirmed; never automatically send another motion or job with a new ID.',
   },
   jog_machine: {
     title: 'Jog the machine',

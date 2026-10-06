@@ -114,6 +114,32 @@ async function reviewing(id: string, oldToken?: string): Promise<MachineOperatio
 }
 
 describe('remote Start uses the ordinary exact review and one-use claim', () => {
+  it('review pages belong to the same caller and expire with the current one-use review', async () => {
+    const args = writeArgs(adapter);
+    await adapter.execute('review_machine_job', args);
+    const first = await reviewing(args.requestId);
+    const request = {
+      operationId: args.requestId,
+      reviewPage: { reviewId: first.review!.reviewId, offset: 0 },
+    };
+    expect(
+      operation(await adapter.execute('get_control_operation', request)).review?.reviewId,
+    ).toBe(first.review!.reviewId);
+    expect(
+      resultCode(
+        await adapter.execute('get_control_operation', request, {
+          remoteCaller: { clientId: 'other', sessionId: 'other' },
+        }),
+      ),
+    ).toBe('stale_revision');
+    useStore.getState().setLayerParam('red', { power: 33 });
+    await reviewing(args.requestId, first.review!.reviewId);
+    expect(resultCode(await adapter.execute('get_control_operation', request))).toBe(
+      'stale_revision',
+    );
+    expect(useLaserStore.getState().startJob).not.toHaveBeenCalled();
+  });
+
   it('review alone sends no Start; the displayed acknowledgement and one affirmative token start exactly once', async () => {
     const args = writeArgs(adapter);
     expect(operation(await adapter.execute('review_machine_job', args)).state).toBe('accepted');

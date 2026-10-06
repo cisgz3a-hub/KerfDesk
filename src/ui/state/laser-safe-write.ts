@@ -14,6 +14,7 @@ import {
   type TranscriptBufferRefs,
 } from './laser-transcript-buffer';
 import type { LaserState } from './laser-store';
+import { controllerOperationOwner } from './laser-controller-operation';
 import type { LaserMotionOperationId } from './laser-motion-operation';
 import { JOG_MPG_INTERRUPTION_MESSAGE } from './frame-status-failure';
 import type { UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
@@ -101,18 +102,69 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
     if (source === 'job' && action === undefined) return writeJobRefill(set, refs, conn, line);
     refuseUnencodableLine(set, get, line);
+    const wakeOwner = wakeOwnerForWrite(get, action);
     const binding = reserveWrite(set, get, refs, line, action, writeSource);
     const { writeEpoch, ownedMotionOperationId } = binding;
     assertDispatchWrite(set, refs, conn, action, binding, assertBeforeWrite);
     try {
       await conn.write(line);
       assertCurrentWriteEpoch(refs, writeEpoch);
+      if (wakeOwnerWasReplaced(get, wakeOwner)) {
+        settleObsoleteWakeWrite(set, refs, writeEpoch);
+        return;
+      }
       commitSuccessfulWrite(set, refs, line, writeSource, action, ownedMotionOperationId);
     } catch (err) {
-      recordWriteFailure(set, refs, writeEpoch, err, action, ownedMotionOperationId);
+      recordOwnedWriteFailure(
+        set,
+        get,
+        refs,
+        writeEpoch,
+        err,
+        action,
+        ownedMotionOperationId,
+        wakeOwner,
+      );
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
+}
+
+function wakeOwnerForWrite(get: GetFn, action: LaserSafetyAction | undefined): object | null {
+  const operation = get().controllerOperation;
+  return action === 'wake' && operation?.kind === 'recovery'
+    ? controllerOperationOwner(operation)
+    : null;
+}
+
+function recordOwnedWriteFailure(
+  set: SetFn,
+  get: GetFn,
+  refs: SafeWriteRefs,
+  writeEpoch: number,
+  error: unknown,
+  action: LaserSafetyAction | undefined,
+  motionOperationId: LaserMotionOperationId | undefined,
+  wakeOwner: object | null,
+): void {
+  if (wakeOwnerWasReplaced(get, wakeOwner)) settleObsoleteWakeWrite(set, refs, writeEpoch);
+  else recordWriteFailure(set, refs, writeEpoch, error, action, motionOperationId);
+}
+
+function wakeOwnerWasReplaced(get: GetFn, owner: object | null): boolean {
+  if (owner === null) return false;
+  const operation = get().controllerOperation;
+  return operation === null || controllerOperationOwner(operation) !== owner;
+}
+
+function settleObsoleteWakeWrite(set: SetFn, refs: SafeWriteRefs, writeEpoch: number): void {
+  // Ctrl-X owes no acknowledgement. Its aggregate transport reservation still
+  // settles on this connection, but its transcript/error belongs to its old
+  // Wake owner. A replacement serial epoch already discarded that reservation.
+  if ((refs.writeEpoch ?? 0) !== writeEpoch) return;
+  set((state) => ({
+    pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+  }));
 }
 // A job makes `$` lines off limits, with two exceptions inside a tool-change
 // hold. The operator's jog in a drained, fresh-Idle hold: GRBL's native jog is

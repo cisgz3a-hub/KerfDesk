@@ -36,6 +36,18 @@ export function start(options = {}) {
           namespace_id: '2001',
           simple: { limit: options.rateLimit ?? 1000, period: 60 },
         },
+        AUTH_LIMIT: {
+          namespace_id: '2002',
+          simple: { limit: options.authRateLimit ?? 600, period: 60 },
+        },
+        CLIENT_LIMIT: {
+          namespace_id: '2003',
+          simple: { limit: options.clientRateLimit ?? 120, period: 60 },
+        },
+        ABORT_LIMIT: {
+          namespace_id: '2004',
+          simple: { limit: options.abortRateLimit ?? 30, period: 60 },
+        },
       },
       assets: {
         directory: fileURLToPath(new URL('../public', import.meta.url)),

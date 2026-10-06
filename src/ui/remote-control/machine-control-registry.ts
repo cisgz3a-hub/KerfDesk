@@ -15,7 +15,12 @@ import {
   type BackgroundMachineAction,
 } from './machine-owned-operation';
 import { RemoteFault } from './fault';
-import type { MachineAuthority, MachineCommand, RemoteCaller } from './machine-types';
+import type {
+  MachineAuthority,
+  MachineCommand,
+  MachineReviewPageRequest,
+  RemoteCaller,
+} from './machine-types';
 import type { RemoteAppStore, RemoteCommandResult, RemoteControlOptions } from './types';
 
 type Execution = {
@@ -33,6 +38,7 @@ type ProjectionSource = {
   readonly id?: string;
   readonly operation?: OwnedMachineOperation;
   readonly status: boolean;
+  readonly page?: MachineReviewPageRequest;
 };
 const MAX_ACTIONS = 4096;
 const MAX_ABORTS = 256;
@@ -68,6 +74,7 @@ export class MachineControlRegistry {
         input.args.operationId,
         this.operations.get(key(caller, input.args.operationId)),
         false,
+        input.args.reviewPage,
       );
     const fingerprint = canonical(input);
     const cached = this.replay(input, caller, fingerprint);
@@ -199,13 +206,15 @@ export class MachineControlRegistry {
     id: string | undefined,
     operation: OwnedMachineOperation | undefined,
     status: boolean,
+    page?: MachineReviewPageRequest,
   ): RemoteCommandResult {
-    const data = status ? this.statusData(caller) : this.operationData(id, operation);
+    const data = status ? this.statusData(caller) : this.operationData(id, operation, page);
     this.sources.set(data, {
       caller,
       ...(id === undefined ? {} : { id }),
       ...(operation === undefined ? {} : { operation }),
       status,
+      ...(page === undefined ? {} : { page }),
     });
     return { ok: true, revision: this.revision(), data };
   }
@@ -230,9 +239,12 @@ export class MachineControlRegistry {
   private operationData(
     id: string | undefined,
     operation: OwnedMachineOperation | undefined,
+    page?: MachineReviewPageRequest,
   ): Record<string, unknown> {
     if (id === undefined) throw new RemoteFault('unavailable');
-    return { operation: machineOperationProjection(id, operation, this.revision(), this.options) };
+    return {
+      operation: machineOperationProjection(id, operation, this.revision(), this.options, page),
+    };
   }
   private canControlNow(caller: RemoteCaller): boolean {
     const authority = this.options.captureMachineAuthority?.();
@@ -273,7 +285,7 @@ export class MachineControlRegistry {
     if (!MACHINE_COMMANDS.has(command) || !value.ok) return value;
     const source = this.sources.get(value.data);
     if (source === undefined) throw new RemoteFault('unavailable');
-    return this.result(source.caller, source.id, source.operation, source.status);
+    return this.result(source.caller, source.id, source.operation, source.status, source.page);
   };
   readonly revisionRenewed = (): void => {
     for (const operation of new Set(this.operations.values()))

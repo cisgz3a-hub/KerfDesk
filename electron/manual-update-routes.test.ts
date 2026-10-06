@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { withLicensingRoutes } from './licensing-routes.js';
+import { withLicensingRoutes, type RequestUpdateClose } from './licensing-routes.js';
 import type { LicensingRuntime } from './licensing-runtime.js';
 import type { UpdateStatus } from './update-status.js';
 
@@ -14,7 +14,7 @@ describe('same-origin manual update commands', () => {
     checkedAt: 1,
   };
   afterEach(() => vi.useRealTimers());
-  function setup(requestUpdateClose?: () => void) {
+  function setup(requestUpdateClose?: RequestUpdateClose) {
     const updates = {
       status: () => state,
       check: () => state,
@@ -27,6 +27,7 @@ describe('same-origin manual update commands', () => {
           installOnQuit: true,
         }),
       ),
+      cancelInstallOnQuit: vi.fn(),
     };
     const route = withLicensingRoutes(
       async () => new Response('fallback'),
