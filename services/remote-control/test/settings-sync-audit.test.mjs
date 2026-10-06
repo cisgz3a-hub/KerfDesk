@@ -168,9 +168,25 @@ test('closing the detail disclosure retires a held private review, even if reope
   const loaded = await loadLive(browser, 'phone', state);
   const p = loaded.surface;
   const summary = p.locator('section[data-panel="details"] > details > summary');
-  let held;
+  let held, fresh;
   try {
     await openDetails(p);
+    await p.evaluate(() => {
+      const originalFetch = globalThis.fetch;
+      globalThis.heldReviewReceived = false;
+      globalThis.fetch = async (input, init) => {
+        const response = await originalFetch(input, init);
+        if (
+          !globalThis.heldReviewReceived &&
+          init?.body &&
+          JSON.parse(init.body).name === 'review_job'
+        ) {
+          globalThis.heldReviewReceived = true;
+          await new Promise((resolve) => (globalThis.releaseReviewDelivery = resolve));
+        }
+        return response;
+      };
+    });
     held = witness.hold('review_job');
     await tick(loaded, 10_001);
     await held.admitted;
@@ -179,18 +195,39 @@ test('closing the detail disclosure retires a held private review, even if reope
     await expect(p.locator('#details-list')).toBeEmpty();
     state.changedSettings = true;
     await summary.click();
+    await expect(p.locator('#live-status')).toHaveText('Updates waiting for the pending request');
     held.release();
     await expect.poll(() => witness.active).toBe(0);
+    await expect.poll(() => p.evaluate(() => globalThis.heldReviewReceived)).toBe(true);
     assert.deepEqual(await p.evaluate(() => globalThis.privateDetailPaints), []);
+    const reviews = count(state, 'review_job');
+    // The fixture is idle while the browser still owns the retired response. A polling
+    // deadline here must wait, and cannot count as the next completed detail refresh.
     await tick(loaded);
+    await expect(p.locator('#live-status')).toHaveText('Updates waiting for the pending request');
+    assert.equal(count(state, 'review_job'), reviews);
+    await p.evaluate(() => globalThis.releaseReviewDelivery());
+    // Live is painted in the browser's refresh completion, after its read and before
+    // its finally block schedules the next poll. The DOM observer runs after both.
+    await expect(p.locator('#live-status')).toHaveText('Live · PC changes appear automatically');
+    assert.deepEqual(await p.evaluate(() => globalThis.privateDetailPaints), []);
+    fresh = witness.hold('get_app_status');
+    await tick(loaded);
+    await fresh.admitted;
+    await expect(p.locator('#details-list')).toContainText('Refreshing from the PC…');
+    assert.deepEqual(await p.evaluate(() => globalThis.privateDetailPaints), []);
+    fresh.release();
     await expect(p.locator('#details-list')).toContainText('Updated machine profile');
     await expect(p.locator('#details-list')).toContainText('Current review warning');
+    await expect(p.locator('#live-status')).toHaveText('Live · PC changes appear automatically');
+    assert.equal(count(state, 'review_job'), reviews + 1);
     assert.deepEqual(await p.evaluate(() => globalThis.privateDetailPaints), []);
     assert.equal(witness.maximum, 1);
     noActions(state);
     assert.deepEqual(loaded.errors, []);
   } finally {
     held?.release();
+    fresh?.release();
     await loaded.context.close();
   }
 });

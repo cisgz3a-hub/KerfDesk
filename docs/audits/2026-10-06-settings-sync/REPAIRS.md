@@ -19,7 +19,7 @@ Date: 2026-10-06. Baseline: `6c62d5a6bfd16210a9c6fa340e60722dba4edad0`, the sour
 - CNC ownership: 35 focused tests across eight files passed. A subsequent refactor passed all 11 tests in the three affected files.
 - Preferences/camera: 86 focused tests across 13 files passed; after the final warning/retry changes, all 20 tests in the three affected files passed.
 - Firmware: the final frozen-source run passed 162 tests across nine files.
-- Phone: 85 final affected browser tests passed with no skips. An earlier 104-test run included the workspace scenarios. These runs overlap and must not be added as distinct coverage.
+- Phone: 85 affected browser tests passed with no skips, and the complete phone/MCP service suite passed all 396 tests. After the first hosted run exposed a test response-delivery race, all 43 tests in the affected browser files passed with the corrected synchronization. An earlier 104-test run included the workspace scenarios. These runs overlap and must not be added as distinct coverage.
 - Complete renderer Chromium scenarios: all nine passed with no skips or retries. They cover blank numeric retyping, operation/toolbar/Machine Setup fields, failure/retry/reload, computer preferences through Open/New, immediate Save As and real autosave recovery.
 - Direct visible Chrome inspection confirmed blank-to-number editing, a decimal grid value and preference retention after reload.
 - The full renderer typecheck passed against the frozen source. Browser-test and remote-service typechecks passed. Full root ESLint and subsequent scoped lint, source formatting, file-size/export guards and whitespace checks passed.
@@ -27,6 +27,8 @@ Date: 2026-10-06. Baseline: `6c62d5a6bfd16210a9c6fa340e60722dba4edad0`, the sour
 - Both the desktop renderer and browser-Free production builds passed. The Electron main-process compile and installer-terms preparation also passed without changes to the EULA.
 
 The initial combined renderer run passed six of eight scenarios but was invalidated by development-server reloads while source files were still being edited. The later nine-scenario run used frozen source and passed. The full remote-service run also exposed older startup tests waiting on detail reads that must now stay absent while the disclosure is closed; their replacement checks retain the mandatory fresh workspace admission contract.
+
+The first hosted phone run passed 395 of 396 tests. Its close/reopen privacy regression incorrectly treated the fixture handler becoming idle as browser response completion. A forced browser-delivery barrier reproduced the exact timeout. The corrected test waits for the retired refresh to finish, witnesses the next fresh read and still requires no private detail to be painted. Production code and assertion timeouts did not change.
 
 Reproduction uses the ordinary repository and remote-service test scripts in a fresh checkout. The local audit worktree used direct installed Node entrypoints and a test-only filesystem allowlist for its linked dependency directory; no runtime Vite configuration was changed.
 
