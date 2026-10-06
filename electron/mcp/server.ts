@@ -22,6 +22,7 @@ import {
   KERFDESK_WORKSPACE_UI_MIME,
   KERFDESK_WORKSPACE_UI_URI,
 } from './workspace-ui.js';
+import { boundedRecipeToolResult, structuredToolResult, toolResultBytes } from './tool-result.js';
 
 export type KerfDeskMcpToolMetadata = Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>>;
 
@@ -42,15 +43,15 @@ function toolSuccess(command: KerfDeskMcpCommand, raw: Record<string, unknown>):
   }
   const output = mcpOutputSchemas[command].safeParse(raw);
   if (!output.success) throw new KerfDeskMcpError('failed');
-  const result: CallToolResult = {
-    content: [{ type: 'text', text: JSON.stringify(output.data) }],
-    structuredContent: output.data,
-  };
+  const result =
+    command === 'list_material_recipes' && 'recipes' in output.data
+      ? boundedRecipeToolResult(output.data)
+      : structuredToolResult(output.data);
   return boundedResult(result);
 }
 
 function boundedResult(result: CallToolResult): CallToolResult {
-  if (new TextEncoder().encode(JSON.stringify(result)).byteLength > MCP_MAX_RESULT_BYTES) {
+  if (toolResultBytes(result) > MCP_MAX_RESULT_BYTES) {
     throw new KerfDeskMcpError('failed');
   }
   return result;

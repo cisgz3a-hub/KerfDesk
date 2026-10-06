@@ -11,6 +11,7 @@ import {
 } from './input-schemas.js';
 import { createKerfDeskMcpServer } from './server.js';
 import { KERFDESK_WORKSPACE_UI_URI } from './workspace-ui.js';
+import { mcpOutputSchemas } from './output-schemas.js';
 const writeAdmission = {
   expectedRevision: 'revision-1',
   requestId: '12345678-1234-4234-8234-123456789abc',
@@ -522,6 +523,32 @@ describe('projected and bounded desktop responses', () => {
       }),
     });
     const result = await client.callTool({ name: 'list_material_recipes', arguments: {} });
+    expect(result.isError).not.toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      revision: 'revision-1',
+      total: 200,
+      truncated: true,
+    });
+    const bounded = mcpOutputSchemas.list_material_recipes.parse(result.structuredContent);
+    expect(bounded.recipes.length).toBeGreaterThan(0);
+    expect(bounded.recipes.length).toBeLessThan(200);
+    expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(MCP_MAX_RESULT_BYTES);
+  });
+
+  it('still refuses oversized output from other tools', async () => {
+    const client = await connectedClient({
+      request: async () => ({
+        ...readResults.get_workspace,
+        artwork: Array.from({ length: 200 }, (_, index) => ({
+          id: `art-${index}`,
+          type: 'rectangle',
+          name: '材'.repeat(512),
+        })),
+        totalArtwork: 200,
+      }),
+    });
+    const result = await client.callTool({ name: 'get_workspace', arguments: {} });
+    expect(result.isError).toBe(true);
     expect(result.structuredContent).toMatchObject({ error: { code: 'failed' } });
     expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThan(MCP_MAX_RESULT_BYTES);
   });
