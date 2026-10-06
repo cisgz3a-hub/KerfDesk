@@ -37,7 +37,11 @@ export function loadRtspCameraUrl(): string | null {
     const stored = localStorage.getItem(RTSP_CAMERA_URL_KEY);
     if (stored === null) return null;
     const safe = rtspUrlWithoutCredentials(stored);
-    if (safe !== stored) localStorage.setItem(RTSP_CAMERA_URL_KEY, safe);
+    try {
+      if (safe !== stored) localStorage.setItem(RTSP_CAMERA_URL_KEY, safe);
+    } catch {
+      // Cleanup is best effort; the sanitized readable choice remains usable.
+    }
     return safe;
   } catch {
     return null;
@@ -69,8 +73,12 @@ export function loadPhoneCamera(): StoredPhoneCamera | null {
     const { app, address } = stored as Record<string, unknown>;
     if ((app !== 'ip-webcam' && app !== 'other') || typeof address !== 'string') return null;
     const safe = phoneCameraAddressWithoutLogin(address);
-    if (safe !== address) {
-      localStorage.setItem(PHONE_CAMERA_KEY, JSON.stringify({ app, address: safe }));
+    try {
+      if (safe !== address) {
+        localStorage.setItem(PHONE_CAMERA_KEY, JSON.stringify({ app, address: safe }));
+      }
+    } catch {
+      // Cleanup is best effort; never return the credentials from the legacy record.
     }
     return { app, address: safe };
   } catch {

@@ -1,6 +1,6 @@
 import test, { before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import {
   capture,
   fixtureState,
@@ -34,8 +34,9 @@ test('phone workspace: bounded preview, job summary, literal untrusted text, no 
       /<script>literal artwork<\/script>/,
     );
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
-    assert.match(await page.locator('#details-list').textContent(), /Estimated 2 min/);
-    assert.match(await page.locator('#details-list').textContent(), /50\.00 × 40\.00 mm/);
+    await page.locator('section[data-panel="details"] > details > summary').click();
+    await expect(page.locator('#details-list')).toContainText('Estimated 2 min');
+    await expect(page.locator('#details-list')).toContainText('50.00 × 40.00 mm');
     assert.equal(await page.locator('#details-list script').count(), 0);
     assert.deepEqual(errors, []);
   } finally {

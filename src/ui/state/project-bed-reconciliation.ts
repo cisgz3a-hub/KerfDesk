@@ -1,9 +1,10 @@
 import type { DeviceProfile } from '../../core/devices';
-import type { MachineConfig, Project } from '../../core/scene';
+import type { CncMachineParams, MachineConfig, Project } from '../../core/scene';
 
 export type ProjectBedReconciliationNotice = {
   readonly previousDevice: DeviceProfile;
   readonly previousMachine: MachineConfig | undefined;
+  readonly previousCncParams: CncMachineParams | undefined;
   readonly openedDeviceName: string;
   readonly previousDeviceName: string;
   readonly openedWorkspace: { readonly width: number; readonly height: number };
@@ -36,6 +37,11 @@ export function canonicalizeOpenedProjectBed(
     notice: {
       previousDevice: previous.device,
       previousMachine: previous.machine,
+      // Older accepted projects can have a missing or stale device mirror.
+      // Capture the actual head's hardware before Open replaces its job.
+      previousCncParams:
+        (previous.machine?.kind === 'cnc' ? previous.machine : previous.parkedCncMachine)?.params ??
+        previous.device.cncSubProfile,
       openedDeviceName: project.device.name,
       previousDeviceName: previous.device.name,
       openedWorkspace,

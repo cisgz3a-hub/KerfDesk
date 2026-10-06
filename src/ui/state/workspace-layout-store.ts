@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { saveComputerPreference } from './preference-persistence';
 
 export type WorkspaceLayoutPreference = 'auto' | 'compact' | 'spacious';
 export const WORKSPACE_LAYOUT_STORAGE_KEY = 'kerfdesk.workspace-layout.v1';
@@ -24,11 +25,7 @@ type WorkspaceLayoutState = {
 };
 
 function savePreference(preference: WorkspaceLayoutPreference): void {
-  try {
-    localStorage.setItem(WORKSPACE_LAYOUT_STORAGE_KEY, preference);
-  } catch {
-    // A restricted or full browser store must not prevent changing the layout.
-  }
+  saveComputerPreference(WORKSPACE_LAYOUT_STORAGE_KEY, preference);
 }
 
 export const useWorkspaceLayoutStore = create<WorkspaceLayoutState>((set) => ({

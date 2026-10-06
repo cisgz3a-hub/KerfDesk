@@ -37,6 +37,44 @@ describe('computeFirmwareDiffs', () => {
     expect(d30?.desired).toBe('1000');
   });
 
+  it.each([
+    [1e-7, '0.0000001'],
+    [1e-8, '.00000001'],
+    [1.1e-7, '.00000011'],
+    [0.01050001, '.01050001'],
+    [1e21, '1000000000000000000000'],
+    [1000.125, '1000.125'],
+  ] as const)(
+    'offers supported profile maximum %s in plain firmware decimal spelling',
+    (maxPowerS, desired) => {
+      const draft = { ...DEFAULT_DEVICE_PROFILE, maxPowerS };
+      expect(computeFirmwareDiffs(draft, rows({ 30: '255' }))[0]).toMatchObject({
+        desired,
+        comparison: 'different',
+        writable: true,
+      });
+      expect(draft.maxPowerS).toBe(maxPowerS);
+    },
+  );
+
+  it.each([1e-9, 1.23e-7, Number.MIN_VALUE, Number.MAX_VALUE, Infinity, NaN])(
+    'keeps unrepresentable profile maximum %s explicit and unavailable to the write queue',
+    (maxPowerS) => {
+      const result = computeFirmwareComparison(
+        { ...DEFAULT_DEVICE_PROFILE, maxPowerS },
+        rows({ 30: '255' }),
+      );
+      expect(result.diffs[0]).toMatchObject({
+        desired: String(maxPowerS),
+        comparison: 'invalid',
+        differs: false,
+        writable: false,
+      });
+      expect(result.invalidCodes).toEqual([]);
+      expect(result.comparedCount).toBe(0);
+    },
+  );
+
   it('surfaces a bed-travel mismatch read-only (machine-critical, not writable here)', () => {
     const draft = { ...DEFAULT_DEVICE_PROFILE, bedWidth: 400 };
     const d130 = computeFirmwareDiffs(draft, rows({ 130: '500' })).find((diff) => diff.id === 130);

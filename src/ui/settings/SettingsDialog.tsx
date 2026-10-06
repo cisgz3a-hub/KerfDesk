@@ -13,6 +13,10 @@ import { machineKindOf, type MachineKind } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { LabsFeatureList } from '../laser/LabsSettingsDialog';
 import { useStore } from '../state/store';
+import {
+  retryComputerPreferences,
+  usePreferencePersistenceStore,
+} from '../state/preference-persistence';
 import { SettingsCanvasSection } from './SettingsCanvasSection';
 import { SettingsGeneralSection } from './SettingsGeneralSection';
 import { SettingsMachineSection } from './SettingsMachineSection';
@@ -88,15 +92,33 @@ export function SettingsDialog(props: { readonly onClose: () => void }): JSX.Ele
           <SectionBody id={active} machineKind={machineKind} onClose={props.onClose} />
         </div>
       </div>
-      <p style={settingsNoteStyle}>
-        Changes apply at once and are kept on this computer. None of them is saved in a project.
-      </p>
+      <PreferenceSaveStatus />
       <DialogActions>
         <Button variant="primary" onClick={props.onClose}>
           Done
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function PreferenceSaveStatus(): JSX.Element {
+  const pendingCount = usePreferencePersistenceStore((state) => state.pending.size);
+  if (pendingCount === 0) {
+    return (
+      <p style={settingsNoteStyle}>
+        Changes apply at once and are kept on this computer. None of them is saved in a project.
+      </p>
+    );
+  }
+  return (
+    <div role="status">
+      <p style={settingsNoteStyle}>
+        Some settings could not be saved. Retry saving before closing KerfDesk. These settings are
+        not saved in a project.
+      </p>
+      <Button onClick={retryComputerPreferences}>Retry saving settings</Button>
+    </div>
   );
 }
 

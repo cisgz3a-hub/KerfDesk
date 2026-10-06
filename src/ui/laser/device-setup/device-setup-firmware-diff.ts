@@ -4,6 +4,7 @@
 // machine-critical ones (bed travel) are surfaced read-only for awareness.
 
 import type { GrblSettingRow } from '../../../core/controllers/grbl';
+import { encodeGrblSettingValue } from '../../../core/controllers/grbl/grbl-setting-number';
 import type { DeviceProfile } from '../../../core/devices';
 import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
 import type { CncMachineConfig, MachineConfig, MachineKind } from '../../../core/scene';
@@ -18,6 +19,7 @@ export type FirmwareDiff = {
   readonly current: string;
   // What the draft profile wants this setting to be.
   readonly desired: string;
+  readonly desiredEncodingIssue?: string;
   readonly comparison: 'match' | 'different' | 'invalid';
   readonly differs: boolean;
   // Whether the wizard may offer to write this (GRBL 'common'-risk only).
@@ -74,9 +76,10 @@ export function computeFirmwareComparison(
       return [];
     }
     const desired = setting.desired;
+    const encoded = encodeGrblSettingValue(setting.id, desired, draft.controllerKind);
     const current = row.numericValue;
     const comparison =
-      current === null || !Number.isFinite(current)
+      encoded.kind === 'blocked' || current === null || !Number.isFinite(current)
         ? 'invalid'
         : numbersClose(current, desired)
           ? 'match'
@@ -87,20 +90,24 @@ export function computeFirmwareComparison(
         code: row.code,
         label: setting.label ?? presentGrblSetting(row, context).name,
         current: row.rawValue,
-        desired: String(desired),
+        desired: encoded.kind === 'ok' ? encoded.value : String(desired),
+        ...(encoded.kind === 'blocked' ? { desiredEncodingIssue: encoded.reason } : {}),
         comparison,
         differs: comparison === 'different',
-        writable: row.writeRisk === 'common',
+        writable: encoded.kind === 'ok' && row.writeRisk === 'common',
       },
     ];
   });
   const invalidCodes = diffs
-    .filter((diff) => diff.comparison === 'invalid')
+    .filter((diff) => {
+      const current = rows.find((row) => row.id === diff.id)?.numericValue;
+      return current === null || current === undefined || !Number.isFinite(current);
+    })
     .map((diff) => diff.code);
   return {
     diffs,
     expectedCount: settings.length,
-    comparedCount: diffs.length - invalidCodes.length,
+    comparedCount: diffs.filter((diff) => diff.comparison !== 'invalid').length,
     missingCodes,
     invalidCodes,
   };

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { chromium } from '@playwright/test';
+import { chromium, expect } from '@playwright/test';
 import { ORIGIN, start, connectDesktop, pairPhone, workspace, authorizeMcp } from './support.mjs';
 import { openTask } from './phone-workspace-support.mjs';
 
@@ -433,18 +433,18 @@ test(
 
 for (const pairedOnStartup of [true, false])
   test(
-    `mobile Chrome: ${pairedOnStartup ? 'saved approval startup' : 'pairing approval timer'} holds Apply until detail reads settle`,
+    `mobile Chrome: ${pairedOnStartup ? 'saved approval startup' : 'pairing approval timer'} holds Apply until fresh workspace authority arrives without hidden detail preparation`,
     { timeout: 30_000 },
     async () => {
       const worker = start();
       let desktop;
       let browser;
-      let detailDelay;
+      let workspaceDelay;
       try {
         desktop = await connectDesktop(worker);
         const commands = [];
         const fixture = syntheticDesktop(desktop, commands);
-        detailDelay = fixture.holdNextAppStatus();
+        workspaceDelay = fixture.holdNextWorkspace();
         let cookies = [];
         if (pairedOnStartup) {
           const phone = await pairPhone(worker, desktop);
@@ -478,22 +478,35 @@ for (const pairedOnStartup of [true, false])
             scopes: ['read', 'edit'],
           });
         }
-        await detailDelay.reached;
+        await workspaceDelay.reached;
         await page.getByRole('button', { name: 'Edit', exact: true }).click();
         if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
-        const apply = page.getByRole('button', { name: 'Apply settings' });
+        const apply = page.locator('#operation-form button');
         assert.equal(await page.locator('body').getAttribute('aria-busy'), 'true');
         assert.equal(await apply.isDisabled(), true);
+        assert.equal(await apply.isHidden(), true);
         const power = page.locator('#operation-form [name=powerPercent]');
         assert.equal(await power.isDisabled(), true);
-        assert.equal(await power.inputValue(), '30');
+        assert.equal(await power.inputValue(), '');
+        assert.equal(await page.locator('#edit-forms').isHidden(), true);
+        assert.equal(await page.locator('#workspace-name').textContent(), '');
+        assert.equal(commands.filter((command) => command.name === 'get_workspace').length, 1);
+        const details = ['get_app_status', 'get_machine', 'review_job', 'list_material_recipes'];
+        assert.equal(
+          commands.some((command) => details.includes(command.name)),
+          false,
+          'Fresh edit authority does not require preparing collapsed details.',
+        );
         assert.equal(
           commands.some((command) => command.name === 'update_operation'),
           false,
         );
-        detailDelay.release();
+        workspaceDelay.release();
         await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+        await openTask(page, 'operation-task');
+        assert.equal(await apply.isVisible(), true);
         assert.equal(await apply.isEnabled(), true);
+        assert.equal(await power.inputValue(), '30');
         await power.fill('');
         assert.equal(await power.inputValue(), '');
         await power.fill('25');
@@ -511,8 +524,13 @@ for (const pairedOnStartup of [true, false])
         assert.equal(await power.inputValue(), '25');
         assert.equal(await page.locator('#notice').textContent(), 'Updated on your computer.');
         assert.equal(await apply.isEnabled(), true);
+        assert.equal(
+          commands.some((command) => details.includes(command.name)),
+          false,
+          'Startup and the first edit leave collapsed detail preparation idle.',
+        );
       } finally {
-        detailDelay?.release();
+        workspaceDelay?.release();
         await browser?.close();
         closeSocket(desktop?.socket);
         await worker.dispose();
@@ -786,7 +804,7 @@ test(
 );
 
 test(
-  'mobile Chrome: saved approval detail failure stays recoverable through Refresh',
+  'mobile Chrome: saved approval startup and opened detail failures recover through Refresh',
   { timeout: 30_000 },
   async () => {
     const worker = start();
@@ -803,10 +821,17 @@ test(
       ]);
       browser = loaded.browser;
       const page = loaded.page;
-      let failed = false;
+      const requested = [];
+      let workspaceFailed = false;
+      let detailFailed = false;
       await page.route('**/api/client/command', async (route) => {
-        if (route.request().postDataJSON().name === 'get_app_status' && !failed) {
-          failed = true;
+        const name = route.request().postDataJSON().name;
+        requested.push(name);
+        const failWorkspace = name === 'get_workspace' && !workspaceFailed;
+        const failDetail = name === 'get_app_status' && !detailFailed;
+        if (failWorkspace || failDetail) {
+          if (failWorkspace) workspaceFailed = true;
+          else detailFailed = true;
           await route.fulfill({
             status: 503,
             contentType: 'application/json',
@@ -816,13 +841,41 @@ test(
       });
       await page.goto(`${ORIGIN}/control`);
       await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
-      assert.equal(failed, true);
+      assert.equal(workspaceFailed, true);
+      assert.equal(detailFailed, false);
       assert.equal(await page.locator('#workspace-area').isVisible(), true);
       assert.equal(await page.locator('#pair-card').isHidden(), true);
+      assert.equal(await page.locator('#workspace-name').textContent(), '');
+      assert.equal(await page.locator('#edit-forms').isHidden(), true);
+      assert.equal(await page.locator('#operation-form button').isDisabled(), true);
       assert.equal(await page.locator('#notice').getAttribute('data-kind'), 'error');
       assert.match(await page.locator('#notice').textContent(), /Refresh the workspace/);
-      await page.getByRole('button', { name: 'Refresh', exact: true }).click();
+      const refresh = page.getByRole('button', { name: 'Refresh', exact: true });
+      assert.equal(await refresh.isEnabled(), true);
+      await refresh.click();
       await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      assert.equal(await page.locator('#notice').textContent(), 'Workspace refreshed.');
+      assert.equal(await page.locator('#workspace-name').textContent(), workspace.name);
+      await page.getByRole('button', { name: 'Edit', exact: true }).click();
+      await openTask(page, 'operation-task');
+      assert.equal(await page.locator('#operation-form button').isEnabled(), true);
+      assert.equal(await page.locator('#operation-form [name=powerPercent]').inputValue(), '30');
+      const details = ['get_app_status', 'get_machine', 'review_job', 'list_material_recipes'];
+      assert.equal(
+        requested.some((name) => details.includes(name)),
+        false,
+      );
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      assert.equal(detailFailed, false);
+      await page.locator('section[data-panel="details"] > details > summary').click();
+      await expect(page.locator('#details-list')).toContainText('Details unavailable.');
+      assert.equal(detailFailed, true);
+      assert.equal(await page.locator('#operation-form button').isEnabled(), true);
+      assert.equal(await refresh.isEnabled(), true);
+      await refresh.click();
+      await page.waitForFunction(() => document.body.getAttribute('aria-busy') === 'false');
+      await expect(page.locator('#details-list')).toContainText('Checked with the PC.');
+      await expect(page.locator('#details-list')).toContainText('Audit machine');
       assert.equal(await page.locator('#notice').textContent(), 'Workspace refreshed.');
       assert.ok(commands.some((command) => command.name === 'get_app_status'));
       assert.equal(

@@ -144,6 +144,7 @@ function ComparisonSummary({
   readonly comparison: FirmwareComparison;
 }): JSX.Element {
   const { comparedCount, expectedCount, missingCodes, invalidCodes, diffs } = comparison;
+  const encodingIssues = diffs.filter((diff) => diff.desiredEncodingIssue !== undefined);
   const complete = comparedCount === expectedCount;
   const matches = comparedCount > 0 && !diffs.some((diff) => diff.differs);
   return (
@@ -157,9 +158,16 @@ function ComparisonSummary({
       {invalidCodes.length > 0 ? (
         <p style={warningStyle}>Invalid readback: {invalidCodes.join(', ')}.</p>
       ) : null}
+      {encodingIssues.map((diff) => (
+        <p key={diff.id} role="note" style={warningStyle}>
+          {diff.code} profile value {diff.desired} cannot be sent: {diff.desiredEncodingIssue}
+        </p>
+      ))}
       {comparedCount === 0 ? (
         <p style={warningStyle}>
-          Firmware agreement could not be verified: no supported numeric values were reported.
+          {encodingIssues.length > 0
+            ? 'Firmware agreement could not be verified: the profile contains unsupported controller values.'
+            : 'Firmware agreement could not be verified: no supported numeric values were reported.'}
         </p>
       ) : matches ? (
         <p style={complete ? okStyle : warningStyle}>
