@@ -97,9 +97,13 @@ still receive the normal image tool result.
 `KerfDeskMcpArgs<C>`. `output-schemas.ts` exports `mcpOutputSchemas` and
 `KerfDeskMcpResult<C>`. Unknown output fields are stripped recursively. Required
 fields are validated. The entire text and structured tool response is limited
-to 256 KiB in UTF-8; invalid or oversized backend output returns a generic
-failure. The backend must supply bounded records with truthful total/truncated
-fields, rather than a raw store, licence status, connection or purchase object.
+to 256 KiB in UTF-8, including JSON escaping in both representations. Valid
+recipe lists that exceed this budget return the largest fitting ordered prefix
+of complete recipes, keeping the revision and total and setting `truncated` to
+true. Fitting responses remain unchanged. Invalid output and oversized output
+from other tools return a generic failure. The backend must still supply bounded
+records with truthful total/truncated fields, rather than a raw store, licence
+status, connection or purchase object.
 
 Backend failures may throw `KerfDeskMcpError` or an object with one of
 `unavailable`, `stale_revision`, `needs_pro`, `unsupported_operation`,

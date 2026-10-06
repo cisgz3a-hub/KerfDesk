@@ -150,9 +150,18 @@ describe('machine operation final delivery privacy', () => {
         command === 'get_control_operation' ? { operationId: args.requestId } : {},
       );
       expect(JSON.stringify(result)).toContain(privateLabel);
+      expect(
+        result.ok &&
+          (result.data['operation'] as { review: { artworkShared: boolean } }).review.artworkShared,
+      ).toBe(true);
       sharing = false;
       const delivered: RemoteCommandResult = adapter.machineDelivery!(command, result);
       expect(JSON.stringify(delivered)).not.toContain(privateLabel);
+      expect(
+        delivered.ok &&
+          (delivered.data['operation'] as { review: { artworkShared: boolean } }).review
+            .artworkShared,
+      ).toBe(false);
       expect(JSON.stringify(delivered)).toContain('0.20 mm');
       expect(JSON.stringify(delivered)).toContain('Laser power is 40%');
       if (!delivered.ok) throw new Error('projection failed');

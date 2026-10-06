@@ -41,7 +41,16 @@ type PickedRecoveryTarget =
 
 export async function handleSalvageExportProject(
   ctx: SalvageExportCtx,
+  prebuilt?: { readonly project: Project; readonly raw: string; readonly target: SaveTarget },
 ): Promise<SalvageExportOutcome> {
+  if (prebuilt !== undefined) {
+    if (prebuilt.project !== ctx.project)
+      return recoveryError(
+        ctx,
+        new Error('The prepared recovery copy belongs to another project.'),
+      );
+    return writeRecoveryTarget(ctx, prebuilt.target, prebuilt.raw);
+  }
   const prepared = prepareRecovery(ctx);
   if (prepared.kind === 'finished') return prepared.outcome;
   const picked = await pickRecoveryTarget(ctx);
@@ -100,7 +109,7 @@ function recoveryError(ctx: SalvageExportCtx, err: unknown): SalvageExportOutcom
   return 'error';
 }
 
-function recoveryName(savedName: string | null): string {
+export function recoveryName(savedName: string | null): string {
   if (savedName === null || savedName.trim() === '') return DEFAULT_RECOVERY_NAME;
   const base = savedName.replace(/\.lf2$/i, '');
   return `${base}${RECOVERY_SUFFIX}`;

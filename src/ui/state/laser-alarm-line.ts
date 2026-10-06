@@ -54,7 +54,10 @@ export function handleAlarmLine(
     mpgActive: prev.mpgActive ?? null,
     ...originAfterAlarm(prev, alarm.code),
     motionOperation: null,
-    controllerOperation: null,
+    // Wake completes in Alarm. Retain its exact owner until its continuation
+    // records that terminal outcome; every other operation is cancelled here.
+    controllerOperation:
+      prev.controllerOperation?.kind === 'recovery' ? prev.controllerOperation : null,
     fireActive: false,
     frameVerification: null,
     framedRun: null,

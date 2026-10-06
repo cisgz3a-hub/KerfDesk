@@ -1,5 +1,5 @@
 // The Pro tools of KerfDesk's Free/Pro split (ADR-540). Free keeps drawing,
-// text, import, basic trace, laser cut and engrave, 2D CNC cuts and every
+// text, import, Line Art tracing, laser cut and engrave, 2D CNC cuts and every
 // machine control; only starting or opening one of these tools needs Pro.
 // Output of a project that already holds Pro operations is never gated, so a
 // job made during a trial still frames and runs after it ends.
@@ -32,7 +32,7 @@ export const PRO_FEATURES: Readonly<
   'advanced-trace': {
     name: 'Advanced tracing',
     summary:
-      'Centerline, colour-layer, photo-shading and multi-file tracing, beyond the outline presets.',
+      'Smooth, Sharp, Centerline, Line + fill, Edge Detection, Photo shading, Colour layers and multi-file tracing. Line Art is included in Free.',
   },
   'camera-alignment': {
     name: 'Camera alignment',

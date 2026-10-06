@@ -35,6 +35,7 @@ function renderButtons() {
   readyButton('frame', writable);
   readyButton('review', writable && status?.frame?.complete);
   readyButton('start', writable && status?.frame?.complete && reviewReady);
+  if (current.pageReading) q('start').disabled = true;
   renderStop();
 }
 function renderStop() {
@@ -138,9 +139,35 @@ export function validReview(value) {
     uuid.test(value.reviewId) &&
     typeof value.revision === 'string' &&
     ['laser', 'cnc'].includes(value.mode) &&
+    (value.artworkShared === undefined || typeof value.artworkShared === 'boolean') &&
     reviewArrays(value) &&
+    validPagination(value) &&
     ['laser-verified', 'laser-unverified', 'cnc'].includes(value.acknowledgement?.kind) &&
     value.frame?.complete === true
+  );
+}
+
+function validPagination(value) {
+  const page = value.pagination;
+  if (page === undefined) return true;
+  const counts = [
+    'offset',
+    'totalFacts',
+    'totalWarnings',
+    'totalOperations',
+    'totalStats',
+    'totalSummaries',
+  ];
+  return (
+    counts.every((key) => Number.isSafeInteger(page?.[key]) && page[key] >= 0) &&
+    page.offset <= page.totalFacts &&
+    (page.nextOffset === null ||
+      (Number.isSafeInteger(page.nextOffset) &&
+        page.nextOffset > page.offset &&
+        page.nextOffset < page.totalFacts)) &&
+    page.totalWarnings >= value.warnings.length &&
+    page.totalOperations >= value.operations.length &&
+    page.totalStats >= value.stats.length
   );
 }
 
@@ -183,15 +210,20 @@ function renderReview() {
   q('review-warnings').replaceChildren();
   q('review-operations').replaceChildren();
   q('acknowledgement').textContent = '';
+  q('review-page-info').textContent = '';
+  q('review-pages').hidden = true;
   if (!ready) return;
   const review = current.operation.review;
+  renderReviewPage(review);
   for (const item of review.stats)
     row(
       q('review-stats'),
       item.label,
       `${safeText(item.value)}${item.detail ? ' · ' + safeText(item.detail) : ''}`,
     );
-  q('warning-count').textContent = `Warnings (${review.warnings.length})`;
+  q('warning-count').textContent = review.pagination
+    ? `Warnings (${review.pagination.totalWarnings} total · ${review.warnings.length} on this page)`
+    : `Warnings (${review.warnings.length} shown)`;
   for (const warning of review.warnings) row(q('review-warnings'), 'Warning', warning.message);
   for (const item of review.operations)
     for (const summary of Array.isArray(item.summaries) ? item.summaries.slice(0, 20) : [])
@@ -201,6 +233,18 @@ function renderReview() {
     (review.acknowledgement.kind === 'laser-verified'
       ? 'The current controller laser mode is verified.'
       : 'Confirm this current review before Start.');
+}
+
+function renderReviewPage(review) {
+  const page = review.pagination;
+  q('review-pages').hidden = !page || (page.offset === 0 && page.nextOffset === null);
+  q('review-first').disabled = current.pageReading || !page || page.offset === 0;
+  q('review-next').disabled = current.pageReading || !page || page.nextOffset === null;
+  q('review-page-info').textContent = !page
+    ? 'This PC version does not report complete review counts. Check all details on the PC or update KerfDesk.'
+    : current.pageReading
+      ? 'Reading more facts from this same job review…'
+      : `Review facts ${page.totalFacts ? page.offset + 1 : 0}–${page.nextOffset ?? page.totalFacts} of ${page.totalFacts} · ${page.totalWarnings} warnings · ${page.totalOperations} operations. Inspect the remaining pages before confirming Start.`;
 }
 
 function row(parent, title, content) {

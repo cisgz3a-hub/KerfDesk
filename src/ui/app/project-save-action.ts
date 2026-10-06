@@ -1,5 +1,4 @@
 import type { Project } from '../../core/scene';
-import { prepareProjectForPersistence } from '../../io/project';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import type { AppState } from '../state/store';
@@ -13,8 +12,11 @@ import {
   type ProjectSaveOwner,
   type SaveProjectOutcome,
 } from './project-save-completion';
-import { handleSalvageExportProject } from './salvage-export';
+import { handleSalvageExportProject, type SalvageExportCtx } from './salvage-export';
 import { rememberRecentProject } from '../recent-projects/recent-project-record';
+import { prepareProjectSave } from './prepare-project-save';
+import { projectSaveNeedsWorker } from './project-save-size';
+import { exportLargeProjectRecovery } from './large-project-recovery';
 
 export type SaveProjectCtx = Omit<ProjectSaveOwner, 'projectSaveRequestEpoch'> & {
   readonly platform: PlatformAdapter;
@@ -36,25 +38,22 @@ export async function handleSaveProject(
   };
   const writeOwner = ctx.projectSaveWriteCoordinator.begin(owner.projectSaveRequestEpoch);
   try {
-    const prepared = prepareProjectForPersistence(ctx.project);
-    if (prepared.kind !== 'ok') {
-      const outcome = await handleInvalidProject(ctx, owner, writeOwner, prepared.reason);
-      return outcome;
-    }
-    const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
-    const targetResult = await projectSaveTarget(ctx, reuseTarget);
-    if (targetResult.kind === 'failed') return failProjectSave(owner, targetResult.message);
-    if (targetResult.kind === 'cancelled') return 'cancelled';
+    const prepared = await prepareProjectSave(ctx, owner, forceDialog);
+    if (prepared.kind === 'stopped') return prepared.outcome;
+    if (prepared.kind === 'invalid')
+      return await handleInvalidProject(ctx, owner, writeOwner, prepared.reason);
     try {
-      await writeOwner.write(targetResult.target, prepared.json, (error) =>
-        reportProjectSaveRestoreFailure(owner, targetResult.target, error),
+      await writeOwner.write(prepared.target, prepared.json, (error) =>
+        reportProjectSaveRestoreFailure(owner, prepared.target, error),
       );
-      const outcome = completeProjectSave(owner, targetResult.target, reuseTarget);
-      rememberSavedProject(ctx.platform, targetResult.target, outcome);
+      const outcome = completeProjectSave(owner, prepared.target, prepared.reuseTarget);
+      rememberSavedProject(ctx.platform, prepared.target, outcome);
       return outcome;
     } catch (err) {
       return failProjectSave(owner, errorMessage(err));
     }
+  } catch (error) {
+    return failProjectSave(owner, errorMessage(error));
   } finally {
     writeOwner.release();
   }
@@ -108,28 +107,6 @@ async function handleInvalidProject(
   return outcome;
 }
 
-type ProjectSaveTargetResult =
-  | { readonly kind: 'selected'; readonly target: SaveTarget }
-  | { readonly kind: 'cancelled' }
-  | { readonly kind: 'failed'; readonly message: string };
-
-async function projectSaveTarget(
-  ctx: SaveProjectCtx,
-  reuseTarget: boolean,
-): Promise<ProjectSaveTargetResult> {
-  try {
-    const target = reuseTarget
-      ? ctx.lastSaveTarget
-      : await ctx.platform.pickFileForSave({
-          suggestedName: ctx.savedName ?? 'untitled.lf2',
-          extensions: ['.lf2'],
-        });
-    return target === null ? { kind: 'cancelled' } : { kind: 'selected', target };
-  } catch (err) {
-    return { kind: 'failed', message: errorMessage(err) };
-  }
-}
-
 // jobAwareConfirm fails closed during an active job, so a refused canonical
 // save never opens a recovery picker while machine work owns the UI.
 async function offerSalvageExport(
@@ -143,7 +120,7 @@ async function offerSalvageExport(
       'repair before it reopens cleanly.',
   );
   if (!wantsSalvage) return;
-  await handleSalvageExportProject({
+  const salvage: SalvageExportCtx = {
     platform: ctx.platform,
     project: ctx.project,
     savedName: ctx.savedName,
@@ -153,7 +130,9 @@ async function offerSalvageExport(
       writeOwner.write(target, contents, (error) =>
         reportRecoveryRestoreFailure(owner, target, error),
       ),
-  });
+  };
+  if (projectSaveNeedsWorker(ctx.project)) await exportLargeProjectRecovery(ctx, owner, salvage);
+  else await handleSalvageExportProject(salvage);
 }
 
 function reportRecoveryRestoreFailure(

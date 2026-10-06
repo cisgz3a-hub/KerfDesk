@@ -15,6 +15,7 @@ import {
   connectAndHome,
 } from './fixtures/recovery-flow';
 import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
+import { saveProjectAs } from './fixtures/project-save';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -68,7 +69,7 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
   await expect(
     page.getByRole('group', { name: 'Preview route controls and statistics' }),
   ).toBeVisible();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBe(4);
@@ -100,7 +101,7 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   await expect(panel).toContainText('Travel time');
   await panel.screenshot({ path: testInfo.outputPath('calibrated-preview-timing.png') });
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
     estimateCutTimeScale: 1.18,
@@ -121,7 +122,7 @@ test('outline-nests complementary vector parts that rectangular bounds cannot fi
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
   await page.getByRole('spinbutton', { name: 'Part spacing (mm)' }).fill('0');
   await page.getByRole('button', { name: 'Nest selection' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects).toHaveLength(2);
@@ -146,7 +147,7 @@ test('imports SVG through the real picker and creates a circular array', async (
   await runMenuCommand(page, 'Arrange', 'Array...');
   await page.getByRole('tab', { name: 'Circular' }).click();
   await page.getByRole('button', { name: 'Create array' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBeGreaterThan(6);
@@ -164,7 +165,7 @@ test('configures chuck rotary and generates its calibration pattern', async ({
   await page.getByLabel('Rotary millimetres per rotation').fill('360');
   page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Generate test pattern' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device.rotary).toMatchObject({
@@ -275,7 +276,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await expect(failedSave).toContainText('No final file was selected or modified');
   await failedSave.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.printAndCutTargets).toEqual({
@@ -360,7 +361,7 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   );
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.variables?.csv).toMatchObject({
@@ -413,7 +414,7 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   expect((finishBox?.x ?? 0) + (finishBox?.width ?? 0)).toBeLessThanOrEqual(390);
   expect((finishBox?.y ?? 0) + (finishBox?.height ?? 0)).toBeLessThanOrEqual(844);
   await page.getByRole('button', { name: 'Save machine setup' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
@@ -454,7 +455,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
   await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
@@ -519,7 +520,7 @@ test('imports a generated bitmap and traces it through the production worker wor
   await expect(page.getByRole('dialog', { name: 'Trace image' })).not.toBeVisible({
     timeout: 30_000,
   });
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.some((object) => object['kind'] === 'traced-image')).toBe(true);
@@ -790,7 +791,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await selectAll(page);
   await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('10');
   await fillAndCommit(page, 'Selection X position', '47');
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const currentProject = await savedProject(kerfdesk);
   const savedBeforeReview = fileSavedCount(await kerfdesk.events());
   const writesBeforeReview = serialWriteBytes(await kerfdesk.events());
@@ -826,7 +827,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review).not.toBeVisible();
   await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('47');
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   await expect
     .poll(async () => fileSavedCount(await kerfdesk.events()))
     .toBeGreaterThan(savedBeforeReview);

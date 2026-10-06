@@ -50,6 +50,8 @@ export type DesktopUpdates = {
   readonly settled: () => Promise<void>;
   readonly download?: () => UpdateStatus;
   readonly installOnQuit?: () => Promise<UpdateStatus>;
+  /** Retire only the explicit install choice whose close was cancelled. */
+  readonly cancelInstallOnQuit?: (armed: UpdateStatus) => void;
 };
 
 const BUSY: ReadonlySet<UpdateState> = new Set(['checking', 'downloading', 'ready']);

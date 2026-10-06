@@ -1,3 +1,4 @@
+import { saveProjectAs } from './fixtures/project-save';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Project } from '../src/core/scene';
@@ -139,7 +140,7 @@ test('photo shading retains portrait tones through the real worker, preview and 
   await dialog.screenshot({ path: testInfo.outputPath('photo-shading-dialog.png') });
   await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
   await expect(dialog).toBeHidden({ timeout: 30_000 });
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const saved = Object.values(await kerfdesk.savedFiles()).find((text) =>
     text.includes('traced-image'),
   );
@@ -196,7 +197,7 @@ test('photo Raster scan keeps partial tones through the conversion worker and PN
   await expect(dialog.getByText(/Trace ready/)).toBeVisible({ timeout: 30_000 });
   await dialog.getByRole('button', { name: 'Trace', exact: true }).click();
   await expect(dialog).toBeHidden({ timeout: 60_000 });
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const saved = Object.values(await kerfdesk.savedFiles()).find((text) =>
     text.includes('raster-image'),
   );

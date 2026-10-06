@@ -122,7 +122,38 @@ describe('GRBL setting decimal encoding', () => {
     });
     expect(encodeGrblSettingValue(1, '65535.000000000', 'grblhal')).toEqual({
       kind: 'ok',
-      value: '65535.000000000',
+      value: '65535',
+    });
+  });
+
+  it.each([
+    ['25.0', '25'],
+    ['25.00', '25'],
+    ['25.000', '25'],
+    ['+00025.0000', '25'],
+    ['2.5000e1', '25'],
+    ['0.000', '0'],
+    ['65535.000000000', '65535'],
+  ])('preserves HAL integer value %s with a digit-only command', (input, value) => {
+    expect(encodeGrblSettingValue(1, input, 'grblhal')).toEqual({ kind: 'ok', value });
+  });
+
+  it.each(['25.1', '25.00000000000000000001', '-1', '4294967295', '1000000009'])(
+    'refuses HAL integer %s when its exact value cannot reach read_uint',
+    (input) => expect(encodeGrblSettingValue(1, input, 'grblhal').kind).toBe('blocked'),
+  );
+
+  it('preserves HAL decimal datatypes and other firmware spellings', () => {
+    for (const kind of ['grbl-v1.1', 'fluidnc'] as const) {
+      expect(encodeGrblSettingValue(1, '25.000', kind)).toEqual({ kind: 'ok', value: '25.000' });
+    }
+    expect(encodeGrblSettingValue(30, '25.000', 'grblhal')).toEqual({
+      kind: 'ok',
+      value: '25.000',
+    });
+    expect(encodeGrblSettingValue(10, '4294967294', 'grblhal')).toEqual({
+      kind: 'ok',
+      value: '4294967294',
     });
   });
 

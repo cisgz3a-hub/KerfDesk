@@ -5,18 +5,28 @@ import { createManualCloseApproval } from './manual-update-quit.js';
 /** The explicit update action retains each window's ordinary save/close owner. */
 export function createDesktopUpdateClose(app: { quit(): void }, windows: () => BrowserWindow[]) {
   const approval = createManualCloseApproval();
-  const pending = new WeakSet<BrowserWindow>();
+  let pending = new WeakSet<BrowserWindow>();
+  let cancelInstall: (() => void) | null = null;
   const guards = new WeakMap<BrowserWindow, ReturnType<typeof installDesktopWindowClose>>();
+  const cancelUpdateClose = (): void => {
+    const cancel = cancelInstall;
+    cancelInstall = null;
+    pending = new WeakSet<BrowserWindow>();
+    cancel?.();
+  };
   return {
     canInstall: approval.canInstall,
-    request: (): void => {
+    request: (cancel: () => void): void => {
       const targets = windows();
       // A separate ordinary close already owns its preparation/recovery decision.
       if (
         targets.length === 0 ||
         targets.some((window) => window.isDestroyed() || guards.get(window)?.isClosing() !== false)
-      )
+      ) {
+        cancel();
         return;
+      }
+      cancelInstall = cancel;
       for (const window of targets) pending.add(window);
       app.quit();
     },
@@ -25,7 +35,7 @@ export function createDesktopUpdateClose(app: { quit(): void }, windows: () => B
         ...options,
         isUpdateCloseRequested: () => pending.has(window),
         cancelQuit: () => {
-          pending.delete(window);
+          if (pending.has(window)) cancelUpdateClose();
           options.cancelQuit();
         },
       });

@@ -12,17 +12,11 @@ import {
   oauthGrantSchema,
   oauthScopes,
 } from './protocol.js';
-import {
-  RequestFailure,
-  boundedText,
-  digest,
-  json,
-  originAllowed,
-  safeResponse,
-} from './security.js';
+import { RequestFailure, boundedText, json, originAllowed, safeResponse } from './security.js';
 import { device } from './relay.js';
 import { publicHandler } from './public.js';
 import { protectedHandler } from './mcp.js';
+import { ingressLimited, rateLimited } from './limits.js';
 export { RemoteDevice } from './device.js';
 const provider = new OAuthProvider<Env>({
   apiRoute: '/mcp',
@@ -94,15 +88,6 @@ function validateRequest(request: Request, env: Env): URL {
 
   return url;
 }
-async function limited(request: Request, env: Env, url: URL): Promise<boolean> {
-  // Hash connection metadata for the provider's ephemeral limiter; never persist or log it.
-  if (request.method !== 'GET' || url.pathname === '/api/desktop/connect') {
-    const key = await digest(`remote-v1:${request.headers.get('CF-Connecting-IP') ?? 'unknown'}`);
-    if (!(await env.PUBLIC_LIMIT.limit({ key })).success) return true;
-  }
-
-  return false;
-}
 async function boundBody(request: Request, url: URL): Promise<Request> {
   // The library's JSON/form parsers are preceded by a real streamed size bound.
   if (request.body) {
@@ -122,9 +107,8 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     try {
       const url = validateRequest(request, env);
-      if (await limited(request, env, url))
-        return safeResponse(json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' }));
       request = await boundBody(request, url);
+      if (await ingressLimited(request, env, url)) return safeResponse(rateLimited());
       const response = await provider.fetch(request, env, ctx);
       const camera =
         request.method === 'GET' &&

@@ -49,6 +49,9 @@ export function encodeGrblSettingValue(
   const lineLimit =
     controllerKind === 'grblhal' ? GRBLHAL_LINE_BUFFER_CHARS : GRBL_LINE_BUFFER_CHARS;
   const valueLimit = lineLimit - `$${id}=`.length;
+  if (controllerKind === 'grblhal' && !HAL_DECIMAL_IDS.has(id)) {
+    return encodeHalInteger(parts, valueLimit);
+  }
   const parser = floatParserFor(id, controllerKind);
   for (const compact of [false, true]) {
     const decimal = expandDecimal(parts, valueLimit, compact);
@@ -57,6 +60,29 @@ export function encodeGrblSettingValue(
     if (compact && issue !== null) return blocked(issue);
   }
   return blocked('The decimal value cannot be represented for this controller.');
+}
+
+function encodeHalInteger(parts: DecimalParts, valueLimit: number): EncodedGrblSettingValue {
+  // HAL's read_uint accepts a decimal point but multiplies its accumulator
+  // for fractional zeroes: 25.0 becomes 250. Expand the exact input first,
+  // then send only unsigned integer digits, never a rounded Number value.
+  // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/nuts_bolts.c#L184-L229
+  const integer = parts.parsed === 0 ? '0' : expandDecimal(parts, valueLimit, true);
+  if (integer === null || !/^\d+$/.test(integer)) {
+    return blocked('Enter an unsigned integer that this grblHAL setting can represent.');
+  }
+  // This parser also skips overflowing digits, including a tenth digit above
+  // four. Refuse before writing instead of discovering corruption in readback.
+  let stored = 0;
+  for (let index = 0; index < integer.length; index++) {
+    const digit = Number(integer[index]);
+    if ((index < 9 || digit <= 4) && stored <= 429496729) {
+      stored = stored * 10 + digit;
+    }
+  }
+  return stored === parts.parsed
+    ? { kind: 'ok', value: integer }
+    : blocked('grblHAL cannot parse this integer without dropping digits.');
 }
 
 function parseDecimalValue(value: number | string): DecimalParts | EncodingRefusal {

@@ -64,7 +64,7 @@ export function DesktopWelcomeDialog({ onClose }: { readonly onClose: () => void
         <section className="lf-desktop-welcome__free" aria-label="Browser Free edition">
           <div>
             <h3>Keep creating in your browser</h3>
-            <span>Drawing, basic tracing, laser &amp; 2D CNC tools.</span>
+            <span>Drawing, Line Art tracing, laser &amp; 2D CNC tools.</span>
           </div>
           <button
             type="button"

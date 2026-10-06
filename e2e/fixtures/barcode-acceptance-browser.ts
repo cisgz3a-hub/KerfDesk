@@ -1,3 +1,4 @@
+import { saveProjectAs } from './project-save';
 import type { Project } from '../../src/core/scene';
 import { expect, type KerfDeskFixture, type Page } from './kerfdesk-test';
 import { toolbarCommand } from './workspace-ui';
@@ -50,7 +51,7 @@ export async function saveBarcodeAcceptanceProject(
   fixture: KerfDeskFixture,
 ): Promise<string> {
   const before = (await fixture.events()).filter((event) => event.kind === 'file-saved').length;
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, fixture);
   await expect
     .poll(
       async () => (await fixture.events()).filter((event) => event.kind === 'file-saved').length,
