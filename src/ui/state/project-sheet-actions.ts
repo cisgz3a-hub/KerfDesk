@@ -27,7 +27,8 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
       };
       if (name.trim() === '' || name.length > 200 || book.inactive.length >= 99) return null;
       const id = crypto.randomUUID();
-      const next = duplicate ? withoutBook(current) : blankSheet(current);
+      const next = duplicate ? duplicateSheetDesign(current) : blankSheet(current);
+      if (next === null) return null;
       const sheetBook: ProjectSheetBook = {
         activeId: id,
         activeName: name.trim(),
@@ -115,6 +116,26 @@ function archiveCurrent(
 function withoutBook(project: Project): Project {
   const { sheetBook: _book, ...content } = project;
   return content;
+}
+function duplicateSheetDesign(project: Project): Project | null {
+  const manifest = project.productionManifest;
+  if (manifest?.activeRowId !== undefined) {
+    // Opened rows contain fixed text/barcodes. A separate batch needs the
+    // editable allocation design and its original variable settings instead.
+    const loaded = deserializeProject(manifest.designProjectJson);
+    if (loaded.kind !== 'ok') {
+      useToastStore
+        .getState()
+        .pushToast(
+          'The production design cannot be reopened. The original sheet was kept.',
+          'warning',
+        );
+      return null;
+    }
+    return loaded.project;
+  }
+  const { productionManifest: _manifest, ...design } = withoutBook(project);
+  return design;
 }
 function blankSheet(project: Project): Project {
   return {

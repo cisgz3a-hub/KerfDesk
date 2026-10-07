@@ -56,6 +56,10 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
         data. Switches reset current review and Frame ownership. Save the project to keep all sheets
         together.
       </p>
+      <p>
+        A duplicate starts without a production run. If a row is open, it uses the run's editable
+        design and variable settings. Run results stay on the original sheet.
+      </p>
       <label>
         New sheet name
         <input
