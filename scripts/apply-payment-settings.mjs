@@ -106,17 +106,31 @@ export function guardedSettings(settings, target) {
   return variable('PAYMENTS_ENABLED');
 }
 
+function canonicalJson(value) {
+  const normalise = (item) => {
+    if (Array.isArray(item)) return item.map(normalise);
+    if (item && typeof item === 'object')
+      return Object.fromEntries(
+        Object.keys(item)
+          .sort()
+          .map((key) => [key, normalise(item[key])]),
+      );
+    return item;
+  };
+  return JSON.stringify(normalise(value));
+}
+
 function protectedFingerprint(settings) {
   const bindings = settings.bindings
     .filter(({ name }) => name !== 'PAYMENTS_ENABLED')
-    .map((binding) => JSON.stringify(binding, Object.keys(binding).sort()))
+    .map(canonicalJson)
     .sort();
   const fields = Object.fromEntries(
     configurationKeys
       .filter((key) => settings[key] !== undefined)
       .map((key) => [key, settings[key]]),
   );
-  return hash(JSON.stringify({ bindings, fields }));
+  return hash(canonicalJson({ bindings, fields }));
 }
 
 export function flagMetadata(settings, version, enabled) {
@@ -142,20 +156,35 @@ export function flagMetadata(settings, version, enabled) {
 
 export async function applyPaymentFlag({ targetName, state, token, output }, fetcher = fetch) {
   const target = TARGETS[targetName];
-  assert.ok(
-    target && ['inspect', 'open', 'close'].includes(state),
-    'Invalid payment settings operation.',
-  );
-  assert.ok(typeof token === 'string' && token.length >= 20, 'Cloudflare credential unavailable.');
-  const base = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/workers/scripts/${target.worker}`;
+  let stage = 'operation-validation';
+  let httpStatus = null;
+  let before;
+  let originalFlag;
+  let originalVersion;
+  let originalCode;
+  let requested;
+  let version;
+  let mutationAttempted = false;
+  let patchResponseReceived = false;
+  const setStage = (value) => {
+    stage = value;
+    httpStatus = null;
+  };
+  const base =
+    'https://api.cloudflare.com/client/v4/accounts/' +
+    ACCOUNT +
+    '/workers/scripts/' +
+    target?.worker;
   const api = async (suffix, init = {}) => {
+    setStage('cloudflare-' + suffix.slice(1) + '-' + (init.method ?? 'GET').toLowerCase());
     const response = await fetcher(base + suffix, {
       ...init,
-      headers: { Authorization: `Bearer ${token}`, ...init.headers },
+      headers: { Authorization: 'Bearer ' + token, ...init.headers },
       redirect: 'error',
       signal: AbortSignal.timeout(30000),
     });
-    assert.ok(response.ok, `Cloudflare request failed (${response.status}).`);
+    httpStatus = response.status;
+    assert.ok(response.ok, 'Cloudflare request failed.');
     const body = await response.json();
     assert.equal(body.success, true, 'Cloudflare refused payment settings operation.');
     return body.result;
@@ -171,76 +200,115 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
       100,
       'Gradual deployment requires separate review.',
     );
-    const version = newest.versions[0].version_id;
-    assert.ok(uuid.test(version), 'Active Worker version unavailable.');
-    return version;
+    const current = newest.versions[0].version_id;
+    assert.ok(uuid.test(current), 'Active Worker version unavailable.');
+    return current;
   };
   const codeFingerprint = async () => {
-    const response = await fetcher(base + '/content', {
-      headers: { Authorization: `Bearer ${token}` },
+    setStage('cloudflare-content-get');
+    const response = await fetcher(base + '/content/v2', {
+      headers: { Authorization: 'Bearer ' + token },
       redirect: 'error',
       signal: AbortSignal.timeout(30000),
     });
+    httpStatus = response.status;
     assert.ok(response.ok, 'Worker content unavailable.');
-    if (!(response.headers.get('content-type') ?? '').includes('multipart/form-data'))
-      return hash(Buffer.from(await response.arrayBuffer()));
+    const mimeType = (response.headers.get('content-type') ?? '')
+      .split(';', 1)[0]
+      .trim()
+      .toLowerCase();
+    if (mimeType !== 'multipart/form-data') {
+      assert.ok(
+        [
+          'application/javascript',
+          'application/javascript+module',
+          'text/javascript',
+          'application/octet-stream',
+          'application/wasm',
+        ].includes(mimeType),
+        'Unexpected Worker content type.',
+      );
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const text = bytes.toString('utf8').trim();
+      assert.ok(bytes.length && text.length, 'Worker content empty.');
+      assert.ok(!text.startsWith('<'), 'HTML is not Worker content.');
+      let json = false;
+      try {
+        JSON.parse(text);
+        json = true;
+      } catch {
+        // Raw Worker JavaScript or binary content is not a JSON response document.
+      }
+      assert.equal(json, false, 'JSON is not Worker content.');
+      return hash(canonicalJson({ mimeType, bytesSha256: hash(bytes) }));
+    }
+    const entrypoint = response.headers.get('cf-entrypoint');
+    assert.ok(entrypoint && entrypoint.trim(), 'Worker entrypoint unavailable.');
     const parts = await response.formData();
+    const entrypointPart = parts.get(entrypoint);
+    assert.ok(
+      entrypointPart && typeof entrypointPart !== 'string',
+      'Worker entrypoint file unavailable.',
+    );
     const modules = [];
-    for (const [name, part] of parts)
-      if (typeof part !== 'string')
-        modules.push([name, hash(Buffer.from(await part.arrayBuffer()))]);
-    assert.ok(modules.length, 'Worker modules unavailable.');
-    return hash(JSON.stringify(modules.sort(([a], [b]) => a.localeCompare(b))));
+    const names = new Set();
+    for (const [name, part] of parts) {
+      assert.ok(!names.has(name), 'Duplicate Worker module field.');
+      names.add(name);
+      assert.ok(
+        typeof part !== 'string' && part.name && part.type,
+        'Unexpected Worker module part.',
+      );
+      const bytes = Buffer.from(await part.arrayBuffer());
+      if (name === entrypoint) assert.ok(bytes.length, 'Worker entrypoint empty.');
+      modules.push([name, part.name, part.type, hash(bytes)]);
+    }
+    modules.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return hash(canonicalJson({ entrypoint, modules }));
   };
-  const before = await api('/settings');
-  const originalFlag = guardedSettings(before, target);
-  const originalVersion = await activeVersion();
-  const originalCode = await codeFingerprint();
-  const requested = state === 'inspect' ? originalFlag : state === 'open' ? 'true' : 'false';
-  let mutated = false;
-  let after = before;
-  let version = originalVersion;
-  if (requested !== originalFlag) {
-    const settings = flagMetadata(before, originalVersion, requested);
+  const patchFlag = async () => {
     const form = new FormData();
     form.set(
       'settings',
-      new Blob([JSON.stringify(settings)], { type: 'application/json' }),
+      new Blob([JSON.stringify(flagMetadata(before, originalVersion, requested))], {
+        type: 'application/json',
+      }),
       'settings.json',
     );
+    // A lost HTTP response cannot establish that the provider did not apply the PATCH.
+    mutationAttempted = true;
     await api('/settings', { method: 'PATCH', body: form });
-    mutated = true;
-    try {
-      after = await api('/settings');
-      assert.equal(guardedSettings(after, target), requested, 'Payment flag did not persist.');
-      assert.equal(
-        protectedFingerprint(after),
-        protectedFingerprint(before),
-        'Protected Worker settings changed.',
-      );
-      assert.equal(await codeFingerprint(), originalCode, 'Worker code changed.');
-      version = await activeVersion();
-    } catch (error) {
-      await api('/deployments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strategy: 'percentage',
-          versions: [{ version_id: originalVersion, percentage: 100 }],
-        }),
-      });
-      throw error;
-    }
-  }
-  try {
-    const configResponse = await fetcher(target.origin + '/v1/public/config', {
+    patchResponseReceived = true;
+  };
+  const verifyWorker = async (flag, expectedVersion) => {
+    const value = await api('/settings');
+    setStage('worker-settings-verification');
+    assert.equal(guardedSettings(value, target), flag, 'Payment flag did not persist.');
+    assert.equal(
+      protectedFingerprint(value),
+      protectedFingerprint(before),
+      'Protected Worker settings changed.',
+    );
+    const code = await codeFingerprint();
+    setStage('worker-content-verification');
+    assert.equal(code, originalCode, 'Worker code changed.');
+    const current = await activeVersion();
+    setStage('worker-deployment-verification');
+    if (expectedVersion) assert.equal(current, expectedVersion, 'Wrong active Worker version.');
+    return current;
+  };
+  const verifyPublicConfig = async (flag) => {
+    setStage('public-config-get');
+    const response = await fetcher(target.origin + '/v1/public/config', {
       redirect: 'error',
       cache: 'no-store',
       signal: AbortSignal.timeout(15000),
     });
-    assert.equal(configResponse.status, 200, 'Public payment configuration unavailable.');
-    const config = await configResponse.json();
-    assert.equal(config.enabled, requested === 'true', 'Public payment flag disagrees.');
+    httpStatus = response.status;
+    assert.equal(response.status, 200, 'Public payment configuration unavailable.');
+    const config = await response.json();
+    setStage('public-config-verification');
+    assert.equal(config.enabled, flag === 'true', 'Public payment flag disagrees.');
     if (config.enabled) {
       assert.equal(config.environment, target.environment, 'Public Paddle environment disagrees.');
       assert.equal(config.provider, 'paddle', 'Public payment provider disagrees.');
@@ -255,25 +323,77 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
         'Public renewal amount disagrees.',
       );
     }
-    const health = await fetcher(target.origin + '/v1/public/health', {
+    return config;
+  };
+  const verifyHealth = async () => {
+    setStage('public-health-get');
+    const response = await fetcher(target.origin + '/v1/public/health', {
       redirect: 'error',
       cache: 'no-store',
       signal: AbortSignal.timeout(15000),
     });
-    assert.equal(health.status, 200, 'Public licence health unavailable.');
-    assert.equal((await health.json()).ok, true, 'Public licence authority unhealthy.');
+    httpStatus = response.status;
+    assert.equal(response.status, 200, 'Public licence health unavailable.');
+    const health = await response.json();
+    setStage('public-health-verification');
+    assert.equal(health.ok, true, 'Public licence authority unhealthy.');
+  };
+  const receiptFields = () => ({
+    checkedAt: new Date().toISOString(),
+    account: ACCOUNT,
+    worker: target?.worker ?? null,
+    environment: target?.environment ?? null,
+    operation: ['inspect', 'open', 'close'].includes(state) ? state : null,
+    mutationAttempted,
+    patchResponseReceived,
+    mutated: patchResponseReceived ? true : mutationAttempted ? null : false,
+    originalFlag: originalFlag ?? null,
+    flag: requested ?? null,
+    originalVersion: originalVersion ?? null,
+    version: version ?? null,
+    codeSha256: originalCode ?? null,
+    realMoneyTransaction: false,
+  });
+  const saveReceipt = async (receipt) => {
+    if (!output) return;
+    await mkdir(resolve(output), { recursive: true });
+    await writeFile(
+      resolve(output, 'payment-flag-receipt.json'),
+      JSON.stringify(receipt, null, 2) + '\n',
+    );
+  };
+  try {
+    assert.ok(
+      target && ['inspect', 'open', 'close'].includes(state),
+      'Invalid payment settings operation.',
+    );
+    assert.ok(
+      typeof token === 'string' && token.length >= 20,
+      'Cloudflare credential unavailable.',
+    );
+    originalVersion = await activeVersion();
+    version = originalVersion;
+    before = await api('/settings');
+    setStage('preflight-settings-verification');
+    originalFlag = guardedSettings(before, target);
+    originalCode = await codeFingerprint();
+    requested = state === 'inspect' ? originalFlag : state === 'open' ? 'true' : 'false';
+    if (requested !== originalFlag) {
+      const boundaryVersion = await activeVersion();
+      setStage('pre-mutation-version-verification');
+      assert.equal(
+        boundaryVersion,
+        originalVersion,
+        'Active Worker version changed before mutation.',
+      );
+      await patchFlag();
+      version = await verifyWorker(requested);
+    }
+    const config = await verifyPublicConfig(requested);
+    await verifyHealth();
     const receipt = {
-      checkedAt: new Date().toISOString(),
-      account: ACCOUNT,
-      worker: target.worker,
-      environment: target.environment,
-      operation: state,
-      mutated,
-      originalFlag,
-      flag: requested,
-      originalVersion,
-      version,
-      codeSha256: originalCode,
+      ...receiptFields(),
+      outcome: 'verified',
       codeUnchanged: true,
       protectedSettingsUnchanged: true,
       protectedBindingNames: before.bindings
@@ -282,26 +402,67 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
         .sort(),
       health: true,
       publicConfigEnabled: config.enabled,
-      realMoneyTransaction: false,
     };
-    if (output) {
-      await mkdir(resolve(output), { recursive: true });
-      await writeFile(
-        resolve(output, 'payment-flag-receipt.json'),
-        JSON.stringify(receipt, null, 2) + '\n',
-      );
-    }
+    setStage('receipt-write');
+    await saveReceipt(receipt);
     return receipt;
-  } catch (error) {
-    if (mutated)
-      await api('/deployments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          strategy: 'percentage',
-          versions: [{ version_id: originalVersion, percentage: 100 }],
-        }),
-      });
+  } catch {
+    // Never expose provider response bodies, assertion values or credential-bearing errors.
+    const failure = { stage, httpStatus };
+    const recovery = { mode: 'not-needed', verified: false };
+    if (mutationAttempted) {
+      if (requested === 'true' && originalFlag === 'false') {
+        recovery.mode = 'restore-original-disabled-deployment';
+        recovery.requestAcknowledged = false;
+        try {
+          await api('/deployments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              strategy: 'percentage',
+              versions: [{ version_id: originalVersion, percentage: 100 }],
+            }),
+          });
+          recovery.requestAcknowledged = true;
+        } catch {
+          recovery.requestFailure = { stage, httpStatus };
+        }
+      } else {
+        // Closing must never restore a version whose checkout flag was enabled.
+        recovery.mode = 'keep-checkout-closed';
+      }
+      try {
+        recovery.version = await verifyWorker(
+          'false',
+          recovery.mode === 'restore-original-disabled-deployment' ? originalVersion : undefined,
+        );
+        recovery.flag = 'false';
+        recovery.workerVerified = true;
+        recovery.publicConfigEnabled = (await verifyPublicConfig('false')).enabled;
+        await verifyHealth();
+        recovery.health = true;
+        recovery.verified = true;
+      } catch {
+        recovery.verificationFailure = { stage, httpStatus };
+      }
+    }
+    const receipt = {
+      ...receiptFields(),
+      outcome: 'failed',
+      requestedFlag: requested ?? null,
+      flag: recovery.flag ?? (mutationAttempted ? null : (originalFlag ?? null)),
+      version: recovery.version ?? (mutationAttempted ? null : (version ?? null)),
+      failure,
+      recovery,
+    };
+    try {
+      await saveReceipt(receipt);
+    } catch {
+      receipt.evidenceWritten = false;
+    }
+    const error = new Error('Payment flag operation failed at ' + failure.stage + '.');
+    error.name = 'PaymentFlagOperationError';
+    error.receipt = receipt;
     throw error;
   }
 }
@@ -315,9 +476,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     output: process.env.KERFDESK_PAYMENT_FLAG_EVIDENCE,
   })
     .then((receipt) => console.log(JSON.stringify(receipt)))
-    .catch(() => {
+    .catch((error) => {
       console.error(
-        'Payment flag operation failed. Review the redacted workflow evidence; no credential values were printed.',
+        JSON.stringify(
+          error.receipt ?? { outcome: 'failed', failure: { stage: 'operation-validation' } },
+        ),
       );
       process.exitCode = 1;
     });

@@ -12,6 +12,7 @@ import { collectNativeSmokeProcess } from './native-smoke-process.mjs';
 import {
   LicenceQualificationError,
   nativeLicenceArguments,
+  nativeQualificationEnvironment,
   privateNativeResult,
   privateQualificationDocument,
   publicNativePhase,
@@ -97,7 +98,12 @@ async function powershell(input, script, args, timeout = 200_000) {
   await execute(
     input.powershell,
     ['-NoProfile', '-NonInteractive', '-File', join(ROOT, 'scripts', script), ...args],
-    { windowsHide: true, timeout, maxBuffer: 64 * 1024 },
+    {
+      windowsHide: true,
+      timeout,
+      maxBuffer: 64 * 1024,
+      env: nativeQualificationEnvironment(process.env),
+    },
   );
 }
 
@@ -175,7 +181,10 @@ async function nativePhase(input, paths, phase, label, onSpawn) {
     {
       timeoutMs: 60_000,
       spawnProcess(executable, args, options) {
-        const child = spawn(executable, args, options);
+        const child = spawn(executable, args, {
+          ...options,
+          env: nativeQualificationEnvironment(process.env),
+        });
         child.once('spawn', () => {
           onSpawn();
           proof = windowProof(
@@ -229,6 +238,7 @@ export async function qualifyDesktopLicence(input) {
     limitations: [
       'One real Windows machine identity; no three-seat or device-transfer qualification.',
       'Developer licence only; paid and trial lifecycle evidence remains separate.',
+      'Native Pro-to-Free deactivation is observed; backend seat inventory is verified separately.',
       'The shipped smoke uses stubbed file pickers and an in-memory project save.',
       'A same-version reinstall is tested; no new-version credential migration is claimed.',
       'UIA screenshot crops are best effort; receipts assert the actual shipped native helper outcomes.',
@@ -239,6 +249,7 @@ export async function qualifyDesktopLicence(input) {
   let installAttempted = false;
   try {
     const privateDocument = privateQualificationDocument(process.env);
+    process.env = nativeQualificationEnvironment(process.env);
     paths = await freshDirectories(input);
     await mkdir(join(input.output, 'screenshots'));
     await writeFile(paths.keyFile, privateDocument, { flag: 'wx', mode: 0o600 });

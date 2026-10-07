@@ -14,6 +14,53 @@ export class LicenceQualificationError extends Error {
   }
 }
 
+const WINDOWS_ENVIRONMENT = new Set([
+  'allusersprofile',
+  'appdata',
+  'commonprogramfiles',
+  'commonprogramfiles(x86)',
+  'computername',
+  'comspec',
+  'home',
+  'homedrive',
+  'homepath',
+  'localappdata',
+  'number_of_processors',
+  'os',
+  'path',
+  'pathext',
+  'processor_architecture',
+  'processor_identifier',
+  'programdata',
+  'programfiles',
+  'programfiles(x86)',
+  'sessionname',
+  'systemdrive',
+  'systemroot',
+  'temp',
+  'tmp',
+  'userdomain',
+  'username',
+  'userprofile',
+  'windir',
+  'electron_builder_cache',
+  'github_actions',
+  'github_workspace',
+  'github_run_id',
+  'github_run_attempt',
+  'runner_environment',
+  'runner_temp',
+]);
+
+/** Native children need Windows/owned-runner settings, never provider or OAuth secrets. */
+export function nativeQualificationEnvironment(environment) {
+  return Object.fromEntries(
+    Object.entries(environment).filter(
+      ([name, value]) => WINDOWS_ENVIRONMENT.has(name.toLowerCase()) && typeof value === 'string',
+    ),
+  );
+}
+
 export function privateQualificationDocument(environment) {
   const key = environment[LICENCE_SECRET];
   delete environment.KERFDESK_NATIVE_QUALIFICATION_LICENCE;
@@ -29,6 +76,7 @@ export function nativeLicenceArguments({ profile, result, phase, keyFile }) {
   )
     throw new LicenceQualificationError('invalid-native-qualification-path-or-phase');
   const args = [
+    '--force-renderer-accessibility',
     `--kerfdesk-native-smoke-user-data=${profile}`,
     `--kerfdesk-native-smoke-result=${result}`,
     `--kerfdesk-native-smoke-licence-phase=${phase}`,
@@ -130,6 +178,10 @@ export function publicNativePhase(result, processResult, profile, phase, label) 
     before: licenceState(observation?.before),
     after: licenceState(observation?.after),
     proToolOpened: observation?.proAction === 'design-studio-opened',
+    nativeDeactivationObserved:
+      phase === 'deactivate' &&
+      free(observation?.after) &&
+      (developer(observation?.before) || observation?.before?.deactivationPending === true),
     offlineEnforced:
       offline?.mode === 'offline-enforced' &&
       offline.chromiumProbeBlocked === true &&
@@ -174,8 +226,10 @@ export async function retainedDeveloperSequence(actions) {
     if (processClosed) {
       receipt.cleanup.attempted = true;
       try {
-        await phase('deactivate', 'online-deactivation');
+        const observed = await phase('deactivate', 'online-deactivation');
         receipt.cleanup.passed = true;
+        receipt.cleanup.nativeDeactivationObserved = observed.nativeDeactivationObserved === true;
+        receipt.cleanup.serverSeatReleaseUnknown = true;
       } catch {
         receipt.cleanup.failure = processClosed
           ? 'deactivation-not-confirmed'
@@ -183,7 +237,8 @@ export async function retainedDeveloperSequence(actions) {
       }
     } else receipt.cleanup.failure = 'owned-app-process-did-not-close';
   }
-  receipt.passed = bodyPassed && receipt.cleanup.passed;
+  receipt.passed =
+    bodyPassed && receipt.cleanup.passed && receipt.cleanup.nativeDeactivationObserved === true;
   return receipt;
 }
 

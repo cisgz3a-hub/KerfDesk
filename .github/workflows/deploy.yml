@@ -320,7 +320,7 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' && inputs.payment_flag != 'none' && inputs.payment_flag != '' &&
       github.repository == 'cisgz3a-hub/KerfDesk' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/payment-launch-20261007')
+      github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: desktop-commercial

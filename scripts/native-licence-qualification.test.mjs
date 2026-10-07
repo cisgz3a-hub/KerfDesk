@@ -4,6 +4,8 @@ import { resolve } from 'node:path';
 import test from 'node:test';
 import {
   LICENCE_SECRET,
+  LicenceQualificationError,
+  nativeQualificationEnvironment,
   privateQualificationDocument,
   nativeLicenceArguments,
   publicNativePhase,
@@ -181,7 +183,11 @@ test('successful sequence includes unchanged-package reinstall and confirmed dea
   const receipt = await retainedDeveloperSequence({
     phase: async (phase) => {
       calls.push(phase);
-      return { passed: true, process: { closed: true } };
+      return {
+        passed: true,
+        nativeDeactivationObserved: phase === 'deactivate',
+        process: { closed: true },
+      };
     },
     credentialPresent: async () => true,
     reinstall: async () => calls.push('reinstall'),
@@ -238,4 +244,60 @@ test('workflow keeps historical default and uploads only explicit safe evidence'
   const licenceJob = yaml.slice(yaml.indexOf('  native-developer-licence:'));
   assert.doesNotMatch(licenceJob, /path:[\s\S]*?RUNNER_TEMP|path:[\s\S]*?private/u);
   assert.match(licenceJob, /screenshots\/\*\.png/u);
+});
+
+test('native child environment admits Windows paths and hosted guards but excludes every credential', () => {
+  const safe = nativeQualificationEnvironment({
+    Path: 'C:/Windows',
+    SystemRoot: 'C:/Windows',
+    GITHUB_ACTIONS: 'true',
+    RUNNER_TEMP: 'C:/owned',
+    [LICENCE_SECRET]: key,
+    GITHUB_TOKEN: 'oauth',
+    GH_TOKEN: 'oauth',
+    CLOUDFLARE_API_TOKEN: 'api',
+    DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: 'signing',
+    secret_title: 'private',
+    NODE_OPTIONS: '--inspect',
+    PSModulePath: 'incompatible-pwsh-module-path',
+  });
+  assert.deepEqual(safe, {
+    Path: 'C:/Windows',
+    SystemRoot: 'C:/Windows',
+    GITHUB_ACTIONS: 'true',
+    RUNNER_TEMP: 'C:/owned',
+  });
+});
+
+test('an already Free local profile never claims that a server seat was released', async () => {
+  const result = nativeResult('deactivate');
+  result.renderer.licenceQualification.before = state(null);
+  const observed = publicNativePhase(result, processResult, profile, 'deactivate', 'cleanup');
+  assert.equal(observed.passed, true);
+  assert.equal(observed.nativeDeactivationObserved, false);
+  const receipt = await retainedDeveloperSequence({
+    phase: async () => ({
+      passed: true,
+      nativeDeactivationObserved: false,
+      process: { closed: true },
+    }),
+    credentialPresent: async () => true,
+    reinstall: async () => null,
+  });
+  assert.equal(receipt.passed, false);
+  assert.equal(receipt.cleanup.serverSeatReleaseUnknown, true);
+});
+
+test('cleanup never launches another copy when phase throws with an unclosed owned process', async () => {
+  let calls = 0;
+  const receipt = await retainedDeveloperSequence({
+    phase: async () => {
+      calls += 1;
+      throw new LicenceQualificationError('closed-unknown', false);
+    },
+    credentialPresent: async () => true,
+    reinstall: async () => null,
+  });
+  assert.equal(calls, 1);
+  assert.equal(receipt.cleanup.attempted, false);
 });
