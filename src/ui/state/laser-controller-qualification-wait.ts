@@ -28,6 +28,7 @@ export class QualificationWait {
   };
   private responseDeadline: number;
   private ownershipFailure = false;
+  private sawStatus = false;
 
   constructor(
     private readonly timeoutMs: number,
@@ -55,13 +56,17 @@ export class QualificationWait {
     // Alarm/Sleep replies prove communication without proving position. An
     // active operation keeps its busy allowance; bare reply debt does not.
     if (activityBusy || receivedStatus) refs.qualificationDeadline = Date.now() + this.timeoutMs;
-    if (receivedStatus) this.responseDeadline = Date.now() + this.timeoutMs;
+    if (receivedStatus) {
+      this.sawStatus = true;
+      this.responseDeadline = Date.now() + this.timeoutMs;
+    }
     // Connect's queued startup poll may owe an ACK while totally silent.
+    // Keep its silence diagnostic until a fresh status proves communication.
     const responseDeadline =
       onSilent === undefined ? refs.qualificationDeadline : this.responseDeadline;
     const ownershipDiagnostic =
       !activityBusy &&
-      pendingWrite &&
+      canDiagnosePendingOwnership(pendingWrite, onSilent, this.sawStatus) &&
       (ownershipTimedOut || Date.now() >= (responseDeadline ?? Infinity));
     return {
       busy: activityBusy || pendingWrite,
@@ -82,6 +87,14 @@ export class QualificationWait {
   restored(): void {
     this.ownershipFailure = false;
   }
+}
+
+function canDiagnosePendingOwnership(
+  pendingWrite: boolean,
+  onSilent: (() => void) | undefined,
+  sawStatus: boolean,
+): boolean {
+  return pendingWrite && (onSilent === undefined || sawStatus);
 }
 
 function qualificationFailureOptions(

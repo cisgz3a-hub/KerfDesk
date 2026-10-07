@@ -202,6 +202,67 @@ describe('automatic controller information scheduling', () => {
     expect(h.run).not.toHaveBeenCalled();
   });
 
+  it('preserves the silent connect diagnostic while the queued startup poll still owes an ACK', async () => {
+    const h = harness({ statusReport: null, statusObservation: null, pendingUntrackedAcks: 1 });
+    const onSilent = vi.fn(() => {
+      h.set({
+        controllerQualification: {
+          kind: 'failed',
+          epoch: h.epoch,
+          message: 'No controller response',
+        },
+      });
+    });
+    scheduleControllerQualification(h.set, h.get, h.refs, h.epoch, { onSilent });
+
+    await vi.advanceTimersByTimeAsync(8_000);
+
+    expect(onSilent).toHaveBeenCalledOnce();
+    expect(h.get().controllerQualification).toMatchObject({
+      kind: 'failed',
+      message: 'No controller response',
+    });
+    expect(h.get().pendingUntrackedAcks).toBe(1);
+    expect(h.run).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { message: 'acknowledgement', pendingUntrackedAcks: 1, pendingTransportWrites: 0 },
+    { message: 'still in transport', pendingUntrackedAcks: 0, pendingTransportWrites: 1 },
+  ])('bounds $message debt after connect receives fresh Idle', async (debt) => {
+    const h = harness({
+      statusReport: null,
+      statusObservation: null,
+      pendingUntrackedAcks: debt.pendingUntrackedAcks,
+      pendingTransportWrites: debt.pendingTransportWrites,
+    });
+    const onSilent = vi.fn();
+    scheduleControllerQualification(h.set, h.get, h.refs, h.epoch, { onSilent });
+
+    for (let response = 0; response < 10; response += 1) {
+      h.observeIdle();
+      await vi.advanceTimersByTimeAsync(1_000);
+    }
+
+    expect(onSilent).not.toHaveBeenCalled();
+    expect(h.get().controllerQualification).toMatchObject({
+      kind: 'failed',
+      message: expect.stringContaining(debt.message),
+    });
+    expect(h.get().pendingUntrackedAcks).toBe(debt.pendingUntrackedAcks);
+    expect(h.get().pendingTransportWrites).toBe(debt.pendingTransportWrites);
+    expect(h.run).not.toHaveBeenCalled();
+    const failed = h.get().controllerQualification;
+    h.observeIdle();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(h.get().controllerQualification).toBe(failed);
+
+    h.set({ pendingUntrackedAcks: 0, pendingTransportWrites: 0 });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(h.run).toHaveBeenCalledOnce();
+    expect(h.get().controllerQualification.kind).toBe('qualified');
+  });
+
   it('preserves a manual Home busy allowance before bounding its leftover ACK debt', async () => {
     const h = harness({
       controllerOperation: { kind: 'home', phase: 'awaiting-idle', idleReports: 0, operationId: 1 },
