@@ -18,6 +18,10 @@ const AUTOSAVE_KEY_PREFIX = `${LEGACY_AUTOSAVE_KEY}:`;
 const AUTOSAVE_INDEX_KEY = 'lf2:autosave:index:v1';
 const AUTOSAVE_SESSION_KEY = 'lf2:autosave:session-id:v1';
 const AUTOSAVE_HISTORY_STATE_KEY = '__laserforgeAutosaveWindow';
+// Unload publishes outside the durable queue. Track those successful slot
+// writes separately from queued fallbacks, even when their bytes/times match.
+const synchronousWriteRevisions = new Map<string, number>();
+let synchronousWriteRevision = 0;
 
 type AutosaveIndexRecord = {
   readonly schemaVersion: number;
@@ -57,19 +61,35 @@ export function writeLocalAutosave(
   const sessionId = scope.sessionId ?? currentAutosaveSessionId();
   const storageKey = autosaveStorageKeyForSession(sessionId);
   const prepared = prepareAutosaveRecord(project, now, sessionId, storageKey);
-  return prepared.kind === 'ok'
-    ? writePreparedLocalAutosave(prepared.record, storageKey)
-    : prepared;
+  return prepared.kind === 'ok' ? writeLocalRecord(prepared.record, storageKey, true) : prepared;
+}
+
+export function captureLocalAutosaveWriteRevision(): number {
+  return synchronousWriteRevision;
+}
+
+export function hasNewerSynchronousLocalAutosave(storageKey: string, revision: number): boolean {
+  return (synchronousWriteRevisions.get(storageKey) ?? 0) > revision;
 }
 
 export function writePreparedLocalAutosave(
   record: AutosaveRecord,
   storageKey: string,
 ): AutosaveWriteResult {
+  return writeLocalRecord(record, storageKey, false);
+}
+
+function writeLocalRecord(
+  record: AutosaveRecord,
+  storageKey: string,
+  synchronous: boolean,
+): AutosaveWriteResult {
   if (!localAutosaveAvailable()) return { kind: 'unavailable', reason: 'storage-unavailable' };
   try {
     requireSupportedLocalAutosaveVersion(storageKey);
     localStorage.setItem(storageKey, JSON.stringify(record));
+    // The bytes are already recoverable even if updating the index fails.
+    if (synchronous) synchronousWriteRevisions.set(storageKey, ++synchronousWriteRevision);
     registerAutosaveKey(storageKey);
     return { kind: 'ok', savedAt: record.savedAt, storageKey };
   } catch (error) {

@@ -7,6 +7,7 @@ import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
 import { settledCompletedFramePatch } from './completed-frame-run';
 import type { LaserState } from './laser-store';
 import { pushLog } from './laser-store-helpers';
+import { settledProgramAirAssistPatch } from './air-assist-command-state';
 import type { TranscriptSource } from './laser-transcript';
 import {
   continueControllerOperation,
@@ -15,6 +16,7 @@ import {
 import {
   completeLiveCanvasRun,
   liveCanvasFinishingPatch,
+  liveCanvasLifecyclePatch,
   liveCanvasTimingUnavailablePatch,
 } from './live-canvas-run';
 
@@ -132,6 +134,7 @@ async function runPostJobSettle(
             controllerOperation: null,
             streamer: null,
             ...finishedJobStateReset(),
+            ...settledProgramAirAssistPatch(state.streamer),
             liveCanvasRun: completeLiveCanvasRun(state.liveCanvasRun ?? null),
             ...settledCompletedFramePatch(state),
             log: pushLog(state, '[lf2] Controller settled after job.'),
@@ -153,8 +156,9 @@ async function runPostJobSettle(
             lastWriteError: message,
             safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),
+            ...liveCanvasLifecyclePatch(state, 'errored'),
             ...liveCanvasTimingUnavailablePatch(
-              state,
+              { ...state, ...liveCanvasLifecyclePatch(state, 'errored') },
               'controller completion settlement could not be confirmed',
             ),
           }

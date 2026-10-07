@@ -7,10 +7,15 @@ import type { GcodeTimingPlanResult } from '../../core/gcode-time';
 import { normalizeReportedFeedRateToMm } from '../../core/controllers/grbl/machine-envelope';
 import { assertNever } from '../../core/scene';
 import type { LaserState } from './laser-store';
-import { registerCanvasProgramRun } from './canvas-program-source';
+import {
+  registerCanvasProgramRun,
+  registerCanvasProgramRunDocument,
+} from './canvas-program-source';
+import { useStore } from './store';
 import {
   endStampFor,
   initialLiveCanvasTiming,
+  isTerminalCanvasLifecycle,
   liveCanvasLifecyclePatch,
   liveCanvasTimingForStatus,
 } from './live-canvas-run-timing';
@@ -35,7 +40,7 @@ export function liveCanvasStatusPatch(
   now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
-  if (run === null) return {};
+  if (run === null || isTerminalCanvasLifecycle(run.lifecycle)) return {};
   const lifecycle = lifecycleFor(
     state,
     streamer,
@@ -166,6 +171,7 @@ export function liveCanvasStartPatch(
   gcode?: string,
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   if (plan === undefined) return {};
+  registerCanvasProgramRunDocument(plan, now, useStore.getState().projectDocumentEpoch);
   if (queued !== undefined) registerCanvasProgramRun(plan, queued, now, gcode);
   return {
     liveCanvasRun: {
@@ -211,6 +217,22 @@ function controllerBlocksExecution(state: LaserState): boolean {
     controllerState === 'Alarm' ||
     controllerState === 'Sleep'
   );
+}
+
+export function liveCanvasStatusCompletionPatch(
+  state: LaserState,
+  report: StatusReport,
+  streamer: StreamerState | null,
+  releasedAtIdle: boolean,
+): Partial<Pick<LaserState, 'liveCanvasRun'>> {
+  const livePatch = liveCanvasStatusPatch(state, report, streamer);
+  if (!releasedAtIdle || streamer?.status !== 'done') return livePatch;
+  // A bare Idle releases busy UI after failed/unowned settlement. Only the
+  // acknowledged driver marker and stable Idle may complete the run.
+  return {
+    ...livePatch,
+    ...liveCanvasLifecyclePatch({ ...state, ...livePatch }, 'errored'),
+  };
 }
 
 export {
@@ -287,7 +309,7 @@ function controllerLifecycle(
   // Marlin's M114 is Idle-shaped but may describe a queued destination. Only
   // realtime Idle can prove a paused sender's accepted tail has drained.
   if (report.state === 'Idle' && isDrainedPausedSender(state, streamer)) return 'paused';
-  return report.state === 'Idle' && streamer?.status === 'done' ? 'finished' : null;
+  return null;
 }
 
 function isDrainedPausedSender(state: LaserState, streamer: StreamerState | null): boolean {

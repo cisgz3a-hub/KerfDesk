@@ -12,6 +12,8 @@ import { useConfirmSaveStore, type ConfirmSaveChoice } from '../state/confirm-sa
 import { useToastStore } from '../state/toast-store';
 import { handleSaveProject, type SaveProjectOutcome } from './file-actions';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
+import { clearAutosaveForDiscard } from './autosave-file-cleanup';
+import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
 
 export async function confirmDiscardAsync(
   platform: PlatformAdapter,
@@ -25,7 +27,16 @@ export async function confirmDiscardAsync(
   // visible. The choice names the original document, never its replacement.
   if (useStore.getState().projectDocumentEpoch !== documentEpoch) return false;
   if (choice === 'cancel') return false;
-  if (choice === 'discard') return true;
+  if (choice === 'discard') {
+    const discardedProject = useStore.getState().project;
+    const getSnapshot = createAutosaveProjectSnapshot();
+    const discardedSnapshot = getSnapshot(useStore.getState());
+    const isCurrent = (): boolean => getSnapshot(useStore.getState()) === discardedSnapshot;
+    await clearAutosaveForDiscard(discardedProject, isCurrent, (message, variant) => {
+      if (isCurrent()) useToastStore.getState().pushToast(message, variant);
+    });
+    return isCurrent();
+  }
   const outcome = await saveProjectNow(platform);
   return outcome === 'saved' && useStore.getState().projectDocumentEpoch === documentEpoch;
 }

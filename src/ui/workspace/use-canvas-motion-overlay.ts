@@ -32,17 +32,17 @@ import {
   prepareIdleCanvasMotionPlanOffThread,
 } from './idle-canvas-motion-worker-client';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
-import { useTerminalCanvasRunInvalidation } from '../laser/terminal-canvas-run-invalidation';
+import { useCurrentCanvasRun } from '../state/use-current-canvas-run';
 
 export function useCanvasMotionOverlay(
   project: Project,
   previewMode: boolean,
 ): CanvasMotionOverlay | null {
-  useTerminalCanvasRunInvalidation();
   const placementSettings = useStore((state) => state.jobPlacement);
   const interactionActive = useStore((state) => state.pendingUndo !== null);
   const outputScope = useOutputScope();
-  const liveRun = useLaserStore((state) => state.liveCanvasRun ?? null);
+  const liveRun = useCurrentCanvasRun();
+  const activeStreamer = useLaserStore((state) => isActiveJob(state.streamer));
   const motionActive = useLaserStore((state) => state.motionOperation !== null);
   const framePreparing = useFramePreparationStore((state) => state.pending);
   const machineRevision = useLaserStore(canvasMachineRevision);
@@ -75,12 +75,12 @@ export function useCanvasMotionOverlay(
     canvasCovered,
   });
 
-  const staleTerminalRun = shouldClearTerminalRun(
+  const staleTerminalRun = useClearStaleTerminalRun(
     liveRun,
     idlePlan?.current === true ? idlePlan.plan : null,
     project.scene.objects.length === 0,
+    activeStreamer,
   );
-  useClearStaleTerminalRun(liveRun, staleTerminalRun);
 
   // The motion layer redraws whenever this object's identity changes, so a fresh
   // literal per render repainted it on every Workspace render (drags, drafts,
@@ -98,7 +98,7 @@ export function useCanvasMotionOverlay(
         plan: liveRun.plan,
         run: liveRun,
         showStartMarkers,
-        planIsCurrent: isActiveCanvasLifecycle(liveRun) || visiblePlanIsCurrent,
+        planIsCurrent: activeStreamer || isActiveCanvasLifecycle(liveRun) || visiblePlanIsCurrent,
       };
     }
     return visiblePlan === null
@@ -113,6 +113,7 @@ export function useCanvasMotionOverlay(
     previewMode,
     canvasCovered,
     liveRun,
+    activeStreamer,
     staleTerminalRun,
     visiblePlan,
     visiblePlanIsCurrent,
@@ -322,18 +323,27 @@ function shouldClearTerminalRun(
   liveRun: LiveCanvasRun | null,
   idlePlan: CanvasMotionPlan | null,
   projectIsEmpty: boolean,
+  activeStreamer: boolean,
 ): boolean {
-  if (liveRun === null || isActiveCanvasLifecycle(liveRun)) return false;
+  if (liveRun === null || isActiveCanvasLifecycle(liveRun) || activeStreamer) return false;
   if (projectIsEmpty) return true;
   return idlePlan !== null && liveRun.plan.retentionKey !== idlePlan.retentionKey;
 }
 
-function useClearStaleTerminalRun(liveRun: LiveCanvasRun | null, stale: boolean): void {
+function useClearStaleTerminalRun(
+  liveRun: LiveCanvasRun | null,
+  idlePlan: CanvasMotionPlan | null,
+  projectIsEmpty: boolean,
+  activeStreamer: boolean,
+): boolean {
+  const stale = shouldClearTerminalRun(liveRun, idlePlan, projectIsEmpty, activeStreamer);
   useEffect(() => {
     if (!stale || liveRun === null) return;
-    if (useLaserStore.getState().liveCanvasRun !== liveRun) return;
+    const state = useLaserStore.getState();
+    if (state.liveCanvasRun !== liveRun || isActiveJob(state.streamer)) return;
     useLaserStore.setState({ liveCanvasRun: null });
   }, [liveRun, stale]);
+  return stale;
 }
 
 function useCanvasMachineSnapshot(
