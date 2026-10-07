@@ -23,6 +23,8 @@ const NOTICES = [
   ['public/third-party-notices.txt', 'resources/legal/third-party-notices.txt'],
 ];
 const NAMES = ['KerfDesk.exe', 'resources/app.asar', ...NOTICES.map(([, name]) => name)];
+const NSIS_PAYLOAD = '$PLUGINSDIR/app-64.7z';
+const MAX_PAYLOAD_BYTES = 300_000_000;
 function requireVerified(condition, message) {
   if (!condition) throw new CommercialReleaseError(message);
 }
@@ -99,6 +101,62 @@ async function builderArchiveTool() {
   return requireBuilder('app-builder-lib/out/toolsets/7zip.js').getPath7za();
 }
 
+async function archiveEntries(tool, execute, archive) {
+  const { stdout } = await execute(tool, ['l', '-slt', '-ba', '--', archive], {
+    env: commercialToolEnvironment(),
+    windowsHide: true,
+    timeout: 120_000,
+    maxBuffer: 4_000_000,
+  });
+  const entries = [];
+  for (const line of stdout.toString().split(/\r?\n/u)) {
+    const path = /^Path = (.+)$/u.exec(line);
+    if (path) entries.push({ name: path[1].trimEnd().replaceAll('\\', '/'), bytes: null });
+    else if (/^Size = \d+$/u.test(line) && entries.length > 0)
+      entries.at(-1).bytes = Number(line.slice(7));
+  }
+  return entries;
+}
+
+/** NSIS wraps the x64 app in a 7z payload; write only this exact owned file. */
+async function installerApplicationArchive(tool, execute, executable, directory, io) {
+  const entries = await archiveEntries(tool, execute, executable);
+  requireVerified(
+    !entries.some(({ name }) => /(^|\/)app-update\.yml$/iu.test(name)),
+    'Unsigned installer contains an update feed.',
+  );
+  const payloads = entries.filter(({ name }) =>
+    /^\$PLUGINSDIR\/app-[^/]+\.(?:7z|zip)$/iu.test(name),
+  );
+  const payload = payloads[0];
+  requireVerified(
+    payloads.length === 1 && payload.name === NSIS_PAYLOAD,
+    'Unsigned installer must contain one embedded Windows x64 application archive.',
+  );
+  requireVerified(
+    Number.isSafeInteger(payload.bytes) && payload.bytes > 0 && payload.bytes <= MAX_PAYLOAD_BYTES,
+    'Unsigned installer application archive size is invalid.',
+  );
+  const { stdout } = await execute(
+    tool,
+    ['e', '-so', '-bd', '-y', '--', executable, NSIS_PAYLOAD],
+    {
+      encoding: 'buffer',
+      env: commercialToolEnvironment(),
+      windowsHide: true,
+      timeout: 120_000,
+      maxBuffer: payload.bytes + 1,
+    },
+  );
+  requireVerified(
+    Buffer.isBuffer(stdout) && stdout.length === payload.bytes,
+    'Unsigned installer application archive size differs from its listing.',
+  );
+  const archive = join(directory, 'app-64.7z');
+  await io.writeFile(archive, stdout, { flag: 'wx' });
+  return archive;
+}
+
 /** Do not execute the installer. Read its archive and Authenticode status only. */
 export function createUnsignedCommercialInstallerVerifier({
   resourceDigests,
@@ -150,15 +208,8 @@ export function createUnsignedCommercialInstallerVerifier({
         'Manual unsigned installer has an unexpected Authenticode status.',
       );
       const tool = await archiveTool();
-      const listing = await execute(tool, ['l', '-slt', '-ba', '--', executable], {
-        env: commercialToolEnvironment(),
-        windowsHide: true,
-        timeout: 120_000,
-        maxBuffer: 4_000_000,
-      });
-      const names = [...listing.stdout.toString().matchAll(/^Path = (.+)\r?$/gmu)].map(([, name]) =>
-        name.trimEnd().replaceAll('\\', '/'),
-      );
+      const archive = await installerApplicationArchive(tool, execute, executable, directory, io);
+      const names = (await archiveEntries(tool, execute, archive)).map(({ name }) => name);
       requireVerified(
         !names.some((name) => /(^|\/)app-update\.yml$/iu.test(name)) &&
           NAMES.every((name) => names.filter((entry) => entry === name).length === 1),
@@ -167,7 +218,7 @@ export function createUnsignedCommercialInstallerVerifier({
       for (const expected of resourceDigests) {
         const { stdout } = await execute(
           tool,
-          ['e', '-so', '-bd', '-y', '--', executable, expected.name],
+          ['e', '-so', '-bd', '-y', '--', archive, expected.name],
           {
             encoding: 'buffer',
             env: commercialToolEnvironment(),
