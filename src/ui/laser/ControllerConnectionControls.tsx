@@ -14,6 +14,7 @@ import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
+import { FluidNcNetworkConnect } from './FluidNcNetworkConnect';
 
 type Props = {
   readonly machineKind: MachineKind;
@@ -85,6 +86,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
           isFileOnlyProfile
         }
       />
+      <FluidNcNetworkConnect />
     </>
   );
 }

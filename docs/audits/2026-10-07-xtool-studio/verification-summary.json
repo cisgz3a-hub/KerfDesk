@@ -1,0 +1,65 @@
+{
+  "auditDate": "2026-10-07",
+  "scope": "Documented xTool Studio workflows versus KerfDesk current-main source and selected baseline tests",
+  "source": {
+    "sha": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+    "committedAt": "2026-10-06T11:21:24+02:00",
+    "remoteHeadVerified": true,
+    "fetchPerformed": true,
+    "checkout": "D:\\LaserForge\\competitive-audit-20261007",
+    "originalBranch": "claude/vcarve-stamp-subcell",
+    "originalHead": "a37082457b76d56b8c9ba92be27db027b5a92cb0",
+    "originalUncommittedWorkExcluded": true
+  },
+  "competitor": {
+    "product": "xTool Studio Desktop",
+    "latestReleaseFamilyVerified": "1.9",
+    "releaseNotesUpdated": "2026-09-11",
+    "sourceTypes": [
+      "official operational documentation",
+      "official release notes",
+      "official public material catalogue"
+    ],
+    "installedOrRun": false,
+    "accountCreated": false,
+    "hardwareOperated": false,
+    "outputQualityBenchmarked": false,
+    "timedUsabilityBenchmarked": false
+  },
+  "newBaselineChecks": {
+    "testFileCount": 47,
+    "testCount": 347,
+    "passed": 347,
+    "failed": 0,
+    "pending": 0,
+    "success": true,
+    "elapsedSeconds": 36.36,
+    "vitestNumTotalTestSuites": 103,
+    "note": "Vitest counts nested describe suites; testResults.length is the actual file count."
+  },
+  "reusedSameBaselineChecks": {
+    "artifact": "../2026-10-07-competitive-landscape/verification-vitest.json",
+    "testFileCount": 41,
+    "testCount": 566,
+    "passed": 566,
+    "failed": 0,
+    "selectionOverlapWithNewChecks": 0,
+    "rerun": false
+  },
+  "combinedBaselineChecks": {
+    "distinctTestFileCount": 88,
+    "testCount": 913,
+    "passed": 913,
+    "failed": 0
+  },
+  "boundaries": {
+    "fullSuiteRun": false,
+    "releaseCheckRun": false,
+    "applicationSourceChanged": false,
+    "newApplicationUiChecksPerformed": false,
+    "hardwareOperated": false,
+    "deploymentVerified": false,
+    "commercialProviderVerified": false,
+    "implementationRecommendationsAreProposals": true
+  }
+}

@@ -3,17 +3,22 @@ import type {
   VariableAdvancementPolicy,
   VariableCsvDataset,
 } from '../../core/scene';
-import { variableTemplateToSource } from '../../core/variables';
 import { Button } from '../kit';
 import { DraftNumberInput } from '../kit/DraftNumberInput';
 import type { useStore } from '../state';
 import type { useToastStore } from '../state/toast-store';
+import type { DialogValues } from './use-text-dialog-fields';
+import { VariableCsvMapping } from './VariableCsvMapping';
+import { VariableRowsPreview } from './VariableRowsPreview';
 import { VariableCsvImport } from './VariableCsvImport';
 import { VariableSequenceControls } from './VariableSequenceControls';
 
 type ControlsProps = {
   readonly variables: ProjectVariableData;
   readonly firstColumn: string | undefined;
+  readonly source?: string;
+  readonly onSourceChange?: (source: string) => void;
+  readonly textValues?: DialogValues;
   readonly onInsert: (source: string) => void;
   readonly setCsv: (csv: VariableCsvDataset | undefined) => void;
   readonly setSettings: ReturnType<typeof useStore.getState>['setVariableSettings'];
@@ -30,16 +35,13 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
         {FIELD_BUTTONS.map((field) => (
           <Insert key={field.source} {...field} insert={props.onInsert} />
         ))}
-        {props.firstColumn === undefined ? null : (
-          <Insert
-            label={`CSV: ${props.firstColumn}`}
-            source={variableTemplateToSource({
-              tokens: [{ kind: 'csv', column: props.firstColumn }],
-            })}
-            insert={props.onInsert}
-          />
-        )}
       </div>
+      <VariableCsvMapping
+        headers={props.variables.csv?.headers ?? []}
+        onInsert={props.onInsert}
+        {...(props.source === undefined ? {} : { source: props.source })}
+        {...(props.onSourceChange === undefined ? {} : { onSourceChange: props.onSourceChange })}
+      />
       <div style={settingsStyle}>
         <VariableCsvImport setCsv={props.setCsv} pushToast={props.pushToast} />
         <Counter
@@ -63,6 +65,13 @@ export function VariableTextControls(props: ControlsProps): JSX.Element {
           reset={props.reset}
         />
       </div>
+      {props.source === undefined ? null : (
+        <VariableRowsPreview
+          source={props.source}
+          variables={props.variables}
+          {...(props.textValues === undefined ? {} : { textValues: props.textValues })}
+        />
+      )}
     </>
   );
 }

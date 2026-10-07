@@ -1,3 +1,4 @@
+import type { TextBoxSettings } from '../scene/text-box';
 import {
   curveSubpathBounds,
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
@@ -9,6 +10,8 @@ import {
   type Polyline,
   type Vec2,
 } from '../scene';
+import { layoutTextBox } from './text-box-layout';
+import { finishTextBoxRender } from './text-box-render';
 import { missingCharacters, textForLayout } from './glyph-coverage';
 import type { TextRenderResult } from './text-to-polylines';
 
@@ -30,6 +33,7 @@ export type StrokeTextRenderInput = {
   readonly lineHeight: number;
   readonly letterSpacing?: number;
   readonly color: string;
+  readonly textBox?: TextBoxSettings;
 };
 
 /** Renders native open-stroke glyphs and deterministic machining polylines. */
@@ -37,17 +41,33 @@ export function renderStrokeFontText(
   input: StrokeTextRenderInput,
   font: StrokeFont,
 ): TextRenderResult {
-  const scale = input.sizeMm / font.capHeight;
-  const spacingMm = (input.letterSpacing ?? 0) * input.sizeMm;
-  const text = textForLayout(input.content);
+  const layout =
+    input.textBox === undefined
+      ? undefined
+      : layoutTextBox(
+          { ...input, content: textForLayout(input.content), textBox: input.textBox },
+          (line, size) =>
+            lineWidth(
+              Array.from(line),
+              font,
+              size / font.capHeight,
+              (input.letterSpacing ?? 0) * size,
+            ),
+          1,
+        );
+  const actual =
+    layout === undefined ? input : { ...input, content: layout.content, sizeMm: layout.sizeMm };
+  const scale = actual.sizeMm / font.capHeight;
+  const spacingMm = (actual.letterSpacing ?? 0) * actual.sizeMm;
+  const text = textForLayout(actual.content);
   const lines = text.split('\n').map((line) => Array.from(line));
   const widths = lines.map((line) => lineWidth(line, font, scale, spacingMm));
   const maxWidth = widths.reduce((maximum, width) => Math.max(maximum, width), 0);
   const curves = lines.flatMap((line, index) =>
     renderLine({
       characters: line,
-      x: alignmentOffset(input.alignment, widths[index] ?? 0, maxWidth),
-      y: index * input.sizeMm * input.lineHeight,
+      x: alignmentOffset(actual.alignment, widths[index] ?? 0, maxWidth),
+      y: index * actual.sizeMm * actual.lineHeight,
       scale,
       spacingMm,
       font,
@@ -56,11 +76,14 @@ export function renderStrokeFontText(
   // Where a zero-width line would sit is the point every line aligns to.
   const result = normalizedResult(
     curves,
-    input.color,
-    alignmentOffset(input.alignment, 0, maxWidth),
+    actual.color,
+    alignmentOffset(actual.alignment, 0, maxWidth),
   );
   const missing = missingCharacters(text, (character) => font.glyphs.has(character));
-  return missing.length === 0 ? result : { ...result, missingCharacters: missing };
+  const rendered = missing.length === 0 ? result : { ...result, missingCharacters: missing };
+  return layout === undefined || input.textBox === undefined
+    ? rendered
+    : finishTextBoxRender(rendered, layout, input.textBox, input.alignment);
 }
 
 type LineRenderInput = {

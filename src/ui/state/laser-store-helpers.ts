@@ -269,6 +269,7 @@ export {
 
 type InitialLaserState = Pick<
   LaserState,
+  | 'controllerFirmwareReport'
   | 'capabilities'
   | 'activeControllerKind'
   | 'activeControllerCommandSet'
@@ -343,6 +344,7 @@ export function initialLaserState(): InitialLaserState {
   return {
     ...initialControllerConnectionState(),
     controllerSessionEpoch: 0,
+    controllerFirmwareReport: null,
     statusSequence: 0,
     statusObservation: null,
     ...sessionScopedJobStateReset(),

@@ -17,12 +17,18 @@ import {
 } from './project-machine-capability';
 import { currentSavedLibrariesState } from './saved-libraries-actions';
 import { preserveBrowserProProject } from './pending-pro-project';
+import {
+  productionManifestActions,
+  type ProductionManifestActions,
+} from './production-manifest-actions';
+import { retainedArrayActions, type RetainedArrayActions } from './retained-array-actions';
 import type { AppState } from './store';
 import { useUiStore } from './ui-store';
 import {
   canonicalizeOpenedProjectBed,
   type ProjectBedReconciliationNotice,
 } from './project-bed-reconciliation';
+import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
 
 type ProjectActionSet = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -30,14 +36,16 @@ type ProjectActionSet = (
 type ProjectActionGet = () => AppState;
 type InitialStateFactory = (project?: Project) => Partial<AppState>;
 
-export type ProjectActions = {
-  readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
-  readonly newProject: () => void;
-  readonly claimProjectOpenRequest: () => number;
-  readonly claimProjectSaveRequest: () => number;
-  readonly acceptOpenedProjectMachine: () => void;
-  readonly keepCurrentMachineForOpenedProject: () => void;
-};
+export type ProjectActions = ProjectSheetActions &
+  ProductionManifestActions &
+  RetainedArrayActions & {
+    readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
+    readonly newProject: () => void;
+    readonly claimProjectOpenRequest: () => number;
+    readonly claimProjectSaveRequest: () => number;
+    readonly acceptOpenedProjectMachine: () => void;
+    readonly keepCurrentMachineForOpenedProject: () => void;
+  };
 
 export function projectActions(
   set: ProjectActionSet,
@@ -45,6 +53,9 @@ export function projectActions(
   initialState: InitialStateFactory,
 ): ProjectActions {
   return {
+    ...projectSheetActions(set, get),
+    ...productionManifestActions(set, get),
+    ...retainedArrayActions(set),
     setProject: (project) => {
       const preserved = preserveBrowserProProject(project);
       if (preserved !== null) return { kind: 'desktop-required', features: preserved.features };

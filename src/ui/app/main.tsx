@@ -13,6 +13,8 @@ import {
   createDesktopProjectFiles,
   createDesktopJobActivityReporter,
   createDesktopSerialAdapter,
+  createDesktopMachineNetwork,
+  createDesktopAiAssistant,
   createDesktopSupportLogReader,
   createDesktopWindowCommands,
   isElectronRenderer,
@@ -69,6 +71,8 @@ const adapter: PlatformAdapter = isElectronRenderer()
             readSupportLog: createDesktopSupportLogReader(),
             reportJobActivity: createDesktopJobActivityReporter(),
             desktopWindow: createDesktopWindowCommands(),
+            aiAssistant: createDesktopAiAssistant(),
+            machineNetwork: createDesktopMachineNetwork(),
           }
         : {}),
     }

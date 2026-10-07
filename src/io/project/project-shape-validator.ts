@@ -1,3 +1,8 @@
+import { optionalSceneGroups } from './project-group-hierarchy-validator';
+import { validateBooleanCompound } from '../../core/scene/boolean-compound';
+import { validateDesignTreeOrder } from './project-design-tree-validator';
+import { validateBounds } from './project-bounds-validator';
+import { validateTextBox } from './project-text-box-validator';
 import { DITHER_ALGORITHMS } from '../../core/scene';
 import * as profileField from './project-device-profile-validator';
 import { validateProjectLayer } from './project-layer-shape-validator';
@@ -23,6 +28,11 @@ import {
   validateProjectMachineKind,
 } from './project-machine-kind-validator';
 import { validateBarcodeSpec } from './project-barcode-validator';
+import { validateProjectSheets } from './project-sheets-validator';
+import { validateProductionManifest } from './project-manifest-validator';
+import { validateFixtureTemplates } from './project-fixture-validator';
+import { validateRetainedArrays } from './project-array-validator';
+import { visitWorkflowArchives } from './project-workflow-archives';
 import {
   firstError,
   isObject,
@@ -53,6 +63,8 @@ const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 
 // which the G-code bounds-check regex can't read — defeating the bounds
 export function validateProjectShape(raw: Record<string, unknown>): string | null {
+  const archiveError = visitWorkflowArchives(raw);
+  if (archiveError !== null) return archiveError;
   const device = raw['device'];
   if (!isObject(device)) return 'missing or invalid `device`';
   const workspace = raw['workspace'];
@@ -72,6 +84,10 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validatePrintAndCutTargets(raw['printAndCutTargets']),
     validateEmbeddedFonts(raw['embeddedFonts']),
     optionalString(raw, 'notes'),
+    validateProjectSheets(raw['sheetBook'], validateProjectShape),
+    validateProductionManifest(raw['productionManifest'], validateProjectShape),
+    validateFixtureTemplates(raw['fixtureTemplates']),
+    validateRetainedArrays(raw['arrayLayouts'], validateProjectShape),
     validateScene(scene),
   ]);
 }
@@ -143,51 +159,18 @@ function validateScene(scene: Record<string, unknown>): string | null {
     validateArray(layers, 'scene.layers', validateProjectLayer) ??
     validateArray(objects, 'scene.objects', validateSceneObject) ??
     validateOptionalArtworkOrder(scene, 'scene.artworkOrder') ??
+    validateDesignTreeOrder(scene['designTreeOrder']) ??
     optionalSceneGroups(scene, 'scene.groups') ??
     validateSceneIntegrity(scene)
   );
 }
 
-function optionalSceneGroups(scene: Record<string, unknown>, path: string): string | null {
-  const groups = scene['groups'];
-  if (groups === undefined) return null;
-  if (!Array.isArray(groups)) return `missing or invalid \`${path}\``;
-  return validateArray(groups, path, validateSceneGroup);
-}
-
-function validateSceneGroup(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
-  const objectIds = value['objectIds'];
-  const fieldError = firstError([
-    requireString(value, `${path}.id`),
-    requireString(value, `${path}.name`),
-    Array.isArray(objectIds)
-      ? validateArray(objectIds, `${path}.objectIds`, validateSceneGroupObjectId)
-      : `missing or invalid \`${path}.objectIds\``,
-  ]);
-  if (fieldError !== null) return fieldError;
-  return Array.isArray(objectIds) && objectIds.length >= 2
-    ? null
-    : `missing or invalid \`${path}.objectIds\``;
-}
-
-function validateSceneGroupObjectId(value: unknown, path: string): string | null {
-  return typeof value === 'string' ? null : `missing or invalid \`${path}\``;
-}
-
 function validateSceneObject(obj: unknown, path: string): string | null {
   if (!isObject(obj)) return `missing or invalid \`${path}\``;
-  const operationIdsError = validateOperationIds(obj['operationIds'], `${path}.operationIds`);
-  if (operationIdsError !== null) return operationIdsError;
-  const tabAnchorError = validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`);
-  if (tabAnchorError !== null) return tabAnchorError;
-  // ADR-494: laser tab anchors have the CNC anchors' shape and limits.
-  const laserTabError = validateCncTabAnchors(obj['laserTabAnchors'], `${path}.laserTabAnchors`);
-  if (laserTabError !== null) return laserTabError;
-  const svgImportError = validateSvgImport(obj['svgImport'], `${path}.svgImport`);
-  if (svgImportError !== null) return svgImportError;
+  const sharedError = validateSharedObjectMetadata(obj, path);
+  if (sharedError !== null) return sharedError;
   const kind = obj['kind'];
-  if (kind === 'imported-svg') return validateVectorObject(obj, path);
+  if (kind === 'imported-svg') return validateImportedVector(obj, path);
   if (kind === 'text') return validateTextObject(obj, path);
   if (kind === 'traced-image') {
     return firstError([validateVectorObject(obj, path), validateTracedImageMetadata(obj, path)]);
@@ -196,6 +179,31 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   if (kind === 'shape') return validateShapeObject(obj, path);
   if (kind === 'relief') return validateReliefObject(obj, path);
   return `missing or invalid \`${path}.kind\``;
+}
+function validateImportedVector(obj: Record<string, unknown>, path: string): string | null {
+  return (
+    validateVectorObject(obj, path) ??
+    validateBooleanCompound(
+      obj['booleanCompound'],
+      `${path}.booleanCompound`,
+      validateCompoundOperand,
+    )
+  );
+}
+function validateCompoundOperand(obj: unknown, path: string): string | null {
+  if (!isObject(obj)) return `invalid ${path}`;
+  return validateSharedObjectMetadata(obj, path) ?? validateVectorObject(obj, path);
+}
+
+function validateSharedObjectMetadata(obj: Record<string, unknown>, path: string): string | null {
+  return firstError([
+    optionalString(obj, `${path}.name`),
+    validateOperationIds(obj['operationIds'], `${path}.operationIds`),
+    validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`),
+    // ADR-494: laser tab anchors have the CNC anchors' shape and limits.
+    validateCncTabAnchors(obj['laserTabAnchors'], `${path}.laserTabAnchors`),
+    validateSvgImport(obj['svgImport'], `${path}.svgImport`),
+  ]);
 }
 
 function validateSvgImport(value: unknown, path: string): string | null {
@@ -285,6 +293,7 @@ function validateTextObject(obj: Record<string, unknown>, path: string): string 
     optionalNumber(obj, `${path}.bendDeg`),
     optionalBoolean(obj, `${path}.weldOverlaps`),
     validatePathText(obj['pathText'], `${path}.pathText`),
+    validateTextBox(obj['textBox'], obj, `${path}.textBox`),
     validateVariableTemplate(obj['variableTemplate'], `${path}.variableTemplate`),
     requireString(obj, `${path}.color`),
     validateBounds(obj['bounds'], `${path}.bounds`),
@@ -395,29 +404,6 @@ function validateShapeSpec(value: unknown, path: string): string | null {
   }
   if (kind === 'barcode') return validateBarcodeSpec(value, path);
   return `missing or invalid \`${path}.kind\``;
-}
-
-function validateBounds(value: unknown, path: string): string | null {
-  if (!isObject(value)) return `missing or invalid \`${path}\``;
-  const fieldError = firstError([
-    requireCoordinate(value, `${path}.minX`),
-    requireCoordinate(value, `${path}.minY`),
-    requireCoordinate(value, `${path}.maxX`),
-    requireCoordinate(value, `${path}.maxY`),
-  ]);
-  if (fieldError !== null) return fieldError;
-  // Cross-field invariant (CQ-006): bounds are normalized (min <= max) by
-  // construction, so an inverted bound is a corrupt/hand-edited .lf2. Reject it
-  // to the "Could not open" modal instead of loading a negative-extent object.
-  // `<=` keeps zero-extent bounds valid (a single point / axis-aligned line).
-  const { minX, minY, maxX, maxY } = value;
-  if (typeof minX === 'number' && typeof maxX === 'number' && minX > maxX) {
-    return `invalid \`${path}\`: minX must be <= maxX`;
-  }
-  if (typeof minY === 'number' && typeof maxY === 'number' && minY > maxY) {
-    return `invalid \`${path}\`: minY must be <= maxY`;
-  }
-  return null;
 }
 
 function validateTransform(value: unknown, path: string): string | null {

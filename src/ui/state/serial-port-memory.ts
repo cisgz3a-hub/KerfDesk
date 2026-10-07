@@ -77,7 +77,7 @@ export function rememberSerialPort(
   storage: StorageLike | null,
   identity: SerialPortIdentity | null,
 ): void {
-  if (storage === null) return;
+  if (storage === null || identity?.transport === 'tcp') return;
   try {
     storage.setItem(
       SERIAL_PORT_MEMORY_STORAGE_KEY,
