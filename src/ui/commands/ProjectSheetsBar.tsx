@@ -52,7 +52,8 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
   const [name, setName] = useState('');
   const [status, setStatus] = useState('');
   const book = state.project.sheetBook;
-  const create = (duplicate: boolean): void => {
+  const productionRowOpen = state.project.productionManifest?.activeRowId !== undefined;
+  const create = (duplicate: boolean | 'production-design'): void => {
     const id = state.addProjectSheet(name, duplicate);
     setStatus(
       id === null
@@ -73,11 +74,7 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
         <ProductionManifestButton />
         <RetainedArraysButton />
       </div>
-      <p>
-        Each sheet retains its artwork, machine setup, placement, selected-output scope and variable
-        data. Switches reset current review and Frame ownership. Save the project to keep all sheets
-        together.
-      </p>
+      <ProjectSheetHelp />
       <label>
         New sheet name
         <input
@@ -88,12 +85,11 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
           onChange={(event) => setName(event.currentTarget.value)}
         />
       </label>
-      <Button disabled={name.trim() === ''} onClick={() => create(false)}>
-        Add blank sheet
-      </Button>
-      <Button disabled={name.trim() === ''} onClick={() => create(true)}>
-        Duplicate active sheet
-      </Button>
+      <SheetCreationButtons
+        disabled={name.trim() === ''}
+        productionRowOpen={productionRowOpen}
+        onCreate={create}
+      />
       {book === undefined ? null : (
         <>
           <label>
@@ -125,5 +121,53 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
         <Button onClick={props.onClose}>Close</Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function SheetCreationButtons(props: {
+  readonly disabled: boolean;
+  readonly productionRowOpen: boolean;
+  readonly onCreate: (duplicate: boolean | 'production-design') => void;
+}): JSX.Element {
+  return (
+    <>
+      <Button disabled={props.disabled} onClick={() => props.onCreate(false)}>
+        Add blank sheet
+      </Button>
+      <Button
+        disabled={props.disabled}
+        title="Copy the current artwork, including any fixed production text and barcodes. The original keeps its run results."
+        onClick={() => props.onCreate(true)}
+      >
+        Duplicate active sheet
+      </Button>
+      {props.productionRowOpen ? (
+        <Button
+          disabled={props.disabled}
+          title="Start a new batch from this run's saved editable design and variable settings."
+          onClick={() => props.onCreate('production-design')}
+        >
+          Duplicate editable design
+        </Button>
+      ) : null}
+    </>
+  );
+}
+
+function ProjectSheetHelp(): JSX.Element {
+  return (
+    <>
+      <p>
+        Each sheet retains its artwork, machine setup, placement, selected-output scope and variable
+        data. Switches reset current review and Frame ownership. Save the project to keep all sheets
+        together.
+      </p>
+      <p>
+        Duplicate active sheet keeps the current artwork, including fixed text and barcodes. When a
+        production row is open, Duplicate editable design restores the run's saved editable design
+        and variable settings for a new batch. Both copies start without a production run; run
+        results stay on the original sheet.
+      </p>
+    </>
   );
 }

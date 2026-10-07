@@ -9,7 +9,10 @@ import { useToastStore } from './toast-store';
 
 type Set = (patch: Partial<AppState> | ((state: AppState) => Partial<AppState>)) => void;
 export type ProjectSheetActions = {
-  readonly addProjectSheet: (name: string, duplicate: boolean) => string | null;
+  readonly addProjectSheet: (
+    name: string,
+    duplicate: boolean | 'production-design',
+  ) => string | null;
   readonly switchProjectSheet: (id: string) => boolean;
   readonly renameProjectSheet: (id: string, name: string) => void;
   readonly deleteInactiveProjectSheet: (id: string) => void;
@@ -27,7 +30,10 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
       };
       if (name.trim() === '' || name.length > 200 || book.inactive.length >= 99) return null;
       const id = crypto.randomUUID();
-      const next = duplicate ? duplicateSheet(current) : blankSheet(current);
+      const next = duplicate
+        ? duplicateSheetDesign(current, duplicate === 'production-design')
+        : blankSheet(current);
+      if (next === null) return null;
       const sheetBook: ProjectSheetBook = {
         activeId: id,
         activeName: name.trim(),
@@ -116,11 +122,25 @@ function withoutBook(project: Project): Project {
   const { sheetBook: _book, ...content } = project;
   return content;
 }
-/** Copy current artwork, including already fixed row text. The original run
- * and its observations stay archived; the copy requires a fresh explicit allocation. */
-function duplicateSheet(project: Project): Project {
-  const { productionManifest: _manifest, ...content } = withoutBook(project);
-  return content;
+function duplicateSheetDesign(project: Project, restoreProductionDesign: boolean): Project | null {
+  const manifest = project.productionManifest;
+  if (restoreProductionDesign && manifest?.activeRowId !== undefined) {
+    // An explicit new-batch design copy restores templates and the original
+    // variable settings. Ordinary duplication keeps the current fixed artwork.
+    const loaded = deserializeProject(manifest.designProjectJson);
+    if (loaded.kind !== 'ok') {
+      useToastStore
+        .getState()
+        .pushToast(
+          'The production design cannot be reopened. The original sheet was kept.',
+          'warning',
+        );
+      return null;
+    }
+    return loaded.project;
+  }
+  const { productionManifest: _manifest, ...design } = withoutBook(project);
+  return design;
 }
 function blankSheet(project: Project): Project {
   return {
