@@ -53,6 +53,8 @@ import { DesktopSessionEndNotice } from './DesktopSessionEndNotice';
 import { TutorialHost } from '../tutorials/TutorialHost';
 import { RecentProjectsHost } from '../recent-projects/RecentProjectsHost';
 import { SupportReportHost } from '../support/SupportReportHost';
+import { RemotePairingHost } from '../remote-access/RemotePairingHost';
+import { useRemoteAccess } from './use-remote-access';
 
 export function App(): JSX.Element {
   return (
@@ -101,6 +103,7 @@ export function App(): JSX.Element {
       <DesignStudioHost />
       <TutorialHost />
       <SupportReportHost />
+      <RemotePairingHost />
       <AppLifecycle />
     </div>
   );
@@ -112,6 +115,7 @@ export function App(): JSX.Element {
 // while the shortcut hooks subscribed from here. Mounted last so its effects
 // still run after every sibling's, as they did from App itself.
 function AppLifecycle(): null {
+  useRemoteAccess();
   // Recovery stays in a nonblocking banner. Background autosave protects
   // edits throughout the session; global handlers catch asynchronous errors.
   usePolylineFairingUpgrade();

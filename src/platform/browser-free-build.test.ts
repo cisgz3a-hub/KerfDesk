@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { build } from 'vite';
 import { describe, expect, it } from 'vitest';
+import { TRACE_PRESETS } from '../core/trace/trace-presets';
 import type {
   CncLayerSettings,
   ImportedSvg,
@@ -22,6 +23,7 @@ import {
   isBrowserFreeMode,
   PRO_BUILD_ENTRIES,
   replaceProEntryBodies,
+  replaceProTracePresets,
 } from '../../scripts/browser-free-build';
 
 describe('browser Free build boundary', () => {
@@ -43,6 +45,9 @@ describe('browser Free build boundary', () => {
     expect(() =>
       replaceProEntryBodies('export function renamed() {}', 'src/core/box/generate-box.ts'),
     ).toThrow('Pro build boundary changed');
+    expect(() => replaceProTracePresets('export const TRACE_PRESETS = {};')).toThrow(
+      'Free trace preset boundary changed',
+    );
   });
 
   it('bundles a nonfunctional Pro entry in browser but a working box generator in desktop', async () => {
@@ -57,9 +62,9 @@ describe('browser Free build boundary', () => {
     expect(generated.kind).toBe('generated');
     expect(generated.panels).toHaveLength(6);
     expect(desktop.code).toContain('buildPanelClaims');
-  });
+  }, 30_000);
 
-  it('keeps Free trace pipelines working and removes advanced trace implementations', async () => {
+  it('keeps only Line Art in browser Free and every preset in desktop', async () => {
     const probe = await traceBundle();
     const data = new Uint8ClampedArray(32 * 32 * 4).fill(255);
     for (let y = 8; y < 24; y++)
@@ -68,11 +73,22 @@ describe('browser Free build boundary', () => {
         data[offset] = data[offset + 1] = data[offset + 2] = 0;
       }
     const image = { width: 32, height: 32, data };
-    for (const preset of ['Line Art', 'Smooth', 'Sharp', 'Line + fill', 'Edge Detection'])
-      expect((await probe.trace(image, probe.presets[preset])).length).toBeGreaterThan(0);
-    for (const preset of ['Centerline', 'Photo shading', 'Colour layers'])
-      await expect(probe.trace(image, probe.presets[preset])).rejects.toThrow(DESKTOP_TOOL_MESSAGE);
-  });
+    expect(Object.keys(probe.presets)).toEqual(['Line Art']);
+    expect((await probe.trace(image, probe.presets['Line Art'])).length).toBeGreaterThan(0);
+    // Dedicated Pro backends cannot be reached with caller-supplied options.
+    for (const preset of [
+      'Centerline',
+      'Photo shading',
+      'Colour layers',
+      'Line + fill',
+      'Edge Detection',
+    ])
+      await expect(probe.trace(image, TRACE_PRESETS[preset])).rejects.toThrow(DESKTOP_TOOL_MESSAGE);
+    const desktop = await traceBundle('desktop');
+    expect(Object.keys(desktop.presets)).toEqual(Object.keys(TRACE_PRESETS));
+    for (const options of Object.values(desktop.presets))
+      expect(Array.isArray(await desktop.trace(image, options))).toBe(true);
+  }, 30_000);
 
   it('compiles every Free CNC choice and diagnostics while rejecting Pro toolpaths', async () => {
     const probe = await cncBundle();
@@ -109,7 +125,7 @@ describe('browser Free build boundary', () => {
       const scene = cncScene(probe, choice);
       expect(() => probe.compile(scene, probe.device, probe.machine)).toThrow(DESKTOP_TOOL_MESSAGE);
     }
-  });
+  }, 30_000);
 });
 
 const boxSpec = {
@@ -156,14 +172,14 @@ async function boxBundle(mode: string): Promise<{
   return { code: chunk.code, generateBox: api.generateBox };
 }
 
-async function traceBundle(): Promise<{
+async function traceBundle(mode = 'production'): Promise<{
   trace: (image: unknown, options: unknown) => Promise<unknown[]>;
   presets: Record<string, unknown>;
 }> {
   const result = await build({
     configFile: false,
     root: resolve('.'),
-    mode: 'production',
+    mode,
     logLevel: 'silent',
     plugins: [
       browserFreeBuild(),

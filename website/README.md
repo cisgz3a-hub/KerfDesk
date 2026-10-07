@@ -1,9 +1,8 @@
 # KerfDesk website
 
 The public product website for KerfDesk: what it does, which machines it has been checked on,
-downloads, getting-started help and safety. It is separate from the KerfDesk app — nothing here is
-bundled into the web app or the desktop builds (ADR-524). Pricing and the legal pages are the app's
-own pages at kerfdesk.com, and this site only links them (see the last section).
+downloads, pricing, getting-started help, safety, privacy and licensing. It is separate from the
+KerfDesk app — nothing here is bundled into the web app or the desktop builds (ADR-524).
 
 ## Commands
 
@@ -51,22 +50,30 @@ project (the app's `laserforge` project must stay on `kerfdesk.com`: installed a
 file and serial permissions and the desktop camera bridge's trusted origin are tied to that
 origin). Pick the site's hostname, then build with `--site-url` and upload `website/dist`.
 
-## Editions, prices and the legal pages
+The website's **Phone & MCP** guide links to `kerfdesk.com/phone.html`, the canvas-free setup page
+shipped with the app's mobile purchase/download landing. Its connection button opens the separate
+KerfDesk remote service as a full page. Keep that navigation: the service uses a host-only session
+cookie and refuses framing. Neither guide creates a pairing or replaces approval on the PC.
+
+## Editions, prices and opening checkout
 
 The owner has settled the offer (ADR-524 Amendment 1), and `commerce.config.mjs` holds it: a Free
-edition with no time limit and a Pro license at US$49.50 plus tax, one time, with a year of
-updates, an optional US$20 update year, three devices and a 30-day trial. `tests/commerce.test.mjs`
-pins the offer and the closed store, so any change to either is deliberate. Write every price with
-"plus tax": Paddle, the reseller, adds the tax where the buyer lives.
+edition with no time limit and a Pro license at US$49.50, one time, with a year of updates, an
+optional US$20 update year, three devices and a 30-day trial. The site shows these prices, but
+checkout is closed (`salesOpen: false`): no plan has a checkout URL, and the pricing page says
+purchase opens soon. `tests/commerce.test.mjs` pins the offer and the closed checkout, so any
+change to either is deliberate. Don't write refund or other sale terms on the site; the terms of
+sale are published before sales open. ADR-247 says a first sale needs a commercial ADR. When
+checkout is ready:
 
-The pricing page, the Terms of Service, the Privacy Notice, the Refund Policy, the PAIA Manual and
-the licence and notices page are checked legal texts (ADR-247 Amendment 2). The app publishes them
-from `docs/legal/` (`scripts/generate-site-pages.mjs`), and this site links them through
-`site.pricingUrl`, `site.termsUrl` and the other URLs in `site.config.mjs`, so it can never show an
-old or different version. Don't write refund, warranty, liability or other sale terms here. The
-terms keep whatever the website says about KerfDesk (section 26.1), so never promise more than they
-do: no "forever", "yours to keep" or "as is".
+1. Publish terms of sale and a refund policy (as pages here or external https URLs).
+2. Create a hosted checkout for each plan with a merchant-of-record or payment-link provider, so
+   no card data touches this site.
+3. Fill in `commerce.config.mjs`: `authorizingAdr`, `termsUrl`, `refundPolicyUrl` and each plan's
+   `checkoutUrl`, then set `salesOpen: true` in the same change.
+4. Revise the pricing page's "purchase opens soon" copy and FAQ, and update
+   `tests/commerce.test.mjs`, in the same change.
 
-Purchases start in the desktop app (ADR-523): no page links a checkout, and the build refuses a
-plan with a checkout URL. Versions already released keep the terms they were released under; the
-licence and notices page says which, and nothing on the site presents KerfDesk as open source.
+The build refuses an open store that is missing any of these, and a closed store that carries a
+checkout URL. Versions already released keep the terms they were released under (MIT so far); the
+License page states this and nothing else on the site presents KerfDesk as open source.

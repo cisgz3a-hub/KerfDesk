@@ -1,0 +1,50 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kerfdesk-phone-control",
+  "main": "src/index.ts",
+  // Shared desktop source and this isolated package must share one SDK class identity.
+  "alias": {
+    "@modelcontextprotocol/server": "./node_modules/@modelcontextprotocol/server/dist/index.mjs",
+    "@modelcontextprotocol/server/_shims": "./node_modules/@modelcontextprotocol/server/dist/shimsWorkerd.mjs",
+    "zod": "./node_modules/zod/index.js",
+    "zod/v4": "./node_modules/zod/v4/index.js",
+    "zod/v4/core": "./node_modules/zod/v4/core/index.js",
+  },
+  "account_id": "10d5d0bdb9bf11ca0468db275a787e20",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["global_fetch_strictly_public", "enable_request_signal"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "PUBLIC_ORIGIN": "https://kerfdesk-phone-control.cisgz3a.workers.dev",
+  },
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "run_worker_first": true,
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "REMOTE_DEVICES", "class_name": "RemoteDevice" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["RemoteDevice"] }],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      // Dedicated namespace created through the verified account dashboard; no licence-service storage.
+      "id": "55981c23524446d4ac69a04bfba21803",
+    },
+  ],
+  "ratelimits": [
+    { "name": "PUBLIC_LIMIT", "namespace_id": "2001", "simple": { "limit": 60, "period": 60 } },
+    { "name": "AUTH_LIMIT", "namespace_id": "2002", "simple": { "limit": 600, "period": 60 } },
+    { "name": "CLIENT_LIMIT", "namespace_id": "2003", "simple": { "limit": 120, "period": 60 } },
+    { "name": "ABORT_LIMIT", "namespace_id": "2004", "simple": { "limit": 30, "period": 60 } },
+  ],
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 0.01 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.01 },
+  },
+}

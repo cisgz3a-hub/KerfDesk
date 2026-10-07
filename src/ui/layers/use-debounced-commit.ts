@@ -57,6 +57,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   // (saved values can lie outside a control's current editing range). Only an
   // actual input change gives blur permission to parse and commit the draft.
   const editedRef = useRef(false);
+  const inputRef = useRef<HTMLInputElement>();
   const parseRef = useRef(parse);
   parseRef.current = parse;
   const formatRef = useRef(format);
@@ -65,11 +66,8 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   commitRef.current = commit;
   const validateRef = useRef(args.validate);
   validateRef.current = args.validate;
-  const validationError = (input: string): string | null => {
-    const validate = validateRef.current;
-    if (validate !== undefined) return validate(input);
-    return typeof value === 'number' ? validateEnglishDecimalInput(input) : null;
-  };
+  const validationError = (input: string): string | null =>
+    draftValidationError(value, input, validateRef.current);
 
   const debouncerRef = useRef<Debouncer<T>>();
   if (debouncerRef.current === undefined) {
@@ -104,9 +102,17 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current?.cancel();
     debouncerRef.current?.acknowledge(value);
     setErrorMessage(null);
-    if (!editedRef.current || parseRef.current(draftRef.current) !== value) {
+    if (
+      !editedRef.current ||
+      draftValidationError(value, draftRef.current, validateRef.current) !== null ||
+      parseRef.current(draftRef.current) !== value
+    ) {
       editedRef.current = false;
       setDraft(formatRef.current(value));
+      // A saved/external value can replace the invalid draft while the input
+      // stays focused. Retire its native error now as well as its React state;
+      // otherwise the valid-looking field remains blocked until another blur.
+      setInputValidity(inputRef.current, '');
     }
   }, [value, args.reconcileKey]);
 
@@ -122,6 +128,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     value,
     draft,
     editedRef,
+    inputRef,
     debounceMs,
     commitOnBlur: args.commitOnBlur === true,
     parse,
@@ -143,6 +150,7 @@ type DebouncedHandlerContext<T> = {
   readonly value: T;
   readonly draft: string;
   readonly editedRef: { current: boolean };
+  readonly inputRef: { current: HTMLInputElement | undefined };
   readonly debounceMs: number;
   readonly commitOnBlur: boolean;
   readonly parse: (input: string) => T;
@@ -155,6 +163,7 @@ type DebouncedHandlerContext<T> = {
 
 function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onChange'] {
   return (event): void => {
+    context.inputRef.current = event.target;
     const nextText = event.target.value;
     context.editedRef.current = true;
     context.setDraft(nextText);
@@ -180,6 +189,15 @@ function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedC
     if (context.debounceMs <= 0) context.debouncer?.flush(parsed);
     else context.debouncer?.schedule(parsed);
   };
+}
+
+function draftValidationError<T>(
+  value: T,
+  input: string,
+  validate: ((input: string) => string | null) | undefined,
+): string | null {
+  if (validate !== undefined) return validate(input);
+  return typeof value === 'number' ? validateEnglishDecimalInput(input) : null;
 }
 
 function createBlurHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onBlur'] {

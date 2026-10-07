@@ -63,8 +63,13 @@ export function createDesktopStartup(start: () => void) {
           }
           return new Response(null, { status: 204, headers: HEADERS });
         }
-        if (!ready && url.pathname.startsWith('/api/licensing/')) {
-          if (!trustedAppRequest(request, url, 'X-KerfDesk-Licensing'))
+        const openingHeader = url.pathname.startsWith('/api/licensing/')
+          ? 'X-KerfDesk-Licensing'
+          : url.pathname.startsWith('/api/remote/')
+            ? 'X-KerfDesk-Remote'
+            : null;
+        if (!ready && openingHeader !== null) {
+          if (!trustedAppRequest(request, url, openingHeader))
             return new Response('Not Found', { status: 404, headers: HEADERS });
           return new Response('Workspace is not open', { status: 503, headers: HEADERS });
         }

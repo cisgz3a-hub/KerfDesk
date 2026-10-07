@@ -2,7 +2,11 @@ import { app, net, Notification, safeStorage, shell } from 'electron';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
 import { isLicenceCheckoutUrl } from './licensing-commerce.js';
 import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
-import { withLicensingRoutes, type ProtocolHandler } from './licensing-routes.js';
+import {
+  withLicensingRoutes,
+  type ProtocolHandler,
+  type RequestUpdateClose,
+} from './licensing-routes.js';
 import { createLicensingStore } from './licensing-store.js';
 import { createLicensingRuntime, type LicensingRuntime } from './licensing-runtime.js';
 import { scheduleLicenceChecks } from './licensing-schedule.js';
@@ -43,6 +47,7 @@ type Options = {
   readonly trustedUpdates: boolean;
   readonly updater: CommercialUpdater;
   readonly canInstallManualUpdate?: () => boolean;
+  readonly requestManualUpdateClose?: RequestUpdateClose;
 };
 
 export function createDesktopLicensing(options: Options) {
@@ -98,7 +103,13 @@ export function createDesktopLicensing(options: Options) {
     updates,
     /** The licensing and update routes in front of the app's own files. */
     routes: (fallback: ProtocolHandler): ProtocolHandler =>
-      withLicensingRoutes(fallback, runtime, earlyUpdates, updates),
+      withLicensingRoutes(
+        fallback,
+        runtime,
+        earlyUpdates,
+        updates,
+        manual === null ? undefined : options.requestManualUpdateClose,
+      ),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
      * the update check. The workspace never waits for either (ADR-540).

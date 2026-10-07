@@ -4,7 +4,7 @@ import { DEFAULT_CNC_MACHINE_CONFIG, LASER_MACHINE_CONFIG } from '../../core/sce
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useStore } from './store';
 import { useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -17,7 +17,9 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   };
   return {
     write: async (data) => {
+      const acknowledgeFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeFence();
       // Real GRBL answers the connect-time $G modal query (C6) with its state
       // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {

@@ -12,6 +12,7 @@ import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/wor
 import type { EmitRdOptions, EmitRdResult } from '../../io/rd';
 import type { TiledOutputPreparation } from '../app/tiled-output-preparation';
 import type { FrameBoundsPreview } from './frame-bounds-preview';
+import type { LaserPowerScaleSource } from './connected-laser-power-scale';
 
 export type OutputSnapshotRequest = {
   readonly registration?: SimilarityTransform | null;
@@ -38,6 +39,7 @@ export type SaveOutputPreparationRequest = {
   readonly controllerSettings?: ControllerSettingsSnapshot | null;
   readonly activeWcs?: ActiveWorkCoordinateSystem | null;
   readonly snapshot?: OutputSnapshotRequest;
+  readonly laserPowerScaleSource?: LaserPowerScaleSource;
 };
 
 export type PrepareOnlyOutputPreparationRequest = {

@@ -43,11 +43,17 @@ import {
   type PreparedCurrentStart,
 } from './job-review-model';
 import { detectFluidncDivergenceWarnings } from './fluidnc-divergence-warnings';
-import { useJobReviewStore, type JobReviewPurpose } from './job-review-store';
+import { type JobReviewPurpose } from './job-review-store';
 import { refreshControllerIdentityWarnings } from '../controller-identity-warnings';
 import { appendExternalGcodePreviewWarning } from '../../state/external-gcode-preview-disclosure';
 import { isOutputPreparationAbort } from '../output-preparation-errors';
-import { ownJobReviewPreparation } from './job-review-preparation-owner';
+import {
+  createJobReviewPresentation,
+  type JobReviewPresenter,
+  type JobReviewPresentation,
+} from './job-review-presentation';
+import { frozenLaserPowerScaleWarnings } from '../connected-laser-power-scale';
+import { clearReviewedJobSnapshot, publishReviewedJobSnapshot } from './reviewed-job-snapshot';
 
 /** Everything one successful prepare ran against. Only ever replaced whole,
  * by another successful prepare, so the bundle that streams is provably the
@@ -59,6 +65,8 @@ export type ReviewedStartBundle = {
   readonly prepared: PreparedCurrentStart;
   readonly laserModeStartSnapshot: LaserModeStartSnapshot;
   readonly outputScope?: OutputScope;
+  /** Read-only observers may reuse only a preparation-time machine binding. */
+  readonly preparedMachineInputsKey?: string;
   /** Durable disclosure for the owned pre-Frame G54 selection. Rebuilds run
    * after that selection, so they must retain the original named WCS fact. */
   readonly frameWcsNormalizationWarning?: string;
@@ -79,12 +87,16 @@ export async function runJobReviewGate(args: {
   readonly onCompletedReplayChanged?: () => Promise<void> | void;
   /** Exact-handoff owner check for a pre-existing permit. */
   readonly shouldAbandon?: () => boolean;
+  readonly onFrameMismatch?: () => void;
+  readonly presenter?: JobReviewPresenter;
 }): Promise<ConfirmedJobReview | null> {
   const purpose = args.purpose ?? 'start';
   let current = args.initial;
   let displayedModel = modelFor(current);
-  if (!useJobReviewStore.getState().open(displayedModel, purpose)) return null;
-  const owner = ownJobReviewPreparation();
+  const owner = presentReview(displayedModel, purpose, args.presenter);
+  if (owner === null) return null;
+  const snapshotOwner = owner.requestOwner;
+  publishReviewedJobSnapshot(current, displayedModel);
   try {
     for (;;) {
       const signal = await owner.nextSignal();
@@ -93,7 +105,7 @@ export async function runJobReviewGate(args: {
       // fast Confirm can therefore arrive before that request. Re-prepare
       // synchronously at this handoff boundary so approval can never bind to
       // stale bytes or stale live evidence.
-      useJobReviewStore.getState().beginPrepare();
+      owner.beginPrepare();
       const rebuilt = await rebuildReviewedStart(
         args.completedReceipt,
         purpose,
@@ -101,9 +113,10 @@ export async function runJobReviewGate(args: {
         args.onCompletedReplayChanged,
         owner.signal,
       );
+      noteFrameMismatch(rebuilt, args);
       if (reviewPreparationWasCancelled(owner.signal, args.shouldAbandon)) return null;
       if (!rebuilt.ok) {
-        if (presentRebuildFailure(rebuilt)) return null;
+        if (presentRebuildFailure(rebuilt, owner)) return null;
         continue;
       }
       const rebuiltModel = modelFor(rebuilt.bundle);
@@ -116,14 +129,30 @@ export async function runJobReviewGate(args: {
       // Changed bytes/evidence need a new affirmative click after display.
       current = rebuilt.bundle;
       displayedModel = rebuiltModel;
-      useJobReviewStore.getState().completePrepare(displayedModel);
+      owner.completePrepare(displayedModel);
+      publishReviewedJobSnapshot(current, displayedModel);
     }
   } catch (error) {
     if (isOutputPreparationAbort(error)) return null;
     throw error;
   } finally {
+    clearReviewedJobSnapshot(snapshotOwner);
     owner.dispose();
   }
+}
+function presentReview(
+  model: JobReviewModel,
+  purpose: JobReviewPurpose,
+  presenter?: JobReviewPresenter,
+): JobReviewPresentation | null {
+  return (presenter ?? createJobReviewPresentation)(model, purpose);
+}
+
+function noteFrameMismatch(
+  rebuilt: RebuiltStart,
+  args: { readonly onFrameMismatch?: () => void },
+): void {
+  if (!rebuilt.ok && rebuilt.display !== undefined) args.onFrameMismatch?.();
 }
 
 function reviewPreparationWasCancelled(
@@ -152,7 +181,7 @@ function sameReviewedArtifact(
   );
 }
 
-function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
+export function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReviewModel> {
   const liveLaser = useLaserStore.getState();
   const configured = bundle.project.device.controllerKind ?? 'grbl-v1.1';
   const device = bundle.project.device;
@@ -184,10 +213,20 @@ function modelFor(bundle: ReviewedStartBundle): ReturnType<typeof buildJobReview
     detected: liveLaser.detectedControllerKind,
     gcode: bundle.prepared.gcode,
   });
+  const frozenPower =
+    bundle.prepared.laserSecondPassChain === undefined
+      ? []
+      : frozenLaserPowerScaleWarnings(bundle.prepared.prepared.project, {
+          ...bundle.laser,
+          connected: bundle.laser.connection.kind === 'connected',
+        });
   const disclosed =
-    fluidnc.length === 0
+    fluidnc.length === 0 && frozenPower.length === 0
       ? baseModel
-      : { ...baseModel, warnings: [...baseModel.warnings, ...fluidnc] };
+      : {
+          ...baseModel,
+          warnings: [...new Set([...baseModel.warnings, ...frozenPower, ...fluidnc])],
+        };
   const warning = bundle.frameWcsNormalizationWarning;
   const framedModel =
     warning === undefined || disclosed.warnings.includes(warning)
@@ -208,7 +247,7 @@ function confirmReviewedStart(
 ): ConfirmedJobReview {
   const machineKind = machineKindOf(bundle.project.machine);
   const laserModeStartEvidence = confirmLaserModeStartEvidence(
-    bundle.project,
+    bundle.prepared.prepared.project,
     bundle.laserModeStartSnapshot,
     () => true,
     bundle.prepared.gcode,
@@ -313,18 +352,21 @@ function refreshFrozenReview(bundle: ReviewedStartBundle): RebuiltStart {
   };
 }
 
-function presentRebuildFailure(rebuilt: Extract<RebuiltStart, { readonly ok: false }>): boolean {
+function presentRebuildFailure(
+  rebuilt: Extract<RebuiltStart, { readonly ok: false }>,
+  owner: JobReviewPresentation,
+): boolean {
   if (rebuilt.closeReview === true) {
-    useJobReviewStore.getState().close();
+    owner.close();
     return true;
   }
   // Publish the compiled model first, then the blocker over it: the stats,
   // warnings, and per-operation compiled summaries follow the edit while
   // Confirm stays unavailable until the operator resolves the refusal.
   if (rebuilt.display !== undefined) {
-    useJobReviewStore.getState().completePrepare(modelFor(rebuilt.display));
+    owner.completePrepare(modelFor(rebuilt.display));
   }
-  useJobReviewStore.getState().failPrepare(rebuilt.messages);
+  owner.failPrepare(rebuilt.messages);
   return false;
 }
 
@@ -385,6 +427,11 @@ async function rebuildCurrentStart(
     laser,
     prepared,
     laserModeStartSnapshot,
+    ...(prepared === previousBundle.prepared
+      ? previousBundle.preparedMachineInputsKey === undefined
+        ? {}
+        : { preparedMachineInputsKey: previousBundle.preparedMachineInputsKey }
+      : { preparedMachineInputsKey: startMachineInputsKey(app.project, laser, camera) }),
     ...(frameWcsNormalizationWarning === undefined ? {} : { frameWcsNormalizationWarning }),
   };
   const frameRefusal = frameFirstRefusal(purpose, bundle);

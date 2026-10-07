@@ -15,10 +15,14 @@ export type EditingToolsActions = OffsetShapesActions &
   LaserTabActions;
 
 type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
+type CopySetter = (
+  fn: (state: AppState) => AppState | Partial<AppState>,
+  onCommitted?: () => void,
+) => unknown;
 
 export function editingToolsActions(
   set: Setter,
-  copySet: Setter,
+  copySet: CopySetter,
   get: () => AppState,
 ): EditingToolsActions {
   return {

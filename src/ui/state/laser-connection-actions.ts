@@ -69,6 +69,7 @@ type SafeWriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 type LiveConnection = NonNullable<LiveRefs['connection']>;
 

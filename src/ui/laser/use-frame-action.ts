@@ -1,5 +1,7 @@
+import { prepareFrameLaser } from './frame-cnc-preparation';
 import { deviceForActiveHead } from '../../core/cnc/cnc-head-feeds';
 import { frameBoundsSignature } from '../../core/job';
+import { currentFrameSpatialSignature } from './frame-spatial-identity';
 import { machineKindOf, type OutputScope, type Project } from '../../core/scene';
 import { currentOutputScope, useStore } from '../state';
 import {
@@ -20,17 +22,14 @@ import {
   useFramePreparationStore,
 } from '../state/frame-preparation-store';
 import { isOutputPreparationAbort } from './output-preparation-errors';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { isWorkZEvidenceCurrentForStart } from '../state/work-z-zero-evidence';
-import { CNC_FRAME_WORK_Z_REQUIRED_MESSAGE } from '../state/cnc-frame-lines';
 import { resolveLiveFramePlacement } from './camera-frame-placement';
 import {
   assertFramePreparationActive,
+  normalizeFrameControllerReportUnits,
   normalizeFrameWorkCoordinateSystem,
 } from './frame-controller-readiness';
 import {
   waitForAbsoluteFrameOffset,
-  waitForFreshIdleFramePosition,
   waitForUnreportedFrameWorkOffset,
 } from './frame-position-readiness';
 import { ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE } from '../job-placement';
@@ -62,6 +61,12 @@ import {
   type FrameContext,
 } from './frame-trace-flow';
 import type { StartJobPreparation } from './start-job-readiness';
+import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
+import {
+  frameExecutionOwner,
+  linkFrameAbort,
+  type FrameCallerOptions,
+} from './frame-caller-options';
 
 export function useFrameAction(): () => void {
   return () => {
@@ -81,32 +86,52 @@ export function useFrameAction(): () => void {
  * at once and the permit is minted when the program arrives and reproduces
  * it (ADR-353). Everything else Frames the exact program as before.
  */
-export function runFrameNow(): Promise<boolean> {
+export function runFrameNow(options: FrameCallerOptions = {}): Promise<boolean> {
   return runOwnedFrame(async () => {
+    assertMachineExecutionOwner(options);
     ensureFramedRunInvalidationSubscriptions();
     clearStartBlockers();
     clearFrameExpiryNote();
-    if (!(await offerFrameBlockerFixes())) return false;
-    const context = await prepareFrameContext();
-    if (context === null) return false;
-    const preparation = startExactFramePreparation(context);
-    const release = registerFramePreparationAbort(preparation.abort);
+    const setupAbort = new AbortController();
+    const releaseSetup = registerFramePreparationAbort(() => setupAbort.abort());
+    const unlinkSetup = linkFrameAbort(options.signal, () => setupAbort.abort());
     try {
-      const preview = traceableFrameBoundsPreview(await preparation.earlyBounds);
-      preparation.signal.throwIfAborted();
-      if (preview !== null) return await dispatchTracedFrame(context, preview, preparation);
-      const prepared = await preparation.program;
-      preparation.signal.throwIfAborted();
-      const bundle = exactFrameBundle(context, prepared);
-      return bundle === null
-        ? false
-        : await dispatchPreparedFrame(bundle, { signal: preparation.signal });
+      if (options.interactiveSetup !== false && !(await offerFrameBlockerFixes())) return false;
+      setupAbort.signal.throwIfAborted();
+      assertMachineExecutionOwner(options);
+      const context = await prepareFrameContext(setupAbort.signal, options);
+      if (context === null) return false;
+      setupAbort.signal.throwIfAborted();
+      const preparation = startExactFramePreparation(context);
+      const unlinkPreparation = linkFrameAbort(options.signal, preparation.abort);
+      const release = registerFramePreparationAbort(preparation.abort);
+      releaseSetup();
+      try {
+        const preview = traceableFrameBoundsPreview(await preparation.earlyBounds);
+        assertMachineExecutionOwner(options);
+        preparation.signal.throwIfAborted();
+        if (preview !== null) return await dispatchTracedFrame(context, preview, preparation);
+        const prepared = await preparation.program;
+        preparation.signal.throwIfAborted();
+        const bundle = exactFrameBundle(context, prepared);
+        return bundle === null
+          ? false
+          : await dispatchPreparedFrame(bundle, {
+              signal: preparation.signal,
+              ...(frameExecutionOwner(options) === undefined ? {} : { owner: options }),
+            });
+      } finally {
+        unlinkPreparation();
+        release();
+      }
     } catch (error) {
+      if (options.signal?.aborted === true) return false;
       return operatorCancelledPreparation(error);
     } finally {
-      release();
+      unlinkSetup();
+      releaseSetup();
     }
-  });
+  }, options.joinExisting !== false);
 }
 
 // The operator's Cancel ends the Frame quietly; any other failure propagates.
@@ -115,7 +140,7 @@ function operatorCancelledPreparation(error: unknown): false {
   const message =
     useFramePreparationStore.getState().stage === 'finishing'
       ? 'Frame preparation cancelled after tracing. No Start permit was issued.'
-      : 'Frame preparation cancelled. Nothing was sent.';
+      : 'Frame preparation cancelled. No Start permit was issued.';
   useToastStore.getState().pushToast(message, 'info');
   return false;
 }
@@ -130,16 +155,23 @@ export type TransientFrameControllerPreparation = {
  * transient project against this returned controller snapshot. */
 export async function prepareTransientFrameController(
   project: Project,
+  signal?: AbortSignal,
 ): Promise<TransientFrameControllerPreparation | null> {
   ensureFramedRunInvalidationSubscriptions();
   clearStartBlockers();
-  if (!(await requireFrameControllerQueue())) return null;
+  if (!(await requireFrameControllerQueue(signal))) return null;
   if (!requireFrameControllerRunsMachineKind(machineKindOf(project.machine))) return null;
   const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
     return null;
   }
+  const reportUnitsIssues = await normalizeFrameControllerReportUnits(signal);
+  if (reportUnitsIssues.length > 0) {
+    reportFramePreparationRefusal(reportUnitsIssues, wcsNormalization.warning);
+    return null;
+  }
+  signal?.throwIfAborted();
   const laser = await prepareFrameLaser(
     project.machine?.kind === 'cnc',
     useLaserStore.getState(),
@@ -193,16 +225,28 @@ export async function dispatchLaserSecondPassFrame(
 
 /** The queue, WCS, controller and placement boundary every ordinary Frame
  * owns before compiling anything. */
-async function prepareFrameContext(): Promise<FrameContext | null> {
-  if (!(await requireFrameControllerQueue())) return null;
+async function prepareFrameContext(
+  signal: AbortSignal,
+  options: FrameCallerOptions = {},
+): Promise<FrameContext | null> {
+  if (!(await requireFrameControllerQueue(signal))) return null;
   if (!requireFrameControllerRunsMachineKind(machineKindOf(useStore.getState().project.machine))) {
     return null;
   }
-  const wcsNormalization = await normalizeFrameWorkCoordinateSystem();
+  const wcsNormalization = await normalizeFrameWorkCoordinateSystem(frameExecutionOwner(options));
   if (!wcsNormalization.ok) {
     reportFramePreparationRefusal(wcsNormalization.messages, wcsNormalization.warning);
     return null;
   }
+  const reportUnitsIssues = await normalizeFrameControllerReportUnits(
+    signal,
+    frameExecutionOwner(options),
+  );
+  if (reportUnitsIssues.length > 0) {
+    reportFramePreparationRefusal(reportUnitsIssues, wcsNormalization.warning);
+    return null;
+  }
+  signal.throwIfAborted();
   if (!(await waitForAbsoluteFrameOffset(useStore.getState().jobPlacement))) {
     reportFramePreparationRefusal(
       [ABSOLUTE_WORK_OFFSET_REQUIRED_MESSAGE],
@@ -211,11 +255,14 @@ async function prepareFrameContext(): Promise<FrameContext | null> {
     return null;
   }
   await waitForUnreportedFrameWorkOffset(useStore.getState().jobPlacement);
+  signal.throwIfAborted();
   const app = useStore.getState();
+  assertMachineExecutionOwner(options);
   const laser = await prepareFrameLaser(
     app.project.machine?.kind === 'cnc',
     useLaserStore.getState(),
     wcsNormalization.warning,
+    options.interactiveSetup !== false,
   );
   if (laser === null) return null;
   const camera = useCameraStore.getState();
@@ -229,6 +276,7 @@ async function prepareFrameContext(): Promise<FrameContext | null> {
     laser,
     camera,
     jobOrigin: placement.jobOrigin,
+    ...(frameExecutionOwner(options) === undefined ? {} : { executionOwner: options }),
     ...(wcsNormalization.warning === undefined
       ? {}
       : { wcsNormalizationWarning: wcsNormalization.warning }),
@@ -260,6 +308,7 @@ type PreparedFrameDispatchOptions = {
   readonly review?: FramedRunReviewEvidence;
   readonly authorizationContext?: FramedRunCandidate['authorizationContext'];
   readonly outputScope?: OutputScope;
+  readonly owner?: FrameCallerOptions;
 };
 
 function reviewEvidenceOf(review: ConfirmedJobReview): FramedRunReviewEvidence {
@@ -281,6 +330,7 @@ async function dispatchPreparedFrame(
 ): Promise<boolean> {
   if (!(await requireFrameControllerQueue(options.signal))) return false;
   assertFramePreparationActive(options.signal);
+  assertMachineExecutionOwner(options.owner);
   const currentLaser = useLaserStore.getState();
   if (!reviewedFrameIsCurrent(bundle, currentLaser, options.authorizationContext)) {
     reportFrameRefusal([FRAME_SETUP_CHANGED_BEFORE_DISPATCH_MESSAGE]);
@@ -328,7 +378,13 @@ async function dispatchPreparedFrame(
       bundle.project.device,
       bundle.project.machine,
     );
-    await currentLaser.frame(motionBounds, framingFeedMmPerMin, candidate);
+    await currentLaser.frame(
+      motionBounds,
+      framingFeedMmPerMin,
+      candidate,
+      undefined,
+      options.owner,
+    );
   } catch (error) {
     completion.cancel();
     reportFrameRefusal([error instanceof Error ? error.message : String(error)]);
@@ -344,11 +400,11 @@ async function dispatchPreparedFrame(
 function reviewedFrameCandidateOptions(
   bundle: ReviewedStartBundle,
   options: PreparedFrameDispatchOptions,
-): Pick<FramedRunCandidate, 'outputScope' | 'authorizationContext'> {
+): Pick<FramedRunCandidate, 'outputScope' | 'authorizationContext' | 'spatialSignature'> {
   const outputScope =
     options.outputScope === undefined ? currentOutputScope(bundle.app) : options.outputScope;
   return options.authorizationContext === undefined
-    ? { outputScope }
+    ? { outputScope, spatialSignature: currentFrameSpatialSignature(bundle.app) }
     : { outputScope, authorizationContext: options.authorizationContext };
 }
 
@@ -360,49 +416,4 @@ function reportFrameCompletion(candidate: FramedRunCandidate, accepted: boolean)
   }
   useToastStore.getState().pushToast(FRAME_COMPLETE_MESSAGE, 'success');
   return true;
-}
-
-async function prepareFrameLaser(
-  isCnc: boolean,
-  laser: ReturnType<typeof useLaserStore.getState>,
-  wcsNormalizationWarning: string | undefined,
-): Promise<ReturnType<typeof useLaserStore.getState> | null> {
-  if (!isCnc) return laser;
-  if (
-    isWorkZEvidenceCurrentForStart(
-      laser.workZZeroEvidence,
-      laser.workZReferenceEpoch,
-      laser.controllerSessionEpoch,
-    )
-  ) {
-    return laser;
-  }
-  const zeroHere = jobAwareConfirm(
-    `${CNC_FRAME_WORK_Z_REQUIRED_MESSAGE}\n\n` +
-      'If the bit is touching the stock-top Z reference now, choose OK to set Work Z zero and continue preparing Frame. Choose Cancel to jog or probe first.',
-  );
-  if (!zeroHere) {
-    reportFramePreparationRefusal([CNC_FRAME_WORK_Z_REQUIRED_MESSAGE], wcsNormalizationWarning);
-    return null;
-  }
-  try {
-    const positionSequenceBeforeZero = laser.statusSequence;
-    await laser.zeroZHere();
-    if (!(await waitForFreshIdleFramePosition(positionSequenceBeforeZero))) {
-      reportFramePreparationRefusal(
-        [
-          'Work Z was set, but the controller did not report the fresh Idle position needed to build an exact Frame. Wait for a complete status report, then Frame again.',
-        ],
-        wcsNormalizationWarning,
-      );
-      return null;
-    }
-    return useLaserStore.getState();
-  } catch (error) {
-    reportFramePreparationRefusal(
-      [error instanceof Error ? error.message : String(error)],
-      wcsNormalizationWarning,
-    );
-    return null;
-  }
 }

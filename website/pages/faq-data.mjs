@@ -239,7 +239,7 @@ function filesAndFeatures() {
   ];
 }
 
-function pricingAndLicense(site, commerce) {
+function pricingAndLicense(commerce) {
   const [plan] = commerce.plans;
   return [
     {
@@ -256,28 +256,27 @@ function pricingAndLicense(site, commerce) {
       question: 'What does Pro add, and what does it cost?',
       answer: html`<p>
           ${plan.name} adds ${plan.includes.join(', ')}. A license costs
-          ${formatPrice(plan.price, commerce.currency)} plus tax, paid once, and includes one year
-          of updates. You can keep using every version released during that year, with no time
-          limit. After the year, ${formatPrice(plan.updateYearPrice, commerce.currency)} plus tax
-          adds another year of updates if you want it; it never renews automatically.
+          ${formatPrice(plan.price, commerce.currency)}, paid once, and includes one year of
+          updates. Every version released during that year keeps working forever. After the year,
+          ${formatPrice(plan.updateYearPrice, commerce.currency)} adds another year of updates if
+          you want it; it never renews automatically.
         </p>
         <p>
           ${plan.where && `${plan.name} works in ${plan.where}; KerfDesk in the browser is Free.`}
           One license is active on up to ${plan.deviceLimit} devices at a time, and each device can
-          try ${plan.name} free for ${plan.trialDays} days with no card. When a trial ends, only the
-          ${plan.name} tools lock, and a license never stops a job from running. You buy it in the
-          desktop app, from Help &gt; Licence. See <a href="${site.pricingUrl}">pricing</a>.
+          try ${plan.name} free for ${plan.trialDays} days with no
+          card${commerce.trialOpen ? '' : ', once the desktop app is released'}. When a trial ends,
+          only the ${plan.name} tools lock, and a license never stops a job from running. Purchase
+          opens soon. See <a href="/pricing/">pricing</a>.
         </p>`,
     },
     {
       id: 'license-terms',
       question: 'Where can I read KerfDesk’s license terms?',
       answer: html`<p>
-        In the <a href="${site.termsUrl}">Terms of Service</a>. The
-        <a href="${site.licenseUrl}">licence and notices page</a> says which terms apply to which
-        version and where to find the licenses of the libraries and fonts bundled with KerfDesk.
-        You’re responsible for running your machine safely: section 2 of the terms explains what
-        that means.
+        On the <a href="/license/">license page</a>. It also lists the libraries and fonts bundled
+        with KerfDesk, which keep their own licenses. KerfDesk is provided as is, without warranty,
+        and you’re responsible for running your machine safely.
       </p>`,
     },
   ].filter(Boolean);
@@ -289,8 +288,8 @@ function privacyAndData(site) {
       id: 'data',
       question: 'Does KerfDesk collect my data?',
       answer: html`<p>
-          Very little. KerfDesk has no analytics, no error reporting, no cloud sync and no accounts.
-          Your projects, machine details and jobs stay on your computer.
+          No. KerfDesk has no analytics, no error reporting, no cloud sync and no accounts. Your
+          projects, machine details and jobs stay on your computer.
         </p>
         <p>
           It does make a few ordinary connections. The web app contacts kerfdesk.com to load and to
@@ -298,8 +297,8 @@ function privacyAndData(site) {
           ${site.downloadHost} once whether a newer Preview exists. A Pro trial or license sends
           ${site.licensingHost} only an installation digest, a device label, the license key and
           order details. None of these carries project, drawing, toolpath, machine or job data, but
-          each service sees normal connection details such as your IP address and the time. The
-          <a href="${site.privacyUrl}">Privacy Notice</a> lists everything we collect and why.
+          each service sees normal connection details such as your IP address and the time.
+          <a href="/privacy/">Read the privacy page</a>.
         </p>`,
     },
     {
@@ -341,11 +340,7 @@ export function faqSections(site, commerce) {
       items: machinesAndConnection(site),
     },
     { id: 'files-features', title: 'Files and features', items: filesAndFeatures() },
-    {
-      id: 'pricing-license',
-      title: 'Pricing and license',
-      items: pricingAndLicense(site, commerce),
-    },
+    { id: 'pricing-license', title: 'Pricing and license', items: pricingAndLicense(commerce) },
     { id: 'privacy-data', title: 'Privacy and data', items: privacyAndData(site) },
   ];
 }

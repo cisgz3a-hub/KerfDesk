@@ -1,10 +1,12 @@
 import { gcodeUsesM7 } from '../../core/preflight/m7-air-assist-readiness';
+import { selectControllerDriver } from '../../core/controllers';
 import type { StartJobOptions } from './laser-job-options';
 import {
   captureLaserModeStartSnapshot,
   createLaserModeStartEvidence,
 } from './laser-mode-start-evidence';
 import { useLaserStore } from './laser-store';
+import { isActiveJob } from './laser-store-helpers';
 
 /** Low-level store harnesses have no Job Review. Make their acknowledgement
  * explicit so production's wire-boundary evidence requirement stays intact. */
@@ -21,6 +23,47 @@ export function startTestLaserJob(gcode: string, options: StartJobOptions = {}):
       true,
     ),
   });
+}
+
+/** Opt-in fake-port reply for the owned Start dwell only. Capture before the
+ * transport await, then call after it succeeds; program/cleanup ACKs remain
+ * controlled by the test and a replacement session cannot inherit this reply. */
+export function captureTestLaserStartFenceAck(
+  data: string,
+  emitLine: (line: string) => void,
+): () => void {
+  const before = useLaserStore.getState();
+  const operation = before.controllerOperation;
+  const driver = selectControllerDriver(
+    before.activeControllerKind,
+    before.activeControllerCommandSet ?? undefined,
+  );
+  const eligible =
+    data === `${driver.commands.settleDwell}\n` &&
+    before.connection.kind === 'connected' &&
+    before.capabilities.overrides &&
+    operation?.kind === 'start-arming' &&
+    operation.phase === 'queue-fence' &&
+    before.pendingUntrackedAcks === 1 &&
+    !isActiveJob(before.streamer);
+  let acknowledged = false;
+  return () => {
+    const current = useLaserStore.getState();
+    if (
+      !eligible ||
+      acknowledged ||
+      current.connection.kind !== 'connected' ||
+      current.controllerSessionEpoch !== before.controllerSessionEpoch ||
+      current.streamerEpoch !== before.streamerEpoch ||
+      current.controllerOperation !== operation ||
+      current.pendingUntrackedAcks !== 1 ||
+      isActiveJob(current.streamer)
+    ) {
+      return;
+    }
+    acknowledged = true;
+    emitLine('ok');
+  };
 }
 
 /** Complete the read-only stock-GRBL handshake owned by connection tests. */

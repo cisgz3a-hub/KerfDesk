@@ -5,4 +5,3 @@ export const PRICING_URL = 'https://kerfdesk.com/pricing/';
 export const TERMS_URL = 'https://kerfdesk.com/terms/';
 export const PRIVACY_URL = 'https://kerfdesk.com/privacy/';
 export const REFUNDS_URL = 'https://kerfdesk.com/refunds/';
-export const PAIA_MANUAL_URL = 'https://kerfdesk.com/paia-manual/';

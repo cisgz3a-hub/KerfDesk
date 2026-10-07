@@ -224,6 +224,7 @@ function requestKey(options: LargeJobPreparationOptions): string {
     contourEntryBounds: options.contourEntryBounds,
     absoluteProgramOffset: options.absoluteProgramOffset,
     workZeroBedPosition: options.workZeroBedPosition,
+    laserMaxPowerS: options.laserMaxPowerS,
     snapshot: options.snapshot ?? null,
     initialPosition:
       options.initialPosition === undefined

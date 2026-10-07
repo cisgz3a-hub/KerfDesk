@@ -12,15 +12,25 @@ function workbox(): NonNullable<Partial<VitePWAOptions>['workbox']> {
   return options.workbox;
 }
 
-// Workbox's NavigationRoute tests each deny pattern against pathname + search.
-function answeredByAppShell(pathAndQuery: string): boolean {
+// Workbox NavigationRoute matches pathname + search against allow and deny
+// patterns. Test each exclusion as well as the resulting app-shell decision.
+function deniedFromAppShell(pathAndQuery: string): boolean {
   const url = new URL(pathAndQuery, 'https://kerfdesk.com');
-  return !(workbox().navigateFallbackDenylist ?? []).some((pattern) =>
+  return (workbox().navigateFallbackDenylist ?? []).some((pattern) =>
     pattern.test(url.pathname + url.search),
   );
 }
 
-describe('standalone checkout, download, support, pricing, legal, machines and safety pages under the service worker', () => {
+function answeredByAppShell(pathAndQuery: string): boolean {
+  const url = new URL(pathAndQuery, 'https://kerfdesk.com');
+  return (
+    (workbox().navigateFallbackAllowlist ?? []).some((pattern) =>
+      pattern.test(url.pathname + url.search),
+    ) && !deniedFromAppShell(pathAndQuery)
+  );
+}
+
+describe('standalone checkout, download, support and legal pages under the service worker', () => {
   it.each([
     '/buy.html?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
     '/buy?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
@@ -30,44 +40,55 @@ describe('standalone checkout, download, support, pricing, legal, machines and s
     '/download.html',
     '/support.html',
     '/support',
-    '/pricing/',
+    '/privacy/',
+    '/privacy/index.html',
+    '/privacy/?version=2',
     '/pricing',
+    '/pricing/',
+    '/pricing/index.html',
+    '/pricing/?country=ZA',
+    '/refunds',
+    '/refunds/',
+    '/terms',
     '/terms/',
     '/terms/index.html',
-    '/privacy/#who-we-are',
-    '/refunds/',
-    '/paia-manual/',
-    '/license/',
-    '/license',
-    '/machines/',
-    '/safety/index.html',
-  ])('never answers %s with the workspace', (page) => {
+    '/terms/?version=1',
+    '/refunds/index.html?version=2',
+  ])('excludes %s from the workspace fallback', (page) => {
+    expect(deniedFromAppShell(page)).toBe(true);
     expect(answeredByAppShell(page)).toBe(false);
   });
 
+  it.each(['/', '/index.html', '/?project=recent'])(
+    'keeps the offline app shell for the entry %s',
+    (page) => {
+      expect(answeredByAppShell(page)).toBe(true);
+    },
+  );
+
   it.each([
-    '/',
-    '/index.html',
-    '/?project=recent',
     '/buyer-guide',
     '/downloads/help',
     '/supported-machines',
     '/pricing-guide',
-    '/terms-of-trade/',
-    '/licenses-help',
-    '/safety-first/',
-  ])('keeps the offline app shell for %s', (page) => {
-    expect(answeredByAppShell(page)).toBe(true);
+    '/refunds-help',
+    '/terms-help',
+    '/privacy-tools',
+  ])('does not deny the unrelated path %s by a partial name match', (page) => {
+    expect(deniedFromAppShell(page)).toBe(false);
   });
 
-  it('keeps the pages and the modules and keys they load out of the precache', () => {
+  it('keeps standalone documents and their loaded modules/keys out of the precache', () => {
     expect(workbox().globIgnores).toEqual(
       expect.arrayContaining([
         'buy.html',
         'download.html',
         'support.html',
+        'privacy/**',
+        'pricing/**',
+        'refunds/**',
+        'terms/**',
         'desktop-*.{mjs,json,css}',
-        '{pricing,privacy,refunds,terms,paia-manual,license,machines,safety}/**',
       ]),
     );
   });

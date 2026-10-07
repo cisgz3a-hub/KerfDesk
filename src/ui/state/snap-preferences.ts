@@ -9,6 +9,7 @@ import {
   type SnapSettings,
 } from '../workspace/snap-settings';
 import { browserLocalStorage } from './browser-local-storage';
+import { saveComputerPreference } from './preference-persistence';
 
 export const SNAP_SETTINGS_KEY = 'laserforge.snap-settings.v1';
 
@@ -28,11 +29,7 @@ export function readSnapSettings(
 
 export function writeSnapSettings(
   settings: SnapSettings,
-  storage: PreferenceStorage | null = browserLocalStorage(),
+  storage?: PreferenceStorage | null,
 ): void {
-  try {
-    storage?.setItem(SNAP_SETTINGS_KEY, JSON.stringify(settings));
-  } catch {
-    // Storage is optional; the in-memory preference still applies this session.
-  }
+  saveComputerPreference(SNAP_SETTINGS_KEY, JSON.stringify(settings), { storage });
 }

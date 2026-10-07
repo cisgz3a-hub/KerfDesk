@@ -5,9 +5,12 @@ import { useStore } from '../state/store';
 import { useExperimentalLaserFeatures } from '../state/experimental-laser-features';
 import { usePrintCutSessionStore } from '../state/print-cut-session-store';
 import { isStampedStartRun } from '../state/framed-run-interruption';
-import type { FrameTrace } from '../state/framed-run';
+import type { FrameTrace, FramedRunPermit } from '../state/framed-run';
+import { completedFrameRunIsOwned } from '../state/completed-frame-run';
+import { frameProofReset } from '../state/laser-session-reset';
 import { framedRunDriftReason, framedRunReadinessIssue } from './framed-run-readiness';
 import { noteFrameExpired } from './frame-expiry-note';
+import { jobStartMarkOwnsFrame, jobStartMarkAcceptsStatus } from '../state/job-start-mark';
 
 type InvalidationLifecycle = { readonly owner: symbol | null };
 
@@ -33,21 +36,66 @@ export function ensureFramedRunInvalidationSubscriptions(): void {
 function expireCurrentPermitIfNeeded(owner: symbol): void {
   if (invalidationLifecycle.getState().owner !== owner) return;
   const laser = useLaserStore.getState();
+  expireCompletedFrame(laser);
   expireStalePermit(laser);
   expireStaleTrace(laser);
+}
+
+function expireCompletedFrame(laser: ReturnType<typeof useLaserStore.getState>): void {
+  const frame = laser.completedFrame ?? null;
+  if (frame === null) return;
+  const ownedExcursion = completedFrameExcursionOwned(laser, frame);
+  const expectedStartRun = isStampedStartRun(laser, laser.statusReport);
+  const drift = framedRunDriftReason(frame, undefined, laser, {
+    ignoreControllerStatusState: ownedExcursion || expectedStartRun,
+    ignoreControllerPosition: ownedExcursion,
+  });
+  if (
+    laser.frameVerification === frame.candidate.frameVerification &&
+    !completedFrameActivityInvalidates(laser, ownedExcursion, expectedStartRun) &&
+    drift === null
+  )
+    return;
+  useLaserStore.setState((current) => (current.completedFrame === frame ? frameProofReset() : {}));
+  if (drift !== null) noteFrameExpired(drift);
+}
+
+function completedFrameExcursionOwned(
+  laser: ReturnType<typeof useLaserStore.getState>,
+  frame: FramedRunPermit,
+): boolean {
+  return (
+    (completedFrameRunIsOwned(laser) && laser.streamer?.status !== 'errored') ||
+    (jobStartMarkOwnsFrame(laser, frame) && jobStartMarkAcceptsStatus(laser, laser.statusReport))
+  );
+}
+
+function completedFrameActivityInvalidates(
+  laser: ReturnType<typeof useLaserStore.getState>,
+  ownedRun: boolean,
+  expectedStartRun: boolean,
+): boolean {
+  return (
+    laser.autofocusBusy ||
+    laser.motionOperation !== null ||
+    laser.alarmCode !== null ||
+    laser.mpgActive === true ||
+    (!ownedRun && transientMachineActivity(laser, expectedStartRun))
+  );
 }
 
 function expireStalePermit(laser: ReturnType<typeof useLaserStore.getState>): void {
   const permit = laser.framedRun;
   if (permit === null) return;
   const expectedStartRun = isStampedStartRun(laser, laser.statusReport);
+  const ownedMark =
+    jobStartMarkOwnsFrame(laser, permit) && jobStartMarkAcceptsStatus(laser, laser.statusReport);
   const drift = framedRunDriftReason(permit, undefined, laser, {
-    ignoreControllerStatusState: expectedStartRun,
+    ignoreControllerStatusState: expectedStartRun || ownedMark,
+    ignoreControllerPosition: ownedMark,
   });
-  if (!transientMachineActivity(laser, expectedStartRun) && drift === null) return;
-  useLaserStore.setState((current) =>
-    current.framedRun === permit ? { framedRun: null, frameVerification: null } : {},
-  );
+  if ((!transientMachineActivity(laser, expectedStartRun) || ownedMark) && drift === null) return;
+  useLaserStore.setState((current) => (current.framedRun === permit ? frameProofReset() : {}));
   // The status line says why the Frame expired (frame-expiry-note.ts). Activity
   // such as a jog or the job itself is visible to the operator and needs no note.
   if (drift !== null) noteFrameExpired(drift);

@@ -6,6 +6,7 @@ import {
 } from './framed-run';
 import { respondToStockGrblHandshakeQuery } from './laser-controller-handshake.test-support';
 import { useLaserStore } from './laser-store';
+import { captureTestLaserStartFenceAck } from './laser-test-start-helpers';
 
 export type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -43,6 +44,7 @@ export function setMotionOperation(operation: MotionOperationSnapshot): void {
 export function makeConnection(
   write: (data: string) => Promise<void>,
   close: () => Promise<void> = async () => undefined,
+  options: { readonly autoAckStartFence?: boolean } = {},
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const closeHandlers = new Set<() => void>();
@@ -51,7 +53,12 @@ export function makeConnection(
   };
   return {
     write: async (data) => {
+      const acknowledgeFence =
+        options.autoAckStartFence === true
+          ? captureTestLaserStartFenceAck(data, emitLine)
+          : undefined;
       await write(data);
+      acknowledgeFence?.();
       respondToStockGrblHandshakeQuery(data, emitLine);
     },
     onLine: (handler) => {

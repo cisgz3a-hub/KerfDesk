@@ -48,7 +48,14 @@ describe('opened project bed reconciliation', () => {
     const state = useStore.getState();
     expect(state.project.device.name).toBe('Current 500 bed');
     expect(state.project.workspace).toMatchObject({ width: 500, height: 450 });
-    expect(state.project.machine).toEqual(DEFAULT_CNC_MACHINE_CONFIG);
+    expect(state.project.machine).toEqual({
+      ...DEFAULT_CNC_MACHINE_CONFIG,
+      params: {
+        ...DEFAULT_CNC_MACHINE_CONFIG.params,
+        maxFeedMmPerMin: current.device.maxFeed,
+        framingFeedMmPerMin: current.device.framingFeedMmPerMin,
+      },
+    });
     expect(state.projectBedReconciliation).toBeNull();
     expect(state.dirty).toBe(true);
   });

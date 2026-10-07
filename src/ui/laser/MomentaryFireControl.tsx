@@ -71,7 +71,12 @@ function useMomentaryRelease(setFireActive: LaserState['setFireActive']): {
   const releasePending = useRef(false);
   const release = useCallback(() => {
     if (releasePending.current) return;
-    if (!held.current && !useLaserStore.getState().fireActive) return;
+    const current = useLaserStore.getState();
+    if (
+      !held.current &&
+      (!current.fireActive || current.controllerOperation?.kind === 'job-start-mark')
+    )
+      return;
     held.current = false;
     releasePending.current = true;
     void setFireActive(false)

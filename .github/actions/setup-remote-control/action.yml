@@ -1,0 +1,25 @@
+name: Prepare phone and MCP service checks
+description: Use the isolated service runtime, frozen dependencies and test browser
+runs:
+  using: composite
+  steps:
+    - name: Set up the service runtime
+      uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+      with:
+        node-version: 24
+        cache: pnpm
+        cache-dependency-path: |
+          pnpm-lock.yaml
+          services/remote-control/pnpm-lock.yaml
+
+    - name: Install isolated service dependencies
+      shell: bash
+      run: pnpm --dir services/remote-control install --frozen-lockfile --ignore-scripts
+
+    - name: Install the service's test browser
+      shell: bash
+      run: pnpm --dir services/remote-control exec playwright install --with-deps chromium
+
+    - name: Select the installed test browser
+      shell: bash
+      run: echo 'KERFDESK_TEST_BROWSER=chromium' >> "${GITHUB_ENV}"

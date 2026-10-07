@@ -1,8 +1,10 @@
 # KerfDesk Refund Policy
 
+> **Draft for review. Not published or in force.** Publication date, public address and telephone arrangements are unresolved. Email is the primary support contact; this draft does not establish that email alone meets disclosure requirements.
+
 Version 1.0. Last updated: [PLACEHOLDER: publication date].
 
-KerfDesk Pro is not on sale yet. Pro, and its free trial, need the licensed KerfDesk for Windows app, which has not been released. We publish this policy now so you can read it before you buy. It will apply to purchases made once sales open (see “Changes to this policy”).
+Paid checkout remains closed. This review draft describes the proposed policy and is not published or in force. A licensed Windows build supports Pro trials and existing-licence activation separately from sales.
 
 ## In short
 
@@ -21,7 +23,7 @@ Paddle’s Buyer Terms (https://www.paddle.com/legal/buyer-terms) and Paddle’s
 
 ## Try before you buy
 
-When KerfDesk for Windows is available, you can try every Pro feature free for 30 days before you buy. No payment card is needed.
+A licensed Windows build can provide every Pro feature free for 30 days before you buy. No payment card is needed.
 
 - Pro, and its trial, are for the KerfDesk desktop app for Windows.
 - Start the trial in the desktop app, for example from Help > Licence, then **Start free 30-day Pro trial**. Starting it needs an internet connection.
@@ -78,10 +80,10 @@ If you get a refund of a licence:
 - The licence ends. You may no longer use the Pro tools.
 - We also refund any update extension you bought for that licence, because it has no use without the licence.
 - Please deactivate the licence on every computer where you activated it: in the desktop app, Help > Licence, then **Deactivate this device**.
-- We cancel the refunded licence in our licensing service, so its key can no longer activate KerfDesk. KerfDesk checks the licence about once a week while it is open and online. After a check finds the licence cancelled, Pro locks from the next time KerfDesk starts. Activated licences also work offline, so a computer that stays offline keeps Pro until it next connects. That is why we rely on you to deactivate.
-- KerfDesk Free keeps working. Your projects and files stay yours, and Free still opens and runs them.
+- We cancel the refunded licence in our licensing service, so its key can no longer activate KerfDesk. KerfDesk checks the licence about once a week while it is open and online. After its next successful online refresh, the app drops the revoked saved entitlement; ordinary machine control and an active job remain usable. Activated licences also work offline, so a computer that stays offline keeps Pro until it next connects. That is why we rely on you to deactivate.
+- KerfDesk Free keeps working. Your projects and files stay yours, and Free retains the project; browser builds may preserve Pro operations for desktop instead of loading them. Existing Pro output is never stopped by a licence check.
 
-If you get a refund of an update extension, that extra year of updates is cancelled. Your licence then covers only the versions it covered before you bought the extension, and those versions keep their Pro features.
+When an update extension is refunded, we handle any entitlement correction manually and keep the original paid licence intact. If we cannot safely restore the earlier update cutoff, you keep the extra update coverage. This does not delay the refund or revoke the Pro rights you already bought.
 
 ## Payment disputes
 
@@ -132,8 +134,8 @@ We may update this policy. The date at the top shows when it last changed. The v
 
 KerfDesk is made and licensed by Johannes Stephanus Stolk, a sole proprietor (an individual, not a company) trading as KerfDesk, in South Africa. Paddle.com resells KerfDesk as merchant of record.
 
-- Street address, also for legal documents: [PLACEHOLDER: street address, South Africa]
-- Telephone: [PLACEHOLDER: telephone number]
+- Street address, also for legal documents: [PLACEHOLDER: public legal-service address unresolved]
+- Telephone: [PLACEHOLDER: public telephone availability unresolved]
 - Email: support@kerfdesk.com
 - Support page: https://kerfdesk.com/support.html
 - Website: https://kerfdesk.com

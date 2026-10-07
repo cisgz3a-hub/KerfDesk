@@ -2,6 +2,10 @@
 
 **Status:** Accepted. | **Date:** 2026-09-23
 
+**Current timing correction:** [Amendment 1](ADR-355-amendment-1-acknowledged-override-baseline.md)
+supersedes the immediate-execution assumption and known-baseline omission below. Supported laser
+Starts use an acknowledged flag-processing boundary and always reset before executable output.
+
 ### Context
 
 An operator ran a raster image, used the live **+/−** Feed and Power

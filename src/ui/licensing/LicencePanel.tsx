@@ -130,9 +130,9 @@ function EditionSummary(): JSX.Element {
   return (
     <>
       <p style={licenceMuted}>
-        Free covers drawing, text, import, basic trace, laser cut and engrave, 2D CNC cuts and all
-        machine control. Pro adds V-carve, 3D relief, adaptive clearing, advanced tracing, camera
-        alignment, the box generator, Design Studio and the G-code Inspector.
+        Free covers drawing, text, import, Line Art tracing, laser cut and engrave, 2D CNC cuts and
+        all machine control. Pro adds V-carve, 3D relief, adaptive clearing, advanced tracing,
+        camera alignment, the box generator, Design Studio and the G-code Inspector.
       </p>
       <p style={licenceMuted}>
         A Pro licence runs on three devices at a time and keeps working with every version released

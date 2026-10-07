@@ -1,259 +1,293 @@
-import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
-
-import { commerce } from '../website/commerce.config.mjs';
-import { LAUNCH_NOTE } from '../website/lib/commerce.mjs';
+import { test } from 'node:test';
+import { attrValues } from '../website/tests/helpers.mjs';
+import { legalPublication } from '../website/legal-publication.config.mjs';
+import { paymentLegalDraftPages } from '../website/pages/payment-legal-drafts.mjs';
 import {
-  DOWNLOAD_PAGE,
-  POLICY_PAGES,
-  REPO_ROOT,
-  buildDownloadPage,
+  draftErrors,
+  publicationBlockers,
+  publicationReviewQuestions,
+} from './check-legal-publication.mjs';
+import { publicPolicySourceErrors } from '../website/pages/payment-information.mjs';
+import {
   buildSitePages,
-  buildSiteStyles,
+  buildPublicInformationFiles,
+  closedInformationErrors,
+  renderPublicInformation,
+  DRAFT_DIRECTORY,
+  REPO_ROOT,
+  renderDrafts,
 } from './generate-site-pages.mjs';
-import { launchNoteHtml } from './site-pages-layout.mjs';
 import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
 
-const pages = await buildSitePages();
-const PAGE_FILES = [
-  'public/pricing/index.html',
-  'public/terms/index.html',
-  'public/privacy/index.html',
-  'public/refunds/index.html',
-  'public/paia-manual/index.html',
-  'public/license/index.html',
-  'public/machines/index.html',
-  'public/safety/index.html',
-];
-
-test('builds the pricing, legal, machines and safety pages, and nothing else', () => {
-  assert.deepEqual([...pages.keys()].sort(), [...PAGE_FILES].sort());
-});
-
-test('the committed pages match their sources', async () => {
-  for (const [file, content] of pages) {
-    const committed = await readFile(path.join(REPO_ROOT, file), 'utf8');
-    assert.equal(committed, content, `${file} is out of date: run pnpm generate:site-pages`);
-  }
-});
-
-// The pages read as if Pro is on sale, and until sales open each one, the download
-// page too, opens with the one launch line (ADR-524 Amendment 4).
-test('every page and the download page open with the one launch line until sales open', async () => {
-  assert.equal(commerce.salesOpen, false);
-  const download = await buildDownloadPage();
-  const committed = await readFile(path.join(REPO_ROOT, DOWNLOAD_PAGE), 'utf8');
-  assert.equal(committed, download.get(DOWNLOAD_PAGE), 'run pnpm generate:site-pages');
-  for (const [file, content] of [...pages, ...download]) {
-    assert.equal(content.split(LAUNCH_NOTE).length, 2, `${file} shows the launch line once`);
-  }
-  assert.doesNotMatch(committed, /once sales open/i);
-  assert.equal(launchNoteHtml(true), '');
-});
-
-test('every page links pricing, support and every legal page from its menus', () => {
-  const links = ['/pricing/', '/terms/', '/privacy/', '/refunds/', '/paia-manual/', '/license/'];
-  for (const [file, content] of pages) {
-    for (const href of [...links, '/support.html']) {
-      assert.match(content, new RegExp(`href="${href}"`), `${file} does not link ${href}`);
+// These scripts must not turn a local review into public pages or executable
+// markup. Tests exercise escaping, links, stale output and readiness failures.
+test('drafts have working local navigation and no executable or network-loaded content', async () => {
+  const files = await buildSitePages();
+  assert.equal(files.size, 7);
+  assert.ok(files.has('index.html'));
+  for (const [file, html] of files) {
+    assert.ok(!file.startsWith('public/') && !file.startsWith('website/dist/'));
+    if (!file.endsWith('.html')) continue;
+    assert.match(html, /data-policy-state="draft"/);
+    assert.match(html, /Not published or in force/);
+    assert.match(html, /script-src 'none'/);
+    assert.match(html, /name="robots" content="noindex, nofollow"/);
+    assert.doesNotMatch(html, /<(?:script|form|iframe)\b/i);
+    assert.doesNotMatch(html, /(?:src|rel="stylesheet" href)="https?:/i);
+    for (const [, href] of html.matchAll(/href="([^"]+)"/g)) {
+      if (/^(?:https:|mailto:|#)/.test(href)) continue;
+      const target = path.posix.normalize(
+        path.posix.join(path.posix.dirname(file), href.split('#')[0]),
+      );
+      assert.ok(files.has(target), `${file}: local link ${href} does not resolve`);
     }
   }
-});
-
-test('pages run no script and load nothing from another site', () => {
-  for (const [file, content] of pages) {
-    assert.doesNotMatch(content, /<script|\son[a-z]+=|javascript:/i, file);
-    assert.doesNotMatch(content, /<(?:img|link|iframe)[^>]+(?:src|href)="https?:/i, file);
-    assert.match(content, /http-equiv="Content-Security-Policy"/i, file);
-    assert.match(content, /script-src 'none'/, file);
-    assert.doesNotMatch(content, /<style\b|\sstyle=/i, file);
-    assert.match(content, /href="\/site-pages[.]css"/, file);
-  }
-});
-
-test('the shared page stylesheet ships with the generated policy documents', async () => {
-  const styles = await buildSiteStyles();
-  for (const [file, content] of styles) {
-    assert.equal(await readFile(path.join(REPO_ROOT, file), 'utf8'), content);
-  }
-});
-
-test('no raw blank or working file shows on a page', () => {
-  for (const [file, content] of pages) {
-    const shown = content.replace(/<!--[\s\S]*?-->/g, '');
-    assert.doesNotMatch(shown, /PLACEHOLDER|docs\/legal|review-notes/i, file);
-  }
-});
-
-test('blanks the owner has not filled in are marked, never shown as real details', () => {
-  assert.equal(
-    inlineHtml('of [PLACEHOLDER: physical address], South Africa [PLACEHOLDER]'),
-    'of <mark class="blank">[physical address]</mark>, South Africa <mark class="blank">[to be filled in]</mark>',
+  const indexSource = await readFile(path.join(REPO_ROOT, 'website/pages/index.mjs'), 'utf8');
+  const privacyGenerator = await readFile(
+    path.join(REPO_ROOT, 'scripts/generate-privacy-page.mjs'),
+    'utf8',
   );
+  assert.doesNotMatch(indexSource, /payment-legal-drafts/);
+  assert.doesNotMatch(privacyGenerator, /legal-publication|kerfdesk-privacy-notice/);
 });
 
-// Paddle's domain review needs the Terms to name the seller; the owner sells as
-// an individual under his own legal name (2026-09-29).
-test('every legal page names the seller', () => {
+test('Markdown escaping keeps untrusted markup inert and section anchors unique', () => {
+  const source =
+    '# Review\n\n<script>alert("unsafe")</script>\n\n## 8. First\n\n## 8. Second\n\n[Safe](https://example.com/"x) [PLACEHOLDER: <img src=x onerror=alert(1)>]\n';
+  const { title, blocks } = readDocument(source);
+  assert.equal(title, 'Review');
+  const html = blocksHtml(blocks);
+  assert.doesNotMatch(html, /<(?:script|img)\b/);
+  assert.match(html, /&lt;script&gt;/);
+  assert.match(html, /href="https:\/\/example.com\/&quot;x"/);
+  assert.match(html, /<mark class="blank">\[&lt;img/);
+  assert.match(html, /id="section-8"/);
+  assert.match(html, /id="section-8-2"/);
+  assert.doesNotMatch(inlineHtml('[Click](javascript:alert(1))'), /href=/);
+});
+
+test('stale/missing draft output is refused without changing a public file', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'kerfdesk-legal-draft-'));
+  try {
+    for (const page of paymentLegalDraftPages) {
+      const target = path.join(root, page.source);
+      await mkdir(path.dirname(target), { recursive: true });
+      await cp(path.join(REPO_ROOT, page.source), target);
+    }
+    await mkdir(path.join(root, 'public'), { recursive: true });
+    const sentinel = path.join(root, 'public', 'privacy.html');
+    await writeFile(sentinel, 'existing published notice');
+    await assert.rejects(renderDrafts({ root, check: true }), /Draft output is stale/);
+    const directory = await renderDrafts({ root });
+    assert.equal(directory, path.join(root, DRAFT_DIRECTORY));
+    await renderDrafts({ root, check: true });
+    await writeFile(path.join(directory, 'terms/index.html'), 'outdated draft');
+    await assert.rejects(renderDrafts({ root, check: true }), /terms\/index.html/);
+    assert.equal(await readFile(sentinel, 'utf8'), 'existing published notice');
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('closed draft configuration passes but changed launch flags are refused', () => {
+  const closed = { salesOpen: false, trialOpen: false };
+  const workerText = '{"PAYMENTS_ENABLED": "false"}';
+  assert.deepEqual(draftErrors({ store: closed, workerText }), []);
+  assert.ok(draftErrors({ store: { ...closed, salesOpen: true }, workerText }).length);
+  assert.ok(draftErrors({ store: { ...closed, trialOpen: true }, workerText }).length);
+  assert.ok(draftErrors({ store: closed, workerText: '{"PAYMENTS_ENABLED": "true"}' }).length);
+  assert.ok(draftErrors({ store: closed, workerText: '' }).length);
+});
+
+test('publication content readiness stays separate from statutory, live-sales and PAIA questions', () => {
+  assert.deepEqual(publicationBlockers(), []);
+  const incomplete = {
+    ...legalPublication,
+    seller: { ...legalPublication.seller, legalName: null },
+  };
+  assert.ok(publicationBlockers(incomplete).some((item) => item.includes('licensor name')));
+  const questions = publicationReviewQuestions();
+  assert.ok(questions.statutory.some((item) => item.includes('ECTA')));
+  assert.ok(questions.statutory.some((item) => item.includes('POPIA')));
+  assert.ok(questions.liveSales.some((item) => item.includes('stay closed')));
+  assert.ok(questions.paia.some((item) => item.includes('PAIA')));
+  assert.equal(legalPublication.seller.publicAddress, null);
+  assert.equal(legalPublication.seller.publicTelephone, null);
+  assert.equal(legalPublication.seller.vatRegistered, false);
+});
+
+test('finished public policy sources reject gaps and undated review content', () => {
+  assert.deepEqual(
+    publicPolicySourceErrors('# Terms\n\nVersion 1.0. Published: 7 October 2026.'),
+    [],
+  );
+  assert.ok(publicPolicySourceErrors('# Terms\n\n[PLACEHOLDER: date]').length);
+  assert.ok(publicPolicySourceErrors('# Terms\n\nDraft for review.').length);
+});
+
+test('published closed-sales policies contain confirmed parties and preserve supplied app licences', async () => {
+  const files = await buildPublicInformationFiles();
+  assert.ok(files.has('pricing/index.html'));
+  assert.ok(files.has('refunds/index.html'));
+  assert.ok(files.has('privacy/index.html'));
+  assert.ok(files.has('terms/index.html') && !files.has('paia-manual/index.html'));
+  for (const [name, bytes] of files) {
+    if (!name.endsWith('.html')) continue;
+    const html = bytes.toString().replace(/\s+/g, ' ');
+    assert.match(html, /Johannes Stephanus Stolk/);
+    assert.match(html, /support@kerfdesk.com/);
+    assert.doesNotMatch(
+      html,
+      /\[PLACEHOLDER|data-policy-state="draft"|public (?:address|telephone).*unresolved/i,
+    );
+    assert.doesNotMatch(html, /<(?:script|form|iframe)\b/i);
+  }
   assert.match(
-    pages.get('public/terms/index.html'),
-    /These terms are an agreement between you and Johannes\s+Stephanus\s+Stolk, trading as\s+KerfDesk/,
-  );
-  for (const file of PAGE_FILES) {
-    assert.match(pages.get(file), /Johannes\s+Stephanus\s+Stolk/, file);
-  }
-});
-
-test('reads headings, bold and italic text, wrapped and nested lists, links and address lines', () => {
-  const { title, blocks } = readDocument(
-    [
-      '# Title',
-      '',
-      '## 2. Words',
-      '',
-      '- **Bold** item that wraps',
-      '  onto a second line.',
-      '- See https://kerfdesk.com/terms/ or the [Refund Policy](https://kerfdesk.com/refunds/).',
-      '  - a nested point',
-      '',
-      '*Not open yet.*',
-      '',
-      'Email support@kerfdesk.com or privacy@paddle.com & ask about Help > Licence.',
-      'Telephone: [PLACEHOLDER: telephone number]',
-    ].join('\n'),
-  );
-  assert.equal(title, 'Title');
-  assert.equal(
-    blocksHtml(blocks),
-    [
-      '<h2 id="section-2">2. Words</h2>',
-      '<ul><li><strong>Bold</strong> item that wraps onto a second line.</li>' +
-        '<li>See <a href="https://kerfdesk.com/terms/">https://kerfdesk.com/terms/</a> or the ' +
-        '<a href="https://kerfdesk.com/refunds/">Refund Policy</a>.<ul><li>a nested point</li></ul></li></ul>',
-      '<p><em>Not open yet.</em></p>',
-      '<p>Email <a href="mailto:support@kerfdesk.com">support@kerfdesk.com</a> or ' +
-        '<a href="mailto:privacy@paddle.com">privacy@paddle.com</a> &amp; ask about Help &gt; ' +
-        'Licence.<br />Telephone: <mark class="blank">[telephone number]</mark></p>',
-    ].join('\n'),
-  );
-});
-
-test('reads boxed notes, numbered lists, tables and rules', () => {
-  const { blocks } = readDocument(
-    [
-      '# Title',
-      '',
-      '> **Not on sale yet.**',
-      '>',
-      '> Every tool is free.',
-      '',
-      '1. Choose **Buy Pro**.',
-      '2. Pay.',
-      '',
-      '| | Price | How |',
-      '|---|---|---|',
-      '| Pro | **US$49.50** | Once |',
-      '',
-      '---',
-    ].join('\n'),
-  );
-  assert.equal(
-    blocksHtml(blocks),
-    [
-      '<aside class="note"><p><strong>Not on sale yet.</strong></p>\n<p>Every tool is free.</p></aside>',
-      '<ol><li>Choose <strong>Buy Pro</strong>.</li><li>Pay.</li></ol>',
-      '<div class="table-scroll"><table><thead><tr><th></th><th>Price</th><th>How</th></tr></thead>' +
-        '<tbody><tr><td>Pro</td><td><strong>US$49.50</strong></td><td>Once</td></tr></tbody></table></div>',
-      '<hr />',
-    ].join('\n'),
-  );
-});
-
-test('a section shown inside another page keeps unique anchors', () => {
-  const ids = new Set();
-  const first = blocksHtml([{ type: 'heading', level: 2, text: 'Contact' }], { ids });
-  const second = blocksHtml([{ type: 'heading', level: 2, text: 'Contact' }], { shift: 1, ids });
-  assert.equal(first, '<h2 id="contact">Contact</h2>');
-  assert.equal(second, '<h3 id="contact-2">Contact</h3>');
-});
-
-// The pricing page is a checked legal text, and the product website shows the
-// same offer from commerce.config.mjs: a change to one must reach the other.
-test('the pricing page shows the settled offer, says Pro is not on sale and links no checkout', () => {
-  const pricing = pages.get('public/pricing/index.html');
-  const [pro] = commerce.plans;
-  assert.equal(commerce.salesOpen, false);
-  assert.match(pricing, new RegExp(`US\\$${pro.price.toFixed(2).replace('.', '\\.')} plus tax`));
-  assert.match(pricing, new RegExp(`US\\$${pro.updateYearPrice} plus tax`));
-  assert.match(pricing, new RegExp(`Up to ${pro.deviceLimit} computers at a time`));
-  assert.match(pricing, new RegExp(`free ${pro.trialDays}-day Pro trial`));
-  for (const tool of pro.includes) {
-    assert.match(pricing, new RegExp(`<strong>${tool}:</strong>`, 'i'), tool);
-  }
-  assert.match(pricing, /KerfDesk Pro is not on sale yet/);
-  assert.match(pricing, /Merchant of Record/);
-  assert.doesNotMatch(pricing, /href="[^"]*(?:buy\.html|checkout|_ptxn)/i);
-});
-
-test('the privacy page is the checked notice, with its PAIA manual link', () => {
-  const privacy = pages.get('public/privacy/index.html');
-  assert.match(privacy, /<h1>KerfDesk Privacy Notice<\/h1>/);
-  assert.match(privacy, /MachineGuid/);
-  assert.match(privacy, /href="https:\/\/kerfdesk\.com\/paia-manual\/"/);
-  assert.match(pages.get('public/paia-manual/index.html'), /section 51 of the Promotion/);
-});
-
-// ADR-543: all rights reserved, except the versions released under the MIT
-// License up to the mit-final tag, which keep it.
-test('the licence page names the owner and keeps the MIT versions under their licence', () => {
-  const licence = pages.get('public/license/index.html');
-  assert.match(
-    licence,
-    /© 2026 Johannes\s+Stephanus\s+Stolk\.\s+All\s+rights\s+reserved,\s+except/,
+    files.get('refunds/index.html').toString().replace(/\s+/g, ' '),
+    /We promise a full refund if you request it within 14 calendar days after purchase/,
   );
   assert.match(
-    licence,
-    /tagged\s+“mit-final”[\s\S]*?were\s+released\s+under\s+the\s+MIT\s+License/,
+    files.get('privacy/index.html').toString().replace(/\s+/g, ' '),
+    /Share artwork previews and text/,
+  );
+  const terms = files.get('terms/index.html').toString().replace(/\s+/g, ' ');
+  assert.match(terms, /Version 1\.0\. Published: 7 October 2026/);
+  assert.match(terms, /purchase provisions apply if and when you buy/);
+  assert.match(terms, /Paddle is the authorised reseller and merchant of record/);
+  assert.match(terms, /(?:do|does) not replace an installed notice/);
+  assert.match(terms, /a requirement for machine control/);
+  assert.doesNotMatch(terms, /terms replace the License|legal.service address unresolved/);
+  assert.deepEqual(closedInformationErrors({ workerText: '{"PAYMENTS_ENABLED":"false"}' }), []);
+  await assert.rejects(
+    buildPublicInformationFiles({ store: { salesOpen: true, trialOpen: false } }),
+    /remain closed/,
   );
 });
 
-test('each page is built from its own document', () => {
-  for (const page of POLICY_PAGES) {
-    assert.equal(page.sources.length, 1, page.path);
-    assert.match(page.sources[0], /^docs\/(?:legal\/kerfdesk-[a-z-]+|site\/[a-z-]+|safety)\.md$/);
+test('public preparation owns Terms, pricing, refunds and existing privacy outputs', async () => {
+  const root = await mkdtemp(path.join(tmpdir(), 'kerfdesk-payment-info-'));
+  try {
+    await mkdir(path.join(root, 'services/desktop-licensing'), { recursive: true });
+    await writeFile(
+      path.join(root, 'services/desktop-licensing/wrangler.jsonc'),
+      '{"PAYMENTS_ENABLED":"false"}',
+    );
+    const directory = path.join(root, 'public');
+    await mkdir(directory, { recursive: true });
+    for (const name of ['eula.txt', 'index.html', 'buy.html'])
+      await writeFile(path.join(directory, name), 'existing:' + name);
+    await renderPublicInformation({ root, directory });
+    await renderPublicInformation({ root, directory, check: true });
+    for (const name of ['eula.txt', 'index.html', 'buy.html'])
+      assert.equal(await readFile(path.join(directory, name), 'utf8'), 'existing:' + name);
+    await assert.rejects(
+      renderPublicInformation({ root, directory: path.dirname(root) }),
+      /inside its workspace/,
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
-// Every page the terms and the pricing page link on kerfdesk.com is built here,
-// so none of those links answers 404.
-test('every kerfdesk.com page a document links is built, or already ships with the app', () => {
-  const built = new Set(POLICY_PAGES.map((page) => page.path));
-  const shipped = new Set([
-    '/',
-    '/support.html',
-    '/download.html',
-    '/buy.html',
-    '/third-party-notices.txt',
-  ]);
-  for (const [file, content] of pages) {
-    for (const [, href] of content.matchAll(/href="https:\/\/kerfdesk\.com(\/[^"#]*)/g)) {
-      assert.ok(built.has(href) || shipped.has(href), `${file} links ${href}`);
+test('public information keeps its document policy, revalidation and hashed-asset cache rules', async () => {
+  const files = await buildPublicInformationFiles();
+  const headers = await readFile(path.join(REPO_ROOT, 'public/_headers'), 'utf8');
+  const rules = new Map();
+  let route;
+  for (const line of headers.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    if (line.startsWith('/')) {
+      route = line;
+      assert.ok(!rules.has(route), 'Duplicate response-header route: ' + route);
+      rules.set(route, []);
+    } else {
+      assert.ok(route, 'Response-header value has no route');
+      rules.get(route).push(line.trim());
     }
   }
+  assert.ok(
+    rules.get('/*').some((line) => line.startsWith("Content-Security-Policy: default-src 'self';")),
+  );
+  for (const page of ['privacy', 'pricing', 'refunds', 'terms']) {
+    const html = files.get(page + '/index.html').toString();
+    assert.match(html, /http-equiv="Content-Security-Policy"/);
+    assert.match(html, /script-src &#39;none&#39;/);
+    for (const route of ['/' + page, '/' + page + '/', '/' + page + '/index.html']) {
+      const values = rules.get(route);
+      assert.ok(values, 'Missing response-header rule: ' + route);
+      assert.ok(
+        values.includes('! Content-Security-Policy'),
+        route + ': app CSP must yield to document CSP',
+      );
+      assert.ok(
+        values.includes('Cache-Control: no-cache, no-transform'),
+        route + ': static notices must revalidate without injected content',
+      );
+      assert.ok(
+        !values.some((line) => line.startsWith('Content-Security-Policy:')),
+        route + ': unexpected overriding CSP',
+      );
+    }
+    assert.ok(
+      rules
+        .get('/' + page + '/assets/*')
+        .includes('Cache-Control: public, max-age=31536000, immutable'),
+    );
+  }
+  // All four current documents reuse the existing content-hashed privacy assets.
+  const assets = [...files.keys()].filter((name) => name.startsWith('privacy/assets/'));
+  assert.ok(assets.length > 0);
+  for (const name of assets) {
+    assert.match(name, /\.[a-f0-9]{10}\.(?:css|png)$/);
+    assert.ok(
+      rules.get('/privacy/assets/*').includes('Cache-Control: public, max-age=31536000, immutable'),
+    );
+  }
 });
 
-test('the safety page keeps the hazards and never waives liability for injury', () => {
-  const safety = pages.get('public/safety/index.html');
-  for (const hazard of [
-    /emergency stop/i,
-    /unattended/i,
-    /PVC/,
-    /wavelength/i,
-    /Clamp the workpiece/,
-  ]) {
-    assert.match(safety, hazard);
+test('all public information links resolve to app inputs and identify the Free app licence', async () => {
+  const files = await buildPublicInformationFiles();
+  for (const [name, bytes] of files) {
+    if (!name.endsWith('.html')) continue;
+    const html = bytes.toString();
+    const normalized = html.replace(/\s+/g, ' ');
+    assert.match(normalized, /href="\/eula\.txt">Free app licence<\/a>/);
+    assert.doesNotMatch(html, /href="\/(?:download|license)\/"|no payment provider is live/i);
+    assert.match(normalized, /href="\/terms\/">Software terms<\/a>/);
+    for (const [tag, attribute] of [
+      ['a', 'href'],
+      ['link', 'href'],
+      ['img', 'src'],
+    ]) {
+      for (const value of attrValues(html, tag, attribute)) {
+        if (value.startsWith('mailto:')) continue;
+        const url = new URL(value, 'https://kerfdesk.com/' + name);
+        if (url.origin !== 'https://kerfdesk.com') continue;
+        const relative = url.pathname.slice(1);
+        const file = relative.endsWith('/') ? relative + 'index.html' : relative || 'index.html';
+        const target = files.get(file);
+        if (!target) {
+          const location = path.join(REPO_ROOT, url.pathname === '/' ? file : 'public/' + file);
+          const input = await stat(location).catch(() => null);
+          assert.ok(input?.isFile(), name + ': missing app input for ' + value);
+        } else if (url.hash && file.endsWith('.html')) {
+          const id = decodeURIComponent(url.hash.slice(1));
+          assert.ok(
+            target.toString().includes('id="' + id + '"'),
+            name + ': missing section ' + value,
+          );
+        }
+      }
+    }
   }
-  assert.doesNotMatch(safety, /own risk|not liable for any/i);
+  assert.match(
+    files.get('pricing/index.html').toString().replace(/\s+/g, ' '),
+    /Sales and paid checkout remain closed/,
+  );
+  assert.ok(files.has('privacy/lucide-license.txt'));
+  assert.ok((await stat(path.join(REPO_ROOT, 'public/privacy/lucide-license.txt'))).isFile());
 });

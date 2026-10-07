@@ -41,6 +41,7 @@ import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
 import { IntervalDialog, MaterialDialog } from './CalibrationGridDialogs';
 import { GcodeSaveDialog } from '../app/GcodeSaveDialog';
+import { ProjectSaveDialog } from '../app/ProjectSaveDialog';
 import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 import { SettingsWindowHost } from '../settings/SettingsWindowHost';
@@ -156,6 +157,7 @@ function StoreOpenedDialogs(): JSX.Element {
   return (
     <>
       <GcodeSaveDialogHost />
+      <ProjectSaveDialog />
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />
@@ -357,8 +359,8 @@ function aboutText(): string {
     `Commit ${__GIT_SHA__}`,
     `Built ${__BUILD_TIME__}`,
     '',
-    'Copyright © 2026 Johannes Stephanus Stolk, trading as KerfDesk. All rights reserved.',
-    'Terms of Service: https://kerfdesk.com/terms/',
+    'Copyright © 2026 Johann Stolk. All rights reserved.',
+    'Terms of use: License & Safety Notice (/eula.txt).',
     'Third-party components and their licences: see /third-party-notices.txt.',
     '',
     'SAFETY: this software drives laser and CNC machinery. Verify every',

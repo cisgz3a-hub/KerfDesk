@@ -5,6 +5,7 @@
 
 import type { RecentFileRef } from '../../platform/types';
 import { browserLocalStorage } from '../state/browser-local-storage';
+import { saveComputerPreference } from '../state/preference-persistence';
 import {
   clampRecentProjectLimit,
   DEFAULT_RECENT_PROJECT_LIMIT,
@@ -16,7 +17,7 @@ const DATABASE_VERSION = 1;
 const STORE = 'lists';
 const LIST_KEY = 'recent-projects';
 const LIST_VERSION = 1;
-const LIMIT_KEY = 'kerfdesk.recent-projects.limit.v1';
+export const RECENT_PROJECT_LIMIT_KEY = 'kerfdesk.recent-projects.limit.v1';
 
 type Entries = ReadonlyArray<RecentProjectEntry>;
 
@@ -136,7 +137,7 @@ export function createFallbackRecentProjectStorage(
 
 export function loadRecentProjectLimit(): number {
   try {
-    const raw = browserLocalStorage()?.getItem(LIMIT_KEY);
+    const raw = browserLocalStorage()?.getItem(RECENT_PROJECT_LIMIT_KEY);
     return raw === null || raw === undefined
       ? DEFAULT_RECENT_PROJECT_LIMIT
       : clampRecentProjectLimit(Number(raw));
@@ -145,12 +146,10 @@ export function loadRecentProjectLimit(): number {
   }
 }
 
-export function saveRecentProjectLimit(limit: number): void {
-  try {
-    browserLocalStorage()?.setItem(LIMIT_KEY, String(clampRecentProjectLimit(limit)));
-  } catch {
-    // A denied storage keeps the setting for this session only.
-  }
+export function saveRecentProjectLimit(limit: number, onSaved?: () => void): boolean {
+  return saveComputerPreference(RECENT_PROJECT_LIMIT_KEY, String(clampRecentProjectLimit(limit)), {
+    onSaved,
+  });
 }
 
 function indexedDbFactory(): IDBFactory | null {

@@ -1,9 +1,9 @@
 # KerfDesk legal documents: lawyer review notes
 
 > **Superseded.** A sourced review of the legal texts replaced these notes on 29 and 30 September
-> 2026, and the owner decided against a lawyer's review (ADR-247 Amendment 2). The customer
-> documents in this folder are the reviewed texts; `publishing-notes.md` lists what ships with them
-> and what must exist before Pro trials or sales open. These notes are kept for their history.
+> 2026, and the owner decided against a lawyer's review (ADR-247 Amendment 2). Current
+> [publishing notes](publishing-notes.md) distinguish the finished public information from local
+> commercial drafts and separate launch questions. These earlier notes are kept for history.
 
 > **Internal working notes. Not legal advice. Do not publish.** Claude (an AI assistant) prepared
 > these notes and the three customer documents at John's request. Claude is not a lawyer. Items

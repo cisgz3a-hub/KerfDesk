@@ -5,9 +5,11 @@
 // https://github.com/grblHAL/core/blob/d7aaee3d84b1e7010f075d395206afff038d7379/spindle_control.c#L867-L868),
 // so a 200% left by a job doubled the capped power (controller audit P-2).
 // The Ov: field of a status report must reach the press, and the reset byte
-// must go out on its own, ahead of Fire-on, owing no acknowledgement.
+// must go out on its own, ahead of Fire-on, owing no acknowledgement. An
+// acknowledged non-motion line first separates any older pending flags.
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { grblDriver } from '../../core/controllers';
 import { createProject } from '../../core/scene';
 import { useExperimentalLaserFeatures } from './experimental-laser-features';
 import { useLaserStore } from './laser-store';
@@ -28,6 +30,7 @@ beforeEach(async () => {
   writes = [];
   connection = makeConnection(async (data) => {
     writes.push(data);
+    if (data === `${grblDriver.commands.settleDwell}\n`) connection.emitLine('ok');
   });
   useStore.setState({ project: createProject() });
   useStore.getState().updateDeviceProfile({
@@ -56,17 +59,17 @@ describe('Fire after a job left the power override raised (real store)', () => {
 
     await useLaserStore.getState().setFireActive(true);
 
-    expect(writes).toEqual(['\x99', FIRE_ON]);
-    // Only Fire-on is a line; the realtime byte is answered by nothing.
+    expect(writes).toEqual([`${grblDriver.commands.settleDwell}\n`, '\x99', FIRE_ON]);
+    // The fence ACK has settled; only Fire-on still owes a line ACK.
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
     expect(useLaserStore.getState().fireActive).toBe(true);
   });
 
-  it('sends Fire-on alone to a controller reporting 100% power', async () => {
+  it('establishes its baseline even when the latest report says 100% power', async () => {
     connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:100,100,100>');
 
     await useLaserStore.getState().setFireActive(true);
 
-    expect(writes).toEqual([FIRE_ON]);
+    expect(writes).toEqual([`${grblDriver.commands.settleDwell}\n`, '\x99', FIRE_ON]);
   });
 });

@@ -22,7 +22,7 @@ import {
 } from './licensing-messages.js';
 import { prepareLicenceCheckout, claimLicencePayment } from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
-import { TrialSessionClock } from './licensing-trial-clock.js';
+import { TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
 import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
 import {
   activationBody,
@@ -122,22 +122,21 @@ class LicensingService {
       this.proLatched = true;
       if (result.tier !== 'trial') this.trialClock = null;
       else if (result.accessExpiresAt !== null && clock?.expiresAt !== result.accessExpiresAt)
-        this.trialClock = new TrialSessionClock(result.accessExpiresAt, this.now);
+        this.trialClock = new TrialSessionClock(result.accessExpiresAt, this.now, saved.lastSeenAt);
     } else if (this.trialClock !== null || result.tier === 'trial') this.proLatched = false;
-    return result;
+    return withTrialBudget(result, saved.lastSeenAt, this.trialNow);
   };
   private readonly readStatus = async (): Promise<LicenceStatus> => {
     if (this.config.channel === 'free') return this.summary('ready');
     if (this.config.channel === 'invalid') return this.evaluate(EMPTY, '');
     const { saved, device } = await this.load();
-    const result = this.evaluate(saved, device);
-    await this.rememberClock(saved, device, result);
-    return result;
+    return this.evaluate(saved, device);
   };
   /**
    * Saves how far a trial's clock has got, so an ended trial cannot come back by
    * winding the clock back before the next launch. Paid rights ignore the clock,
-   * and a mark that has barely moved is not rewritten.
+   * and an unchanged whole-second mark is not rewritten. Even a short session's
+   * observed progress must survive the next launch.
    */
   private readonly rememberClock = async (
     saved: LicenceRecord,
@@ -151,7 +150,13 @@ class LicensingService {
     if (mutation) this.updateCache.beginMutation();
     return this.serial(async () => {
       try {
-        return await work();
+        const result = await work();
+        // Every verified trial status, including order/reset actions, saves observed time.
+        if (result.tier === 'trial') {
+          const { saved, device } = await this.load();
+          await this.rememberClock(saved, device, result);
+        }
+        return result;
       } catch (error) {
         this.updateCache.invalidate();
         if (error instanceof LicenceStoreUnreadableError)
@@ -289,7 +294,6 @@ class LicensingService {
         ['ready', 'updates-expired', 'clock-error'].includes(current.state) &&
         this.now() - (saved.refreshedAt ?? 0) >= REFRESH_INTERVAL;
       if (due) return this.acquire('refresh');
-      await this.rememberClock(saved, device, current);
       return current;
     }, true);
   readonly deactivate = () =>

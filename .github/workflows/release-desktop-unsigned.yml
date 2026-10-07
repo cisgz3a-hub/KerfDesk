@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_now:
-        description: Release now before 20 merged PRs (all checks and trust guards still apply)
+        description: Release now before 10 merged PRs (all checks and trust guards still apply)
         type: boolean
         default: false
 
@@ -43,7 +43,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
-      - name: Require exact main checks and 20 merged PRs or explicit release now
+      - name: Require exact main checks and 10 merged PRs or explicit release now
         id: gate
         env:
           GITHUB_TOKEN: ${{ github.token }}

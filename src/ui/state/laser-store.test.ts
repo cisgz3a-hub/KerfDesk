@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -42,7 +42,9 @@ function makeConnection(
   };
   return {
     write: async (data) => {
+      const acknowledgeFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeFence();
       if (
         data === '$I\n' &&
         useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'
@@ -223,10 +225,14 @@ describe('laser-store serial write failures', () => {
   });
 
   it('does not enter streaming state when the initial job write fails', async () => {
-    const write = vi.fn(async () => {
-      throw new Error('port lost');
+    const write = vi.fn(async (data: string) => {
+      if (data.includes('G21\n')) throw new Error('port lost');
+      // The failed program may have reached the controller. Its owned reset
+      // still works and produces the boundary before fail-dark cleanup/close.
+      if (data === '\x18') connection.emitLine('Grbl 1.1f');
     });
-    const connection = makeConnection(write);
+    const close = vi.fn(async () => undefined);
+    const connection = makeConnection(write, close);
     await connectWith(connection);
     useLaserStore.setState({
       accessoryCache: {
@@ -238,6 +244,7 @@ describe('laser-store serial write failures', () => {
     });
 
     await expect(startTestLaserJob('G21\nG90\nM3 S0\nM5\n')).rejects.toThrow('port lost');
+    await vi.waitFor(() => expect(close).toHaveBeenCalledOnce());
 
     expect(useLaserStore.getState().streamer).toMatchObject({
       status: 'cancelled',
@@ -248,8 +255,12 @@ describe('laser-store serial write failures', () => {
     expect(useLaserStore.getState().log.join('\n')).toContain('Serial write failed: port lost');
     expect(useLaserStore.getState().safetyNotice).toMatchObject({
       kind: 'write-failed',
-      action: 'disconnect',
+      action: 'start',
     });
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(write).toHaveBeenCalledWith('\x18');
+    expect(write).toHaveBeenCalledWith('M5\n');
+    expect(write).toHaveBeenCalledWith('M9\n');
   });
 
   it('keeps an initial job ack that arrives before the first write resolves', async () => {

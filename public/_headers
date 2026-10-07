@@ -76,16 +76,60 @@
 /desktop-checkout.css
   Cache-Control: no-cache
 
-# This static privacy notice supplies a no-script CSP in its document. Cover
+# Phone setup is a canvas-free public page, with no scripts or session data.
+# Revalidate it and its shared mobile styles when setup instructions change.
+/phone
+  Cache-Control: no-cache
+/phone.html
+  Cache-Control: no-cache
+/phone.css
+  Cache-Control: no-cache
+
+# These static notices supply a no-script CSP in each document. Cover
 # both the directory route and Pages' clean-URL forms without altering the app.
+# Preserve readable contact links: edge email obfuscation injects a decoder
+# that these pages' no-script policies correctly refuse.
 /privacy
   ! Content-Security-Policy
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-transform
 /privacy/
   ! Content-Security-Policy
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-transform
 /privacy/index.html
   ! Content-Security-Policy
-  Cache-Control: no-cache
+  Cache-Control: no-cache, no-transform
 /privacy/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/pricing
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/pricing/
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/pricing/index.html
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/pricing/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/refunds
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/refunds/
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/refunds/index.html
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/refunds/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/terms
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/terms/
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/terms/index.html
+  ! Content-Security-Policy
+  Cache-Control: no-cache, no-transform
+/terms/assets/*
   Cache-Control: public, max-age=31536000, immutable

@@ -19,11 +19,15 @@ export async function confirmDiscardAsync(
 ): Promise<boolean> {
   const state = useStore.getState();
   if (!state.dirty) return true;
+  const documentEpoch = state.projectDocumentEpoch;
   const choice = await requestChoice(state.savedName ?? 'this project', action);
+  // A pending Open or recovery can replace the document while the question is
+  // visible. The choice names the original document, never its replacement.
+  if (useStore.getState().projectDocumentEpoch !== documentEpoch) return false;
   if (choice === 'cancel') return false;
   if (choice === 'discard') return true;
   const outcome = await saveProjectNow(platform);
-  return outcome === 'saved';
+  return outcome === 'saved' && useStore.getState().projectDocumentEpoch === documentEpoch;
 }
 
 function requestChoice(projectName: string, action: string): Promise<ConfirmSaveChoice> {

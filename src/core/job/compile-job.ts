@@ -59,14 +59,8 @@ import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
 import { registrationJigCompilationRuns } from './registration-jig-compilation-runs';
-
-// Groups plus anything the operator should be told about them. Threaded up
-// rather than logged, because src/core/ has no logger and a warning that never
-// reaches Job Review is the same as no warning at all.
-type VectorCompilation = {
-  readonly groups: ReadonlyArray<Group>;
-  readonly diagnostics: ReadonlyArray<JobDiagnostic>;
-};
+import type { LaserPowerScaleVersion } from '../output/laser-power-scale-version';
+import { vectorCompilation, type VectorCompilation } from './vector-compilation';
 
 // Line-mode segments plus what the kerf offset lost of them. A failed offset,
 // a hole it closed up and a layer with no closed contours all yield fewer
@@ -89,14 +83,11 @@ type LineSegmentSink = {
 
 const NO_DIAGNOSTICS: ReadonlyArray<JobDiagnostic> = [];
 
-function vectorCompilation(parts: ReadonlyArray<VectorCompilation>): VectorCompilation {
-  return {
-    groups: parts.flatMap((part) => part.groups),
-    diagnostics: parts.flatMap((part) => part.diagnostics),
-  };
-}
-
-export function compileJob(scene: Scene, device: DeviceProfile): Job {
+export function compileJob(
+  scene: Scene,
+  device: DeviceProfile,
+  laserPowerScaleVersion: LaserPowerScaleVersion = 2,
+): Job {
   const groups: Group[] = [];
   const diagnostics: JobDiagnostic[] = [];
   const completeSceneObjects = [...scene.objects, ...(scene.outputDependencies ?? [])];
@@ -111,6 +102,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
         device,
         run.priorityObjectId,
         completeSceneObjects,
+        laserPowerScaleVersion,
       );
     }
     return withContourEntryBounds(
@@ -128,6 +120,7 @@ export function compileJob(scene: Scene, device: DeviceProfile): Job {
       device,
       priorityObjectId,
       completeSceneObjects,
+      laserPowerScaleVersion,
     );
   }
   return withContourEntryBounds(
@@ -144,6 +137,7 @@ function appendOperationCompilation(
   device: DeviceProfile,
   priorityObjectId: string,
   completeSceneObjects: ReadonlyArray<SceneObject>,
+  laserPowerScaleVersion: LaserPowerScaleVersion,
 ): void {
   for (const operationLayer of outputOperationLayers(layer)) {
     if (operationLayer.mode !== 'image') {
@@ -158,6 +152,7 @@ function appendOperationCompilation(
     }
     const raster = compileRasterGroupsForLayer(rasterObjects, operationLayer, device, {
       sceneObjects: completeSceneObjects,
+      laserPowerScaleVersion,
     });
     for (const group of raster.groups) output.groups.push(group);
     for (const diagnostic of raster.diagnostics) output.diagnostics.push(diagnostic);

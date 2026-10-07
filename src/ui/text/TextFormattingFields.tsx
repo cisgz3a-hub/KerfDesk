@@ -8,11 +8,14 @@ import { TextDialogNumericFields } from './TextDialogNumericFields';
 import { VariableTextFields } from './VariableTextFields';
 import type { DialogFields } from './use-text-dialog-fields';
 
-export function TextFormattingFields(props: {
+type Props = {
   readonly fields: DialogFields;
   readonly onInsert?: (text: string) => void;
   readonly variableFields?: React.ReactNode;
-}): JSX.Element {
+  readonly disabled?: boolean;
+};
+
+export function TextFormattingFields(props: Props): JSX.Element {
   const { fields } = props;
   const { values } = fields;
   const outline = findFontEntry(values.fontKey)?.geometry !== 'single-line';
@@ -31,6 +34,8 @@ export function TextFormattingFields(props: {
         <FontPicker
           value={values.fontKey}
           embeddedFonts={values.embeddedFonts}
+          previewText={values.content}
+          disabled={props.disabled ?? false}
           onChange={fields.setFontKey}
         />
         <FontImportButton importFont={fields.importFont} />
@@ -126,6 +131,7 @@ const fieldAlignStyle: React.CSSProperties = { alignItems: 'flex-start' };
 const fieldLabelPadStyle: React.CSSProperties = { paddingTop: 4 };
 const fieldControlStyle: React.CSSProperties = {
   flex: 1,
+  minWidth: 0,
   display: 'flex',
   alignItems: 'center',
   gap: 4,

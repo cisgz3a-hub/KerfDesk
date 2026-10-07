@@ -73,3 +73,11 @@ Thumbs.db
 
 # Local reference repos for study only
 references/
+
+# Local payment/legal review pages; never publication output
+/output/payment-legal-draft/
+
+# Local payment setup receipts, previews and generated Worker bundles
+/output/payment-live-setup/
+/output/payment-public-information/
+/services/desktop-licensing/output/payment-live-setup/

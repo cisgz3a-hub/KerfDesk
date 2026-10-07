@@ -1,6 +1,11 @@
 import type { FramedRunPermit } from './framed-run';
+import type { JobStartMarkPhase } from './job-start-mark';
 
 export type LaserControllerOperation =
+  | {
+      readonly kind: 'job-start-mark';
+      readonly phase: JobStartMarkPhase;
+    }
   | {
       readonly kind: 'connection-handshake';
       readonly phase: 'waiting-controller' | 'settings';
@@ -62,6 +67,49 @@ export type LaserControllerOperation =
 // the same owner; a newly started operation, even of the same kind, does not.
 // Keep this identity outside the public state/persistence schema.
 const operationOwners = new WeakMap<LaserControllerOperation, object>();
+
+export type ControllerRecoveryResetEvidence = {
+  readonly sessionEpoch: number;
+  readonly writeEpoch: number;
+  readonly statusSequence: number;
+};
+
+// A canonical Abort can issue another reset while the same recovery still
+// awaits Idle. Keep that deliberate reset with its private owner; ordinary
+// phase/status updates and new operations cannot transfer this evidence.
+const recoveryResetEvidence = new WeakMap<
+  object,
+  { readonly evidence: ControllerRecoveryResetEvidence; readonly isCurrent: () => boolean }
+>();
+
+export function registerControllerRecoveryReset(
+  operation: LaserControllerOperation,
+  evidence: ControllerRecoveryResetEvidence,
+  isCurrent: () => boolean,
+): void {
+  recoveryResetEvidence.set(controllerOperationOwner(operation), { evidence, isCurrent });
+}
+
+export function recordControllerRecoveryReset(
+  operation: LaserControllerOperation | null,
+  evidence: ControllerRecoveryResetEvidence,
+): void {
+  if (operation?.kind === 'recovery') {
+    const owner = controllerOperationOwner(operation);
+    const current = recoveryResetEvidence.get(owner);
+    // Abort must still execute for an invalid owner, but cannot revive its
+    // obsolete Wake by lending it the new reset's session evidence.
+    if (current?.isCurrent() === true) {
+      recoveryResetEvidence.set(owner, { ...current, evidence });
+    }
+  }
+}
+
+export function controllerRecoveryResetEvidence(
+  operation: LaserControllerOperation,
+): ControllerRecoveryResetEvidence | undefined {
+  return recoveryResetEvidence.get(controllerOperationOwner(operation))?.evidence;
+}
 
 export function controllerOperationOwner(operation: LaserControllerOperation): object {
   return operationOwners.get(operation) ?? operation;
@@ -127,9 +175,7 @@ function describeEstablishedControllerOperation(
 ): string {
   if (operation === null) return 'Controller ready';
   if (operation.kind === 'home') {
-    if (operation.phase === 'command') return 'Homing';
-    if (operation.phase === 'settling') return 'Settling after Home';
-    return 'Waiting for fresh Idle after Home';
+    return describeHomeOperation(operation.phase);
   }
   if (operation.kind === 'post-job-settle') {
     return describePostJobSettle(operation.phase);
@@ -148,7 +194,26 @@ function describeEstablishedControllerOperation(
       ? 'Reading active CNC work coordinates'
       : 'Reading CNC work offsets';
   }
+  if (operation.kind === 'job-start-mark') return describeJobStartMark(operation.phase);
   return operation.label;
+}
+
+function describeHomeOperation(phase: 'command' | 'settling' | 'awaiting-idle'): string {
+  if (phase === 'command') return 'Homing';
+  if (phase === 'settling') return 'Settling after Home';
+  return 'Waiting for fresh Idle after Home';
+}
+
+function describeJobStartMark(phase: JobStartMarkPhase): string {
+  const labels: Record<JobStartMarkPhase, string> = {
+    preflight: 'Checking the current job start and controller position',
+    travel: 'Moving with the laser off to the first burn point',
+    pulse: 'Marking the first burn point for one second',
+    return: 'Returning with the laser off to the original head position',
+    settling: 'Verifying the original position after the mark',
+    uncertain: 'Mark position or shutoff is unconfirmed — request Abort and check the machine',
+  };
+  return labels[phase];
 }
 
 function describeAutofocusOperation(

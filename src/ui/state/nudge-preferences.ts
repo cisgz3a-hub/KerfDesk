@@ -9,6 +9,7 @@
 
 import { create } from 'zustand';
 import { browserLocalStorage } from './browser-local-storage';
+import { hasPendingComputerPreference, saveComputerPreference } from './preference-persistence';
 
 export type NudgeSteps = {
   readonly fineMm: number;
@@ -57,15 +58,8 @@ export function readNudgeSteps(
   }
 }
 
-export function writeNudgeSteps(
-  steps: NudgeSteps,
-  storage: PreferenceStorage | null = browserLocalStorage(),
-): void {
-  try {
-    storage?.setItem(NUDGE_STEPS_KEY, JSON.stringify(steps));
-  } catch {
-    // Storage is optional; the in-memory preference still applies this session.
-  }
+export function writeNudgeSteps(steps: NudgeSteps, storage?: PreferenceStorage | null): void {
+  saveComputerPreference(NUDGE_STEPS_KEY, JSON.stringify(steps), { storage });
 }
 
 type NudgeState = {
@@ -80,8 +74,10 @@ export const useNudgeStore = create<NudgeState>((set) => ({
   setNudgeSteps: (next) =>
     set((state) => {
       const merged = normalizeNudgeSteps({ ...state.nudgeSteps, ...next }, state.nudgeSteps);
-      if (STEP_KEYS.every((key) => merged[key] === state.nudgeSteps[key])) return state;
+      const unchanged = STEP_KEYS.every((key) => merged[key] === state.nudgeSteps[key]);
+      if (unchanged && !hasPendingComputerPreference(NUDGE_STEPS_KEY)) return state;
       writeNudgeSteps(merged);
+      if (unchanged) return state;
       return { nudgeSteps: merged };
     }),
   resetNudgeSteps: () => {

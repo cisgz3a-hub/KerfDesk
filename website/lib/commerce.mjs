@@ -3,11 +3,6 @@
 // plan ever carries a checkout URL (purchases start in the desktop app, ADR-524
 // Amendment 2), and an open store can never ship half-configured.
 
-// Until sales open, every page of this website, and the pricing, legal and download
-// pages that ship with the app, opens with this one line; the pages themselves read as
-// if Pro is on sale (ADR-524 Amendment 4). Setting `salesOpen` removes it everywhere.
-export const LAUNCH_NOTE = 'KerfDesk Pro launches soon.';
-
 const BILLING = new Set(['one-time', 'yearly']);
 const PLAN_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const ADR_ID = /^ADR-\d{3,}$/;

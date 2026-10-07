@@ -4,6 +4,7 @@ import { describeLiveJobTiming } from '../state/live-job-timing';
 import { JobTimeBadge, type JobTimeBadgeState } from './JobTimeBadge';
 import { EstimateBadge } from './JobEstimatePresentation';
 import type { LiveJobEstimate } from './live-job-estimate';
+import { useTerminalCanvasRunInvalidation } from './terminal-canvas-run-invalidation';
 
 const CLOCK_TICK_MS = 1_000;
 
@@ -16,6 +17,7 @@ export function LiveJobTimeBadge({
 }: {
   readonly estimate: LiveJobEstimate;
 }): JSX.Element | null {
+  useTerminalCanvasRunInvalidation();
   const run = useLaserStore((state) => state.liveCanvasRun ?? null);
   const isTicking = run?.timing?.kind === 'running' || run?.timing?.kind === 'estimating';
   useClockTick(isTicking);

@@ -3,6 +3,7 @@ import type { OutputCompilationProgress } from '../../io/gcode/prepare-output-as
 import { Icon } from '../kit/icons';
 import { jobTimeNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
+import { isFramedRunCandidate } from '../state/framed-run';
 import {
   cancelOwnedFramePreparation,
   useFramePreparationStore,
@@ -12,11 +13,12 @@ import { actionGridStyle, framedRunStatusStyle, primaryActionStyle } from './Job
 import { startJobTitle } from './JobEstimatePresentation';
 import { LiveJobTimeBadge } from './LiveJobTimeBadge';
 import { frameExpiredStartMessage, useFrameExpiryNote } from './frame-expiry-note';
-import { framedRunReadinessIssue } from './framed-run-readiness';
+import { currentCompletedFrame, framedRunReadinessIssue } from './framed-run-readiness';
 import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
 import { useFrameAction } from './use-frame-action';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
 import { useJobEstimate } from './use-job-estimate';
+import { useJobStartMarkPreparation } from './use-job-start-mark';
 
 type Props = {
   readonly disabled: boolean;
@@ -83,7 +85,7 @@ export function JobActionControls(props: Props): JSX.Element {
 
 function useJobActionModel(props: { readonly disabled: boolean; readonly streaming: boolean }) {
   const onFrame = useFrameAction();
-  // Watch only the fields used by exact-artifact readiness. Pointer movement and
+  // Watch only the fields used by spatial readiness. Pointer movement and
   // controller poll bookkeeping must not repeat the comparison or estimation.
   const app = useExecutionSignatureAppState();
   const laser = useFramedRunLaserState();
@@ -93,11 +95,14 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
   const progress = useFramePreparationStore((state) => state.progress);
   const stage = useFramePreparationStore((state) => state.stage);
   const cancellable = useFramePreparationStore((state) => state.cancellable);
+  const markPending = useJobStartMarkPreparation((state) => state.pending);
   const expiredBecause = useFrameExpiryNote((state) => state.reason);
   const frameActive = laser.motionOperation?.kind === 'frame';
+  const frameDeferred = frameIsDeferred(laser.motionOperation);
   const preparingFrame = framePending && !frameActive;
-  const busy = props.disabled || props.streaming || framePending;
-  const framedRunIssue = framedRunReadinessIssue(laser.framedRun, app, laser);
+  const busy = [props.disabled, props.streaming, framePending, markPending].some(Boolean);
+  const frame = currentCompletedFrame(laser);
+  const framedRunIssue = framedRunReadinessIssue(frame, app, laser);
   const framedReady = framedRunIssue === null;
   const frameControl = frameControlProps(busy, laser.statusReport?.state);
   return {
@@ -107,22 +112,23 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     preparingFrame,
     cancellablePreparation: preparingFrame && cancellable,
     frameControl,
-    // The dock's one bright action: Frame until this exact job is framed, then Start.
+    // The dock's one bright action: Frame the current placement, then Start.
     frameIsNext: !framedReady && !frameControl.disabled,
     frameLabel: preparingFrame ? 'Preparing Frame…' : framedReady ? 'Frame again' : 'Frame job',
     // Frame is the only Start gate (ADR-228): Start stays greyed out until a
-    // clean Frame of this exact job completes, and then nothing else holds it.
+    // clean Frame of this footprint and placement completes.
     startControl: {
       disabled: busy || !framedReady,
       title: framedReady
         ? startJobTitle(estimate, jobTimeNoun(machineKind))
-        : 'Start unlocks when a Frame of this exact job finishes cleanly. Press Frame job first.',
+        : 'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.',
     },
     statusText: framedRunStatusText({
       frameActive,
+      frameDeferred,
       stage,
       framedReady,
-      hasFramedRun: laser.framedRun !== null,
+      hasFramedRun: frame !== null,
       framedRunIssue,
       expiredBecause,
       preparingFrame,
@@ -130,6 +136,16 @@ function useJobActionModel(props: { readonly disabled: boolean; readonly streami
     }),
     estimate,
   };
+}
+
+function frameIsDeferred(
+  operation: ReturnType<typeof useFramedRunLaserState>['motionOperation'],
+): boolean {
+  return (
+    operation?.kind === 'frame' &&
+    operation.candidate !== undefined &&
+    !isFramedRunCandidate(operation.candidate)
+  );
 }
 
 function JobActionButtons(props: {
@@ -180,6 +196,7 @@ function JobActionButtons(props: {
 
 function framedRunStatusText(args: {
   readonly frameActive: boolean;
+  readonly frameDeferred: boolean;
   readonly stage: FramePreparationStage;
   readonly framedReady: boolean;
   readonly hasFramedRun: boolean;
@@ -191,12 +208,12 @@ function framedRunStatusText(args: {
   if (args.frameActive) {
     // A split Frame traces the compiled outline while the exact program is
     // still being prepared (ADR-353); no permit exists until it arrives.
-    return args.stage === 'tracing'
+    return args.frameDeferred
       ? 'Framing the job outline — the exact job is still being prepared…'
       : 'Framing exact job…';
   }
   if (args.preparingFrame) return preparingFrameStatusText(args.progress, args.stage);
-  if (args.framedReady) return 'Ready to start — framed job unchanged';
+  if (args.framedReady) return 'Ready to start — framed placement unchanged';
   if (args.hasFramedRun) return `Frame expired — ${args.framedRunIssue}`;
   if (args.expiredBecause !== null) {
     return `Frame expired — ${frameExpiredStartMessage(args.expiredBecause)}`;
@@ -213,7 +230,7 @@ function frameControlProps(busy: boolean, state: string | undefined) {
     disabled: busy || !ready,
     title:
       state === 'Idle'
-        ? "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run."
+        ? "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged."
         : state === 'Alarm'
           ? 'The controller is in Alarm. Frame offers Home or Unlock first.'
           : frameBlockedTitle(state),

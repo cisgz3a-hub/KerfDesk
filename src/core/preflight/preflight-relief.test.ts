@@ -59,13 +59,13 @@ describe('runPreflight relief-needs-cnc', () => {
     expect(issue?.message).toContain('CNC mode');
   });
 
-  it('keeps the generic empty-output error when the relief layer has output off', () => {
+  it('names disabled output when the relief layer has output off', () => {
     const project = reliefOnlyProject({ output: false });
 
     const result = runPreflight(project, emit(project));
 
     const codes = result.issues.map((issue) => issue.code);
-    expect(codes).toContain('empty-output');
+    expect(codes).toEqual(['no-output-layer']);
     expect(codes).not.toContain('relief-needs-cnc');
   });
 });

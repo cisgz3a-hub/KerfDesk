@@ -26,6 +26,10 @@ import {
   projectHasPagedRasterAssets,
 } from '../import/paged-raster-hydration';
 import { projectHasVariableData } from '../../core/variables/object-variable-template';
+import {
+  laserPowerPreparationOptions,
+  laserPowerScaleWarnings,
+} from '../laser/connected-laser-power-scale';
 
 /**
  * Builds the ordinary Save output and preserves preparation failure in the
@@ -53,6 +57,7 @@ function saveGcodeOptions(
   placement: Extract<ResolvedJobPlacement, { readonly ok: true }>,
 ): EmitGcodeOptions {
   return {
+    ...laserPowerPreparationOptions(ctx.project, ctx.machine),
     ...runtimeCoordinatePreparationOptions(ctx.project.device, placement, saveEvidence(ctx)),
     metadata: buildGcodeMetadata(),
     ...(placement.jobOrigin === undefined ? {} : { jobOrigin: placement.jobOrigin }),
@@ -102,6 +107,7 @@ async function prepareSaveInBackground(
       kind: 'save',
       project: ctx.project,
       options,
+      ...(ctx.machine === undefined ? {} : { laserPowerScaleSource: ctx.machine }),
       ...(ctx.controllerSettings === undefined
         ? {}
         : { controllerSettings: ctx.controllerSettings }),
@@ -145,12 +151,15 @@ async function prepareSaveDirect(
     ...options,
   });
   const machineWarnings = prepared.ok
-    ? detectMachineJobWarnings(
-        prepared.project,
-        ctx.controllerSettings ?? null,
-        ctx.activeWcs ?? null,
-        prepared,
-      )
+    ? [
+        ...detectMachineJobWarnings(
+          prepared.project,
+          ctx.controllerSettings ?? null,
+          ctx.activeWcs ?? null,
+          prepared,
+        ),
+        ...laserPowerScaleWarnings(ctx.project, ctx.machine),
+      ]
     : [];
   return emitSavePreparedOutput(prepared, options, machineWarnings);
 }

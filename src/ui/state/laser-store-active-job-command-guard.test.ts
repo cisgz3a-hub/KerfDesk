@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 
 type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -28,7 +28,9 @@ function makeConnection(write: (data: string) => Promise<void>): FakeConnection 
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       await write(data);
+      acknowledgeStartFence();
       if (
         data === '$I\n' &&
         useLaserStore.getState().controllerOperation?.kind === 'connection-handshake'

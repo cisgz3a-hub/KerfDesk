@@ -12,18 +12,17 @@ const PENDING =
 const RECOVERY =
   'Checkout could not continue. Keep this browser’s data and try Check payment or Retry availability. If you already paid, contact support with your receipt before paying again.';
 
-export async function startBrowserPurchase(window, fetcher, openCheckout, agreement) {
-  const page = new BrowserPurchasePage(window, fetcher, openCheckout, agreement);
+export async function startBrowserPurchase(window, fetcher, openCheckout) {
+  const page = new BrowserPurchasePage(window, fetcher, openCheckout);
   await page.start();
   return page;
 }
 
 class BrowserPurchasePage {
-  constructor(window, fetcher, openCheckout, agreement) {
+  constructor(window, fetcher, openCheckout) {
     this.window = window;
     this.fetcher = fetcher;
     this.openCheckout = openCheckout;
-    this.agreement = agreement;
     this.config = null;
     this.pending = null;
     this.busy = false;
@@ -33,8 +32,6 @@ class BrowserPurchasePage {
   }
 
   async start() {
-    for (const box of this.agreement?.boxes ?? [])
-      box.addEventListener('change', () => this.render());
     this.element('browser-purchase').hidden = false;
     this.element('desktop-checkout-note').hidden = true;
     this.element('purchase-open').addEventListener('click', () => void this.run(() => this.buy()));
@@ -120,7 +117,6 @@ class BrowserPurchasePage {
   }
 
   async buy() {
-    if (this.agreement && !this.agreement.agreed()) return;
     if (!this.readSaved() || this.key !== null) return;
     this.config = await publicConfig(this.fetcher);
     if (this.config === null) {
@@ -193,14 +189,12 @@ class BrowserPurchasePage {
   }
 
   render() {
-    if (this.agreement) this.agreement.element.hidden = !this.config;
     const buy = this.element('purchase-open');
     buy.disabled =
       this.busy ||
       !this.config ||
       !this.storageReady ||
       this.key !== null ||
-      (this.agreement && !this.agreement.agreed()) ||
       !supportsBrowserPurchase(this.window);
     buy.textContent =
       this.key !== null

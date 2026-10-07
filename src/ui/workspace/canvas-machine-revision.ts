@@ -1,4 +1,5 @@
 import type { LaserState } from '../state/laser-store';
+import { observedLaserMaxPowerS } from '../laser/connected-laser-power-scale';
 import { memoizeOnInputs } from '../state/memoize-on-inputs';
 import {
   nativeBedEvidenceSnapshot,
@@ -32,6 +33,10 @@ export function deriveCanvasMachineRevision(state: CanvasRevisionSource): string
     state.connection.kind,
     state.capabilities.statusQuery,
     state.controllerSettings?.reportInches === true ? 'in' : 'mm',
+    String(
+      observedLaserMaxPowerS({ ...state, connected: state.connection.kind === 'connected' }) ??
+        'profile',
+    ),
     state.workOriginActive ? 'origin' : 'machine',
     String(state.trustedPositionEpoch ?? 0),
     axisKey(state.wcoCache),
@@ -52,6 +57,8 @@ export const canvasMachineRevision = memoizeOnInputs(
     state.connection.kind,
     state.capabilities.statusQuery,
     state.controllerSettings,
+    state.controllerSettingsObservation,
+    state.controllerSessionEpoch,
     state.workOriginActive,
     state.trustedPositionEpoch,
     state.wcoCache,

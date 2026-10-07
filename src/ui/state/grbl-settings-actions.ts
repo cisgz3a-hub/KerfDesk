@@ -1,5 +1,6 @@
 import { idleCollector, type SettingsCollectorState } from '../../core/controllers/grbl';
 import { settingReadbackMatches } from '../../core/controllers/grbl/grbl-setting-storage';
+import { encodeGrblSettingValue } from '../../core/controllers/grbl/grbl-setting-number';
 import type { ControllerDriver } from '../../core/controllers';
 import { machineKindOf } from '../../core/scene';
 import { useStore } from './store';
@@ -212,9 +213,13 @@ async function writeGrblSettingAction(
     value,
   );
   if (blocked !== null) return blockWrite(set, get, blocked);
+  const encoded = encodeGrblSettingValue(id, value, refs.driver.kind);
+  if (encoded.kind === 'blocked') {
+    return blockWrite(set, get, `$${id} cannot be sent: ${encoded.reason}`);
+  }
   clearCncLiveCaps();
   const qualificationEpoch = get().controllerSessionEpoch;
-  const trimmed = value.trim();
+  const trimmed = encoded.value;
   set({
     controllerOperation: settingsControllerOperation(`Writing $${id}`),
     ...(id === 13 ? beginReportUnitsWrite() : {}),

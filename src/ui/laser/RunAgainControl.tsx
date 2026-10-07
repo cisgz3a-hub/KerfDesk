@@ -12,7 +12,7 @@ import { useRecoveryRepositorySelection } from '../state/use-recovery-repository
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 import { useExecutionSignatureAppState } from './use-execution-signature-app-state';
 import { currentReplayExecutionSignature } from './start-job-execution-tracking';
-import { framedRunReadinessIssue } from './framed-run-readiness';
+import { currentCompletedFrame, framedRunReadinessIssue } from './framed-run-readiness';
 import { runCompletedJobAgainFlow } from './start-job-flow';
 import { useFramedRunLaserState } from './use-framed-run-laser-state';
 
@@ -27,9 +27,8 @@ type Props = {
 
 /** Exact replay is deliberately separate from interrupted-job recovery. The
  * offer exists only while the open execution inputs still match the immutable
- * receipt. Like Start, it unlocks only when a clean Frame of this exact job has
- * issued a permit, and it streams that permit; it never Frames itself
- * (ADR-372 Amendment 1). */
+ * receipt. Like Start, it reuses clean spatial evidence for unchanged placement
+ * and claims a newly reviewed exact permit; it never Frames itself (ADR-565). */
 export function RunAgainControl(props: Props): JSX.Element | null {
   const repository = props.repository ?? recoveryRepository;
   const receipt = useRecoveryRepositorySelection(selectLastCompletedReceipt, repository);
@@ -50,7 +49,7 @@ export function RunAgainControl(props: Props): JSX.Element | null {
   const eligible = receipt !== null && receipt.artifact.executionSignature === currentSignature;
 
   if (!eligible || receipt === null) return null;
-  const framedReady = framedRunReadinessIssue(laser.framedRun, app, laser) === null;
+  const framedReady = framedRunReadinessIssue(currentCompletedFrame(laser), app, laser) === null;
 
   const runAgain = async (): Promise<void> => {
     if (starting) return;
@@ -73,8 +72,8 @@ export function RunAgainControl(props: Props): JSX.Element | null {
       disabled={props.disabled || props.busy || starting || !framedReady}
       title={
         framedReady
-          ? 'Run the framed job, which is this exact completed job, from line 1 with a new run identity.'
-          : 'Run again unlocks when a Frame of this exact job finishes cleanly, like Start. Press Frame job first.'
+          ? 'Run the same completed job from the beginning using its unchanged framed placement.'
+          : 'Run again needs a clean Frame of this footprint and placement, like Start. Press Frame job first.'
       }
     >
       {starting ? 'Checking completed job…' : 'Run same job again from start'}

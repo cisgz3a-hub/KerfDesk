@@ -12,9 +12,11 @@ import {
 import { mapControllerPointToScene, rebuildCanvasPlanForGcode } from '../state/canvas-motion-plan';
 import { readJobCheckpoint, writeJobCheckpoint } from '../state/job-checkpoint-storage';
 import { jobActions } from '../state/laser-job-actions';
+import { consumeControllerCommandResponse } from '../state/laser-interactive-command';
 import { captureLaserModeStartSnapshot } from '../state/laser-mode-start-evidence';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
+import { LASER_START_OVERRIDE_RESET } from '../state/laser-start-override-reset';
 import { recoveryRepository, RecoveryRepository } from '../state/recovery';
 import { isCurrentExecutionArtifact } from '../state/recovery/execution-artifact';
 import { executionArtifactIntegrityIsValid } from '../state/recovery/execution-artifact-integrity';
@@ -57,8 +59,8 @@ beforeEach(() => {
     controllerSettings: { maxPowerS: 1_000, minPowerS: 0, laserModeEnabled: true },
     controllerSettingsObservation: { sessionEpoch: 9, observedAt: 1 },
     controllerQualification: { kind: 'qualified', epoch: 9, settings: 'verified' },
-    // Overrides reported at 100%, so Start sends no ADR-355 reset ahead of the
-    // program and the first write these tests reject is the program's own.
+    // Even reported 100% can precede pending override flags. The fixture
+    // answers the owned dwell and accepts the baseline before rejecting output.
     ovCache: { feed: 100, rapid: 100, spindle: 100 },
   });
 });
@@ -100,7 +102,11 @@ describe('recovery source and first-write authority', () => {
 
       expect(await runLaserRecoveryCapsuleFlow(capsule, repository, { fromLine })).toBe(false);
 
-      expect(writes[0]).toContain('G1');
+      expect(writes.slice(0, 2)).toEqual([
+        `${grblDriver.commands.settleDwell}\n`,
+        LASER_START_OVERRIDE_RESET,
+      ]);
+      expect(writes[2]).toContain('G1');
       const retained = repository.getSnapshot().recoveryCapsule;
       expect(retained?.runId).not.toBe(artifact.runId);
       expect(retained?.interruption.kind).toBe('write-failed');
@@ -139,7 +145,11 @@ describe('recovery source and first-write authority', () => {
       ),
     ).toBe(false);
 
-    expect(writes[0]).toContain('G1');
+    expect(writes.slice(0, 2)).toEqual([
+      `${grblDriver.commands.settleDwell}\n`,
+      LASER_START_OVERRIDE_RESET,
+    ]);
+    expect(writes[2]).toContain('G1');
     expect(invalidate).toHaveBeenCalledOnce();
     expect(repository.getSnapshot().recoveryCapsule).toBeNull();
     expect(readJobCheckpoint()?.resumeInFlight).toBe(true);
@@ -148,8 +158,29 @@ describe('recovery source and first-write authority', () => {
 
 function installPrefixFailure(closeBeforeRejection: boolean): string[] {
   const writes: string[] = [];
+  const refs: Parameters<typeof jobActions>[2] = {
+    driver: grblDriver,
+    controllerCommand: null,
+    controllerIdleWait: null,
+    controllerResetWait: null,
+    controllerStatusWait: null,
+    pauseResumeTransition: null,
+    pendingResetCleanup: null,
+    qualificationTimer: null,
+    qualificationDeadline: null,
+    runControllerQualification: null,
+    writeEpoch: 0,
+    untrackedAckReservations: [],
+  };
   const safeWrite = async (data: string): Promise<void> => {
     writes.push(data);
+    if (data === `${grblDriver.commands.settleDwell}\n`) {
+      expect(refs.controllerCommand?.statusOwnership).toBe('laser-start-override-dwell');
+      consumeControllerCommandResponse(refs, { kind: 'ok' }, 'ok');
+      return;
+    }
+    if (data === LASER_START_OVERRIDE_RESET) return;
+    expect(data).toContain('G1');
     // A WritableStream rejection does not prove the USB/controller received no
     // prefix. Also exercise onClose clearing all live ownership before reject.
     if (closeBeforeRejection)
@@ -160,7 +191,6 @@ function installPrefixFailure(closeBeforeRejection: boolean): string[] {
       });
     throw new Error('Transport rejected after transmitting a nonzero prefix.');
   };
-  const refs = { driver: grblDriver } as Parameters<typeof jobActions>[2];
   const actions = jobActions(
     useLaserStore.setState,
     useLaserStore.getState,

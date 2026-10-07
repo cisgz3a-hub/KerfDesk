@@ -35,8 +35,10 @@ describe('licence clock rules (ADR-523 Amendment 2)', () => {
     expect(clockRolledBack(claims('paid'), NOW + 86_400, NOW - 86_400)).toBe(false);
     expect(clockRolledBack(claims('developer'), NOW + 86_400, NOW - 86_400)).toBe(false);
   });
-  it('saves a trial clock mark only once it has moved a minute on', () => {
-    expect(nextClockMark(claims('trial'), NOW, NOW + 59)).toBeNull();
+  it('saves each forward whole-second trial mark without rewriting unchanged or paid time', () => {
+    expect(nextClockMark(claims('trial'), NOW, NOW)).toBeNull();
+    expect(nextClockMark(claims('trial'), NOW, NOW + 1)).toBe(NOW + 1);
+    expect(nextClockMark(claims('trial'), NOW, NOW + 59)).toBe(NOW + 59);
     expect(nextClockMark(claims('trial'), NOW, NOW + 60)).toBe(NOW + 60);
     expect(nextClockMark(claims('trial'), NOW, NOW - 600)).toBeNull();
     expect(nextClockMark(claims('paid'), NOW, NOW + 86_400)).toBeNull();

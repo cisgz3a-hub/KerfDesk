@@ -19,12 +19,16 @@
 //   inert / hidden / disabled / aria-hidden are excluded.
 // - The Tab handler measures focusable elements at keydown time (not
 //   at mount), so dynamic fields appearing later still join the cycle.
-// - We capture `previouslyFocused` on the FIRST render only (via ref).
-//   If the dialog re-renders before close, we don't clobber the saved
-//   focus target.
+// - We capture `previouslyFocused` during the first render, before a child
+//   autoFocus control can take focus. Rerenders and StrictMode effect replay
+//   retain that original opener.
 
-import { useEffect, useRef, type RefObject } from 'react';
-import { recoverDialogFocus, restoreDialogFocus } from './recover-dialog-focus';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import {
+  dialogControlIsUnavailable,
+  recoverDialogFocus,
+  restoreDialogFocus,
+} from './recover-dialog-focus';
 
 const FOCUSABLE_SELECTOR = [
   'button:not([disabled])',
@@ -47,10 +51,14 @@ export function useDialogA11y(
   onClose: () => void,
   options: DialogA11yOptions = {},
 ): void {
-  // The element that was focused before the dialog mounted, so we can
-  // hand focus back on close. Captured once (the ref guards against
-  // re-render clobbering) and read in the cleanup.
-  const previouslyFocused = useRef<HTMLElement | null>(null);
+  // A passive effect runs after React has focused autoFocus descendants.
+  // Capture the opener before mounting them, then keep it across rerenders
+  // and StrictMode's setup/cleanup replay rather than recapturing an inner field.
+  const [previouslyFocused] = useState<HTMLElement | null>(() =>
+    typeof document !== 'undefined' && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
   // Hold the latest onClose in a ref so Escape always calls the current handler
   // WITHOUT making the focus-setup effect depend on onClose's identity. Callers
   // routinely pass a fresh arrow each render (onClose={() => setOpen(false)}); a
@@ -63,9 +71,6 @@ export function useDialogA11y(
   optionsRef.current = options;
 
   useEffect(() => {
-    previouslyFocused.current =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-
     const node = ref.current;
     if (node === null) return undefined;
 
@@ -78,6 +83,12 @@ export function useDialogA11y(
 
     const onKeyDown = (e: KeyboardEvent): void => {
       if (!isTopmostModal(node)) return;
+      // Escape/Tab can belong to an IME candidate window rather than the modal.
+      // Keep native composition in charge without reaching enclosing shortcuts.
+      if (e.isComposing || e.keyCode === 229) {
+        e.stopPropagation();
+        return;
+      }
       if (e.key === 'Escape' && optionsRef.current.closeOnEscape !== false) {
         e.preventDefault();
         // Closing can remove the modal gate before this event reaches window.
@@ -97,12 +108,11 @@ export function useDialogA11y(
       // Return focus to whatever opened us — typically a toolbar button.
       // Guard against the element having been removed from the DOM in
       // the meantime (e.g., a layout swap during dialog lifetime).
-      restoreDialogFocus(node, previouslyFocused.current);
+      restoreDialogFocus(node, previouslyFocused);
     };
-    // Mount-only: focus setup, listener, and previously-focused capture must run
-    // once for the dialog's lifetime. onClose is read via onCloseRef so its
-    // changing identity never re-triggers this (see the ref above).
-  }, [ref]);
+    // The saved opener is stable for the dialog's lifetime. Read onClose via
+    // its ref so a fresh callback never reruns focus setup or replaces the opener.
+  }, [ref, previouslyFocused]);
 }
 
 function initialFocusTarget(node: HTMLElement, options: DialogA11yOptions): HTMLElement {
@@ -110,7 +120,9 @@ function initialFocusTarget(node: HTMLElement, options: DialogA11yOptions): HTML
   // Supplemental help stays keyboard reachable without replacing the main control on open.
   return (
     Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).find(
-      (element) => element.closest('[data-dialog-secondary-focus]') === null,
+      (element) =>
+        !dialogControlIsUnavailable(element) &&
+        element.closest('[data-dialog-secondary-focus]') === null,
     ) ?? node
   );
 }
@@ -122,7 +134,7 @@ function isTopmostModal(node: HTMLElement): boolean {
 
 function trapTabWithin(node: HTMLElement, event: KeyboardEvent): void {
   const focusables = Array.from(node.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (element) => !element.hasAttribute('aria-hidden') && element.offsetParent !== null,
+    (element) => !dialogControlIsUnavailable(element) && element.offsetParent !== null,
   );
   const first = focusables[0];
   const last = focusables[focusables.length - 1];

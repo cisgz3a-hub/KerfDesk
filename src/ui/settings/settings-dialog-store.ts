@@ -4,7 +4,7 @@
 
 import { create } from 'zustand';
 
-export type SettingsSectionId = 'general' | 'canvas' | 'labs' | 'machine';
+export type SettingsSectionId = 'general' | 'canvas' | 'labs' | 'machine' | 'remote';
 
 type SettingsDialogState = {
   readonly open: boolean;

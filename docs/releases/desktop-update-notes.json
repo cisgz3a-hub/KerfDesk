@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "a6c7642ffcd784c2f680867b494d29cd71d826ef",
+  "sinceSourceSha": "6c62d5a6bfd16210a9c6fa340e60722dba4edad0",
   "highlights": [
-    "Updated the desktop runtime with Chromium and Windows fixes.",
-    "Improved desktop opening order for licence and update checks.",
-    "Your saved machine and its settings now load automatically on startup.",
-    "New canvases start with fresh job settings; saved projects keep their settings.",
-    "Added checks that desktop upgrades retain projects and preferences.",
-    "Restored the public privacy notice and improved download statistics reliability."
+    "Cancelled Install and close requests no longer trigger an installer later; Free updates remain available after a failed trial request.",
+    "Phone & MCP keeps a separate Abort allowance and lets you read every Job Review warning and operation across pages.",
+    "grblHAL whole-number settings keep their intended values; reconnecting no longer leaves an old Wake error on the new connection.",
+    "Line Art is the free tracing option; the other tracing modes ask for desktop Pro access.",
+    "Large projects save in the background, with cancellation preserving your unsaved edits.",
+    "Material recipes fit MCP responses, and closing a dialog returns focus to the control that opened it."
   ]
 }

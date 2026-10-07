@@ -4,37 +4,29 @@
 // src/ui/common/Toolbar.native-smoke-reach.test.tsx pins the toolbar side of
 // the contract (accessible names, More items as menuitems) in the fast suite.
 
-// A new profile opens on the first-use agreement to the terms and machine
-// safety (ADR-564). The smoke's profile is thrown away, so it agrees as a new
-// user would. src/ui/legal/TermsAgreementGate.test.tsx runs this against the
-// real dialog. Browsers that report automation are never asked, so the
-// browser suite passes 'not-asked'.
-export const RENDERER_TERMS_AGREEMENT_SOURCE = String.raw`(async (delay) => {
-    const agreement = document.querySelector('[data-terms-agreement="first"]');
-    if (agreement === null) return 'not-asked';
-    for (const box of agreement.querySelectorAll('input[type="checkbox"]')) {
-      if (!box.checked) box.click();
-    }
-    const agree = [...agreement.querySelectorAll('button')].find(
-      (button) => button.textContent.trim() === 'Agree and continue',
-    );
-    if (!(agree instanceof HTMLButtonElement)) throw new Error('Agree and continue button missing');
-    for (let attempt = 0; attempt < 20 && agree.disabled; attempt += 1) await delay(10);
-    if (agree.disabled) throw new Error('Agree and continue stayed disabled');
-    agree.click();
-    for (let attempt = 0; attempt < 100; attempt += 1) {
-      if (document.querySelector('[data-terms-agreement]') === null) return 'agreed';
-      await delay(50);
-    }
-    throw new Error('the terms agreement stayed open');
-  })`;
-
 export const RENDERER_NODE_PRIMITIVES_SOURCE = String.raw`({
     require: typeof globalThis.require,
     process: typeof globalThis.process,
     module: typeof globalThis.module,
     Buffer: typeof globalThis.Buffer,
 })`;
+
+// ready-to-show can precede React's ordinary workspace-ready handshake. Wait
+// for usable App controls behind that gate; qualification must never open it.
+// This leaves the existing 45s native watchdog and 60s wrapper unchanged.
+export const RENDERER_WORKSPACE_READY_SOURCE = String.raw`(async () => {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    if (document.querySelector('#app-root > [role="alert"]'))
+      throw new Error('Workspace startup failed');
+    const toolbar = document.querySelector('header[aria-label="Toolbar"]');
+    const button = toolbar?.querySelector(
+      'button[aria-label="Import..."]:not(:disabled), button[aria-label="More commands"]:not(:disabled)',
+    );
+    if (button instanceof HTMLButtonElement) return;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error('Workspace did not open within the native smoke budget');
+})()`;
 
 // Only reads the app's local protocol. Never copies licence keys, order IDs,
 // messages or account data into smoke evidence, and never initiates a check.
@@ -67,6 +59,7 @@ export const RENDERER_LICENSING_SOURCE = String.raw`(async () => {
 })()`;
 
 export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
+  await ${RENDERER_WORKSPACE_READY_SOURCE};
   // Read the actual main-world globals before installing the picker stubs.
   // This deliberately performs no Node access or device I/O. The licensing
   // observation below uses only the app's local protocol, never a provider.
@@ -99,15 +92,6 @@ export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
     }
     throw new Error(label + ' command missing from More');
   };
-  const termsAgreement = await ${RENDERER_TERMS_AGREEMENT_SOURCE}(delay);
-  // The workspace mounts once the agreement is answered.
-  for (
-    let attempt = 0;
-    attempt < 100 && !labelled('button', 'Import...') && !labelled('button', 'More commands');
-    attempt += 1
-  ) {
-    await delay(50);
-  }
   let saved = '';
   Object.defineProperty(window, 'showOpenFilePicker', {
     configurable: true,
@@ -152,7 +136,6 @@ export const RENDERER_SMOKE_SOURCE = String.raw`(async () => {
     savedSchemaVersion,
     savedBytes: saved.length,
     nodePrimitives,
-    termsAgreement,
     licensing,
     fileAccess: { openPicker: 'stubbed', savePicker: 'stubbed', writeTarget: 'memory' },
     title: document.title,

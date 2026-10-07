@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { FIXTURE_NAME } from './installed-app-evidence.mjs';
 import { validateUpgradeProject } from './verify-upgrade-project.mjs';
 
 const fixture = {
-  schemaVersion: 9,
+  schemaVersion: 12,
   device: {
     name: 'Upgrade retention fixture',
     bedWidth: 321,
@@ -40,6 +41,27 @@ const fixture = {
   },
 };
 const encoded = (value) => Buffer.from(JSON.stringify(value));
+
+test('installed project qualification matches the canonical writer schema before native execution', async () => {
+  // This fixture also represents authenticated public 1.0.2 and 1.0.3 saves.
+  // Require an explicit qualification update if the app's persistence format changes.
+  const source = await readFile(new URL('../src/core/scene/project.ts', import.meta.url), 'utf8');
+  const versions = [
+    ...source.matchAll(/^export const PROJECT_SCHEMA_VERSION = (\d+) as const;$/gm),
+  ];
+  assert.equal(versions.length, 1, 'Canonical schema declaration changed; review qualification');
+  assert.equal(Number(versions[0][1]), fixture.schemaVersion, 'Qualification schema is stale');
+  assert.deepEqual(validateUpgradeProject(encoded(fixture)), fixture);
+});
+
+test('historical project qualification refuses legacy, future and malformed schema versions', () => {
+  for (const schemaVersion of [8, 9, 10, 11, 13, '12', null, undefined]) {
+    assert.throws(
+      () => validateUpgradeProject(encoded({ ...fixture, schemaVersion })),
+      /Expected current project schema/,
+    );
+  }
+});
 
 test('historical project qualification compares actual geometry, operations and machine configuration', () => {
   assert.deepEqual(validateUpgradeProject(encoded(fixture), fixture), fixture);

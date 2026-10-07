@@ -6,6 +6,7 @@ import type { PreparedStartProgram } from '../state/framed-run';
 import type { ExecutionArtifactV1 } from '../state/recovery';
 import { selectionKey } from '../state/recovery/laser-second-pass-lineage';
 import { serializeCanonicalDeviceProfile } from '../../io/machine-profile/machine-profile-io';
+import { archivedLaserPowerScaleVersion } from '../../core/output/laser-power-scale-version';
 
 export type LaserSecondPassSourceSnapshot = {
   readonly source: ExecutionArtifactV1;
@@ -113,6 +114,7 @@ function sourceMetadataKey(source: ExecutionArtifactV1): string {
     source.controller,
     serializeCanonicalDeviceProfile(source.prepared.project.device),
     source.prepared.project.machine,
+    archivedLaserPowerScaleVersion(source.prepared.laserPowerScaleVersion),
     source.prepared.jobOriginOffset,
     source.provenance,
     source.outputScope,

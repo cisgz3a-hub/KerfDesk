@@ -5,11 +5,13 @@
 // electron/camera-frame-proxy*.ts, electron/private-network-host-policy.ts,
 // src/platform/web/web-camera.ts, src/platform/electron/preview-updates.ts), in
 // ADR-523 and docs/desktop-commercial-business-decisions.md section 4 (what
-// licensing sends), or in website/lib/meta-files.mjs. The formal privacy notice
-// for purchases is written separately; this page doesn't replace it.
+// licensing sends), or in website/lib/meta-files.mjs. This factual published
+// notice is separate from the full review draft and does not certify compliance.
 
 import { callout, featureGrid, pageHero, section, statusPill, table } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
+import { remotePrivacy } from '../lib/remote-privacy.mjs';
+import { publicSellerContact } from '../lib/legal-publication.mjs';
 
 const AT_A_GLANCE = [
   {
@@ -19,8 +21,8 @@ const AT_A_GLANCE = [
   },
   {
     icon: 'user-x',
-    title: 'No account',
-    body: 'KerfDesk has no sign-up or sign-in. A Pro trial or license sends only the few licensing details listed below.',
+    title: 'No account required',
+    body: 'Ordinary desktop use needs no account. Pro licensing sends the few details below. Optional phone and MCP access needs your approval on the computer.',
   },
   {
     icon: 'eye-off',
@@ -30,7 +32,7 @@ const AT_A_GLANCE = [
   {
     icon: 'hard-drive',
     title: 'Your work stays with you',
-    body: 'Your projects, machine details and jobs stay on your computer. KerfDesk doesn’t upload them.',
+    body: 'Saved projects and jobs stay on your computer. Approved remote clients receive summaries and edits; a separate opt-in allows artwork previews and text, as described below.',
   },
 ];
 
@@ -86,6 +88,11 @@ function connections(site) {
       'You open the Camera panel or use a network camera in the desktop app',
       'A helper on your own computer, and cameras on your private network',
       'Requests for camera pictures. They stay on your local network. See below.',
+    ],
+    [
+      'You enable approved phone or MCP access',
+      'kerfdesk-phone-control.cisgz3a.workers.dev (Cloudflare)',
+      'An authenticated connection carries approved requests and bounded workspace, machine and recipe summaries. Separate artwork-sharing opt-in allows PNG previews and text contents. Access starts turned off, and each client needs your approval. See below for permissions, cookies and retention.',
     ],
   ];
 }
@@ -216,8 +223,9 @@ function licensing(site, appPrivacy) {
     <p>
       Purchase isn’t open yet, and ${appPrivacy ? 'this privacy page' : 'this website'} has no
       checkout. When purchase opens, payments will be handled by Paddle, the payment provider, as
-      merchant of record. Paddle processes the payment and your customer record under its own
-      privacy notice.
+      merchant of record and authorised reseller: you purchase from Paddle, while KerfDesk provides
+      the software and licence. Paddle processes the payment and your customer record under
+      <a href="https://www.paddle.com/legal/privacy">its own privacy notice</a>.
     </p>
     <p>
       The separate Buy Pro page contacts ${site.licensingHost} to check whether purchases are
@@ -285,8 +293,8 @@ function appPart(site, appPrivacy) {
       rows: connections(site),
     })}
     <div class="prose">
-      ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${cameraHelper()}
-      ${deviceAccess()}
+      ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${remotePrivacy()}
+      ${cameraHelper()} ${deviceAccess()}
       ${callout({
         iconName: 'wifi-off',
         title: 'Working offline',
@@ -318,10 +326,10 @@ export const page = {
   nav: null,
   title: 'Privacy',
   description:
-    'KerfDesk has no account, analytics or cloud sync, and this site sets no cookies. See what the site and the app send, including for Pro licensing.',
+    'KerfDesk needs no account for ordinary use. This site sets no cookies. Read the app disclosures for updates, licensing, downloads and optional phone or MCP access.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-09-30">September 30, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-07">October 7, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'
@@ -357,6 +365,12 @@ export const page = {
       eyebrow: 'Part 2',
       title: 'The KerfDesk app',
       content: appPart(site, appPrivacy),
+    })}
+    ${section({
+      id: 'controller',
+      narrow: true,
+      title: 'Who is responsible for your information',
+      content: publicSellerContact({ privacy: true }),
     })}
     ${section({
       id: 'questions',

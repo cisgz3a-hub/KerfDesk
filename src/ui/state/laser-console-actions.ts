@@ -1,3 +1,4 @@
+import { stateEffectLabel } from './console-state-effect-label';
 import type { PreparedConsoleCommand, SettingsCollectorState } from '../../core/controllers/grbl';
 import { grblSettingCommandMachineKindIssue } from '../../core/controllers/grbl/grbl-setting-write';
 import type { ControllerDriver } from '../../core/controllers';
@@ -19,6 +20,12 @@ import {
 } from './console-command-readiness';
 import { consoleOwnershipBlockReason } from './console-command-ownership';
 import { writeConsoleCommand } from './console-command-transport';
+import { normalizeFrameReportUnits } from './frame-report-units';
+import {
+  assertMachineExecutionOwner,
+  ownedMachineWrite,
+  type MachineExecutionOwner,
+} from './machine-execution-owner';
 import {
   canSelectFrameWcs,
   frameWcsSelectionPatch,
@@ -56,6 +63,7 @@ type ConsoleWriteFn = (
   line: string,
   action: LaserSafetyAction | undefined,
   source: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 
 export type ConsoleCommandOptions = {
@@ -75,7 +83,13 @@ export function consoleActions(
   get: GetFn,
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
-): Pick<LaserState, 'sendConsoleCommand' | 'selectPrimaryWcsForFrame' | 'clearTranscript'> {
+): Pick<
+  LaserState,
+  | 'sendConsoleCommand'
+  | 'selectPrimaryWcsForFrame'
+  | 'normalizeFrameReportUnits'
+  | 'clearTranscript'
+> {
   return {
     sendConsoleCommand: async (input, options = {}) => {
       const prepared = refs.driver.prepareConsoleCommand(input);
@@ -120,7 +134,10 @@ export function consoleActions(
         set((state) => ({ transcript: appendTranscript(state.transcript, entry) }));
       }
     },
-    selectPrimaryWcsForFrame: () => selectPrimaryWcsForFrame(set, get, refs, write),
+    selectPrimaryWcsForFrame: (owner) =>
+      selectPrimaryWcsForFrame(set, get, refs, ownedMachineWrite(write, owner), owner),
+    normalizeFrameReportUnits: (signal, owner) =>
+      normalizeFrameReportUnits({ set, get, refs, write: ownedMachineWrite(write, owner), signal }),
     // Both retained histories, not just the displayed one: `log` is a parallel
     // 200-line ring buffer that Clear used to leave untouched. Anything the
     // stream buffer is holding back is dropped too, or Clear would be undone
@@ -137,13 +154,16 @@ async function selectPrimaryWcsForFrame(
   get: GetFn,
   refs: ConsoleActionRefs,
   write: ConsoleWriteFn,
+  owner?: MachineExecutionOwner,
 ): Promise<FrameWcsSelection> {
+  assertMachineExecutionOwner(owner);
   // Read before selecting, and keep the origin record (frame-wcs-selection.ts).
   if (!canSelectFrameWcs(refs.driver)) return { kind: 'not-selectable' };
   await readUnknownActiveWcs(get, refs, (line, action, source) =>
     write(line, action, source ?? 'system'),
   );
   const previous = get().activeWcs;
+  assertMachineExecutionOwner(owner);
   if (previous === 'G54') return { kind: 'already-g54' };
   const prepared = refs.driver.prepareConsoleCommand('G54');
   if (!prepared.ok) throw new Error(prepared.reason);
@@ -160,6 +180,7 @@ async function selectPrimaryWcsForFrame(
     await confirmFreshConsoleIdle(set, get, refs, write);
   }
   const idleBlocked = consoleCommandBlockReason(get(), prepared.command, true);
+  assertMachineExecutionOwner(owner);
   if (idleBlocked !== null) throw new Error(idleBlocked);
   const refreshedOwnershipBlocked = consoleOwnershipBlockReason(get(), refs, prepared.command);
   if (refreshedOwnershipBlocked !== null) throw new Error(refreshedOwnershipBlocked);
@@ -387,31 +408,6 @@ function unknownCoordinatePatch(): Partial<LaserState> {
     workZZeroEvidence: null,
     wcoCache: null,
   };
-}
-
-function stateEffectLabel(effect: Exclude<ConsoleStateEffect, 'read-only'>): string {
-  switch (effect) {
-    case 'machine-state':
-      return 'machine-state command';
-    case 'accessories':
-      return 'accessory command';
-    case 'non-positional':
-      return 'non-positional command';
-    case 'coordinates-xy':
-      return 'XY-coordinate command';
-    case 'coordinates-z':
-      return 'Z-coordinate command';
-    case 'coordinates-all':
-      return 'coordinate-system command';
-    case 'tool':
-      return 'tool-state command';
-    case 'reference':
-      return 'reference-state command';
-    case 'configuration':
-      return 'configuration command';
-    case 'configuration-nonpositional':
-      return 'non-positional configuration command';
-  }
 }
 
 function block(set: SetFn, get: GetFn, refs: ConsoleActionRefs, reason: string): never {

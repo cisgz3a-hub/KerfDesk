@@ -25,6 +25,56 @@ function harness(active = true) {
 }
 
 describe('desktop application close handoff', () => {
+  it.each([
+    { active: true },
+    { fireLatched: true },
+    { motionOwner: {} },
+    { controllerOwner: 'synthetic-probe-owner' },
+    { warning: 'Stop is unconfirmed' },
+    { updateBlocked: true },
+  ])(
+    'keeps active or unconfirmed machine state %j open for an update without Abort',
+    async (patch) => {
+      const h = harness(false);
+      h.patch(patch);
+      expect(await h.controller.prepareForUpdate(1)).toEqual({ status: 'cancelled' });
+      expect(h.stop).not.toHaveBeenCalled();
+      expect(h.controller.ownsUnload).toBe(false);
+    },
+  );
+  it('retains the ordinary save decision for an idle update close', async () => {
+    const h = harness(false);
+    expect(await h.controller.prepareForUpdate(1)).toEqual({ status: 'ready', dirty: true });
+    expect(h.stop).not.toHaveBeenCalled();
+    h.controller.cancel(1);
+    expect(h.controller.ownsUnload).toBe(false);
+  });
+  it('invalidates an update close when a job starts during saving or before unload', async () => {
+    const h = harness(false);
+    await h.controller.prepareForUpdate(1);
+    h.patch({ active: true });
+    expect(h.controller.approve(1)).toEqual({ status: 'retry' });
+    expect(await h.controller.prepareForUpdate(2)).toEqual({ status: 'cancelled' });
+    expect(h.stop).not.toHaveBeenCalled();
+    h.patch({ active: false });
+    await h.controller.prepareForUpdate(3);
+    expect(h.controller.approve(3)).toEqual({ status: 'approved' });
+    h.patch({ motionOwner: {} });
+    const event = new Event('beforeunload', { cancelable: true }) as BeforeUnloadEvent;
+    expect(h.controller.handleBeforeUnload(event)).toBe(true);
+    expect(event.defaultPrevented).toBe(true);
+    h.controller.cancel(3);
+    expect(await h.controller.prepareForUpdate(4)).toEqual({ status: 'cancelled' });
+    expect(h.stop).not.toHaveBeenCalled();
+  });
+  it('rechecks update-only preparation and observed controller activity immediately before approval', async () => {
+    const h = harness(false);
+    await h.controller.prepareForUpdate(1);
+    h.patch({ updateBlocked: true });
+    expect(h.controller.approve(1)).toEqual({ status: 'retry' });
+    expect(await h.controller.prepareForUpdate(2)).toEqual({ status: 'cancelled' });
+    expect(h.stop).not.toHaveBeenCalled();
+  });
   it('retains a delayed stop, joins duplicate close requests and suppresses duplicate unload writes', async () => {
     const h = harness();
     const reply = vi.fn();

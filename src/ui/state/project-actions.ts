@@ -1,4 +1,12 @@
-import { createProject, machineKindOf, type Project } from '../../core/scene';
+import {
+  createProject,
+  DEFAULT_CNC_MACHINE_CONFIG,
+  machineKindOf,
+  type CncMachineConfig,
+  type Project,
+} from '../../core/scene';
+import { cncParamsWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
+import { cncMachineWithReusableTools } from './machine-actions';
 import { loneSelectableArtworkId } from './lone-selectable-artwork';
 import { currentMaterialLibraryState } from './material-library-actions';
 import { modeSwitchState } from './mode-switch-settings';
@@ -106,31 +114,60 @@ function keepCurrentMachinePatch(
 ): Partial<AppState> {
   if (notice === null) return {};
   const { machine: openedMachine, ...projectWithoutMachine } = state.project;
+  const keptKind = machineKindOf(notice.previousMachine);
+  const { cnc, device } = openedCncWithCurrentHardware(state, notice);
   const kept: Project = {
     ...projectWithoutMachine,
-    device: notice.previousDevice,
+    device,
     workspace: {
       ...state.project.workspace,
       width: notice.previousDevice.bedWidth,
       height: notice.previousDevice.bedHeight,
     },
-    ...(notice.previousMachine === undefined ? {} : { machine: notice.previousMachine }),
+    ...(keptKind === 'cnc' && cnc !== null
+      ? { machine: cnc }
+      : notice.previousMachine === undefined
+        ? {}
+        : { machine: notice.previousMachine }),
   };
-  // Keeping a laser machine parks the opened file's CNC setup, not drops it.
-  const parked =
-    openedMachine?.kind === 'cnc' ? openedMachine : (state.project.parkedCncMachine ?? null);
   const switched = modeSwitchState(
-    projectWithParkedCnc(kept, parked),
+    projectWithParkedCnc(kept, cnc),
     state.jobPlacement,
     machineKindOf(openedMachine),
     machineKindOf(kept.machine),
   );
   return {
     ...switched,
-    cachedCncMachine: switched.project.parkedCncMachine ?? state.cachedCncMachine,
+    cachedCncMachine: switched.project.parkedCncMachine ?? null,
     projectBedReconciliation: null,
     dirty: true,
   };
+}
+
+function openedCncWithCurrentHardware(
+  state: AppState,
+  notice: ProjectBedReconciliationNotice,
+): { readonly device: Project['device']; readonly cnc: CncMachineConfig | null } {
+  const openedCnc =
+    state.project.machine?.kind === 'cnc' ? state.project.machine : state.project.parkedCncMachine;
+  const needsCnc = openedCnc !== undefined || machineKindOf(notice.previousMachine) === 'cnc';
+  if (notice.previousCncParams === undefined && !needsCnc) {
+    return { device: notice.previousDevice, cnc: null };
+  }
+  const params = cncParamsWithOwnFeeds(
+    notice.previousCncParams ?? DEFAULT_CNC_MACHINE_CONFIG.params,
+    notice.previousDevice,
+  );
+  // Stock, cutter definitions/selection and tiling belong to the opened job.
+  // Only physical parameters come from the machine chosen before Open.
+  const cnc = needsCnc
+    ? {
+        ...(openedCnc ??
+          cncMachineWithReusableTools(DEFAULT_CNC_MACHINE_CONFIG, state.cncLibrary.customTools)),
+        params: { ...params },
+      }
+    : null;
+  return { device: { ...notice.previousDevice, cncSubProfile: { ...params } }, cnc };
 }
 
 function retainedApplicationState(

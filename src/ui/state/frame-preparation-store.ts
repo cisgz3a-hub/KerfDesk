@@ -36,8 +36,11 @@ let activeAbort: (() => void) | null = null;
 let cancelRequested = false;
 
 /** Repeated button, shortcut and setup requests join the same exact Frame. */
-export function runOwnedFrame(work: () => Promise<boolean>): Promise<boolean> {
-  if (activeFrame !== null) return activeFrame;
+export function runOwnedFrame(work: () => Promise<boolean>, joinExisting = true): Promise<boolean> {
+  if (activeFrame !== null) {
+    if (!joinExisting) return Promise.reject(new Error('Another Frame already owns preparation.'));
+    return activeFrame;
+  }
   cancelRequested = false;
   const pending = Promise.resolve()
     .then(work)

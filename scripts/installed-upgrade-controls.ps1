@@ -49,17 +49,21 @@ function Get-UpgradeWindowTitle {
 }
 
 function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null, [switch]$Prefix, [int]$TimeoutSeconds = 30, [switch]$Optional) {
+  # Chromium can expose unrelated provider elements without a ControlType.
+  # Filter in UIA before reading control properties under StrictMode.
+  $controlType = [Windows.Automation.ControlType]::$Role
+  $condition = [Windows.Automation.PropertyCondition]::new([Windows.Automation.AutomationElement]::ControlTypeProperty, $controlType)
   $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
   do {
     Assert-UpgradeApp
     if ($null -eq $Parent) {
-      $root = [Windows.Automation.AutomationElement]::FromHandle($script:upgradeWindow)
+      $root = Get-UpgradeWindowElement $script:upgradeWindow
       if ($root.Current.ProcessId -ne $script:upgradeApp.Id) { throw 'Native root window belongs to another PID.' }
     } else { $root = $Parent }
-    $matches = @($root.FindAll([Windows.Automation.TreeScope]::Descendants, [Windows.Automation.Condition]::TrueCondition) | Where-Object {
-      $_.Current.ControlType.ProgrammaticName -eq "ControlType.$Role" -and
+    $matches = @($root.FindAll([Windows.Automation.TreeScope]::Descendants, $condition) | Where-Object {
+      $controlName = [string]$_.Current.Name
       -not $_.Current.IsOffscreen -and
-      $(if ($Prefix) { $_.Current.Name -eq $Name -or $_.Current.Name.StartsWith($Name + ' ', [StringComparison]::Ordinal) } else { $_.Current.Name -eq $Name })
+      $(if ($Prefix) { $controlName -eq $Name -or $controlName.StartsWith($Name + ' ', [StringComparison]::Ordinal) } else { $controlName -eq $Name })
     })
     if ($matches.Count -gt 1) { throw "Ambiguous native control: $Role $Name" }
     if ($matches.Count -eq 1) { return $matches[0] }
@@ -94,7 +98,14 @@ function Set-UpgradeValue([string]$Name, [string]$Role, [string]$Value, $Parent 
   if (-not $control.Current.IsEnabled) { throw "Native value control is disabled: $Name" }
   $control.SetFocus()
   $control.GetCurrentPattern([Windows.Automation.ValuePattern]::Pattern).SetValue($Value)
-  if ((Get-UpgradeValue $Name $Role $Parent) -ne $Value) { throw "Native value did not read back: $Name" }
+  # UIA can return before Chromium publishes the edited value. Re-read through
+  # the owned window without repeating the edit or accepting a different value.
+  $deadline = [DateTime]::UtcNow.AddSeconds(5)
+  do {
+    if ((Get-UpgradeValue $Name $Role $Parent) -eq $Value) { return }
+    Start-Sleep -Milliseconds 100
+  } while ([DateTime]::UtcNow -lt $deadline)
+  throw "Native value did not read back: $Name"
 }
 
 function Open-UpgradeSettings {

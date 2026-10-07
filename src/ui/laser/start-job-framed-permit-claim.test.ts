@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectControllerDriver } from '../../core/controllers';
-import type { StatusReport } from '../../core/controllers/grbl';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import {
   createLayer,
@@ -13,11 +12,6 @@ import { useStore } from '../state';
 import { useCameraStore } from '../state/camera-store';
 import { useLaserStore, type StartJobOptions } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import {
-  connectWith,
-  makeConnection,
-  type FakeConnection,
-} from '../state/laser-store-motion-operation.test-support';
 import { RecoveryRepository } from '../state/recovery';
 import {
   MemoryRecoveryGenerationStore,
@@ -32,6 +26,11 @@ import { useStartBlockerStore } from './start-blocker-store';
 import { runStartJobFlow } from './start-job-flow';
 import { ensureFramedRunInvalidationSubscriptions } from './framed-run-invalidation';
 import { prepareCurrentStartJob, prepareRecoverySource } from './start-job-source';
+import { installAutoJobReview, useJobReviewStore } from './job-review';
+import {
+  CLAIM_TEST_IDLE_STATUS as idleStatus,
+  installConnectedFramedRun,
+} from './start-job-framed-permit-claim.test-support';
 
 vi.mock('../state/job-aware-dialogs', () => ({
   jobAwareAlert: vi.fn(),
@@ -39,15 +38,7 @@ vi.mock('../state/job-aware-dialogs', () => ({
 }));
 
 const originalStartJob = useLaserStore.getState().startJob;
-const idleStatus: StatusReport = {
-  state: 'Idle',
-  subState: null,
-  mPos: { x: 0, y: 0, z: 0 },
-  wPos: null,
-  feed: 0,
-  spindle: 0,
-  wco: null,
-};
+let uninstallReview = (): void => undefined;
 const lineObject: SceneObject = {
   kind: 'imported-svg',
   id: 'claim-line',
@@ -94,42 +85,6 @@ function pauseNextStartArming(repository: RecoveryRepository) {
   return { arm, release };
 }
 
-async function installConnectedFramedRun(
-  write?: (data: string) => Promise<void>,
-  startJob = originalStartJob,
-) {
-  const connection: FakeConnection = makeConnection(
-    write ??
-      (async (data) => {
-        if (data === '?') {
-          setTimeout(() => {
-            connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-          }, 0);
-        }
-      }),
-  );
-  useLaserStore.setState({
-    ...initialLaserState(),
-    startJob,
-  });
-  await connectWith(connection);
-  const controllerSessionEpoch = useLaserStore.getState().controllerSessionEpoch;
-  useLaserStore.setState({
-    statusReport: idleStatus,
-    controllerOperation: null,
-    pendingUntrackedAcks: 0,
-    controllerSettings: { maxPowerS: 1000, laserModeEnabled: true },
-    controllerSettingsObservation: { sessionEpoch: controllerSessionEpoch, observedAt: 1 },
-    controllerQualification: {
-      kind: 'qualified',
-      epoch: controllerSessionEpoch,
-      settings: 'verified',
-    },
-  });
-  const permit = await installFramedRunPermitForCurrentState();
-  return { connection, verification: permit.candidate.frameVerification };
-}
-
 async function startAcceptedFramedRun() {
   const connected = await installConnectedFramedRun();
 
@@ -153,6 +108,10 @@ beforeEach(async () => {
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
   localStorage.clear();
   resetStore();
+  useJobReviewStore.getState().close();
+  // Each ordinary Start now affirms newly prepared exact bytes, even when
+  // the original Frame fixture already carries older review evidence.
+  uninstallReview = installAutoJobReview('confirm');
   const project = {
     ...createProject({ ...DEFAULT_DEVICE_PROFILE, streamingMode: 'ping-pong' as const }),
     scene: {
@@ -178,6 +137,8 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  uninstallReview();
+  useJobReviewStore.getState().close();
   localStorage.clear();
   useLaserStore.setState({ ...initialLaserState(), startJob: originalStartJob });
   vi.restoreAllMocks();
@@ -279,10 +240,13 @@ describe('ordinary framed Start permit claim', () => {
 
   it('allows only one async owner to claim the same permit', async () => {
     const repository = recoveryRepository();
-    const permit = useLaserStore.getState().framedRun;
+    const frameProof = useLaserStore.getState().framedRun;
     const paused = pauseNextStartArming(repository);
     const first = runStartJobFlow(repository);
     await vi.waitFor(() => expect(paused.arm).toHaveBeenCalledTimes(1));
+    const permit = useLaserStore.getState().framedRun;
+    expect(permit).not.toBe(frameProof);
+    expect(useLaserStore.getState().framedRunStartClaim?.permit).toBe(permit);
 
     await runStartJobFlow(repository);
     expect(paused.arm).toHaveBeenCalledTimes(1);
@@ -391,9 +355,9 @@ describe('ordinary framed Start permit claim', () => {
   });
 
   it('does not revoke a stamped Start-owned Run status at the same position', async () => {
-    const permit = useLaserStore.getState().framedRun;
-    if (permit === null) throw new Error('Expected a framed-run permit.');
     const startJob = vi.fn(async (_gcode: string, options: StartJobOptions = {}) => {
+      const permit = options.framedRunPermit;
+      if (permit === undefined) throw new Error('Expected the reviewed execution permit.');
       const statusSequence = useLaserStore.getState().statusSequence;
       useLaserStore.setState({
         controllerOperation: {

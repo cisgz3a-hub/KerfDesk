@@ -1,175 +1,176 @@
-// Builds the pricing and legal pages that ship with the web app on kerfdesk.com
-// (ADR-524 Amendment 3) from the customer documents in docs/legal/, which the
-// sourced legal review of 29 September 2026 checked (ADR-247 Amendment 2), and
-// the machines and safety pages those documents link. It also writes the terms
-// the app shows when it asks for agreement on first use (ADR-564), and the
-// download page's launch line (ADR-524 Amendment 4). Everything
-// it writes is committed, so a review shows the exact published text, and
-// generate-site-pages.test.mjs and app-terms-module.test.mjs fail when a file is
-// out of date.
-//
-//   node scripts/generate-site-pages.mjs          writes public/<page>/index.html
-//                                                 and src/ui/legal/terms-text.generated.ts
-//   node scripts/generate-site-pages.mjs --check  lists out-of-date files, exits 1
-
+// Default: full review drafts in ignored output. --public-info prepares the
+// finished closed-sales pages for a local build, without deployment or app gates.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import * as prettier from 'prettier';
-
-import { APP_TERMS_MODULE, TERMS_SOURCE, appTermsModule } from './app-terms-module.mjs';
-import { launchNoteHtml, sitePage, SITE_STYLES, SITE_STYLES_FILE } from './site-pages-layout.mjs';
-import { blocksHtml, inlineHtml, readDocument } from './site-pages-markdown.mjs';
+import { legalPublication } from '../website/legal-publication.config.mjs';
+import { commerce } from '../website/commerce.config.mjs';
+import { site } from '../website/site.config.mjs';
+import { renderAppPrivacyDocument } from '../website/lib/layout.mjs';
+import { paymentInformationPages } from '../website/pages/payment-information.mjs';
+import { appPrivacyFiles } from './generate-privacy-page.mjs';
+import { paymentLegalDraftPages } from '../website/pages/payment-legal-drafts.mjs';
+import { LEGAL_DRAFT_STYLES, legalDraftPage } from '../website/lib/legal-draft-layout.mjs';
+import { blocksHtml, escapeText, readDocument } from './site-pages-markdown.mjs';
+import { format } from 'prettier';
 
 export const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const DRAFT_DIRECTORY = 'output/payment-legal-draft';
 
-// The first document is the page; any others follow it as sections.
-export const POLICY_PAGES = [
-  {
-    path: '/pricing/',
-    title: 'Pricing',
-    description:
-      'KerfDesk Free and Pro: what each edition includes, what Pro costs, and how a Pro licence, the trial and refunds work.',
-    sources: ['docs/legal/kerfdesk-pricing.md'],
-  },
-  {
-    path: '/terms/',
-    title: 'Terms of Service',
-    description:
-      'The KerfDesk Terms of Service and Licence Agreement: the terms for the website, KerfDesk Free, the Pro trial and Pro licences.',
-    sources: ['docs/legal/kerfdesk-licence-agreement.md'],
-  },
-  {
-    path: '/privacy/',
-    title: 'Privacy Notice',
-    description:
-      'What personal information KerfDesk, its website and its licensing service collect, why, who handles it, how long it is kept, and your rights.',
-    sources: ['docs/legal/kerfdesk-privacy-notice.md'],
-  },
-  {
-    path: '/refunds/',
-    title: 'Refund Policy',
-    description: 'How refunds work for KerfDesk Pro licences and update extensions.',
-    sources: ['docs/legal/kerfdesk-refund-policy.md'],
-  },
-  {
-    path: '/paia-manual/',
-    title: 'PAIA Manual',
-    description:
-      "KerfDesk's manual under section 51 of South Africa's Promotion of Access to Information Act: the records it holds and how to ask for them.",
-    sources: ['docs/legal/kerfdesk-paia-manual.md'],
-  },
-  {
-    path: '/license/',
-    title: 'Licence and notices',
-    description:
-      'Which terms apply to which KerfDesk versions, the third-party components it includes, and its name.',
-    sources: ['docs/legal/kerfdesk-licence-and-notices.md'],
-  },
-  {
-    path: '/machines/',
-    title: 'Machines',
-    description:
-      'The controllers and machines KerfDesk supports, and how far each has been tested.',
-    sources: ['docs/site/machines.md'],
-  },
-  {
-    path: '/safety/',
-    title: 'Safety',
-    description:
-      'Laser and CNC safety: what KerfDesk cannot do for you, and what to check before every job.',
-    sources: ['docs/safety.md'],
-  },
-];
-
-async function policyPage({ sources, ...page }) {
-  const [first, ...sections] = await Promise.all(
-    sources.map(async (source) =>
-      readDocument(await readFile(path.join(REPO_ROOT, source), 'utf8')),
-    ),
+function localPolicyLinks(html) {
+  return html.replace(
+    /href="https:\/\/kerfdesk[.]com(\/[^"#]*)(#[^"]*)?"/g,
+    (match, url, anchor = '') => {
+      const page = paymentLegalDraftPages.find((candidate) => candidate.path === url);
+      return page ? `href="..${page.path}index.html${anchor}"` : match;
+    },
   );
-  const ids = new Set();
-  const parts = [`<h1>${inlineHtml(first.title)}</h1>`, blocksHtml(first.blocks, { ids })];
-  for (const section of sections) {
-    const heading = { type: 'heading', level: 1, text: section.title };
-    parts.push(blocksHtml([heading, ...section.blocks], { shift: 1, ids }));
+}
+
+export async function buildSitePages(root = REPO_ROOT) {
+  if (legalPublication.status !== 'draft' || legalPublication.publicationDate !== null) {
+    throw new Error(
+      'This renderer is for undated local drafts only; review any publication separately.',
+    );
   }
-  return { ...page, body: parts.join('\n'), sources };
-}
-
-function outputFile(pagePath) {
-  return path.posix.join('public', pagePath, 'index.html');
-}
-
-// Formatted as `prettier --check .` expects, so the committed pages pass it.
-async function formatted(html, file) {
-  const options = (await prettier.resolveConfig(path.join(REPO_ROOT, file))) ?? {};
-  return prettier.format(html, { ...options, filepath: file });
-}
-
-// Map of repository-relative output file to its content.
-export async function buildSitePages() {
-  const pages = await Promise.all(POLICY_PAGES.map(policyPage));
-  const built = new Map();
-  for (const page of pages) {
-    const file = outputFile(page.path);
-    built.set(file, await formatted(sitePage(page), file));
+  const files = new Map([['site-pages.css', LEGAL_DRAFT_STYLES]]);
+  for (const page of paymentLegalDraftPages) {
+    const source = await readFile(path.join(root, page.source), 'utf8');
+    const document = readDocument(source);
+    const body = `<h1>${escapeText(document.title)}</h1>
+${localPolicyLinks(blocksHtml(document.blocks))}`;
+    files.set(`${page.path.slice(1)}index.html`, legalDraftPage({ title: page.title, body }));
   }
-  return built;
-}
-
-export async function buildSiteStyles() {
-  return new Map([[SITE_STYLES_FILE, await formatted(SITE_STYLES, SITE_STYLES_FILE)]]);
-}
-
-// The download page is written by hand. The generator keeps only its launch line,
-// between the two launch-note markers, in step with the other pages.
-export const DOWNLOAD_PAGE = 'public/download.html';
-const LAUNCH_BLOCK = /(<!-- launch-note:[^>]*-->)[\s\S]*?(<!-- \/launch-note -->)/;
-
-export async function buildDownloadPage() {
-  const current = await readFile(path.join(REPO_ROOT, DOWNLOAD_PAGE), 'utf8');
-  if (!LAUNCH_BLOCK.test(current)) throw new Error(`${DOWNLOAD_PAGE} lost its launch-note markers`);
-  const next = current.replace(
-    LAUNCH_BLOCK,
-    (_, open, close) => `${open}\n${launchNoteHtml()}${close}`,
+  files.set(
+    'index.html',
+    legalDraftPage({
+      title: 'Payment and legal review',
+      index: true,
+      body: '<h1>Payment and legal publication drafts</h1><p>Use the navigation to review five source-grounded drafts. Unresolved details are marked. These files do not replace the live website or current app notices.</p>',
+    }),
   );
-  return new Map([[DOWNLOAD_PAGE, await formatted(next, DOWNLOAD_PAGE)]]);
+  return files;
 }
 
-// The terms the app shows on first use (ADR-564), from the terms page's source.
-export async function buildAppTerms() {
-  const source = await readFile(path.join(REPO_ROOT, TERMS_SOURCE), 'utf8');
-  return new Map([[APP_TERMS_MODULE, await formatted(appTermsModule(source), APP_TERMS_MODULE)]]);
-}
-
-async function main(args) {
-  const check = args.includes('--check');
+export async function renderDrafts({ check = false, root = REPO_ROOT } = {}) {
+  const directory = path.join(root, DRAFT_DIRECTORY);
   const stale = [];
-  const outputs = new Map([
-    ...(await buildSitePages()),
-    ...(await buildSiteStyles()),
-    ...(await buildDownloadPage()),
-    ...(await buildAppTerms()),
-  ]);
-  for (const [file, content] of outputs) {
-    const target = path.join(REPO_ROOT, file);
+  for (const [relative, content] of await buildSitePages(root)) {
+    const target = path.join(directory, relative);
     if (check) {
-      const current = await readFile(target, 'utf8').catch(() => null);
-      if (current !== content) stale.push(file);
-      continue;
+      if ((await readFile(target, 'utf8').catch(() => null)) !== content) stale.push(relative);
+    } else {
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, content);
     }
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, content);
-    console.log(`Wrote ${file}`);
   }
-  if (stale.length > 0) {
-    console.error(`Out of date: ${stale.join(', ')}. Run pnpm generate:site-pages.`);
-    process.exitCode = 1;
+  if (stale.length)
+    throw new Error(`Draft output is stale: ${stale.join(', ')}. Rerun the local renderer.`);
+  return directory;
+}
+
+export function closedInformationErrors({ store = commerce, workerText } = {}) {
+  const errors = [];
+  if (store.salesOpen !== false || store.trialOpen !== false)
+    errors.push(
+      'Closed-sales information requires website sales and trial flags to remain closed.',
+    );
+  if (!/"PAYMENTS_ENABLED"\s*:\s*"false"/.test(workerText ?? ''))
+    errors.push('Closed-sales information requires checked-in Worker payments to remain disabled.');
+  return errors;
+}
+
+// Prepare truthful public information independently of the undated commercial
+// drafts. The existing privacy renderer remains the single source for privacy.
+export async function buildPublicInformationFiles({ root = REPO_ROOT, store = commerce } = {}) {
+  const workerText = await readFile(
+    path.join(root, 'services/desktop-licensing/wrangler.jsonc'),
+    'utf8',
+  );
+  const errors = closedInformationErrors({ store, workerText });
+  if (errors.length) throw new Error(errors.join('\n'));
+  const privacy = await appPrivacyFiles();
+  const files = new Map(
+    [...privacy].map(([name, value]) => ['privacy/' + name.replaceAll(path.sep, '/'), value]),
+  );
+  const assets = new Map(
+    [...privacy.keys()]
+      .filter((name) => name.startsWith('assets' + path.sep))
+      .map((name) => {
+        const plain = path.basename(name).replace(/\.[a-f0-9]{10}(?=\.[^.]+$)/, '');
+        return [plain, '/privacy/' + name.replaceAll(path.sep, '/')];
+      }),
+  );
+  const ctx = {
+    site,
+    commerce: store,
+    siteUrl: site.appUrl,
+    appPrivacy: true,
+    asset: (name) => {
+      if (!assets.has(name)) throw new Error('Unknown privacy asset: ' + name);
+      return assets.get(name);
+    },
+    contentSecurityPolicy:
+      "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
+  };
+  for (const page of paymentInformationPages) {
+    const html = renderAppPrivacyDocument(page, page.render(ctx), ctx);
+    if (/\[PLACEHOLDER|data-policy-state="draft"|not published or in force/i.test(html))
+      throw new Error('Unfinished legal content cannot enter public information: ' + page.path);
+    const options = JSON.parse(await readFile(path.join(REPO_ROOT, '.prettierrc'), 'utf8'));
+    files.set(
+      page.path.slice(1) + 'index.html',
+      Buffer.from(await format(html, { ...options, parser: 'html' })),
+    );
   }
+  return files;
+}
+
+export async function renderPublicInformation({
+  check = false,
+  root = REPO_ROOT,
+  directory = path.join(root, 'public'),
+} = {}) {
+  const destination = path.resolve(directory);
+  const workspace = path.resolve(root);
+  if (!destination.startsWith(workspace + path.sep))
+    throw new Error('Information output must remain inside its workspace.');
+  const stale = [];
+  for (const [relative, bytes] of await buildPublicInformationFiles({ root })) {
+    const target = path.join(destination, relative);
+    if (check) {
+      const existing = await readFile(target).catch(() => null);
+      if (!existing || !bytes.equals(existing)) stale.push(relative);
+    } else {
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, bytes);
+    }
+  }
+  if (stale.length) throw new Error('Public information output is stale: ' + stale.join(', '));
+  return destination;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  await main(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  const outIndex = args.indexOf('--out');
+  const allowed = args.filter(
+    (_, index) => outIndex === -1 || (index !== outIndex && index !== outIndex + 1),
+  );
+  if (
+    allowed.some((arg) => !['--check', '--public-info'].includes(arg)) ||
+    (outIndex !== -1 && (!args.includes('--public-info') || !args[outIndex + 1]))
+  )
+    throw new Error(
+      'Usage: node scripts/generate-site-pages.mjs [--check] [--public-info [--out <workspace directory>]]',
+    );
+  if (args.includes('--public-info')) {
+    const directory = outIndex === -1 ? undefined : path.resolve(REPO_ROOT, args[outIndex + 1]);
+    console.log(
+      'Prepared closed-sales information: ' +
+        (await renderPublicInformation({ check: args.includes('--check'), directory })),
+    );
+  } else {
+    console.log('Local draft output: ' + (await renderDrafts({ check: args.includes('--check') })));
+  }
 }

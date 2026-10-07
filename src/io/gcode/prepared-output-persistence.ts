@@ -1,5 +1,6 @@
 import { compileJob, type Group, type RasterGroup } from '../../core/job';
 import type { PreparedOutput } from './prepare-output';
+import { archivedLaserPowerScaleVersion } from '../../core/output/laser-power-scale-version';
 
 export type SuccessfulPreparedOutput = Extract<PreparedOutput, { readonly ok: true }>;
 
@@ -27,14 +28,21 @@ export function prepareOutputForStructuredClone(
 export function hydratePreparedExecutionOutput(
   prepared: SuccessfulPreparedOutput,
 ): SuccessfulPreparedOutput | null {
+  const version = archivedLaserPowerScaleVersion(prepared.laserPowerScaleVersion);
+  if (version === null) return null;
+  const runtime =
+    prepared.laserPowerScaleVersion === version
+      ? prepared
+      : { ...prepared, laserPowerScaleVersion: version };
   const needsHydration = prepared.job.groups.some(
     (group) => group.kind === 'raster' && group.archivedRowProviderRecipe === 'prepared-project',
   );
-  if (!needsHydration) return prepared;
+  if (!needsHydration) return runtime;
   try {
     const compiledRasters = compileJob(
       prepared.project.scene,
       prepared.project.device,
+      version,
     ).groups.filter((group): group is RasterGroup => group.kind === 'raster');
     const used = new Set<number>();
     const groups = prepared.job.groups.map((group): Group => {
@@ -56,7 +64,7 @@ export function hydratePreparedExecutionOutput(
         ...(candidate.rowProvider === undefined ? {} : { rowProvider: candidate.rowProvider }),
       };
     });
-    return { ...prepared, job: { ...prepared.job, groups } };
+    return { ...runtime, job: { ...prepared.job, groups } };
   } catch {
     return null;
   }

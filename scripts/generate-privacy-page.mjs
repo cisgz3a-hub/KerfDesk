@@ -26,7 +26,7 @@ export async function appPrivacyFiles() {
   const policy = {
     ...page,
     description:
-      'KerfDesk has no account, analytics or cloud sync. See what the app sends for updates, Pro licensing and aggregate download statistics.',
+      'Read what KerfDesk sends for updates, licensing, aggregate download statistics and optional phone or MCP access. Ordinary use needs no account.',
   };
   const context = {
     site,

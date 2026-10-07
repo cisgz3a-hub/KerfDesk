@@ -5,6 +5,7 @@ import {
   createProject,
   EMPTY_SCENE,
   IDENTITY_TRANSFORM,
+  LASER_MACHINE_CONFIG,
   type SceneObject,
 } from '../../core/scene';
 import { useStore } from '../state';
@@ -19,6 +20,7 @@ import {
   installReviewPendingFramedRunPermitForCurrentState,
 } from './framed-run-testing';
 import { prepareCurrentStartJob } from './start-job-source';
+import { initDeviceSetup, machineSetupProfile } from './device-setup/device-setup-flow';
 
 const lineObject: SceneObject = {
   kind: 'imported-svg',
@@ -90,6 +92,86 @@ afterEach(() => {
 });
 
 describe('completed Frame retention across descriptive device metadata', () => {
+  it('retains Frame when Machine Setup saves the same device with reordered property keys', async () => {
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        machine: LASER_MACHINE_CONFIG,
+        device: {
+          ...state.project.device,
+          capabilities: [...(state.project.device.capabilities ?? []), 'laser-output'],
+        },
+      },
+    }));
+    const permit = await installReviewPendingFramedRunPermitForCurrentState();
+    const before = useStore.getState().project;
+    const draft = initDeviceSetup(before.device, null, {
+      machine: before.machine ?? LASER_MACHINE_CONFIG,
+    });
+    const saved = machineSetupProfile(draft);
+    expect(saved).toEqual(before.device);
+    expect(Object.keys(saved)).not.toEqual(Object.keys(before.device));
+
+    useStore.getState().replaceMachineSetup(saved, draft.draftMachine, draft.cncDraft);
+    expect(useStore.getState().project.scene).toBe(before.scene);
+    expect(useStore.getState().project.machine).toEqual(before.machine);
+    expect(useLaserStore.getState().completedFrame).toBe(permit);
+    expect(useLaserStore.getState().frameVerification).toBe(permit.candidate.frameVerification);
+    const rebuilt = await prepareCurrentStartJob(
+      useStore.getState(),
+      useLaserStore.getState(),
+      useCameraStore.getState(),
+      undefined,
+      false,
+    );
+    if (!rebuilt.ok) throw new Error(rebuilt.messages.join(' '));
+    expect(rebuilt.metrics.frameJobBounds).toEqual(
+      permit.candidate.preparedStart.metrics.frameJobBounds,
+    );
+    expect(rebuilt.metrics.frameMotionBounds).toEqual(
+      permit.candidate.preparedStart.metrics.frameMotionBounds,
+    );
+    expect(rebuilt.gcode).toBe(permit.candidate.preparedStart.gcode);
+  });
+
+  it('retains the implicit Laser Frame when Wizard Save adds its output label and advisory values', async () => {
+    const permit = await installReviewPendingFramedRunPermitForCurrentState();
+    const before = useStore.getState().project;
+    expect(before.machine).toBeUndefined();
+    expect(before.device.capabilities).not.toContain('laser-output');
+    const draft = initDeviceSetup(before.device, null, { machine: LASER_MACHINE_CONFIG });
+    const saved = machineSetupProfile({
+      ...draft,
+      draft: {
+        ...draft.draft,
+        estimateCutTimeScale: 2,
+        estimateTravelTimeScale: 2,
+        noGoZones: [
+          { id: 'clamp', name: 'Clamp', enabled: true, x: 45, y: 375, width: 20, height: 10 },
+        ],
+      },
+    });
+    expect(saved.capabilities).toContain('laser-output');
+    useStore.getState().replaceMachineSetup(saved, draft.draftMachine, draft.cncDraft);
+    expect(useStore.getState().project.machine).toEqual(LASER_MACHINE_CONFIG);
+    expect(useLaserStore.getState().completedFrame).toBe(permit);
+
+    const rebuilt = await prepareCurrentStartJob(
+      useStore.getState(),
+      useLaserStore.getState(),
+      useCameraStore.getState(),
+      undefined,
+      false,
+    );
+    if (!rebuilt.ok) throw new Error(rebuilt.messages.join(' '));
+    expect(rebuilt.gcode).toBe(permit.candidate.preparedStart.gcode);
+    expect(rebuilt.metrics.frameMotionBounds).toEqual(
+      permit.candidate.preparedStart.metrics.frameMotionBounds,
+    );
+    expect(rebuilt.metrics).not.toEqual(permit.candidate.preparedStart.metrics);
+    expect(rebuilt.warnings.join('\n')).toContain('no-go zone "Clamp"');
+  });
+
   it.each<[string, Partial<DeviceProfile>]>([
     ['name', { name: 'Operator-renamed profile' }],
     ['vendor', { vendor: 'Operator vendor note' }],
@@ -144,12 +226,68 @@ describe('completed Frame retention across descriptive device metadata', () => {
       },
     ],
     ['output power', { maxPowerS: 2000 }],
-    ['coordinate origin', { origin: 'rear-right' }],
-  ])('still expires the permit when %s evidence changes', async (_field, patch) => {
+    ['minimum power', { minPowerS: 10 }],
+    ['framing feed', { framingFeedMmPerMin: 3000 }],
+    ['corner timing', { junctionDeviationMm: 0.04 }],
+    ['air command', { airAssistCommand: 'M8' }],
+    ['air restart strategy', { airAssistRestartUnreliable: true }],
+    ['controlled tool-off feed', { controlledLaserOffTravelFeedMmPerMin: 800 }],
+    ['laser-mode profile hint', { laserModeEnabled: false }],
+    ['autofocus button command', { autofocusCommand: 'G30' }],
+    ['Fire button configuration', { fireControl: { enabled: true, maxPowerPercent: 3 } }],
+  ])(
+    'retains spatial Frame and refreshes exact preparation when %s changes',
+    async (_field, patch) => {
+      const permit = await installReviewPendingFramedRunPermitForCurrentState();
+      const before = useStore.getState().project;
+      useStore.setState({ project: { ...before, device: { ...before.device, ...patch } } });
+      expect(useLaserStore.getState().framedRun).toBe(permit);
+      expect(useLaserStore.getState().completedFrame).toBe(permit);
+      expect(useLaserStore.getState().frameVerification).toBe(permit.candidate.frameVerification);
+      const rebuilt = await prepareCurrentStartJob(
+        useStore.getState(),
+        useLaserStore.getState(),
+        useCameraStore.getState(),
+        undefined,
+        false,
+      );
+      if (!rebuilt.ok) throw new Error(rebuilt.messages.join(' '));
+      const framed = permit.candidate.preparedStart;
+      expect(rebuilt.canvasPlan.retentionKey).not.toBe(permit.candidate.executionSignature);
+      expect(rebuilt.metrics.frameJobBounds).toEqual(framed.metrics.frameJobBounds);
+      expect(rebuilt.metrics.frameMotionBounds).toEqual(framed.metrics.frameMotionBounds);
+      if (_field === 'controlled tool-off feed') {
+        expect(rebuilt.gcode).not.toBe(framed.gcode);
+      } else {
+        expect(rebuilt.gcode).toBe(framed.gcode);
+        if (_field === 'output power') {
+          expect(rebuilt.prepared.project.device.maxPowerS).toBe(1000);
+          expect(rebuilt.laserPowerScale).toEqual({
+            maxPowerS: 1000,
+            source: 'controller',
+            controllerSessionEpoch: 7,
+          });
+          expect(useStore.getState().project.device.maxPowerS).toBe(2000);
+          expect(rebuilt.warnings.join('\n')).toContain(
+            "Output power uses the connected controller's $30=1000",
+          );
+        } else if (_field === 'no-go warning') {
+          expect(framed.warnings.join('\n')).not.toContain('Clamp');
+          expect(rebuilt.warnings.join('\n')).toContain('no-go zone "Clamp"');
+        } else if (_field === 'cut calibration' || _field === 'travel calibration') {
+          expect(rebuilt.metrics).not.toEqual(framed.metrics);
+          expect(rebuilt.jobTimingPlan).not.toEqual(framed.jobTimingPlan);
+        }
+      }
+    },
+  );
+
+  it('still expires Frame after the physical coordinate origin changes', async () => {
     const permit = await installReviewPendingFramedRunPermitForCurrentState();
-    const before = useStore.getState().project;
-    useStore.setState({ project: { ...before, device: { ...before.device, ...patch } } });
-    expect(useLaserStore.getState().framedRun).toBeNull();
+    useStore.setState((state) => ({
+      project: { ...state.project, device: { ...state.project.device, origin: 'rear-right' } },
+    }));
+    expect(useLaserStore.getState().completedFrame).toBeNull();
     expect(useLaserStore.getState().frameVerification).toBeNull();
     const rebuilt = await prepareCurrentStartJob(
       useStore.getState(),
@@ -159,19 +297,7 @@ describe('completed Frame retention across descriptive device metadata', () => {
       false,
     );
     if (!rebuilt.ok) throw new Error(rebuilt.messages.join(' '));
-    const framed = permit.candidate.preparedStart;
     expect(rebuilt.canvasPlan.retentionKey).not.toBe(permit.candidate.executionSignature);
-    if (_field === 'output power' || _field === 'coordinate origin') {
-      expect(rebuilt.gcode).not.toBe(framed.gcode);
-    } else {
-      expect(rebuilt.gcode).toBe(framed.gcode);
-      if (_field === 'no-go warning') {
-        expect(framed.warnings.join('\n')).not.toContain('Clamp');
-        expect(rebuilt.warnings.join('\n')).toContain('no-go zone "Clamp"');
-      } else {
-        expect(rebuilt.metrics).not.toEqual(framed.metrics);
-        expect(rebuilt.jobTimingPlan).not.toEqual(framed.jobTimingPlan);
-      }
-    }
+    expect(rebuilt.gcode).not.toBe(permit.candidate.preparedStart.gcode);
   });
 });

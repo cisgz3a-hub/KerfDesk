@@ -1,0 +1,9 @@
+node_modules
+dist
+.wrangler
+pnpm-lock.yaml
+worker-configuration.d.ts
+test-results
+public/third-party-notices.txt
+public/control-scanner-decoder.js
+*.md

@@ -1,3 +1,4 @@
+import { saveProjectAs } from './fixtures/project-save';
 import { writeFileSync } from 'node:fs';
 import type { SceneObject, TextObject } from '../src/core/scene';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
@@ -49,7 +50,7 @@ for (const mode of ['Circular', 'Point Rotation'] as const) {
       .poll(async () => (await composedSvgSnapshot(page)).project)
       .toEqual(created.project);
 
-    await (await toolbarCommand(page, 'Save As...')).click();
+    await saveProjectAs(page, kerfdesk);
     await expect
       .poll(
         async () =>

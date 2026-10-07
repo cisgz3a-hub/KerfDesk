@@ -30,8 +30,9 @@ type EntryPolicy = {
 export function configuredSegmentOrder<T extends CutSegment>(
   segments: ReadonlyArray<T>,
   settings: SegmentOrderSettings,
+  initialCursor?: Vec2,
 ): T[] {
-  const startCursor = startCursorForSegments(segments, settings.startPoint);
+  const startCursor = initialCursor ?? startCursorForSegments(segments, settings.startPoint);
   const policy: EntryPolicy = {
     allowsReverse: settings.pathDirection === 'allow-reverse',
     closedShapeStart: settings.closedShapeStart ?? 'drawn',

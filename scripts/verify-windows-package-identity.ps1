@@ -6,7 +6,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$expectedCompanyName = 'Johannes Stephanus Stolk'
+$expectedCompanyName = 'Johann Stolk'
 $expectedProductName = 'KerfDesk'
 $appFileDescription = 'KerfDesk'
 $installerFileDescription = 'Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.'
@@ -16,7 +16,7 @@ $expectedFileDescription = if ($Kind -eq 'Installer') {
   $appFileDescription
 }
 $copyrightSymbol = [char]0x00A9
-$expectedLegalCopyright = "Copyright $copyrightSymbol 2026 Johannes Stephanus Stolk"
+$expectedLegalCopyright = "Copyright $copyrightSymbol 2026 Johann Stolk"
 
 if (-not (Test-Path -LiteralPath $Executable -PathType Leaf)) {
   throw "Missing packaged Windows executable: $Executable"

@@ -78,12 +78,7 @@ export class LicensingUpdateCache {
     release: ReturnType<typeof verifyLicenceRelease>,
     expectedVersion: string,
   ): boolean {
-    if (
-      this.config.channel !== 'commercial' ||
-      this.mutations !== 0 ||
-      this.authenticationFailed ||
-      this.value === null
-    )
+    if (this.config.channel !== 'commercial' || this.mutations !== 0 || this.value === null)
       return false;
     const { saved, device } = this.value;
     if (release === null || release.version !== expectedVersion) return false;
@@ -96,7 +91,10 @@ export class LicensingUpdateCache {
       this.config.entitlementKeys,
       device,
     );
-    return claims !== null && claimsTakeRelease(claims, saved.lastSeenAt, this.now(), release);
+    return (
+      claims !== null &&
+      claimsTakeRelease(claims, saved.lastSeenAt, this.now(), release, this.authenticationFailed)
+    );
   }
 }
 
@@ -105,11 +103,19 @@ function claimsTakeRelease(
   lastSeenAt: number,
   now: number,
   release: NonNullable<ReturnType<typeof verifyLicenceRelease>>,
+  authenticationFailed: boolean,
 ): boolean {
   // An ended trial leaves a Free device too. A paid licence whose updates have
   // ended keeps its covered version, so its Pro tools stay unlocked.
-  if (claims.accessExpiresAt !== null && now >= claims.accessExpiresAt) return true;
-  return validTime(claims, lastSeenAt, now) && licenceCoversRelease(claims, release);
+  if (claims.accessExpiresAt !== null && Math.max(now, lastSeenAt) >= claims.accessExpiresAt)
+    return true;
+  // Failed licence authentication cannot authorize paid or still-active trial
+  // updates. Free devices need no grant, including a verified ended trial.
+  return (
+    !authenticationFailed &&
+    validTime(claims, lastSeenAt, now) &&
+    licenceCoversRelease(claims, release)
+  );
 }
 
 function validTime(claims: LicenceClaims, lastSeenAt: number, now: number): boolean {

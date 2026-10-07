@@ -1,9 +1,54 @@
 import { describe, expect, it } from 'vitest';
 import { createProject, DEFAULT_PROJECT_OPTIMIZATION, type Project } from '../../core/scene';
+import { LINE_START_REGIONS } from '../../core/scene/project';
 import { deserializeProject } from './deserialize-project';
 import { serializeProject } from './serialize-project';
 
 describe('project cut-planner settings', () => {
+  it('keeps the new Line preference absent on new and existing default files', () => {
+    const fresh = createProject();
+    expect('lineStartRegion' in fresh.optimization).toBe(false);
+    const text = serializeProject(fresh);
+    const reloaded = deserializeProject(text);
+    if (reloaded.kind !== 'ok') throw new Error('Expected default project to load');
+    expect('lineStartRegion' in reloaded.project.optimization).toBe(false);
+    expect(serializeProject(reloaded.project)).toBe(text);
+  });
+
+  it.each(LINE_START_REGIONS)(
+    'round-trips the optional %s Line preference independently',
+    (lineStartRegion) => {
+      const base = createProject();
+      const project: Project = {
+        ...base,
+        optimization: {
+          ...base.optimization,
+          startPoint: 'job-lower-left',
+          travelPolicy: 'source-order',
+          reduceTravelMoves: false,
+          closedShapeStart: 'drawn',
+          lineStartRegion,
+        },
+      };
+      const result = deserializeProject(serializeProject(project));
+      if (result.kind !== 'ok') throw new Error('Expected optional preference to load');
+      expect(result.project.optimization).toEqual(project.optimization);
+    },
+  );
+
+  it.each(['middle', '', 'artwork-center', null, 3])(
+    'rejects an invalid Line preference %s',
+    (lineStartRegion) => {
+      const base = createProject();
+      const result = deserializeProject(
+        JSON.stringify({ ...base, optimization: { ...base.optimization, lineStartRegion } }),
+      );
+      expect(result.kind).toBe('invalid');
+      if (result.kind === 'invalid')
+        expect(result.reason).toContain('optimization.lineStartRegion');
+    },
+  );
+
   it('back-fills defaults on older .lf2 files', () => {
     const oldShape = JSON.stringify({
       schemaVersion: 3, // This legacy shape predates the required v4 jobSetup.

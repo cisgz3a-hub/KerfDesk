@@ -19,7 +19,6 @@ import {
 } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 import { shot } from '../lib/screens.mjs';
-import { site } from '../site.config.mjs';
 import {
   CAMERA,
   DESIGN_POINTS,
@@ -45,10 +44,7 @@ function overview() {
           machine
         </li>
         <li>${statusPill('in-progress')} Part of it works today, and more is being built</li>
-        <li>
-          ${proPill()} Part of the Pro edition.
-          <a href="${site.pricingUrl}">Compare Free and Pro</a>
-        </li>
+        <li>${proPill()} Part of the Pro edition. <a href="/pricing/">Compare Free and Pro</a></li>
       </ul>
       ${featureGrid(OVERVIEW)}`,
   });
@@ -174,7 +170,7 @@ export const page = {
       tone: 'alt',
       eyebrow: 'Images and tracing',
       title: 'Turn pictures into paths or engravings',
-      lead: 'Import PNG and JPG images to trace into vectors or, on a laser, to engrave. Basic tracing is part of Free, and advanced tracing is part of Pro.',
+      lead: 'Import PNG and JPG images to trace into vectors or, on a laser, to engrave. Line Art tracing is part of Free. Every other trace preset is part of Pro.',
       content: featureGrid(IMAGES),
     })}
     ${section({

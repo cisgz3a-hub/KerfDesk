@@ -209,6 +209,7 @@ function resolveEvaluationContext(
 
 function outputOptions(options: PrepareOutputSnapshotOptions): PrepareOutputOptions {
   return {
+    ...(options.laserMaxPowerS === undefined ? {} : { laserMaxPowerS: options.laserMaxPowerS }),
     ...(options.jobOrigin === undefined ? {} : { jobOrigin: options.jobOrigin }),
     ...(options.outputScope === undefined ? {} : { outputScope: options.outputScope }),
     ...(options.contourEntryBounds === undefined
@@ -253,6 +254,7 @@ function snapshotCacheKey(
     contourEntryBounds: options.contourEntryBounds,
     absoluteProgramOffset: options.absoluteProgramOffset,
     workZeroBedPosition: options.workZeroBedPosition,
+    laserMaxPowerS: options.laserMaxPowerS,
     registration: options.registration ?? null,
   });
 }

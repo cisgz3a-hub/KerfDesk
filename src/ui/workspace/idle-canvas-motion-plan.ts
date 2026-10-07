@@ -11,6 +11,7 @@ import { hydratePagedRasterProject } from '../import/paged-raster-hydration';
 import type { JobPlacementSettings, ResolvedJobPlacement } from '../job-placement';
 import { runtimeCoordinatePreparationOptions } from '../job-placement';
 import type { MachineStartSnapshot } from '../laser/start-job-readiness';
+import { laserPowerPreparationOptions } from '../laser/connected-laser-power-scale';
 import { renderVariableText } from '../text/render-variable-text';
 import {
   buildCanvasMarkerPlan,
@@ -44,6 +45,7 @@ export async function buildIdleCanvasMotionPlanFromRequest(
   );
   const preparationProject = await hydratePagedRasterProject(request.project);
   const prepared = await prepareOutputSnapshot(preparationProject, {
+    ...laserPowerPreparationOptions(request.project, request.machine),
     ...(request.resolvedPlacement.ok
       ? runtimeCoordinatePreparationOptions(
           request.project.device,

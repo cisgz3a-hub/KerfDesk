@@ -27,6 +27,7 @@ import {
   type ArchivedCanvasMotionPlan,
 } from './execution-artifact-canvas';
 import { packedMotionManifestBytes } from './packed-motion-manifest';
+import { archivedLaserPowerScaleVersion } from '../../../core/output/laser-power-scale-version';
 import {
   isExecutionProvenance,
   type ExecutionProvenance,
@@ -395,6 +396,7 @@ function hasExecutionPayload(value: Record<string, unknown>): boolean {
   return (
     isRecord(value['prepared']) &&
     value['prepared']['ok'] === true &&
+    archivedLaserPowerScaleVersion(value['prepared']['laserPowerScaleVersion']) !== null &&
     isRecord(value['controller']) &&
     isRecord(value['canvasPlan']) &&
     isRecord(value['archivedControllerObservation']) &&

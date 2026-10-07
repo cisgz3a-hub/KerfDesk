@@ -1,6 +1,7 @@
 import type { GrblState } from '../../core/controllers/grbl';
 import type { FrameVerification } from './frame-verification';
 import type { FrameMotionCandidate } from './framed-run';
+import type { MachineExecutionOwner } from './machine-execution-owner';
 
 export type LaserMotionOperationKind = 'frame' | 'jog';
 export type LaserMotionOperationId = number | symbol;
@@ -9,6 +10,7 @@ type LaserMotionOperationCommon = {
   /** Stable owner for every async transport/ack continuation belonging to one
    * physical motion operation. Carried unchanged across all Frame legs. */
   readonly operationId: LaserMotionOperationId;
+  readonly executionOwner?: MachineExecutionOwner;
   readonly sawControllerBusy: boolean;
   readonly idleStatusReports: number;
   readonly dispatchComplete: boolean;
@@ -17,6 +19,9 @@ type LaserMotionOperationCommon = {
    * same owned settlement lifecycle, but can promote only frameVerification;
    * the richer candidate below is the sole source of a one-use Start permit. */
   readonly verification?: FrameVerification;
+  /** Owned CNC Frame completion target for a safe-Z park or nonnegative
+   * restore, interpreted within the controller's observed Z resolution. */
+  readonly expectedReturnWorkZMm?: number;
   /** Number of leading lines, including the one currently dispatched, whose
    * acknowledgement advances directly to the next line without waiting for a
    * motion status transition. Frame uses this for its instantaneous tool-off
@@ -71,6 +76,7 @@ export function startMotionOperation(
   operationId: LaserMotionOperationId = Symbol('motion-operation'),
   settlementLine?: string,
   verification?: FrameVerification,
+  expectedReturnWorkZMm?: number,
 ): LaserMotionOperation {
   const common = {
     operationId,
@@ -82,6 +88,7 @@ export function startMotionOperation(
     pendingMotionTransportWrites,
     ...(settlementLine === undefined ? {} : { settlementLine }),
     ...(verification === undefined ? {} : { verification }),
+    ...(expectedReturnWorkZMm === undefined ? {} : { expectedReturnWorkZMm }),
   };
   if (kind === 'jog') return { kind, ...common };
   return candidate === undefined ? { kind, ...common } : { kind, ...common, candidate };
@@ -255,16 +262,20 @@ export function takeNextAcknowledgedFramePrefixLine(
   const [line, ...pendingLines] = operation.pendingLines;
   if (line === undefined) return null;
   return {
-    operation: startMotionOperation(
-      'frame',
-      pendingLines,
-      operation.candidate,
-      Math.max(0, remaining - 1),
-      operation.pendingMotionTransportWrites ?? 0,
-      operation.operationId,
-      operation.settlementLine,
-      operation.verification,
-    ),
+    operation: {
+      ...startMotionOperation(
+        'frame',
+        pendingLines,
+        operation.candidate,
+        Math.max(0, remaining - 1),
+        operation.pendingMotionTransportWrites ?? 0,
+        operation.operationId,
+        operation.settlementLine,
+        operation.verification,
+        operation.expectedReturnWorkZMm,
+      ),
+      ...executionOwnerPatch(operation),
+    },
     line,
   };
 }
@@ -286,6 +297,7 @@ export function takeNextMotionLine(
     operation.operationId,
     operation.settlementLine,
     operation.verification,
+    operation.expectedReturnWorkZMm,
   );
   const dispatchesSettlement =
     pendingLines.length === 0 && operation.settlementLine !== undefined
@@ -294,6 +306,7 @@ export function takeNextMotionLine(
   return {
     operation: {
       ...nextOperation,
+      ...executionOwnerPatch(operation),
       ...(operation.mpgInterruptionId === undefined
         ? {}
         : { mpgInterruptionId: operation.mpgInterruptionId }),
@@ -301,6 +314,12 @@ export function takeNextMotionLine(
     },
     line,
   };
+}
+
+function executionOwnerPatch(
+  operation: LaserMotionOperation,
+): Pick<LaserMotionOperationCommon, 'executionOwner'> {
+  return operation.executionOwner === undefined ? {} : { executionOwner: operation.executionOwner };
 }
 
 export function acknowledgeMotionSettlementMarker(

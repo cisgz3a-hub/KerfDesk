@@ -5,6 +5,7 @@ import type { LaserState, LiveRefs } from './laser-store';
 export function controllerOperationOwnsPolling(state: LaserState): boolean {
   const operation = state.controllerOperation;
   if (operation?.kind === 'start-arming') return true;
+  if (operation?.kind === 'job-start-mark') return true;
   // Settings/build-info workflows are terminal-only interactive exchanges.
   // Realtime Alarm reports invalidate controller commands globally, so the
   // background poll must not cancel the exact read that owns this interval.

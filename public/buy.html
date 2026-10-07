@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#171714" />
     <meta
       name="description"
-      content="Meet KerfDesk Pro for Windows. Buy a licence on your phone when sales open, then activate it on your computer. Free tools stay free."
+      content="Connect your phone to KerfDesk on your PC, get the Windows app, or buy a desktop Pro licence when sales open. Free tools stay free."
     />
     <meta
       http-equiv="Content-Security-Policy"
@@ -16,13 +16,19 @@
     <title>KerfDesk — Pro for your next project</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="stylesheet" href="/desktop-checkout.css" />
+    <link rel="stylesheet" href="/phone.css" />
     <script type="module" src="/desktop-checkout.mjs"></script>
   </head>
   <body>
     <a class="skip-link" href="#licence">Skip to licence and purchase</a>
     <header class="site-header">
       <a class="brand" href="/buy.html" aria-label="KerfDesk licence page">Kerf<span>Desk</span></a>
-      <a class="header-link" href="/download.html">Windows app <span aria-hidden="true">↗</span></a>
+      <nav class="header-nav" aria-label="Product">
+        <a class="header-link" href="/phone.html">Phone &amp; MCP</a>
+        <a class="header-link" href="/download.html"
+          >Windows app <span aria-hidden="true">↗</span></a
+        >
+      </nav>
     </header>
     <main>
       <section class="hero" aria-labelledby="page-title">
@@ -41,6 +47,19 @@
         <p class="hero-caption">DESIGN / ENGRAVE / CARVE</p>
       </section>
 
+      <section class="phone-entry" aria-labelledby="phone-heading">
+        <div>
+          <p class="eyebrow">ALREADY USING KERFDESK ON YOUR PC?</p>
+          <h2 id="phone-heading">Your workspace. On your phone.</h2>
+          <p>
+            Connect to your open desktop app to view artwork or make edits you approve on the PC.
+          </p>
+        </div>
+        <a class="phone-button" href="/phone.html"
+          >Set up Phone &amp; MCP <span aria-hidden="true">→</span></a
+        >
+      </section>
+
       <div class="page-grid">
         <section class="licence-card" id="licence" aria-labelledby="licence-heading">
           <div class="card-heading">
@@ -57,34 +76,13 @@
           <ul class="licence-facts">
             <li><span aria-hidden="true">✓</span> Three active computers</li>
             <li><span aria-hidden="true">✓</span> One year of updates included</li>
-            <li><span aria-hidden="true">✓</span> Keep using your licensed versions</li>
+            <li><span aria-hidden="true">✓</span> Keep using the versions you own</li>
           </ul>
           <div class="purchase-panel" aria-labelledby="checkout-heading">
-            <h3 id="checkout-heading">Choose your licence</h3>
+            <h3 id="checkout-heading">Make it yours</h3>
             <p id="checkout-status" role="status" aria-live="polite">
               Checking purchase availability…
             </p>
-            <div id="checkout-agreement" hidden>
-              <label>
-                <input type="checkbox" data-checkout-agreement />
-                <span
-                  >I have read and agree to the
-                  <a href="/terms/" target="_blank">Terms of Service</a> and the
-                  <a href="/refunds/" target="_blank">Refund Policy</a>, and I have read the
-                  <a href="/privacy/" target="_blank">Privacy Notice</a>.</span
-                >
-              </label>
-              <label>
-                <input type="checkbox" data-checkout-agreement />
-                <span
-                  >I have read the machine-safety section of the terms (<a
-                    href="/terms/#section-2"
-                    target="_blank"
-                    >section 2</a
-                  >), understand the risks, and will operate my machine safely.</span
-                >
-              </label>
-            </div>
             <button
               id="checkout-open"
               type="button"
@@ -218,7 +216,7 @@
             >
             <p class="small">
               The browser workspace is for desktop computers. This mobile page helps you choose and
-              manage your purchase.
+              manage your purchase, or connect your phone to the open desktop app.
             </p>
           </section>
         </div>
@@ -252,24 +250,11 @@
         </details>
       </section>
     </main>
-    <p class="seller">
-      Our order process is conducted by our online reseller Paddle.com. Paddle.com is the Merchant
-      of Record for all our orders. Paddle provides all customer service inquiries and handles
-      returns.
-    </p>
-    <p class="seller">
-      KerfDesk is made and licensed by Johannes Stephanus Stolk, trading as KerfDesk. For help with
-      a payment, receipt, invoice or refund, go to
-      <a href="https://paddle.net">paddle.net</a>; for help with KerfDesk or your licence, see
-      <a href="/support.html">Support</a>.
-    </p>
-
-    <p class="seller">You buy a licence to use the software, not ownership of it.</p>
     <footer class="site-footer">
       <p>KerfDesk <span>by Ons Houtkombuis</span></p>
       <nav aria-label="Footer">
         <a href="/support.html">Support</a><a href="/eula.txt">App licence</a
-        ><a href="/download.html">Downloads</a>
+        ><a href="/download.html">Downloads</a><a href="/phone.html">Phone &amp; MCP</a>
       </nav>
     </footer>
   </body>

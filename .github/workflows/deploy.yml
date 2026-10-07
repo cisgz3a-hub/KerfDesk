@@ -178,6 +178,10 @@ jobs:
         if: ${{ steps.deployment_identity.outputs.eligible == 'true' }}
         run: pnpm guard:repo
 
+      - name: Prepare the service checks for a manual deployment
+        if: ${{ steps.deployment_identity.outputs.eligible == 'true' && github.event_name == 'workflow_dispatch' }}
+        uses: ./.github/actions/setup-remote-control
+
       - name: Release verification gate
         id: release_check
         # A manual dispatch has no CI run behind it, so it runs the whole gate

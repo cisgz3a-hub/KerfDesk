@@ -37,7 +37,7 @@ export const LIVE_ESTIMATE_COMPILED_SEGMENT_BUDGET = PREPARATION_COMPILED_SEGMEN
 export type LiveJobEstimateOptions = Pick<JobDurationEstimateOptions, 'initialPosition'> &
   Pick<
     PrepareOutputOptions,
-    'contourEntryBounds' | 'absoluteProgramOffset' | 'workZeroBedPosition'
+    'contourEntryBounds' | 'absoluteProgramOffset' | 'workZeroBedPosition' | 'laserMaxPowerS'
   >;
 
 export type LiveJobEstimate =

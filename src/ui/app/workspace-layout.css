@@ -25,6 +25,31 @@
   max-width: min(430px, calc(100% - 100px));
 }
 
+.lf-workspace-panels--compact[data-collapsed='false'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* A project-machine choice or job notice can fill a very short window. Keep
+   the panel header and its scroller usable; scroll the rail when its fixed
+   controls cannot fit instead of shrinking the settings beneath the job dock. */
+.lf-workspace-panels--compact[data-collapsed='false'] > .lf-workspace-panel-body {
+  flex: 1 0 120px;
+  min-height: 120px;
+}
+
+/* Machine controls scroll their whole rail, including the heading. Artwork
+   keeps its heading and tabs outside its scroller and needs more room. */
+.lf-workspace-panels--compact[data-collapsed='false'][data-active-panel='machine']
+  > .lf-workspace-panel-body {
+  flex-basis: 64px;
+  min-height: 64px;
+}
+
+.lf-workspace-panels--compact > .lf-workspace-job-actions {
+  flex-shrink: 0;
+}
+
 .lf-workspace-panel-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

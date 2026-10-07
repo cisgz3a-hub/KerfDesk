@@ -8,6 +8,10 @@ import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import { frameBoundsPreviewOf, type FrameBoundsPreview } from './frame-bounds-preview';
 import { prepareStartInput } from './start-job-input';
 import {
+  laserPowerPreparationOptions,
+  laserPowerScaleBinding,
+} from './connected-laser-power-scale';
+import {
   finalizeStartPreparation,
   inspectPreparedStart,
   type MachineStartSnapshot,
@@ -36,6 +40,7 @@ export async function prepareStartJobAsync(
   );
   if (!input.ok) return input.result;
   const prepared = await prepare(project, {
+    ...laserPowerPreparationOptions(project, machine),
     ...runtimeCoordinatePreparationOptions(
       project.device,
       input.placement,
@@ -61,5 +66,6 @@ export async function prepareStartJobAsync(
     canvasPlanKey,
     printCutRegistration: undefined,
     sourceGeometryChecks: 'full',
+    ...laserPowerScaleBinding(project, machine),
   });
 }

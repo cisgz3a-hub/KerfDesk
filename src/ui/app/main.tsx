@@ -34,7 +34,6 @@ import { PlatformProvider } from './platform-context';
 import { EditionProvider } from '../licensing/EditionProvider';
 import { watchPreloadErrors } from './preload-error-toast';
 import { DesktopStartupGate } from './DesktopStartupGate';
-import { TermsAgreementGate } from '../legal/TermsAgreementGate';
 
 const rootElement = document.getElementById('app-root');
 if (rootElement === null) {
@@ -105,21 +104,19 @@ createRoot(rootElement).render(
   <StrictMode>
     <ErrorBoundary softwareAbort={softwareAbort}>
       <PlatformProvider adapter={adapter}>
-        <TermsAgreementGate>
-          <DesktopStartupGate>
-            <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>
-              <EditionProvider
-                {...(import.meta.env.DEV &&
-                (import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'test')
-                  ? { unlicensedRunsFree: false }
-                  : {})}
-                {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
-              >
-                <App />
-              </EditionProvider>
-            </DesktopDownloadContext.Provider>
-          </DesktopStartupGate>
-        </TermsAgreementGate>
+        <DesktopStartupGate>
+          <DesktopDownloadContext.Provider value={resolveWindowsDesktopDownload}>
+            <EditionProvider
+              {...(import.meta.env.DEV &&
+              (import.meta.env.MODE === 'desktop' || import.meta.env.MODE === 'test')
+                ? { unlicensedRunsFree: false }
+                : {})}
+              {...(desktopLicenceClient === undefined ? {} : { client: desktopLicenceClient })}
+            >
+              <App />
+            </EditionProvider>
+          </DesktopDownloadContext.Provider>
+        </DesktopStartupGate>
       </PlatformProvider>
     </ErrorBoundary>
   </StrictMode>,

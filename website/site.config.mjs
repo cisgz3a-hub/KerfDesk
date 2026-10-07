@@ -23,6 +23,8 @@ export const site = {
   // run that check or find the newest version itself: its desktop buttons open
   // that page instead of naming a version or linking an installer directly.
   downloadPageUrl: `${APP_URL}/download.html`,
+  // The app's canvas-free phone pairing guide, shipped alongside buy/download.
+  phoneSetupUrl: `${APP_URL}/phone.html`,
   downloadHost: 'dl.kerfdesk.com',
   // Help > Get Help and Help > Report a Problem in the app open this page. It
   // names the current contact route, including the support email address.
@@ -34,17 +36,6 @@ export const site = {
   noticesUrl: `${APP_URL}/third-party-notices.txt`,
   // The licensing service the app uses for Pro trials and activation.
   licensingHost: 'license.kerfdesk.com',
-  // The pricing, legal and licence pages. The app publishes them from the
-  // checked texts in docs/legal (scripts/generate-site-pages.mjs), so this site
-  // links them instead of keeping its own copies (ADR-247 Amendment 2).
-  pricingUrl: `${APP_URL}/pricing/`,
-  termsUrl: `${APP_URL}/terms/`,
-  privacyUrl: `${APP_URL}/privacy/`,
-  refundsUrl: `${APP_URL}/refunds/`,
-  paiaManualUrl: `${APP_URL}/paia-manual/`,
-  licenseUrl: `${APP_URL}/license/`,
-  // The seller named in the terms: an individual trading as KerfDesk.
-  owner: 'Johannes Stephanus Stolk',
   studio: 'Ons Houtkombuis',
 };
 
@@ -53,7 +44,8 @@ export const primaryNav = [
   { key: 'features', label: 'Features', href: '/features/' },
   { key: 'machines', label: 'Machines', href: '/machines/' },
   { key: 'docs', label: 'Get started', href: '/docs/' },
-  { key: 'pricing', label: 'Pricing', href: site.pricingUrl },
+  { key: 'phone', label: 'Phone & MCP', href: '/phone/' },
+  { key: 'pricing', label: 'Pricing', href: '/pricing/' },
   { key: 'faq', label: 'FAQ', href: '/faq/' },
 ];
 
@@ -66,13 +58,14 @@ export const footerNav = [
       { label: 'CNC', href: '/cnc/' },
       { label: 'Machines', href: '/machines/' },
       { label: 'Download', href: '/download/' },
-      { label: 'Pricing', href: site.pricingUrl },
+      { label: 'Pricing', href: '/pricing/' },
     ],
   },
   {
     heading: 'Help',
     links: [
       { label: 'Get started', href: '/docs/' },
+      { label: 'Phone & MCP', href: '/phone/' },
       { label: 'Safety', href: '/safety/' },
       { label: 'FAQ', href: '/faq/' },
       { label: 'Support', href: SUPPORT_URL },
@@ -82,11 +75,8 @@ export const footerNav = [
     heading: 'Project',
     links: [
       { label: 'About', href: '/about/' },
-      { label: 'Terms of Service', href: site.termsUrl },
-      { label: 'Privacy Notice', href: site.privacyUrl },
-      { label: 'Refund Policy', href: site.refundsUrl },
-      { label: 'PAIA Manual', href: site.paiaManualUrl },
-      { label: 'Licence and notices', href: site.licenseUrl },
+      { label: 'Privacy', href: '/privacy/' },
+      { label: 'License', href: '/license/' },
     ],
   },
 ];

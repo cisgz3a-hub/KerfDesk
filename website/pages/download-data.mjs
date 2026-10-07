@@ -118,7 +118,8 @@ export function downloadFaq(site, commerce) {
         No. There’s no sign-up or sign-in, and KerfDesk Free needs nothing else.
         ${plan &&
         html`${plan.name} is unlocked with a license, and each device can try ${plan.name} free for
-        ${plan.trialDays} days first, with no card needed.`}
+        ${plan.trialDays} days first, with no card
+        needed${commerce.trialOpen ? '' : ', once the desktop app is released'}.`}
       </p>`,
     },
     {
@@ -127,9 +128,9 @@ export function downloadFaq(site, commerce) {
       answer: html`<p>
         KerfDesk Free costs nothing and has no time limit.
         ${plan &&
-        html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)} plus tax, paid once,
-        with a year of updates.`}
-        Purchase isn’t open yet. See <a href="${site.pricingUrl}">pricing</a>.
+        html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)}, paid once, with a
+        year of updates.`}
+        Purchase isn’t open yet. See <a href="/pricing/">pricing</a>.
       </p>`,
     },
     {

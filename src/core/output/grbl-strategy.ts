@@ -4,7 +4,8 @@
 //   #3 Laser-off on travel: every G0 line carries `S0`.
 //   #5 Deterministic output: fixed decimal precision, LF line endings,
 //      indexed iteration (no Set/Map iteration order).
-//   #7 Power scale honest: S = round((power/100) * device.maxPowerS).
+//   #7 Power uses the prepared execution maximum (ADR-567). Whole-number
+//      ranges retain rounded S; fractional ranges preserve relative precision.
 //
 // Preamble:  G21 (mm), G90 (absolute), M3 S0 (arm laser at zero power —
 //            see preamble() for the $32=0 priming rationale; M3 S0 is
@@ -25,6 +26,7 @@ import type { CutGroup, CutSegment, FillGroup, Group, Job, RasterGroup } from '.
 import { emitRasterGroupWithEnd } from '../raster/emit-raster';
 import { assertNever } from '../scene';
 import { formatGcodeFeedMmPerMin } from '../gcode/feed-word';
+import { formatGcodePowerS } from '../gcode/decimal-word';
 import type { OutputEmitOptions, OutputStrategy } from './output-strategy';
 import { bridgedAirGapIndices } from './air-assist-hold';
 import { withAirKeepAlive } from './air-keep-alive';
@@ -62,6 +64,10 @@ import { laserArcMovesEnabled } from '../devices/laser-arc-moves';
 import { jobWritesArcMoves } from '../job/cut-arc-moves';
 import { arcSegmentBurns } from './grbl-laser-arc-moves';
 import { operationProvenanceComment } from './operation-provenance-comment';
+import {
+  powerScaleVersionForDevice,
+  type LaserPowerScaleVersion,
+} from './laser-power-scale-version';
 
 type CoolantMode = 'off' | 'M7' | 'M8';
 
@@ -110,6 +116,7 @@ function postamble(
 // entryRunwayMm carries the group's ADR-239 tangential entry; undefined keeps
 // legacy byte-identical approach motion.
 type SegmentEmissionContext = {
+  readonly laserPowerScaleVersion: LaserPowerScaleVersion;
   readonly s: number;
   readonly feed: number;
   readonly device: DeviceProfile;
@@ -122,7 +129,7 @@ type SegmentEmissionContext = {
 };
 type GroupEmissionContext = Pick<
   SegmentEmissionContext,
-  'device' | 'dialect' | 'entryBounds' | 'cursor' | 'arcMovesEnabled'
+  'device' | 'dialect' | 'entryBounds' | 'cursor' | 'arcMovesEnabled' | 'laserPowerScaleVersion'
 >;
 
 function emitSegment(seg: CutSegment, context: SegmentEmissionContext): string[] {
@@ -179,7 +186,10 @@ function polylineSegmentBurns(
     const burnEmitted = firstTarget !== null;
     const feedWord =
       !burnEmitted || !dialect.modalFeedrate ? ` F${formatGcodeFeedMmPerMin(feed)}` : '';
-    const sWord = !burnEmitted || dialect.emitSOnEveryBurnMove ? ` S${s}` : '';
+    const sWord =
+      !burnEmitted || dialect.emitSOnEveryBurnMove
+        ? ` S${formatGcodePowerS(s, context.laserPowerScaleVersion)}`
+        : '';
     lines.push(`G1 X${target.x} Y${target.y}${feedWord}${sWord}`);
     firstTarget ??= pt;
     head = target;
@@ -228,7 +238,7 @@ function segmentApproachLines(
 }
 
 function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
-  const s = scaleS(group.power, context.device.maxPowerS);
+  const s = scaleS(group.power, context.device.maxPowerS, context.laserPowerScaleVersion);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
@@ -255,7 +265,7 @@ function emitGroup(group: CutGroup, context: GroupEmissionContext): string {
 }
 
 function emitOffsetFillGroup(group: FillGroup, context: GroupEmissionContext): string {
-  const s = scaleS(group.power, context.device.maxPowerS);
+  const s = scaleS(group.power, context.device.maxPowerS, context.laserPowerScaleVersion);
   const feed = roundedPositiveFeed(group.speed, `Layer ${group.layerId}`);
   const chunks: string[] = [];
   chunks.push(
@@ -288,6 +298,7 @@ function emitRasterGroupHere(group: RasterGroup, context: GroupEmissionContext):
   const operationComment = operationProvenanceComment(group);
   const deferEntry = cursor.litAtStop;
   const emission = emitRasterGroupWithEnd({
+    laserPowerScaleVersion: context.laserPowerScaleVersion,
     sValues: group.sValues,
     ...(group.rowProvider !== undefined ? { rowProvider: group.rowProvider } : {}),
     ...(group.rowProviderOrder !== undefined ? { rowProviderOrder: group.rowProviderOrder } : {}),
@@ -396,6 +407,7 @@ function modeChangeLines(
 // unless an M3 burn may still be lit; the cursor then holds them until the
 // group's first laser-off move (OR-1).
 function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {}): string {
+  const laserPowerScaleVersion = powerScaleVersionForDevice(device, options.laserPowerScaleVersion);
   const dialect = emittedDialect(device, options);
   const arcMovesEnabled = laserArcMovesEnabled(device);
   const parts: string[] = [];
@@ -418,7 +430,16 @@ function emitJob(job: Job, device: DeviceProfile, options: OutputEmitOptions = {
     parts.push(joinedLines(transitionLinesNow(cursor, transition)));
     if (wantedMode !== 'group-managed') mode = wantedMode;
     coolant = nextCoolant;
-    parts.push(emitAnyGroup(group, { device, dialect, entryBounds, cursor, arcMovesEnabled }));
+    parts.push(
+      emitAnyGroup(group, {
+        device,
+        dialect,
+        entryBounds,
+        cursor,
+        arcMovesEnabled,
+        laserPowerScaleVersion,
+      }),
+    );
     if (group.kind === 'raster') mode = 'off'; // raster ends in M5, written or held
   }
   // Job end: held lines, air off and M5 follow the last burn, and the park

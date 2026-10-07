@@ -8,7 +8,7 @@ const verifier = readFileSync(
 );
 
 test('checks the executable product and truthful author metadata', () => {
-  assert.match(verifier, /\$expectedCompanyName = 'Johannes Stephanus Stolk'/);
+  assert.match(verifier, /\$expectedCompanyName = 'Johann Stolk'/);
   assert.match(verifier, /\$expectedProductName = 'KerfDesk'/);
   assert.match(verifier, /\$appFileDescription = 'KerfDesk'/);
   assert.match(verifier, /\$installerFileDescription = 'Focused GRBL CAM application/);
@@ -16,7 +16,7 @@ test('checks the executable product and truthful author metadata', () => {
   assert.match(verifier, /\$copyrightSymbol = \[char\]0x00A9/);
   assert.match(
     verifier,
-    /\$expectedLegalCopyright = "Copyright \$copyrightSymbol 2026 Johannes Stephanus Stolk"/,
+    /\$expectedLegalCopyright = "Copyright \$copyrightSymbol 2026 Johann Stolk"/,
   );
   assert.match(verifier, /\$versionInfo\.CompanyName/);
   assert.match(verifier, /\$versionInfo\.ProductName/);

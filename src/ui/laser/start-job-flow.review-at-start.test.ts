@@ -186,8 +186,13 @@ describe('ADR-237 Start-time Job Review', () => {
     expect(useLaserStore.getState().framedRun).toBe(permit);
   });
 
-  it('streams a birth-reviewed permit without reopening Job Review', async () => {
-    await installFramedRunPermitForCurrentState();
+  it('streams a transient birth-reviewed permit without reopening Job Review', async () => {
+    const installed = await installFramedRunPermitForCurrentState();
+    const permit = {
+      ...installed,
+      candidate: { ...installed.candidate, authorizationContext: 'transient-camera' as const },
+    };
+    useLaserStore.setState({ framedRun: permit });
     let reviewOpened = false;
     const stopObserving = useJobReviewStore.subscribe((store) => {
       if (store.state.kind === 'open') reviewOpened = true;

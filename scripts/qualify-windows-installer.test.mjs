@@ -1,12 +1,221 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 const script = fileURLToPath(new URL('./qualify-windows-installer.ps1', import.meta.url));
+
+test(
+  'Windows PowerShell qualification children can hash files without inheriting incompatible pwsh modules',
+  { skip: process.platform !== 'win32' },
+  () => {
+    const helper = fileURLToPath(new URL('./windows-powershell-process.ps1', import.meta.url));
+    const root = mkdtempSync(path.join(tmpdir(), 'kerfdesk-winps-modules-'));
+    const file = path.join(root, 'saved project [fixture].lf2');
+    const bytes = Buffer.from([0, 1, 127, 128, 255, 13, 10, 42]);
+    writeFileSync(file, bytes);
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    const child = `
+$ErrorActionPreference = 'Stop'
+@{ hash = (Get-FileHash -LiteralPath ${quoted(file)} -Algorithm SHA256).Hash.ToLowerInvariant(); bytes = (Get-Item -LiteralPath ${quoted(file)}).Length; major = $PSVersionTable.PSVersion.Major; marker = $env:KERFDESK_QUALIFICATION_TEST_MARKER } | ConvertTo-Json -Compress
+`;
+    const command = `
+$ErrorActionPreference = 'Stop'
+. ${quoted(helper)}
+# A direct ProcessStartInfo launch does not receive pwsh's native-command path cleanup.
+$coreModules = Join-Path $PSHOME 'Modules'
+$env:PSModulePath = $coreModules
+$env:KERFDESK_QUALIFICATION_TEST_MARKER = 'retained-marker'
+$info = New-QualificationWindowsPowerShell
+$info.UseShellExecute = $false; $info.CreateNoWindow = $true
+$info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
+$info.Arguments = '-NoProfile -NonInteractive -EncodedCommand ${Buffer.from(child, 'utf16le').toString('base64')}'
+$process = [Diagnostics.Process]::Start($info)
+try {
+  $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
+  if (-not $process.WaitForExit(15000)) { $process.Kill(); throw 'Read-only hash probe timed out.' }
+  if ($process.ExitCode -ne 0) { throw $stderr.GetAwaiter().GetResult() }
+  @{ child = ($stdout.GetAwaiter().GetResult() | ConvertFrom-Json); childModulePathRemoved = -not $info.EnvironmentVariables.ContainsKey('PSModulePath'); parentUnchanged = $env:PSModulePath -eq $coreModules } | ConvertTo-Json -Depth 4 -Compress
+} finally { $process.Dispose() }
+`;
+    try {
+      const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', command], {
+        encoding: 'utf8',
+        timeout: 30_000,
+        windowsHide: true,
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, result.stderr);
+      const report = JSON.parse(result.stdout);
+      assert.equal(report.child.hash, createHash('sha256').update(bytes).digest('hex'));
+      assert.equal(report.child.bytes, bytes.length);
+      assert.equal(report.child.major, 5, 'must exercise the native Windows PowerShell host');
+      assert.equal(report.child.marker, 'retained-marker', 'preserve unrelated child variables');
+      assert.equal(report.childModulePathRemoved, true);
+      assert.equal(report.parentUnchanged, true, 'do not rewrite the parent environment');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  },
+);
+
+test(
+  'strict native selectors ignore unsupported descendants without accepting wrong roles or ambiguous owners',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    const helper = fileURLToPath(new URL('./installed-upgrade-controls.ps1', import.meta.url));
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    const command = `
+Set-StrictMode -Version Latest
+. ${quoted(helper)}
+function Assert-UpgradeApp {}
+function Get-UpgradeWindowElement([IntPtr]$Window) { return $script:root }
+function New-Control([string]$Name, [string]$Role, [bool]$Offscreen = $false) {
+  $type = $(if ($Role) { [Windows.Automation.ControlType]::$Role } else { $null })
+  return [pscustomobject]@{ RoleId = $(if ($type) { $type.Id } else { 0 }); Current = [pscustomobject]@{ Name = $Name; ControlType = $type; IsOffscreen = $Offscreen; IsEnabled = $true } }
+}
+$script:upgradeApp = [pscustomobject]@{ Id = 8000 }; $script:upgradeWindow = [IntPtr]9000
+$unsupported = New-Control 'Unsupported provider element' ''
+$wrongRole = New-Control 'Edit' 'Button'
+$edit = New-Control 'Edit' 'MenuItem'
+$hiddenEdit = New-Control 'Edit' 'MenuItem' $true
+$unnamed = New-Control '' 'MenuItem'
+$unnamed.Current.Name = $null
+$settings = New-Control ('Settings... ' + [char]9 + 'Ctrl+,') 'MenuItem'
+$reports = foreach ($case in @(
+  @{ label = 'mixed-provider'; name = 'Edit'; prefix = $false; pid = 8000; controls = @($unsupported, $wrongRole, $edit, $hiddenEdit) },
+  @{ label = 'shortcut-name'; name = 'Settings...'; prefix = $true; pid = 8000; controls = @($unsupported, $unnamed, $settings) },
+  @{ label = 'wrong-role-only'; name = 'Edit'; prefix = $false; pid = 8000; controls = @($unsupported, $wrongRole) },
+  @{ label = 'ambiguous'; name = 'Edit'; prefix = $false; pid = 8000; controls = @($unsupported, $edit, (New-Control 'Edit' 'MenuItem')) },
+  @{ label = 'foreign-root'; name = 'Edit'; prefix = $false; pid = 9001; controls = @($edit) }
+)) {
+  $script:queries = [Collections.Generic.List[int]]::new()
+  $script:root = [pscustomobject]@{ Current = [pscustomobject]@{ ProcessId = $case.pid }; Controls = $case.controls }
+  $script:root | Add-Member -MemberType ScriptMethod -Name FindAll -Value {
+    param($Scope, $Condition)
+    if ($Scope -ne [Windows.Automation.TreeScope]::Descendants) { throw 'Selector escaped descendant scope.' }
+    if ($Condition -eq [Windows.Automation.Condition]::TrueCondition) { return $this.Controls }
+    if ($Condition -isnot [Windows.Automation.PropertyCondition] -or $Condition.Property -ne [Windows.Automation.AutomationElement]::ControlTypeProperty) { throw 'Unexpected native condition.' }
+    $script:queries.Add([int]$Condition.Value)
+    return @($this.Controls | Where-Object { $_.RoleId -eq $Condition.Value })
+  }
+  try {
+    # A supplied dialog exercises the same selector without depending on an OS HWND.
+    $parent = $(if ($case.label -eq 'foreign-root') { $null } else { $script:root })
+    $control = Get-UpgradeControl $case.name 'MenuItem' $parent -Prefix:$case.prefix -TimeoutSeconds 0 -Optional
+    @{ label = $case.label; passed = $true; found = $null -ne $control; name = $(if ($control) { $control.Current.Name } else { $null }); queries = @($script:queries) }
+  } catch { @{ label = $case.label; passed = $false; error = $_.ToString(); queries = @($script:queries) } }
+}
+$reports | ConvertTo-Json -Depth 5 -Compress
+`;
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        windowsHide: true,
+      },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const [mixed, shortcut, missing, ambiguous, foreign] = JSON.parse(result.stdout);
+    assert.equal(mixed.passed, true, mixed.error);
+    assert.equal(mixed.name, 'Edit');
+    assert.deepEqual(mixed.queries, [50011]);
+    assert.equal(shortcut.passed, true, shortcut.error);
+    assert.match(shortcut.name, /^Settings\.\.\.\s+Ctrl\+,/u);
+    assert.equal(missing.passed, true, missing.error);
+    assert.equal(missing.found, false, 'a same-name button cannot satisfy a menu-item selector');
+    assert.equal(ambiguous.passed, false);
+    assert.match(ambiguous.error, /Ambiguous native control/u);
+    assert.equal(foreign.passed, false);
+    assert.match(foreign.error, /another PID/u);
+    assert.deepEqual(foreign.queries, [], 'reject a foreign root before querying descendants');
+  },
+);
+
+test(
+  'native value readback waits for a delayed provider but rejects lost input, disabled controls and ownership changes',
+  {
+    skip: process.platform !== 'win32',
+  },
+  () => {
+    const helper = fileURLToPath(new URL('./installed-upgrade-controls.ps1', import.meta.url));
+    const quoted = (value) => `'${value.replaceAll("'", "''")}'`;
+    const command = `
+Set-StrictMode -Version Latest
+. ${quoted(helper)}
+function Assert-UpgradeApp { if (-not $script:state.owned) { throw 'Native UI process ownership changed.' } }
+function Get-UpgradeControl([string]$Name, [string]$Role, $Parent = $null) { return $script:control }
+$reports = foreach ($case in @(
+  @{ label = 'immediate'; delayReads = 0; enabled = $true; changeOwner = $false },
+  @{ label = 'delayed'; delayReads = 2; enabled = $true; changeOwner = $false },
+  @{ label = 'lost-input'; delayReads = 100000; enabled = $true; changeOwner = $false },
+  @{ label = 'disabled'; delayReads = 0; enabled = $false; changeOwner = $false },
+  @{ label = 'ownership-changed'; delayReads = 0; enabled = $true; changeOwner = $true }
+)) {
+  $script:state = @{ owned = $true; reads = 0; setCount = 0; focusCount = 0; expected = ''; delayReads = $case.delayReads; changeOwner = $case.changeOwner }
+  $value = [pscustomobject]@{}
+  $value | Add-Member -MemberType ScriptProperty -Name Value -Value {
+    $script:state.reads++
+    if ($script:state.reads -le $script:state.delayReads) { return '10' }
+    return $script:state.expected
+  }
+  $script:pattern = [pscustomobject]@{ Current = $value }
+  $script:pattern | Add-Member -MemberType ScriptMethod -Name SetValue -Value {
+    param($Value)
+    $script:state.setCount++; $script:state.expected = $Value
+    if ($script:state.changeOwner) { $script:state.owned = $false }
+  }
+  $script:control = [pscustomobject]@{ Current = [pscustomobject]@{ IsEnabled = $case.enabled } }
+  $script:control | Add-Member -MemberType ScriptMethod -Name SetFocus -Value { $script:state.focusCount++ }
+  $script:control | Add-Member -MemberType ScriptMethod -Name GetCurrentPattern -Value {
+    param($Pattern)
+    if ($Pattern -ne [Windows.Automation.ValuePattern]::Pattern) { throw 'Unexpected value pattern.' }
+    return $script:pattern
+  }
+  try {
+    Set-UpgradeValue 'Recent projects to keep' 'Spinner' '17'
+    @{ label = $case.label; passed = $true; reads = $script:state.reads; setCount = $script:state.setCount; focusCount = $script:state.focusCount }
+  } catch { @{ label = $case.label; passed = $false; error = $_.ToString(); reads = $script:state.reads; setCount = $script:state.setCount; focusCount = $script:state.focusCount } }
+}
+$reports | ConvertTo-Json -Depth 5 -Compress
+`;
+    const result = spawnSync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', command],
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        windowsHide: true,
+      },
+    );
+    assert.ifError(result.error);
+    assert.equal(result.status, 0, result.stderr);
+    const [immediate, delayed, lost, disabled, foreign] = JSON.parse(result.stdout);
+    assert.equal(immediate.passed, true, immediate.error);
+    assert.equal(immediate.reads, 1);
+    assert.equal(delayed.passed, true, delayed.error);
+    assert.equal(delayed.reads, 3);
+    assert.equal(delayed.setCount, 1, 'a stale read must not repeat the user edit');
+    assert.equal(lost.passed, false);
+    assert.match(lost.error, /Native value did not read back/u);
+    assert.equal(disabled.passed, false);
+    assert.match(disabled.error, /disabled/u);
+    assert.equal(disabled.setCount, 0);
+    assert.equal(disabled.focusCount, 0);
+    assert.equal(foreign.passed, false);
+    assert.match(foreign.error, /ownership changed/u);
+    assert.equal(foreign.reads, 0, 'stop reading immediately when the process owner changes');
+  },
+);
 
 test(
   'native ownership keeps the original HWND through transient panes and rejects dead, foreign or recycled owners',

@@ -79,7 +79,12 @@ async function fireBytes(
   const write = vi.fn(async (line: string) => {
     writes.push(line);
   });
-  await fireActions(set, () => state, write).setFireActive(active, FIRE_PERCENT);
+  await fireActions(
+    set,
+    () => state,
+    write,
+    async () => undefined,
+  ).setFireActive(active, FIRE_PERCENT);
   return { bytes: writes.join(''), state };
 }
 

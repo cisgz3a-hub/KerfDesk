@@ -222,7 +222,7 @@ describe('runPreflight — F-A10 check 1: no output layer', () => {
     const project = projectWith(layer);
     const result = runPreflight(project, emit(project));
     expect(result.ok).toBe(false);
-    expect(result.issues.map((i) => i.code)).toContain('no-output-layer');
+    expect(result.issues.map((i) => i.code)).toEqual(['no-output-layer']);
   });
 });
 
@@ -290,9 +290,9 @@ describe('runPreflight — F-A10 check 5: passes < 1', () => {
 
 describe('runPreflight — F-A10 check 6: empty output', () => {
   it('flags empty-output when no G1 lines exist', () => {
-    const project = createProject();
-    const result = runPreflight(project, emit(project));
-    // Empty project has no output layers (different check) AND no G1 lines.
+    const project = projectWith(createLayer({ id: 'L1', color: '#ff0000' }));
+    const result = runPreflight(project, 'G21\nG90\nM5');
+    // Enabled output with missing motion still indicates a generation failure.
     expect(result.issues.map((i) => i.code)).toContain('empty-output');
   });
   // The relief-only specialization of this check lives in

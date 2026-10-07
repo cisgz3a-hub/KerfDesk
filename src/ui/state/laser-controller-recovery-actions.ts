@@ -22,7 +22,12 @@ import type { ControllerWakeOutcome } from './laser-store-action-types';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { pushLog } from './laser-store-helpers';
-import { continueControllerOperation } from './laser-controller-operation';
+import {
+  continueControllerOperation,
+  controllerOperationOwner,
+  controllerRecoveryResetEvidence,
+  registerControllerRecoveryReset,
+} from './laser-controller-operation';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -31,6 +36,12 @@ type GetFn = () => LaserState;
 type SafeWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
 type DriverFn = () => ControllerDriver;
 type RecoveryRefs = ControllerLifecycleRefs & { readonly connection: unknown | null };
+type RecoveryOwnership = {
+  readonly owns: () => boolean;
+  readonly assertOwned: () => void;
+  readonly observedReset: () => boolean;
+  readonly observedAlarm: () => boolean;
+};
 
 export function controllerRecoveryActions(
   set: SetFn,
@@ -70,24 +81,19 @@ async function runWake(
   );
   clearCncLiveCaps();
   cancelControllerLifecycleRefs(refs, 'Controller recovery started.');
-  const resetWriteEpoch = refs.writeEpoch ?? 0;
   let resetSent = false;
-  set((state) => ({
-    ...invalidateControllerSessionEvidence(state),
-    controllerOperation: { kind: 'recovery', phase: 'reset', idleReports: 0 },
-  }));
+  const recovery = beginOwnedRecovery(set, get, refs, driver);
   try {
-    try {
-      await safeWrite(softReset, 'wake');
-    } catch (error) {
-      // Web Serial may deliver the commanded reboot banner before its
-      // write Promise resolves. That observed boundary is stronger than
-      // the old transport Promise, provided recovery still owns it.
-      if (!observedOwnedRecoveryReset(get, refs, resetWriteEpoch)) throw error;
-    }
+    await sendOwnedReset(safeWrite, softReset, recovery);
+    recovery.assertOwned();
     resetSent = true;
+    if (recovery.observedAlarm()) {
+      set(wokeIntoAlarmPatch(alarmNotice));
+      return 'alarm';
+    }
     set(afterResetPatch);
     await waitForFreshIdle(refs, { kind: 'recovery', requiredReports: 1 });
+    recovery.assertOwned();
     set((state) =>
       state.controllerOperation?.kind === 'recovery'
         ? {
@@ -98,7 +104,10 @@ async function runWake(
     );
     return 'idle';
   } catch (err) {
-    if (resetSent && controllerReportsAlarm(get())) {
+    // Reconnect, another Wake, or another operation may own the controller
+    // now. An obsolete Promise must not clear or annotate that owner's state.
+    if (!recovery.owns()) throw err;
+    if (resetSent && recovery.observedAlarm()) {
       set(wokeIntoAlarmPatch(alarmNotice));
       return 'alarm';
     }
@@ -110,6 +119,22 @@ async function runWake(
     }));
     throw err;
   }
+}
+
+async function sendOwnedReset(
+  safeWrite: SafeWriteFn,
+  softReset: string,
+  recovery: RecoveryOwnership,
+): Promise<void> {
+  recovery.assertOwned();
+  try {
+    await safeWrite(softReset, 'wake');
+  } catch (error) {
+    // A reboot banner or terminal Alarm may precede transport completion.
+    // That evidence is stronger only while this exact recovery still owns it.
+    if (!recovery.observedReset() && !recovery.observedAlarm()) throw error;
+  }
+  recovery.assertOwned();
 }
 
 function afterResetPatch(state: LaserState): Partial<LaserState> {
@@ -179,15 +204,67 @@ function controllerReportsAlarm(state: LaserState): boolean {
   return state.alarmCode !== null || state.statusReport?.state === 'Alarm';
 }
 
-function observedOwnedRecoveryReset(
+function beginOwnedRecovery(
+  set: SetFn,
   get: GetFn,
-  refs: ControllerLifecycleRefs,
-  previousWriteEpoch: number,
-): boolean {
-  const state = get();
-  return (
-    (refs.writeEpoch ?? 0) > previousWriteEpoch &&
-    state.connection.kind === 'connected' &&
-    state.controllerOperation?.kind === 'recovery'
-  );
+  refs: RecoveryRefs,
+  driver: DriverFn,
+): RecoveryOwnership {
+  const connection = refs.connection;
+  const connectionAttempt = get().connectionAttempt;
+  const controller = driver();
+  const writeEpoch = refs.writeEpoch ?? 0;
+  const operation = { kind: 'recovery', phase: 'reset', idleReports: 0 } as const;
+  set((state) => ({
+    ...invalidateControllerSessionEvidence(state),
+    controllerOperation: operation,
+  }));
+  const initialEvidence = {
+    sessionEpoch: get().controllerSessionEpoch,
+    writeEpoch,
+    statusSequence: get().statusSequence,
+  };
+  const resetEvidence = () => controllerRecoveryResetEvidence(operation) ?? initialEvidence;
+  const observedReset = () => get().controllerSessionEpoch === resetEvidence().sessionEpoch + 1;
+  const observedAlarm = () => {
+    const state = get();
+    const evidence = resetEvidence();
+    const expectedWriteEpoch = evidence.writeEpoch + (observedReset() ? 1 : 0);
+    const currentWriteEpoch = refs.writeEpoch ?? 0;
+    // A numbered Alarm advances the write epoch. A pure status Alarm is
+    // equally terminal, even when repeating an Alarm that preceded Wake.
+    // Neither can pardon an unrelated write/session epoch change.
+    return (
+      controllerReportsAlarm(state) &&
+      (currentWriteEpoch === expectedWriteEpoch + 1 ||
+        (currentWriteEpoch === expectedWriteEpoch &&
+          state.statusReport?.state === 'Alarm' &&
+          state.statusSequence > evidence.statusSequence))
+    );
+  };
+  const owns = () => {
+    const state = get();
+    const evidence = resetEvidence();
+    return (
+      state.connection.kind === 'connected' &&
+      refs.connection === connection &&
+      state.connectionAttempt === connectionAttempt &&
+      driver() === controller &&
+      state.controllerOperation !== null &&
+      controllerOperationOwner(state.controllerOperation) === operation &&
+      (state.controllerSessionEpoch === evidence.sessionEpoch || observedReset()) &&
+      ((refs.writeEpoch ?? 0) === evidence.writeEpoch + (observedReset() ? 1 : 0) ||
+        observedAlarm())
+    );
+  };
+  registerControllerRecoveryReset(operation, initialEvidence, owns);
+  return {
+    owns,
+    observedReset: () => owns() && observedReset(),
+    observedAlarm: () => owns() && observedAlarm(),
+    assertOwned: () => {
+      if (!owns())
+        throw new Error('Controller recovery was superseded by another session or operation.');
+    },
+  };
 }

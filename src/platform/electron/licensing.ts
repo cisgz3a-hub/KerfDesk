@@ -1,4 +1,6 @@
 import type { CommercialUpdateStatus, EarlyUpdates, LicenceAdapter, LicenceStatus } from '../types';
+import { boundedUpdateRequest } from './update-request';
+import { validUpdateProgress } from './update-progress';
 
 type FetchLicence = (input: string, init: RequestInit) => Promise<Response>;
 const STATES: ReadonlyArray<LicenceStatus['state']> = [
@@ -42,7 +44,12 @@ function validRights(status: LicenceStatus): boolean {
     (status.tier === null || ['trial', 'paid', 'developer'].includes(status.tier)) &&
     [status.accessExpiresAt, status.updatesUntil].every(
       (time) => time === null || Number.isSafeInteger(time),
-    )
+    ) &&
+    (status.trialExpiresInMs === undefined ||
+      (status.tier === 'trial' &&
+        status.accessExpiresAt !== null &&
+        Number.isSafeInteger(status.trialExpiresInMs) &&
+        status.trialExpiresInMs >= 0))
   );
 }
 
@@ -74,7 +81,12 @@ const RELEASE_VERSION = /^\d{1,16}\.\d{1,16}\.\d{1,16}$/;
 export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateStatus {
   if (typeof value !== 'object' || value === null) throw new Error('Invalid update status.');
   const status = value as CommercialUpdateStatus;
-  if (!validUpdateFields(status) || !validManualUpdateStatus(status) || !validUpdateNotes(status))
+  if (
+    !validUpdateFields(status) ||
+    !validManualUpdateStatus(status) ||
+    !validUpdateNotes(status) ||
+    !validUpdateProgress(status)
+  )
     throw new Error('Invalid update status.');
   const { state, currentVersion, version, checkedAt } = status;
   return {
@@ -88,6 +100,15 @@ export function parseCommercialUpdateStatus(value: unknown): CommercialUpdateSta
       ? {}
       : { releaseNotesState: status.releaseNotesState }),
     ...(status.releaseNotes === undefined ? {} : { releaseNotes: [...status.releaseNotes] }),
+    ...(status.downloadProgress === undefined
+      ? {}
+      : {
+          downloadProgress: {
+            phase: status.downloadProgress.phase,
+            receivedBytes: status.downloadProgress.receivedBytes,
+            totalBytes: status.downloadProgress.totalBytes,
+          },
+        }),
   };
 }
 
@@ -141,7 +162,7 @@ function validManualUpdateStatus(status: CommercialUpdateStatus): boolean {
 export function createDesktopLicenceAdapter(
   fetchLicence: FetchLicence = (input, init) => fetch(input, init),
 ): LicenceAdapter {
-  const send = async (action: string, body?: unknown): Promise<unknown> => {
+  const send = async (action: string, body?: unknown, signal?: AbortSignal): Promise<unknown> => {
     const response = await fetchLicence(`./api/licensing/${action}`, {
       method: body === undefined ? 'GET' : 'POST',
       cache: 'no-store',
@@ -152,13 +173,23 @@ export function createDesktopLicenceAdapter(
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      ...(signal === undefined ? {} : { signal }),
     });
     if (!response.ok)
       throw new Error('The desktop licence service is unavailable. Please restart KerfDesk.');
     return response.json() as Promise<unknown>;
   };
-  const request = async (action: string, body?: unknown): Promise<LicenceStatus> =>
-    parseLicenceStatus(await send(action, body));
+  const update = async (action: string, body?: unknown): Promise<CommercialUpdateStatus> =>
+    parseCommercialUpdateStatus(await boundedUpdateRequest((signal) => send(action, body, signal)));
+  const request = async (action: string, body?: unknown): Promise<LicenceStatus> => {
+    const requestedAt = performance.now();
+    const status = parseLicenceStatus(await send(action, body));
+    if (status.trialExpiresInMs === undefined) return status;
+    // Native status may await durable storage before delivery. Subtract the
+    // whole request conservatively, including any activation/network wait.
+    const elapsedMs = Math.max(0, Math.ceil(performance.now() - requestedAt));
+    return { ...status, trialExpiresInMs: Math.max(0, status.trialExpiresInMs - elapsedMs) };
+  };
   return {
     status: () => request('status'),
     activate: (licenseKey) => request('activate', { licenseKey }),
@@ -172,10 +203,12 @@ export function createDesktopLicenceAdapter(
     discardPayment: () => request('discard-payment', {}),
     earlyUpdates: async () => parseEarlyUpdates(await send('early-updates')),
     setEarlyUpdates: async (enabled) => parseEarlyUpdates(await send('early-updates', { enabled })),
-    updateStatus: async () => parseCommercialUpdateStatus(await send('update-status')),
-    checkForUpdates: async () => parseCommercialUpdateStatus(await send('check-updates', {})),
-    downloadUpdate: async () => parseCommercialUpdateStatus(await send('download-update', {})),
+    updateStatus: () => update('update-status'),
+    checkForUpdates: () => update('check-updates', {}),
+    downloadUpdate: () => update('download-update', {}),
     installUpdateOnQuit: async () =>
       parseCommercialUpdateStatus(await send('install-update-on-quit', {})),
+    installUpdateAndClose: async () =>
+      parseCommercialUpdateStatus(await send('install-update-and-close', {})),
   };
 }

@@ -1,5 +1,7 @@
 ## ADR-247 Amendment 2 - No lawyer's review before the first sale (2026-09-29)
 
+> **Current publication scope (8 October 2026):** The owner decision about lawyer review remains recorded here. The finished public information and separate local commercial drafts are now defined in [publishing notes](../legal/publishing-notes.md), as implemented on main by PR #1083. The historical review below does not make a draft published or effective.
+
 **Status:** Accepted | **Date:** 2026-09-29 | **Amends:** ADR-247 "Consequences"; ADR-114's
 consequences; ADR-543 decision 6
 

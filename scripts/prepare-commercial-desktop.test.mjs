@@ -378,6 +378,8 @@ test('afterPack verifies actual ASAR metadata and explicit external terms before
   await mkdir(join(appOutDir, 'resources'), { recursive: true });
   await mkdir(app);
   await mkdir(join(app, 'dist/web'), { recursive: true });
+  await mkdir(join(app, 'dist-electron'), { recursive: true });
+  await writeFile(join(app, 'dist-electron/main.js'), '');
   await writeFile(
     join(app, 'dist/web/index.html'),
     '<meta name="kerfdesk-build-capabilities" content="desktop">',
@@ -584,6 +586,8 @@ test('unsigned afterPack validates production ASAR, renderer, notices and actual
     JSON.stringify(input.releaseKeySet),
   );
   await mkdir(join(app, 'dist/web'), { recursive: true });
+  await mkdir(join(app, 'dist-electron'), { recursive: true });
+  await writeFile(join(app, 'dist-electron/main.js'), '');
   await writeFile(
     join(app, 'dist/web/index.html'),
     '<meta name="kerfdesk-build-capabilities" content="desktop">',

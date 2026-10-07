@@ -53,6 +53,7 @@ $Installer = Assert-ChildPath $Installer $env:GITHUB_WORKSPACE
 if ($Scenario -in @('Full', 'HistoricalUpgrade')) { $UpgradeInstaller = Assert-ChildPath $UpgradeInstaller $env:GITHUB_WORKSPACE }
 $EvidenceRoot = Assert-ChildPath $EvidenceRoot $env:GITHUB_WORKSPACE
 . (Join-Path $PSScriptRoot 'installer-qualification-root.ps1')
+. (Join-Path $PSScriptRoot 'windows-powershell-process.ps1')
 $ownedRoot = Assert-ChildPath (Get-InstallerQualificationRoot $env:RUNNER_TEMP $env:GITHUB_RUN_ID $env:GITHUB_RUN_ATTEMPT $Scenario) $env:RUNNER_TEMP
 $installRoot = Assert-ChildPath (Join-Path $ownedRoot 'KerfDesk Installed') $ownedRoot
 $executable = Join-Path $installRoot 'KerfDesk.exe'
@@ -344,7 +345,7 @@ function Invoke-InstalledSmoke([string]$Label) {
 
 function Invoke-HistoricalProfile([string]$Label, [string]$Phase, [string]$ExpectedVersion, [string]$ExpectedSourceCommit) {
   $output = Join-Path $EvidenceRoot $Label
-  $info = [Diagnostics.ProcessStartInfo]::new((Get-Command powershell.exe).Source)
+  $info = New-QualificationWindowsPowerShell
   $info.UseShellExecute = $false; $info.CreateNoWindow = $true
   $info.RedirectStandardOutput = $true; $info.RedirectStandardError = $true
   foreach ($argument in @('-NoProfile', '-NonInteractive', '-File',

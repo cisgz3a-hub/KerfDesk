@@ -2,6 +2,10 @@ import type { FrameWcsSelection } from '../state/frame-wcs-selection';
 import { useLaserStore } from '../state/laser-store';
 import { hasPendingControllerWrite } from '../state/laser-start-queue-fence';
 import { waitForFreshIdleFramePosition } from './frame-position-readiness';
+import {
+  assertMachineExecutionOwner,
+  type MachineExecutionOwner,
+} from '../state/machine-execution-owner';
 
 const FRAME_QUEUE_SETTLE_TIMEOUT_MS = 1_500;
 const FRAME_QUEUE_POLL_MS = 25;
@@ -40,16 +44,38 @@ export function assertFramePreparationActive(signal?: AbortSignal): void {
   signal?.throwIfAborted();
 }
 
+/** A driver whose parser units also control position reports must normalize
+ * them before placement or compiler snapshots consume any coordinates. */
+export async function normalizeFrameControllerReportUnits(
+  signal?: AbortSignal,
+  owner?: MachineExecutionOwner,
+): Promise<ReadonlyArray<string>> {
+  try {
+    assertMachineExecutionOwner(owner);
+    await useLaserStore.getState().normalizeFrameReportUnits(signal, owner);
+    assertMachineExecutionOwner(owner);
+    return [];
+  } catch (error) {
+    signal?.throwIfAborted();
+    return [
+      `Frame could not confirm controller report units: ${error instanceof Error ? error.message : String(error)}`,
+    ];
+  }
+}
+
 /** Select the emitted G54 frame and retain disclosure of any named WCS change.
  *  An unknown WCS is read first; see frame-wcs-selection.ts (audit CG-2). */
-export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNormalization> {
+export async function normalizeFrameWorkCoordinateSystem(
+  owner?: MachineExecutionOwner,
+): Promise<FrameWcsNormalization> {
+  assertMachineExecutionOwner(owner);
   const before = useLaserStore.getState();
   if (before.capabilities.transport !== 'serial' || before.activeWcs === 'G54') {
     return { ok: true };
   }
   let selection: FrameWcsSelection;
   try {
-    selection = await before.selectPrimaryWcsForFrame();
+    selection = await before.selectPrimaryWcsForFrame(owner);
   } catch (error) {
     return normalizationFailure(
       [
@@ -60,7 +86,8 @@ export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNorm
   }
   if (selection.kind !== 'selected') return { ok: true };
   const warning = knownWcsNormalizationWarning(selection.previous);
-  const queueIssue = await frameControllerQueueIssue();
+  assertMachineExecutionOwner(owner);
+  const queueIssue = await frameControllerQueueIssue(owner?.signal);
   if (queueIssue !== null) return normalizationFailure([queueIssue], warning);
   const afterSelectionSequence = useLaserStore.getState().statusSequence;
   // Ask for the post-G54 report now. Waiting for the periodic poll instead
@@ -82,6 +109,7 @@ export async function normalizeFrameWorkCoordinateSystem(): Promise<FrameWcsNorm
       warning,
     );
   }
+  assertMachineExecutionOwner(owner);
   return warning === undefined ? { ok: true } : { ok: true, warning };
 }
 

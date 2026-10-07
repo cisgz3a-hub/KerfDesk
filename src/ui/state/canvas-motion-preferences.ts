@@ -1,4 +1,5 @@
 import { browserLocalStorage } from './browser-local-storage';
+import { saveComputerPreference } from './preference-persistence';
 
 export const CANVAS_START_MARKERS_KEY = 'laserforge.canvas-start-markers.v1';
 
@@ -16,11 +17,7 @@ export function readCanvasStartMarkersVisible(
 
 export function writeCanvasStartMarkersVisible(
   visible: boolean,
-  storage: PreferenceStorage | null = browserLocalStorage(),
+  storage?: PreferenceStorage | null,
 ): void {
-  try {
-    storage?.setItem(CANVAS_START_MARKERS_KEY, visible ? '1' : '0');
-  } catch {
-    // Storage is optional; the in-memory preference still applies this session.
-  }
+  saveComputerPreference(CANVAS_START_MARKERS_KEY, visible ? '1' : '0', { storage });
 }

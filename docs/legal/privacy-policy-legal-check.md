@@ -1,5 +1,7 @@
 # Legal check: KerfDesk Privacy Policy, general part
 
+> **Historical internal review. Not a current publication claim.** The factual public privacy source is website/pages/privacy.mjs. The full commercial notice remains a local draft; [publishing notes](publishing-notes.md) records the current public information and separate review questions.
+
 > **Superseded.** The page this checked, `kerfdesk-privacy-policy.md`, was replaced on 29
 > September 2026 by the reviewed Privacy Notice (`kerfdesk-privacy-notice.md`), which is now the
 > whole of https://kerfdesk.com/privacy/. That notice meets the four points in section 5 below:

@@ -1,6 +1,8 @@
 # KerfDesk Privacy Notice
 
-**Last updated:** [PLACEHOLDER: publication date]. This version applies from that date.
+> **Draft for review. Not published or in force.** Publication date, public contact disclosures, retention and provider operations remain unresolved. support@kerfdesk.com is the primary support route. Email preference does not establish compliance with required disclosures.
+
+**Last updated:** [PLACEHOLDER: publication date]. No effective date is set for this review draft.
 
 This policy explains what personal information KerfDesk collects, why, who else handles it, how long we keep it, and what rights you have. It covers:
 
@@ -12,18 +14,18 @@ This policy explains what personal information KerfDesk collects, why, who else 
 ## The short version
 
 - KerfDesk has no accounts, analytics, advertising or automatic crash reports. We do not track you across other websites or apps.
-- Your projects, designs, machine settings and jobs stay on your computer. We only see them if you send them to us.
-- Our own pages set no cookies, although our host, Cloudflare, may set a security cookie (section 11). The only page that loads code from another company's servers is our checkout page, which loads Paddle's checkout.
+- Projects stay on your computer unless you send them or approve remote sharing. Optional phone/MCP access processes bounded summaries, approved edits/actions and separately opted-in artwork previews/text (section 3.7).
+- Ordinary product pages add no analytics or advertising. The phone service uses a connection cookie, browser purchase recovery uses local storage, and Paddle may use checkout cookies (sections 3.5, 3.7 and 11).
 - A Pro trial or licence sends our licensing service a few licensing details. They include a one-way code made from your Windows installation's ID, never the ID itself.
 - Paddle resells KerfDesk Pro as merchant of record and takes your payment. We never see your full card number.
 - We do not sell your personal information. We do not send marketing emails unless you ask us to.
 - You can ask to see, correct or delete your information (section 9).
 
-**Pro trials and sales have not opened yet.** The licensed Windows app is not released, and our licensing service is switched off. Sections 3.4 and 3.5 explain what will happen once trials and sales open.
+**Current configuration.** Checked-in production licensing enables activation and trials, while payments and website sales/trial launch flags remain closed. Configuration is separate from live merchant approval. This is a review draft, not the published notice.
 
 ## 1. Who we are
 
-KerfDesk is made and licensed by **Johannes Stephanus Stolk**, a sole proprietor (an individual, not a company) trading as KerfDesk, of [PLACEHOLDER: physical street address], South Africa. In this policy, “we”, “us” and “our” mean him.
+KerfDesk is made and licensed by **Johannes Stephanus Stolk**, a sole proprietor (an individual, not a company) trading as KerfDesk, of [PLACEHOLDER: public legal-service address unresolved], South Africa. In this policy, “we”, “us” and “our” mean him.
 
 He decides how your personal information is used and is responsible for it. South African law calls him the “responsible party”; EU and UK law call him the “controller”. Paddle is responsible for the information it collects at checkout (section 3.5).
 
@@ -32,8 +34,8 @@ He is also our Information Officer under South African law.
 **Contact us** about anything in this policy:
 
 - Email: support@kerfdesk.com (please put “Privacy” in the subject)
-- Post: [PLACEHOLDER: physical street address], South Africa
-- Telephone: [PLACEHOLDER: telephone number]
+- Post: [PLACEHOLDER: public legal-service address unresolved], South Africa
+- Telephone: [PLACEHOLDER: public telephone availability unresolved]
 
 Our PAIA manual, which explains how to ask for records under South Africa's Promotion of Access to Information Act, is at https://kerfdesk.com/paia-manual/.
 
@@ -41,8 +43,8 @@ Our PAIA manual, which explains how to ask for records under South Africa's Prom
 
 - No analytics, telemetry, advertising or tracking.
 - No automatic crash or error reports.
-- No accounts, passwords or cloud sync.
-- No uploading of your projects, drawings, toolpaths, machine settings or job data.
+- No KerfDesk account or automatic project cloud synchronization. Approved phone/MCP clients have separate access credentials.
+- Licensing does not upload projects, drawings, toolpaths, machine settings or jobs. Optional phone/MCP sharing is described separately in section 3.7.
 - No selling or renting of your personal information, and no sharing of it for advertising.
 
 ## 3. What we collect, and why
@@ -52,17 +54,17 @@ Our PAIA manual, which explains how to ask for records under South Africa's Prom
 Cloudflare delivers our website and the web app. Each time your browser asks for a page or file, Cloudflare receives the details every website receives: your IP address, the time, the address of the page, and your browser's standard technical details, such as its type, version and language.
 
 - We add no analytics or tracking. Cloudflare's dashboard shows us overall totals, such as the number of requests and the countries they came from. It also shows details, including the IP address, of requests that Cloudflare's security features block or challenge. We use these only to keep our website working and secure.
-- The web app can connect only to kerfdesk.com and to a camera helper on your own computer. It loads no code from other companies' servers.
+- The ordinary browser workspace uses its documented first-party connections and a camera helper on your computer. A separate payment page loads Paddle checkout; optional remote access uses the distinct service in section 3.7.
 - Your browser keeps the web app's files so that it works offline. When you open the web app online, it checks kerfdesk.com for a newer version. Lesson and CNC bit pictures you open are kept for up to 30 days.
 
 **Why:** to deliver the pages and files you ask for, and to keep them secure.
 
 ### 3.2 What stays on your computer
 
-None of the following is sent to us unless you choose to send it:
+The following remains local unless you send it or approve sharing described in section 3.7:
 
 - **Your projects.** You save them as files, where you choose.
-- **Working data.** KerfDesk keeps an autosaved copy of your open project, your material and bit libraries, your settings (including machine, connection and camera settings, and the names of recent projects), your lesson progress, a checkpoint for resuming an interrupted job, and which version of our terms you agreed to, and when. In a browser, clearing the site data for kerfdesk.com removes them.
+- **Working data.** KerfDesk keeps an autosaved copy of your open project, your material and bit libraries, your settings (including machine, connection and camera settings, and the names of recent projects), your lesson progress, a checkpoint for resuming an interrupted job. In a browser, clearing the site data for kerfdesk.com removes them.
 - **The desktop log.** The desktop app keeps a log file on your computer: a line each time it starts (its version and your operating system), its own messages, and its warnings and errors. On Windows it is in the logs folder inside the laserforge folder in %APPDATA%; Help > Open Data Folder shows it. The app removes licence keys, and writes your home folder as “~”, before a line is saved.
 - **Your saved licence.** The licensed Windows app keeps your licence key, licence details and any unfinished order codes encrypted with Windows' own data protection.
 - **Your machine and cameras.** KerfDesk talks to your machine over the USB cable you connect. In a browser, it can use a USB camera only after you allow it. It asks for video only, never sound, and the picture stays on your computer. The desktop app's camera helper connects only to your own computer and to cameras on your private network, never to the internet. When you open the Camera panel, it looks for a machine's built-in camera at four fixed addresses on your local network.
@@ -71,13 +73,15 @@ None of the following is sent to us unless you choose to send it:
 
 - Installers download from dl.kerfdesk.com, which Cloudflare serves. Our download page also reads the list of versions from there. Cloudflare sees the usual connection details.
 - **Desktop Preview.** When you open it, it asks dl.kerfdesk.com once whether a newer Preview exists. It sends no project, design, machine, job or device details and no cookies, and it identifies itself only as “KerfDesk-Desktop-Preview”. It never downloads or installs anything by itself. The Preview builds never contact our licensing service and never read your Windows installation ID.
-- **Licensed Windows app.** It checks dl.kerfdesk.com for new versions. When a newer version your licence covers exists, it downloads it and installs it when you close KerfDesk. When it fetches an update, its update component also sends a random ID that it created and saved on your computer. This ID is not linked to your licence, and we do not keep or use it.
+- **Current unsigned licensed Windows app.** At startup, every 30 minutes while open and when you choose Check for Updates, it checks dl.kerfdesk.com for available versions. A covered installer downloads only when you choose **Download update**. Installation is armed only when you choose **Install when I close KerfDesk**; it starts after KerfDesk completes its ordinary close safeguards. No project, design, machine or job details are sent. Signed release metadata verifies the downloaded bytes; it is not Windows publisher code signing.
+- **Separate signed Windows lane.** Its update component can download a covered update and apply it at an ordinary close. It can send a random saved update ID. This draft does not establish that this lane is enabled, signed or qualified for release.
+- **Aggregate download statistics.** The owner can view Cloudflare request estimates grouped by date, version, platform and estimated request country. Repeat requests and partial downloads count; VPNs/proxies can affect country. These figures do not identify people or prove installation. The local dashboard saves aggregate figures, without IP addresses, device identifiers or licence details, and adds no tracking script or cookie.
 
 **Why:** to provide the software and updates you asked for, and to keep them secure.
 
 ### 3.4 Pro trials and licences
 
-The licensed Windows app contacts our licensing service at license.kerfdesk.com when you start a trial, activate a licence, deactivate a computer, start a purchase or renewal, or confirm a payment. It also confirms your licence in the background about once a week, when you are online. The web app has no licence and never contacts the service. Our checkout page asks the service only whether checkout is open.
+The licensed Windows app contacts our licensing service at license.kerfdesk.com when you start a trial, activate a licence, deactivate a computer, start a purchase or renewal, or confirm a payment. It also confirms your licence in the background about once a week, when you are online. The ordinary browser workspace does not activate a device. The separate purchase page checks availability, creates an order and claims the fulfilled key through documented browser endpoints. Browser renewal and activation are not supported.
 
 The app sends only:
 
@@ -95,7 +99,7 @@ The licensing service keeps:
 
 It does not keep your name, email address, postal address, IP address or any card details.
 
-Cloudflare receives your IP address, and the app's standard technical details (such as the app's version and your operating system), with each request. The service uses your IP address only to limit how many requests one address can make in a minute, which protects the service, and does not store it. The service also writes a short technical line about each request (its type, result and duration, with no IDs, keys or IP addresses). We do not store these lines.
+Cloudflare receives your IP address, and the app's standard technical details (such as the app's version and your operating system), with each request. The service uses your IP address only to limit how many requests one address can make in a minute, which protects the service, and does not store it. The service also writes a short technical line about each request (its type, result and duration, with no IDs, keys or IP addresses). Workers Logs and sampled diagnostics may retain these bounded lines. Provider retention requires confirmation before publication; this draft does not claim logs are never stored.
 
 You do not have to use a trial or a licence: the Free features work without one. Without the details above, we cannot give you a trial or a licence.
 
@@ -103,20 +107,22 @@ You do not have to use a trial or a licence: the Free features work without one.
 
 ### 3.5 Buying Pro through Paddle
 
-Sales have not opened yet. When they do, you will start a purchase or renewal in the licensed Windows app, and pay on our checkout page.
+Sales have not opened yet. When they do, you can start a new purchase in Help > Licence in the licensed Windows app or on kerfdesk.com/buy.html in a supported browser, including a phone. Renew an existing licence from the Windows app. Paddle checkout handles payment.
 
 **Paddle** is our reseller and the merchant of record for every order. It sells KerfDesk Pro to you, takes the payment, charges tax, sends your receipt and handles refunds. The Paddle company that sells to you is named on your receipt: Paddle.com Inc. in the United States, Paddle.com (Canada) Ltd in Canada, and Paddle.com Market Limited everywhere else. Paddle decides for itself how it uses the information you give it at checkout, under its own privacy notice at https://www.paddle.com/legal/privacy (privacy@paddle.com).
 
-- Our checkout page, kerfdesk.com/buy.html, is the only page on our website that loads code from another company's servers: Paddle's checkout, from cdn.paddle.com. It loads only when you open the page to pay for an order started in the Windows app. Paddle's checkout may store cookies or similar data on your device, and collects details about your device, browser and IP address, to take the payment and prevent fraud.
+- Our checkout page, kerfdesk.com/buy.html, is the only page on our website that loads code from another company's servers: Paddle's checkout, from cdn.paddle.com. It loads when an available checkout is opened for an order created through the Windows app or a supported purchase browser. Paddle's checkout may store cookies or similar data on your device, and collects details about your device, browser and IP address, to take the payment and prevent fraud.
 - You give your payment details, email address, country and, where tax rules need them, your address or business details to Paddle, not to us. We never see your full card number.
 - When a payment is complete, Paddle sends our licensing service a message about it. The message includes the order number, what was bought and the amounts. It also includes Paddle's customer and address reference numbers (and a business reference number if you bought as a business) and, for a card, the card type, last four digits, expiry date and cardholder name. The service keeps only what is listed in section 3.4 and discards the rest.
 - Paddle also lets us see your order information in its seller dashboard: your name and address (if you gave them), your email address, what you bought, the price, tax and date, and your purchase history with us.
 
 We use Paddle's information only to provide and support your licence, to handle refunds, chargebacks and disputes, to prevent fraud, and to keep our accounts.
 
+Browser purchase recovery persistently saves a random request ID, then order ID and claim credential, before opening Paddle. Scripts on that first-party origin can access this storage. Clearing site data or private browsing can lose recovery information. Credentials travel in JSON bodies, never query parameters. Only a verified webhook fulfils an order; the page then claims and displays the key. Save the key and receipt. There is no automatic key email; recovery requires support and private ownership verification.
+
 ### 3.6 When you email us
 
-Email to support@kerfdesk.com passes through Cloudflare Email Routing and arrives in our mailbox at Google (Gmail). We receive whatever you send: your email address and name, your message and any attachments, such as a support report, project files or photos. Cloudflare does not keep the message, but it keeps an activity log showing the sender, recipient, subject and whether the message was delivered, for 31 days.
+Email to support@kerfdesk.com passes through Cloudflare Email Routing and arrives in our mailbox at Google (Gmail). We receive whatever you send: your email address and name, your message and any attachments, such as a support report, project files or photos. The draft assumes the established Cloudflare-to-Gmail support route. Provider message/log handling, current retention periods and account terms still need verification before publication; this draft sets no fixed provider deletion promise.
 
 **Support reports.** Help > Save Support Report, in the web app and the desktop app, saves a text file on your computer for you to read and, if you choose, send to us. It contains:
 
@@ -132,21 +138,37 @@ You do not have to email us or send a report, but without them we may not be abl
 
 **Why:** to answer you and fix problems.
 
+### 3.7 Optional phone and MCP access
+
+Remote access starts turned off and needs no KerfDesk account. If you turn it on in desktop Settings, the app connects to kerfdesk-phone-control.cisgz3a.workers.dev, a separate service hosted by Cloudflare. Each phone or MCP client needs a short-lived pairing code and your approval on the computer. Viewing, artwork editing and machine control are separate permissions. Editing and machine control start unchecked in the PC approval. The computer must stay awake, online and running KerfDesk.
+
+Approved requests and responses pass through this service. Responses contain bounded artwork and operation summaries, machine limits, edition and update status, and material recipes. Editing clients can change supported artwork and ordinary laser operation settings, including text, layout and the shared Undo/Redo history. Separately approved machine-control clients can use discrete Jog, Frame, current Job Review, confirmed Start and Abort. They cannot change the machine connection, send console commands or read arbitrary files. Licence and payment credentials, serial-port identities, saved file paths and complete project files are excluded.
+
+A separate setting, Share artwork previews and text with approved phones and MCP apps, starts turned off. If you enable it on the PC, approved clients can request a bounded PNG artwork preview and existing text contents. Pairing or granting editing permission alone does not enable sharing. Operation labels and artwork-derived warning wording are hidden while sharing is off because they can contain the design's text. An MCP client may send approved summaries, shared previews and text to its AI provider under that provider's privacy terms. Turning sharing off prevents later preview/text reads, but cannot retrieve content already received by a client. Remote access does not synchronize complete project files.
+
+The computer saves its remote identity, opt-in and credentials in a separate file encrypted using operating-system secure storage. The service stores a random computer ID, a generic computer label, a one-way hash of its owner credential, and approved client identifiers, labels, permissions and expiry information. It stores phone-session credentials as one-way hashes. Command arguments and workspace responses are processed in memory and are not written to the service's databases. To prevent repeated machine actions after a lost reply, the service stores bounded records of admitted action IDs, a one-way digest of each command's validated inputs, its approval lease and short outcome flags. These records contain no artwork, text contents, job review or executable G-code. Old action IDs stay consumed for that approval rather than being deleted to make room for another action.
+
+The separate phone page uses a Secure, HttpOnly, SameSite=Strict cookie to keep your approved connection for eight hours. It does not renew that period merely because you visit it. Pairing offers and pending claims expire after five minutes. An MCP access token lasts thirty minutes; an approval with refresh access can last up to thirty days. Authorization transactions and unexchanged authorization codes expire after ten minutes. OAuth client registrations have a ninety-day idle retention period, renewed by successful token exchanges.
+
+Expired pairing and approval records are removed when the computer or client next uses the relevant service, including the expired approval's action records. There is no promised deletion timer for an idle computer. Revoking a connection removes its desktop approval immediately and blocks its old tokens; remaining OAuth action records are removed with that approval. Remaining OAuth database records expire under the limits above or are removed when a refused refresh triggers cleanup. The computer registration and owner-credential hash remain for later reconnection. Turning access off closes the connection immediately and saves a pending revocation; if the computer is offline, the service receives that revocation when it next connects.
+
+Like other web services, Cloudflare receives normal connection details such as your IP address and time. Sampled service logs and platform diagnostic metadata may be retained by the hosting provider; the service does not deliberately log workspace payloads or credentials. You can use the ordinary desktop app without enabling remote access.
+
 ## 4. Our legal reasons for using your information
 
 The law says we need a valid reason for each use of your information. These are ours:
 
-| What we do | EU and UK law (GDPR) | South African law (POPIA) |
-| --- | --- | --- |
-| Deliver our website, web app, downloads and updates, and keep them secure | Our legitimate interests in providing what you ask for, securely (Article 6(1)(f)) | Legitimate interests (section 11(1)(f)) |
-| Provide trials and licences; activate, check and deactivate computers; fulfil orders | Performing our agreement with you (Article 6(1)(b)) | Performing our agreement with you (section 11(1)(b)) |
-| Allow one trial per installation and apply the device limit; prevent abuse and fraud; limit requests per IP address; keep records of our administrative actions | Our legitimate interests in fair licensing, preventing piracy and fraud, and running a secure service (Article 6(1)(f)) | Legitimate interests (section 11(1)(f)) |
-| Answer your emails and support reports | Performing our agreement with you, or our legitimate interest in helping people use KerfDesk (Article 6(1)(b) or (f)) | Section 11(1)(b) or (f) |
-| Handle refunds, chargebacks, disputes and legal claims | Our legitimate interests in resolving them (Article 6(1)(f)) | Section 11(1)(b) or (f) |
-| Keep accounting and tax records | Our legitimate interest in complying with South African tax law (Article 6(1)(f)) | A legal obligation: Tax Administration Act 28 of 2011, section 29 (section 11(1)(c)) |
-| Report security breaches; answer lawful requests from authorities | A legal obligation where EU or UK law applies (Article 6(1)(c)); otherwise our legitimate interests (Article 6(1)(f)) | A legal obligation (section 11(1)(c)) |
-| Move the business to a new owner (section 5) | Our legitimate interest in continuing KerfDesk (Article 6(1)(f)) | Legitimate interests (section 11(1)(f)) |
-| Send marketing emails you ask for | Your consent, which you can withdraw at any time (Article 6(1)(a)) | Your consent (sections 11(1)(a) and 69) |
+| What we do                                                                                                                                                      | EU and UK law (GDPR)                                                                                                    | South African law (POPIA)                                                            |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Deliver our website, web app, downloads and updates, and keep them secure                                                                                       | Our legitimate interests in providing what you ask for, securely (Article 6(1)(f))                                      | Legitimate interests (section 11(1)(f))                                              |
+| Provide trials and licences; activate, check and deactivate computers; fulfil orders                                                                            | Performing our agreement with you (Article 6(1)(b))                                                                     | Performing our agreement with you (section 11(1)(b))                                 |
+| Allow one trial per installation and apply the device limit; prevent abuse and fraud; limit requests per IP address; keep records of our administrative actions | Our legitimate interests in fair licensing, preventing piracy and fraud, and running a secure service (Article 6(1)(f)) | Legitimate interests (section 11(1)(f))                                              |
+| Answer your emails and support reports                                                                                                                          | Performing our agreement with you, or our legitimate interest in helping people use KerfDesk (Article 6(1)(b) or (f))   | Section 11(1)(b) or (f)                                                              |
+| Handle refunds, chargebacks, disputes and legal claims                                                                                                          | Our legitimate interests in resolving them (Article 6(1)(f))                                                            | Section 11(1)(b) or (f)                                                              |
+| Keep accounting and tax records                                                                                                                                 | Our legitimate interest in complying with South African tax law (Article 6(1)(f))                                       | A legal obligation: Tax Administration Act 28 of 2011, section 29 (section 11(1)(c)) |
+| Report security breaches; answer lawful requests from authorities                                                                                               | A legal obligation where EU or UK law applies (Article 6(1)(c)); otherwise our legitimate interests (Article 6(1)(f))   | A legal obligation (section 11(1)(c))                                                |
+| Move the business to a new owner (section 5)                                                                                                                    | Our legitimate interest in continuing KerfDesk (Article 6(1)(f))                                                        | Legitimate interests (section 11(1)(f))                                              |
+| Send marketing emails you ask for                                                                                                                               | Your consent, which you can withdraw at any time (Article 6(1)(a))                                                      | Your consent (sections 11(1)(a) and 69)                                              |
 
 Where we rely on legitimate interests, you can object (section 9).
 
@@ -154,7 +176,7 @@ No law requires you to give us personal information. You need to give the detail
 
 ## 5. Who else handles your information
 
-- **Cloudflare, Inc.** (United States) hosts our website and web app (Cloudflare Pages), runs our licensing service and its database (Cloudflare Workers and Durable Objects), serves our downloads (Cloudflare R2) and forwards support email (Cloudflare Email Routing). It acts for us under its data processing terms. It also uses connection data under its own privacy policy to protect its network from attacks.
+- **Cloudflare, Inc.** (United States) hosts our website and web app (Cloudflare Pages), runs our licensing service and its database (Cloudflare Workers and Durable Objects), serves our downloads (Cloudflare R2) and forwards support email (Cloudflare Email Routing). It provides data processing terms and uses connection data under its own privacy policy to protect its network. Applicable account terms and safeguards remain to be verified for publication.
 - **Google LLC** (United States) provides the mailbox (Gmail) where support email arrives.
 - **Paddle** sells KerfDesk Pro as reseller and merchant of record, under its own privacy notice (section 3.5). We give Paddle order numbers when we ask it to refund an order or to help with a request.
 - **Professional advisers**, such as an accountant or lawyer, who must keep it confidential.
@@ -165,33 +187,24 @@ No law requires you to give us personal information. You need to give the detail
 
 We are in South Africa. Our providers work in other countries:
 
-- Cloudflare runs our services from its data centres around the world. Our licensing database is stored in a Cloudflare location outside South Africa, because Cloudflare does not offer this kind of storage in Africa.
+- Cloudflare runs our services from its data centres around the world. Database location, provider terms and international-transfer arrangements need confirmation; this source inspection did not verify provider placement.
 - Google keeps email in its data centres, which are in the United States and other countries.
 - Paddle is based in the United Kingdom, with companies in the United States, Canada and Ireland.
 
-How we protect it:
-
-- **If you are in South Africa:** these countries' laws may not protect personal information as strongly as POPIA does. We send it there because it is needed to provide what you asked for, such as your licence or an answer to your question about a purchase or licence (POPIA section 72(1)(c)), or, for other emails, because it is for your benefit and we cannot practicably ask your consent first (section 72(1)(e)). Cloudflare is bound by written data protection terms, and Cloudflare and Google take part in the EU–US Data Privacy Framework. Paddle collects its checkout information itself.
-- **If you are in the European Economic Area (the EU, Iceland, Liechtenstein and Norway) or the UK:** information you send us yourself, from the app or by email, is collected directly by us, a business based in South Africa. The EU and UK have not recognised South Africa's law as giving equal protection: there is no “adequacy decision”. When our providers handle it for us, we rely on these safeguards: for Cloudflare, the EU Standard Contractual Clauses and the UK Addendum in its data processing terms, and its certification under the EU–US Data Privacy Framework and its UK extension; for support email held by Google in the United States, Google's certification under the EU–US Data Privacy Framework and its UK extension. Paddle sends us order information under the EU Standard Contractual Clauses and the UK Addendum in its data-sharing terms. Email us for a copy of these safeguards.
+**Transfer safeguards remain unresolved for publication.** The applicable Cloudflare, Google and Paddle account/data-processing terms, their transfer mechanisms and current certifications must be checked against the actual accounts and destinations. This draft does not assert that a particular agreement, certification or exemption already satisfies POPIA, EU or UK requirements. Required copies, representative arrangements and applicable legal bases must be settled before the final notice describes them as established facts.
 
 ## 7. How long we keep it
 
-| Information | How long we keep it |
-| --- | --- |
-| Your licence, its active computers, and the orders that bought or extended it | As long as the licence exists, because a licence you keep for good needs them to activate new computers. We delete them sooner if you ask (section 9). |
-| A licence cancelled after a refund or chargeback, with its computers and orders | 2 years after cancellation. We delete them sooner if you ask (section 9). |
-| Computers you have deactivated | Deleted within 90 days after deactivation. |
-| Trial records (the keyed hash of the installation code, the device label and the trial dates) | Deleted 3 years after the trial ends. We keep them so that each Windows installation gets one trial. |
-| Orders that were never paid, or whose checkout failed | Deleted within 90 days. |
-| Records of payments the service refused | 5 years after we submit the tax return that covers the payment. |
-| Our accounting records of each sale (only what our accounts need, such as the order number, date, product, price, tax and country) | 5 years after we submit the tax return that covers the sale, as South Africa's Tax Administration Act (section 29) requires. |
-| Records of our administrative actions | 5 years after the action. |
-| Backup copies of the licensing database | Up to 90 days. Newer backups replace older ones, so information we delete at your request is gone from our backups within 90 days. |
-| Support emails and their attachments, including support reports | 2 years after our last exchange with you. |
-| Cloudflare's email activity log (the sender, recipient and subject of each email to our support address) | 31 days, set by Cloudflare. |
-| IP addresses | Not kept in our records. Cloudflare keeps its own short-term logs under its own policies. |
-| Paddle's records of your order | Paddle decides, under its privacy notice. |
-| Information on your computer | Until you delete it. |
+The current licensing service has no scheduled retention cleanup. It does not automatically remove unpaid orders, expired trials, revoked licences, administrative audit records or backups after fixed deadlines. Deactivation marks an installation inactive and frees its seat; it does not delete every related record.
+
+- Licence and order records are retained for activation, entitlements, payment reconciliation and support. The implementation does not enforce a maximum retention period. We review these records manually at least monthly and retain them while needed to fulfil a valid licence, resolve a payment or dispute, or meet a legal obligation. There is no automatic deletion timer.
+- An authenticated operator can delete a customer's licence/order and associated records after verifying the request. Paid/developer licences must first be revoked. Administrative audit records remain. There is no customer self-service deletion endpoint.
+- We review support correspondence and private backups manually, remove material no longer needed for the request or licence, and restrict access to material retained for legal obligations or disputes. Provider logs and Paddle payment records follow their providers' published retention criteria; we do not promise an automatic deletion timer for those systems.
+- Paddle retains its own payment records under its notice and legal obligations.
+- Optional remote-service expiry/cleanup is described in section 3.7 and differs from licensing retention. An idle computer has no promised deletion timer.
+- Local project/purchase data remains until it is cleared or deleted. Clearing browser purchase data can prevent recovery; save the key and receipt first.
+
+Email support@kerfdesk.com to request access, correction or deletion. Identity must be verified and any legal retention explained. We verify ownership privately, explain any information we must retain and give the outcome of the request.
 
 ## 8. Security
 
@@ -249,7 +262,7 @@ You can complain to the Information Regulator:
 
 - **Reviewing or changing your information** (including under California law): email us as described above.
 - **Do Not Track.** KerfDesk does not track you across other websites or apps over time, so we do not change anything when your browser sends a Do Not Track signal.
-- **Other companies.** Apart from Paddle's checkout on our checkout page (section 3.5), and Cloudflare's security processing (section 3.1), no other company collects information about your online activities through our website or apps.
+- **Other companies.** Paddle handles checkout information; Cloudflare handles hosting/security; Google handles support email. Optional approved MCP clients can process shared information with their AI provider (section 3.7). We add no advertising or cross-site tracking.
 - **Nevada.** We do not sell personal information. You can still send a request not to sell to our designated address, support@kerfdesk.com.
 
 ## 10. Decisions made by computer
@@ -258,11 +271,11 @@ We make no decisions about you by computer alone that have legal or similarly si
 
 ## 11. Cookies and similar technology
 
-- Our pages set no cookies. We use no analytics, advertising or social media cookies.
+- Ordinary product pages set no application cookies. We use no analytics, advertising or social media cookies. The separate approved phone service uses its connection cookie (section 3.7).
 - The web app and desktop app store working data on your device (section 3.2), because they need it to work. It stays on your device.
-- Cloudflare, which delivers our pages, may set a strictly necessary security cookie (such as __cf_bm or cf_clearance) when it needs to check that a visitor is not an automated attack.
+- Cloudflare, which delivers our pages, may set a strictly necessary security cookie (such as \_\_cf_bm or cf_clearance) when it needs to check that a visitor is not an automated attack.
 - On our checkout page, Paddle's checkout may set cookies or use similar storage to take the payment and prevent fraud. See Paddle's privacy notice.
-- The licensed Windows app's update component saves its random update ID on your computer (section 3.3).
+- Browser purchase recovery saves first-party order/claim data (section 3.5). A separate signed updater can save its random update ID (section 3.3).
 
 ## 12. Children
 
@@ -279,7 +292,7 @@ When we change this policy, we will post the new version here with a new date an
 ## 15. Contact
 
 Johannes Stephanus Stolk, trading as KerfDesk
-[PLACEHOLDER: physical street address], South Africa
+[PLACEHOLDER: public legal-service address unresolved], South Africa
 Email: support@kerfdesk.com
-Telephone: [PLACEHOLDER: telephone number]
+Telephone: [PLACEHOLDER: public telephone availability unresolved]
 Website: https://kerfdesk.com

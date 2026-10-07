@@ -1,3 +1,4 @@
+import { saveProjectAs } from './fixtures/project-save';
 import { toolbarCommand } from './fixtures/workspace-ui';
 import type { Project } from '../src/core/scene';
 import { expect, test } from './fixtures/kerfdesk-test';
@@ -89,7 +90,7 @@ test('an ordinary raster prepares its estimate, markers and full Preview in real
   expect(preparationReplies.map((reply) => reply.kind)).toEqual(
     expect.arrayContaining(['estimate', 'transfer-start', 'transfer-chunk', 'transfer-complete']),
   );
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk, { expectPreparation: true });
   await expect.poll(async () => Object.keys(await kerfdesk.savedFiles()).length).toBeGreaterThan(0);
   const entry = Object.entries(await kerfdesk.savedFiles()).find(([name]) => name.endsWith('.lf2'));
   if (entry === undefined) throw Error('Saved raster project is missing');

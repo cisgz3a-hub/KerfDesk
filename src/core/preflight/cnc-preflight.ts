@@ -81,7 +81,7 @@ export function runCncPreflight(
   appendNoGoZoneIssues(project, config, gcode, options, issues);
   appendPlungedTravelIssues(gcode, config, issues);
 
-  appendEmptyOutputIssue(gcode, issues);
+  if (outputLayers.length > 0) appendEmptyOutputIssue(gcode, issues);
   return { ok: issues.length === 0, issues };
 }
 

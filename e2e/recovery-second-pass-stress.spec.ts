@@ -7,6 +7,7 @@
 
 import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
 import { expect, test } from './fixtures/kerfdesk-test';
+import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 import {
   acknowledgeExactly,
   acknowledgeJobLinesOnly,
@@ -18,7 +19,6 @@ import {
   drainHeldSerialWrites,
   frameCurrentJob,
   IDLE,
-  programLinesSince,
   reopenProject,
   runMenuCommand,
   selectAll,
@@ -99,12 +99,12 @@ for (const acked of [0, 1, 3, 5]) {
     );
     await expect(review).not.toBeVisible();
     await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
-    const burst = programLinesSince(await kerfdesk.events(), resumeMark);
+    const burst = recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), resumeMark);
     expect(burst.length).toBeGreaterThan(0);
     expect(saved.expectedSent.slice(0, burst.length)).toEqual(burst);
 
     await drainHeldSerialWrites(page, kerfdesk, resumeBaselineLines, 400);
-    expect(programLinesSince(await kerfdesk.events(), resumeMark)).toEqual([
+    expect(recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), resumeMark)).toEqual([
       ...saved.expectedSent,
       'G4 P0.01',
     ]);
@@ -184,7 +184,7 @@ test('records a disconnect during post-job settle as an interruption of every li
   );
   await expect(review).not.toBeVisible();
   await drainHeldSerialWrites(page, kerfdesk, resumeBaselineLines, 400);
-  expect(programLinesSince(await kerfdesk.events(), resumeMark)).toEqual([
+  expect(recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), resumeMark)).toEqual([
     ...(saved?.expectedSent ?? []),
     'G4 P0.01',
   ]);
@@ -276,12 +276,8 @@ test('offers darkening once per completion, closes on Escape, re-offers after Ru
   await expect(paint).toBeEnabled();
 
   const runAgain = page.getByRole('button', { name: 'Run same job again from start', exact: true });
-  // Run again needs a fresh Frame, like Start (ADR-372 Amendment 1): the first
-  // run spent its permit.
-  await expect(runAgain).toBeDisabled();
-  await kerfdesk.setAutoAcknowledge(true);
-  await frameCurrentJob(page, kerfdesk);
-  await kerfdesk.setAutoAcknowledge(false);
+  // ADR-565: clean completion retains the unchanged physical footprint.
+  // Replay still reviews and claims its own exact executable program.
   await expect(runAgain).toBeEnabled();
   baselineLines = serialWriteLineCount(await kerfdesk.events());
   await runAgain.click();
@@ -367,9 +363,8 @@ test('opens the finished job from the Machine panel and withdraws it once a late
 
   // A later job that does not finish leaves no job to darken. The earlier
   // completion is not offered in its place.
-  await kerfdesk.setAutoAcknowledge(true);
-  await frameCurrentJob(page, kerfdesk);
-  await kerfdesk.setAutoAcknowledge(false);
+  // The completed Frame still owns this unchanged placement (ADR-565).
+  await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
@@ -433,11 +428,11 @@ test('resumes an image engraving interrupted 150 lines in, finishes it and offer
     review.getByRole('button', { name: 'Start supervised recovery', exact: true }),
   );
   await expect(review).not.toBeVisible();
-  const burst = programLinesSince(await kerfdesk.events(), resumeMark);
+  const burst = recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), resumeMark);
   expect(burst.length).toBeGreaterThan(0);
   expect(saved.expectedSent.slice(0, burst.length)).toEqual(burst);
   await drainHeldSerialWrites(page, kerfdesk, resumeBaselineLines, 2_000);
-  expect(programLinesSince(await kerfdesk.events(), resumeMark)).toEqual([
+  expect(recoveryExecutionLinesSince(kerfdesk, await kerfdesk.events(), resumeMark)).toEqual([
     ...saved.expectedSent,
     'G4 P0.01',
   ]);

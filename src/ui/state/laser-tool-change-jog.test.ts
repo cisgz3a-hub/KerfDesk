@@ -27,6 +27,7 @@ import {
 } from './laser-store-helpers';
 import { respondToTestGrblBuildInfo } from './laser-test-start-helpers';
 import { useStore } from './store';
+import { testAdapter, writeArgs } from '../remote-control/authoring-test-support';
 
 const IDLE = '<Idle|MPos:10.000,20.000,-1.000|FS:0,0|Ov:100,100,100>';
 
@@ -130,6 +131,97 @@ afterEach(async () => {
 });
 
 describe('jog during a drained, fresh-Idle CNC tool-change hold (audit drivers-2)', () => {
+  it('remote control uses the same actual Z jog and keeps Frame and Start unavailable through the held job', async () => {
+    useStore.getState().setMachineKind('cnc');
+    const sent: string[] = [];
+    await holdAtToolChange(makeDevice(sent));
+    const held = useLaserStore.getState();
+    const queueIndex = held.streamer?.queueIndex;
+    const authorityController = new AbortController();
+    const caller = { clientId: 'phone-control-only', sessionId: 'renderer-session' };
+    const authority = {
+      ...caller,
+      signal: authorityController.signal,
+      assertCurrent: () => authorityController.signal.throwIfAborted(),
+    };
+    const remote = testAdapter({
+      canWrite: () => false,
+      getRemoteCaller: () => caller,
+      captureMachineAuthority: () => authority,
+    });
+    try {
+      const status = await remote.execute('get_machine_status', {});
+      expect(status.ok && status.data['availability']).toMatchObject({
+        jog: { available: true },
+        frame: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+        review: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+        start: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+      });
+      sent.length = 0;
+      const args = writeArgs(remote, {
+        axis: 'z',
+        direction: -1,
+        distanceMm: 1,
+        feedMmPerMin: 300,
+      });
+      const accepted = await remote.execute('jog_machine', args);
+      expect(accepted.ok).toBe(true);
+      await expect
+        .poll(
+          async () => {
+            const result = await remote.execute('get_control_operation', {
+              operationId: args.requestId,
+            });
+            return result.ok
+              ? (result.data['operation'] as { state: string }).state
+              : result.error.code;
+          },
+          { timeout: 3000 },
+        )
+        .toBe('completed');
+      expect(sent).toContain('$J=G91 G21 Z-1.000 F300\n');
+      expect(useLaserStore.getState().streamer).toMatchObject({
+        status: 'tool-change',
+        queueIndex,
+      });
+      expect(sent.some((data) => /(^|\n)M0(\n|$)/.test(data))).toBe(false);
+    } finally {
+      remote.dispose();
+    }
+  });
+
+  it('a regular running job exposes factual no-Frame/no-Start readiness and refuses a second native Start', async () => {
+    await holdAtToolChange(makeDevice([]));
+    const held = useLaserStore.getState().streamer!;
+    useLaserStore.setState({ streamer: { ...held, status: 'streaming' } });
+    const caller = { clientId: 'phone', sessionId: 'session' };
+    const authorityController = new AbortController();
+    const authority = {
+      ...caller,
+      signal: authorityController.signal,
+      assertCurrent: () => authorityController.signal.throwIfAborted(),
+    };
+    const remote = testAdapter({
+      canWrite: () => false,
+      getRemoteCaller: () => caller,
+      captureMachineAuthority: () => authority,
+    });
+    try {
+      const status = await remote.execute('get_machine_status', {});
+      expect(status.ok && status.data['job']).toMatchObject({ active: true, state: 'running' });
+      expect(status.ok && status.data['availability']).toMatchObject({
+        jog: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+        frame: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+        review: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+        start: { available: false, reason: ACTIVE_JOB_COMMAND_MESSAGE },
+      });
+      await expect(
+        useLaserStore.getState().startJob(TWO_BIT_JOB, { machineKind: 'cnc' }),
+      ).rejects.toThrow(ACTIVE_JOB_COMMAND_MESSAGE);
+    } finally {
+      remote.dispose();
+    }
+  });
   it('sends the operator jog to the controller and keeps the job held', async () => {
     const sent: string[] = [];
     const device = makeDevice(sent);

@@ -13,11 +13,16 @@ import { machineKindOf, type MachineKind } from '../../core/scene';
 import { Button, Dialog, DialogActions } from '../kit';
 import { LabsFeatureList } from '../laser/LabsSettingsDialog';
 import { useStore } from '../state/store';
+import {
+  retryComputerPreferences,
+  usePreferencePersistenceStore,
+} from '../state/preference-persistence';
 import { SettingsCanvasSection } from './SettingsCanvasSection';
 import { SettingsGeneralSection } from './SettingsGeneralSection';
 import { SettingsMachineSection } from './SettingsMachineSection';
 import { useSettingsDialogStore, type SettingsSectionId } from './settings-dialog-store';
 import { settingsNoteStyle } from './settings-styles';
+import { RemoteAccessSection } from '../remote-access/RemoteAccessSection';
 
 type SectionSpec = {
   readonly id: SettingsSectionId;
@@ -25,6 +30,7 @@ type SectionSpec = {
   readonly title: string;
   // Labs holds laser-only workflows (ADR-101): hidden while the project is CNC.
   readonly laserOnly?: boolean;
+  readonly desktopOnly?: boolean;
 };
 
 export const SETTINGS_SECTIONS: ReadonlyArray<SectionSpec> = [
@@ -49,10 +55,21 @@ export const SETTINGS_SECTIONS: ReadonlyArray<SectionSpec> = [
     title: 'Optional laser workflows that are still being hardware-validated',
     laserOnly: true,
   },
+  {
+    id: 'remote',
+    label: 'Phone & MCP',
+    title: 'Approved remote viewing and editing connections',
+    desktopOnly: true,
+  },
 ];
 
 export function visibleSettingsSections(machineKind: MachineKind): ReadonlyArray<SectionSpec> {
-  return SETTINGS_SECTIONS.filter((entry) => entry.laserOnly !== true || machineKind === 'laser');
+  return SETTINGS_SECTIONS.filter(
+    (entry) =>
+      (entry.laserOnly !== true || machineKind === 'laser') &&
+      (entry.desktopOnly !== true ||
+        (typeof location !== 'undefined' && location.protocol === 'app:')),
+  );
 }
 
 export function SettingsDialog(props: { readonly onClose: () => void }): JSX.Element {
@@ -75,15 +92,33 @@ export function SettingsDialog(props: { readonly onClose: () => void }): JSX.Ele
           <SectionBody id={active} machineKind={machineKind} onClose={props.onClose} />
         </div>
       </div>
-      <p style={settingsNoteStyle}>
-        Changes apply at once and are kept on this computer. None of them is saved in a project.
-      </p>
+      <PreferenceSaveStatus />
       <DialogActions>
         <Button variant="primary" onClick={props.onClose}>
           Done
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function PreferenceSaveStatus(): JSX.Element {
+  const pendingCount = usePreferencePersistenceStore((state) => state.pending.size);
+  if (pendingCount === 0) {
+    return (
+      <p style={settingsNoteStyle}>
+        Changes apply at once and are kept on this computer. None of them is saved in a project.
+      </p>
+    );
+  }
+  return (
+    <div role="status">
+      <p style={settingsNoteStyle}>
+        Some settings could not be saved. Retry saving before closing KerfDesk. These settings are
+        not saved in a project.
+      </p>
+      <Button onClick={retryComputerPreferences}>Retry saving settings</Button>
+    </div>
   );
 }
 
@@ -149,6 +184,8 @@ function SectionBody(props: {
       return <SettingsMachineSection machineKind={props.machineKind} onClose={props.onClose} />;
     case 'labs':
       return <LabsFeatureList />;
+    case 'remote':
+      return <RemoteAccessSection />;
   }
 }
 

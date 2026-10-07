@@ -21,7 +21,7 @@ import {
 } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 import { shot } from '../lib/screens.mjs';
-import { LABELS, MADE, principles, reportLinks } from './about-data.mjs';
+import { LABELS, MADE, PRINCIPLES, reportLinks } from './about-data.mjs';
 
 function purpose(ctx) {
   return section({
@@ -149,7 +149,7 @@ function maker(site) {
       <p>The app’s startup screen reads “Created by ${site.studio}”.</p>
       <p>
         KerfDesk comes in a Free edition with no time limit and a Pro edition with a one-time
-        license. <a href="${site.pricingUrl}">See pricing</a>.
+        license. Purchase opens soon. <a href="/pricing/">See pricing</a>.
       </p>
       <h3>Why the code still says LaserForge</h3>
       <p>
@@ -201,7 +201,7 @@ export const page = {
       eyebrow: 'Principles',
       title: 'What KerfDesk holds to',
       lead: 'Four ideas shape how KerfDesk works and how this site talks about it.',
-      content: featureGrid(principles(ctx.site), { columns: 4 }),
+      content: featureGrid(PRINCIPLES, { columns: 4 }),
     })}
     ${frameFirst()} ${labels()} ${made()} ${maker(ctx.site)} ${reporting(ctx.site)}
     ${ctaBand({

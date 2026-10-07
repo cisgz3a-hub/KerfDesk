@@ -12,7 +12,8 @@ import {
 } from '../workspace/snap-settings';
 import type { SnapGuide } from '../workspace/snapping';
 import { snapGuideStateUpdate } from './snap-guide-state';
-import { readSnapSettings, writeSnapSettings } from './snap-preferences';
+import { hasPendingComputerPreference } from './preference-persistence';
+import { readSnapSettings, SNAP_SETTINGS_KEY, writeSnapSettings } from './snap-preferences';
 
 export type UiSnapState = {
   readonly snapSettings: SnapSettings;
@@ -38,8 +39,10 @@ export function uiSnapSlice(set: SnapSetter): UiSnapState {
           { ...state.snapSettings, ...next },
           state.snapSettings,
         );
-        if (sameSnapSettings(merged, state.snapSettings)) return state;
+        const unchanged = sameSnapSettings(merged, state.snapSettings);
+        if (unchanged && !hasPendingComputerPreference(SNAP_SETTINGS_KEY)) return state;
         writeSnapSettings(merged);
+        if (unchanged) return state;
         return { snapSettings: merged };
       }),
     snapGuides: [],

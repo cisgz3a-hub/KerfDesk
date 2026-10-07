@@ -72,9 +72,8 @@ import {
   PREVIEW_UPDATE_API_PATH,
 } from './preview-update.js';
 import * as updateTrust from './update-channel-trust.js';
-import { createManualCloseApproval } from './manual-update-quit.js';
+import { createDesktopUpdateClose } from './desktop-update-close.js';
 import { installWindowReadinessPolicy } from './window-readiness-policy.js';
-import { installDesktopWindowClose } from './desktop-window-close.js';
 import { sessionPermissionsOnce } from './session-permissions-once.js';
 import { installDesktopProjectOpens } from './desktop-project-open.js';
 import { installDesktopSerialPorts } from './desktop-serial-ports.js';
@@ -88,11 +87,11 @@ import { createDesktopLicensing } from './desktop-licensing.js';
 import { readLicensingConfig } from './licensing-config.js';
 import { refusedDebugSwitch } from './debug-switch-policy.js';
 import { startDesktopSupportLog } from './support-log.js';
-import { installSessionEndGuard, withDesktopActivityRoute } from './session-end-guard.js';
+import { installSessionEndGuard } from './session-end-guard.js';
 import { installTaskbarJobProgress } from './taskbar-job-progress.js';
-import { withSupportRoutes } from './support-routes.js';
-import { withDesktopWindowCommands } from './desktop-window-commands.js';
+import { withDesktopWorkspaceRoutes } from './desktop-routes.js';
 import { createDesktopBackgroundStartup } from './desktop-startup.js';
+import { createDesktopRemoteAccess } from './remote-access/desktop.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -135,7 +134,8 @@ if (process.platform === 'win32') app.setAppUserModelId(DESKTOP_APP_USER_MODEL_I
 let desktopWindowReady = false;
 let quitRequested = false;
 let prepareLicenceQuit: (() => void) | null = null;
-const manualCloseApproval = createManualCloseApproval();
+const remoteAccess = createDesktopRemoteAccess(DESKTOP_DATA_PATH);
+const manualCloseApproval = createDesktopUpdateClose(app, () => BrowserWindow.getAllWindows());
 const reopenDesktopWindow = createDesktopWindowReopener({
   isReady: () => desktopWindowReady,
   isQuitting: () => quitRequested,
@@ -356,8 +356,9 @@ function installNavigationPolicy(window: BrowserWindow): void {
     // open in the operator's browser, never as a second app window (ADR-482).
     const browserUrl = externalBrowserUrl(details.url);
     if (browserUrl !== null) {
-      void shell.openExternal(browserUrl).catch((error: unknown) => {
-        console.warn('Could not open the link in the browser:', error);
+      void shell.openExternal(browserUrl).catch(() => {
+        // Native errors can include private pairing fragments or query values.
+        console.warn('Could not open the link in the browser.');
       });
       return { action: 'deny' };
     }
@@ -382,6 +383,7 @@ function installDevTools(window: BrowserWindow): void {
 async function createWindow(): Promise<void> {
   const placement = loadWindowPlacement(app.getPath('userData'));
   const window = createMainWindow(placement.bounds);
+  remoteAccess.observe(window);
   // Keep the qualification label visible even when the renderer updates its title.
   if (LICENSING_CONFIG.channel !== 'free' && LICENSING_CONFIG.sandbox === true)
     window.on('page-title-updated', (event) => {
@@ -395,7 +397,7 @@ async function createWindow(): Promise<void> {
   nativeSmoke.installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
   installDesktopContextMenu(window);
-  const closeGuard = installDesktopWindowClose(window, {
+  const closeGuard = manualCloseApproval.install(window, {
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
@@ -403,7 +405,6 @@ async function createWindow(): Promise<void> {
     },
     quit: () => app.quit(),
   });
-  manualCloseApproval.observe(window, closeGuard);
   // Windows restarting or shutting down mid-job waits, or gets Abort (ADR-548),
   // and the taskbar button shows the job's progress (ADR-553).
   installSessionEndGuard(window);
@@ -527,6 +528,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         trustedUpdates: IS_DESKTOP_UPDATE_CHANNEL_TRUSTED,
         updater: autoUpdater,
         canInstallManualUpdate: manualCloseApproval.canInstall,
+        requestManualUpdateClose: manualCloseApproval.request,
       });
       prepareLicenceQuit = licence.prepareQuit;
       const startup = createDesktopBackgroundStartup(licence, autoUpdater, {
@@ -539,13 +541,11 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
       protocol.handle(
         'app',
         startup.routes(
-          withDesktopWindowCommands(
-            withDesktopActivityRoute(
-              withSupportRoutes(
-                licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
-                SUPPORT_LOG,
-              ),
+          withDesktopWorkspaceRoutes(
+            remoteAccess.routes(
+              licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
             ),
+            SUPPORT_LOG,
           ),
         ),
       );
@@ -565,7 +565,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-installApplicationFinalCleanup(app, () => cameraBridge?.close(), {
+const closeDesktopServices = remoteAccess.cleanup(() => cameraBridge?.close());
+installApplicationFinalCleanup(app, closeDesktopServices, {
   reportFailure: (error: unknown) => console.warn('RTSP camera bridge cleanup failed:', error),
 });
 

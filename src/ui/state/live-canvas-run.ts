@@ -9,7 +9,6 @@ import { assertNever } from '../../core/scene';
 import type { LaserState } from './laser-store';
 import { registerCanvasProgramRun } from './canvas-program-source';
 import {
-  completeLiveCanvasRun,
   endStampFor,
   initialLiveCanvasTiming,
   liveCanvasLifecyclePatch,
@@ -212,26 +211,6 @@ function controllerBlocksExecution(state: LaserState): boolean {
     controllerState === 'Alarm' ||
     controllerState === 'Sleep'
   );
-}
-
-export function liveCanvasStatusCompletionPatch(
-  state: LaserState,
-  report: StatusReport,
-  streamer: StreamerState | null,
-  completeAtIdle: boolean,
-): Partial<Pick<LaserState, 'liveCanvasRun'>> {
-  const livePatch = liveCanvasStatusPatch(state, report, streamer);
-  if (
-    !completeAtIdle ||
-    streamer?.status !== 'done' ||
-    state.liveCanvasRun?.plan.capability !== 'realtime'
-  ) {
-    return livePatch;
-  }
-  return {
-    ...livePatch,
-    liveCanvasRun: completeLiveCanvasRun(livePatch.liveCanvasRun ?? state.liveCanvasRun ?? null),
-  };
 }
 
 export {

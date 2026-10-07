@@ -33,6 +33,8 @@ export async function toolbarCommand(page: Page, name: string): Promise<Locator>
 /** Spacious layouts show both panels; compact layouts expose each through its tab. */
 export async function selectWorkspacePanel(page: Page, name: 'Artwork' | 'Machine'): Promise<void> {
   await page.getByRole('region', { name: 'Workspace side panels', exact: true }).waitFor();
-  const tab = page.getByRole('tab', { name, exact: true });
+  const tab = page
+    .getByRole('tablist', { name: 'Side panel', exact: true })
+    .getByRole('tab', { name, exact: true });
   if (await tab.isVisible()) await tab.click();
 }

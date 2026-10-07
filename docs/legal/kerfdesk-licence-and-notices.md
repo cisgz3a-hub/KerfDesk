@@ -1,5 +1,7 @@
 # KerfDesk licence and notices
 
+> **Historical local draft. Not published or effective.** This earlier proposal does not replace the supplied License & Safety Notice, LICENSE or historical MIT grants. See [publishing notes](publishing-notes.md) and [current licensing guidance](../licensing/current-guidance.md) for the current boundary.
+
 KerfDesk is made and licensed by Johannes Stephanus Stolk, a sole proprietor (an individual, not a company) trading as KerfDesk. © 2026 Johannes Stephanus Stolk. All rights reserved, except as set out below.
 
 ## Which terms apply

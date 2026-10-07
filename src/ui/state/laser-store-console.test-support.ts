@@ -1,6 +1,7 @@
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { respondToStockGrblHandshakeQuery } from './laser-controller-handshake.test-support';
 import { useLaserStore } from './laser-store';
+import { captureTestLaserStartFenceAck } from './laser-test-start-helpers';
 
 export type FakeConnection = SerialConnection & {
   readonly emitLine: (line: string) => void;
@@ -12,7 +13,10 @@ export type FakeConnection = SerialConnection & {
  */
 export function makeConnection(
   write: (data: string) => Promise<void>,
-  options: { readonly autoRespondToStatusQuery?: boolean } = {},
+  options: {
+    readonly autoRespondToStatusQuery?: boolean;
+    readonly autoAckStartFence?: boolean;
+  } = {},
 ): FakeConnection {
   const lineHandlers = new Set<(line: string) => void>();
   const emit = (line: string): void => {
@@ -20,7 +24,10 @@ export function makeConnection(
   };
   return {
     write: async (data) => {
+      const acknowledgeFence =
+        options.autoAckStartFence === true ? captureTestLaserStartFenceAck(data, emit) : undefined;
       await write(data);
+      acknowledgeFence?.();
       respondToStockGrblHandshakeQuery(data, emit);
       if (data === '?' && options.autoRespondToStatusQuery === true) {
         // The production transport delivers the reply asynchronously. Two

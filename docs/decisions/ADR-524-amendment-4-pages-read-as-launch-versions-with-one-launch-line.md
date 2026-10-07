@@ -1,6 +1,8 @@
 ## ADR-524 Amendment 4 - The pages read as if Pro is on sale, with one "launches soon" line until sales open (2026-09-30)
 
-**Status:** Accepted | **Date:** 2026-09-30 | **Amends:** ADR-524 Amendment 2 decision 2,
+> **Reconciliation (8 October 2026):** This earlier copy and generator plan is superseded by [publishing notes](../legal/publishing-notes.md) and main PR #1083. Current public pages state the actual closed-sales and trial status; the default generator writes local drafts, and public information is checked separately with --public-info. The original decision is retained below as history.
+
+**Status:** Superseded | **Date:** 2026-09-30 | **Amends:** ADR-524 Amendment 2 decision 2,
 ADR-524 Amendment 3
 
 ### Context

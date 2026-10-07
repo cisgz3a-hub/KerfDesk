@@ -16,8 +16,13 @@ import { JobControls } from './JobControls';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 const originalFrame = useLaserStore.getState().frame;
+let frameDispatch: Promise<void>;
 
 beforeEach(() => {
+  let observeFrameDispatch!: () => void;
+  frameDispatch = new Promise<void>((resolve) => {
+    observeFrameDispatch = resolve;
+  });
   resetStore();
   useLaserStore.setState({
     ...initialLaserState(),
@@ -34,7 +39,7 @@ beforeEach(() => {
     activeWcs: 'G54',
     // Reported zero offset: Frame need not ask for WCO first (ADR-375).
     wcoCache: { x: 0, y: 0, z: 0 },
-    frame: vi.fn(async () => undefined),
+    frame: vi.fn(async () => observeFrameDispatch()),
   });
   useToastStore.setState({ toasts: [] });
   useStore.setState((state) => ({
@@ -110,17 +115,18 @@ describe('JobControls Absolute Coordinates frame-first', () => {
       expect(buttonByText('Frame job').disabled).toBe(false);
       expect(buttonByText('Start').disabled).toBe(true);
       expect(buttonByText('Frame job').title).toBe(
-        "Trace the exact job's full generated motion envelope with the tool off. After a clean Frame, press Start to review and run.",
+        "Trace the job's generated motion envelope with the tool off. A clean Frame stays valid while its footprint and placement remain unchanged.",
       );
       expect(buttonByText('Start').title).toBe(
-        'Start unlocks when a Frame of this exact job finishes cleanly. Press Frame job first.',
+        'Start unlocks after a clean Frame of this footprint and placement. Press Frame job first.',
       );
 
       await act(async () => {
         buttonByText('Frame job').dispatchEvent(new MouseEvent('click', { bubbles: true }));
       });
 
-      await vi.waitFor(() => expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1));
+      await frameDispatch;
+      expect(useLaserStore.getState().frame).toHaveBeenCalledTimes(1);
       expect(useLaserStore.getState().frame).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(Number),
@@ -129,6 +135,8 @@ describe('JobControls Absolute Coordinates frame-first', () => {
             wco: { x: 0, y: 0, z: 0 },
           }),
         }),
+        undefined,
+        undefined,
       );
       // The exact candidate is armed at dispatch, but a mocked trace that has
       // not physically completed earns neither compatibility proof nor permit.

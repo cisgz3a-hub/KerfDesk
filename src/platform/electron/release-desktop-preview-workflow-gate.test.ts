@@ -80,18 +80,18 @@ describe('Desktop Preview release workflow gate (ADR-248/249)', () => {
   });
 
   it('preserves Windows upgrade identity and sets the Mac bundle identity', () => {
-    expect(packageJson.author?.name).toBe('Johannes Stephanus Stolk');
+    expect(packageJson.author?.name).toBe('Johann Stolk');
     expect(builder).toMatch(/^appId: dev\.laserforge\.app$/m);
     expect(builder).toMatch(/mac:\s[\s\S]*appId: com\.kerfdesk\.app/);
     expect(builder).toMatch(/^productName: KerfDesk$/m);
-    expect(builder).toMatch(/^copyright: Copyright © 2026 Johannes Stephanus Stolk$/m);
+    expect(builder).toMatch(/^copyright: Copyright © 2026 Johann Stolk$/m);
     expect(builder).toContain('shortcutName: KerfDesk');
     expect(workflow).toContain(
       './scripts/verify-windows-preview-package.ps1 -Version $env:VERSION',
     );
     expect(windowsVerifier.match(/verify-windows-package-identity\.ps1'\)/g)).toHaveLength(2);
     expect(macVerifier).toContain('NSHumanReadableCopyright');
-    expect(macVerifier).toContain('Copyright © 2026 Johannes Stephanus Stolk');
+    expect(macVerifier).toContain('Copyright © 2026 Johann Stolk');
   });
 
   it('keeps Preview unsigned, unnotarized, and outside updater trust', () => {

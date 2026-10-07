@@ -33,6 +33,57 @@ afterEach(() => {
 });
 
 describe('OptimizationSettingsDialog', () => {
+  it('offers an effective Line choice under source order without changing legacy policies', async () => {
+    const settings: ProjectOptimizationSettings = {
+      ...DEFAULT_PROJECT_OPTIMIZATION,
+      travelPolicy: 'source-order',
+      reduceTravelMoves: false,
+      startPoint: 'job-center',
+    };
+    const { host, root, onApply } = await renderDialog(vi.fn(), settings);
+    try {
+      const select = host.querySelector<HTMLSelectElement>('select[name="lineStartRegion"]');
+      if (select === null) throw new Error('Line preference missing');
+      expect(select.disabled).toBe(false);
+      expect(select.value).toBe('');
+      expect(select.options).toHaveLength(10);
+      await act(async () => {
+        select.value = 'center';
+        Simulate.change(select);
+      });
+      expect(host.querySelector<HTMLInputElement>('input[name="insideFirst"]')?.disabled).toBe(
+        false,
+      );
+      expect(host.querySelector<HTMLSelectElement>('select[name="pathDirection"]')?.disabled).toBe(
+        false,
+      );
+      expect(host.textContent).toContain('Fill/raster keep their scan order');
+      expect(host.textContent).toContain('Job origin is unchanged');
+      expect(host.textContent).toContain('Where drawn still applies to other operations');
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (form === null) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+      expect(onApply).toHaveBeenCalledWith({ ...settings, lineStartRegion: 'center' });
+      await act(async () => {
+        select.value = '';
+        Simulate.change(select);
+      });
+      expect(host.querySelector<HTMLInputElement>('input[name="insideFirst"]')?.disabled).toBe(
+        true,
+      );
+      await act(async () => {
+        const form = host.querySelector('form');
+        if (form === null) throw new Error('form missing');
+        Simulate.submit(form);
+      });
+      expect(onApply).toHaveBeenLastCalledWith({ ...settings, lineStartRegion: undefined });
+    } finally {
+      await act(async () => root.unmount());
+    }
+  });
+
   it('submits all cut-planner policies and synchronizes the legacy flag', async () => {
     const { host, root, onApply } = await renderDialog();
     try {

@@ -1,3 +1,8 @@
+import {
+  reserveWrite,
+  assertDispatchWrite,
+  motionTransportWritePatch,
+} from './laser-write-reservation';
 import type { ControllerDriver } from '../../core/controllers';
 import { wireEncodingError } from '../../core/controllers/serial-wire-encoding';
 import type { SerialConnection } from '../../platform/types';
@@ -9,9 +14,10 @@ import {
   type TranscriptBufferRefs,
 } from './laser-transcript-buffer';
 import type { LaserState } from './laser-store';
+import { controllerOperationOwner } from './laser-controller-operation';
 import type { LaserMotionOperationId } from './laser-motion-operation';
 import { JOG_MPG_INTERRUPTION_MESSAGE } from './frame-status-failure';
-import { reserveUntrackedAcks, type UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
+import type { UntrackedAckLedgerRefs } from './laser-untracked-ack-ledger';
 import {
   beginJobTransportWrite,
   settleJobTransportWrite,
@@ -48,6 +54,7 @@ export type SafeWrite = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 
 const MOTION_TRANSCRIPT_ACTIONS: ReadonlyArray<LaserSafetyAction | undefined> = [
@@ -64,7 +71,8 @@ type SetFn = (
 type GetFn = () => LaserState;
 
 export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): SafeWrite {
-  return async (line, action, source) => {
+  return async (line, action, source, assertBeforeWrite) => {
+    assertBeforeWrite?.();
     // Setup-only lines (GRBL `$` commands) are blocked while a job is active;
     // the active driver decides what counts as setup-only for its firmware.
     const blockedMessage = refs.driver.isSetupOnlyPayload(line)
@@ -94,31 +102,70 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
     if (source === 'job' && action === undefined) return writeJobRefill(set, refs, conn, line);
     refuseUnencodableLine(set, get, line);
-    const owedAcks = owedTerminalAcks(line, writeSource);
-    const writeEpoch = refs.writeEpoch ?? 0;
-    const motionOperationId = currentMotionOperationId(get, action);
-    const ownedMotionOperationId = motionOperationId;
-    reserveUntrackedAcks(refs, owedAcks, motionOperationId ?? null);
-    // Reserve both transport and terminal-response ownership before the first
-    // await. Some adapters can dispatch an immediate controller reply before
-    // conn.write() resolves; pre-reserving prevents that valid reply from
-    // looking orphaned or advancing a job stream.
-    set((state) => ({
-      pendingTransportWrites: (state.pendingTransportWrites ?? 0) + 1,
-      ...(owedAcks > 0 ? { pendingUntrackedAcks: state.pendingUntrackedAcks + owedAcks } : {}),
-      ...motionTransportWritePatch(state, action, 1, ownedMotionOperationId),
-    }));
+    const wakeOwner = wakeOwnerForWrite(get, action);
+    const binding = reserveWrite(set, get, refs, line, action, writeSource);
+    const { writeEpoch, ownedMotionOperationId } = binding;
+    assertDispatchWrite(set, refs, conn, action, binding, assertBeforeWrite);
     try {
       await conn.write(line);
       assertCurrentWriteEpoch(refs, writeEpoch);
+      if (wakeOwnerWasReplaced(get, wakeOwner)) {
+        settleObsoleteWakeWrite(set, refs, writeEpoch);
+        return;
+      }
       commitSuccessfulWrite(set, refs, line, writeSource, action, ownedMotionOperationId);
     } catch (err) {
-      recordWriteFailure(set, refs, writeEpoch, err, action, ownedMotionOperationId);
+      recordOwnedWriteFailure(
+        set,
+        get,
+        refs,
+        writeEpoch,
+        err,
+        action,
+        ownedMotionOperationId,
+        wakeOwner,
+      );
       throw err instanceof Error ? err : new Error(serialWriteErrorMessage(err));
     }
   };
 }
 
+function wakeOwnerForWrite(get: GetFn, action: LaserSafetyAction | undefined): object | null {
+  const operation = get().controllerOperation;
+  return action === 'wake' && operation?.kind === 'recovery'
+    ? controllerOperationOwner(operation)
+    : null;
+}
+
+function recordOwnedWriteFailure(
+  set: SetFn,
+  get: GetFn,
+  refs: SafeWriteRefs,
+  writeEpoch: number,
+  error: unknown,
+  action: LaserSafetyAction | undefined,
+  motionOperationId: LaserMotionOperationId | undefined,
+  wakeOwner: object | null,
+): void {
+  if (wakeOwnerWasReplaced(get, wakeOwner)) settleObsoleteWakeWrite(set, refs, writeEpoch);
+  else recordWriteFailure(set, refs, writeEpoch, error, action, motionOperationId);
+}
+
+function wakeOwnerWasReplaced(get: GetFn, owner: object | null): boolean {
+  if (owner === null) return false;
+  const operation = get().controllerOperation;
+  return operation === null || controllerOperationOwner(operation) !== owner;
+}
+
+function settleObsoleteWakeWrite(set: SetFn, refs: SafeWriteRefs, writeEpoch: number): void {
+  // Ctrl-X owes no acknowledgement. Its aggregate transport reservation still
+  // settles on this connection, but its transcript/error belongs to its old
+  // Wake owner. A replacement serial epoch already discarded that reservation.
+  if ((refs.writeEpoch ?? 0) !== writeEpoch) return;
+  set((state) => ({
+    pendingTransportWrites: Math.max(0, (state.pendingTransportWrites ?? 0) - 1),
+  }));
+}
 // A job makes `$` lines off limits, with two exceptions inside a tool-change
 // hold. The operator's jog in a drained, fresh-Idle hold: GRBL's native jog is
 // itself a `$J=` line (https://github.com/gnea/grbl/wiki/Grbl-v1.1-Jogging),
@@ -182,16 +229,6 @@ async function writeJobRefill(
   if (bufferTranscriptEntry(refs, entry)) {
     set((state) => publishTranscriptPatch(refs, state));
   }
-}
-
-function currentMotionOperationId(
-  get: GetFn,
-  action: LaserSafetyAction | undefined,
-): LaserMotionOperationId | undefined {
-  const operation = get().motionOperation;
-  if (action === 'frame' && operation?.kind === 'frame') return operation.operationId;
-  if (action === 'jog' && operation?.kind === 'jog') return operation.operationId;
-  return undefined;
 }
 
 function assertCurrentWriteEpoch(refs: SafeWriteRefs, expected: number): void {
@@ -260,33 +297,6 @@ function recordWriteFailure(
   console.error('Serial write failed:', err);
 }
 
-function motionTransportWritePatch(
-  state: LaserState,
-  action: LaserSafetyAction | undefined,
-  delta: 1 | -1,
-  motionOperationId: LaserMotionOperationId | undefined,
-): Partial<Pick<LaserState, 'motionOperation'>> {
-  const operation = state.motionOperation;
-  if (
-    (action !== 'frame' && action !== 'jog') ||
-    motionOperationId === undefined ||
-    operation === null ||
-    operation.kind !== action ||
-    operation.operationId !== motionOperationId
-  ) {
-    return {};
-  }
-  return {
-    motionOperation: {
-      ...operation,
-      pendingMotionTransportWrites: Math.max(
-        0,
-        (operation.pendingMotionTransportWrites ?? 0) + delta,
-      ),
-    },
-  };
-}
-
 // Every queued (newline-terminated) LINE earns exactly one terminal
 // ok/error from the controller, in strict receive order — and one write may
 // carry several lines (the Marlin/Smoothie jog payload is G91\nG0…\nG90\n,
@@ -295,13 +305,6 @@ function motionTransportWritePatch(
 // bytes (?, !, ~, 0x18, 0x85, overrides) have no newline and no ack. The
 // line handler settles the counter as each terminal ack arrives, and Start
 // gates on it reaching zero.
-function owedTerminalAcks(line: string, source: TranscriptSource): number {
-  if (source === 'job') return 0;
-  let count = 0;
-  for (const ch of line) if (ch === '\n') count += 1;
-  return count;
-}
-
 function transcriptSourceForWrite(
   line: string,
   action: LaserSafetyAction | undefined,

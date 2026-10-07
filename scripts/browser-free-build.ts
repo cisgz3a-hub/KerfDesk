@@ -45,6 +45,8 @@ export const PRO_BUILD_ENTRIES: Readonly<Record<string, readonly string[]>> = {
     'traceCenterlineStrokePaths',
     'traceCenterlineStrokePathsSteps',
   ],
+  'src/core/trace/edge-trace.ts': ['traceImageToEdgePaths', 'traceImageToEdgePathsSteps'],
+  'src/core/trace/hybrid/trace-hybrid.ts': ['traceHybridPaths', 'traceHybridPathsSteps'],
   'src/core/trace/batch-trace.ts': ['traceImagesToVectorFiles'],
   // Legacy colour tracing is not a Free escape route around the new backends.
   'src/core/trace/trace-to-paths.ts': ['loadTracer', 'traceLegacyImageSteps'],
@@ -52,6 +54,35 @@ export const PRO_BUILD_ENTRIES: Readonly<Record<string, readonly string[]>> = {
 };
 
 export const DESKTOP_TOOL_MESSAGE = 'This tool is available in KerfDesk Pro for desktop.';
+
+const TRACE_PRESETS_PATH = 'src/core/trace/trace-presets.ts';
+
+/** Smooth and Sharp share Line Art's contour primitives. Remove their tuned
+ * presets along with the dedicated Pro presets, keeping the Free primitives. */
+export function replaceProTracePresets(source: string): string {
+  const file = ts.createSourceFile(TRACE_PRESETS_PATH, source, ts.ScriptTarget.Latest, true);
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.name.text !== 'TRACE_PRESETS') continue;
+      const presets = declaration.initializer;
+      if (presets === undefined || !ts.isObjectLiteralExpression(presets)) break;
+      const lineArt = presets.properties.find(
+        (property) =>
+          ts.isPropertyAssignment(property) &&
+          ts.isStringLiteral(property.name) &&
+          property.name.text === 'Line Art',
+      );
+      if (lineArt === undefined) break;
+      return (
+        source.slice(0, presets.getStart(file)) +
+        `{ ${lineArt.getText(file)} }` +
+        source.slice(presets.end)
+      );
+    }
+  }
+  throw new Error(`Free trace preset boundary changed in ${TRACE_PRESETS_PATH}`);
+}
 
 export function isBrowserFreeMode(mode: string, command: 'build' | 'serve' = 'build'): boolean {
   return mode !== 'desktop' && !(mode === 'test' && command === 'serve');
@@ -115,6 +146,7 @@ export function browserFreeBuild(): Plugin {
     },
     buildStart() {
       if (!free) return;
+      replaceProTracePresets(readFileSync(resolve(root, TRACE_PRESETS_PATH), 'utf8'));
       for (const path of Object.keys(PRO_BUILD_ENTRIES))
         replaceProEntryBodies(readFileSync(resolve(root, path), 'utf8'), path);
     },
@@ -135,6 +167,7 @@ export function browserFreeBuild(): Plugin {
       const normalized = id.replaceAll('\\', '/').split('?')[0] ?? '';
       if (!normalized.startsWith(`${root}/`)) return null;
       const path = normalized.slice(root.length + 1);
+      if (path === TRACE_PRESETS_PATH) return { code: replaceProTracePresets(source), map: null };
       if (PRO_BUILD_ENTRIES[path] === undefined) return null;
       return { code: replaceProEntryBodies(source, path), map: null };
     },

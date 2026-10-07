@@ -1,6 +1,7 @@
 import type { StatusReport } from '../../core/controllers/grbl';
 import type { LaserState } from './laser-store';
 import { continueControllerOperation } from './laser-controller-operation';
+import { jobStartMarkAcceptsStatus } from './job-start-mark';
 
 export function framedRunInterruptionPatch(
   state: LaserState,
@@ -12,6 +13,7 @@ export function framedRunInterruptionPatch(
   if (state.framedRun === null || report.state === 'Idle') {
     return {};
   }
+  if (jobStartMarkAcceptsStatus(state, report)) return {};
   if (
     startOwnsSettleDwell &&
     report.state === 'Run' &&

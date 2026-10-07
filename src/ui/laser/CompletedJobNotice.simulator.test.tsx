@@ -7,7 +7,7 @@ import { completedJobCanBeDismissed } from '../state/completed-job-display';
 import { laserCountdownTestHandoff } from '../state/laser-countdown-test-handoff';
 import { useLaserStore } from '../state/laser-store';
 import { initialLaserState } from '../state/laser-store-helpers';
-import { startTestLaserJob } from '../state/laser-test-start-helpers';
+import { startTestLaserJobOnClock } from '../state/laser-test-command-control';
 import { resetStore } from '../state/test-helpers';
 import { DWELL_EVIDENCE_UNAVAILABLE_REASON } from '../state/canvas-job-timing-plan';
 import { COMPLETED_GCODE } from './CompletedJobNotice.test-support';
@@ -54,7 +54,7 @@ it('offers Done after the real store settles a simulated job and sends no comman
   );
 
   await act(async () => {
-    await startTestLaserJob(COMPLETED_GCODE, {
+    await startTestLaserJobOnClock(COMPLETED_GCODE, {
       ...laserCountdownTestHandoff({
         gcode: COMPLETED_GCODE,
         retentionKey: 'completed-display-simulator',
@@ -97,7 +97,7 @@ it('offers Done after an unknown-dwell run settles even though its live estimate
     reason: DWELL_EVIDENCE_UNAVAILABLE_REASON,
   });
   act(() => root.render(<CompletedJobNotice />));
-  await act(async () => startTestLaserJob(gcode, handoff));
+  await act(async () => startTestLaserJobOnClock(gcode, handoff));
   expect(useLaserStore.getState().liveCanvasRun?.timing).toMatchObject({ kind: 'unavailable' });
   expect(completedJobCanBeDismissed(useLaserStore.getState())).toBe(false);
 

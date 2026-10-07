@@ -6,6 +6,7 @@
 import { create } from 'zustand';
 import type { RecentFileAdapter, RecentFileRef } from '../../platform/types';
 import { useToastStore } from '../state/toast-store';
+import { hasPendingComputerPreference } from '../state/preference-persistence';
 import {
   clampRecentProjectLimit,
   clearUnpinnedRecentProjects,
@@ -20,6 +21,7 @@ import {
   defaultRecentProjectStorage,
   loadRecentProjectLimit,
   saveRecentProjectLimit,
+  RECENT_PROJECT_LIMIT_KEY,
   type RecentProjectStorage,
 } from './recent-project-storage';
 
@@ -65,6 +67,7 @@ export const RECENT_PROJECTS_UNSAVED_MESSAGE =
 
 let storage: RecentProjectStorage | null = null;
 let pending: Promise<unknown> = Promise.resolve();
+let committedLimit = loadRecentProjectLimit();
 
 function currentStorage(): RecentProjectStorage {
   storage ??= defaultRecentProjectStorage({
@@ -94,7 +97,13 @@ export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => 
     notice: null,
     refresh: () =>
       serialize(async () => {
-        set({ entries: await currentStorage().load(), limit: loadRecentProjectLimit() });
+        const entries = await currentStorage().load();
+        if (hasPendingComputerPreference(RECENT_PROJECT_LIMIT_KEY)) {
+          set({ entries });
+        } else {
+          committedLimit = loadRecentProjectLimit();
+          set({ entries, limit: committedLimit });
+        }
       }),
     record: (files, use) =>
       serialize(async () => {
@@ -102,7 +111,7 @@ export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => 
         const id = matchId ?? newRecentProjectId();
         const usedAt = Date.now();
         const entries = await currentStorage().update((current) =>
-          recordRecentProjectUse(current, { ...use, usedAt }, matchId, id, get().limit),
+          recordRecentProjectUse(current, { ...use, usedAt }, matchId, id, committedLimit),
         );
         set({ entries, statuses: { ...get().statuses, [id]: 'present' } });
       }),
@@ -120,9 +129,21 @@ export const useRecentProjectsStore = create<RecentProjectsState>((set, get) => 
     clearAll: () => apply(() => []),
     setLimit: (limit) => {
       const next = clampRecentProjectLimit(limit);
-      saveRecentProjectLimit(next);
       set({ limit: next });
-      return apply((entries) => trimRecentProjects(entries, next));
+      let trimming = Promise.resolve();
+      saveRecentProjectLimit(next, () => {
+        committedLimit = next;
+        trimming = apply((entries) => trimRecentProjects(entries, next));
+        void trimming.catch(() =>
+          useToastStore
+            .getState()
+            .pushToast(
+              'The recent-project limit was saved, but the list could not be updated. Reopen Recent Projects to retry.',
+              'warning',
+            ),
+        );
+      });
+      return trimming;
     },
     setStatus: (id, status) => set({ statuses: { ...get().statuses, [id]: status } }),
     openDialog: (notice) => set({ dialogOpen: true, notice: notice ?? null }),
@@ -165,6 +186,7 @@ function newRecentProjectId(): string {
 export function configureRecentProjectsForTests(next: RecentProjectStorage | null): void {
   storage = next;
   pending = Promise.resolve();
+  committedLimit = loadRecentProjectLimit();
   useRecentProjectsStore.setState({
     entries: [],
     limit: loadRecentProjectLimit(),

@@ -13,6 +13,7 @@ import { machineKindOf } from '../../core/scene';
 import { useStore } from '../state';
 import { jobAwareAlert } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
+import { jobStartMarkIsOwned } from '../state/job-start-mark';
 import {
   createRunId,
   recoveryRepository,
@@ -23,7 +24,10 @@ import { clearStartBlockers } from './start-blocker-invalidation';
 import { useToastStore } from '../state/toast-store';
 import { streamResumeFromRawLine } from './start-job-resume-stream';
 import { noteManualRestartStarted, prepareManualRestartSource } from './manual-restart-source';
-import { completedReceiptIsCurrent } from './start-job-execution-tracking';
+import {
+  completedReceiptIsCurrent,
+  currentReplayExecutionSignature,
+} from './start-job-execution-tracking';
 import { armFreshStartHandoff } from './start-handoff-arming';
 import {
   currentLaserForAuthorizedStartNow,
@@ -32,7 +36,14 @@ import {
 import { reportStartAuthorizationRefusal } from './start-job-authorization-reporting';
 import { transmitPreparedStart, type PreparedStartArgs } from './start-job-transmission';
 import type { FramedRunPermit, FramedRunReviewEvidence } from '../state/framed-run';
-import { framedRunReadinessIssue, REPLAY_PERMIT_MISMATCH_MESSAGE } from './framed-run-readiness';
+import {
+  currentCompletedFrame,
+  framedRunReadinessIssue,
+  REPLAY_PERMIT_MISMATCH_MESSAGE,
+} from './framed-run-readiness';
+import { armPermitFromCompletedFrame } from './framed-start-preparation';
+import { assertMachineExecutionOwner } from '../state/machine-execution-owner';
+import type { FramedStartOptions } from './framed-start-options';
 import {
   FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE,
   reviewFramedRunForStart,
@@ -55,12 +66,13 @@ export async function runStartJobFlow(
 async function runFreshFramedJobFlow(
   repository: RecoveryRepository,
   completedReceipt: LastCompletedReceipt | null = null,
-): Promise<void> {
+): Promise<boolean> {
   clearStartBlockers();
-  const permit = useLaserStore.getState().framedRun;
+  if (refuseStartWhileMarkOwnsController()) return false;
+  const permit = currentCompletedFrame();
   const issue = framedRunReadinessIssue(permit) ?? replayPermitMismatch(permit, completedReceipt);
   if (issue !== null) {
-    // Start is disabled until a clean Frame of this exact job completes; only
+    // Start is disabled until a clean Frame of this placement completes; only
     // the keyboard shortcut or a permit expiring under the click reaches here.
     // Frame is the operator's own step, so Start says so instead of framing.
     if (permit !== null) useLaserStore.setState({ framedRun: null, frameVerification: null });
@@ -73,10 +85,10 @@ async function runFreshFramedJobFlow(
           : issue,
         'warning',
       );
-    return;
+    return false;
   }
-  if (permit === null) return;
-  await runFramedPermitStart(permit, repository, completedReceipt);
+  if (permit === null) return false;
+  return runFramedPermitStart(permit, repository, completedReceipt);
 }
 
 // Run again streams a Frame permit like Start, so the permit must be for the
@@ -99,16 +111,33 @@ export async function runFramedPermitStart(
   permit: FramedRunPermit,
   repository: RecoveryRepository = recoveryRepository,
   completedReceipt: LastCompletedReceipt | null = null,
+  options: FramedStartOptions = {},
 ): Promise<boolean> {
-  if (useLaserStore.getState().framedRun !== permit || framedRunReadinessIssue(permit) !== null) {
+  assertMachineExecutionOwner(options.executionOwner);
+  if (refuseStartWhileMarkOwnsController()) return false;
+  if (framedRunReadinessIssue(permit) !== null || !armPermitFromCompletedFrame(permit)) {
     return false;
   }
   // ADR-237: the single Job Review runs here at Start. Transient camera
   // permits were reviewed before their Frame and carry evidence from birth.
-  const review = permit.candidate.review ?? (await reviewFramedRunForStart(permit));
-  if (review === null) return false;
+  const reviewed = await framedReviewForStart(permit, options);
+  if (reviewed === null) return false;
+  assertMachineExecutionOwner(options.executionOwner);
+  permit = reviewed.permit;
+  const review = reviewed.review;
   if (useLaserStore.getState().framedRun !== permit) {
     useToastStore.getState().pushToast(FRAMED_PERMIT_LOST_DURING_REVIEW_MESSAGE, 'warning');
+    return false;
+  }
+  // Process edits may retain the spatial Frame while changing the reviewed
+  // job. Replay still requires the completed job's execution inputs; ordinary
+  // Start may use this same Frame for the newly approved process settings.
+  if (replayPermitMismatch(permit, completedReceipt) !== null) {
+    await reportStartAuthorizationRefusal(
+      { kind: 'execution-inputs-changed' },
+      completedReceipt,
+      repository,
+    );
     return false;
   }
   const claim = claimCurrentFramedRunStart(permit);
@@ -119,10 +148,26 @@ export async function runFramedPermitStart(
     return false;
   }
   try {
-    return await streamFramedRun(permit, review, claim, repository, completedReceipt);
+    return await streamFramedRun(permit, review, claim, repository, completedReceipt, options);
   } finally {
     releaseFramedRunStartClaim(claim);
   }
+}
+async function framedReviewForStart(permit: FramedRunPermit, options: FramedStartOptions) {
+  if (permit.candidate.review !== undefined && permit.candidate.authorizationContext !== undefined)
+    return { permit, review: permit.candidate.review };
+  return reviewFramedRunForStart(permit, options);
+}
+
+function refuseStartWhileMarkOwnsController(): boolean {
+  if (!jobStartMarkIsOwned(useLaserStore.getState())) return false;
+  // The mark owns a temporary head excursion and the queued pulse ACKs.
+  // Refuse this transport handoff before comparing the original Frame head
+  // or arming a new execution; its strict return proof settles independently.
+  useToastStore
+    .getState()
+    .pushToast('Wait for the timed start mark to finish before starting the job.', 'warning');
+  return true;
 }
 
 async function streamFramedRun(
@@ -131,6 +176,7 @@ async function streamFramedRun(
   claim: FramedRunStartClaim,
   repository: RecoveryRepository,
   completedReceipt: LastCompletedReceipt | null,
+  options: FramedStartOptions = {},
 ): Promise<boolean> {
   const authorizationArgs = {
     preparedAgainst: permit.controller,
@@ -141,7 +187,9 @@ async function streamFramedRun(
   } as const;
   const currentLaser = await currentLaserForAuthorizedStart(authorizationArgs);
   if (currentLaser === null) return false;
+  assertMachineExecutionOwner(options.executionOwner);
   return streamPreparedStart({
+    ...options,
     outputScope: permit.candidate.outputScope,
     project: permit.candidate.project,
     laser: currentLaser,
@@ -165,7 +213,18 @@ export async function runCompletedJobAgainFlow(
   receipt: LastCompletedReceipt,
   repository: RecoveryRepository = recoveryRepository,
 ): Promise<void> {
-  await runFreshFramedJobFlow(repository, receipt);
+  const started = await runFreshFramedJobFlow(repository, receipt);
+  if (
+    !started &&
+    currentReplayExecutionSignature() !== receipt.artifact.executionSignature &&
+    repository.getSnapshot().lastCompletedReceipt?.runId === receipt.runId
+  ) {
+    await reportStartAuthorizationRefusal(
+      { kind: 'execution-inputs-changed' },
+      receipt,
+      repository,
+    );
+  }
 }
 
 async function currentLaserForAuthorizedStart(
@@ -197,6 +256,12 @@ async function streamPreparedStart(args: PreparedStartArgs): Promise<boolean> {
     return false;
   }
   const handoff = await armFreshStartHandoff(args, runId);
+  try {
+    assertMachineExecutionOwner(args.executionOwner);
+  } catch (error) {
+    if (handoff.armed) await args.repository.cancelPendingStart(runId);
+    throw error;
+  }
   if (handoff.blocked) return false;
   const authorizationArgs = {
     preparedAgainst: args.laser,

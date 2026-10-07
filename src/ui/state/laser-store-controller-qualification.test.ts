@@ -3,7 +3,7 @@ import { settingsMapToRows } from '../../core/controllers/grbl';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { recoveryRepository } from './recovery';
 import { useLaserStore } from './laser-store';
-import { startTestLaserJob } from './laser-test-start-helpers';
+import { captureTestLaserStartFenceAck, startTestLaserJob } from './laser-test-start-helpers';
 import { useStore } from './store';
 
 type FakeConnection = SerialConnection & {
@@ -18,7 +18,9 @@ function makeConnection(writes: string[]): FakeConnection {
   };
   return {
     write: async (data) => {
+      const acknowledgeStartFence = captureTestLaserStartFenceAck(data, emit);
       writes.push(data);
+      acknowledgeStartFence();
       // Real GRBL answers the connect-time $G modal query (C6) with its state
       // then ok; model it so the modal query settles during connect.
       if (data === '$G\n') {

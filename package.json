@@ -4,7 +4,7 @@
   "private": true,
   "description": "Focused GRBL CAM application for laser cutters, engravers, and CNC routers. Web + Windows desktop from one codebase.",
   "author": {
-    "name": "Johannes Stephanus Stolk"
+    "name": "Johann Stolk"
   },
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
@@ -26,7 +26,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:release-integrity": "node --test scripts/check-adr-numbers.test.mjs scripts/third-party-closure.test.mjs scripts/generate-release-evidence.test.mjs scripts/report-dependency-audit.test.mjs scripts/verify-github-actions-pinning.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs scripts/report-release-readiness.test.mjs scripts/report-coverage-trend.test.mjs scripts/resolve-web-deploy-identity.test.mjs scripts/list-reverted-in-candidate.test.mjs scripts/run-vitest-coverage.test.mjs scripts/verify-windows-packaged-native-smoke.test.mjs scripts/verify-packaged-desktop.test.mjs scripts/verify-desktop-renderer.test.mjs scripts/verify-asar-integrity-enforced.test.mjs scripts/desktop-release-notes.test.mjs scripts/desktop-preview-cadence.test.mjs scripts/qualify-windows-installer.test.mjs scripts/published-upgrade-installers.test.mjs scripts/verify-upgrade-project.test.mjs scripts/verify-update-publisher.test.mjs scripts/native-smoke-process.test.mjs scripts/native-smoke-runner.test.mjs scripts/native-smoke-evidence.test.mjs scripts/native-smoke-shutdown.test.mjs scripts/publish-stable-release.test.mjs scripts/stable-release-publisher.test.mjs scripts/stable-release-store.test.mjs scripts/unsigned-release-plan.test.mjs scripts/stable-release-artifacts.test.mjs scripts/stable-release-retry.test.mjs scripts/preview-release-publisher.test.mjs scripts/desktop-downloads.test.mjs scripts/desktop-windows-download.test.mjs scripts/desktop-update-notes.test.mjs scripts/reviewed-desktop-update-notes.test.mjs scripts/manual-commercial-publisher.test.mjs scripts/publish-manual-commercial-release.test.mjs scripts/desktop-checkout.test.mjs scripts/prepare-commercial-desktop.test.mjs scripts/prepare-installer-terms.test.mjs scripts/prepare-sandbox-desktop.test.mjs scripts/commercial-release-manifest.test.mjs scripts/commercial-release-package.test.mjs scripts/unsigned-commercial-package.test.mjs scripts/commercial-release-publisher.test.mjs scripts/commercial-release-promotion.test.mjs scripts/release-train-policy.test.mjs scripts/release-train.test.mjs scripts/issue-developer-licences.test.mjs services/desktop-licensing/*.test.mjs scripts/download-stats/*.test.mjs scripts/ci-parallel-gate.test.mjs scripts/generate-site-pages.test.mjs scripts/app-terms-module.test.mjs",
+    "test:release-integrity": "node --test scripts/check-adr-numbers.test.mjs scripts/generate-site-pages.test.mjs scripts/third-party-closure.test.mjs scripts/generate-release-evidence.test.mjs scripts/report-dependency-audit.test.mjs scripts/verify-github-actions-pinning.test.mjs scripts/verify-packaged-preview-metadata.test.mjs scripts/verify-windows-package-identity.test.mjs scripts/report-release-readiness.test.mjs scripts/report-coverage-trend.test.mjs scripts/resolve-web-deploy-identity.test.mjs scripts/list-reverted-in-candidate.test.mjs scripts/run-vitest-coverage.test.mjs scripts/verify-windows-packaged-native-smoke.test.mjs scripts/verify-packaged-desktop.test.mjs scripts/verify-desktop-renderer.test.mjs scripts/verify-asar-integrity-enforced.test.mjs scripts/desktop-release-notes.test.mjs scripts/desktop-preview-cadence.test.mjs scripts/qualify-windows-installer.test.mjs scripts/published-upgrade-installers.test.mjs scripts/verify-upgrade-project.test.mjs scripts/verify-update-publisher.test.mjs scripts/native-smoke-process.test.mjs scripts/native-smoke-runner.test.mjs scripts/native-smoke-evidence.test.mjs scripts/native-smoke-shutdown.test.mjs scripts/publish-stable-release.test.mjs scripts/stable-release-publisher.test.mjs scripts/stable-release-store.test.mjs scripts/unsigned-release-plan.test.mjs scripts/stable-release-artifacts.test.mjs scripts/stable-release-retry.test.mjs scripts/preview-release-publisher.test.mjs scripts/desktop-downloads.test.mjs scripts/desktop-windows-download.test.mjs scripts/desktop-update-notes.test.mjs scripts/reviewed-desktop-update-notes.test.mjs scripts/manual-commercial-publisher.test.mjs scripts/publish-manual-commercial-release.test.mjs scripts/desktop-checkout.test.mjs scripts/prepare-commercial-desktop.test.mjs scripts/prepare-installer-terms.test.mjs scripts/prepare-sandbox-desktop.test.mjs scripts/commercial-release-manifest.test.mjs scripts/commercial-release-package.test.mjs scripts/unsigned-commercial-package.test.mjs scripts/commercial-release-publisher.test.mjs scripts/commercial-release-promotion.test.mjs scripts/release-train-policy.test.mjs scripts/release-train.test.mjs scripts/issue-developer-licences.test.mjs services/desktop-licensing/*.test.mjs scripts/download-stats/*.test.mjs scripts/ci-parallel-gate.test.mjs",
     "test:watch": "vitest",
     "test:coverage": "node scripts/run-vitest-coverage.mjs",
     "report:coverage": "node scripts/report-coverage-trend.mjs",
@@ -49,14 +49,15 @@
     "website:build": "node website/build.mjs",
     "website:preview": "node website/build.mjs && node website/serve.mjs",
     "website:test": "node --test \"website/tests/*.test.mjs\"",
-    "release:check": "pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm check:privacy && pnpm format:check && pnpm check:adr-numbers && pnpm check:action-pins && pnpm license-check && pnpm test && pnpm test:release-integrity && pnpm website:test && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
+    "check:remote-control": "pnpm --dir services/remote-control typecheck && pnpm --dir services/remote-control lint && pnpm --dir services/remote-control format:check && pnpm --dir services/remote-control license-check && pnpm --dir services/remote-control test",
+    "release:check": "pnpm typecheck && pnpm lint && pnpm lint:electron && pnpm check:privacy && pnpm format:check && pnpm check:adr-numbers && pnpm check:action-pins && pnpm license-check && pnpm test && pnpm test:release-integrity && pnpm website:test && pnpm check:remote-control && pnpm build:web && pnpm build:electron-main && pnpm check:file-size && pnpm check:soft-size && pnpm check:index-exports",
     "guard:repo": "node scripts/assert-correct-repo.mjs",
     "dev:web": "vite",
     "trace": "node scripts/trace-cli.mjs",
     "build": "pnpm build:web",
     "generate:notices": "node scripts/generate-third-party-notices.mjs",
-    "generate:privacy": "node scripts/generate-site-pages.mjs",
-    "check:privacy": "node scripts/generate-site-pages.mjs --check",
+    "generate:privacy": "node scripts/generate-privacy-page.mjs",
+    "check:privacy": "node scripts/generate-privacy-page.mjs --check",
     "build:web": "pnpm generate:privacy && pnpm generate:notices && pnpm typecheck && pnpm build:bundle",
     "build:bundle": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build",
     "preview:web": "vite preview",
@@ -69,10 +70,10 @@
     "deploy:web": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=main",
     "deploy:web:preview": "pnpm guard:repo && pnpm release:check && wrangler pages deploy dist/web --project-name=laserforge --branch=preview",
     "build:bundle:desktop": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build --mode desktop",
-    "build:renderer:desktop": "pnpm generate:notices && pnpm typecheck && pnpm build:bundle:desktop",
-    "generate:site-pages": "node scripts/generate-site-pages.mjs"
+    "build:renderer:desktop": "pnpm generate:notices && pnpm typecheck && pnpm build:bundle:desktop"
   },
   "dependencies": {
+    "@modelcontextprotocol/server": "2.2.0",
     "@tabler/icons": "3.43.0",
     "clipper2-ts": "2.0.1-17",
     "delaunator": "5.1.0",
@@ -88,17 +89,21 @@
     "saxes": "6.0.0",
     "three": "^0.180.0",
     "tiff": "7.1.3",
+    "ws": "8.21.0",
+    "zod": "4.4.3",
     "zustand": "^4.5.0"
   },
   "devDependencies": {
     "@electron/asar": "3.4.1",
     "@eslint/js": "^9.10.0",
+    "@modelcontextprotocol/client": "2.2.0",
     "@playwright/test": "^1.61.1",
     "@types/node": "^20.14.0",
     "@types/opentype.js": "^1.3.9",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@types/three": "^0.185.0",
+    "@types/ws": "8.18.2",
     "@vitejs/plugin-react": "^4.3.0",
     "@vitest/coverage-v8": "4.1.11",
     "electron": "44.5.1",

@@ -1,5 +1,7 @@
 # Machines and controllers
 
+> **Historical local draft (29 September 2026). Not a published page.** Current website machine information comes from website/pages/machines.mjs. References below to section 2 of the earlier commercial terms are historical; [publishing notes](../legal/publishing-notes.md) records which information is public.
+
 Last checked: 29 September 2026.
 
 KerfDesk runs laser and CNC jobs on your machine over a USB cable. It is built for GRBL-family controllers (GRBL 1.1, grblHAL and FluidNC), and it also has drivers for Marlin and Smoothieware lasers and an experimental file export for Ruida controllers.

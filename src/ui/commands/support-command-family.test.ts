@@ -1,17 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  PAIA_MANUAL_URL,
-  PRICING_URL,
-  PRIVACY_URL,
-  REFUNDS_URL,
-  TERMS_URL,
-} from '../common/site-page-urls';
+import { PRICING_URL, PRIVACY_URL, REFUNDS_URL, TERMS_URL } from '../common/site-page-urls';
 import {
   REPORT_PROBLEM_URL,
   SUPPORT_URL,
   discussionsCommand,
   openExternalUrl,
-  paiaManualCommand,
   pricingCommand,
   privacyCommand,
   refundsCommand,
@@ -40,16 +33,8 @@ describe('support commands', () => {
     expect(pricingCommand().id).toBe('help.pricing');
     expect(termsCommand().id).toBe('help.terms');
     expect(privacyCommand().id).toBe('help.privacy');
-    expect(PAIA_MANUAL_URL).toBe('https://kerfdesk.com/paia-manual/');
     expect(refundsCommand().id).toBe('help.refunds');
-    expect(paiaManualCommand().id).toBe('help.paia-manual');
-    const policies = [
-      pricingCommand(),
-      termsCommand(),
-      privacyCommand(),
-      refundsCommand(),
-      paiaManualCommand(),
-    ];
+    const policies = [pricingCommand(), termsCommand(), privacyCommand(), refundsCommand()];
     for (const command of policies) {
       expect(command.family).toBe('help');
       expect(command.enabled).toBe(true);

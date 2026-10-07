@@ -1,6 +1,8 @@
 ## ADR-524 Amendment 3 - The pricing and policy pages ship with the web app on kerfdesk.com (2026-09-29)
 
-**Status:** Accepted | **Date:** 2026-09-29 | **Amends:** ADR-524 decision 6 and "Alternatives
+> **Reconciliation (8 October 2026):** The four public information pages and their navigation remain. The eight-page draft publication and agreement plan below is superseded by [publishing notes](../legal/publishing-notes.md) and main PR #1083: unfinished commercial and PAIA documents stay local, supplied app notices remain, and the current workspace and checkout flow are preserved.
+
+**Status:** Superseded in part | **Date:** 2026-09-29 | **Amends:** ADR-524 decision 6 and "Alternatives
 considered"
 
 ### Context

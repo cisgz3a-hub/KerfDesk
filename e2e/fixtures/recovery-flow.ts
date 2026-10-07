@@ -5,6 +5,11 @@
 
 import { expandMachineUtilities, selectWorkspacePanel } from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
+import {
+  acknowledgeStartOverrideFence,
+  acknowledgedStartControlLinesSince,
+  reviewStartBoundary,
+} from './recovery-start-boundary';
 
 export const IDLE = '<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>';
 const ASCII_REALTIME_BYTES = new Set(['?', '!', '~', String.fromCharCode(0x18)]);
@@ -168,7 +173,8 @@ export async function acknowledgeJobLinesOnly(
       return;
     }
     const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
-    const pending = written - acknowledged;
+    const pending =
+      written - acknowledged - acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
     if (pending > 0) {
       await kerfdesk.acknowledgeSerial(pending);
       acknowledged += pending;
@@ -188,7 +194,10 @@ export async function acknowledgeExactly(
   let acknowledged = 0;
   for (let attempt = 0; attempt < 400 && acknowledged < target; attempt += 1) {
     const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
-    const pending = Math.min(written - acknowledged, target - acknowledged);
+    const pending = Math.min(
+      written - acknowledged - acknowledgedStartControlLinesSince(kerfdesk, baselineLines),
+      target - acknowledged,
+    );
     if (pending > 0) {
       await kerfdesk.acknowledgeSerial(pending);
       acknowledged += pending;
@@ -221,10 +230,12 @@ export async function confirmJobReview(
   status: string = IDLE,
 ): Promise<void> {
   const before = await reviewStartBoundary(page);
+  const fromEventIndex = (await kerfdesk.events()).length;
   const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
     (byte) => byte === 0x3f,
   ).length;
   await startButton.click();
+  await acknowledgeStartOverrideFence(page, kerfdesk, before, fromEventIndex);
   await expect
     .poll(
       async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
@@ -237,32 +248,6 @@ export async function confirmJobReview(
     })
     .toBe(true);
   await kerfdesk.emitSerialLine(status);
-}
-
-async function reviewStartBoundary(page: Page): Promise<{
-  streamerEpoch: number;
-  awaitingFreshReport: boolean;
-}> {
-  return page.evaluate(async () => {
-    const moduleUrl = '/src/ui/state/laser-store.ts';
-    const { useLaserStore } = (await import(moduleUrl)) as {
-      useLaserStore: {
-        getState: () => {
-          streamerEpoch: number;
-          controllerOperation: { kind: string; phase?: string } | null;
-          pendingTransportWrites?: number;
-        };
-      };
-    };
-    const state = useLaserStore.getState();
-    return {
-      streamerEpoch: state.streamerEpoch,
-      awaitingFreshReport:
-        state.controllerOperation?.kind === 'start-arming' &&
-        state.controllerOperation.phase === 'live-status' &&
-        (state.pendingTransportWrites ?? 0) === 0,
-    };
-  });
 }
 
 export async function reopenProject(page: Page, name = 'project-basic.lf2'): Promise<void> {
@@ -343,7 +328,8 @@ export async function drainHeldSerialWrites(
   let stablePasses = 0;
   for (let attempt = 0; attempt < maxPasses; attempt += 1) {
     const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
-    const pending = written - acknowledged;
+    const pending =
+      written - acknowledged - acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
     if (pending > 0) {
       await kerfdesk.acknowledgeSerial(pending);
       acknowledged += pending;

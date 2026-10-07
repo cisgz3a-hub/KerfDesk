@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { rotaryRasterSaveProject } from '../../__fixtures__/rotary-raster-save-project';
-import { createProject } from '../../core/scene';
+import { createLayer, createProject } from '../../core/scene';
 import { prepareOutput, type PreparedOutput } from '../../io/gcode';
 import { emitSavePreparedOutput } from './save-output-emission';
 
@@ -24,8 +24,23 @@ describe('emitSavePreparedOutput', () => {
     });
   });
 
-  it('keeps ordinary empty-output in the canonical emitted-preflight partition', () => {
+  it('keeps missing output layers in the canonical emitted-preflight partition', () => {
     const result = emitSavePreparedOutput(prepareOutput(createProject()), {});
+
+    expect(result.kind).toBe('emitted');
+    expect(result.preflight.issues.map((issue) => issue.code)).toEqual(['no-output-layer']);
+  });
+
+  it('keeps missing motion from an enabled layer in the canonical emitted-preflight partition', () => {
+    const base = createProject();
+    const project = {
+      ...base,
+      scene: {
+        ...base.scene,
+        layers: [createLayer({ id: 'enabled-empty', color: '#ff0000' })],
+      },
+    };
+    const result = emitSavePreparedOutput(prepareOutput(project), {});
 
     expect(result.kind).toBe('emitted');
     expect(result.preflight.issues.map((issue) => issue.code)).toContain('empty-output');

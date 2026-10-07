@@ -1,5 +1,7 @@
 # PAIA Manual: Johannes Stephanus Stolk, trading as KerfDesk
 
+> **Draft for review. Not published or in force.** Publication date, public address and telephone arrangements are unresolved. Email is the primary support contact; this draft does not establish that email alone meets disclosure requirements.
+
 Prepared in terms of section 51 of the Promotion of Access to Information Act 2 of 2000 (as amended), following the Information Regulator's template for private bodies.
 
 Date of compilation: [PLACEHOLDER: publication date]
@@ -33,7 +35,7 @@ KerfDesk is a sole proprietorship. As its head, Johannes Stephanus Stolk is its 
 **Information Officer**
 
 - Name: Johannes Stephanus Stolk
-- Telephone: [PLACEHOLDER: telephone number]
+- Telephone: [PLACEHOLDER: public telephone availability unresolved]
 - Email: support@kerfdesk.com (please put "PAIA request" or "Privacy" in the subject)
 
 **Access to information: general contact**
@@ -42,9 +44,9 @@ KerfDesk is a sole proprietorship. As its head, Johannes Stephanus Stolk is its 
 
 **Head office**
 
-- Postal address: [PLACEHOLDER: street address, South Africa]
-- Physical address: [PLACEHOLDER: street address, South Africa]
-- Telephone: [PLACEHOLDER: telephone number]
+- Postal address: [PLACEHOLDER: public legal-service address unresolved]
+- Physical address: [PLACEHOLDER: public legal-service address unresolved]
+- Telephone: [PLACEHOLDER: public telephone availability unresolved]
 - Email: support@kerfdesk.com
 - Website: https://kerfdesk.com
 
@@ -66,22 +68,22 @@ KerfDesk is a sole proprietorship. As its head, Johannes Stephanus Stolk is its 
 - the notices issued in terms of sections 22 and 54 of PAIA regarding fees for requests for access; and
 - the regulations made in terms of section 92 of PAIA.
 
-4.4 You can inspect or copy the Guide at the offices of public and private bodies, including the Regulator's office, during normal working hours. Because KerfDesk is run from a private address, please arrange a time with us by email first.
+4.4 You can inspect or copy the Guide at the offices of public and private bodies, including the Regulator's office, during normal working hours. A public inspection arrangement remains unresolved. Email support@kerfdesk.com about an access request; this draft does not claim email replaces required physical inspection/contact arrangements.
 
 4.5 You can also get the Guide:
 
 - on request from our Information Officer; or
 - from the Regulator's website: https://inforegulator.org.za/paia/
 
-4.6 We keep a copy of the Guide in English and Afrikaans for inspection, by appointment, during normal office hours.
+4.6 Availability of the Guide in required languages and an appropriate inspection arrangement must be confirmed before publication.
 
 ## 5. Records available without a request
 
-These records are available to anyone, without a PAIA request:
+The final publication is intended to make the following records available without a PAIA request. The new policy pages and an earlier-version archive are not published by this review draft:
 
 | Category of records | Types of record | On the website | On request |
 | --- | --- | --- | --- |
-| Legal documents | Terms of Service and Licence Agreement, Privacy Notice, Refund Policy, this PAIA manual, and their earlier versions | Yes: https://kerfdesk.com/terms/, /privacy/, /refunds/ and /paia-manual/ | Yes |
+| Legal documents | Proposed Terms, Privacy Notice, Refund Policy, this PAIA manual, and future earlier-version archive | Intended: https://kerfdesk.com/terms/, /privacy/, /refunds/ and /paia-manual/; not published by this draft | On request where held |
 | Product information | Pricing, the Free and Pro editions, supported machines, safety notes, download page, release notes | Yes: https://kerfdesk.com | Yes |
 | Software notices | Third-party and open-source licence notices | Yes: https://kerfdesk.com/third-party-notices.txt | Yes |
 | Support information | Support page and help articles | Yes: https://kerfdesk.com/support.html | Yes |
@@ -92,7 +94,7 @@ These records are available to anyone, without a PAIA request:
 | --- | --- |
 | PAIA manual | Promotion of Access to Information Act 2 of 2000 |
 | Tax and accounting records | Income Tax Act 58 of 1962; Tax Administration Act 28 of 2011 |
-| VAT records, if we are registered for VAT | Value-Added Tax Act 89 of 1991 |
+| VAT records | Not VAT-registered; no VAT registration is asserted by this draft |
 | Records of personal information processing and data subject requests | Protection of Personal Information Act 4 of 2013 |
 | Consumer transaction records, terms and supplier information | Consumer Protection Act 68 of 2008; Electronic Communications and Transactions Act 25 of 2002 |
 
@@ -108,7 +110,7 @@ These records are available to anyone, without a PAIA request:
 | Legal | Terms, policies and notices with their earlier versions, records of consent to terms, legal correspondence |
 | Information technology and security | Configuration of our services, records of our administrative actions in the licensing service, security incident records |
 
-Records are not automatically available just because they are listed here. Access may be refused on the grounds in Chapter 4 of Part 3 of PAIA, for example to protect the privacy of other people, commercial information, or confidential information.
+The list describes potential categories where such records exist. It does not assert that registrations, payout history, accepted new terms or provider agreements have already been completed. Records are not automatically available just because they are listed here. Access may be refused on the grounds in Chapter 4 of Part 3 of PAIA, for example to protect the privacy of other people, commercial information, or confidential information.
 
 ## 8. Processing of personal information
 
@@ -123,6 +125,7 @@ We process personal information to:
 - answer support requests and complaints;
 - keep accounting and tax records, as the law requires;
 - comply with the law, report security breaches and answer lawful requests from authorities; and
+- provide optional phone/MCP access only with approved permissions, including separate artwork-sharing opt-in; and
 - send marketing emails only to people who ask for them.
 
 Our Privacy Notice at https://kerfdesk.com/privacy/ explains this in detail.
@@ -132,7 +135,9 @@ Our Privacy Notice at https://kerfdesk.com/privacy/ explains this in detail.
 | Categories of data subjects | Personal information that may be processed |
 | --- | --- |
 | Website and web app visitors | IP address, time of request, page address, browser type, version and language (processed by our host, Cloudflare) |
-| Desktop app users | The same connection details when the app checks for updates; for the licensed Windows app, a random update ID |
+| Desktop app users | Connection details when the app checks for updates; a separate signed update component can use a random update ID |
+| Approved phone/MCP users | Remote identity, credential hashes, client labels/permissions and expiry; bounded summaries/actions; artwork previews/text only with separate opt-in; phone connection cookie |
+| Browser purchasers | Local order/claim recovery credentials; order and transaction records; no phone activation seat |
 | Trial users and licence holders | A keyed one-way hash of the Windows installation code, a generic device label, licence and activation numbers, keyed hashes of licence keys and activation codes, and licence and trial dates |
 | Customers | Order numbers, what was bought, price, tax and currency, and Paddle's transaction references; in Paddle's seller dashboard: name, email address, address (if given) and purchase history |
 | People who contact us | Name, email address, the message and any attachments, such as support reports |
@@ -152,11 +157,11 @@ Our Privacy Notice at https://kerfdesk.com/privacy/ explains this in detail.
 
 Personal information is processed outside the Republic by our service providers:
 
-- **Cloudflare, Inc.:** in the United States and in Cloudflare's data centres worldwide (connection details, licensing records, downloads and support email in transit). Our licensing database is stored in a Cloudflare location outside South Africa.
+- **Cloudflare, Inc.:** in the United States and in Cloudflare's data centres worldwide (connection details, licensing records, downloads and support email in transit). Database location and international-transfer arrangements require provider verification.
 - **Google LLC:** in the United States and other countries (the support mailbox).
 - **Paddle:** in the United Kingdom, the United States, Canada and Ireland (order and payment information, which Paddle collects itself).
 
-These transfers are needed to provide the software, licences and support that people ask for (POPIA section 72(1)(c)), or benefit them where their consent cannot practicably be obtained (section 72(1)(e)). Cloudflare is bound by written data protection terms, and Cloudflare and Google take part in the EU–US Data Privacy Framework.
+Applicable provider terms, transfer mechanisms, legal bases, current certifications and account destinations remain unresolved for publication. This draft does not assert that any particular agreement, certification or exemption already satisfies the requirements. The final manual must reflect the actual established arrangements.
 
 ### 8.5 Information security measures
 
@@ -164,7 +169,7 @@ These transfers are needed to provide the software, licences and support that pe
 - Licence keys, activation codes, checkout and claim codes, and installation codes are stored only as keyed one-way hashes.
 - The key that signs licences is kept outside the database, and every licence is signed, so forged licences can be detected.
 - The licensing service's administration tools need a secret credential, and each use is recorded.
-- Licences saved on users' computers are encrypted with Windows' own data protection.
+- Windows licence and remote credentials use operating-system secure storage. Browser purchase recovery uses first-party storage accessible to scripts on that origin.
 - Card details go only into Paddle's checkout. We never receive full card numbers.
 - Requests to the licensing service are rate-limited to protect it from abuse.
 
@@ -187,7 +192,7 @@ These transfers are needed to provide the software, licences and support that pe
 10.1 This manual is available:
 
 - on our website at https://kerfdesk.com/paia-manual/;
-- at our head office for public inspection during normal business hours, by appointment arranged by email;
+- at an appropriate inspection location once that unresolved arrangement is established;
 - to any person on request, on payment of a reasonable prescribed fee; and
 - to the Information Regulator on request.
 

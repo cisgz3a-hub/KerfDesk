@@ -2,6 +2,10 @@
 
 **Status:** Accepted. | **Date:** 2026-09-24
 
+**Amended by [ADR-565](ADR-565-frame-remains-valid-for-unchanged-placement.md):** the physical
+Frame may remain valid for unchanged placement while each Start prepares, reviews and claims its
+own exact execution permit. Start still never runs a Frame itself.
+
 Amends the Start entry of ADR-237: a Start without a permit no longer runs the Frame. The
 Frame-only Start policy of ADR-228/230/232 is unchanged. A completed Frame of the exact job is
 still the only Start gate, and a permit still names exact bytes. Hardware qualification remains

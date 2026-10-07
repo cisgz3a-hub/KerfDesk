@@ -10,7 +10,12 @@ import {
   type Locator,
   type Page,
 } from './fixtures/kerfdesk-test';
-import { connectAndHome } from './fixtures/recovery-flow';
+import {
+  confirmJobReview as confirmRecoveryJobReview,
+  connectAndHome,
+} from './fixtures/recovery-flow';
+import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
+import { saveProjectAs } from './fixtures/project-save';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -64,7 +69,7 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
   await expect(
     page.getByRole('group', { name: 'Preview route controls and statistics' }),
   ).toBeVisible();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBe(4);
@@ -96,7 +101,7 @@ test('calibrates machine timing and exposes cut and travel estimates in Preview'
   await expect(panel).toContainText('Travel time');
   await panel.screenshot({ path: testInfo.outputPath('calibrated-preview-timing.png') });
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
     estimateCutTimeScale: 1.18,
@@ -117,7 +122,7 @@ test('outline-nests complementary vector parts that rectangular bounds cannot fi
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
   await page.getByRole('spinbutton', { name: 'Part spacing (mm)' }).fill('0');
   await page.getByRole('button', { name: 'Nest selection' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects).toHaveLength(2);
@@ -142,7 +147,7 @@ test('imports SVG through the real picker and creates a circular array', async (
   await runMenuCommand(page, 'Arrange', 'Array...');
   await page.getByRole('tab', { name: 'Circular' }).click();
   await page.getByRole('button', { name: 'Create array' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.length).toBeGreaterThan(6);
@@ -160,7 +165,7 @@ test('configures chuck rotary and generates its calibration pattern', async ({
   await page.getByLabel('Rotary millimetres per rotation').fill('360');
   page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: 'Generate test pattern' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device.rotary).toMatchObject({
@@ -271,7 +276,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await expect(failedSave).toContainText('No final file was selected or modified');
   await failedSave.getByRole('button', { name: 'Cancel', exact: true }).click();
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.printAndCutTargets).toEqual({
@@ -356,7 +361,7 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
   );
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Text formatting' })).not.toBeVisible();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.variables?.csv).toMatchObject({
@@ -409,7 +414,7 @@ test('configures the Creality Falcon profile through the complete setup wizard',
   expect((finishBox?.x ?? 0) + (finishBox?.width ?? 0)).toBeLessThanOrEqual(390);
   expect((finishBox?.y ?? 0) + (finishBox?.height ?? 0)).toBeLessThanOrEqual(844);
   await page.getByRole('button', { name: 'Save machine setup' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
@@ -450,7 +455,7 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   await setup.getByRole('button', { name: 'Check essentials', exact: true }).click();
   await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await setup.getByRole('button', { name: 'Save machine setup' }).click();
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.device).toMatchObject({
@@ -515,7 +520,7 @@ test('imports a generated bitmap and traces it through the production worker wor
   await expect(page.getByRole('dialog', { name: 'Trace image' })).not.toBeVisible({
     timeout: 30_000,
   });
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
   expect(saved.scene.objects.some((object) => object['kind'] === 'traced-image')).toBe(true);
@@ -630,6 +635,7 @@ test('shows controller-reported canvas progress without treating acknowledgement
   await kerfdesk.setAutoAcknowledge(false);
   page.on('dialog', (dialog) => void dialog.accept());
   const writesBefore = serialWrites(await kerfdesk.events()).length;
+  const baselineLines = serialWriteLineCount(await kerfdesk.events());
   await page.getByRole('button', { name: 'Start', exact: true }).click();
   await confirmJobReview(page, kerfdesk);
   await expect(probe).toHaveAttribute('data-lifecycle', 'running');
@@ -640,7 +646,9 @@ test('shows controller-reported canvas progress without treating acknowledgement
   expect(firstMove).not.toBeNull();
   const acceptedThroughFirstMove =
     [...programWrites.slice(0, firstMove?.index ?? 0)].filter((character) => character === '\n')
-      .length + 1;
+      .length +
+    1 -
+    acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
   await kerfdesk.acknowledgeSerial(acceptedThroughFirstMove);
   await expect
     .poll(async () => Number(await probe.getAttribute('data-confirmed-route-mm')))
@@ -783,7 +791,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await selectAll(page);
   await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('10');
   await fillAndCommit(page, 'Selection X position', '47');
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const currentProject = await savedProject(kerfdesk);
   const savedBeforeReview = fileSavedCount(await kerfdesk.events());
   const writesBeforeReview = serialWriteBytes(await kerfdesk.events());
@@ -819,7 +827,7 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await expect(review).not.toBeVisible();
   await expect(page.getByLabel('Selection X position', { exact: true })).toHaveValue('47');
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   await expect
     .poll(async () => fileSavedCount(await kerfdesk.events()))
     .toBeGreaterThan(savedBeforeReview);
@@ -832,16 +840,11 @@ test('preserves an interrupted laser checkpoint after a cable disconnect', async
   await recovery.getByRole('button', { name: 'Review recovery', exact: true }).click();
   await selectRecoveryMovement(review.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
   await kerfdesk.setAutoAcknowledge(false);
-  const queriesBeforeResume = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === 0x3f,
-  ).length;
-  await review.getByRole('button', { name: 'Start supervised recovery', exact: true }).click();
-  await expect
-    .poll(
-      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
-    )
-    .toBeGreaterThan(queriesBeforeResume);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await confirmRecoveryJobReview(
+    page,
+    kerfdesk,
+    review.getByRole('button', { name: 'Start supervised recovery', exact: true }),
+  );
   await expect(review).not.toBeVisible();
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await kerfdesk.acknowledgeSerial(1);
@@ -930,16 +933,11 @@ test('prepares a large image restart preview and starts only the selected remain
   await expect(preview).toBeVisible({ timeout: 30_000 });
   await selectRecoveryMovement(preview.getByRole('img', { name: /^Laser recovery canvas:/ }), true);
   await kerfdesk.setAutoAcknowledge(false);
-  const queriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === 0x3f,
-  ).length;
-  await preview.getByRole('button', { name: 'Start selected remainder', exact: true }).click();
-  await expect
-    .poll(
-      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
-    )
-    .toBeGreaterThan(queriesBefore);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
+  await confirmRecoveryJobReview(
+    page,
+    kerfdesk,
+    preview.getByRole('button', { name: 'Start selected remainder', exact: true }),
+  );
   await expect(page.getByRole('button', { name: 'Pause', exact: true })).toBeVisible();
   await expect(preview).not.toBeVisible();
   expect(
@@ -1186,52 +1184,7 @@ async function confirmJobReview(
     .getByRole('dialog', { name: 'Review job before starting' })
     .getByRole('button', { name: 'Start job' }),
 ): Promise<void> {
-  const before = await reviewStartBoundary(page);
-  const statusQueriesBefore = serialWriteBytes(await kerfdesk.events()).filter(
-    (byte) => byte === 0x3f,
-  ).length;
-  await startButton.click();
-  await expect
-    .poll(
-      async () => serialWriteBytes(await kerfdesk.events()).filter((byte) => byte === 0x3f).length,
-    )
-    .toBeGreaterThan(statusQueriesBefore);
-  // The fixture replies synchronously inside the query write. Start requires
-  // a later report, after that write resolves. Ignore earlier periodic queries
-  // during handoff, and also allow a reply that already started this new stream.
-  await expect
-    .poll(async () => {
-      const current = await reviewStartBoundary(page);
-      return current.streamerEpoch !== before.streamerEpoch || current.awaitingFreshReport;
-    })
-    .toBe(true);
-  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-}
-
-async function reviewStartBoundary(page: Page): Promise<{
-  streamerEpoch: number;
-  awaitingFreshReport: boolean;
-}> {
-  return page.evaluate(async () => {
-    const moduleUrl = '/src/ui/state/laser-store.ts';
-    const { useLaserStore } = (await import(moduleUrl)) as {
-      useLaserStore: {
-        getState: () => {
-          streamerEpoch: number;
-          controllerOperation: { kind: string; phase?: string } | null;
-          pendingTransportWrites?: number;
-        };
-      };
-    };
-    const state = useLaserStore.getState();
-    return {
-      streamerEpoch: state.streamerEpoch,
-      awaitingFreshReport:
-        state.controllerOperation?.kind === 'start-arming' &&
-        state.controllerOperation.phase === 'live-status' &&
-        (state.pendingTransportWrites ?? 0) === 0,
-    };
-  });
+  await confirmRecoveryJobReview(page, kerfdesk, startButton);
 }
 
 async function choosePreparedGcodeDestination(page: Page): Promise<void> {
@@ -1333,7 +1286,8 @@ async function drainHeldSerialWrites(
   let stablePasses = 0;
   for (let attempt = 0; attempt < 40; attempt += 1) {
     const written = serialWriteLineCount(await kerfdesk.events()) - baselineLines;
-    const pending = written - acknowledged;
+    const pending =
+      written - acknowledged - acknowledgedStartControlLinesSince(kerfdesk, baselineLines);
     if (pending > 0) {
       await kerfdesk.acknowledgeSerial(pending);
       acknowledged += pending;

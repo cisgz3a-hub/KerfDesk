@@ -103,6 +103,8 @@ test('generated sandbox config and real ASAR keep installers, profiles, trust an
   }
   await mkdir(source);
   await mkdir(join(source, 'dist/web'), { recursive: true });
+  await mkdir(join(source, 'dist-electron'), { recursive: true });
+  await writeFile(join(source, 'dist-electron/main.js'), '');
   await writeFile(
     join(source, 'dist/web/index.html'),
     '<meta name="kerfdesk-build-capabilities" content="desktop">',

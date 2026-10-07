@@ -57,14 +57,6 @@
         color: #4b5563;
         font-size: 1.05rem;
       }
-      .launch-note {
-        margin: 0;
-        padding: 0.55rem 1.25rem;
-        background: #111827;
-        color: #ffffff;
-        font-weight: 600;
-        text-align: center;
-      }
       .notice {
         margin-top: 1.5rem;
         padding: 1rem 1.1rem;
@@ -163,59 +155,9 @@
         max-width: 26rem;
         margin: 1rem 0;
       }
-      .site-header,
-      .site-footer {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem 1.5rem;
-        align-items: baseline;
-        justify-content: space-between;
-        width: min(64rem, 100%);
-        margin: 0 auto;
-        padding: 1.25rem 1.25rem 0;
-      }
-      .site-footer {
-        padding: 1.25rem 1.25rem 2.5rem;
-      }
-      .site-header nav,
-      .site-footer nav {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.35rem 1.1rem;
-      }
-      .site-footer p {
-        flex-basis: 100%;
-        margin: 0;
-        color: #4b5563;
-      }
-      .brand {
-        color: #111827;
-        font-size: 1.2rem;
-        font-weight: 700;
-        text-decoration: none;
-      }
-      [aria-current='page'] {
-        color: #111827;
-        font-weight: 600;
-        text-decoration: none;
-      }
     </style>
   </head>
   <body>
-    <!-- launch-note: written by scripts/generate-site-pages.mjs (ADR-524 Amendment 4) -->
-    <p class="launch-note">KerfDesk Pro launches soon.</p>
-    <!-- /launch-note -->
-    <header class="site-header">
-      <a class="brand" href="/">KerfDesk</a>
-      <nav aria-label="KerfDesk">
-        <a href="/pricing/">Pricing</a>
-        <a href="/machines/">Machines</a>
-        <a href="/safety/">Safety</a>
-        <a href="/download.html" aria-current="page">Download</a>
-        <a href="/support.html">Support</a>
-        <a href="/">Open the web app</a>
-      </nav>
-    </header>
     <main>
       <h1>Download KerfDesk</h1>
       <p class="intro">
@@ -237,7 +179,7 @@
           stops a running job. A Pro licence costs US$49.50 plus any applicable tax. It works on
           three active computers, includes one year of updates, and never stops working for the
           versions released while your updates are covered. Another year of updates costs US$20 and
-          never renews automatically. Buy Pro, or another year of updates, from
+          never renews automatically. Once sales open, buy or renew from
           <strong>Help &gt; Licence</strong> inside the app.
         </p>
         <p id="commercial-status" role="status">Checking for the licensed Windows edition…</p>
@@ -371,15 +313,5 @@
         features and can be installed from the browser.
       </footer>
     </main>
-    <footer class="site-footer">
-      <nav aria-label="Policies">
-        <a href="/terms/">Terms of Service</a>
-        <a href="/privacy/">Privacy Notice</a>
-        <a href="/refunds/">Refund Policy</a>
-        <a href="/paia-manual/">PAIA Manual</a>
-        <a href="/license/">Licence and notices</a>
-      </nav>
-      <p>KerfDesk is made and licensed by Johannes Stephanus Stolk, trading as KerfDesk.</p>
-    </footer>
   </body>
 </html>

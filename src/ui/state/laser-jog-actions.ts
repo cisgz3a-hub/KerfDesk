@@ -30,6 +30,11 @@ import {
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import {
+  assertMachineExecutionOwner,
+  ownedMachineWrite,
+  type MachineExecutionOwner,
+} from './machine-execution-owner';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -39,6 +44,7 @@ type SafeWriteFn = (
   line: string,
   action?: LaserSafetyAction,
   source?: TranscriptSource,
+  assertBeforeWrite?: () => void,
 ) => Promise<void>;
 type JogActionContext = {
   readonly set: SetFn;
@@ -64,11 +70,12 @@ export function jogActions(
   return {
     home: () => runHomeAction(set, get, refs, safeWrite, refs.driver),
     jogToMachinePosition: (x, y, feed) => runJogToMachinePosition(context, x, y, feed),
-    jog: (params) => runJog(context, params),
+    jog: (params, owner) => runJog(context, params, owner),
     cancelJog: () => runCancelJog(set, get, refs, safeWrite),
-    frame: (bounds, feed, candidate, jobProject) =>
-      runFrame(context, bounds, feed, candidate, jobProject),
-    traceFrame: (bounds, feed, candidate) => runFrame(context, bounds, feed, candidate),
+    frame: (bounds, feed, candidate, jobProject, owner) =>
+      runFrame(context, bounds, feed, candidate, jobProject, owner),
+    traceFrame: (bounds, feed, candidate, owner) =>
+      runFrame(context, bounds, feed, candidate, undefined, owner),
   };
 }
 
@@ -129,18 +136,26 @@ async function runJogToMachinePosition(
 async function runJog(
   context: JogActionContext,
   params: Parameters<LaserState['jog']>[0],
+  owner?: MachineExecutionOwner,
 ): Promise<void> {
+  assertMachineExecutionOwner(owner);
+  context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
   const { set, get, refs } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'jogging');
   const cancelGeneration = await confirmUncancelledFreshIdle(context, 'jog');
+  assertMachineExecutionOwner(owner);
   warnJogMotionPolicy(set, get, params);
   // Any deliberate head move consumes the placement proof even if the
   // head later returns to numerically identical coordinates.
-  const operation = startSettledJogOperation(refs);
+  const operation = {
+    ...startSettledJogOperation(refs),
+    ...(owner === undefined ? {} : { executionOwner: owner }),
+  };
   assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation, frameVerification: null, framedRun: null, frameTrace: null });
+  owner?.onMotionOwner?.(operation.operationId);
   try {
     await dispatchOwnedJog(context, params, operation);
   } catch (error) {
@@ -156,7 +171,14 @@ async function dispatchOwnedJog(
 ): Promise<void> {
   const { set, get, refs, safeWrite } = context;
   assertMotionOperationOwner(get, operation.operationId, 'Jog');
-  await safeWrite(`${refs.driver.commands.buildJog(params)}\n`, 'jog');
+  assertMachineExecutionOwner(operation.executionOwner);
+  operation.executionOwner?.onDispatch?.();
+  await ownedMachineWrite(safeWrite, {
+    assertCurrent: () => {
+      assertMotionOperationOwner(get, operation.operationId, 'Jog');
+      assertMachineExecutionOwner(operation.executionOwner);
+    },
+  })(`${refs.driver.commands.buildJog(params)}\n`, 'jog');
   set((state) => ({
     motionOperation: markMotionOperationDispatched(
       state.motionOperation,
@@ -177,12 +199,16 @@ async function runFrame(
   feed: number,
   candidate: Parameters<LaserState['frame']>[2] | Parameters<LaserState['traceFrame']>[2],
   jobProject?: Parameters<LaserState['frame']>[3],
+  owner?: MachineExecutionOwner,
 ): Promise<void> {
+  assertMachineExecutionOwner(owner);
+  context = { ...context, safeWrite: ownedMachineWrite(context.safeWrite, owner) };
   const { set, get, refs, safeWrite } = context;
   assertAutofocusIdle(get());
   assertJogFrameReady(set, get);
   assertMotionQueueSettled(set, get, 'framing again');
   const cancelGeneration = await confirmUncancelledFreshIdle(context, 'frame');
+  assertMachineExecutionOwner(owner);
   // A new physical Frame voids every earlier proof, traced or permitted.
   set({ frameVerification: null, framedRun: null, frameTrace: null });
   const plan = buildFrameDispatchPlan(refs, get, bounds, feed, candidate, jobProject);
@@ -203,20 +229,33 @@ async function runFrame(
     set({ lastWriteError: message, log: pushLog(get(), `[lf2] ${message}`) });
     throw new Error(message);
   }
-  const operation = startMotionOperation(
-    'frame',
-    pendingLines,
-    candidate,
-    refs.driver.commands.frameToolOffLines.length,
-    0,
-    undefined,
-    frameSettlementLine,
-  );
+  const operation = {
+    ...startMotionOperation(
+      'frame',
+      pendingLines,
+      candidate,
+      refs.driver.commands.frameToolOffLines.length,
+      0,
+      undefined,
+      frameSettlementLine,
+      undefined,
+      plan.expectedReturnWorkZMm,
+    ),
+    ...(owner === undefined ? {} : { executionOwner: owner }),
+  };
   assertManualMotionNotCancelled(refs, cancelGeneration);
   set({ motionOperation: operation });
+  owner?.onMotionOwner?.(operation.operationId);
   try {
     assertMotionOperationOwner(get, operation.operationId, 'Frame');
-    await safeWrite(firstLine, 'frame');
+    assertMachineExecutionOwner(owner);
+    owner?.onDispatch?.();
+    await ownedMachineWrite(safeWrite, {
+      assertCurrent: () => {
+        assertMotionOperationOwner(get, operation.operationId, 'Frame');
+        assertMachineExecutionOwner(owner);
+      },
+    })(firstLine, 'frame');
     set((state) => ({
       motionOperation: markMotionOperationDispatched(
         state.motionOperation,

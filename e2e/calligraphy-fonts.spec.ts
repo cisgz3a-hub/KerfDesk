@@ -1,4 +1,4 @@
-import { toolbarCommand } from './fixtures/workspace-ui';
+import { saveProjectAs } from './fixtures/project-save';
 import { expect, test } from './fixtures/kerfdesk-test';
 import type { AppState } from '../src/ui/state/store';
 import { CANVAS_PADDING_PX } from '../src/ui/workspace/canvas-layout';
@@ -65,7 +65,7 @@ for (const [name, fontKey] of FONTS) {
       true,
     );
     await page.screenshot({ path: testInfo.outputPath(`${fontKey}.png`) });
-    await (await toolbarCommand(page, 'Save As...')).click();
+    await saveProjectAs(page, kerfdesk);
     await expect
       .poll(async () =>
         Object.values(await kerfdesk.savedFiles()).some(

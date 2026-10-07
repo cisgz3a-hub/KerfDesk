@@ -2,6 +2,10 @@
 
 **Status:** Accepted. | **Date:** 2026-09-26
 
+**Amended by [ADR-565](ADR-565-frame-remains-valid-for-unchanged-placement.md):** unchanged
+placement may reuse a clean completed Frame. Each replay still claims its own exact reviewed
+program, and a newly framed Current Position placement remains authoritative over receipt origin.
+
 ### Context
 
 ADR-372 made Start wait for a clean Frame of the exact job and stream that Frame's one-run permit.
