@@ -151,7 +151,7 @@ function closeOpenFillContoursCommand(ctx: AppCommandContext): AppCommand {
         'tools.close-open-fill-contours',
         'tools',
         label,
-        'Mark selected near-closed Fill contours as closed',
+        'Close selected near-closed Fill contours',
         ctx.closeSelectedOpenFillContours,
       )
     : disabled(

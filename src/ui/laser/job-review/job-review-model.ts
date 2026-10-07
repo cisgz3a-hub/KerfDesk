@@ -34,6 +34,7 @@ import {
   originTileValue,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
+import { buildFillOmissions, type JobReviewFillOmissions } from './job-review-fill-omissions';
 import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectArchiveCapacityWarnings } from './archive-capacity-warnings';
@@ -74,6 +75,7 @@ export type JobReviewModel = {
   readonly machineKind: MachineKind;
   readonly stats: ReadonlyArray<JobReviewStatTile>;
   readonly warnings: ReadonlyArray<string>;
+  readonly openFillOmissions?: JobReviewFillOmissions;
   readonly resolvedOriginLabel: string;
   /** Placement of the reviewed job; decides where an unset CNC park ends. */
   readonly startFrom?: JobOriginPlacement['startFrom'];
@@ -100,8 +102,10 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   if (args.prepared.laserSecondPassChain !== undefined) return buildSecondPassReviewModel(args);
   const machineKind = machineKindOf(args.project.machine);
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
+  const openFillOmissions = buildFillOmissions(args.prepared, outputScope);
   return {
     machineKind,
+    ...(openFillOmissions === undefined ? {} : { openFillOmissions }),
     stats: buildStatTiles(
       args.prepared,
       machineKind,

@@ -200,3 +200,44 @@ tolerance after scaling, oversized and mismatched contours, legacy flag-only clo
 synchronization and unchanged anchors. The shared targeted helper is covered by
 src/core/geometry/path-direction-edits.test.ts; existing general Close Path tests remain
 applicable.
+
+### Amendment 2 - Fill omissions follow effective canonical output (2026-10-07)
+
+Selected Fill diagnostics, highlighting and tolerance repair share the compiler's enabled
+operation expansion, including inherited and independently overridden suboperations.
+Object-scoped and legacy global overrides resolve before mode eligibility. A disabled parent
+or suboperation does not contribute, and a base Fill operation overridden to Line is not a
+Fill repair target. Canonical curves are flattened at the machine tolerance; endpoint closure
+is measured after the object transform in physical millimetres, matching Fill compilation.
+Every physical contour is counted once across its enabled Fill operations. Closed canonical
+contours are dismissed without flattening dense traces; mixed paths materialize only their
+potentially open subpaths. A closed degenerate contour is not mislabeled as an open omission.
+
+A curve/polyline count mismatch or ambiguous parametric shape remains visible in the open
+count but is ineligible for automatic repair. The targeted repair keeps Amendment 1's paired
+geometry, unlocked selection, one Undo step, project round trip and unchanged tab anchors.
+General Close Path retains its original eligibility and gap behavior.
+
+Scanline, Island and Offset Fill all omit open contours. Start and Save G-code disclose the
+omitted contour and artwork counts and advise closing the shapes or using Line for their
+outlines. Scanline is not a workaround for an open region. The historical
+offset-fill-open-contour advisory key remains readable; its scope now includes all Fill styles.
+
+Ordinary Job Review receives explicit optional omission IDs and counts from the exact
+prepared project and selected-artwork output scope. Bounded per-object content fingerprints
+establish correspondence across worker clones and reject changed artwork that reuses an ID.
+**Show omitted artwork** first cancels the pending review, then selects only still-open
+matching artwork, fits that selection and reveals the Artwork rail. It does not expand to
+unreviewed group members. Opening review alone changes no artwork, selection or project.
+A rebuild replaces the omission data; stale entries are skipped individually. Archived
+recovery and painted second-pass reviews do not claim editable source correspondence.
+
+These findings remain advisory under ADR-565. No additional Start, Save, transport, licence
+or hardware gate is added. No controller command is part of diagnostics or artwork reveal.
+
+Verification: the effective/canonical Fill regression, review model and review UI suites
+cover overrides, suboperations, output-off controls, scale-sensitive closure and tolerance,
+legacy flags, mismatches, deduplicated counts, exact prepared scope, repaired/rebuilt models,
+same-ID replacement, structured clones, cancellation, selection fit, group boundaries and
+archive/second-pass exclusions. Existing diagnostics, closure, review and preflight controls
+remain applicable. These are software tests; no physical-machine qualification is claimed.

@@ -3571,15 +3571,18 @@ or traced image) with at least one closed polyline.
    order using their own mode, power, speed, passes, fill, image, kerf, tab, and air settings. This
    supports fill-then-line workflows without duplicating artwork or opening a nested Sub-layers box.
 
-**Error**:
-- *No closed polylines on this color* — the layer's mode is Fill, but
-  every matching polyline is open (e.g., a single line, not a region).
-  The compile step silently emits nothing for that layer (no error
-  toast; the empty result is itself the diagnostic). Switch back to
-  Line mode to engrave the outline instead.
-- *Offset Fill on open contours* - Start / Save G-code preflight blocks with
-  a specific Offset Fill message. Close the shapes or switch the layer back to
-  Scanline Fill.
+**Warnings**:
+- *Open Fill contours omitted* — Scanline, Island and Offset Fill require closed regions.
+  Start and Save G-code report the omitted contour and artwork counts. These warnings are
+  advisory when other artwork produces executable output. Close the shapes, or use Line
+  to engrave their outlines; changing to Scanline does not fill an open region.
+- Selected open Fill artwork is highlighted using its canonical geometry and effective enabled
+  operations, including object overrides and suboperations. **Close Open Fill Contours** closes
+  eligible near gaps in physical millimetres; ambiguous curve/polyline pairs stay unresolved.
+- In ordinary Job Review, **Show omitted artwork** cancels the pending run, selects unchanged
+  matching artwork from the reviewed output scope, fits the selection and reveals the Artwork
+  rail. Changed objects, archived recovery and painted second passes do not invent source
+  correspondence. Merely opening review changes no selection or project.
 - *Additional operation disabled* - the operation stays saved on the project but does not compile
   into Preview, Frame, Save G-code, or Start output.
 

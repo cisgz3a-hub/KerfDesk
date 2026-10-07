@@ -62,7 +62,12 @@ function OpenJobReview(props: {
       {blocker !== null ? (
         <BlockerBanner blocker={blocker} purpose={purpose} onRetry={requestReviewRebuild} />
       ) : null}
-      <JobReviewWarnings warnings={model.warnings} />
+      <JobReviewWarnings
+        warnings={model.warnings}
+        {...(purpose === 'laser-second-pass' || model.openFillOmissions === undefined
+          ? {}
+          : { openFillOmissions: model.openFillOmissions })}
+      />
       {model.machineKind === 'cnc' ? <JobReviewCncOwnerActions /> : null}
       <ReviewArtwork model={model} purpose={purpose} onApprove={requestReviewRebuild} />
       <ReviewMachineFacts model={model} purpose={purpose} />
