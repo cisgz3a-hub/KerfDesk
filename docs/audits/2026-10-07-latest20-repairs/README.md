@@ -1,6 +1,6 @@
 # Latest twenty PR audit repairs
 
-The repair branch carries forward the document and job handover fixes from PR #1082, fixes inherited image-mask nesting and MCP cancellation defects, and strengthens substantive regression coverage. The original PR branches are retained.
+The combined workflow candidate also retains PR #1084 features and adds the workflow repairs below. The repair branch carries forward the document and job handover fixes from PR #1082, fixes inherited image-mask nesting and MCP cancellation defects, and strengthens substantive regression coverage. The original PR branches are retained.
 
 | Finding | Result | Regression or source evidence |
 | --- | --- | --- |
@@ -13,6 +13,13 @@ The repair branch carries forward the document and job handover fixes from PR #1
 | R1 accepted legacy batches lose cancellation ownership | Preserve 1-100 valid legacy messages and bounded priority Abort capacity. Associate each typed wire ID with its authenticated client/grant, apply mixed cancellation once, preserve original retained member bytes, and release every acquired association. | `services/remote-control/test/mcp-batch-boundary.test.mjs`, lifecycle and raw-byte regressions; real legacy/modern SDK HTTP cancellation and shared `electron/mcp/server.test.ts` wire-ID forwarding. |
 | R2 phone test reads controls before readiness | Wait for the admitted edit form before beginning the original complete workflow. | `services/remote-control/test/mobile.test.mjs`. |
 | R3 local quota assertion can cross its minute boundary | Observe the real test binding epoch and start the unchanged exact 61-request assertion inside one verified minute. | `services/remote-control/test/rate-admission.test.mjs`; test-only observer, no production quota changes. |
+
+
+| F1 copied production sheets inherit completed observations | Copy current artwork while keeping the original run archived; explicitly allocate a new run with fresh identities, pending rows and fresh capture attribution. | `src/ui/state/project-sheet-production-copy.test.ts` and `e2e/project-production-reuse.spec.ts`, including save/reopen and no serial writes. |
+| F2 a valid long experiment ID produces an invalid recipe reference | Keep derived IDs within the existing 200-character limit, resolve collisions across both stores, and validate the entire next library before persistence. | `src/ui/state/material-experiment-recipe-id.test.ts`: boundary lengths, suffix growth, collision, CNC/tool fidelity and atomic refusal. |
+| B1 an extra workflow strip reduces the compact canvas | Move sheet, production and saved-array controls into the existing header and an accessible dialog. | `e2e/ux-shell.spec.ts`: original canvas height bounds, keyboard reachability, nested dialog and opener focus. |
+| B2 seven browser scenarios follow superseded UI controls | Follow explicit Nest acceptance, scoped Materials status, CSV column insertion, current numeric fields and the shared Save flow. | Production, variable-array and shape browser tests retain output, placement, Undo, persistence and SVG assertions. |
+| Workflow integration conflicts | Preserve closed-sales seller/Paddle policies and AI disclosure together; retain the verified workflow Nest implementation when merging inherited fixes. | Full website, privacy, legal-publication and release-integrity checks; final candidate checks are recorded separately. |
 
 The service README records the precise legacy batch, MIME, wire-ID and capacity boundaries. Invalid or unsupported shapes are rejected before effects. Capacity denial remains per member; HTTP cancellation does not implicitly call physical Abort or replay controller commands.
 
