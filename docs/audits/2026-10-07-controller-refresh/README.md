@@ -102,7 +102,7 @@ keeping a usable port, rather than copying every sender's stopping behaviour.
 
 ## Verification
 
-The full repository suite passed: **27,785 tests passed**, 29 skipped/pending and 0 todo across 3,578 files. There were no failed tests or runner-error suites. The source guard checked 7,891 source/config files before and after the run: zero changes. The compact [current-main verification](verification-current-main.json) records the counts, source-manifest hash and build asset hashes.
+The full repository suite passed on the implementation snapshot based on `76b5ff53e3be7df6c160a8b26820e61188595f08`: **27,785 tests passed**, 29 skipped/pending and 0 todo across 3,578 files. There were no failed tests or runner-error suites. The source guard checked 7,891 source/config files before and after the run: zero changes. The compact [current-main verification](verification-current-main.json) records the counts, source-manifest hash and build asset hashes.
 
 TypeScript, the repository lint check, formatting, the production renderer build,
 file-size limits, ADR numbering and the privacy check passed on the integrated
@@ -130,6 +130,21 @@ the newly resumed settings read. Repairs preserve the original ownership and
 close-approval outcomes, then verify genuine boot/cleanup replies and successful
 automatic refresh. All 19 affected tests pass together with no unhandled error.
 The failed diagnostic run is retained locally and excluded from final pass credit.
+
+The first PR browser-CI run exposed an outdated successful-Abort fixture in
+`e2e/production-workflows.spec.ts`: it sent Ctrl-X without a recognized reboot,
+so a legitimate recovery warning remained beside Alarm 3. The failure was
+reproduced locally. That scenario now supplies its own prompt reboot, acknowledges
+only the new M5/M9 cleanup and waits for full information refresh over the same
+port before exercising Alarm recovery and actual Home. The final assertions also
+finish Home's modal-state readback, require current-session homing and zero reply
+or write debt, and retain the absence of all alerts and the Frame/Start outcome.
+
+The repaired Chrome workflow and a cold-start browser test both passed. The
+[compact browser evidence](browser-ci-repair.json) records their separate counts,
+the exact test-source hash and the integrated main revision `e3820ed51`.
+Intermediate diagnostic failures receive no pass credit. These focused browser
+checks supplement the historical full-suite evidence; they do not replace it.
 
 The final [bounded fault audit](mutation-audit-current-main.json) ran in a separate
 source copy. All 76 selected tests passed before and after the six fault injections;

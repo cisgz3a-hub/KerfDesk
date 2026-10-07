@@ -537,6 +537,50 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   kerfdesk,
 }) => {
   await connectAndHome(page, kerfdesk);
+  const connectionEvents = async () =>
+    (await kerfdesk.events()).filter((event) =>
+      ['serial-request-port', 'serial-open', 'serial-close', 'serial-disconnect'].includes(
+        event.kind,
+      ),
+    );
+  const originalConnection = await connectionEvents();
+  expect(originalConnection.map((event) => event.kind)).toEqual([
+    'serial-request-port',
+    'serial-open',
+  ]);
+  const recoverySnapshot = async () =>
+    page.evaluate(async () => {
+      const moduleUrl = '/src/ui/state/laser-store.ts';
+      const { useLaserStore } = (await import(moduleUrl)) as {
+        useLaserStore: {
+          getState: () => {
+            controllerSessionEpoch: number;
+            controllerQualification: { kind: string; epoch: number };
+            controllerOperation: { kind: string } | null;
+            pendingUntrackedAcks: number;
+            pendingTransportWrites?: number;
+            activeWcs: string | null;
+            homingState: string;
+            homingProof: { sessionEpoch: number } | null;
+          };
+        };
+      };
+      const state = useLaserStore.getState();
+      return {
+        sessionEpoch: state.controllerSessionEpoch,
+        qualifiedSession:
+          state.controllerQualification.kind === 'qualified' &&
+          state.controllerQualification.epoch === state.controllerSessionEpoch,
+        operation: state.controllerOperation?.kind ?? null,
+        pendingAcks: state.pendingUntrackedAcks,
+        pendingWrites: state.pendingTransportWrites ?? 0,
+        activeWcs: state.activeWcs,
+        homedSession:
+          state.homingState === 'confirmed' &&
+          state.homingProof?.sessionEpoch === state.controllerSessionEpoch,
+      };
+    });
+  const connectedSessionEpoch = (await recoverySnapshot()).sessionEpoch;
 
   await kerfdesk.setAutoAcknowledge(false);
   const frameBaselineLines = serialWriteLineCount(await kerfdesk.events());
@@ -580,14 +624,57 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
   await kerfdesk.emitSerialLine('<Run|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:1500,0>');
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
 
-  await kerfdesk.setAutoAcknowledge(true);
-  const abortWritesBefore = serialWrites(await kerfdesk.events()).length;
+  const abortEventBaseline = (await kerfdesk.events()).length;
+  const settingsReadsBeforeAbort = exactSerialWriteCount(await kerfdesk.events(), '$$\n');
+  // Model this scenario's prompt reboot at the accepted reset write. Browser
+  // scheduling must not turn it into the separate missing/late-boot workflow.
+  await kerfdesk.setSerialStatusAfterCommand('\u0018', "Grbl 1.1h ['$' for help]");
   await page.getByRole('button', { name: 'ABORT JOB', exact: true }).click();
-  await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('\u0018');
+  await expect
+    .poll(async () => serialWrites((await kerfdesk.events()).slice(abortEventBaseline)))
+    .toContain('\u0018');
+  // The observed reboot retires the held job replies. Publish a fresh Idle
+  // before acknowledging only the new session's M5/M9 cleanup.
+  await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await expect(page.getByRole('button', { name: 'Start', exact: true })).toBeVisible();
   await expect
-    .poll(async () => serialWrites(await kerfdesk.events()).slice(abortWritesBefore))
-    .toContain('M9\n');
+    .poll(async () =>
+      (await kerfdesk.events())
+        .slice(abortEventBaseline)
+        .filter(
+          (event) =>
+            event.kind === 'serial-write' &&
+            ['\u0018', 'M5\n', 'M9\n'].includes(String(event.text)),
+        )
+        .map((event) => event.text),
+    )
+    .toEqual(['\u0018', 'M5\n', 'M9\n']);
+  await expect.poll(recoverySnapshot).toMatchObject({ pendingAcks: 2, pendingWrites: 0 });
+  const resetSessionEpoch = (await recoverySnapshot()).sessionEpoch;
+  expect(resetSessionEpoch).toBeGreaterThan(connectedSessionEpoch);
+  expect(exactSerialWriteCount(await kerfdesk.events(), '$$\n')).toBe(settingsReadsBeforeAbort);
+  // Enable replies for the ensuing information read before releasing the two
+  // fresh cleanup replies; enabling alone does not replay abandoned job ACKs.
+  await kerfdesk.setAutoAcknowledge(true);
+  await kerfdesk.acknowledgeSerial(2);
+  await expect
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$$\n'))
+    .toBeGreaterThan(settingsReadsBeforeAbort);
+  const readyResetSession = {
+    sessionEpoch: resetSessionEpoch,
+    qualifiedSession: true,
+    activeWcs: 'G54',
+    homedSession: false,
+    operation: null,
+    pendingAcks: 0,
+    pendingWrites: 0,
+  };
+  await expect.poll(recoverySnapshot).toEqual(readyResetSession);
+  const informationWarning = page
+    .getByRole('alert')
+    .filter({ hasText: /Controller connection needs recovery|Controller information unavailable/ });
+  await expect(informationWarning).toHaveCount(0);
+  expect(await connectionEvents()).toEqual(originalConnection);
 
   // Publish diagnostic text and its matching polled state in one browser task.
   // A poll between separate evaluations could otherwise report the old Run/Idle
@@ -599,13 +686,16 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
     fixture.emitSerialLine('ALARM:3');
     fixture.emitSerialLine('<Alarm|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   });
-  await expect(page.getByRole('alert')).toContainText('Alarm 3');
+  const alarm = page.getByRole('alert').filter({ hasText: 'Alarm 3' });
+  await expect(alarm).toBeVisible();
+  await expect(informationWarning).toHaveCount(0);
   await kerfdesk.setAutoAcknowledge(false);
   await kerfdesk.setSerialStatusAfterCommand(
     '$H\n',
     '<Home|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>',
   );
   const homeWritesBeforeRecovery = exactSerialWriteCount(await kerfdesk.events(), '$H\n');
+  const wcsReadsBeforeHome = exactSerialWriteCount(await kerfdesk.events(), '$G\n');
   const settleWritesBeforeRecovery = exactSerialWriteCount(await kerfdesk.events(), 'G4 P0.01\n');
   await page.getByRole('button', { name: 'Home ($H)' }).click();
   await expect
@@ -616,8 +706,18 @@ test('frames, pauses, resumes, alarms, stops, and homes back to a safe ready sta
     .poll(async () => exactSerialWriteCount(await kerfdesk.events(), 'G4 P0.01\n'))
     .toBeGreaterThan(settleWritesBeforeRecovery);
   await kerfdesk.acknowledgeSerial(1);
+  // Completed Home reads the modal state again. Answer that new read only
+  // after the real Home and settle-marker acknowledgements have been earned.
+  await kerfdesk.setAutoAcknowledge(true);
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('alert')).not.toBeVisible();
+  await expect
+    .poll(async () => exactSerialWriteCount(await kerfdesk.events(), '$G\n'))
+    .toBeGreaterThan(wcsReadsBeforeHome);
+  await expect.poll(recoverySnapshot).toEqual({ ...readyResetSession, homedSession: true });
+  await expect(alarm).not.toBeVisible();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(informationWarning).toHaveCount(0);
+  expect(await connectionEvents()).toEqual(originalConnection);
   // The aborted run consumed its Frame: Frame is available again, and Start
   // stays greyed out until that new Frame completes.
   await expect(page.getByRole('button', { name: 'Frame job', exact: true })).toBeEnabled();

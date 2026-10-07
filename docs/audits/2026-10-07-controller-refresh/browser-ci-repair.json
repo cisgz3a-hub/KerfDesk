@@ -1,0 +1,52 @@
+{
+  "kind": "controller-recovery-ci-repair-browser-verification",
+  "testedBaseHead": "e77ab976cd8788b0182f7a480f54d83a290ac23b",
+  "includedMainHead": "e3820ed51a8d3e9ae8eab16f47097c4011dbd703",
+  "originalPrHead": "f2ff8e5d77b7dbb80a2406a3e602f81d38e421d7",
+  "testFile": "e2e/production-workflows.spec.ts",
+  "testSourceSha256": "c77c96635ffc32a6d26dfc38fa18470ac77061d11fa2f7c37cdf51f3e4548887",
+  "originalFailure": {
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "flaky": 0,
+    "runnerErrors": 0,
+    "durationMs": 53068.116,
+    "cause": "Abort fixture emitted no recognized reboot, leaving the legitimate controller-recovery fence alongside Alarm 3; the unscoped alert assertion failed."
+  },
+  "repairedWorkflow": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "runnerErrors": 0,
+    "durationMs": 47762.124,
+    "assertions": [
+      "One accepted Ctrl-X causes this scenario's recognized boot.",
+      "Exactly M5 and M9 are sent and await their two fresh acknowledgements.",
+      "Settings are not read before those cleanup acknowledgements.",
+      "Current-session settings and G54 are qualified, with no controller owner, transport write or terminal acknowledgement debt.",
+      "The port is requested and opened once, with no close or disconnect through Abort and Home.",
+      "Actual Home and settle-marker writes earn separate acknowledgements.",
+      "The post-Home G54 readback finishes, homing is confirmed for the current session, and all alerts disappear.",
+      "Frame is available and Start requires a new Frame."
+    ]
+  },
+  "coldStartup": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0,
+    "flaky": 0,
+    "runnerErrors": 0,
+    "durationMs": 80199.582
+  },
+  "environment": {
+    "browser": "Installed Google Chrome, headless Playwright",
+    "controller": "Browser Web Serial fixture; no physical controller",
+    "configuration": "Repository desktop mode and browser policies; private local override permits the NTFS dependency junction, uses a private Vite cache and direct Node Vite launcher, and writes test artifacts outside the watched checkout."
+  },
+  "limits": [
+    "Startup failures and intermediate diagnostic runs are retained locally and excluded from pass credit.",
+    "These focused browser checks do not rerun the historical full unit suite or qualify hardware, deployment or installers."
+  ]
+}
