@@ -14,6 +14,7 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
     lineHeight: text.lineHeight,
     letterSpacing: text.letterSpacing,
     color: text.color,
+    ...(text.textBox === undefined ? {} : { textBox: text.textBox }),
   });
   if (text.pathText !== undefined) {
     const guide = project.scene.objects.find(
@@ -29,6 +30,11 @@ export const renderVariableText: VariableTextRenderer = async ({ text, content, 
       transform: { ...IDENTITY_TRANSFORM, x: placed.origin.x, y: placed.origin.y },
     };
   }
+  if (text.textBox !== undefined)
+    return {
+      ...applyTextWeld(rendered, text.fontKey, text.weldOverlaps),
+      transform: text.transform,
+    };
   return applyTextWeld(
     bendTextRender(rendered, text.bendDeg ?? 0),
     text.fontKey,

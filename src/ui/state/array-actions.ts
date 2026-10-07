@@ -1,3 +1,5 @@
+import { objectVariableTemplate } from '../../core/variables/object-variable-template';
+import { cloneSelectionGroups } from './clone-selection-groups';
 import {
   arrayPlacements,
   combinedBBox,
@@ -25,6 +27,8 @@ import { sceneObjectCopyClosure } from './scene-object-copy-dependencies';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
 import { useToastStore } from './toast-store';
+import type { RetainArrayRequest } from './retained-array-capture';
+import { retainedProject } from './retain-array-project';
 
 export { placedObject } from './array-selection-copies';
 
@@ -32,12 +36,17 @@ export type ArrayMaterialization = {
   readonly bounds: Bounds;
   readonly sources: ReadonlyArray<ReadonlyArray<SceneObject>>;
   readonly placements?: ReadonlyArray<ArrayPlacement>;
+  readonly evaluationTime?: string;
+  readonly advanceVariables?: boolean;
 };
 export type ArrayActions = {
   readonly arraySelection: (
     spec: ArraySpec,
     materialized?: ArrayMaterialization,
     expectedProject?: Project,
+    retain?: { readonly name: string; readonly advanceVariables?: boolean },
+    onCommitted?: () => void,
+    isCurrent?: () => boolean,
   ) => void;
   /**
    * The selection repeated at explicit placements (ADR-442 find pieces and
@@ -52,15 +61,22 @@ export type ArrayActions = {
 };
 
 // The edition-aware setter returns false when an authoring change awaits Pro.
-type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => unknown;
+type Setter = (
+  fn: (state: AppState) => AppState | Partial<AppState>,
+  onCommitted?: () => void,
+  isCurrent?: () => boolean,
+) => unknown;
 
 export function arrayActions(set: Setter): ArrayActions {
   return {
-    arraySelection: (spec, materialized, expectedProject) =>
-      set((state) =>
-        expectedProject !== undefined && state.project !== expectedProject
-          ? {}
-          : applyArraySelection(state, spec, undefined, materialized),
+    arraySelection: (spec, materialized, expectedProject, retain, onCommitted, isCurrent) =>
+      set(
+        (state) =>
+          expectedProject !== undefined && state.project !== expectedProject
+            ? {}
+            : applyArraySelection(state, spec, undefined, materialized, retain),
+        onCommitted,
+        isCurrent,
       ),
     placeSelectionCopies: (placements, expectedProject) => {
       let placed = false;
@@ -83,6 +99,7 @@ export function applyArraySelection(
   spec: ArraySpec,
   idFactory: () => string = () => crypto.randomUUID(),
   materialized?: ArrayMaterialization,
+  retain?: { readonly name: string; readonly advanceVariables?: boolean },
 ): AppState | Partial<AppState> {
   return applySelectionPlacements(
     state,
@@ -93,6 +110,20 @@ export function applyArraySelection(
       sourceIds: arraySelectionIds(state, spec),
       instances: arrayPlacementCount(spec),
       ask: arrayAsk(spec),
+      ...(retain === undefined
+        ? {}
+        : {
+            retain: {
+              name: retain.name,
+              spec,
+              ...((materialized?.advanceVariables ?? retain.advanceVariables) === undefined
+                ? {}
+                : { advanceVariables: materialized?.advanceVariables ?? retain.advanceVariables }),
+              ...(materialized?.evaluationTime === undefined
+                ? {}
+                : { evaluationTime: materialized.evaluationTime }),
+            },
+          }),
     },
   );
 }
@@ -113,6 +144,7 @@ export function arraySelectionIds(
 
 /** What a placement request says beyond where the copies go. */
 export type PlacementRequest = {
+  readonly retain?: RetainArrayRequest;
   /** Variable copies already rendered: each instance's own objects. */
   readonly materialized?: ArrayMaterialization | undefined;
   /** What is copied; the selection when absent. */
@@ -147,6 +179,8 @@ export function applySelectionPlacements(
   if (selection === null) return state;
   const { selectedIds, sourceObjects, selected, bounds } = selection;
   const copySources = sceneObjectCopyClosure(sourceObjects, selectedIds);
+  const retentionError = retentionProblem(state.project, copySources, request);
+  if (retentionError !== null) return refused(state, retentionError);
   const tooMany = roomProblem(state.project.scene, copySources.length, request);
   if (tooMany !== null) return refused(state, tooMany);
   const placements = placementsFor(bounds);
@@ -161,6 +195,7 @@ export function applySelectionPlacements(
     copySources,
     first,
     idFactory,
+    request.retain !== undefined,
   );
   const firstGroups = cloneSelectedGroups(
     groups,
@@ -177,14 +212,46 @@ export function applySelectionPlacements(
   const overrun = sceneLimitOverrun(state.project.scene, scene);
   if (overrun !== null) return refused(state, overrun);
   const selectedResultIds = [...firstPlan.selectedObjectIds, ...later.selectedIds];
+  const retained = retainedProject(
+    state.project,
+    scene,
+    copySources,
+    selectedIds,
+    firstPlan,
+    later.instanceMaps,
+    request.retain,
+    idFactory,
+  );
+  if (retained === null) return state;
   return {
-    project: { ...state.project, scene },
+    project: retained,
     selectedObjectId: selectedResultIds[0] ?? null,
     additionalSelectedIds: new Set(selectedResultIds.slice(1)),
     undoStack: pushUndo(state.project, state.undoStack, 'Array'),
     redoStack: [],
     dirty: true,
   };
+}
+
+function retentionProblem(
+  project: Project,
+  sources: ReadonlyArray<SceneObject>,
+  request: PlacementRequest,
+): string | null {
+  if (request.retain === undefined) return null;
+  if ((project.arrayLayouts?.length ?? 0) >= 32)
+    return 'This sheet has 32 retained arrays. Expand one or use another sheet.';
+  if (
+    request.materialized === undefined &&
+    sources.some((object) => objectVariableTemplate(object) !== undefined)
+  )
+    return 'Prepare the variable values before retaining this array.';
+  const sourceIds = new Set(sources.map((object) => object.id));
+  return project.arrayLayouts?.some((layout) =>
+    layout.ownedObjectIds.some((id) => sourceIds.has(id)),
+  ) === true
+    ? 'Expand an existing retained array before retaining another array of its copies.'
+    : null;
 }
 
 // A count known up front is set against the room before anything is laid out.
@@ -225,12 +292,14 @@ function laterCopies(
   readonly objects: SceneObject[];
   readonly selectedIds: string[];
   readonly groups: SceneGroup[];
+  readonly instanceMaps: ReadonlyMap<string, string>[];
 } {
   const { selected, copySources, groups, materialized, idFactory } = copying;
   const copySourceIds = new Set(copySources.map((object) => object.id));
   const objects: SceneObject[] = [];
   const selectedIds: string[] = [];
   const copiedGroups: SceneGroup[] = [];
+  const instanceMaps: ReadonlyMap<string, string>[] = [];
   for (let index = 1; index < placements.length; index += 1) {
     const placement = placements[index];
     if (placement === undefined) continue;
@@ -240,6 +309,7 @@ function laterCopies(
       idFactory,
     );
     objects.push(...copied.objects);
+    instanceMaps.push(copied.ids);
     selectedIds.push(
       ...selected.flatMap((object) => {
         const id = copied.ids.get(object.id);
@@ -248,7 +318,7 @@ function laterCopies(
     );
     copiedGroups.push(...cloneSelectedGroups(groups, copySourceIds, copied.ids, idFactory));
   }
-  return { objects, selectedIds, groups: copiedGroups };
+  return { objects, selectedIds, groups: copiedGroups, instanceMaps };
 }
 
 function arraySourceSelection(
@@ -289,12 +359,5 @@ export function cloneSelectedGroups(
   copiedIds: ReadonlyMap<string, string>,
   idFactory: () => string,
 ): SceneGroup[] {
-  return groups.flatMap((group) => {
-    if (!group.objectIds.every((id) => selectedIds.has(id))) return [];
-    const objectIds = group.objectIds.flatMap((id) => {
-      const copy = copiedIds.get(id);
-      return copy === undefined ? [] : [copy];
-    });
-    return objectIds.length < 2 ? [] : [{ ...group, id: idFactory(), objectIds }];
-  });
+  return cloneSelectionGroups(groups, selectedIds, copiedIds, idFactory);
 }

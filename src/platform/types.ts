@@ -3,6 +3,8 @@
 // fs). Injected at React root per ADR-011. Phase A scope: file-pick (open) +
 // file-pick (save). Phase B adds serial-port connection methods.
 
+import type { AiAssistant } from '../core/ai/assistant';
+
 /**
  * A device's licence as the app sees it (ADR-540). The app always opens;
  * `edition` says whether the Pro tools are unlocked for this session. It is
@@ -283,6 +285,13 @@ export type SerialConnection = {
 export type SerialPortIdentity = {
   readonly usbVendorId?: number;
   readonly usbProductId?: number;
+  /** Actual session transport. Network target details stay in local connection UI only. */
+  readonly transport?: 'serial' | 'tcp';
+};
+
+export type MachineNetworkAdapter = {
+  /** Explicit operator-entered FluidNC Telnet target; no discovery or automatic reconnect. */
+  readonly serialForTarget: (host: string, port: number) => SerialAdapter;
 };
 
 export type SerialPortRef = {
@@ -433,6 +442,9 @@ export type DesktopUpdateAdapter = {
 };
 
 export type PlatformAdapter = {
+  /** Optional user-configured desktop provider; requests are explicit and drafts require review. */
+  readonly aiAssistant?: AiAssistant;
+  readonly machineNetwork?: MachineNetworkAdapter;
   readonly id: 'web' | 'electron' | 'mock';
 
   // Show a file-open picker. Resolves to the chosen files (may be empty if

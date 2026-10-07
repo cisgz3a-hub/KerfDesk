@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import { isVectorPathObject, type VectorSceneObject } from '../../core/geometry';
 import { joinOpenVectorPaths } from '../../core/geometry/vector-path-join';
 import { unionVectorObjects } from '../../core/geometry/vector-path-union';
@@ -158,7 +159,10 @@ function selectedRepairObjects(state: RepairState): ReadonlyArray<VectorSceneObj
   const ids = new Set(selectedObjectIds(state));
   const objects = state.project.scene.objects.filter(
     (object): object is VectorSceneObject =>
-      ids.has(object.id) && object.locked !== true && isVectorPathObject(object),
+      ids.has(object.id) &&
+      object.locked !== true &&
+      !isBooleanCompoundObject(object) &&
+      isVectorPathObject(object),
   );
   return objects.length === ids.size ? objects : [];
 }

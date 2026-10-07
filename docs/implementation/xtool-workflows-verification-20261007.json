@@ -1,0 +1,767 @@
+{
+  "formatVersion": 2,
+  "date": "2026-10-07",
+  "branch": "codex/xtool-workflows-20261007",
+  "baselineCommit": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+  "worktree": "D:/LaserForge/competitive-audit-20261007",
+  "state": "implementation prepared for pull-request review; complete recorded local regression verification passed",
+  "schemaVersions": {
+    "project": 14,
+    "materialLibrary": 3
+  },
+  "sourceSnapshot": {
+    "changedSourceFiles": 407,
+    "changedSourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+    "algorithm": "SHA-256 over UTF-8 sorted changed src/electron/scripts/website ts/tsx/mjs/js/json/css paths, each followed by newline, the file raw-byte SHA-256 and newline",
+    "unchangedDuringFinalRun": false,
+    "productionUnchangedAcrossQualifiedShards": true,
+    "testOnlyDelta": {
+      "verified": true,
+      "beforeSourceSha256": "6c5d6402e96c211885ac9ae9e42d88cdef138ba6caa48e8e671d671426cab208",
+      "afterSourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+      "changedSourceFiles": 407,
+      "changedPath": "src/io/project/tile-registration-persistence.test.ts",
+      "exactChange": {
+        "before": "steps: [5, 6, 7, 8, 9, 10, 11, 12],",
+        "after": "steps: [5, 6, 7, 8, 9, 10, 11, 12, 13],"
+      },
+      "productionUnchanged": true,
+      "allOtherChangedSourceFilesByteIdentical": true,
+      "changedTestExcludedFromRetainedPassingShards": true,
+      "passingShardReports": [
+        {
+          "shard": 1,
+          "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-1.json",
+          "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-1-completion.json",
+          "rawReportSha256": "06d77b71e25b72fc9d4db84580d69470b3c14d162121b6ce972b181408e351d3",
+          "startedAtUtc": "2026-10-07T08:09:04.636Z",
+          "changedTestExcluded": true
+        },
+        {
+          "shard": 2,
+          "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-2.json",
+          "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-2-completion.json",
+          "rawReportSha256": "fbbd1cac9b8cadfeb5f09702bde94388b5f4d00eccb3dd9b08d6c773073b3795",
+          "startedAtUtc": "2026-10-07T08:16:12.255Z",
+          "changedTestExcluded": true
+        },
+        {
+          "shard": 3,
+          "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-3.json",
+          "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-3-completion.json",
+          "rawReportSha256": "42b4c5529ae7ca2587d64323dd36e8115bdc7552f36b685c7c8b76125b123fb3",
+          "startedAtUtc": "2026-10-07T08:21:10.546Z",
+          "changedTestExcluded": true
+        }
+      ],
+      "capturedAtUtc": "2026-10-07T08:39:05.103Z",
+      "proofLocation": "Windows temporary directory: kerfdesk-xtool-shards-final-20261007/migration-expectation-delta.json",
+      "proofSha256": "bfa8887e79a8e7915c8a2c12bb1be9fdf5d97e757c3e813112b004ccf19e48f5"
+    },
+    "unchangedDuringEachQualifiedShard": true
+  },
+  "vitest": {
+    "version": "4.1.11",
+    "status": "passed",
+    "execution": "Eight admitted file-shard reports; fork pool with one worker for performance-sensitive shard 4 and four for others; three unaffected passing shards retained after exact single-test expectation correction",
+    "command": "node --max-old-space-size=5120 node_modules/vitest/vitest.mjs run --maxWorkers=<workers> --pool=forks --testTimeout=30000 --shard=<index>/8 --reporter=dot --reporter=json --outputFile.json <shard-report.json>",
+    "success": true,
+    "exitCode": 0,
+    "shardCount": 8,
+    "expectedTestFiles": 3636,
+    "discoveryCommand": "node node_modules/vitest/vitest.mjs list --filesOnly --json <discovery.json>",
+    "evidenceDirectory": "Windows temporary directory: kerfdesk-xtool-shards-qualified-20261007",
+    "discoveryLocation": "Windows temporary directory: kerfdesk-xtool-sharded-test-files-20261007.json",
+    "sourceCheckedBeforeAndAfterEachShard": true,
+    "defaultTestBudgetMs": 30000,
+    "budgetExplanation": "Local scheduling allowance following timeout-only failures in concurrent threads; test assertions and explicit timeouts unchanged",
+    "retainedPassingShardDirectory": "Windows temporary directory: kerfdesk-xtool-shards-final-20261007",
+    "workerPolicy": {
+      "default": 4,
+      "shard4": 1,
+      "reason": "Remove competing Vitest worker activity while preserving unchanged local performance assertions"
+    },
+    "exitCodeScope": "All eight native shard processes returned zero; no single native whole-run report",
+    "tests": {
+      "passed": 28090,
+      "failed": 0,
+      "pending": 29,
+      "todo": 0,
+      "total": 28119
+    },
+    "coverage": {
+      "observedFiles": 3636,
+      "missingFiles": 0,
+      "extraFiles": 0,
+      "duplicateFiles": 0,
+      "exactOnce": true,
+      "fileStatuses": {
+        "passed": 3636
+      },
+      "reportedFileStatusNote": "Native JSON reports label every file passed, including skipped-only and no-assertion files; execution coverage is derived separately from assertions",
+      "assertionDerivedFileStatuses": {
+        "passed": 3618,
+        "skippedOnly": 17,
+        "noAssertions": 1,
+        "failed": 0
+      },
+      "skippedOnlyFilePaths": [
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/trace-parity-thinning.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_arch-a-scale.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_cnc-audit-geometry.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_edge-zoom.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_trace-audit-render.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_centerline-wobble-probe.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_letter-b-smoothness.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_reference-iou.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_contour-hole-debug.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_letter-a-counter.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_reference-export.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/colour-layers-real-art.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/trace-parity-distance-field.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_tracer-upgrade-audit.test.ts",
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/_arch-house-edge-audit.test.ts"
+      ],
+      "noAssertionFilePaths": [
+        "D:/LaserForge/competitive-audit-20261007/src/__fixtures__/perceptual/trace-parity-oracle.test.ts"
+      ]
+    },
+    "startedAtUtc": "2026-10-07T08:09:04.636Z",
+    "finishedAtUtc": "2026-10-07T09:30:41.7557494Z",
+    "wallDurationSeconds": 4897.119,
+    "discoverySha256": "7d5f689c0d518975a5b4e1b2113852eb7ed2c84d49441552b6e493e10ace7865",
+    "aggregateReportKind": "Verified aggregate of eight native Vitest shard reports with exact test-only source-delta admission; not a native single-run report",
+    "aggregateReportLocation": "Windows temporary directory: kerfdesk-xtool-shards-qualified-20261007/aggregate.json",
+    "aggregateReportSha256": "b6e749ae5b1878674f2fca6b3cd39696a8a5012e39e1c07f3e9dffd75d9d3e03",
+    "finalSourceSnapshotSha256": "187fd975e90c15a0a702773de61107d4c858f518c93bf4fd9c9656aa44466ca1",
+    "shards": [
+      {
+        "shard": 1,
+        "reportName": "shard-1.json",
+        "completionName": "shard-1-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-1.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-1-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "6c5d6402e96c211885ac9ae9e42d88cdef138ba6caa48e8e671d671426cab208",
+        "retainedThroughVerifiedTestOnlyDelta": true,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "06d77b71e25b72fc9d4db84580d69470b3c14d162121b6ce972b181408e351d3",
+        "startedAtUtc": "2026-10-07T08:09:04.636Z",
+        "finishedAtUtc": "2026-10-07T08:16:10.9714586Z",
+        "files": 455,
+        "fileStatuses": {
+          "passed": 455
+        },
+        "tests": {
+          "passed": 3990,
+          "failed": 0,
+          "pending": 0,
+          "todo": 0,
+          "total": 3990
+        }
+      },
+      {
+        "shard": 2,
+        "reportName": "shard-2.json",
+        "completionName": "shard-2-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-2.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-2-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "6c5d6402e96c211885ac9ae9e42d88cdef138ba6caa48e8e671d671426cab208",
+        "retainedThroughVerifiedTestOnlyDelta": true,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "fbbd1cac9b8cadfeb5f09702bde94388b5f4d00eccb3dd9b08d6c773073b3795",
+        "startedAtUtc": "2026-10-07T08:16:12.255Z",
+        "finishedAtUtc": "2026-10-07T08:21:09.0081038Z",
+        "files": 455,
+        "fileStatuses": {
+          "passed": 455
+        },
+        "tests": {
+          "passed": 3709,
+          "failed": 0,
+          "pending": 11,
+          "todo": 0,
+          "total": 3720
+        }
+      },
+      {
+        "shard": 3,
+        "reportName": "shard-3.json",
+        "completionName": "shard-3-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-3.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-final-20261007\\shard-3-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "6c5d6402e96c211885ac9ae9e42d88cdef138ba6caa48e8e671d671426cab208",
+        "retainedThroughVerifiedTestOnlyDelta": true,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "42b4c5529ae7ca2587d64323dd36e8115bdc7552f36b685c7c8b76125b123fb3",
+        "startedAtUtc": "2026-10-07T08:21:10.546Z",
+        "finishedAtUtc": "2026-10-07T08:27:15.9833952Z",
+        "files": 455,
+        "fileStatuses": {
+          "passed": 455
+        },
+        "tests": {
+          "passed": 3438,
+          "failed": 0,
+          "pending": 3,
+          "todo": 0,
+          "total": 3441
+        }
+      },
+      {
+        "shard": 4,
+        "reportName": "shard-4.json",
+        "completionName": "shard-4-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-4.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-4-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 1,
+        "sourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+        "retainedThroughVerifiedTestOnlyDelta": false,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "6a7c09276842736bce80ff74cf9614758e17a8c7f156a1af765469e95c4de7b3",
+        "startedAtUtc": "2026-10-07T08:51:54.377Z",
+        "finishedAtUtc": "2026-10-07T09:09:34.6722027Z",
+        "files": 455,
+        "fileStatuses": {
+          "passed": 455
+        },
+        "tests": {
+          "passed": 3462,
+          "failed": 0,
+          "pending": 6,
+          "todo": 0,
+          "total": 3468
+        }
+      },
+      {
+        "shard": 5,
+        "reportName": "shard-5.json",
+        "completionName": "shard-5-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-5.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-5-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+        "retainedThroughVerifiedTestOnlyDelta": false,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "830e019da7c71ac32978dcea613dad10bad4f1441db1d3ad8997ca5dcf633564",
+        "startedAtUtc": "2026-10-07T09:09:35.873Z",
+        "finishedAtUtc": "2026-10-07T09:14:00.2595780Z",
+        "files": 454,
+        "fileStatuses": {
+          "passed": 454
+        },
+        "tests": {
+          "passed": 3197,
+          "failed": 0,
+          "pending": 6,
+          "todo": 0,
+          "total": 3203
+        }
+      },
+      {
+        "shard": 6,
+        "reportName": "shard-6.json",
+        "completionName": "shard-6-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-6.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-6-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+        "retainedThroughVerifiedTestOnlyDelta": false,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "898a4876405506fe5216d91f6d6ce7e73feec121b6ee4d51f1f4efbb74eae769",
+        "startedAtUtc": "2026-10-07T09:14:01.449Z",
+        "finishedAtUtc": "2026-10-07T09:19:19.3373070Z",
+        "files": 454,
+        "fileStatuses": {
+          "passed": 454
+        },
+        "tests": {
+          "passed": 3277,
+          "failed": 0,
+          "pending": 1,
+          "todo": 0,
+          "total": 3278
+        }
+      },
+      {
+        "shard": 7,
+        "reportName": "shard-7.json",
+        "completionName": "shard-7-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-7.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-7-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+        "retainedThroughVerifiedTestOnlyDelta": false,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "fa266d8261ed39c5062bca378049c3ddf8860dd71225abd1ffc6af9d6e9ab6b8",
+        "startedAtUtc": "2026-10-07T09:19:20.558Z",
+        "finishedAtUtc": "2026-10-07T09:24:42.0768058Z",
+        "files": 454,
+        "fileStatuses": {
+          "passed": 454
+        },
+        "tests": {
+          "passed": 3499,
+          "failed": 0,
+          "pending": 2,
+          "todo": 0,
+          "total": 3501
+        }
+      },
+      {
+        "shard": 8,
+        "reportName": "shard-8.json",
+        "completionName": "shard-8-completion.json",
+        "reportPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-8.json",
+        "completionPath": "C:\\Users\\Asus\\AppData\\Local\\Temp\\kerfdesk-xtool-shards-qualified-20261007\\shard-8-completion.json",
+        "exitCode": 0,
+        "success": true,
+        "maxWorkers": 4,
+        "sourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+        "retainedThroughVerifiedTestOnlyDelta": false,
+        "changedSourceFiles": 407,
+        "rawReportSha256": "16cf2b698e43de8f7f8e303bdc336aff4e0681eeca83f2d27b92c496da1cd944",
+        "startedAtUtc": "2026-10-07T09:24:43.494Z",
+        "finishedAtUtc": "2026-10-07T09:30:41.7520456Z",
+        "files": 454,
+        "fileStatuses": {
+          "passed": 454
+        },
+        "tests": {
+          "passed": 3518,
+          "failed": 0,
+          "pending": 0,
+          "todo": 0,
+          "total": 3518
+        }
+      }
+    ],
+    "assertionCountersIndependentlyVerified": true,
+    "wrapperRestartedAtUtc": "2026-10-07T08:51:52.3701111Z",
+    "wallDurationIncludesCorrectionGap": true
+  },
+  "interruptedContinuationAttempt": {
+    "startedAtUtc": "2026-10-07T06:32:54Z",
+    "pool": "forks",
+    "maxWorkers": 4,
+    "status": "worker pool initialisation/teardown errors; no final JSON report",
+    "qualifiedAsCleanRun": false,
+    "testCounts": null,
+    "unclassifiedFailureMarkerObserved": true,
+    "sourceDelta": {
+      "changedFile": "src/core/geometry/boolean-compound.test.ts",
+      "annotationCount": 2,
+      "beforeSourceSha256": "85810dca9b8a126e56af6852165984bff36ba681a5ae4dac2f2317d878a135bc",
+      "reconstructedBeforeSourceSha256": "85810dca9b8a126e56af6852165984bff36ba681a5ae4dac2f2317d878a135bc",
+      "currentSourceSha256": "6c5d6402e96c211885ac9ae9e42d88cdef138ba6caa48e8e671d671426cab208",
+      "javascriptSha256": "13152875f99a02078533737db1420df284318c8e8c94c90a0f96b9ea94e5ec67",
+      "runtimeIdentical": true,
+      "exactlyTwoTestAnnotationsOnly": true
+    },
+    "followUp": {
+      "enumSuites": {
+        "passed": 26,
+        "suites": 2
+      },
+      "twoThreadProjectAndEnumSuites": {
+        "passed": 33,
+        "suites": 3
+      },
+      "overlappingCountsNotAdded": true
+    }
+  },
+  "finalChecks": [
+    {
+      "name": "Renderer TypeScript",
+      "command": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit --pretty false",
+      "exitCode": 0,
+      "scope": "Final current source after the single migration expectation correction"
+    },
+    {
+      "name": "Electron TypeScript",
+      "command": "node node_modules/typescript/bin/tsc --project electron/tsconfig.json --noEmit --pretty false",
+      "exitCode": 0
+    },
+    {
+      "name": "Repository ESLint",
+      "command": "node --max-old-space-size=5120 node_modules/eslint/bin/eslint.js .",
+      "exitCode": 0,
+      "scope": "Full repository plus scoped follow-up after two test return annotations"
+    },
+    {
+      "name": "Electron ESLint",
+      "command": "node node_modules/eslint/bin/eslint.js --config eslint.electron.config.mjs electron/**/*.ts",
+      "exitCode": 0
+    },
+    {
+      "name": "Prettier",
+      "command": "node node_modules/prettier/bin/prettier.cjs --check .",
+      "exitCode": 0,
+      "scope": "Full check plus final annotated test-file follow-up; evidence documents completed afterwards"
+    },
+    {
+      "name": "Browser Free renderer",
+      "command": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build --outDir dist/xtool-browser-free",
+      "exitCode": 0,
+      "capabilityMetadata": "browser-free"
+    },
+    {
+      "name": "Desktop renderer",
+      "command": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build --mode desktop --outDir dist/xtool-desktop-renderer",
+      "exitCode": 0,
+      "capabilityMetadata": "desktop"
+    },
+    {
+      "name": "Physical file-size backstop",
+      "command": "node scripts/check-file-size-policy.mjs",
+      "exitCode": 0
+    },
+    {
+      "name": "Index export ratchet",
+      "command": "node scripts/check-index-exports.mjs",
+      "exitCode": 0
+    },
+    {
+      "name": "ADR numbers",
+      "command": "node scripts/check-adr-numbers.mjs",
+      "exitCode": 0
+    },
+    {
+      "name": "Electron TypeScript emit",
+      "command": "node node_modules/typescript/bin/tsc --project electron/tsconfig.json --outDir dist/xtool-electron-main --pretty false",
+      "exitCode": 0,
+      "packagedInstallation": false
+    },
+    {
+      "name": "Privacy publication",
+      "command": "node scripts/generate-privacy-page.mjs --check",
+      "exitCode": 0,
+      "files": 4
+    },
+    {
+      "name": "Final migration expectation lint and format",
+      "commands": [
+        "node node_modules/eslint/bin/eslint.js src/io/project/tile-registration-persistence.test.ts",
+        "node node_modules/prettier/bin/prettier.cjs --check src/io/project/tile-registration-persistence.test.ts"
+      ],
+      "exitCode": 0
+    },
+    {
+      "name": "Final evidence formatting",
+      "command": "node node_modules/prettier/bin/prettier.cjs --check docs/implementation/xtool-workflows-20261007.md docs/implementation/xtool-workflows-verification-20261007.md docs/implementation/xtool-workflows-verification-20261007.json docs/decisions/ADR-571-retained-design-and-explicit-desktop-adapters.md",
+      "exitCode": 0,
+      "scope": "Verification JSON matched repository Prettier rules; Markdown excluded by existing ignore rules"
+    },
+    {
+      "name": "Final diff whitespace",
+      "command": "git diff --check",
+      "exitCode": 0,
+      "scope": "Tracked diff; complete source formatting verified separately"
+    }
+  ],
+  "websiteTests": {
+    "command": "node --test \"website/tests/*.test.mjs\"",
+    "passed": 39,
+    "failed": 0,
+    "suites": 3
+  },
+  "qualificationScriptTests": {
+    "passed": 36,
+    "suites": 3,
+    "scope": "Installation and upgrade evidence scripts; no installation or upgrade performed"
+  },
+  "productionBundleStartup": {
+    "browserFree": {
+      "origin": "http://127.0.0.1:56734/",
+      "workspaceOpened": true,
+      "dialogOpened": "Project sheets",
+      "capturedErrorLogs": 0,
+      "capabilityMetadata": "browser-free"
+    },
+    "desktopRenderer": {
+      "origin": "http://127.0.0.1:56735/",
+      "workspaceOpened": true,
+      "dialogOpened": "Production run",
+      "capturedErrorLogs": 0,
+      "capabilityMetadata": "desktop"
+    },
+    "packagedElectronInstallation": false,
+    "providerRequestMade": false,
+    "controllerConnected": false,
+    "productionJobAllocated": false
+  },
+  "interactiveContinuationChecks": [
+    "Live compound creation, retained-source editing, Apply and Undo preserved one result object",
+    "Actual pointer opened the compound editor and unclipped numeric node popup",
+    "Node expression 199.998+1 applied 200.998; Tab retained popup and advanced focus; Undo restored 199.998",
+    "Accessible hierarchy transfers moved artwork to root and back as first group child; three objects and one manufacturing operation preserved",
+    "HTML5 hierarchy dragging covered by component tests; pointer dragging not qualified by the browser sequence",
+    "Browser AI notice explained the desktop connection boundary; no credential or provider request used"
+  ],
+  "sourceFixes": [
+    "Credential reads cannot recreate forgotten or replaced secrets",
+    "Cancellation reserves ownership before asynchronous request-body reads and handles reversed delivery",
+    "Fresh request allowlists exclude unknown provider metadata",
+    "Archived compound operands must evaluate and reproduce cached geometry throughout permitted nested archives",
+    "Operation and source enums reject coercible non-string values",
+    "Hierarchy reorder identity comparison is structural and rejects blank scene identities",
+    "Retouch probe travel and slow contacts stay within requested floor and clearance",
+    "Compound and numeric node launchers work through actual pointer interaction without clipped panels"
+  ],
+  "boundaries": [
+    "Source and local tests/build/browser evidence; no hosted CI, merge, publication or deployment",
+    "Studio documentation comparison; Studio was not installed or operated",
+    "Large-file timing is a native-browser component pipeline, not complete application or competitor speed",
+    "AI and documented FluidNC/GRBL protocol adapters implemented; real provider account, native package, controller motion/sensors and material results unqualified",
+    "No controller connection, physical machine operation or material qualification",
+    "Firmware-image installation, controller SD delivery, universal autofocus, automatic curved-surface compensation and conveyors require separate documented adapters and physical evidence",
+    "Existing Frame/Start and licence boundaries preserved"
+  ],
+  "initialDelivery": {
+    "historicalSnapshot": true,
+    "date": "2026-10-07",
+    "branch": "codex/xtool-workflows-20261007",
+    "baselineCommit": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+    "worktree": "D:/LaserForge/competitive-audit-20261007",
+    "state": "local uncommitted implementation",
+    "sourceSnapshot": {
+      "changedSourceFiles": 280,
+      "changedSourceSha256": "486fecfaceb777c4bbf72c89168e6adf70eb843a6a2736585e08da5a3d774adb",
+      "algorithm": "SHA-256 of sorted changed src/scripts code/JSON paths plus newline, then each raw-byte file SHA-256 plus newline",
+      "unchangedDuringFinalRun": true
+    },
+    "vitest": {
+      "version": "4.1.11",
+      "command": "node --max-old-space-size=5120 node_modules/vitest/vitest.mjs run --maxWorkers=4 --reporter=dot --reporter=json --outputFile.json <temporary-report.json>",
+      "exitCode": 0,
+      "success": true,
+      "startedAtUtc": "2026-10-07T04:23:21.516Z",
+      "durationSeconds": 1710.11,
+      "tests": {
+        "passed": 27879,
+        "failed": 0,
+        "skipped": 29,
+        "total": 27908
+      },
+      "files": {
+        "passed": 3593,
+        "failed": 0,
+        "skipped": 18,
+        "total": 3611
+      },
+      "rawReportSha256": "69a6c72973c7e7af31036415f4d510de70784d7220efedf93f370282393a28b4",
+      "rawReportLocation": "Windows temporary directory: kerfdesk-xtool-final-vitest-20261007.json"
+    },
+    "finalChecks": [
+      {
+        "name": "TypeScript",
+        "command": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit --pretty false",
+        "exitCode": 0
+      },
+      {
+        "name": "ESLint",
+        "command": "node --max-old-space-size=5120 node_modules/eslint/bin/eslint.js .",
+        "exitCode": 0
+      },
+      {
+        "name": "Prettier",
+        "command": "node node_modules/prettier/bin/prettier.cjs --check .",
+        "exitCode": 0
+      },
+      {
+        "name": "Browser Free renderer",
+        "command": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build --outDir dist/xtool-browser-free",
+        "exitCode": 0,
+        "capabilityMetadata": "browser-free"
+      },
+      {
+        "name": "Desktop renderer",
+        "command": "node --max-old-space-size=4096 node_modules/vite/bin/vite.js build --mode desktop --outDir dist/xtool-desktop-renderer",
+        "exitCode": 0,
+        "capabilityMetadata": "desktop"
+      },
+      {
+        "name": "Physical file-size backstop",
+        "command": "node scripts/check-file-size-policy.mjs",
+        "exitCode": 0
+      },
+      {
+        "name": "Index export ratchet",
+        "command": "node scripts/check-index-exports.mjs",
+        "exitCode": 0
+      },
+      {
+        "name": "ADR numbers",
+        "command": "node scripts/check-adr-numbers.mjs",
+        "exitCode": 0
+      },
+      {
+        "name": "Whitespace",
+        "command": "git diff --check",
+        "exitCode": 0
+      }
+    ],
+    "qualificationScriptTests": {
+      "passed": 24,
+      "suites": 3
+    },
+    "productionBundleStartup": {
+      "browserFree": "Workspace and Project sheets dialog opened at a fresh local origin",
+      "desktopRenderer": "Workspace and Production run dialog opened at a fresh local origin; no captured console errors",
+      "packagedElectronInstallation": false
+    },
+    "schemaVersions": {
+      "project": 13,
+      "materialLibrary": 3
+    },
+    "boundaries": [
+      "Source and local browser/build evidence; hosted CI and deployment were not performed",
+      "Studio documentation comparison; Studio was not installed or operated",
+      "Large-file timing measures a native-browser component pipeline, not complete app interaction or competitor speed",
+      "No controller connection, physical machine operation or material qualification",
+      "AI/provider integrations and new vendor firmware/focus/surface/conveyor adapters are not delivered"
+    ]
+  },
+  "interruptedThreadedAttempt": {
+    "startedAtUtc": "2026-10-07T07:20:29Z",
+    "pool": "threads",
+    "maxWorkers": 2,
+    "status": "Session lost; process no longer running; no final JSON report",
+    "qualifiedAsCleanRun": false,
+    "testCounts": null,
+    "consoleLogLocation": "Windows temporary directory: kerfdesk-xtool-continuation-threaded-vitest-20261007.log",
+    "sourceSha256": "6c5d6402e96c211885ac9ae9e42d88cdef138ba6caa48e8e671d671426cab208"
+  },
+  "recordedThreadShardAttempt": {
+    "shard": 1,
+    "shardCount": 8,
+    "pool": "threads",
+    "maxWorkers": 4,
+    "defaultTestBudgetMs": 5000,
+    "exitCode": 1,
+    "success": false,
+    "tests": {
+      "passed": 3986,
+      "failed": 4,
+      "total": 3990
+    },
+    "files": {
+      "passed": 453,
+      "failed": 2,
+      "total": 455
+    },
+    "rawReportSha256": "19735787f3a4927f565055a1dc8cf42ad28a8e9c774fbf4f0a40b909304b83fb",
+    "rawReportLocation": "Windows temporary directory: kerfdesk-xtool-shards-20261007/shard-1.json",
+    "failureClassification": "Four five-second timeouts; no recorded failed geometry assertion",
+    "unchangedSuites": [
+      "src/core/relief/relief-flat-finish.test.ts",
+      "src/ui/gcode-inspector/stock-design-compare.test.ts"
+    ],
+    "isolatedFollowUp": {
+      "command": "node --max-old-space-size=5120 node_modules/vitest/vitest.mjs run src/core/relief/relief-flat-finish.test.ts src/ui/gcode-inspector/stock-design-compare.test.ts --maxWorkers=1 --pool=forks --reporter=dot",
+      "exitCode": 0,
+      "passed": 14,
+      "suites": 2,
+      "defaultTestBudgetMs": 5000,
+      "durationSeconds": 28.16,
+      "sourceAndAssertionsUnchanged": true
+    },
+    "temporaryWrapperFailure": "Atomic state replacement passed an empty backup path; corrected outside repository and overwrite verified",
+    "applicationSourceChangedForRetry": false
+  },
+  "recordedMigrationShardAttempt": {
+    "shard": 4,
+    "exitCode": 1,
+    "success": false,
+    "tests": {
+      "passed": 3461,
+      "failed": 1,
+      "pending": 6,
+      "total": 3468
+    },
+    "rawReportSha256": "8a62db03f2c06c720e99a2042bcaee7f2f78b814d5a847609efa75dcbe3f0491",
+    "rawReportLocation": "Windows temporary directory: kerfdesk-xtool-shards-final-20261007/shard-4.json",
+    "failedTestFile": "src/io/project/tile-registration-persistence.test.ts",
+    "reason": "Stale schema 13 migration-step expectation omitted the schema 13 to 14 step",
+    "correction": {
+      "before": "steps: [5, 6, 7, 8, 9, 10, 11, 12],",
+      "after": "steps: [5, 6, 7, 8, 9, 10, 11, 12, 13],"
+    },
+    "followUp": {
+      "command": "node --max-old-space-size=5120 node_modules/vitest/vitest.mjs run src/io/project/tile-registration-persistence.test.ts --maxWorkers=1 --pool=forks --reporter=dot --reporter=json --outputFile.json <follow-up-report.json>",
+      "passed": 10,
+      "failed": 0,
+      "files": 1,
+      "defaultTestBudgetMs": 5000,
+      "rawReportSha256": "c25adc9f25f9c8a3f1c048137529d9bfa911a632eb41a1df887e776ae7164b15"
+    },
+    "independentReadOnlyVerification": true,
+    "failedBatchExcludedFromFinalAggregate": true
+  },
+  "recordedConcurrentPerformanceAttempt": {
+    "shard": 4,
+    "sourceSha256": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+    "maxWorkers": 4,
+    "exitCode": 1,
+    "success": false,
+    "tests": {
+      "passed": 3461,
+      "failed": 1,
+      "pending": 6,
+      "total": 3468
+    },
+    "rawReportSha256": "fce664d2f2c2260fbfd45f6ccbd263622d9971c733b14f3a3f620ef2e58a21b2",
+    "rawReportLocation": "Windows temporary directory: kerfdesk-xtool-shards-schema14-20261007/shard-4.json",
+    "failedFile": "src/__fixtures__/performance/laser-workflow-budgets.test.ts",
+    "failedAssertion": {
+      "phase": "small import",
+      "observedMs": 169.90460000000076,
+      "localLimitMs": 150
+    },
+    "sourceFileUnchanged": true,
+    "followUp": {
+      "command": "node --max-old-space-size=5120 node_modules/vitest/vitest.mjs run src/__fixtures__/performance/laser-workflow-budgets.test.ts --maxWorkers=1 --pool=forks --reporter=dot --reporter=json --outputFile.json <follow-up-report.json>",
+      "passed": 3,
+      "failed": 0,
+      "files": 1,
+      "originalExplicitTimeoutMs": 40000,
+      "phaseBudgetsUnchanged": true,
+      "rawReportSha256": "aed759be47e7447ecb975dd83efef8e3ce80bb1edef546a0474f6c94c4ce3051",
+      "observedConsoleImportMs": {
+        "small": 25.9,
+        "medium": 63.4,
+        "large": 249.6
+      }
+    },
+    "inference": "Consistent with concurrent test contention; a specific CPU cause is not established",
+    "replacementPolicy": "One fork worker for shard 4; all performance assertions and explicit timeouts unchanged",
+    "failedBatchExcludedFromFinalAggregate": true
+  },
+  "publicationPreparation": {
+    "originMain": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+    "baselineMatchesFreshOriginMain": true,
+    "licence": "All rights reserved; unchanged and matches origin/main",
+    "sourceFilesByteIdenticalToQualifiedSnapshot": 407,
+    "sourceFingerprint": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
+    "fingerprintOrder": "Replay of the ordered recorded source manifest; every current source-file raw-byte hash matches",
+    "scope": "Authorised commit and pull request; hosted check identity and status are separate from this local verification record"
+  }
+}

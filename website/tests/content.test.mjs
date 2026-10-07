@@ -102,7 +102,7 @@ describe('website copy', () => {
   // The source repository is private (ADR-524 Amendment 1), so no download,
   // release, issue, discussion, source or bug-report link may send a visitor to
   // GitHub. Every text file the build writes is scanned, not just the pages.
-  it('sends no visitor to GitHub, and links leave only for kerfdesk.com', () => {
+  it('sends no visitor to GitHub and scopes external links to the provider data policy', () => {
     for (const path of walk(outDir)) {
       if (!/(\.html|\.txt|\.xml|\.css|_headers)$/.test(path)) continue;
       assert.doesNotMatch(readFileSync(path, 'utf8'), /github/i, path);
@@ -110,6 +110,11 @@ describe('website copy', () => {
     for (const { file, html } of built) {
       for (const href of attrValues(html, 'a', 'href')) {
         if (!/^https?:/.test(href)) continue;
+        if (
+          file === 'privacy/index.html' &&
+          href === 'https://developers.openai.com/api/docs/guides/your-data'
+        )
+          continue;
         assert.equal(new URL(href).hostname, 'kerfdesk.com', `${file} links to ${href}`);
       }
     }

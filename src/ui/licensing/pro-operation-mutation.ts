@@ -20,8 +20,9 @@ export function proOperationMutationSetter<State extends ProjectEditState>(
   set: (update: (state: State) => State | Partial<State>) => void,
   get: () => State,
   featureForEdit = newlyIntroducedProFeature,
-): (update: Mutation<State>, onCommitted?: () => void) => boolean {
-  return (update, onCommitted) => {
+): (update: Mutation<State>, onCommitted?: () => void, isCurrent?: () => boolean) => boolean {
+  return (update, onCommitted, isCurrent) => {
+    if (isCurrent?.() === false) return false;
     const before = get();
     const restoreUndoName = saveUndoStepName(before.project);
     const patch = typeof update === 'function' ? update(before) : update;
@@ -45,7 +46,8 @@ export function proOperationMutationSetter<State extends ProjectEditState>(
       set((current) => {
         if (
           current.project !== before.project ||
-          current.projectDocumentEpoch !== before.projectDocumentEpoch
+          current.projectDocumentEpoch !== before.projectDocumentEpoch ||
+          isCurrent?.() === false
         )
           return {};
         commitUndoName();

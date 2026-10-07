@@ -10,6 +10,7 @@ import { IntervalTestDialog } from '../calibration/IntervalTestDialog';
 import { MaterialTestDialog } from '../calibration/MaterialTestDialog';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { captureGridExperiment } from '../material-library/capture-material-experiment';
 
 export function IntervalDialog(props: { readonly onClose: () => void }): JSX.Element {
   const replaceSceneWithGeneratedScene = useStore((s) => s.replaceSceneWithGeneratedScene);
@@ -43,6 +44,28 @@ export function MaterialDialog(props: { readonly onClose: () => void }): JSX.Ele
     replaceSceneWithGeneratedScene(grid.scene);
     props.onClose();
     pushToast(materialTestSummary(grid), 'success');
+    const state = useStore.getState();
+    if (state.materialLibrary === null) state.createLibrary(`${state.project.device.name} Library`);
+    try {
+      const experiment = captureGridExperiment(
+        state.project,
+        grid,
+        `experiment-${crypto.randomUUID()}`,
+        new Date().toISOString(),
+      );
+      const result = useStore.getState().upsertMaterialExperiment(experiment);
+      pushToast(
+        result.kind === 'invalid'
+          ? result.reason
+          : 'Exact cell settings captured in Material Library → Experiments.',
+        result.kind === 'invalid' ? 'warning' : 'success',
+      );
+    } catch (error) {
+      pushToast(
+        error instanceof Error ? error.message : 'Could not save experiment settings.',
+        'warning',
+      );
+    }
   };
   return (
     <MaterialTestDialog

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentType } from 'react';
 import { APP_DISPLAY_NAME } from '../../core/app-branding';
 import { primaryOperationForObject } from '../../core/scene';
 import { CONNECTION_HELP_TEXT } from '../help/connection-help';
@@ -36,6 +36,7 @@ import { WorkspaceContextBar } from './WorkspaceContextBar';
 import { ArrayDialogHost } from './ArrayDialogHost';
 import { CopyAlongPathDialogHost } from './CopyAlongPathDialogHost';
 import { OptimizeShapesDialogHost } from './OptimizeShapesDialogHost';
+import { BooleanDialogHost } from './BooleanDialogHost';
 import { QuickNestDialogHost } from './QuickNestDialogHost';
 import { PrintAndCutDialogHost } from '../laser/PrintAndCutDialogHost';
 import { ScanOffsetCommandDialog } from './ScanOffsetCommandDialog';
@@ -46,6 +47,10 @@ import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 import { SettingsWindowHost } from '../settings/SettingsWindowHost';
 import { redoSteps, undoSteps } from '../state/undo-history';
+import { ProjectSheetsBar } from './ProjectSheetsBar';
+import { JointResizeDialogHost } from './JointResizeDialogHost';
+import { StampPreparationDialogHost } from './StampPreparationDialogHost';
+import { AiAssistantDialogHost } from '../ai/AiAssistantDialog';
 
 type SettingsDialogKind =
   | 'optimization'
@@ -53,6 +58,8 @@ type SettingsDialogKind =
   | 'nest'
   | 'union'
   | 'join'
+  | 'joints'
+  | 'stamp'
   | 'offset'
   | 'print-cut'
   | 'labs'
@@ -61,7 +68,6 @@ type SettingsDialogKind =
   | null;
 
 export function CommandShell(): JSX.Element {
-  const openConvertBitmapDialog = useUiStore((s) => s.openConvertBitmapDialog);
   const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
   const [boxGeneratorOpen, setBoxGeneratorOpen] = useState(false);
   const [boxFitTestOpen, setBoxFitTestOpen] = useState(false);
@@ -79,7 +85,7 @@ export function CommandShell(): JSX.Element {
   const commands = useAppCommands({
     requestImportImage: onImagePick,
     requestMultiFileTrace: () => setSettingsDialog('multi-file-trace'),
-    requestConvertToBitmap: openConvertBitmapDialog,
+    requestConvertToBitmap: () => useUiStore.getState().openConvertBitmapDialog(),
     requestAdjustImage: () => setAdjustDialogOpen(true),
     requestGcodeInspector: gcodeInspector.open,
     requestBoxGenerator: () => setBoxGeneratorOpen(true),
@@ -94,6 +100,8 @@ export function CommandShell(): JSX.Element {
     requestQuickNest: () => setSettingsDialog('nest'),
     requestUnionSilhouette: () => setSettingsDialog('union'),
     requestJoinPaths: () => setSettingsDialog('join'),
+    requestResizeJoints: () => setSettingsDialog('joints'),
+    requestPrepareStamp: () => setSettingsDialog('stamp'),
     requestOffsetShapes: () => setSettingsDialog('offset'),
     requestPrintAndCut: () => setSettingsDialog('print-cut'),
     requestRotarySetup: () => setSettingsDialog('rotary'),
@@ -111,6 +119,7 @@ export function CommandShell(): JSX.Element {
       <Toolbar commands={commands} machineKind={machineKind} />
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
+      <ProjectSheetsBar />
       <BitmapDialog />
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
@@ -161,8 +170,10 @@ function StoreOpenedDialogs(): JSX.Element {
       <BarcodeDialogHost />
       <CopyAlongPathDialogHost />
       <OptimizeShapesDialogHost />
+      <BooleanDialogHost />
       <ExportSvgDialogHost />
       <SettingsWindowHost />
+      <AiAssistantDialogHost />
     </>
   );
 }
@@ -177,19 +188,28 @@ function SettingsDialogHost(props: {
   readonly current: SettingsDialogKind;
   readonly onClose: () => void;
 }): JSX.Element | null {
-  if (props.current === 'optimization') return <OptimizationDialog onClose={props.onClose} />;
-  if (props.current === 'array') return <ArrayDialogHost onClose={props.onClose} />;
-  if (props.current === 'nest') return <QuickNestDialogHost onClose={props.onClose} />;
+  if (props.current === null) return null;
   if (props.current === 'union' || props.current === 'join')
     return <VectorRepairDialogHost kind={props.current} onClose={props.onClose} />;
-  if (props.current === 'offset') return <OffsetShapesDialogHost onClose={props.onClose} />;
-  if (props.current === 'print-cut') return <PrintAndCutDialogHost onClose={props.onClose} />;
-  if (props.current === 'labs') return <LabsSettingsDialog onClose={props.onClose} />;
-  if (props.current === 'rotary') return <RotarySetupHost onClose={props.onClose} />;
-  if (props.current === 'multi-file-trace')
-    return <MultiFileTraceDialogHost onClose={props.onClose} />;
-  return null;
+  const Host = SETTINGS_DIALOG_HOSTS[props.current];
+  return <Host onClose={props.onClose} />;
 }
+
+const SETTINGS_DIALOG_HOSTS: Record<
+  Exclude<SettingsDialogKind, 'union' | 'join' | null>,
+  ComponentType<{ readonly onClose: () => void }>
+> = {
+  optimization: OptimizationDialog,
+  array: ArrayDialogHost,
+  nest: QuickNestDialogHost,
+  joints: JointResizeDialogHost,
+  stamp: StampPreparationDialogHost,
+  offset: OffsetShapesDialogHost,
+  'print-cut': PrintAndCutDialogHost,
+  labs: LabsSettingsDialog,
+  rotary: RotarySetupHost,
+  'multi-file-trace': MultiFileTraceDialogHost,
+};
 const FOCUS_TEST_UNAVAILABLE_MESSAGE =
   'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.';
 

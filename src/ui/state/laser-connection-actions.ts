@@ -157,7 +157,7 @@ function attachConnectedController(
   set((state) => ({
     ...connectedControllerStatePatch(state),
     serialPortInfo: portInfo,
-    connectedBaudRate: baudRate,
+    connectedBaudRate: portInfo?.transport === 'tcp' ? null : baudRate,
   }));
   startConnectedControllerHandshake(set, get, refs, safeWrite, connection, baudRate);
 }

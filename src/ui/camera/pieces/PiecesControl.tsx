@@ -19,6 +19,7 @@ import { pieceMoveLabel, pieceNotes, pieceSizeLabel } from './piece-label';
 import { usePieceScanStore, type PieceScan } from './piece-scan-store';
 import { selectionFrame } from './selection-frame';
 import { useFindPieces } from './use-find-pieces';
+import { FixtureTemplatesPanel } from './FixtureTemplatesPanel';
 
 export function PiecesControl(): JSX.Element {
   const scan = usePieceScanStore((s) => s.scan);
@@ -78,6 +79,7 @@ export function PiecesControl(): JSX.Element {
           {message}
         </div>
       )}
+      <FixtureTemplatesPanel />
     </div>
   );
 }

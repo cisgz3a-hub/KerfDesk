@@ -75,6 +75,29 @@ describe('Trace commit ownership', () => {
 
     expect(sameTraceSourceContent(replacement, seed)).toBe(false);
   });
+
+  it('rejects mask edits and an external-mask placement change while retaining ordinary transform-only tracing', () => {
+    const seed = raster({ imageMaskId: 'mask' });
+    const moved = { ...seed, transform: { ...seed.transform, x: 2 } };
+    expect(sameTraceSourceContent(moved, seed)).toBe(false);
+    expect(sameTraceSourceContent({ ...seed, imageMaskId: 'other' }, seed)).toBe(false);
+    const plain = raster();
+    expect(sameTraceSourceContent({ ...plain, transform: moved.transform }, plain)).toBe(true);
+    const mask = { ...raster(), id: 'mask' };
+    const project = projectWith(seed);
+    useStore.setState({
+      project: { ...project, scene: { ...project.scene, objects: [seed, mask] } },
+      projectDocumentEpoch: 11,
+    });
+    useUiStore.setState({ imageDialog: { source: seed, requestToken: 'masked-owner' } });
+    const owner = captureTraceCommitOwner(seed, 'masked-owner')!;
+    expect(claimTraceCommitOwner(owner)).not.toBeNull();
+    const current = useStore.getState().project;
+    useStore.setState({
+      project: { ...current, scene: { ...current.scene, objects: [seed, { ...mask }] } },
+    });
+    expect(claimTraceCommitOwner(owner)).toBeNull();
+  });
 });
 
 function install(

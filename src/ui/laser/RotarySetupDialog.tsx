@@ -1,20 +1,18 @@
 import { useState } from 'react';
 import {
   DEFAULT_ROTARY_SETUP,
-  rotaryCircumferenceMm,
   rotaryMeasurementsValid,
-  rotaryUsesRollerDiameter,
-  rotaryYLimitMm,
-  rotaryYScale,
   type RotarySetup,
 } from '../../core/devices/rotary';
 import type { RotaryPreset } from '../../core/devices/rotary-presets';
 import { Button, Dialog, DialogActions } from '../kit';
-import { errorStyle, previewStyle } from './rotary-setup-dialog.styles';
+import { errorStyle } from './rotary-setup-dialog.styles';
 import { startRotaryEdit } from './rotary-setup-edit';
 import { RotarySetupFields } from './RotarySetupFields';
 import { RotaryTestRotationPanel } from './RotaryTestRotationPanel';
 import { useRotaryTestRotation } from './use-rotary-test-rotation';
+import { RotaryWrapPreview } from './RotaryWrapPreview';
+import type { RotaryArtworkExtent } from './rotary-wrap-preview';
 
 export function RotarySetupDialog(props: {
   readonly setup: RotarySetup | undefined;
@@ -23,6 +21,8 @@ export function RotarySetupDialog(props: {
   readonly onGenerateCalibration: (setup: RotarySetup) => void;
   /** Published rotaries for this machine (ADR-503). */
   readonly presets?: ReadonlyArray<RotaryPreset>;
+  readonly artwork?: RotaryArtworkExtent | null;
+  readonly outputDescription?: string;
 }): JSX.Element {
   const [edit, setEdit] = useState(() => startRotaryEdit(props.setup ?? DEFAULT_ROTARY_SETUP));
   const test = useRotaryTestRotation();
@@ -35,7 +35,13 @@ export function RotarySetupDialog(props: {
         onEdit={setEdit}
         {...(props.presets === undefined ? {} : { presets: props.presets })}
       />
-      <RotaryPreview setup={setup} valid={valid} />
+      <RotaryWrapPreview
+        setup={setup}
+        {...(props.artwork === undefined ? {} : { artwork: props.artwork })}
+        {...(props.outputDescription === undefined
+          ? {}
+          : { outputDescription: props.outputDescription })}
+      />
       {!valid ? (
         <p style={errorStyle}>Diameters and motion per turn must be greater than zero.</p>
       ) : null}
@@ -49,29 +55,6 @@ export function RotarySetupDialog(props: {
         onGenerateCalibration={props.onGenerateCalibration}
       />
     </Dialog>
-  );
-}
-
-// The wrap limit is one revolution: artwork taller than the circumference
-// would overlap itself, and the machine sees it as the Y travel below.
-function RotaryPreview(props: {
-  readonly setup: RotarySetup;
-  readonly valid: boolean;
-}): JSX.Element {
-  const circumference = props.valid ? rotaryCircumferenceMm(props.setup) : 0;
-  const machineWrap = props.valid ? rotaryYLimitMm(props.setup) : 0;
-  const scale = props.valid ? rotaryYScale(props.setup) : 1;
-  const unscaledRoller = props.setup.type === 'roller' && !rotaryUsesRollerDiameter(props.setup);
-  return (
-    <div style={previewStyle} aria-label="Rotary wrap preview">
-      <span>Surface circumference: {circumference.toFixed(2)} mm</span>
-      <span>Machine travel per revolution: {machineWrap.toFixed(2)} mm</span>
-      <span>
-        Y scale: ×{scale.toFixed(4)}{' '}
-        {unscaledRoller ? '(Y moves the surface directly)' : 'machine mm per surface mm'}
-      </span>
-      <span>Wrap limit: artwork up to {circumference.toFixed(2)} mm tall fits one revolution</span>
-    </div>
   );
 }
 

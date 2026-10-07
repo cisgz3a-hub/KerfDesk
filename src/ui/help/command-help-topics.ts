@@ -10,6 +10,11 @@ export type CommandHelpTopic = {
 };
 
 export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
+  'tools.ai-assistant': {
+    family: 'tools',
+    tooltip:
+      'Configure an optional desktop AI connection. Review generated editable vector artwork or suggestions from your saved material library before applying anything.',
+  },
   ...FILE_COMMAND_HELP,
   ...EDITING_TOOLS_COMMAND_HELP,
   ...MACHINE_MOVE_COMMAND_HELP,
@@ -188,6 +193,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.join-paths': {
     family: 'tools',
     tooltip: 'Join nearby open endpoints with matching operations, colour and artwork settings.',
+  },
+  'tools.resize-joints': {
+    family: 'tools',
+    tooltip: 'Review straight receiving slots and notches against measured material thickness.',
+  },
+  'tools.prepare-stamp': {
+    family: 'tools',
+    tooltip: 'Prepare a mirrored stamp face and graded shoulders, then review the height map.',
   },
   'tools.subtract': {
     family: 'tools',

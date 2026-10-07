@@ -1,4 +1,5 @@
 import type { SaveTarget } from '../../platform/types';
+import type { Project } from '../../core/scene';
 import { useStore } from '../state';
 import {
   useProjectSaveDialogStore,
@@ -10,6 +11,7 @@ import {
   prepareProjectSaveOffThread,
   type ProjectSavePreparation,
 } from './project-save-preparation-client';
+import { portableProjectAssets, projectNeedsPortableAssets } from './portable-project-assets';
 
 export type ProjectSaveTargetResult =
   | { readonly kind: 'selected'; readonly target: SaveTarget }
@@ -70,11 +72,7 @@ export async function prepareLargeProjectSave(
     if (!reuseTarget && staleProjectSaveOutcome(owner) !== null) cancel();
   });
   try {
-    const prepared = await prepareProjectSaveOffThread(
-      ctx.project,
-      controller.signal,
-      purpose === 'recovery' ? 'recovery' : 'canonical',
-    );
+    const prepared = await prepareCapturedProject(ctx.project, purpose, controller.signal);
     if (!reuseTarget && (controller.signal.aborted || staleProjectSaveOutcome(owner) !== null))
       return cancelledOutcome();
     if (prepared.kind !== 'ok') return prepared;
@@ -98,4 +96,23 @@ export async function prepareLargeProjectSave(
 
 function preparationName(savedName: string | null, purpose: 'project' | 'recovery'): string {
   return purpose === 'recovery' ? 'raw recovery copy' : (savedName ?? 'untitled.lf2');
+}
+
+function prepareCapturedProject(
+  project: Project,
+  purpose: 'project' | 'recovery',
+  signal: AbortSignal,
+): Promise<ProjectSavePreparation> {
+  // Plain projects and raw recovery start their worker in this preparation
+  // turn. Only portable assets require an asynchronous hydration stage.
+  if (purpose === 'project' && projectNeedsPortableAssets(project)) {
+    return portableProjectAssets(project, undefined, signal).then((portable) =>
+      prepareProjectSaveOffThread(portable, signal),
+    );
+  }
+  return prepareProjectSaveOffThread(
+    project,
+    signal,
+    purpose === 'recovery' ? 'recovery' : 'canonical',
+  );
 }

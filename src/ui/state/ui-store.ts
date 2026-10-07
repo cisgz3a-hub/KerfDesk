@@ -1,3 +1,4 @@
+import type { TextBoxSettings } from '../../core/scene/text-box';
 // Ephemeral UI state — things that aren't project data and aren't toasts:
 // the drag-import overlay flag (F-A3), the preview scrubber position
 // (F-A8), and the viewport zoom + pan (F-A15). Kept separate from the
@@ -49,6 +50,7 @@ export type TextDialogState =
       readonly bendDeg?: number;
       readonly weldOverlaps?: boolean;
       readonly pathText?: PathTextSettings;
+      readonly textBox?: TextBoxSettings;
       readonly variableTemplate?: VariableTemplate;
       readonly color: string;
     };

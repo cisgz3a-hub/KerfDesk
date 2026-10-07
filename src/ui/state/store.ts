@@ -1,3 +1,4 @@
+import { observeDesignHierarchyDocument } from './design-hierarchy-store';
 import { proOperationMutationSetter } from '../licensing/pro-operation-mutation';
 import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Zustand store: project/UI state, undo/redo, and dirty/save tracking.
@@ -391,7 +392,7 @@ export type AppState = ObjectPropertiesActions &
     readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
   };
 
-function initialState(
+const initialState = (
   project = createStartupProject(),
 ): Pick<
   AppState,
@@ -427,15 +428,13 @@ function initialState(
   | 'layerDefaults'
 > &
   ReturnType<typeof currentMaterialLibraryState> &
-  ReturnType<typeof currentSavedLibrariesState> {
-  return {
-    ...initialProjectWorkspaceState(project),
-    ...CNC_LIBRARY_STATE_DEFAULTS,
-    layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
-    ...MATERIAL_LIBRARY_STATE_DEFAULTS,
-    ...SAVED_LIBRARIES_STATE_DEFAULTS,
-  };
-}
+  ReturnType<typeof currentSavedLibrariesState> => ({
+  ...initialProjectWorkspaceState(project),
+  ...CNC_LIBRARY_STATE_DEFAULTS,
+  layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
+  ...MATERIAL_LIBRARY_STATE_DEFAULTS,
+  ...SAVED_LIBRARIES_STATE_DEFAULTS,
+});
 
 export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
@@ -490,3 +489,6 @@ export const useStore = create<AppState>((set, get) => ({
   ...interactionActions(set),
   ...saveTrackingActions(set, get),
 }));
+
+// Attach only after every action slice and the composed store are initialized.
+observeDesignHierarchyDocument(useStore.subscribe);

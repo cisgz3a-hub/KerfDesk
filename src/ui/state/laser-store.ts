@@ -91,6 +91,9 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import type { StallProbe } from './laser-stream-stall';
+import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
+import { firmwareReportActions } from './controller-firmware-report-action';
+import { surfaceProbeActions } from './laser-surface-probe-actions';
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
@@ -117,6 +120,7 @@ export type LaserState = LaserStoreActions &
     readonly serialPortInfo?: SerialPortIdentity | null;
     readonly statusReport: StatusReport | null;
     readonly controllerSessionEpoch: number;
+    readonly controllerFirmwareReport: ControllerFirmwareReport | null;
     readonly statusSequence: number;
     readonly statusObservation: ControllerObservationStamp | null;
     readonly alarmCode: number | null;
@@ -547,6 +551,8 @@ export const useLaserStore = create<LaserState>((set, get) => {
     ...jobActions(set, get, refs, write, () => refs.driver),
     ...setupActions(set, get, refs, (line) => safeWrite(set, get, line)),
     ...settingsActions,
+    ...firmwareReportActions(set, get, refs, write),
+    ...surfaceProbeActions(set, get, refs, write),
     retryControllerQualification: settingsActions.readMachineSettings,
     ...consoleActions(set, get, refs, write),
     ...statusRequestActions(get, refs, (line, action, source) =>

@@ -6,6 +6,7 @@ export type TraceCommitOwner = {
   readonly projectDocumentEpoch: number;
   readonly source: RasterImage;
   readonly dialogRequestToken: string;
+  readonly maskObject?: SceneObject;
   readonly sourceOrigin?: 'camera-capture';
 };
 
@@ -34,7 +35,13 @@ export function captureTraceCommitOwner(
   }
   const source = state.project.scene.objects.find((object) => object.id === seed.id);
   if (!sameTraceSourceContent(source, seed)) return null;
-  return { projectDocumentEpoch: state.projectDocumentEpoch, source, dialogRequestToken };
+  const maskObject = state.project.scene.objects.find((object) => object.id === seed.imageMaskId);
+  return {
+    projectDocumentEpoch: state.projectDocumentEpoch,
+    source,
+    dialogRequestToken,
+    ...(maskObject === undefined ? {} : { maskObject }),
+  };
 }
 
 /** Reclaim only the exact submission owner; value-equivalent replacements are stale. */
@@ -50,6 +57,10 @@ export function claimTraceCommitOwner(owner: TraceCommitOwner): TraceCommitClaim
   }
   const source = state.project.scene.objects.find((object) => object.id === owner.source.id);
   if (source !== owner.source) return null;
+  const maskObject = state.project.scene.objects.find(
+    (object) => object.id === owner.source.imageMaskId,
+  );
+  if (maskObject !== owner.maskObject) return null;
   return { project: state.project, source: owner.source };
 }
 
@@ -73,6 +84,26 @@ export function sameTraceSourceContent(
     live.dataUrl === seed.dataUrl &&
     live.imageAsset === seed.imageAsset &&
     live.pixelWidth === seed.pixelWidth &&
-    live.pixelHeight === seed.pixelHeight
+    live.pixelHeight === seed.pixelHeight &&
+    live.imageMaskId === seed.imageMaskId &&
+    live.imageClip === seed.imageClip &&
+    sameMaskPlacement(live, seed)
+  );
+}
+
+function sameMaskPlacement(live: RasterImage, seed: RasterImage): boolean {
+  const hasMask = seed.imageMaskId !== undefined || seed.imageClip !== undefined;
+  if (
+    hasMask &&
+    Object.entries(seed.bounds).some(
+      ([key, value]) => live.bounds[key as keyof typeof live.bounds] !== value,
+    )
+  )
+    return false;
+  return (
+    seed.imageMaskId === undefined ||
+    Object.entries(seed.transform).every(
+      ([key, value]) => live.transform[key as keyof typeof live.transform] === value,
+    )
   );
 }

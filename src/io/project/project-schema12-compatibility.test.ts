@@ -84,7 +84,7 @@ describe('schema 12 unifies the two schema 11 feature branches', () => {
       verifySettings(loaded, aligned, staged);
       const saved = prepareProjectForPersistence(loaded);
       if (saved.kind !== 'ok') throw new Error(saved.reason);
-      expect(JSON.parse(saved.json).schemaVersion).toBe(12);
+      expect(JSON.parse(saved.json).schemaVersion).toBe(14);
       const reopened = readProject(saved.json);
       verifySettings(reopened, aligned, staged);
       if (!aligned) {
@@ -103,7 +103,7 @@ function readProject(json: string): Project {
 }
 
 function verifySettings(project: Project, aligned: boolean, staged: boolean): void {
-  expect(project.schemaVersion).toBe(12);
+  expect(project.schemaVersion).toBe(14);
   expect(project.scene.objects[0]).toMatchObject({
     pathText: aligned ? placement : legacyPlacement,
   });

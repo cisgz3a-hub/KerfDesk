@@ -18,17 +18,16 @@ import { positionTraceOverRasterSource, useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { effectiveOutput, type TraceFillStyle, type TraceOutput } from './dialog-parts';
-import { rasterDisplayDataUrl } from '../workspace/draw-raster';
 import type { PendingPreparedTrace, PreparedTrace } from './prepared-trace';
 import { TraceDialogView } from './TraceDialogView';
 import type { BoundaryMode } from './region-enhance-trace';
-import { BoundaryModePicker, cropOnlyNote } from './BoundaryModePicker';
+import { cropOnlyNote } from './BoundaryModePicker';
 import type { BoundarySelection } from './use-boundary-selection';
-import { TracePreview } from './TracePreview';
+import { TracePreviewPanel } from './TracePreviewPanel';
 import { conditionTracedImageForMachine } from './trace-machine-conditioning';
 import { useDialogTraceOptions, useTraceDialogSettings } from './use-trace-dialog-settings';
 import { resolveTraceCommitResult } from './trace-commit-result';
-import { TraceCommitGridNote, traceCommitGridForClaim } from './trace-commit-grid-note';
+import { traceCommitGridForClaim } from './trace-commit-grid-note';
 import {
   captureTraceCommitOwner,
   claimTraceCommitOwner,
@@ -47,7 +46,7 @@ import {
 } from './use-trace-preview-settlement';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
 import { isTraceAbort, traceAbortError } from './trace-cancellation';
-import { useTraceSourceFile } from './use-trace-source-file';
+import { useCanvasTraceSourceFile } from './use-trace-source-file';
 
 export function ImportImageDialog(): JSX.Element | null {
   const dialog = useUiStore((s) => s.imageDialog);
@@ -103,7 +102,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
   const commitRasterizedTrace = useStore((s) => s.commitRasterizedTrace);
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
   const pushToast = useToastStore((s) => s.pushToast);
-  const file = useTraceSourceFile(seed, pushToast);
+  const file = useCanvasTraceSourceFile(seed, pushToast);
   // Re-trace Original opens on the settings recorded with the trace (ADR-408).
   const choices = useTraceDialogSettings(machineKind, seed, props);
   const boundarySelection = choices.boundarySelection;
@@ -178,6 +177,7 @@ function DialogBody(props: DialogBodyProps): JSX.Element {
         <TracePreviewPanel
           preview={preview}
           seed={seed}
+          file={file}
           boundarySelection={boundarySelection}
           cropOnlyNote={cropOnlyNote(options)}
           submission={{ busy, output: effectiveTraceOutput }}
@@ -213,44 +213,6 @@ function isFilledContourTraceOptions(options: TraceOptions): boolean {
     options.traceMode !== 'centerline' &&
     options.traceMode !== 'edge' &&
     options.traceMode !== 'hybrid'
-  );
-}
-
-function TracePreviewPanel(props: {
-  readonly submission: { readonly busy: boolean; readonly output: TraceOutput };
-  /** Why the selected style can only crop, or null when it offers Enhance. */
-  readonly cropOnlyNote: string | null;
-  readonly preview: ReturnType<typeof useTracePreview>;
-  readonly seed: RasterImage;
-  readonly boundarySelection: BoundarySelection;
-}): JSX.Element {
-  const selection = props.boundarySelection;
-  return (
-    <>
-      <TracePreview
-        state={props.preview}
-        sourceDataUrl={rasterDisplayDataUrl(props.seed)}
-        imageSize={{ width: props.seed.pixelWidth, height: props.seed.pixelHeight }}
-        boundary={selection.boundary}
-        boundaryDisabled={props.submission.busy}
-        isRasterizing={
-          props.submission.busy &&
-          props.submission.output === 'raster' &&
-          props.preview.kind === 'ready'
-        }
-        onBoundaryChange={selection.setBoundary}
-        onBoundaryClear={selection.clearBoundary}
-      />
-      {selection.boundary !== null ? (
-        <BoundaryModePicker
-          value={selection.boundaryMode}
-          onChange={selection.setBoundaryMode}
-          cropOnlyNote={props.cropOnlyNote}
-          disabled={props.submission.busy}
-        />
-      ) : null}
-      <TraceCommitGridNote preview={props.preview} source={props.seed} />
-    </>
   );
 }
 

@@ -10,6 +10,16 @@ export type NestItem = {
   readonly width: number;
   readonly height: number;
   readonly canRotate: boolean;
+  /** Allowed turns relative to the artwork's current orientation. */
+  readonly rotationAngles?: ReadonlyArray<NestRotation>;
+};
+
+export type NestRotation = 0 | 90 | 180 | 270;
+
+export type NestOptions = {
+  readonly padding: number;
+  readonly obstacles?: ReadonlyArray<NestRect>;
+  readonly itemOrder?: ReadonlyArray<string>;
 };
 
 export type NestPlacement = {
@@ -17,6 +27,7 @@ export type NestPlacement = {
   readonly x: number;
   readonly y: number;
   readonly rotated90: boolean;
+  readonly rotationDeg?: NestRotation;
 };
 
 export type QuickNestResult =
@@ -32,7 +43,7 @@ type Candidate = NestPlacement & {
 export function quickNest(
   bin: NestRect,
   items: ReadonlyArray<NestItem>,
-  options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
+  options: NestOptions,
 ): QuickNestResult {
   if (!validRect(bin)) return { ok: false, unplacedIds: items.map((item) => item.id) };
   const padding = finiteNonNegative(options.padding);
@@ -42,7 +53,7 @@ export function quickNest(
   for (const obstacle of options.obstacles ?? []) {
     free = subtractUsed(free, expandRect(obstacle, inset));
   }
-  const ordered = [...items].sort(compareItems);
+  const ordered = orderNestItems(items, options.itemOrder);
   const placements: NestPlacement[] = [];
   const unplacedIds: string[] = [];
   for (const item of ordered) {
@@ -56,6 +67,7 @@ export function quickNest(
       x: candidate.x,
       y: candidate.y,
       rotated90: candidate.rotated90,
+      ...(candidate.rotationDeg === undefined ? {} : { rotationDeg: candidate.rotationDeg }),
     });
     free = subtractUsed(free, candidate.packed);
   }
@@ -67,12 +79,11 @@ function bestCandidate(
   item: NestItem,
   padding: number,
 ): Candidate | null {
-  const dimensions = [
-    { width: item.width, height: item.height, rotated90: false },
-    ...(item.canRotate && item.width !== item.height
-      ? [{ width: item.height, height: item.width, rotated90: true }]
-      : []),
-  ];
+  const dimensions = allowedNestRotations(item).map((angle) => ({
+    width: angle % 180 === 0 ? item.width : item.height,
+    height: angle % 180 === 0 ? item.height : item.width,
+    ...nestTurn(angle),
+  }));
   let best: Candidate | null = null;
   for (const rect of freeRects) {
     for (const dimension of dimensions) {
@@ -86,6 +97,7 @@ function bestCandidate(
         x: rect.minX + padding / 2,
         y: rect.minY + padding / 2,
         rotated90: dimension.rotated90,
+        ...(dimension.rotationDeg === undefined ? {} : { rotationDeg: dimension.rotationDeg }),
         packed: {
           minX: rect.minX,
           minY: rect.minY,
@@ -127,6 +139,36 @@ function compareItems(a: NestItem, b: NestItem): number {
     b.width * b.height - a.width * a.height ||
     Math.max(b.width, b.height) - Math.max(a.width, a.height) ||
     a.id.localeCompare(b.id)
+  );
+}
+
+export function allowedNestRotations(item: NestItem): ReadonlyArray<NestRotation> {
+  return item.rotationAngles === undefined
+    ? item.canRotate
+      ? [0, 90]
+      : [0]
+    : [...new Set(item.rotationAngles)].filter((angle) => [0, 90, 180, 270].includes(angle));
+}
+
+export function nestTurn(angle: NestRotation): Pick<NestPlacement, 'rotated90' | 'rotationDeg'> {
+  return {
+    rotated90: angle % 180 !== 0,
+    ...(angle === 180 || angle === 270 ? { rotationDeg: angle } : {}),
+  };
+}
+
+export function nestRotation(placement: NestPlacement): NestRotation {
+  return placement.rotationDeg ?? (placement.rotated90 ? 90 : 0);
+}
+
+export function orderNestItems<T extends NestItem>(
+  items: ReadonlyArray<T>,
+  order?: ReadonlyArray<string>,
+): T[] {
+  if (order === undefined) return [...items].sort(compareItems);
+  const rank = new Map(order.map((id, index) => [id, index]));
+  return [...items].sort(
+    (a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity) || compareItems(a, b),
   );
 }
 

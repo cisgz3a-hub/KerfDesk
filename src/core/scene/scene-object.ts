@@ -1,10 +1,12 @@
-// SceneObject — the discriminated union the rest of the pipeline pattern-matches
+// SceneObject â€” the discriminated union the rest of the pipeline pattern-matches
 // against. Phase A ships one variant (ImportedSvg); ADR-014 commits to adding
 // 'text' (Phase D) and 'traced-image' (Phase E) without touching code outside
 // this module's switch arms. `assertNever` enforces exhaustiveness at compile
 // time so the missing arm is the only compile error when a new variant lands.
 
 import type { ColoredPath } from './colored-path';
+import type { TextBoxSettings } from './text-box';
+import type { BooleanCompound } from './boolean-compound';
 export type { ColoredPath, SubpathNesting } from './colored-path';
 
 import type { VariableTemplate } from './variable-template';
@@ -139,6 +141,8 @@ export type ObjectOperationOverride = ObjectOperationSettingsOverride & {
 };
 
 export type ObjectPowerScale = {
+  /** Operator-assigned artwork label, independent of manufacturing operations. */
+  readonly name?: string;
   // Shared source fragment identity and authored placement for SVG re-import.
   readonly svgImport?: {
     readonly mode?: 'line' | 'fill' | 'image';
@@ -192,6 +196,7 @@ export type LibraryAssetProvenance = {
 
 export type ImportedSvg = ObjectPowerScale & {
   readonly kind: 'imported-svg';
+  readonly booleanCompound?: BooleanCompound;
   readonly id: string;
   readonly source: string; // filename for display (e.g. 'logo.svg')
   readonly libraryProvenance?: LibraryAssetProvenance;
@@ -202,7 +207,7 @@ export type ImportedSvg = ObjectPowerScale & {
 
 // Text variant added in Phase D (ADR-012). Kept inline here (alongside
 // ImportedSvg) so the SceneObject union remains the single source of
-// truth — every variant's full shape is in one file. The font
+// truth â€” every variant's full shape is in one file. The font
 // registry + opentype rendering pipeline live in core/text/ and
 // reference TextObject FROM here, not the other way around (avoids a
 // circular dependency).
@@ -245,19 +250,20 @@ export type TextObject = ObjectPowerScale & {
   // editable source. Absent/false preserves legacy independent contours.
   readonly weldOverlaps?: boolean;
   readonly pathText?: PathTextSettings;
+  readonly textBox?: TextBoxSettings;
   readonly color: string; // hex; default black
   readonly bounds: Bounds; // computed at edit time from `paths`
   readonly transform: Transform;
   // Pre-rendered polylines. Set when the text is created/edited by
   // calling `textToPolylines` in the UI layer (opentype.js needs the
   // font ArrayBuffer, which is a UI-layer concern). compileJob then
-  // iterates these like it does for an ImportedSvg — single code
+  // iterates these like it does for an ImportedSvg â€” single code
   // path for both variants once they're materialized.
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
 // Traced raster image, Phase E (ADR-013). Same shape pattern as
-// TextObject — the raster is pre-traced (via imagetracerjs +
+// TextObject â€” the raster is pre-traced (via imagetracerjs +
 // parseSvg) at import time and the polylines are stored on the
 // object. compileJob iterates `paths` like any other variant.
 // The `source` field carries the original filename for display.
@@ -312,7 +318,7 @@ export type TraceSettingsRecord = {
 // path can dither + emit per-pixel S-modulation G-code.
 //
 // dataUrl carries PNG bytes embedded in the .lf2 file as a data URL
-// (per ADR-020 — self-contained projects). pixelWidth/pixelHeight
+// (per ADR-020 â€” self-contained projects). pixelWidth/pixelHeight
 // are the source bitmap dimensions; bounds is its placement in mm
 // on the workspace.
 //
@@ -381,7 +387,7 @@ export type RasterImage = ObjectPowerScale & {
   readonly dither: DitherAlgorithm;
   // Engraving resolution. 5-25 typical for diode lasers; above 20
   // strains USB bandwidth and pushes G-code past ~1 MB on a
-  // 100×100 mm image.
+  // 100Ã—100 mm image.
   readonly linesPerMm: number;
   readonly brightness?: number; // -100..100; image engrave adjustment, default 0
   readonly contrast?: number; // -100..100; image engrave adjustment, default 0
@@ -395,7 +401,7 @@ export type RasterImage = ObjectPowerScale & {
   // The owned clip intersects any external imageMaskId mask.
   readonly imageClip?: ReadonlyArray<ColoredPath>;
   // Pre-extracted greyscale luma buffer (one byte per pixel, ITU-R
-  // BT.601: 0.299·R + 0.587·G + 0.114·B), base64-encoded so it can
+  // BT.601: 0.299Â·R + 0.587Â·G + 0.114Â·B), base64-encoded so it can
   // round-trip through .lf2's JSON. Length after decode equals
   // pixelWidth * pixelHeight. Optional because pre-F.2.e .lf2 files
   // didn't have it; compileJob treats missing data as all-white
@@ -405,10 +411,10 @@ export type RasterImage = ObjectPowerScale & {
   // ADR-026 render-only marker. When this raster is the source bitmap
   // kept *behind* a trace (the backing you delete once the vector looks
   // right), it's tagged 'trace-source' so the canvas renders it with a
-  // tint — the visual cue that there are two stacked layers and which
+  // tint â€” the visual cue that there are two stacked layers and which
   // one to remove. Standalone Engrave-Image rasters leave it unset and
   // render normally. Optional + additive: pre-ADR-026 .lf2 files simply
-  // lack it (no schemaVersion bump, no migration — same pattern as
+  // lack it (no schemaVersion bump, no migration â€” same pattern as
   // letterSpacing). Affects display only; never the compiled G-code.
   readonly role?: 'trace-source';
 };
@@ -451,7 +457,7 @@ export type StarShape = {
   readonly innerRadiusRatio: number; // innerRadiusMm / outerRadiusMm, 0..1
 };
 
-// An open or closed run of points — the pen tool's freeform primitive (B6).
+// An open or closed run of points â€” the pen tool's freeform primitive (B6).
 // The points are absolute (the factory places them at IDENTITY_TRANSFORM).
 export type PolylineShape = {
   readonly kind: 'polyline';
@@ -514,13 +520,13 @@ export type ShapeObject = ObjectPowerScale & {
   // Registration-box provenance: 'captured-board' (Place Board, ADR-124/127)
   // vs 'jig' (Registration Jig panel). The two share one reserved-color box; the
   // tag lets the jig panel refuse to unlock/replace a captured board, whose
-  // canvas position encodes the physical work origin. Absent → jig (back-compat).
+  // canvas position encodes the physical work origin. Absent â†’ jig (back-compat).
   readonly provenance?: 'captured-board' | 'jig';
   // Pen-drawing fairing version (ADR-214). Stamped by createPolyline and by the
   // fairing migration so a drawing faired by a known engine version is
   // recognized by that version alone, instead of re-deriving the fitter output
   // and comparing JSON byte-for-byte (which any future fitter/tolerance change
-  // silently breaks). Absent → pre-marker drawing; the migration falls back to
+  // silently breaks). Absent â†’ pre-marker drawing; the migration falls back to
   // structural recognition for those. Newer-than-current values are tolerated
   // (a file from a future build), never downgraded.
   readonly fairingVersion?: number;

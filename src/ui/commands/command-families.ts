@@ -5,6 +5,8 @@ import { cameraCommand } from './camera-command-family';
 import { placeBoardCommand } from './board-capture-command-family';
 import { adjustImageCommand, processedRasterToolCommands } from './command-raster-family';
 import { vectorBooleanCommands } from './vector-boolean-commands';
+import { jointResizeCommand } from './joint-resize-command';
+import { stampPreparationCommand } from './stamp-preparation-command';
 import { offsetShapesCommand, wireframeCommand } from './editing-tools-commands';
 import { designToolsCommands } from './design-tools-commands';
 import { vectorCutCommands } from './vector-cut-commands';
@@ -12,23 +14,14 @@ import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
+import { useAiDialogStore } from '../ai/ai-dialog-store';
 
 export { fileCommands } from './file-command-family';
 export { connectionHelpCommand, helpCommand, safetyHelpCommand } from './help-command-family';
 
 export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
-    {
-      ...enabled(
-        'tools.measure',
-        'tools',
-        'Measure',
-        'Measure distance and angle on the workspace',
-        ctx.measureTool,
-        'Alt+M',
-      ),
-      active: ctx.measureActive,
-    },
+    measureCommand(ctx),
     canvasTextCommand(ctx),
     registrationJigCommand(ctx),
     cameraCommand(ctx),
@@ -59,6 +52,15 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
     convertToPathCommand(ctx),
     weldCommand(ctx),
     ...vectorBooleanCommands(ctx),
+    jointResizeCommand(ctx),
+    stampPreparationCommand(ctx),
+    enabled(
+      'tools.ai-assistant',
+      'tools',
+      'AI Assistant...',
+      'Review generated vector designs and saved material recipe suggestions',
+      ctx.openAiAssistant ?? useAiDialogStore.getState().show,
+    ),
     offsetShapesCommand(ctx),
     ...designToolsCommands(ctx),
     ...vectorCutCommands(ctx),
@@ -95,6 +97,20 @@ export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand>
           ctx.convertToBitmap,
         ),
   ];
+}
+
+function measureCommand(ctx: AppCommandContext): AppCommand {
+  return {
+    ...enabled(
+      'tools.measure',
+      'tools',
+      'Measure',
+      'Measure distance and angle on the workspace',
+      ctx.measureTool,
+      'Alt+M',
+    ),
+    active: ctx.measureActive,
+  };
 }
 
 function canvasTextCommand(ctx: AppCommandContext): AppCommand {

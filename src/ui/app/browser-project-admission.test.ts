@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { createProject, type Project, type TracedImage } from '../../core/scene';
 import { serializeProjectTemplate } from '../../io/project/project-template';
+import { serializeProject } from '../../io/project';
 import type { FileHandle } from '../../platform/types';
 import { artworkProject } from '../library/personal-artwork-test-fixtures';
 import { usePendingProProjectStore } from '../state/pending-pro-project';
@@ -84,6 +85,73 @@ it('keeps existing desktop Pro project admission unchanged', () => {
   expect(useStore.getState().setProject(incoming).kind).toBe('loaded');
   expect(useStore.getState().project.scene).toEqual(incoming.scene);
   expect(usePendingProProjectStore.getState().pending).toBeNull();
+});
+
+it('retains the whole multi-sheet file when only inactive artwork needs the existing Pro admission', () => {
+  const incoming: Project = {
+    ...createProject(),
+    sheetBook: {
+      activeId: 'free',
+      activeName: 'Laser',
+      inactive: [
+        { id: 'cnc', name: 'V-carved signs', projectJson: serializeProject(proProject()) },
+      ],
+    },
+  };
+  const current = useStore.getState();
+  expect(current.setProject(incoming)).toEqual({ kind: 'desktop-required', features: ['vcarve'] });
+  expect(useStore.getState()).toBe(current);
+  expect(usePendingProProjectStore.getState().pending?.project).toBe(incoming);
+  build.browser = false;
+  expect(current.setProject(incoming).kind).toBe('loaded');
+  expect(useStore.getState().project.sheetBook).toBe(incoming.sheetBook);
+});
+
+it('checks preserved production and retained-array sources at the same existing file admission boundary', () => {
+  const source = serializeProject(proProject());
+  const incoming: Project = {
+    ...createProject(),
+    productionManifest: {
+      id: 'run',
+      name: 'Signs',
+      frozenAt: '2026-10-07T00:00:00.000Z',
+      designProjectJson: source,
+      rows: [
+        {
+          id: 'row',
+          index: 0,
+          recordIndex: 0,
+          serialValue: 1,
+          values: [],
+          notes: '',
+          status: 'pending',
+        },
+      ],
+    },
+  };
+  expect(useStore.getState().setProject(incoming)).toEqual({
+    kind: 'desktop-required',
+    features: ['vcarve'],
+  });
+  const retained: Project = {
+    ...createProject(),
+    arrayLayouts: [
+      {
+        id: 'array',
+        name: 'Signs',
+        spec: { kind: 'grid', rows: 1, columns: 1, spacingX: 0, spacingY: 0 },
+        sourceIds: ['art'],
+        instances: [{ id: 'instance', sourceToObject: { art: 'art' } }],
+        ownedObjectIds: ['art'],
+        sourceProjectJson: source,
+        baselineProjectJson: source,
+      },
+    ],
+  };
+  expect(useStore.getState().setProject(retained)).toEqual({
+    kind: 'desktop-required',
+    features: ['vcarve'],
+  });
 });
 
 it('native and LightBurn completion never marks a refused project loaded or clears recovery', () => {

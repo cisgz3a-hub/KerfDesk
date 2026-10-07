@@ -11,6 +11,7 @@
 import { callout, featureGrid, pageHero, section, statusPill, table } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 import { remotePrivacy } from '../lib/remote-privacy.mjs';
+import { aiPrivacy } from '../lib/ai-privacy.mjs';
 
 const AT_A_GLANCE = [
   {
@@ -31,7 +32,7 @@ const AT_A_GLANCE = [
   {
     icon: 'hard-drive',
     title: 'Your work stays with you',
-    body: 'Saved projects and jobs stay on your computer. Approved remote clients receive summaries and edits; a separate opt-in allows artwork previews and text, as described below.',
+    body: 'Saved projects and jobs stay on your computer. Optional AI sends only the request you review. Approved remote clients receive summaries and edits; a separate opt-in allows artwork previews and text, as described below.',
   },
 ];
 
@@ -93,6 +94,16 @@ function connections(site) {
       'kerfdesk-phone-control.cisgz3a.workers.dev (Cloudflare)',
       'An authenticated connection carries approved requests and bounded workspace, machine and recipe summaries. Separate artwork-sharing opt-in allows PNG previews and text contents. Access starts turned off, and each client needs your approval. See below for permissions, cookies and retention.',
     ],
+    [
+      'You choose Request draft in the optional desktop AI assistant',
+      'api.openai.com (OpenAI)',
+      'The reviewed prompt, dimensions and task; for material requests, the listed candidate recipe names/descriptions and any photograph you select. Your API key authenticates the request. No open project, canvas, machine settings or toolpaths are attached. See below for storage and provider handling.',
+    ],
+    [
+      'You explicitly connect a FluidNC network machine in the desktop app',
+      'The IP address or hostname and Telnet port you enter',
+      'Controller commands and responses use that configured TCP channel. There is no network scan or automatic reconnect. The channel is not encrypted; use a trusted network.',
+    ],
   ];
 }
 
@@ -131,7 +142,7 @@ function websitePart(site, appPrivacy) {
       the KerfDesk app, its download page, its support page and its notices.
       <a href="#app">Part 2</a> covers the app. The download page serves installers from
       ${site.downloadHost}. Your browser may tell the next site that you came from here, but not
-      which page.
+      which page. The optional AI section also links to OpenAI’s API data policy.
     </p>
     <h3>Download statistics</h3>
     <p>
@@ -256,9 +267,10 @@ function deviceAccess() {
   return html`<h3>Your machine and USB cameras</h3>
     <ul>
       <li>
-        <strong>Your machine.</strong> KerfDesk connects to your machine over a USB cable. When you
-        click Connect, you pick your machine’s port from a list. Machine commands go over that
-        cable, not over the internet or Wi-Fi.
+        <strong>Your machine.</strong> For USB, you pick your machine’s port when you click Connect.
+        The desktop app also supports an explicitly configured FluidNC Telnet channel. Machine
+        commands go to the port or network address you choose. These connections do not upload a
+        project to a KerfDesk service.
       </li>
       <li>
         <strong>USB cameras.</strong> In a browser, KerfDesk can use a camera only after you allow
@@ -280,28 +292,29 @@ function appPart(site, appPrivacy) {
       ${storedLocally()}
       <h3>What goes over the network</h3>
       <p>
-        These are the only connections KerfDesk is built to make on its own. None of them sends your
-        projects, designs, machine details or jobs. Each service still sees ordinary connection
-        details, such as your IP address and the time.
+        Automatic update and licensing requests do not send projects, designs, machine details or
+        jobs. Optional AI, remote access, cameras and network machines make the user-requested
+        connections described below. Each service still sees ordinary connection details, such as
+        your IP address and the time.
       </p>
     </div>
     ${table({
-      caption: 'Connections KerfDesk makes on its own',
+      caption: 'Automatic and user-requested connections',
       head: ['When', 'Where it goes', 'What happens'],
       rows: connections(site),
     })}
     <div class="prose">
       ${previewCheck(site, appPrivacy)} ${licensing(site, appPrivacy)} ${remotePrivacy()}
-      ${cameraHelper()} ${deviceAccess()}
+      ${aiPrivacy()} ${cameraHelper()} ${deviceAccess()}
       ${callout({
         iconName: 'wifi-off',
         title: 'Working offline',
         body: html`<p>
           After your first visit, the web app keeps working with no internet connection. Design,
-          preview and machine control all run on your computer. Lesson and CNC bit pictures you
-          haven’t viewed yet need a connection. Running a machine with the network switched off is
-          confirmed in software but hasn’t been tested on a real machine yet. The desktop app runs
-          from files installed on your computer.
+          preview and machine control all run on your computer. Optional AI requests need internet
+          access. Lesson and CNC bit pictures you haven’t viewed yet need a connection. Running a
+          machine with the network switched off is confirmed in software but hasn’t been tested on a
+          real machine yet. The desktop app runs from files installed on your computer.
         </p>`,
       })}
     </div>`;
@@ -324,10 +337,10 @@ export const page = {
   nav: null,
   title: 'Privacy',
   description:
-    'KerfDesk needs no account for ordinary use. This site sets no cookies. Read the app disclosures for updates, licensing, downloads and optional phone or MCP access.',
+    'KerfDesk needs no account for ordinary use. Read about updates, licensing, downloads, optional AI, remote access and machine connections.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-04">October 4, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-07">October 7, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

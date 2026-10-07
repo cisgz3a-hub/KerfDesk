@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import {
   assertNever,
   pathUsesOperation,
@@ -83,6 +84,7 @@ function closeObjectFillContours(
   fillOperations: ReadonlyArray<Layer>,
   toleranceMm: number,
 ): SceneObject {
+  if (isBooleanCompoundObject(object)) return object;
   switch (object.kind) {
     case 'imported-svg':
     case 'text':

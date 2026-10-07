@@ -546,6 +546,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
               licence.routes(DESKTOP_PROJECT_OPENS.routes(makeAppProtocolHandler(distRoot))),
             ),
             SUPPORT_LOG,
+            DESKTOP_DATA_PATH,
           ),
         ),
       );

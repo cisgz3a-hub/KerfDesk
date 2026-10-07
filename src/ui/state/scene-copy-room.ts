@@ -1,3 +1,4 @@
+import { retainedBooleanOperandCount } from '../../core/scene/boolean-compound';
 // How many copies the project has room for, shared by the commands that copy
 // the selection: Array (ADR-307 amendment 1) and Copy Along Path (ADR-498
 // amendment 1). A project holds at most PROJECT_SCENE_LIMITS.objects objects and
@@ -35,8 +36,19 @@ export function sceneCopyRoom(
   sourceIds: ReadonlySet<string>,
   originalsFreed = 0,
 ): number {
-  const perCopy = sceneObjectCopyClosure(scene.objects, sourceIds).length;
-  return copiesThatFit(scene.objects.length - originalsFreed, perCopy);
+  const closure = sceneObjectCopyClosure(scene.objects, sourceIds);
+  const perCopy = closure.length + retainedBooleanOperandCount(closure);
+  const retainedFreed =
+    originalsFreed === sourceIds.size
+      ? retainedBooleanOperandCount(scene.objects.filter((object) => sourceIds.has(object.id)))
+      : 0;
+  return copiesThatFit(
+    scene.objects.length +
+      retainedBooleanOperandCount(scene.objects) -
+      originalsFreed -
+      retainedFreed,
+    perCopy,
+  );
 }
 
 /**
@@ -63,7 +75,11 @@ type Budget = {
 // Copies add objects and, when they carry whole groups, groups and members; a
 // paste from another project brings its operations (scene layers) with it.
 const BUDGETS: ReadonlyArray<Budget> = [
-  { what: 'objects', limit: PROJECT_SCENE_LIMITS.objects, count: (scene) => scene.objects.length },
+  {
+    what: 'objects',
+    limit: PROJECT_SCENE_LIMITS.objects,
+    count: (scene) => scene.objects.length + retainedBooleanOperandCount(scene.objects),
+  },
   {
     what: 'groups',
     limit: PROJECT_SCENE_LIMITS.groups,
