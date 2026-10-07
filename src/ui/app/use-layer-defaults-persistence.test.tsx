@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { createProject } from '../../core/scene';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useStore } from '../state';
@@ -150,6 +151,56 @@ describe('useLayerDefaultsPersistence', () => {
           ...defaultsFixture(),
           applyToNewOperations: false,
         });
+      } finally {
+        await unmount();
+      }
+    },
+  );
+
+  it('opens a saved machine from an empty source without deleting the destination presets', async () => {
+    const profileA = useStore.getState().project.device;
+    const profileB = { ...profileA, name: 'Saved project machine' };
+    persistLayerDefaults(localStorage, profileB.name, defaultsFixture());
+    const savedSlot = localStorage.getItem(layerDefaultsStorageKey(profileB.name));
+    const { unmount } = await mountHook();
+    try {
+      expect(useStore.getState().layerDefaults.allColors).toBeNull();
+      await act(async () => useStore.getState().setProject(createProject(profileB)));
+      expect(useStore.getState().layerDefaults).toEqual({
+        ...defaultsFixture(),
+        applyToNewOperations: false,
+      });
+      expect(localStorage.getItem(layerDefaultsStorageKey(profileB.name))).toBe(savedSlot);
+      expect(localStorage.getItem(layerDefaultsStorageKey(profileA.name))).toBeNull();
+    } finally {
+      await unmount();
+    }
+  });
+
+  it.each(['new', 'open'] as const)(
+    '%s ends automatic reuse while keeping saved presets available for explicit reuse',
+    async (replacement) => {
+      const device = useStore.getState().project.device;
+      const { unmount } = await mountHook();
+      try {
+        await act(async () => {
+          useStore
+            .getState()
+            .setLayerDefaults({ ...defaultsFixture(), applyToNewOperations: true });
+        });
+        const savedSlot = localStorage.getItem(layerDefaultsStorageKey(device.name));
+        expect(useStore.getState().layerDefaults.applyToNewOperations).toBe(true);
+        await act(async () => {
+          if (replacement === 'new') useStore.getState().newProject();
+          else useStore.getState().setProject(createProject(device));
+        });
+        expect(useStore.getState().layerDefaults).toEqual({
+          ...defaultsFixture(),
+          applyToNewOperations: false,
+        });
+        expect(restoreLayerDefaults(localStorage, device.name)).toEqual(defaultsFixture());
+        expect(localStorage.getItem(layerDefaultsStorageKey(device.name))).toBe(savedSlot);
+        expect(useStore.getState().dirty).toBe(false);
       } finally {
         await unmount();
       }

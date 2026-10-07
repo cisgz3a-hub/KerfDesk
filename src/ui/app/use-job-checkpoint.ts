@@ -139,8 +139,24 @@ class JobCheckpointTracker {
     else this.observeStreamer(state, state.streamer);
   };
 
+  private retryActivatedProgress(): void {
+    const active = this.repository.getSnapshot().activeRun;
+    const observed = this.previous;
+    if (
+      active === null ||
+      observed?.runId !== active.runId ||
+      this.terminalQueued ||
+      this.firstInterruption?.runId === active.runId
+    )
+      return;
+    this.lastPersistedAck = Math.max(this.lastPersistedAck, active.ackedLines);
+    if (observed.completed > Math.max(this.lastPersistedAck, this.highestQueuedAck))
+      this.queueProgress(active.runId, observed.completed);
+  }
+
   readonly retryActivatedArchive = (handoff: CheckpointArchiveHandoff): void => {
     this.activatedArchiveHandoff = handoff;
+    this.retryActivatedProgress();
     const waiting = this.deferredArchiveHandoff;
     if (
       waiting?.runId !== handoff.runId ||

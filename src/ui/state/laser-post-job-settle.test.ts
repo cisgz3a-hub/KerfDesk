@@ -167,7 +167,7 @@ describe('post-job settle failure handling', () => {
         phase: 'awaiting-idle',
       },
       ...STALE_FINISHED_JOB_STATE,
-      liveCanvasRun: { timing: { kind: 'finishing' } },
+      liveCanvasRun: { lifecycle: 'running', endedAtMs: null, timing: { kind: 'finishing' } },
     });
 
     connection.emitLine('<Idle|MPos:10.000,0.000,0.000|FS:0,0>');
@@ -182,7 +182,11 @@ describe('post-job settle failure handling', () => {
       toolChangeToolIds: [],
       pendingToolLabel: null,
       pendingToolId: null,
-      liveCanvasRun: { timing: { kind: 'complete' } },
+      liveCanvasRun: {
+        lifecycle: 'finished',
+        endedAtMs: expect.any(Number),
+        timing: { kind: 'complete' },
+      },
     });
   });
 
