@@ -1,3 +1,7 @@
+.lf-dialog.lf-project-sheets-dialog {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
 .lf-project-sheets-controls {
   display: flex;
   align-items: center;

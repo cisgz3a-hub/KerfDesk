@@ -62,7 +62,12 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
     if (id !== null) setName('');
   };
   return (
-    <Dialog title="Project sheets" onClose={props.onClose} size="md">
+    <Dialog
+      title="Project sheets"
+      onClose={props.onClose}
+      size="md"
+      panelClassName="lf-project-sheets-dialog"
+    >
       <div className="lf-project-sheets-controls">
         <ActiveProjectSheet />
         <ProductionManifestButton />
