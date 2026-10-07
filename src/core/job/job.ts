@@ -9,6 +9,9 @@
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
+import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
@@ -452,14 +455,6 @@ export type CncReliefPlanningEvidence = {
   readonly toolTipDiameterMm?: number;
   readonly rowSpacingMm?: number;
   readonly scallopMm?: number;
-};
-
-/** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
-export type CncCompilationSidecar = {
-  readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
-  readonly offsetLadderDiagnostics?: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
-  readonly stepoverOperations?: ReadonlyArray<CncStepoverCompilationEvidence>;
-  readonly reliefPlans?: ReadonlyArray<CncReliefPlanningEvidence>;
 };
 
 export type Job = {

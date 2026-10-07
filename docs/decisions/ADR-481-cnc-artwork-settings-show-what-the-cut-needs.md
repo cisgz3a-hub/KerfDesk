@@ -78,3 +78,38 @@ Every control was checked for a home before anything left the inspector:
   for the Design Studio.
 - Tests, tutorials and WORKFLOW say **Spindle speed**, **Bit**, **Material** and **Manage bits**.
 - Machine Setup gains a `bit-library` field anchor; its bit library is unchanged.
+
+### Amendment 2 — Show omitted open CNC contours (2026-10-07)
+
+A closed-only CNC operation can contain both a valid pocket boundary and open
+lettering. The pocket still cuts, so the all-open note and empty-layer diagnostic
+alone do not explain the omitted lettering.
+
+The compiler records exact open-contour counts and separate source-object IDs
+from the canonical contours it already collected for each operation. Pocket,
+V-carve and Drill report these omissions; open-capable profiles and Engrave do
+not. Closure follows the collected canonical geometry, including V-carve stroke
+outlines, rather than compatibility flags or whether a closed contour happens to
+produce a toolpath. Fresh jobs retain authoritative empty arrays too.
+
+Artwork settings show the omitted count on mixed operations and retain the
+all-open no-toolpath explanation for vector-only operations. An assigned relief
+can contribute motion independently of the vector cut type, so that case reports
+only the omitted vector contours without claiming the whole operation is empty.
+This note uses assignment facts and does not compile relief output in the live
+inspector. Output-off operations remain quiet. Job Review
+shows the count as an advisory even when qualification uses only retained compile
+evidence. It never disables ordinary Start or Save G-code, and the valid toolpath
+and emitted bytes do not change.
+
+For fresh prepared jobs, **Show omitted artwork** cancels the pending review,
+selects unchanged eligible omitted objects without expanding their canvas groups,
+fits the selection and opens Artwork. Correspondence belongs to the actual
+prepared project and output scope. Content fingerprints reject changed or
+reused-ID artwork; current operation, output, visibility and machine eligibility
+are checked before navigation. Preparing or blocked reviews cannot navigate.
+
+Archived jobs retain recorded counts but offer no fabricated correspondence to
+today's canvas. Derived CNC recovery jobs retain both optional omission arrays
+only for layers that still contain CNC motion. Legacy artifacts without these
+arrays do not reconstruct historical omissions from current artwork.

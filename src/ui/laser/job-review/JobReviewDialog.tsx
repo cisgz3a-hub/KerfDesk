@@ -67,6 +67,9 @@ function OpenJobReview(props: {
         {...(purpose === 'laser-second-pass' || model.openFillOmissions === undefined
           ? {}
           : { openFillOmissions: model.openFillOmissions })}
+        {...(purpose === 'laser-second-pass' || model.openCncContourOmissions === undefined
+          ? {}
+          : { openCncContourOmissions: model.openCncContourOmissions })}
       />
       {model.machineKind === 'cnc' ? <JobReviewCncOwnerActions /> : null}
       <ReviewArtwork model={model} purpose={purpose} onApprove={requestReviewRebuild} />

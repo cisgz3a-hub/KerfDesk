@@ -73,6 +73,8 @@ export type PreflightCode =
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'
   | 'cnc-layer-empty'
+  // Advisory-only: exact open contours omitted by closed-only CNC operations.
+  | 'cnc-open-contours-omitted'
   | 'plunged-travel'
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'
