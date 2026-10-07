@@ -174,10 +174,60 @@ describe('automatic controller information scheduling', () => {
 
     expect(h.run).not.toHaveBeenCalled();
     expect(h.get().pendingUntrackedAcks).toBe(1);
-    expect(h.get().controllerQualification.kind).toBe('qualifying');
+    expect(h.get().controllerQualification).toMatchObject({
+      kind: 'failed',
+      message: expect.stringContaining('acknowledgement'),
+    });
     h.set({ pendingUntrackedAcks: 0 });
     await vi.advanceTimersByTimeAsync(100);
 
+    expect(h.run).toHaveBeenCalledOnce();
+  });
+
+  it('does not count completed status-poll transport as progress on a missing cleanup ACK', async () => {
+    const h = harness({ pendingUntrackedAcks: 1 });
+    scheduleControllerQualification(h.set, h.get, h.refs, h.epoch);
+    for (let poll = 0; poll < 20; poll += 1) {
+      h.set({ pendingTransportWrites: 1 });
+      await vi.advanceTimersByTimeAsync(100);
+      h.set({ pendingTransportWrites: 0 });
+      h.observeIdle();
+      await vi.advanceTimersByTimeAsync(400);
+    }
+    expect(h.get().controllerQualification).toMatchObject({
+      kind: 'failed',
+      message: expect.stringContaining('acknowledgement'),
+    });
+    expect(h.get().pendingUntrackedAcks).toBe(1);
+    expect(h.run).not.toHaveBeenCalled();
+  });
+
+  it('preserves a manual Home busy allowance before bounding its leftover ACK debt', async () => {
+    const h = harness({
+      controllerOperation: { kind: 'home', phase: 'awaiting-idle', idleReports: 0, operationId: 1 },
+      pendingUntrackedAcks: 1,
+    });
+    scheduleControllerQualification(h.set, h.get, h.refs, h.epoch);
+    for (let response = 0; response < 6; response += 1) {
+      h.observe('Home');
+      await vi.advanceTimersByTimeAsync(5_000);
+    }
+    expect(h.run).not.toHaveBeenCalled();
+    expect(h.get().controllerQualification.kind).toBe('qualifying');
+    expect(h.get().pendingUntrackedAcks).toBe(1);
+    h.set({ controllerOperation: null });
+    h.observeIdle();
+    await vi.advanceTimersByTimeAsync(7_000);
+    expect(h.get().controllerQualification.kind).toBe('qualifying');
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(h.get().controllerQualification).toMatchObject({
+      kind: 'failed',
+      message: expect.stringContaining('acknowledgement'),
+    });
+    expect(h.get().pendingUntrackedAcks).toBe(1);
+    h.set({ pendingUntrackedAcks: 0 });
+    h.observeIdle();
+    await vi.advanceTimersByTimeAsync(100);
     expect(h.run).toHaveBeenCalledOnce();
   });
 

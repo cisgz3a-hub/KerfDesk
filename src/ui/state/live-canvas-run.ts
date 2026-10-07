@@ -8,6 +8,7 @@ import { normalizeReportedFeedRateToMm } from '../../core/controllers/grbl/machi
 import { assertNever } from '../../core/scene';
 import type { LaserState } from './laser-store';
 import { registerCanvasProgramRun } from './canvas-program-source';
+import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
 import {
   endStampFor,
   initialLiveCanvasTiming,
@@ -35,7 +36,7 @@ export function liveCanvasStatusPatch(
   now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
-  if (run === null) return {};
+  if (run === null || isProvisionalResetFreeze(state, streamer?.status)) return {};
   const lifecycle = lifecycleFor(
     state,
     streamer,

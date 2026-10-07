@@ -11,7 +11,12 @@ function state(overrides: Partial<RecoveryStatus> = {}): RecoveryStatus {
     controllerSessionEpoch: 4,
     controllerQualification: { kind: 'failed', epoch: 4, message: 'Empty settings response.' },
     controllerOperation: null,
+    motionOperation: null,
+    streamer: null,
+    fireActive: false,
+    autofocusBusy: false,
     pendingUntrackedAcks: 0,
+    pendingTransportWrites: 0,
     statusObservation: { sessionEpoch: 4, positionEpoch: 1, sequence: 7, observedAt: now - 500 },
     ...overrides,
   };
@@ -64,15 +69,37 @@ describe('current controller reconnect recommendation', () => {
     expect(controllerReconnectRecommended(state({ pendingUntrackedAcks: 1 }), now)).toBe(true);
   });
 
+  it('offers replacement for a failed write still in transport despite fresh status and no ACK reservation', () => {
+    expect(controllerReconnectRecommended(state({ pendingTransportWrites: 1 }), now)).toBe(true);
+  });
+
   it('waits for an active owner instead of interrupting its current response', () => {
     expect(
       controllerReconnectRecommended(
         state({
           pendingUntrackedAcks: 1,
+          pendingTransportWrites: 1,
           controllerOperation: {
             kind: 'interactive-command',
             phase: 'command',
             label: 'Reading controller build information',
+          },
+        }),
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it('preserves manual Home ownership despite a failed qualification and pending transport', () => {
+    expect(
+      controllerReconnectRecommended(
+        state({
+          pendingTransportWrites: 1,
+          controllerOperation: {
+            kind: 'home',
+            phase: 'awaiting-idle',
+            idleReports: 0,
+            operationId: 1,
           },
         }),
         now,
@@ -117,6 +144,7 @@ describe('current controller reconnect recommendation', () => {
       controllerReconnectRecommended(
         state({
           controllerQualification: { kind: 'qualified', epoch: 4, settings: 'verified' },
+          pendingTransportWrites: 1,
         }),
         now,
       ),

@@ -32,6 +32,7 @@ function fixture() {
     state: 'Idle',
     resetBanner: true,
     cleanupAck: true,
+    missingM5Ack: false,
     statusResponses: true,
     pauseResumeResponses: false,
   };
@@ -68,7 +69,8 @@ function fixture() {
           status();
         }, 10);
       }
-      if (data === 'M5\n' || (data === 'M9\n' && controls.cleanupAck)) emit('ok');
+      if ((data === 'M5\n' && !controls.missingM5Ack) || (data === 'M9\n' && controls.cleanupAck))
+        emit('ok');
     },
     onLine: (listener) => {
       listeners.add(listener);
@@ -346,26 +348,64 @@ describe('controller recovery on the existing connection', () => {
     },
   );
 
-  it('retains a lost cleanup acknowledgement and resumes only after its real reply arrives', async () => {
-    const f = await connect();
-    await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
-    f.controls.cleanupAck = false;
-    f.emit('error:20');
-    await flush();
-    await vi.advanceTimersByTimeAsync(30_000);
+  it.each([
+    { missing: 'M5', debt: 1, trigger: 'Abort', responding: true },
+    { missing: 'M9', debt: 1, trigger: 'Abort', responding: true },
+    { missing: 'M5 and M9', debt: 2, trigger: 'Abort', responding: true },
+    { missing: 'M9', debt: 1, trigger: 'Abort', responding: false },
+    { missing: 'M9', debt: 1, trigger: 'controller error', responding: true },
+    { missing: 'M9', debt: 1, trigger: 'controller error', responding: false },
+  ])(
+    'bounds lost post-reboot $missing replies after $trigger (status responds: $responding)',
+    async ({ missing, debt, trigger, responding }) => {
+      const f = await connect();
+      await startTestLaserJob('G1 X1 S100\nG1 X2 S100');
+      f.controls.missingM5Ack = missing.includes('M5');
+      f.controls.cleanupAck = !missing.includes('M9');
+      f.controls.statusResponses = responding;
+      if (trigger === 'Abort') await useLaserStore.getState().stopJob();
+      else {
+        f.emit('error:20');
+        await flush();
+      }
+      await vi.advanceTimersByTimeAsync(7_000);
 
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(1);
-    expectQualifying();
-    expect(f.settingsReads()).toBe(1);
-    await expect(useLaserStore.getState().retryControllerQualification()).rejects.toThrow(
-      'previous controller write and acknowledgement',
-    );
-    f.emit('ok');
-    await vi.advanceTimersByTimeAsync(250);
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(debt);
+      expectQualifying();
+      expect(f.settingsReads()).toBe(1);
+      await vi.advanceTimersByTimeAsync(2_000);
 
-    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
-    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
-    expect(f.settingsReads()).toBe(2);
-    expectSameConnection(f);
-  });
+      const state = useLaserStore.getState();
+      expect(state.controllerQualification).toMatchObject({
+        kind: 'failed',
+        message: expect.stringContaining('acknowledgement'),
+      });
+      expect(state.statusReport?.state).toBe('Idle');
+      expect(state.statusResponseObservation?.sessionEpoch).toBe(state.controllerSessionEpoch);
+      expect(state.pendingUntrackedAcks).toBe(debt);
+      expect(state.getControllerReconnectRecommended()).toBe(true);
+      expect(f.settingsReads()).toBe(1);
+      const readBlock = state.getMachineSettingsReadBlockReason();
+      expect(readBlock).not.toBeNull();
+      await expect(state.retryControllerQualification()).rejects.toThrow(readBlock ?? '');
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(debt);
+      expect(f.settingsReads()).toBe(1);
+      if (trigger === 'controller error') {
+        expect(useLaserStore.getState().safetyNotice?.kind).toBe('controller-error');
+      }
+      f.controls.statusResponses = true;
+      f.status();
+      for (let reply = 0; reply < debt; reply += 1) f.emit('ok');
+      await vi.advanceTimersByTimeAsync(250);
+
+      expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+      expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
+      expect(useLaserStore.getState().getControllerReconnectRecommended()).toBe(false);
+      expect(f.settingsReads()).toBe(2);
+      expect(useLaserStore.getState().frameVerification).toBeNull();
+      expectSameConnection(f);
+    },
+  );
 });

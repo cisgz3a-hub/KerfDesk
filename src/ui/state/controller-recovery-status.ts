@@ -1,3 +1,5 @@
+import { controllerInformationActivityIsBusy } from './controller-information-activity';
+import { pendingTransportWriteCount } from './laser-start-queue-fence';
 import type { LaserState } from './laser-store';
 
 type RecoveryStatus = Pick<
@@ -6,7 +8,12 @@ type RecoveryStatus = Pick<
   | 'controllerQualification'
   | 'controllerSessionEpoch'
   | 'controllerOperation'
+  | 'motionOperation'
+  | 'streamer'
+  | 'fireActive'
+  | 'autofocusBusy'
   | 'pendingUntrackedAcks'
+  | 'pendingTransportWrites'
   | 'statusObservation'
   | 'statusResponseObservation'
 >;
@@ -27,10 +34,11 @@ export function controllerReconnectRecommended(state: RecoveryStatus, now = Date
       state.controllerOperation.kind === 'recovery' && state.controllerOperation.phase === 'reset'
     );
   }
-  // A timed-out owned response can leave an acknowledgement fence even while
-  // realtime status still arrives. Replacing that session is an escape hatch;
-  // the settings Retry must continue respecting the unresolved response owner.
-  if (state.pendingUntrackedAcks > 0) return true;
+  if (controllerInformationActivityIsBusy(state)) return false;
+  // Unsettled transport or response ownership can fence Retry even while
+  // realtime status still arrives. Replacement offers an explicit recovery
+  // route without treating a write still in transport as an accepted command.
+  if (state.pendingUntrackedAcks > 0 || pendingTransportWriteCount(state) > 0) return true;
   return controllerResponseMissing(state, now);
 }
 

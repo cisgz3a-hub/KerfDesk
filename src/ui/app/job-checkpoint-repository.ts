@@ -4,7 +4,7 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
 import { currentJobStopRequest } from '../state/job-stop-request';
-import { hasOwnedControllerReset } from '../state/laser-reset-cleanup';
+import { isProvisionalResetFreeze } from '../state/laser-reset-terminal-state';
 import { isUnarchivedRun } from '../state/laser-unarchived-run';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import type { RecoveryRepository, RunId } from '../state/recovery';
@@ -85,11 +85,7 @@ export function observedStreamInterruption(
   status: StreamerStatus,
   state: LaserState,
 ): JobInterruption | null {
-  if (
-    status === 'errored' &&
-    hasOwnedControllerReset(state.controllerOperation) &&
-    (state.safetyNotice === null || state.safetyNotice.kind === 'cnc-transition-unconfirmed')
-  ) {
+  if (isProvisionalResetFreeze(state, status)) {
     // Reset freezes host refill before the accepted Stop or closed port can
     // publish its terminal event. Real fault notices keep their own cause.
     return null;

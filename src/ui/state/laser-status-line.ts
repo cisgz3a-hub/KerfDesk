@@ -22,6 +22,7 @@ import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { statusBufferPatch } from './laser-rx-capacity-evidence';
 import { statusObservationPatch, statusResponseObservationPatch } from './laser-status-observation';
 import { hasOwnedControllerReset } from './laser-reset-cleanup';
+import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
 import { shouldReleaseStreamerAtIdle } from './laser-terminal-stream-release';
 import { statusPositionPatch } from './laser-status-position';
 import { liveCanvasLifecyclePatch, liveCanvasStatusPatch } from './live-canvas-run';
@@ -382,7 +383,9 @@ function liveCanvasLifecyclePatchForInvalidation(
   state: LaserState,
   alarm: boolean,
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
-  return liveCanvasLifecyclePatch(state, alarm ? 'errored' : 'disconnected');
+  return isProvisionalResetFreeze(state)
+    ? {}
+    : liveCanvasLifecyclePatch(state, alarm ? 'errored' : 'disconnected');
 }
 
 function advanceWriteEpoch(refs: HandlerRefs): void {

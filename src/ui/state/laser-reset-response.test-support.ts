@@ -8,28 +8,77 @@ export async function flush(): Promise<void> {
   for (let index = 0; index < 96; index++) await Promise.resolve();
 }
 
+function fixtureControls() {
+  return {
+    state: 'Idle',
+    reset: 'accepted',
+    cleanupAck: true,
+    rejectNextM5: false,
+    emptySettings: false,
+  };
+}
+
+function heldWrites() {
+  let held = false;
+  const pending: Array<() => void> = [];
+  return {
+    hold: () => {
+      held = true;
+    },
+    wait: async (): Promise<void> => {
+      if (held) await new Promise<void>((resolve) => pending.push(resolve));
+    },
+    settle: (): void => {
+      held = false;
+      for (const resolve of pending.splice(0)) resolve();
+    },
+  };
+}
+
+function resetWriteControl(
+  controls: ReturnType<typeof fixtureControls>,
+  emit: (line: string) => void,
+  status: () => void,
+) {
+  let completeReset = (): void => undefined;
+  return {
+    write: async (): Promise<void> => {
+      if (controls.reset === 'rejected') throw new Error('Reset transport rejected.');
+      if (controls.reset === 'immediate-boot') {
+        emit('Grbl 1.1f');
+        status();
+      }
+      if (controls.reset === 'hung' || controls.reset === 'immediate-boot') {
+        await new Promise<void>((resolve) => {
+          completeReset = resolve;
+        });
+      }
+    },
+    complete: () => completeReset(),
+  };
+}
+
+function emitSettings(emit: (line: string) => void, empty: boolean): void {
+  if (!empty) {
+    emit('$30=1000');
+    emit('$31=0');
+    emit('$32=1');
+  }
+  emit('ok');
+}
+
 function fixture() {
   const writes: string[] = [];
   const listeners = new Set<(line: string) => void>();
   const closeListeners = new Set<() => void>();
-  const controls = { state: 'Idle', reset: 'accepted', cleanupAck: true, rejectNextM5: false };
-  let completeReset = (): void => undefined;
+  const controls = fixtureControls();
   const emit = (line: string): void => {
     for (const listener of listeners) listener(line);
   };
   const status = (): void => emit(`<${controls.state}|MPos:0,0,0|FS:0,0>`);
-  const resetWrite = async (): Promise<void> => {
-    if (controls.reset === 'rejected') throw new Error('Reset transport rejected.');
-    if (controls.reset === 'immediate-boot') {
-      emit('Grbl 1.1f');
-      status();
-    }
-    if (controls.reset === 'hung' || controls.reset === 'immediate-boot') {
-      await new Promise<void>((resolve) => {
-        completeReset = resolve;
-      });
-    }
-  };
+  const statusWrites = heldWrites();
+  const jobWrites = heldWrites();
+  const reset = resetWriteControl(controls, emit, status);
   const close = vi.fn(async () => undefined);
   const connection: SerialConnection = {
     write: async (data) => {
@@ -39,8 +88,12 @@ function fixture() {
         controls.rejectNextM5 = false;
         throw new Error('Beam-off transport rejected.');
       }
-      if (data === '\x18') await resetWrite();
-      if (data === '?') status();
+      if (data === '\x18') await reset.write();
+      if (data === '?') {
+        status();
+        await statusWrites.wait();
+      }
+      if (data.includes('G1 X')) await jobWrites.wait();
       if (data === '$I\n') {
         emit('[VER:1.1h.20190830:test]');
         emit('[OPT:VM,15,128]');
@@ -50,12 +103,7 @@ function fixture() {
         emit('[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]');
         emit('ok');
       }
-      if (data === '$$\n') {
-        emit('$30=1000');
-        emit('$31=0');
-        emit('$32=1');
-        emit('ok');
-      }
+      if (data === '$$\n') emitSettings(emit, controls.emptySettings);
       if (controls.cleanupAck && (data === 'M5\n' || data === 'M9\n')) emit('ok');
       acknowledgeStartFence();
     },
@@ -76,7 +124,11 @@ function fixture() {
     status,
     close,
     adapter: adapterFor(connection),
-    completeReset: () => completeReset(),
+    completeReset: reset.complete,
+    holdStatusWrites: statusWrites.hold,
+    settleStatusWrites: statusWrites.settle,
+    holdJobWrites: jobWrites.hold,
+    settleJobWrites: jobWrites.settle,
     drop: () => {
       for (const listener of closeListeners) listener();
     },
@@ -141,6 +193,8 @@ export function installResetOwnershipFixtureHooks(): void {
   });
 
   afterEach(async () => {
+    current?.settleStatusWrites();
+    current?.settleJobWrites();
     current?.drop();
     current = null;
     await flush();

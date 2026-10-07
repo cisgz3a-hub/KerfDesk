@@ -10,6 +10,7 @@ import {
   acceptOwnedResetWrite,
   claimResetOwnership,
   failOwnedResetInformation,
+  failOwnedResetWrite,
   RESET_OWNERSHIP_UNCONFIRMED,
   writeResetWithinDeadline,
   type ResetOwnership,
@@ -123,6 +124,7 @@ async function runOwnedReset(
   options: ResetTransactionOptions,
 ): Promise<void> {
   const reset = refs.driver.realtime.softReset;
+  const action = options.action ?? 'disconnect';
   const connection = refs.connection;
   if (reset === null) {
     transaction.finishResetWrite(null);
@@ -151,16 +153,11 @@ async function runOwnedReset(
   const boundary = waitForOwnedResetBoundary(refs, owner);
   let resetError: unknown = null;
   try {
-    await writeResetWithinDeadline(
-      connection,
-      refs,
-      safeWrite,
-      reset,
-      options.action ?? 'disconnect',
-    );
+    await writeResetWithinDeadline(connection, refs, safeWrite, reset, action);
     owner.resetAccepted = true;
   } catch (error) {
     resetError = error;
+    failOwnedResetWrite(owner, action);
   }
   acceptOwnedResetWrite(owner, options.keepErroredStreamer === true);
   transaction.finishResetWrite(owner.boundaryObserved ? null : resetError);

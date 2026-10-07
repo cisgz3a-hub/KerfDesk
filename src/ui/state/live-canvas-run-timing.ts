@@ -184,7 +184,7 @@ function liveCanvasTimingForLifecycle(
   }
 }
 
-function isTerminalCanvasLifecycle(lifecycle: LiveCanvasLifecycle): boolean {
+export function isTerminalCanvasLifecycle(lifecycle: LiveCanvasLifecycle): boolean {
   return (
     lifecycle === 'stopped' ||
     lifecycle === 'disconnected' ||

@@ -9,10 +9,14 @@ import {
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
 import { cancelResetCleanup, type ResetCleanupRefs } from './laser-reset-cleanup';
-import type { LaserSafetyAction } from './laser-safety-notice';
+import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import {
+  isProvisionalResetFreeze,
+  provisionalResetCanvasPatch,
+} from './laser-reset-terminal-state';
 import { frameProofReset } from './laser-session-reset';
 import {
   canonicalRecoveryForReset,
@@ -97,7 +101,11 @@ export function claimResetOwnership(
           : quarantineStreamer
             ? wipeInFlight(cancelStreamer(state.streamer))
             : markErrored(state.streamer),
-      ...liveCanvasLifecyclePatch(state, quarantineStreamer ? 'stopped' : 'errored'),
+      ...(quarantineStreamer
+        ? liveCanvasLifecyclePatch(state, 'stopped')
+        : isProvisionalResetFreeze({ ...state, controllerOperation: operation }, 'errored')
+          ? provisionalResetCanvasPatch(state)
+          : liveCanvasLifecyclePatch(state, 'errored')),
       controllerOperation: operation,
       probeBusy: false,
       // The reset owner abandons all further interactive motion dispatch.
@@ -142,6 +150,23 @@ export function acceptOwnedResetWrite(owner: ResetOwnership, keepErroredStreamer
       ? {
           streamer: state.streamer === null ? null : cancelStreamer(state.streamer),
           ...liveCanvasLifecyclePatch(state, 'stopped'),
+        }
+      : {},
+  );
+}
+
+/** A rejected or timed-out reset is a real transport fault; it cannot publish
+ * an accepted stopped outcome. Preserve an earlier factual notice. */
+export function failOwnedResetWrite(owner: ResetOwnership, action: LaserSafetyAction): void {
+  if (owner.refs.connection !== owner.connection || owner.boundaryObserved) return;
+  owner.set((state) =>
+    ownsResetOperation(state, owner.operation)
+      ? {
+          ...liveCanvasLifecyclePatch(state, 'errored'),
+          ...(state.safetyNotice === null ||
+          state.safetyNotice.kind === 'cnc-transition-unconfirmed'
+            ? { safetyNotice: writeFailedNotice(action) }
+            : {}),
         }
       : {},
   );
