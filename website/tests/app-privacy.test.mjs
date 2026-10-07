@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve, sep } from 'node:path';
 import { test } from 'node:test';
@@ -26,11 +26,25 @@ function fixture(t) {
   return directory;
 }
 
+function noticeLinkExists(pathname, directory = publicRoot, privacy = expected) {
+  const relative = pathname.replace(/^\//, '');
+  const file = relative.endsWith('/') ? relative + 'index.html' : relative;
+  if (file.startsWith('privacy/'))
+    return privacy.has(file.slice('privacy/'.length).split('/').join(sep));
+  try {
+    return statSync(join(directory, file)).isFile();
+  } catch {
+    return false;
+  }
+}
+
 test('app privacy notice preserves source disclosures and scopes static-page claims', () => {
   const document = expected.get('index.html').toString('utf8');
   const text = textContent(document);
   assert.match(document, /href="https:\/\/kerfdesk.com\/privacy\/"/);
-  assert.match(document, /datetime="2026-10-04"/);
+  assert.match(document, /datetime="2026-10-07"/);
+  assert.match(text, /Johannes Stephanus Stolk/);
+  assert.match(text, /responsible for the personal information KerfDesk handles/);
   assert.match(text, /No cookies on this page/);
   assert.doesNotMatch(text, /This website sets no cookies/);
   assert.match(text, /grouped by date, app version, platform and request country/);
@@ -56,15 +70,16 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   for (const href of attrValues(document, 'a', 'href')) {
     if (href.startsWith('#') || href.startsWith('mailto:')) continue;
     const url = new URL(href, 'https://kerfdesk.com');
-    assert.equal(url.origin, 'https://kerfdesk.com');
+    if (url.origin !== 'https://kerfdesk.com') {
+      assert.equal(
+        url.href,
+        'https://www.paddle.com/legal/privacy',
+        'Unexpected external notice link',
+      );
+      continue;
+    }
     if (url.pathname === '/') continue;
-    const path = url.pathname.replace(/^\//, '');
-    assert.ok(
-      path.startsWith('privacy/')
-        ? expected.has(path.slice('privacy/'.length))
-        : existsSync(join(publicRoot, path)),
-      `Notice links to missing app file ${url.pathname}`,
-    );
+    assert.ok(noticeLinkExists(url.pathname), `Notice links to missing app file ${url.pathname}`);
   }
 });
 
@@ -83,4 +98,18 @@ test('privacy check rejects a missing hashed asset and obsolete cached asset', (
   writeFileSync(join(directory, asset), expected.get(asset));
   writeFileSync(join(directory, 'assets', 'site.0000000000.css'), 'old stylesheet');
   assert.throws(() => checkPrivacyFiles(directory, expected), /Obsolete privacy asset/);
+});
+
+test('directory links require an actual default document, not an empty directory', (t) => {
+  const directory = fixture(t);
+  mkdirSync(join(directory, 'pricing'));
+  assert.equal(noticeLinkExists('/pricing/', directory), false);
+  assert.equal(noticeLinkExists('/pricing/index.html', directory), false);
+  writeFileSync(join(directory, 'pricing/index.html'), '<h1>Pricing</h1>');
+  assert.equal(noticeLinkExists('/pricing/', directory), true);
+  assert.equal(noticeLinkExists('/pricing/index.html', directory), true);
+  assert.equal(noticeLinkExists('/refunds/', directory), false);
+  assert.equal(noticeLinkExists('/privacy/', directory), true);
+  assert.equal(noticeLinkExists('/privacy/', directory, new Map()), false);
+  assert.equal(noticeLinkExists('/privacy/missing.html', directory), false);
 });

@@ -120,7 +120,11 @@ function footer() {
       )}
     </div>
     <div class="wrap site-footer__legal">
-      <p>© 2026 Johann Stolk. <a href="/license/">License and notices</a></p>
+      <p>
+        © 2026 Johann Stolk. <a href="/license/">License and notices</a> ·
+        <a href="/terms/">Software terms</a> · <a href="/refunds/">Refund Policy</a> ·
+        <a href="/privacy/">Privacy</a>
+      </p>
     </div>
   </footer>`;
 }
@@ -138,8 +142,8 @@ export function renderDocument(page, body, ctx) {
   return `<!doctype html>\n${doc}\n`;
 }
 
-// The app origin publishes this one notice, rather than the separate marketing
-// site's navigation. Every destination below already belongs to the app.
+// The app origin publishes these static notices with its own destinations,
+// including the retained Free app licence and icon notice.
 export function renderAppPrivacyDocument(page, body, ctx) {
   const links = [
     { href: site.downloadPageUrl, label: 'Download' },
@@ -177,13 +181,18 @@ export function renderAppPrivacyDocument(page, body, ctx) {
       <footer class="site-footer">
         <div class="wrap site-footer__legal">
           <p>
-            © 2026 Johann Stolk. <a href="/eula.txt">Licence agreement</a> ·
-            <a href="${site.noticesUrl}">Third-party notices</a> ·
+            © 2026 Johann Stolk. <a href="/eula.txt">Free app licence</a> ·
+            <a href="/terms/">Software terms</a> · <a href="/refunds/">Refund Policy</a> ·
+            <a href="/privacy/">Privacy</a> · <a href="${site.noticesUrl}">Third-party notices</a> ·
             <a href="/privacy/lucide-license.txt">Icon licence</a>
           </p>
         </div>
       </footer>
     </body>
   </html>`;
-  return `<!doctype html>\n${doc}\n`;
+  const appPaths = { download: '/download.html', license: '/eula.txt' };
+  return `<!doctype html>\n${doc}\n`.replace(
+    /href="\/(download|license)\/([?#][^"]*)?"/g,
+    (_, destination, suffix = '') => `href="${appPaths[destination]}${suffix}"`,
+  );
 }

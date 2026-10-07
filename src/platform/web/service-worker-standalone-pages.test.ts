@@ -12,15 +12,25 @@ function workbox(): NonNullable<Partial<VitePWAOptions>['workbox']> {
   return options.workbox;
 }
 
-// Workbox's NavigationRoute tests each deny pattern against pathname + search.
-function answeredByAppShell(pathAndQuery: string): boolean {
+// Workbox NavigationRoute matches pathname + search against allow and deny
+// patterns. Test each exclusion as well as the resulting app-shell decision.
+function deniedFromAppShell(pathAndQuery: string): boolean {
   const url = new URL(pathAndQuery, 'https://kerfdesk.com');
-  return !(workbox().navigateFallbackDenylist ?? []).some((pattern) =>
+  return (workbox().navigateFallbackDenylist ?? []).some((pattern) =>
     pattern.test(url.pathname + url.search),
   );
 }
 
-describe('standalone checkout, download and support pages under the service worker', () => {
+function answeredByAppShell(pathAndQuery: string): boolean {
+  const url = new URL(pathAndQuery, 'https://kerfdesk.com');
+  return (
+    (workbox().navigateFallbackAllowlist ?? []).some((pattern) =>
+      pattern.test(url.pathname + url.search),
+    ) && !deniedFromAppShell(pathAndQuery)
+  );
+}
+
+describe('standalone checkout, download, support and legal pages under the service worker', () => {
   it.each([
     '/buy.html?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
     '/buy?_ptxn=txn_01h8zzzzzzzzzzzzzzzzzzzzzz',
@@ -30,27 +40,54 @@ describe('standalone checkout, download and support pages under the service work
     '/download.html',
     '/support.html',
     '/support',
-  ])('never answers %s with the workspace', (page) => {
+    '/privacy/',
+    '/privacy/index.html',
+    '/privacy/?version=2',
+    '/pricing',
+    '/pricing/',
+    '/pricing/index.html',
+    '/pricing/?country=ZA',
+    '/refunds',
+    '/refunds/',
+    '/terms',
+    '/terms/',
+    '/terms/index.html',
+    '/terms/?version=1',
+    '/refunds/index.html?version=2',
+  ])('excludes %s from the workspace fallback', (page) => {
+    expect(deniedFromAppShell(page)).toBe(true);
     expect(answeredByAppShell(page)).toBe(false);
   });
 
+  it.each(['/', '/index.html', '/?project=recent'])(
+    'keeps the offline app shell for the entry %s',
+    (page) => {
+      expect(answeredByAppShell(page)).toBe(true);
+    },
+  );
+
   it.each([
-    '/',
-    '/index.html',
-    '/?project=recent',
     '/buyer-guide',
     '/downloads/help',
     '/supported-machines',
-  ])('keeps the offline app shell for %s', (page) => {
-    expect(answeredByAppShell(page)).toBe(true);
+    '/pricing-guide',
+    '/refunds-help',
+    '/terms-help',
+    '/privacy-tools',
+  ])('does not deny the unrelated path %s by a partial name match', (page) => {
+    expect(deniedFromAppShell(page)).toBe(false);
   });
 
-  it('keeps the pages and the modules and keys they load out of the precache', () => {
+  it('keeps standalone documents and their loaded modules/keys out of the precache', () => {
     expect(workbox().globIgnores).toEqual(
       expect.arrayContaining([
         'buy.html',
         'download.html',
         'support.html',
+        'privacy/**',
+        'pricing/**',
+        'refunds/**',
+        'terms/**',
         'desktop-*.{mjs,json,css}',
       ]),
     );

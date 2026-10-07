@@ -253,3 +253,26 @@ test('provider response is bounded while streaming and a failed response cannot 
     0,
   );
 });
+
+test('closed-checkout webhook retains every provider configuration requirement', async () => {
+  const f = await fixture();
+  const invalid = [
+    { PAYMENT_PROVIDER: 'other' },
+    { PADDLE_ENVIRONMENT: 'other' },
+    { PADDLE_PURCHASE_PRICE_ID: undefined },
+    { PADDLE_RENEWAL_PRICE_ID: undefined },
+    { PADDLE_RENEWAL_PRICE_ID: f.env.PADDLE_PURCHASE_PRICE_ID },
+    { PADDLE_API_KEY: undefined },
+    { PADDLE_WEBHOOK_SECRET: undefined },
+    { PADDLE_CLIENT_TOKEN: undefined },
+    { PADDLE_CLIENT_TOKEN: 'live_wrong_environment_public_token' },
+    { PADDLE_CHECKOUT_URL: 'http://kerfdesk.com/buy.html' },
+    { PADDLE_CHECKOUT_URL: 'https://private@kerfdesk.com/buy.html' },
+    { PADDLE_CHECKOUT_URL: 'https://kerfdesk.com/buy.html?query=1' },
+    { PADDLE_CHECKOUT_URL: 'https://kerfdesk.com/buy.html#fragment' },
+  ];
+  for (const changes of invalid)
+    assert.throws(() => paddleVerifier({ ...f.env, ...changes }), {
+      code: 'payment_provider_not_configured',
+    });
+});
