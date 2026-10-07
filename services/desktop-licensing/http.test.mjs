@@ -4,7 +4,15 @@ import assert from 'node:assert/strict';
 import worker from './worker.mjs';
 import { authorityRequest } from './http.mjs';
 import { claimOrder, prepareOrder } from './payments.mjs';
-import { fixture, NOW, paddleTransaction, request, signedPaddle } from './test-support.mjs';
+import {
+  checkoutOrder,
+  deviceId,
+  fixture,
+  NOW,
+  paddleTransaction,
+  request,
+  signedPaddle,
+} from './test-support.mjs';
 
 test('developer issuance is admin-only; wrong auth and admin exceptions cannot leak secrets', async () => {
   const f = await fixture();
@@ -113,7 +121,14 @@ test('public config reveals only public token after full payment configuration a
       headers: { origin: 'https://kerfdesk.com' },
     });
   const disabled = await worker.fetch(input(), f.env);
-  assert.equal((await disabled.json()).enabled, false);
+  assert.deepEqual(await disabled.json(), {
+    enabled: false,
+    provider: null,
+    environment: null,
+    clientToken: null,
+    purchase: { amount: 4950, currency: 'USD' },
+    renewal: { amount: 2000, currency: 'USD' },
+  });
   f.env.PAYMENTS_ENABLED = 'true';
   const response = await worker.fetch(input(), f.env);
   const config = await response.json();
@@ -136,7 +151,7 @@ test('public config reveals only public token after full payment configuration a
   assert.equal(other.headers.get('access-control-allow-origin'), null);
 });
 
-test('HTTP webhook stays disabled until configured; invalid signatures grant nothing; duplicate valid payment grants once', async () => {
+test('HTTP webhook requires provider configuration; invalid signatures grant nothing; duplicate valid payment grants once', async () => {
   const f = await fixture();
   const id = `txn_${'c'.repeat(26)}`;
   const order = await prepareOrder(f.authority, {
@@ -156,7 +171,10 @@ test('HTTP webhook stays disabled until configured; invalid signatures grant not
       },
       body: raw,
     });
-  assert.equal((await authorityRequest(input(), f.env, f.authority)).status, 503);
+  assert.equal(
+    (await authorityRequest(input(), { ...f.env, PADDLE_WEBHOOK_SECRET: '' }, f.authority)).status,
+    503,
+  );
   f.env.PAYMENTS_ENABLED = 'true';
   assert.equal((await authorityRequest(input(`${signed.raw} `), f.env, f.authority)).status, 401);
   await assert.rejects(claimOrder(f.authority, order), { code: 'payment_pending' });
@@ -170,4 +188,60 @@ test('HTTP webhook stays disabled until configured; invalid signatures grant not
   f.setNow(NOW + 6);
   assert.equal((await authorityRequest(input(), f.env, f.authority)).status, 401);
   assert.match((await claimOrder(f.authority, order)).licenseKey, /^KD1\./u);
+});
+
+test('a checkout created before closing fulfils once while new checkout and public config remain closed', async (t) => {
+  t.mock.method(console, 'log', () => undefined);
+  const f = await fixture();
+  f.env.PAYMENTS_ENABLED = 'true';
+  const { checkout, intent } = await checkoutOrder(f, deviceId(8));
+  const signed = signedPaddle(f.env, paddleTransaction(f.env, intent));
+  f.env.PAYMENTS_ENABLED = 'false';
+  const recordCount = () => f.database.prepare('SELECT COUNT(*) AS n FROM records').get().n;
+  const originalRecords = recordCount();
+  const closed = await authorityRequest(
+    request('/v1/checkout', { requestId: deviceId(9), operation: 'purchase' }),
+    f.env,
+    f.authority,
+    { fetcher: () => assert.fail('closed checkout must never call Paddle') },
+  );
+  assert.equal(closed.status, 503);
+  assert.deepEqual(await closed.json(), { error: { code: 'payment_provider_not_configured' } });
+  const config = await worker.fetch(
+    new Request('https://licensing.example/v1/public/config'),
+    f.env,
+  );
+  assert.deepEqual(await config.json(), {
+    enabled: false,
+    provider: null,
+    environment: null,
+    clientToken: null,
+    purchase: { amount: 4950, currency: 'USD' },
+    renewal: { amount: 2000, currency: 'USD' },
+  });
+  const input = (raw = signed.raw) =>
+    new Request('https://licensing.example/v1/payments/webhook', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'paddle-signature': signed.headers.get('paddle-signature'),
+      },
+      body: raw,
+    });
+  const invalid = await authorityRequest(input(`${signed.raw} `), f.env, f.authority);
+  assert.equal(invalid.status, 401);
+  assert.deepEqual(await invalid.json(), { error: { code: 'invalid_payment_signature' } });
+  assert.equal(recordCount(), originalRecords);
+  await assert.rejects(claimOrder(f.authority, checkout), { code: 'payment_pending' });
+  const first = await authorityRequest(input(), f.env, f.authority);
+  assert.equal(first.status, 200);
+  assert.deepEqual(await first.json(), { received: true, duplicate: false });
+  const licence = await claimOrder(f.authority, checkout);
+  assert.match(licence.licenseKey, /^KD1\./u);
+  const fulfilledRecords = recordCount();
+  const duplicate = await authorityRequest(input(), f.env, f.authority);
+  assert.equal(duplicate.status, 200);
+  assert.deepEqual(await duplicate.json(), { received: true, duplicate: true });
+  assert.equal(recordCount(), fulfilledRecords);
+  assert.deepEqual(await claimOrder(f.authority, checkout), licence);
 });
