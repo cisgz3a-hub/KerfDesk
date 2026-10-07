@@ -2622,7 +2622,9 @@ authorization, Frame proof, controller command, or safety boundary.
   shows before anything burns. The Review then reads as set from the head stop instead of
   warning that the origin moved (ADR-341 Amendment 6). It also says how far back along the path
   the lines sent after the last confirmed one reach, the stretch a laser that lost power may
-  not have burned (ADR-341 Amendment 8).
+  not have burned (ADR-341 Amendment 8). That XY distance includes arc travel along the curve,
+  rather than its endpoint chord. Unsupported or ambiguous geometry leaves the distance
+  unknown; it does not establish which queued commands physically ran.
 - Once the controller has the origin the job ran with, or one set from where the head stopped,
   **Go to job origin** and **Go to restart point** jog the head, beam off, to work X0 Y0 and to
   where the chosen restart line re-enters the job (ADR-341 Amendment 8).
