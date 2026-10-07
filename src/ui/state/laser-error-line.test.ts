@@ -118,6 +118,7 @@ function makeLaserState(): LaserState {
     normalizeFrameReportUnits: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
+    clearIncidentHistory: () => undefined,
     requestControllerStatus: async () => undefined,
   };
 }

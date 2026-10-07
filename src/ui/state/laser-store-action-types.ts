@@ -65,6 +65,7 @@ export type LaserStoreActions = {
    * without a realtime query or while a controller operation owns polling. */
   readonly requestControllerStatus: () => Promise<void>;
   readonly clearTranscript: () => void;
+  readonly clearIncidentHistory: () => void;
   readonly jog: (params: JogParams, owner?: MachineExecutionOwner) => Promise<void>;
   readonly jogToMachinePosition: (x: number, y: number, feed: number) => Promise<void>;
   readonly setAirAssistEnabled: (enabled: boolean) => Promise<void>;

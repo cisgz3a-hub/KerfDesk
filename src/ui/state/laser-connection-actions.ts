@@ -5,11 +5,11 @@
 // cycle (same pattern as the sibling action modules).
 
 import type { SerialPortIdentity } from '../../platform/types';
-import { selectControllerDriver } from '../../core/controllers';
 import { runConnectAction } from './laser-connect-action';
 import { cancelConnectAttempt } from './laser-connect-attempt';
 import {
   closeConnectionOnce,
+  isIntentionalDisconnectClaimed,
   connectionForgetRequested,
   quarantineConnectionRefs,
   runIntentionalDisconnectOnce,
@@ -18,17 +18,11 @@ import {
 } from './laser-connection-teardown';
 import { handleLine } from './laser-line-handler';
 import {
-  disconnectedControllerQualification,
   failedControllerQualificationPatch,
   qualifyingController,
 } from './laser-controller-qualification';
 import { controllerHandshakeOwnership, runControllerHandshake } from './laser-controller-handshake';
-import { recoveryRepository } from './recovery';
-import {
-  writeFailedNotice,
-  type LaserSafetyAction,
-  type LaserSafetyNotice,
-} from './laser-safety-notice';
+import { writeFailedNotice, type LaserSafetyAction } from './laser-safety-notice';
 import {
   retainedDisconnectSafetyNotice,
   retainedUnavailableTransportSafetyNotice,
@@ -37,7 +31,15 @@ import {
 } from './laser-disconnect-safety';
 import { stopBeforeDisconnect } from './laser-disconnect-stop';
 import { disconnectedStatePatch } from './laser-disconnected-state';
-import { buildPortClosePatch, initialLaserState, pushLog } from './laser-store-helpers';
+import { buildPortClosePatch } from './laser-store-helpers';
+import {
+  publishControllerIncident,
+  publishOwnedDisconnectStopFailure,
+} from './laser-incident-publish';
+import {
+  finalizeForgottenController,
+  finalizeForgottenControllerOnce,
+} from './laser-forget-finalization';
 import {
   containActiveStreamWriteFailure,
   containLostStreamHeartbeat,
@@ -52,7 +54,6 @@ import {
 } from './laser-status-polling-policy';
 import type { LaserState, LiveRefs } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
-import { useToastStore } from './toast-store';
 import type { TranscriptSource } from './laser-transcript';
 import { clearCncLiveCaps } from './detected-settings-action';
 import { createLaserStatusPollWriter } from './laser-status-poll-writer';
@@ -150,6 +151,16 @@ function attachConnectedController(
   observeSerialLineErrors(set, get, refs, connection);
   refs.unsubscribeClose = connection.onClose(() => {
     if (refs.connection !== connection) return;
+    if (!isIntentionalDisconnectClaimed(refs, connection)) {
+      set((state) =>
+        publishControllerIncident(
+          refs,
+          state,
+          '[lf2] Controller connection closed unexpectedly.',
+          'disconnect',
+        ),
+      );
+    }
     teardownConnectionRefs(refs);
     clearCncLiveCaps();
     set(buildPortClosePatch);
@@ -184,7 +195,11 @@ function startConnectedControllerHandshake(
           ? {
               ...failedControllerQualificationPatch(state, ownership.qualificationEpoch, message),
               lastWriteError: message,
-              log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
+              ...publishControllerIncident(
+                refs,
+                state,
+                `[lf2] Controller handshake failed: ${message}`,
+              ),
             }
           : {},
       );
@@ -323,9 +338,12 @@ async function runOwnedIntentionalDisconnect(
   let retainedSafetyNotice = unconfirmedDisconnectStopNotice(get(), refs.driver);
   try {
     await stopBeforeDisconnect(set, get, refs, safeWrite, connection);
-  } catch {
+  } catch (error) {
     retainedSafetyNotice = writeFailedNotice('disconnect');
-    set({ safetyNotice: retainedSafetyNotice });
+    set((state) => ({
+      ...publishOwnedDisconnectStopFailure(refs, state, connection, error),
+      safetyNotice: retainedSafetyNotice,
+    }));
   }
   if (refs.connection === connection) quarantineConnectionRefs(refs);
   let closeError: unknown = null;
@@ -333,6 +351,17 @@ async function runOwnedIntentionalDisconnect(
     await closeConnectionOnce(refs, connection, request.forgetRequested);
   } catch (error) {
     closeError = error;
+    if (refs.connection === connection) {
+      const message = error instanceof Error ? error.message : String(error);
+      set((state) =>
+        publishControllerIncident(
+          refs,
+          state,
+          `[lf2] Controller close failed: ${message}`,
+          'disconnect',
+        ),
+      );
+    }
     retainedSafetyNotice = writeFailedNotice('disconnect');
     set({ safetyNotice: retainedSafetyNotice });
   }
@@ -348,59 +377,6 @@ async function runOwnedIntentionalDisconnect(
   }
   if (closeError !== null) {
     throw closeError instanceof Error ? closeError : new Error(String(closeError));
-  }
-}
-
-function finalizeForgottenControllerOnce(
-  connection: LiveConnection,
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  retainedSafetyNotice: LaserSafetyNotice | null,
-): Promise<void> {
-  const existing = refs.forgetFinalizations.get(connection);
-  if (existing !== undefined) return existing;
-  const finalization = finalizeForgottenController(set, get, refs, retainedSafetyNotice);
-  refs.forgetFinalizations.set(connection, finalization);
-  return finalization;
-}
-
-async function finalizeForgottenController(
-  set: SetFn,
-  get: GetFn,
-  refs: LiveRefs,
-  retainedSafetyNotice: LaserSafetyNotice | null,
-): Promise<void> {
-  const safetyNotice = retainedSafetyNotice ?? retainedDisconnectSafetyNotice(get());
-  // purgeControllerData clears its published recovery snapshot and writes the
-  // deletion generation before its first await. Start it, then reset the live
-  // controller state immediately so a slow IndexedDB delete cannot leave a
-  // closed port looking connected and qualified.
-  const purge = recoveryRepository.purgeControllerData();
-  refs.driver = selectControllerDriver(undefined);
-  set((state) => ({
-    ...initialLaserState(),
-    controllerSessionEpoch: state.controllerSessionEpoch + 1,
-    controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch + 1),
-    trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-    workZReferenceEpoch: state.workZReferenceEpoch + 1,
-    safetyNotice,
-  }));
-
-  let purgeWarning: string | null = null;
-  try {
-    const purged = await purge;
-    if (!purged.ok) purgeWarning = `recovery storage reported ${purged.error}`;
-  } catch (error) {
-    purgeWarning = error instanceof Error ? error.message : String(error);
-  }
-  if (purgeWarning !== null) {
-    useToastStore
-      .getState()
-      .pushToast(
-        `Controller state was reset, but recovery storage could not be purged: ${purgeWarning}`,
-        'warning',
-      );
   }
 }
 

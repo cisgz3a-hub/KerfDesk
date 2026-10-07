@@ -2370,8 +2370,19 @@ authorization, Frame proof, controller command, or safety boundary.
    instead of rows.
 
 #### Edge - long sessions
-1. The transcript store keeps the newest 500 entries; the Super console shows all of them,
-   not the docked panel's 150-entry slice.
+1. The rolling transcript keeps the newest 500 entries; the Super console shows all of them,
+   plus a separate history of the newest 500 controller incidents. Rows appearing in both are
+   shown once with their original time. Errors, search and Copy visible include retained incidents
+   after routine traffic evicts them or Disconnect, Forget and reconnect reset live controller state.
+2. UART/silence diagnostics keep their original message kind and appear under Errors; ordinary
+   Ready messages remain Replies. Transport and run facts are captured when the incident happens,
+   so reconnect does not rewrite earlier evidence. This history lasts only in the current window.
+3. The docked console's Clear removes rolling traffic/logs only. **Clear incident history** in the
+   Super console removes retained incidents and any remaining copies of their IDs in rolling
+   traffic. Neither action acknowledges a safety notice, changes Frame or settles machine ACKs.
+4. Help > Save Support Report includes retained incidents under their own heading with separately
+   labelled event-time context, alongside current machine facts and the existing last 100 console
+   lines. The file is local, licence keys are redacted, and the customer reads and sends it.
 #### Success - settings pane (v2)
 1. The dialog's right pane embeds the read-only Machine Settings table (F-B14).
 2. When the dialog opens, it reuses a settings snapshot already read in the current controller

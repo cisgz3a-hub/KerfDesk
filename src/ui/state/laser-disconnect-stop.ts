@@ -22,7 +22,8 @@ import { disconnectStopPlan } from './laser-disconnect-safety';
 import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState, LiveRefs } from './laser-store';
-import { isActiveJob, pushLog } from './laser-store-helpers';
+import { isActiveJob } from './laser-store-helpers';
+import { publishControllerIncident } from './laser-incident-publish';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -60,7 +61,7 @@ export async function stopBeforeDisconnect(
   // stops the output: wait (bounded) for their acknowledgements before the
   // close drops DTR (audit TC-3).
   if (disconnectWaitsForCleanupAcks(get(), stopCommands, softReset)) {
-    await waitForDisconnectCleanupAcks(set, get, () => refs.connection === connection);
+    await waitForDisconnectCleanupAcks(set, get, refs, () => refs.connection === connection);
   }
 }
 
@@ -83,17 +84,20 @@ export function disconnectWaitsForCleanupAcks(
 async function waitForDisconnectCleanupAcks(
   set: SetFn,
   get: GetFn,
+  refs: LiveRefs,
   stillOwned: () => boolean,
 ): Promise<void> {
   const deadline = Date.now() + DISCONNECT_CLEANUP_ACK_WAIT_MS;
   while (get().pendingUntrackedAcks > 0 && stillOwned()) {
     if (Date.now() >= deadline) {
-      set((state) => ({
-        log: pushLog(
+      set((state) =>
+        publishControllerIncident(
+          refs,
           state,
           `[lf2] Disconnect: the controller did not acknowledge the stop commands within ${DISCONNECT_CLEANUP_ACK_WAIT_MS / 1_000} s; closing the port anyway. Check that the laser and air are off.`,
+          'message',
         ),
-      }));
+      );
       return;
     }
     await new Promise<void>((resolve) => {

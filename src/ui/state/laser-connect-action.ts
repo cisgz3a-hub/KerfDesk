@@ -17,6 +17,7 @@ import {
   backgroundStreamingFallbackWarning,
 } from './laser-background-streaming-notice';
 import { pushLog } from './laser-store-helpers';
+import { publishControllerIncident } from './laser-incident-publish';
 import { connectionScopedEvidenceReset } from './laser-module-probe';
 import { useToastStore } from './toast-store';
 import { browserLocalStorage } from './browser-local-storage';
@@ -87,6 +88,7 @@ async function connectSerialController(
   const attempt = beginConnectAttempt(refs);
   set({ connectionAttempt: attempt.revision });
   let requestedPort: SerialPortRef | null = null;
+  const attemptedBaudRate = options.baudRate ?? driver.defaultBaudRate;
   let cancelledPermissionReleased = false;
   const releaseCancelledPermission = async (): Promise<void> => {
     if (
@@ -108,7 +110,6 @@ async function connectSerialController(
     }
   }
   refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
-  refs.nextTranscriptId = 1;
   refs.driver = driver;
   set((state) => ({ ...connectingPatch(state, refs), ...connectionScopedEvidenceReset() }));
   try {
@@ -125,7 +126,7 @@ async function connectSerialController(
       }));
       return;
     }
-    const baudRate = options.baudRate ?? refs.driver.defaultBaudRate;
+    const baudRate = attemptedBaudRate;
     const connection = await portRef.open(serialOpenRequest(baudRate, options, refs.driver));
     if (!connectAttemptIsCurrent(refs, attempt)) {
       await closeCancelledConnection(refs, attempt, connection);
@@ -140,6 +141,15 @@ async function connectSerialController(
     }
     const message = error instanceof Error ? error.message : String(error);
     set((state) => ({
+      ...publishControllerIncident(
+        refs,
+        {
+          ...state,
+          connectedBaudRate: attemptedBaudRate,
+          serialPortInfo: requestedPort?.info ?? null,
+        },
+        `[lf2] Controller connection failed: ${message}`,
+      ),
       connection: { kind: 'failed', error: message },
       controllerQualification: disconnectedControllerQualification(state.controllerSessionEpoch),
     }));

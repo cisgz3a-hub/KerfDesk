@@ -10695,6 +10695,37 @@ sendConsoleCommand -> safeWrite path and its existing confirmations/refusals; UI
 advisory and a raced state change still fails closed at the store. Snapshot import/export and
 diagnostics are read-only and never call writeGrblSetting. No automatic EEPROM writes are added.
 
+### Amendment 1 (2026-10-07): retained controller incidents
+
+Keep a separate, window-local history of the newest 500 controller incidents: alarms, errors,
+blocked commands, unexpected disconnects and owned transport diagnostics, including failed opens,
+handshakes, UART byte loss, controller silence, heartbeat containment and failed stop/close paths.
+Normal replies, polling, job acknowledgements and the initial still-listening notice do not enter
+this history. Existing UART throttling and connection/write/attempt ownership fences remain.
+Entry IDs increase for the lifetime of the window, including Disconnect, Forget and reconnect.
+Archive only newly published entries/batches, with their original timestamp and decoded text;
+never rescan old transcript rows when an acknowledgement batch is published. Distinct owned
+transport rejections and stop-wrapper deadlines keep separate incident IDs even when their text
+matches; persistent last-write error text is not evidence that a new event was already captured.
+
+An incident captures bounded immutable event-time facts: this build, selected/detected controller,
+command set, session, connection, baud/USB, qualification, bounded firmware lines, last observed
+status/positions, and run identity/progress/ACK/transport counts. A failed open records the selected
+port's allowlisted USB identity and attempted baud while its connection is still labelled
+connecting. Refill counts use the caller's current write-epoch ledger, separately from store writes.
+No artwork, executable program or mutable live state is copied. A containment close failure uses
+facts captured before teardown and cannot append into a replacement connection.
+
+The expanded console merges retained incidents and rolling traffic by ID before filtering or
+display; retained evidence owns its original context. A diagnostic message keeps its original
+message kind and carries an incident marker for Errors; an ordinary unarchived Ready message stays
+in Replies. Search and Copy visible use the same merged rows. Clear on the docked console clears
+the rolling transcript/log/buffers only. **Clear incident history** separately removes retained
+rows and any copies of those IDs still in the rolling transcript/buffer; it never acknowledges a
+SafetyNotice, changes Frame evidence, settles an ACK or writes a command. Forget retains this
+window's incident history while resetting controller-owned state. Reload closes this history's
+lifetime; no persistence or automatic upload is introduced. ADR-546 defines the local report.
+
 ---
 
 ## ADR-230 - Exact-artifact Frame authorization and one-use Start permit

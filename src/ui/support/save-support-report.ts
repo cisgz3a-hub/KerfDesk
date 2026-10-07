@@ -71,6 +71,7 @@ export async function gatherSupportReportFacts(
       lines: laser.grblSettingsRows.map((row) => `${row.code}=${row.rawValue}`),
     },
     machineConsole: laser.log.slice(-CONSOLE_LINES),
+    controllerIncidents: laser.incidentHistory ?? [],
     problems: recentRendererProblems(),
     desktopLog: await readDesktopLog(platform),
   };

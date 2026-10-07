@@ -12,6 +12,11 @@ import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-discon
 import { buildPortClosePatch, isActiveJob } from './laser-store-helpers';
 import { detectActiveStreamHeartbeatLoss } from './laser-stream-heartbeat';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { publishControllerIncident } from './laser-incident-publish';
+import {
+  controllerIncidentContext,
+  type ControllerIncidentContext,
+} from './controller-incident-context';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -52,7 +57,10 @@ export function containLostStreamHeartbeat(
   );
   refs.heartbeatProbe = heartbeat.probe;
   if (!heartbeat.lost) return false;
-  set((current) => ({ safetyNotice: current.safetyNotice ?? streamStalledNotice() }));
+  set((current) => ({
+    ...publishControllerIncident(refs, current, streamStalledNotice().message),
+    safetyNotice: current.safetyNotice ?? streamStalledNotice(),
+  }));
   // Freeze synchronously, then quarantine after the bounded reset transaction
   // so a late banner/ok cannot enter a future job.
   const connection = refs.connection;
@@ -76,6 +84,13 @@ export function containActiveStreamWriteFailure(
     if (!isActiveJob(state.streamer) || state.streamer === null) return state;
     shouldQuarantine = true;
     return {
+      ...(isLiveRefs(refs)
+        ? publishControllerIncident(
+            refs,
+            state,
+            `[lf2] Active job transport write failed: ${writeFailedNotice(action).message}`,
+          )
+        : {}),
       streamer: markErrored(state.streamer),
       safetyNotice: state.safetyNotice ?? writeFailedNotice(action),
       ...liveCanvasLifecyclePatch(state, 'errored'),
@@ -102,25 +117,66 @@ async function quarantineStreamFault(
   safeWrite: SafeWriteFn,
   connection: NonNullable<LiveRefs['connection']>,
 ): Promise<void> {
+  let closeContext: ControllerIncidentContext | undefined;
+  let retiredWriteEpoch: number | undefined;
   try {
     await runGrblDisconnectTransaction(set, refs, safeWrite);
-  } catch {
-    set({ safetyNotice: writeFailedNotice('disconnect') });
+  } catch (error) {
+    if (refs.connection === connection) {
+      set((state) => ({
+        ...disconnectFailureIncident(refs, state, error),
+        safetyNotice: writeFailedNotice('disconnect'),
+      }));
+    }
   } finally {
     // An explicit Disconnect joining this reset owns final state clearing.
     if (!isIntentionalDisconnectClaimed(refs, connection)) {
       if (refs.connection === connection) {
+        const contextRefs = {
+          writeEpoch: refs.writeEpoch ?? 0,
+          ...(refs.jobTransportWrites === undefined
+            ? {}
+            : { jobTransportWrites: refs.jobTransportWrites }),
+        };
         teardownConnectionRefs(refs);
+        retiredWriteEpoch = refs.writeEpoch;
         set((state) => {
+          closeContext = controllerIncidentContext(state, contextRefs);
           const patch = buildPortClosePatch(state);
           return state.safetyNotice === null
             ? patch
             : { ...patch, safetyNotice: state.safetyNotice };
         });
       }
-      await closeConnectionOnce(refs, connection).catch(() => undefined);
+      await closeConnectionOnce(refs, connection).catch((error: unknown) => {
+        // A later Connect/Forget owns its new facts; a retired close cannot pollute it.
+        if (
+          retiredWriteEpoch === undefined ||
+          refs.writeEpoch !== retiredWriteEpoch ||
+          refs.connection !== null
+        )
+          return;
+        const message = error instanceof Error ? error.message : String(error);
+        const raw = `[lf2] Contained controller close failed: ${message}`;
+        set((state) =>
+          publishControllerIncident(refs, state, raw, 'disconnect', raw, closeContext),
+        );
+      });
     }
   }
+}
+
+function disconnectFailureIncident(
+  refs: LiveRefs,
+  state: LaserState,
+  error: unknown,
+): Partial<LaserState> {
+  const message = error instanceof Error ? error.message : String(error);
+  return publishControllerIncident(
+    refs,
+    state,
+    `[lf2] Controller stop before disconnect failed: ${message}`,
+  );
 }
 
 function isLiveRefs(refs: object): refs is LiveRefs {

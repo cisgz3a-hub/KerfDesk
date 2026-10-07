@@ -305,6 +305,7 @@ type InitialLaserState = Pick<
   | 'workZReferenceEpoch'
   | 'log'
   | 'transcript'
+  | 'incidentHistory'
   | 'detectedSettings'
   | keyof Pick<LaserState, 'controllerSettings' | 'reportUnitsUnconfirmed'>
   | 'controllerSettingsObservation'
@@ -367,6 +368,7 @@ export function initialLaserState(): InitialLaserState {
     workZReferenceEpoch: 0,
     log: [],
     transcript: [],
+    incidentHistory: [],
     detectedSettings: null,
     ...{ controllerSettings: null, reportUnitsUnconfirmed: false },
     controllerSettingsObservation: null,

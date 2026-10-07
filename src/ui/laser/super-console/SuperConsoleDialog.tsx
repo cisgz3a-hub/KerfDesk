@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Dialog, DialogActions } from '../../kit/Dialog';
 import { useLaserStore } from '../../state/laser-store';
+import { mergeIncidentTranscript } from '../../state/laser-incident-history';
 import type { SerialTranscriptEntry } from '../../state/laser-transcript';
 import { ConsoleCommandDeck } from '../console/ConsoleCommandDeck';
 import {
@@ -18,7 +19,13 @@ const ALL_GROUPS: ReadonlySet<SuperConsoleGroup> = new Set(
 type CopyState = 'idle' | 'copied' | 'manual';
 
 export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX.Element {
-  const transcript = useLaserStore((state) => state.transcript);
+  const rawTranscript = useLaserStore((state) => state.transcript);
+  const history = useLaserStore((state) => state.incidentHistory);
+  const clearHistory = useLaserStore((state) => state.clearIncidentHistory);
+  const transcript = useMemo(
+    () => mergeIncidentTranscript(rawTranscript, history ?? []),
+    [rawTranscript, history],
+  );
   const view = useSuperConsoleView(transcript);
   return (
     <Dialog
@@ -48,6 +55,8 @@ export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX
         visibleCount={view.visible.length}
         copyState={view.copyState}
         onCopy={view.copyVisible}
+        incidentCount={history?.length ?? 0}
+        onClearHistory={clearHistory}
         onClose={props.onClose}
       />
     </Dialog>
@@ -163,10 +172,20 @@ function SuperConsoleActions(props: {
   readonly visibleCount: number;
   readonly copyState: CopyState;
   readonly onCopy: () => void;
+  readonly incidentCount: number;
+  readonly onClearHistory: () => void;
   readonly onClose: () => void;
 }): JSX.Element {
   return (
     <DialogActions>
+      <button
+        type="button"
+        title="Clear retained incidents and their remaining console rows. Safety acknowledgement is separate."
+        disabled={props.incidentCount === 0}
+        onClick={props.onClearHistory}
+      >
+        Clear incident history
+      </button>
       <button
         type="button"
         title="Copy the filtered transcript as timestamped tab-separated values."

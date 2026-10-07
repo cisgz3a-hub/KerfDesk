@@ -68,7 +68,7 @@ function reportMissingControllerResponse(
   const { baudRate, epoch } = session;
   const evidence = inboundEvidence(get(), refs);
   const [notice, failure] = silenceMessages(evidence, waitedMs / 1000, baudRate, refs.driver.label);
-  set(appendSystemNotice(get(), refs, notice));
+  set(appendSystemNotice(get(), refs, notice, true));
   set((state) => failedControllerQualificationPatch(state, epoch, failure));
 }
 
