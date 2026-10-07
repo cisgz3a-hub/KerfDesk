@@ -185,7 +185,7 @@ describe('handleLine streamer writes', () => {
     expect(get().streamer).toBeNull();
   });
 
-  it('releases the job lock once an errored stream settles to Idle, keeping the error notice', () => {
+  it('releases the errored job after its reset boundary, cleanup and fresh Idle, keeping the error notice', async () => {
     const { refs, set, get } = makeHarness();
     set({ streamer: step(createStreamer('G1 X1\nG1 X2\nG1 X3\n')).state });
     // GRBL rejects a line mid-job: terminal 'errored' + a controller-error notice.
@@ -197,10 +197,17 @@ describe('handleLine streamer writes', () => {
     handleLine(set, get, refs, async () => undefined, '<Run|MPos:1.000,0.000,0.000|FS:600,0>');
     expect(get().streamer?.status).toBe('errored');
 
-    // Idle means motion stopped: the dead job lock releases so the controller
-    // is usable again, while the operator still sees the error notice.
+    // Fresh Idle alone cannot erase old replies after an unconfirmed reset.
+    handleLine(set, get, refs, async () => undefined, '<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
+    expect(get().streamer?.status).toBe('errored');
+    expect(get().streamer?.inFlight).toHaveLength(2);
+    const notice = get().safetyNotice;
+    handleLine(set, get, refs, async () => undefined, 'Grbl 1.1f');
+    for (let index = 0; index < 40; index++) await Promise.resolve();
+    expect(get().controllerOperation).toBeNull();
     handleLine(set, get, refs, async () => undefined, '<Idle|MPos:1.000,0.000,0.000|FS:0,0>');
     expect(get().streamer).toBeNull();
+    expect(get().safetyNotice).toBe(notice);
     expect(get().safetyNotice).not.toBeNull();
   });
 

@@ -97,6 +97,47 @@ describe('checkpointInterruption', () => {
       checkpointInterruption('disconnected', notice, { reason: 'operator', streamerEpoch: 1 }),
     ).toEqual({ kind: 'disconnect', message: notice.message });
   });
+
+  it('keeps an unconfirmed CNC transition resumable while the job remains paused', () => {
+    expect(
+      checkpointInterruption('paused', {
+        kind: 'cnc-transition-unconfirmed',
+        message: 'Inspect the machine and retry Resume or request ABORT JOB.',
+      }),
+    ).toBeNull();
+  });
+
+  it.each([
+    ['cancelled', 'cancelled'],
+    ['disconnected', 'disconnect'],
+    ['errored', 'unknown'],
+  ] as const)(
+    'records a later %s event instead of the retained CNC transition warning',
+    (status, kind) => {
+      const interruption = checkpointInterruption(status, {
+        kind: 'cnc-transition-unconfirmed',
+        message: 'Inspect the machine and retry Resume or request ABORT JOB.',
+      });
+      expect(interruption?.kind).toBe(kind);
+      expect(interruption?.message).not.toContain('retry Resume');
+    },
+  );
+
+  it('records accepted Abort over retained CNC guidance and actual disconnect over a lingering Stop request', () => {
+    const notice: LaserSafetyNotice = {
+      kind: 'cnc-transition-unconfirmed',
+      message: 'Retry Resume.',
+    };
+    const stop = { reason: 'operator', streamerEpoch: 3 } as const;
+    expect(checkpointInterruption('errored', notice, stop)).toEqual({
+      kind: 'cancelled',
+      message: 'Stopped by the operator (Abort).',
+    });
+    expect(checkpointInterruption('disconnected', notice, stop)).toEqual({
+      kind: 'disconnect',
+      message: 'The serial connection closed during the job.',
+    });
+  });
 });
 
 // ADR-215 Amendment 1 (CNC audit MC-3): a stop that may have killed the

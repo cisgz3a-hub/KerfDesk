@@ -2,6 +2,7 @@ import type { ControllerCapabilities } from '../../core/controllers/controller-c
 import type { LaserState } from './laser-store';
 import { isActiveJob } from './laser-store-helpers';
 import { pendingTransportWriteCount } from './laser-start-queue-fence';
+import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
 
 export type ControllerQualificationPhase =
   | 'controller-response'
@@ -24,8 +25,12 @@ export type ControllerQualification =
 
 export type ControllerQualificationScheduleRefs = {
   readonly connection?: unknown | null;
+  readonly pendingResetCleanup?: unknown | null;
+  readonly controllerCommand?: unknown | null;
+  readonly settingsCollector?: { readonly kind: string };
   qualificationTimer?: ReturnType<typeof setTimeout> | null;
   qualificationDeadline?: number | null;
+  qualificationRevision?: number;
   runControllerQualification?: (() => Promise<void>) | null;
 };
 
@@ -95,7 +100,11 @@ export function failedControllerQualificationPatch(
 type QualificationScheduleOptions = {
   /** Run only on an Idle that follows an Alarm report. */
   readonly afterAlarm?: boolean;
+  /** Preserve connect-time diagnostics while continuing to listen for recovery. */
+  readonly onSilent?: () => void;
 };
+
+type QualificationReadiness = { alarmSeen: boolean };
 
 export function scheduleControllerQualification(
   set: SetFn,
@@ -105,40 +114,62 @@ export function scheduleControllerQualification(
   options: QualificationScheduleOptions = {},
 ): void {
   cancelScheduledControllerQualification(refs);
-  refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
-  let alarmSeen = options.afterAlarm !== true;
-  let reportSequence = get().statusSequence;
+  const connection = refs.connection;
+  const revision = refs.qualificationRevision ?? 0;
+  const readiness: QualificationReadiness = { alarmSeen: options.afterAlarm !== true };
+  let lastStatusSequence = get().statusSequence;
+  // Only this scheduler's readiness failure can resume automatically. Empty
+  // or rejected settings responses remain an explicit Retry.
+  let readinessFailure: ControllerQualification | null = null;
+  const responseWait = { deadline: Date.now() + QUALIFICATION_READY_TIMEOUT_MS };
+  refs.qualificationDeadline = responseWait.deadline;
   const poll = (): void => {
     refs.qualificationTimer = null;
     const state = get();
-    if (!qualificationStillPending(state, refs, epoch)) {
+    if (!qualificationScheduleIsCurrent(state, refs, epoch, connection, revision)) {
       refs.qualificationDeadline = null;
       return;
     }
-    const controllerBusy = controllerQualificationIsBusy(state);
-    const freshReport = state.statusSequence !== reportSequence;
-    reportSequence = state.statusSequence;
-    if (controllerBusy || controllerReportsLive(state, freshReport)) {
+    if (qualificationScheduleHasEnded(state.controllerQualification, readinessFailure)) {
+      refs.qualificationDeadline = null;
+      return;
+    }
+    const receivedStatus = receivedControllerStatus(state, lastStatusSequence);
+    lastStatusSequence = state.statusSequence;
+    const controllerBusy = controllerQualificationIsBusy(state, refs);
+    const ready = qualificationReadinessAllowsRead(state, refs, readiness);
+    // A retained Alarm/Sleep report does not prove current communication.
+    // New replies advance sequence even when position evidence is invalid.
+    if (controllerBusy || receivedStatus) {
       refs.qualificationDeadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
     }
-    const reported = state.statusReport?.state;
-    if (reported === 'Alarm') alarmSeen = true;
-    if (!controllerBusy && alarmSeen && reported === 'Idle') {
+    // A queued startup poll may owe an ACK while the controller is silent.
+    // Its ownership blocks reads, but must not suppress communication diagnostics.
+    const responseDeadline = qualificationResponseDeadline(
+      refs,
+      responseWait,
+      receivedStatus,
+      options.onSilent,
+    );
+    if (readinessFailure !== null && receivedStatus) {
+      restoreQualificationAfterStatus(set, readinessFailure, epoch, readiness.alarmSeen);
+      readinessFailure = null;
+      if (!qualificationScheduleIsCurrent(get(), refs, epoch, connection, revision)) return;
+    }
+    if (!controllerBusy && ready) {
       refs.qualificationDeadline = null;
       startQualificationRun(refs);
       return;
     }
-    if (Date.now() >= (refs.qualificationDeadline ?? 0)) {
-      refs.qualificationDeadline = null;
-      set((current) =>
-        failedControllerQualificationPatch(
-          current,
-          epoch,
-          'The controller did not reach fresh Idle in time. Check the connection, then retry reading controller settings.',
-        ),
-      );
-      return;
-    }
+    readinessFailure = reportQualificationReadinessTimeout(
+      set,
+      get,
+      epoch,
+      responseDeadline,
+      readinessFailure,
+      options.onSilent,
+    );
+    if (!qualificationScheduleIsCurrent(get(), refs, epoch, connection, revision)) return;
     refs.qualificationTimer = setTimeout(poll, QUALIFICATION_READY_POLL_MS);
   };
   refs.qualificationTimer = setTimeout(poll, QUALIFICATION_READY_POLL_MS);
@@ -213,80 +244,127 @@ export function awaitPolledQualification(
 ): void {
   if (refs.connection !== connection || get().controllerSessionEpoch !== epoch) return;
   set({ controllerQualification: qualifyingController(epoch, 'controller-response') });
-  scheduleControllerQualification(set, get, refs, epoch);
-  const reportsBefore = get().statusSequence;
-  setTimeout(() => {
-    const state = get();
-    if (refs.connection !== connection || state.controllerSessionEpoch !== epoch) return;
-    // Any report answers, an Alarm or Sleep too, though those clear statusObservation.
-    if (state.statusSequence !== reportsBefore) return;
-    const qualification = state.controllerQualification;
-    if (qualification.kind !== 'qualifying' || qualification.epoch !== epoch) return;
-    cancelScheduledControllerQualification(refs);
-    onSilent();
-  }, POLLED_RESPONSE_TIMEOUT_MS);
+  scheduleControllerQualification(set, get, refs, epoch, { onSilent });
 }
 
-// A fresh report that is not Idle is a live controller: waiting for the
-// operator (Alarm, Sleep: $X, $H or Wake) or still busy (Run, Jog, Home, Hold,
-// Door, Check), not a dead link. After a Stop mid-motion GRBL reboots into
-// ALARM:3, and the 8 s deadline used to latch "Controller qualification
-// failed" on every such Stop, with nothing re-arming it once the operator
-// unlocked (audit connect-3); a controller still busy when the connect
-// handshake handed over did the same (audit TC-1). Qualification now runs on
-// the first fresh Idle however long that takes; reports that stop arriving
-// still time out. An Alarm or Sleep report clears the status observation
-// (laser-status-line handleInvalidatingStatus), so a report also counts as
-// fresh when the status sequence moved since the previous poll.
-function controllerReportsLive(state: LaserState, freshReport: boolean): boolean {
-  const reported = state.statusReport?.state;
-  if (reported === undefined || reported === 'Idle') return false;
-  if (freshReport) return true;
-  const observedAt = state.statusObservation?.observedAt;
-  return observedAt !== undefined && Date.now() - observedAt <= QUALIFICATION_READY_TIMEOUT_MS;
+function qualificationScheduleHasEnded(
+  qualification: ControllerQualification,
+  readinessFailure: ControllerQualification | null,
+): boolean {
+  return (
+    qualification.kind === 'qualified' ||
+    (qualification.kind === 'failed' && qualification !== readinessFailure)
+  );
+}
+
+function receivedControllerStatus(state: LaserState, previousSequence: number): boolean {
+  return state.statusSequence !== previousSequence && state.statusReport !== null;
+}
+
+function qualificationResponseDeadline(
+  refs: ControllerQualificationScheduleRefs,
+  responseWait: { deadline: number },
+  receivedStatus: boolean,
+  onSilent: (() => void) | undefined,
+): number | null | undefined {
+  if (receivedStatus) responseWait.deadline = Date.now() + QUALIFICATION_READY_TIMEOUT_MS;
+  return onSilent === undefined ? refs.qualificationDeadline : responseWait.deadline;
+}
+
+function qualificationReadinessAllowsRead(
+  state: LaserState,
+  refs: ControllerQualificationScheduleRefs,
+  readiness: QualificationReadiness,
+): boolean {
+  if (state.statusReport?.state === 'Alarm') readiness.alarmSeen = true;
+  return (
+    readiness.alarmSeen &&
+    machineSettingsReadBlockReason(state, {
+      resetCleanupPending: refs.pendingResetCleanup != null,
+      settingsCollectionActive: refs.settingsCollector?.kind === 'collecting',
+      requireCurrentStatusObservation: true,
+    }) === null
+  );
+}
+
+function restoreQualificationAfterStatus(
+  set: SetFn,
+  readinessFailure: ControllerQualification,
+  epoch: number,
+  alarmSeen: boolean,
+): void {
+  set((current) =>
+    current.controllerQualification === readinessFailure
+      ? {
+          controllerQualification: qualifyingController(
+            epoch,
+            alarmSeen ? 'controller-response' : 'reset-cleanup',
+          ),
+        }
+      : {},
+  );
+}
+
+function reportQualificationReadinessTimeout(
+  set: SetFn,
+  get: GetFn,
+  epoch: number,
+  deadline: number | null | undefined,
+  readinessFailure: ControllerQualification | null,
+  onSilent: (() => void) | undefined,
+): ControllerQualification | null {
+  if (readinessFailure !== null || Date.now() < (deadline ?? 0)) return readinessFailure;
+  if (onSilent !== undefined) {
+    onSilent();
+    const qualification = get().controllerQualification;
+    return qualification.kind === 'failed' && qualification.epoch === epoch ? qualification : null;
+  }
+  const patch = failedControllerQualificationPatch(
+    get(),
+    epoch,
+    'Waiting for a fresh controller status. Controller information will refresh automatically when the connection responds and reports Idle.',
+  );
+  set(patch);
+  return patch.controllerQualification ?? null;
 }
 
 function qualificationScheduleIsCurrent(
   state: LaserState,
   refs: ControllerQualificationScheduleRefs,
   epoch: number,
+  connection: unknown,
+  revision: number,
 ): boolean {
   return (
     refs.connection != null &&
+    refs.connection === connection &&
+    (refs.qualificationRevision ?? 0) === revision &&
     state.connection.kind === 'connected' &&
     state.controllerSessionEpoch === epoch &&
     state.controllerQualification.epoch === epoch
   );
 }
 
-function qualificationIsTerminal(qualification: ControllerQualification): boolean {
-  return qualification.kind === 'qualified' || qualification.kind === 'failed';
-}
-
 function startQualificationRun(refs: ControllerQualificationScheduleRefs): void {
   const run = refs.runControllerQualification;
-  if (run == null) return;
-  void run().catch(() => undefined);
+  if (run != null) void run().catch(() => undefined);
 }
 
-function qualificationStillPending(
+function controllerQualificationIsBusy(
   state: LaserState,
   refs: ControllerQualificationScheduleRefs,
-  epoch: number,
 ): boolean {
   return (
-    qualificationScheduleIsCurrent(state, refs, epoch) &&
-    !qualificationIsTerminal(state.controllerQualification)
-  );
-}
-
-function controllerQualificationIsBusy(state: LaserState): boolean {
-  return (
+    refs.pendingResetCleanup != null ||
+    refs.controllerCommand != null ||
+    refs.settingsCollector?.kind === 'collecting' ||
     state.controllerOperation !== null ||
     state.motionOperation !== null ||
     state.pendingUntrackedAcks > 0 ||
     pendingTransportWriteCount(state) > 0 ||
-    isActiveJob(state.streamer)
+    isActiveJob(state.streamer) ||
+    state.fireActive ||
+    state.autofocusBusy
   );
 }
 
@@ -294,6 +372,7 @@ export function cancelScheduledControllerQualification(
   refs: ControllerQualificationScheduleRefs,
 ): void {
   if (refs.qualificationTimer != null) clearTimeout(refs.qualificationTimer);
+  refs.qualificationRevision = (refs.qualificationRevision ?? 0) + 1;
   refs.qualificationTimer = null;
   refs.qualificationDeadline = null;
 }

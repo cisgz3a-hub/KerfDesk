@@ -280,6 +280,7 @@ type InitialLaserState = Pick<
   | 'controllerSessionEpoch'
   | 'statusSequence'
   | 'statusObservation'
+  | 'statusResponseObservation'
   | 'alarmCode'
   | 'lastError'
   | 'lastWriteError'
@@ -345,6 +346,7 @@ export function initialLaserState(): InitialLaserState {
     controllerSessionEpoch: 0,
     statusSequence: 0,
     statusObservation: null,
+    statusResponseObservation: null,
     ...sessionScopedJobStateReset(),
     lastWriteError: null,
     safetyNotice: null,
@@ -412,6 +414,7 @@ export function buildPortClosePatch(state: LaserState): Partial<LaserState> {
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
+    statusResponseObservation: null,
     detectedSettings: null,
     detectedControllerKind: null,
     controllerSettings: null,

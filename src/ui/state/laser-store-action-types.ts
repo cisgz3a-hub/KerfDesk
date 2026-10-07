@@ -48,6 +48,8 @@ export type LaserStoreActions = {
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
   readonly retryControllerQualification: () => Promise<void>;
+  readonly getMachineSettingsReadBlockReason: () => string | null;
+  readonly getControllerReconnectRecommended: () => boolean;
   readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   /** Owned G54 selection used before preparing Frame so Frame and emitted

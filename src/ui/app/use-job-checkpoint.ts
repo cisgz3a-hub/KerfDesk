@@ -9,7 +9,6 @@ import type { JobInterruption } from '../../core/recovery';
 import { recoveryRepository, type RecoveryRepository, type RunId } from '../state/recovery';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import { CHECKPOINT_ACK_INTERVAL_LINES } from '../state/job-checkpoint-storage';
-import { currentJobStopRequest } from '../state/job-stop-request';
 import { settledCleanly } from '../state/post-job-clean-settle';
 import { useToastStore } from '../state/toast-store';
 import { useLaserSecondPassUiStore } from '../state/laser-second-pass-ui-store';
@@ -20,15 +19,11 @@ import {
   releaseUnarchivedRun,
 } from '../state/laser-unarchived-run';
 import {
-  checkpointInterruption,
-  currentRunPlannerBacklog,
-  runStopMayHaveLostPosition,
-} from './checkpoint-interruption';
-import {
   activeInRepository,
   cachedAck,
   clearInactiveRunOwnership,
   disappearedStreamInterruption,
+  observedStreamInterruption,
   onceTrackingFailureReporter,
   progressDeferredOrSettled,
   terminalRecordedOrUnarchived,
@@ -178,14 +173,7 @@ class JobCheckpointTracker {
     }
     if (this.previous?.runId !== runId) this.beginRun(runId);
     const statusChanged = streamer.status !== this.previous?.status;
-    const interruption = checkpointInterruption(
-      streamer.status,
-      state.safetyNotice,
-      currentJobStopRequest(state),
-      currentRunPlannerBacklog(state),
-      runStopMayHaveLostPosition(state),
-      Math.min(streamer.total, streamer.completed + streamer.inFlight.length),
-    );
+    const interruption = observedStreamInterruption(streamer.status, state);
     this.previous = { runId, status: streamer.status, completed: streamer.completed };
 
     if (interruption !== null) {

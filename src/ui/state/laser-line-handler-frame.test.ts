@@ -99,6 +99,8 @@ function makeLaserState(): LaserState {
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
     retryControllerQualification: async () => undefined,
+    getMachineSettingsReadBlockReason: () => null,
+    getControllerReconnectRecommended: () => false,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
     selectPrimaryWcsForFrame: async () => ({ kind: 'already-g54' as const }),

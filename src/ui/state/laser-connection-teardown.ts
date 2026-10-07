@@ -154,7 +154,7 @@ async function finalizeForgetAfterOperation(
 }
 
 /** Resolve the startup raw-line wait without letting it qualify as a real line. */
-export function cancelRawControllerLineWait(refs: LiveRefs): void {
+export function cancelRawControllerLineWait(refs: Partial<Pick<LiveRefs, 'onLineArrived'>>): void {
   const pending = refs.onLineArrived;
   refs.onLineArrived = null;
   pending?.();

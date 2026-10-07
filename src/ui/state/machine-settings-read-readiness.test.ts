@@ -73,4 +73,56 @@ describe('machineSettingsReadBlockReason', () => {
       'already being read',
     );
   });
+  it('keeps deferred reset cleanup ahead of manual reads in both Idle and Alarm', () => {
+    for (const controllerState of ['Idle', 'Alarm']) {
+      expect(
+        machineSettingsReadBlockReason(
+          state({ statusReport: { state: controllerState } as LaserState['statusReport'] }),
+          { resetCleanupPending: true },
+        ),
+      ).toContain('reset cleanup');
+    }
+  });
+
+  it('requires current-session Idle only for automatic refresh', () => {
+    const epoch = 4;
+    const alarm = state({
+      controllerSessionEpoch: epoch,
+      statusReport: { state: 'Alarm' } as LaserState['statusReport'],
+      statusObservation: null,
+    });
+    expect(machineSettingsReadBlockReason(alarm)).toBeNull();
+    expect(
+      machineSettingsReadBlockReason(alarm, { requireCurrentStatusObservation: true }),
+    ).toContain('Waiting for Idle');
+    expect(
+      machineSettingsReadBlockReason(
+        state({ controllerSessionEpoch: epoch, statusObservation: null }),
+        { requireCurrentStatusObservation: true },
+      ),
+    ).toContain('fresh controller status');
+    expect(
+      machineSettingsReadBlockReason(
+        state({
+          controllerSessionEpoch: epoch,
+          statusObservation: {
+            sessionEpoch: epoch - 1,
+            positionEpoch: 0,
+            sequence: 1,
+            observedAt: 0,
+          },
+        }),
+        { requireCurrentStatusObservation: true },
+      ),
+    ).toContain('fresh controller status');
+    expect(
+      machineSettingsReadBlockReason(
+        state({
+          controllerSessionEpoch: epoch,
+          statusObservation: { sessionEpoch: epoch, positionEpoch: 0, sequence: 1, observedAt: 0 },
+        }),
+        { requireCurrentStatusObservation: true },
+      ),
+    ).toBeNull();
+  });
 });

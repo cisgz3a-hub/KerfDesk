@@ -16,9 +16,11 @@ beforeEach(() => {
   ensureFramedRunInvalidationSubscriptions();
 });
 afterEach(async () => {
+  const disconnect = useLaserStore.getState().disconnect();
+  await vi.advanceTimersByTimeAsync(2_000);
+  await disconnect;
   vi.clearAllTimers();
   vi.useRealTimers();
-  await useLaserStore.getState().disconnect();
   useExperimentalLaserFeatures.getState().resetFeatures();
   vi.restoreAllMocks();
 });

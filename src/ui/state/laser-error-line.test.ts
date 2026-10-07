@@ -112,6 +112,8 @@ function makeLaserState(): LaserState {
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
     retryControllerQualification: async () => undefined,
+    getMachineSettingsReadBlockReason: () => null,
+    getControllerReconnectRecommended: () => false,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
     selectPrimaryWcsForFrame: async () => ({ kind: 'already-g54' as const }),
@@ -212,16 +214,17 @@ describe('handleLine controller error (P0-1)', () => {
     // soft-reset is still sent to drain any already-buffered laser-on motion.
     expect(get().streamer?.status).toBe('errored');
     expect(safeWrite).toHaveBeenNthCalledWith(1, RT_SOFT_RESET, 'stop', 'system');
-    // The reset wiped the in-flight accounting (audit F1)...
-    expect(get().streamer?.inFlight).toEqual([]);
+    // Accepted transport is not a reboot boundary; the earlier second line
+    // still owns its reply until the recognized greeting.
+    expect(get().streamer?.inFlight).toEqual(firstStep.state.inFlight.slice(1));
     // ...and explicit M5 + M9 fail-off cleanup is deferred until the boot banner
     // arrives (audit F2), so it is NOT written yet.
     expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_COOLANT_OFF}\n`)).toBe(
       false,
     );
     handleLine(set, get, refs, safeWrite, 'Grbl 1.1f');
-    await Promise.resolve();
-    await Promise.resolve();
+    expect(get().streamer?.inFlight).toEqual([]);
+    for (let index = 0; index < 12; index++) await Promise.resolve();
     expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_SPINDLE_OFF}\n`)).toBe(true);
     expect(safeWrite.mock.calls.some(([payload]) => payload === `${CMD_COOLANT_OFF}\n`)).toBe(true);
     expect(safeWrite.mock.calls.some(([payload]) => payload.startsWith('G1 '))).toBe(false);
@@ -250,8 +253,7 @@ describe('handleLine controller error (P0-1)', () => {
 
     expect(refs.pendingResetCleanup?.lines).toEqual([CMD_SPINDLE_OFF, CMD_COOLANT_OFF]);
     handleLine(set, get, refs, safeWrite, 'Grbl 1.1f');
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let index = 0; index < 12; index++) await Promise.resolve();
     expect(safeWrite).toHaveBeenCalledWith(`${CMD_SPINDLE_OFF}\n`, 'stop', 'system');
     expect(safeWrite).toHaveBeenCalledWith(`${CMD_COOLANT_OFF}\n`, 'stop', 'system');
   });

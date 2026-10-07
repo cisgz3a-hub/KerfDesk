@@ -176,7 +176,7 @@ describe('CNC Pause and Resume progress-aware deadlines', () => {
     expect(observed.error()).toBeInstanceOf(Error);
     expect(useLaserStore.getState().pauseResumeTransition).toBeNull();
     expect(useLaserStore.getState().safetyNotice).toEqual({
-      kind: 'stream-stalled',
+      kind: 'cnc-transition-unconfirmed',
       message: CNC_PAUSE_RESUME_STALLED_MESSAGE,
     });
     expect(harness.writes).not.toContain(RT_SOFT_RESET);
