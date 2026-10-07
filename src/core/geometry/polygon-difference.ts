@@ -117,6 +117,19 @@ function normalizeClosedPolylines(
 export function normalizeClosedPolylineTreeEvenOddChecked(
   contours: ReadonlyArray<Polyline>,
 ): Result<ReadonlyArray<NormalizedPolylineTreeNode>, VectorOpError> {
+  return normalizeClosedPolylineTree(contours, FillRule.EvenOdd);
+}
+
+export function normalizeClosedPolylineTreeNonZeroChecked(
+  contours: ReadonlyArray<Polyline>,
+): Result<ReadonlyArray<NormalizedPolylineTreeNode>, VectorOpError> {
+  return normalizeClosedPolylineTree(contours, FillRule.NonZero);
+}
+
+function normalizeClosedPolylineTree(
+  contours: ReadonlyArray<Polyline>,
+  fillRule: FillRule,
+): Result<ReadonlyArray<NormalizedPolylineTreeNode>, VectorOpError> {
   const paths = contours.map(polylineToPathD).filter((path) => path.length >= MIN_CLOSED_POINTS);
   if (paths.length === 0) return ok([]);
   const normalized = tryVectorOp(() => {
@@ -126,7 +139,7 @@ export function normalizeClosedPolylineTreeEvenOddChecked(
       paths,
       null,
       tree,
-      FillRule.EvenOdd,
+      fillRule,
       DIFFERENCE_PRECISION_DECIMALS,
     );
     return tree;

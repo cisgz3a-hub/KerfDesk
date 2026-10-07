@@ -124,7 +124,9 @@ export type GcodeMetadata = {
 // Second CNC audit: finish-only features step down the depth ladder (ADR-140 Amd 1),
 // tabs no thinner than set stock are halved (ADR-258 Amd 4), and STL reliefs plan
 // from each cell's highest point (ADR-412 Amd 1).
-export const EMITTER_REVISION = 'cnc-finish-ladder-thin-stock-tabs-mesh-footprint-20260929-v16';
+// ADR-486 Amd 2 resolves Fill ownership before settings and orders compensated
+// Line parents across process groups, retaining passes before their low-power tabs.
+export const EMITTER_REVISION = 'operation-topology-fill-ownership-contour-packets-20261007-v17';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S
