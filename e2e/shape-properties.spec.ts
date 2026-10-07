@@ -12,7 +12,7 @@ test('edits a drawn rectangle as canonical geometry and undoes the edit', async 
   kerfdesk,
 }) => {
   await drawRectangle(page);
-  const cornerRadius = page.getByRole('textbox', { name: 'Rectangle corner radius' });
+  const cornerRadius = page.getByRole('textbox', { name: 'Rectangle corner radius', exact: true });
   await expect(cornerRadius).toHaveValue('0');
   await cornerRadius.fill('6');
   await cornerRadius.press('Tab');
@@ -47,7 +47,7 @@ async function drawRectangle(page: Page): Promise<void> {
     .getByRole('tablist', { name: 'Edit artwork or operation' })
     .getByRole('tab', { name: 'Artwork', exact: true })
     .click();
-  await expect(page.getByRole('textbox', { name: 'Rectangle width' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Rectangle width', exact: true })).toBeVisible();
 }
 
 async function savedProject(kerfdesk: KerfDeskFixture): Promise<SavedProject> {

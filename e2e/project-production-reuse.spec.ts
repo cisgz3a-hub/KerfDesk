@@ -43,7 +43,8 @@ test('duplicates completed artwork into a separate explicitly allocated run and 
   await closeProduction(page);
   await saveProjectAs(page, kerfdesk);
   const original = await savedProject(kerfdesk);
-  const originalManifest = original.productionManifest!;
+  const originalManifest = original.productionManifest;
+  if (originalManifest === undefined) throw new Error('Original production manifest was not saved');
   expect(originalManifest.rows[0]).toMatchObject({
     status: 'completed',
     notes: 'Observed original only',
@@ -71,7 +72,8 @@ test('duplicates completed artwork into a separate explicitly allocated run and 
     .poll(async () => (await savedProject(kerfdesk)).productionManifest?.name)
     .toBe('Separate run');
   const combined = await savedProject(kerfdesk);
-  const fresh = combined.productionManifest!;
+  const fresh = combined.productionManifest;
+  if (fresh === undefined) throw new Error('Fresh production manifest was not saved');
   expect(combined.scene).toEqual(original.scene);
   expect(fresh.id).not.toBe(originalManifest.id);
   expect(fresh.rows[0]?.id).not.toBe(originalManifest.rows[0]?.id);
@@ -80,7 +82,8 @@ test('duplicates completed artwork into a separate explicitly allocated run and 
   expect(fresh.rows[0]?.reviewedProjectJson).toBeUndefined();
   expect(fresh.rows[0]?.reviewedAt).toBeUndefined();
   expect(fresh.rows[0]?.resultAt).toBeUndefined();
-  const archived = combined.sheetBook!.inactive[0]!;
+  const archived = combined.sheetBook?.inactive[0];
+  if (archived === undefined) throw new Error('Original completed sheet was not archived');
   expect((JSON.parse(archived.projectJson) as SavedProductionProject).productionManifest).toEqual(
     originalManifest,
   );

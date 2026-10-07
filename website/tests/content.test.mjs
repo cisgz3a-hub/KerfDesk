@@ -109,7 +109,10 @@ describe('website copy', () => {
       'https://www.paddle.com/legal/privacy',
     ];
     const external = new Map([
-      ['privacy/index.html', new Set([paddlePolicies[2], 'https://developers.openai.com/api/docs/guides/your-data'])],
+      [
+        'privacy/index.html',
+        new Set([paddlePolicies[2], 'https://developers.openai.com/api/docs/guides/your-data']),
+      ],
       ['terms/index.html', new Set([...paddlePolicies, 'https://paddle.net/'])],
       [
         'refunds/index.html',

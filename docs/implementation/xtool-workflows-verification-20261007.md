@@ -8,6 +8,18 @@ The Studio comparison uses public first-party documentation and KerfDesk source 
 
 All work is isolated in `D:\LaserForge\competitive-audit-20261007`. The dirty primary checkout and other worktrees were preserved. Verification below is local source/component/browser/build evidence. It does not establish hosted CI, publication, an installed package, a real provider-account exchange, a controller connection or a physical result.
 
+## CI correction and main integration
+
+The first hosted browser run for [PR #1084](https://github.com/cisgz3a-hub/KerfDesk/pull/1084), at commit `4165bb6fe6262b4b7d590fc2542064ccacc3290c`, retained eight failing acceptance cases in development-browser shards 3/4. Unit tests, type/lint/format, builds, production-bundle browser checks, Phone/MCP and Linux desktop package checks passed on that original head; they do not qualify a later head. The failed browser run is [37609533765](https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37609533765).
+
+Seven cases used older nesting, CSV insertion, status or input interactions. The corrected tests inspect the nesting draft, establish that it has not mutated the design, explicitly accept it and require one Undo entry. They use the current CSV mapping controls, scope the linked recipe status to Materials and target arithmetic textboxes. Existing saved geometry, template, sequence, placement, Cancel, Undo/Redo, Save/reopen and SVG outcome assertions remain. Reproduced pre-edit failures and successful after evidence are retained separately. All seven affected workflow cases passed locally; no timeout or assertion was relaxed.
+
+The eighth failure was a real layout regression. At 640×450, the numeric controls wrapped above the new sheet workflow row, leaving a 329×184.015625-pixel canvas. Narrow-width numeric spacing and a bounded, horizontally scrollable sheet bar restore it to 329×217.203125, including with a 200-character sheet name. The original greater-than-200-pixel acceptance assertion passes unchanged. Actual browser checks also kept page overflow at zero at 375/600/1024/1366-pixel widths, with sheet management and production controls reachable by keyboard.
+
+Main moved to `e3820ed51` after the original PR opened. Integration preserves its current seller/Paddle information and closed-sales state alongside this branch's AI/network disclosures; all three privacy conflicts are resolved, provider links remain exact, and generated local information is checked. The merged website passed 40 tests, the public-page generator 10 and standalone-page service-worker rules 33. Renderer TypeScript and scoped repair/website lint and formatting passed. No licence terms, provider state or machine state were changed by this correction.
+
+The full-suite counts, source fingerprints and build identities in the following sections describe the original implementation qualification. They are not relabelled as results for the repair commit. The new exact-head hosted checks are recorded by PR #1084 separately.
+
 ## Continuation: schema 14 and explicit desktop adapters
 
 The continuation implements editable Boolean compounds, hierarchy dragging and accessible transfers, an optional desktop OpenAI connection, owned firmware reports, FluidNC Telnet TCP and measured GRBL-family surface grids. The [AI guide](2026-10-07-desktop-ai-workflow.md), [protocol evidence](2026-10-07-machine-protocol-workflows.md) and [ADR-571](../decisions/ADR-571-retained-design-and-explicit-desktop-adapters.md) describe their exact boundaries.

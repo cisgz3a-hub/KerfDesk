@@ -4,7 +4,7 @@
   "branch": "codex/xtool-workflows-20261007",
   "baselineCommit": "76b5ff53e3be7df6c160a8b26820e61188595f08",
   "worktree": "D:/LaserForge/competitive-audit-20261007",
-  "state": "implementation prepared for pull-request review; complete recorded local regression verification passed",
+  "state": "initial implementation qualification and local CI correction recorded; hosted checks tracked by PR #1084",
   "schemaVersions": {
     "project": 14,
     "materialLibrary": 3
@@ -58,7 +58,8 @@
       "proofLocation": "Windows temporary directory: kerfdesk-xtool-shards-final-20261007/migration-expectation-delta.json",
       "proofSha256": "bfa8887e79a8e7915c8a2c12bb1be9fdf5d97e757c3e813112b004ccf19e48f5"
     },
-    "unchangedDuringEachQualifiedShard": true
+    "unchangedDuringEachQualifiedShard": true,
+    "scope": "Original schema-14 implementation before CI corrections and subsequent main integration; not the fingerprint of later commits"
   },
   "vitest": {
     "version": "4.1.11",
@@ -763,5 +764,110 @@
     "sourceFingerprint": "d6bb4cbcdeaa1afb994a594e01d40a769db14ea1f230bebc8c160f5b6187c4f2",
     "fingerprintOrder": "Replay of the ordered recorded source manifest; every current source-file raw-byte hash matches",
     "scope": "Authorised commit and pull request; hosted check identity and status are separate from this local verification record"
+  },
+  "ciRepair": {
+    "date": "2026-10-07",
+    "pullRequest": "https://github.com/cisgz3a-hub/KerfDesk/pull/1084",
+    "originalHead": "4165bb6fe6262b4b7d590fc2542064ccacc3290c",
+    "integratedMain": "e3820ed51",
+    "failedWorkflowRun": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/37609533765",
+    "failureCases": 8,
+    "repairs": [
+      "Inspect and explicitly accept the nesting draft; verify no mutation before acceptance and exactly one Undo entry after acceptance",
+      "Use current CSV column selection and Insert column controls, Materials-scoped recipe status and arithmetic textbox roles; retain saved geometry and variable-array assertions",
+      "Keep numeric editing compact below 700px and bound/scroll the sheet workflow bar without hiding editing controls",
+      "Combine current main seller/Paddle information with existing AI and FluidNC disclosures and exact provider-policy links; regenerate canonical local public information"
+    ],
+    "localChecks": {
+      "focusedWorkflowBrowser": {
+        "passed": 7,
+        "failed": 0,
+        "exitCode": 0,
+        "nativeLastRun": {
+          "status": "passed",
+          "failedTests": []
+        },
+        "command": [
+          "node",
+          "node_modules/@playwright/test/cli.js",
+          "test",
+          "e2e/production-workflows.spec.ts",
+          "e2e/shape-properties.spec.ts",
+          "e2e/variable-array-acceptance.e2e.ts",
+          "--grep",
+          "creates arrays, nests them|outline-nests complementary|imports a CLB library|builds bounded variable text|edits a drawn rectangle|variable copies preserve",
+          "--output",
+          "C:/Users/Asus/AppData/Local/Temp/kerfdesk-pr1084-browser-workflow-after",
+          "--reporter",
+          "list"
+        ],
+        "source": [
+          {
+            "Path": "D:\\LaserForge\\competitive-audit-20261007\\e2e\\production-workflows.spec.ts",
+            "Hash": "BCF92B28722236CB7BF27E87937D3361F97FA41A318DBB6C113FA43524F10B46"
+          },
+          {
+            "Path": "D:\\LaserForge\\competitive-audit-20261007\\e2e\\variable-array-acceptance.e2e.ts",
+            "Hash": "A531E2182CDFA9BA28D5B14104018C28892AD08686BED2662A07502E2E0BCAB9"
+          },
+          {
+            "Path": "D:\\LaserForge\\competitive-audit-20261007\\e2e\\shape-properties.spec.ts",
+            "Hash": "761218C0AB6203C039DA6C9997483176E4D6D3773F9D7B66991D923DA5C84771"
+          }
+        ],
+        "observationScope": "agent-observed focused verification"
+      },
+      "compactBrowser": {
+        "passed": 1,
+        "failed": 0,
+        "exitCode": 0,
+        "acceptanceMinimumHeightPx": 200,
+        "beforeCanvas": {
+          "width": 329,
+          "height": 184.015625
+        },
+        "afterCanvas": {
+          "width": 329,
+          "height": 217.203125
+        },
+        "longNameCharacters": 200,
+        "extraViewportWidths": [375, 600, 1024, 1366],
+        "scope": "Actual browser geometry, keyboard access and page overflow; acceptance assertion unchanged"
+      },
+      "rendererTypecheck": {
+        "exitCode": 0,
+        "command": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit --pretty false"
+      },
+      "scopedLintAndFormat": {
+        "exitCode": 0,
+        "scope": "All six browser/layout repair files and the three reconciled website source/test files"
+      },
+      "websiteTests": {
+        "passed": 40,
+        "failed": 0,
+        "exitCode": 0
+      },
+      "publicPageGeneratorTests": {
+        "passed": 10,
+        "failed": 0,
+        "exitCode": 0
+      },
+      "standalonePageServiceWorkerTests": {
+        "passed": 33,
+        "failed": 0,
+        "exitCode": 0
+      },
+      "privacyAndLegalGeneration": {
+        "exitCode": 0,
+        "scope": "Local draft and closed-sales information generation/checks only; no deployment, checkout, licence terms or provider state change"
+      }
+    },
+    "preservedEvidence": [
+      "Windows temporary directory: kerfdesk-pr1084-browser-workflow-before",
+      "Windows temporary directory: kerfdesk-pr1084-browser-nest-before",
+      "Windows temporary directory: kerfdesk-pr1084-browser-workflow-after",
+      "Windows temporary directory: kerfdesk-pr1084-compact-repair"
+    ],
+    "qualification": "Focused local checks on the repaired source. Earlier full-suite counts and fingerprints below remain historical initial-implementation evidence. New exact-head hosted CI is tracked by the pull request."
   }
 }

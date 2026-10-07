@@ -16,6 +16,7 @@ import {
 } from './fixtures/recovery-flow';
 import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 import { saveProjectAs } from './fixtures/project-save';
+import { composedSvgSnapshot } from './fixtures/composed-svg-browser';
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
@@ -63,8 +64,7 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
     'aria-pressed',
     'true',
   );
-  await page.getByRole('button', { name: 'Nest selection' }).click();
-  await page.getByRole('button', { name: 'Accept best valid layout', exact: true }).click();
+  await acceptNestDraft(page);
 
   await (await toolbarCommand(page, 'Preview')).click();
   await expect(
@@ -122,8 +122,7 @@ test('outline-nests complementary vector parts that rectangular bounds cannot fi
   await selectAll(page);
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
   await page.getByRole('spinbutton', { name: 'Part spacing (mm)' }).fill('0');
-  await page.getByRole('button', { name: 'Nest selection' }).click();
-  await page.getByRole('button', { name: 'Accept best valid layout', exact: true }).click();
+  await acceptNestDraft(page);
   await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
@@ -306,7 +305,7 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
   await expect(page.getByText('Linked preset to layer.', { exact: true })).toBeVisible();
   await expect(
     page
-      .getByRole('tabpanel', { name: 'Materials' })
+      .getByRole('tabpanel', { name: 'Materials', exact: true })
       .getByRole('status')
       .filter({ hasText: /Linked preset is current at revision/ }),
   ).toBeVisible();
@@ -330,7 +329,9 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
     mimeType: 'text/csv',
     buffer: Buffer.from('name,material\nBracket,Birch\nPanel,Acrylic\n'),
   });
-  await page.getByRole('button', { name: 'Insert column' }).click();
+  const csvMapping = page.getByRole('region', { name: 'CSV column mapping', exact: true });
+  await csvMapping.getByRole('combobox', { name: 'CSV column to insert' }).selectOption('name');
+  await csvMapping.getByRole('button', { name: 'Insert column', exact: true }).click();
   await page.getByRole('button', { name: 'Serial' }).click();
   await page.getByRole('spinbutton', { name: 'Variable serial start' }).fill('100');
   await expect(
@@ -1171,6 +1172,20 @@ test('uses jog speed for XY buttons and return to work zero without hijacking ca
 
 async function selectAll(page: Page): Promise<void> {
   await runMenuCommand(page, 'Edit', 'Select All');
+}
+
+async function acceptNestDraft(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Quick Nest', exact: true });
+  const before = await composedSvgSnapshot(page);
+  await dialog.getByRole('button', { name: 'Nest selection', exact: true }).click();
+  await expect(dialog.getByRole('status')).toContainText('Search complete');
+  await expect(
+    dialog.getByRole('img', { name: 'Nesting draft: blue parts and grey locked obstacles' }),
+  ).toBeVisible();
+  expect(await composedSvgSnapshot(page)).toEqual(before);
+  await dialog.getByRole('button', { name: 'Accept best valid layout', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect((await composedSvgSnapshot(page)).undoCount).toBe(before.undoCount + 1);
 }
 
 async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
