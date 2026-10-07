@@ -167,10 +167,17 @@ async function windowProof(input, paths, evidence, child, label, edition) {
   }
 }
 
-async function nativePhase(input, paths, phase, label, onSpawn) {
+export async function nativePhase(
+  input,
+  paths,
+  phase,
+  label,
+  onSpawn,
+  collectProcess = collectNativeSmokeProcess,
+) {
   const resultPath = privateNativeResult(paths.privateRoot, label);
   let proof = Promise.resolve(false);
-  const processResult = await collectNativeSmokeProcess(
+  const processResult = await collectProcess(
     join(paths.installRoot, 'KerfDesk.exe'),
     nativeLicenceArguments({
       profile: paths.profile,
@@ -200,16 +207,24 @@ async function nativePhase(input, paths, phase, label, onSpawn) {
       },
     },
   );
-  const result = await readFile(resultPath, 'utf8')
-    .then(JSON.parse)
-    .catch(() => null);
-  const safe = publicNativePhase(result, processResult, paths.profile, phase, label);
-  safe.editionScreenshotCaptured = await proof;
-  await writeFile(join(input.output, `${label}.json`), JSON.stringify(safe, null, 2) + '\n', {
-    flag: 'wx',
-  });
-  await rm(resultPath, { force: true });
-  return safe;
+  try {
+    const result = await readFile(resultPath, 'utf8')
+      .then(JSON.parse)
+      .catch(() => null);
+    const safe = publicNativePhase(result, processResult, paths.profile, phase, label);
+    safe.editionScreenshotCaptured = await proof;
+    await writeFile(join(input.output, `${label}.json`), JSON.stringify(safe, null, 2) + '\n', {
+      flag: 'wx',
+    });
+    await rm(resultPath, { force: true });
+    return safe;
+  } catch {
+    // Preserve observed process state when evidence handling fails before returning it.
+    throw new LicenceQualificationError(
+      'native-phase-evidence-failed',
+      processResult.childClosed === true,
+    );
+  }
 }
 
 async function erasePrivateInputs(paths, receipt) {

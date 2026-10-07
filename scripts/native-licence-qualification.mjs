@@ -230,7 +230,8 @@ export async function retainedDeveloperSequence(actions) {
         receipt.cleanup.passed = true;
         receipt.cleanup.nativeDeactivationObserved = observed.nativeDeactivationObserved === true;
         receipt.cleanup.serverSeatReleaseUnknown = true;
-      } catch {
+      } catch (error) {
+        if (error instanceof LicenceQualificationError) processClosed = error.processClosed;
         receipt.cleanup.failure = processClosed
           ? 'deactivation-not-confirmed'
           : 'owned-app-process-did-not-close';

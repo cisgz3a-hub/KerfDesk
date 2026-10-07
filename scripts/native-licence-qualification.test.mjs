@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import {
   LICENCE_SECRET,
@@ -11,7 +12,7 @@ import {
   publicNativePhase,
   retainedDeveloperSequence,
 } from './native-licence-qualification.mjs';
-import { qualificationInput } from './qualify-desktop-licence.mjs';
+import { nativePhase, qualificationInput } from './qualify-desktop-licence.mjs';
 
 const key = `KD1.synthetic-qualification.${'x'.repeat(43)}`;
 const profile = resolve('owned-test-profile');
@@ -301,3 +302,119 @@ test('cleanup never launches another copy when phase throws with an unclosed own
   assert.equal(calls, 1);
   assert.equal(receipt.cleanup.attempted, false);
 });
+
+for (const childClosed of [false, true])
+  test(`native evidence-write failure preserves ${childClosed ? 'closed' : 'unclosed'} process state through cleanup`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-native-evidence-'));
+    assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+    let phaseCalls = 0;
+    let phaseError;
+    try {
+      const receipt = await retainedDeveloperSequence({
+        phase: async (name, label) => {
+          phaseCalls += 1;
+          try {
+            return await nativePhase(
+              { output: join(directory, 'missing-evidence-directory') },
+              {
+                installRoot: join(directory, 'unused-install'),
+                privateRoot: directory,
+                profile: join(directory, 'unused-profile'),
+                keyFile: join(directory, 'unused-key.json'),
+              },
+              name,
+              label,
+              () => assert.fail('cannot spawn a native process'),
+              async () => ({ ...processResult, childClosed }),
+            );
+          } catch (error) {
+            phaseError = error;
+            throw error;
+          }
+        },
+        credentialPresent: async () => assert.fail('cannot read a credential'),
+        reinstall: async () => assert.fail('cannot run an installer'),
+      });
+      assert.equal(phaseCalls, childClosed ? 2 : 1);
+      assert.ok(phaseError instanceof LicenceQualificationError);
+      assert.equal(phaseError.code, 'native-phase-evidence-failed');
+      assert.equal(phaseError.processClosed, childClosed);
+      assert.equal(receipt.cleanup.attempted, childClosed);
+      assert.equal(
+        receipt.cleanup.failure,
+        childClosed ? 'deactivation-not-confirmed' : 'owned-app-process-did-not-close',
+      );
+      assert.equal(receipt.passed, false);
+    } finally {
+      assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+      await rm(directory, { recursive: true });
+    }
+  });
+
+for (const childClosed of [false, true])
+  test(`deactivation evidence-write failure preserves ${childClosed ? 'closed' : 'unclosed'} process state after successful earlier phases`, async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-native-deactivation-'));
+    assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+    const paths = {
+      installRoot: join(directory, 'unused-install'),
+      privateRoot: join(directory, 'private'),
+      profile: join(directory, 'unused-profile'),
+      keyFile: join(directory, 'unused-key.json'),
+    };
+    const evidence = join(directory, 'evidence');
+    const calls = [];
+    let phaseError;
+    try {
+      await mkdir(paths.privateRoot);
+      await mkdir(evidence);
+      const receipt = await retainedDeveloperSequence({
+        phase: async (name, label) => {
+          calls.push(name);
+          const result = {
+            ...nativeResult(name),
+            userData: paths.profile,
+            sessionData: paths.profile,
+          };
+          await writeFile(join(paths.privateRoot, `${label}.json`), JSON.stringify(result));
+          try {
+            return await nativePhase(
+              {
+                output:
+                  name === 'deactivate' ? join(directory, 'missing-evidence-directory') : evidence,
+              },
+              paths,
+              name,
+              label,
+              () => assert.fail('cannot spawn a native process'),
+              async () => ({
+                ...processResult,
+                childClosed: name === 'deactivate' ? childClosed : true,
+              }),
+            );
+          } catch (error) {
+            phaseError = error;
+            throw error;
+          }
+        },
+        credentialPresent: async () => true,
+        reinstall: async () => calls.push('reinstall'),
+      });
+      assert.deepEqual(calls, ['activate', 'offline', 'reinstall', 'offline', 'deactivate']);
+      assert.equal(receipt.stages.length, 3);
+      assert.ok(receipt.stages.every(({ passed }) => passed));
+      assert.equal(receipt.reinstalledSamePublishedBytes, true);
+      assert.ok(phaseError instanceof LicenceQualificationError);
+      assert.equal(phaseError.code, 'native-phase-evidence-failed');
+      assert.equal(phaseError.processClosed, childClosed);
+      assert.equal(receipt.cleanup.attempted, true);
+      assert.equal(receipt.cleanup.passed, false);
+      assert.equal(
+        receipt.cleanup.failure,
+        childClosed ? 'deactivation-not-confirmed' : 'owned-app-process-did-not-close',
+      );
+      assert.equal(receipt.passed, false);
+    } finally {
+      assert.equal(dirname(resolve(directory)), resolve(tmpdir()));
+      await rm(directory, { recursive: true });
+    }
+  });
