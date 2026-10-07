@@ -17,6 +17,7 @@ import {
 import { pushUndo } from './scene-mutations';
 import { outlineForNestUnit } from './nest-outline';
 import type { AppState } from './store';
+import { rigidNestDependencies, rigidNestMembers } from './nest-dependencies';
 
 export type QuickNestOptions = {
   readonly bin: 'workspace' | 'board';
@@ -88,15 +89,13 @@ function planNest(state: AppState, options: QuickNestOptions): NestPlan {
       )
       .map((object) => object.id),
   );
-  const units = nestUnits(state, movableIds);
+  const dependencies = rigidNestDependencies(state.project.scene, movableIds);
+  if (!dependencies.ok) return dependencies;
+  const units = nestUnits(state, movableIds, dependencies.neighbours);
   if (units.length === 0) return { ok: false, reason: 'Select unlocked visible artwork to nest.' };
   const bin = resolveBin(state, options.bin);
   if (bin === null) return { ok: false, reason: 'Place a board before nesting into the board.' };
-  const binBoxId =
-    options.bin === 'board' ? findRegistrationBoxes(state.project.scene)[0]?.id : undefined;
-  const obstacles = state.project.scene.objects
-    .filter((object) => object.locked === true && object.id !== binBoxId)
-    .map(transformedBBox);
+  const obstacles = lockedNestObstacles(state, options.bin);
   const items = units.map(
     (unit): OutlineNestItem => ({
       id: unit.id,
@@ -154,37 +153,36 @@ function applyNestPlan(
   };
 }
 
-function nestUnits(state: AppState, movableIds: ReadonlySet<string>): NestUnit[] {
+function lockedNestObstacles(state: AppState, bin: QuickNestOptions['bin']): NestRect[] {
+  const binBoxId = bin === 'board' ? findRegistrationBoxes(state.project.scene)[0]?.id : undefined;
+  return state.project.scene.objects
+    .filter((object) => object.locked === true && object.id !== binBoxId)
+    .map(transformedBBox);
+}
+function nestUnits(
+  state: AppState,
+  movableIds: ReadonlySet<string>,
+  neighbours: ReadonlyMap<string, ReadonlySet<string>>,
+): NestUnit[] {
   const consumed = new Set<string>();
   const units: NestUnit[] = [];
-  for (const group of state.project.scene.groups ?? []) {
-    if (group.objectIds.length < 2 || !group.objectIds.every((id) => movableIds.has(id))) continue;
-    const objects = state.project.scene.objects.filter((object) =>
-      group.objectIds.includes(object.id),
-    );
+  for (const object of state.project.scene.objects) {
+    if (!movableIds.has(object.id) || consumed.has(object.id)) continue;
+    const members = rigidNestMembers(object.id, neighbours);
+    members.forEach((id) => consumed.add(id));
+    const objects = state.project.scene.objects.filter((item) => members.has(item.id));
     const bounds = combinedBBox(objects);
     if (bounds === null) continue;
     units.push({
-      id: `group:${group.id}`,
+      // Scene object IDs are unique. Group IDs are opaque and may contain separators.
+      id: 'object:' + object.id,
       objects,
       bounds,
       ...outlineForNestUnit(objects, bounds),
     });
-    group.objectIds.forEach((id) => consumed.add(id));
-  }
-  for (const object of state.project.scene.objects) {
-    if (!movableIds.has(object.id) || consumed.has(object.id)) continue;
-    const bounds = transformedBBox(object);
-    units.push({
-      id: `object:${object.id}`,
-      objects: [object],
-      bounds,
-      ...outlineForNestUnit([object], bounds),
-    });
   }
   return units;
 }
-
 function placeUnit(unit: NestUnit, placement: NestPlacement): SceneObject[] {
   const rotated = placement.rotated90 ? rotateUnit90(unit) : [...unit.objects];
   const rotatedBounds = combinedBBox(rotated);

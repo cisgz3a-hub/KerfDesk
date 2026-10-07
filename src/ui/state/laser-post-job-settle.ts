@@ -93,11 +93,10 @@ async function runPostJobSettle(
 ): Promise<void> {
   try {
     if (!ownsCurrent()) return;
-    // Use the active driver's settle marker (ADR-095), not a hardcoded GRBL
-    // dwell: on Marlin the marker is M400 (acks only when buffered motion has
-    // drained); G4 P is milliseconds there and acks immediately, so the settle
-    // would clear the streamer mid-motion (CTL-02). GRBL's is 'G4 P0.01', so
-    // its bytes are unchanged. The home action does the same at its call site.
+    // Use the active driver's settle marker (ADR-095): Marlin's M400 waits for
+    // buffered motion to drain. Marlin's G4 also synchronizes the planner, but
+    // its P parameter is milliseconds. GRBL's marker remains 'G4 P0.01' with P
+    // in seconds. The home action also uses its driver's settle marker.
     await startControllerCommand(refs, safeWrite, {
       kind: 'post-job-settle',
       label: 'post-job settle marker',
