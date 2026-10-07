@@ -39,6 +39,8 @@ import {
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
+import { rootSvgViewportMapping } from './svg-root-viewport';
+import type { SvgMatrix } from './svg-curve-transform';
 import {
   INITIAL_PRESENTATION_STATE,
   numAttr,
@@ -102,14 +104,10 @@ type WalkContext = {
   readonly useBudget: SvgUseBudget;
 };
 
-function walkGeometry(
-  svgEl: Element,
-  context: WalkContext,
-  unitScale: { readonly scaleX: number; readonly scaleY: number },
-): void {
+function walkGeometry(svgEl: Element, context: WalkContext, transform: SvgMatrix | null): void {
   // The unit scale seeds the transform stack root so every element's
   // geometry lands in mm (H9), composing with element/group transforms.
-  const transform = { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 };
+  if (transform === null) return;
   const rootState = presentationStateFor(
     svgEl,
     { ...INITIAL_PRESENTATION_STATE, transform, viewport: rootViewportSize(svgEl) },
@@ -375,7 +373,8 @@ export function parseSvgDocument(
   }
 
   const unitScale = resolveUnitScale(svgEl);
-  const bounds = unitScale.bounds;
+  const rootViewport = rootSvgViewportMapping(svgEl, unitScale);
+  const bounds = rootViewport.bounds;
   assertSvgImportPoints([
     { x: bounds.minX, y: bounds.minY },
     { x: bounds.maxX, y: bounds.maxY },
@@ -402,7 +401,7 @@ export function parseSvgDocument(
       active: new Set(),
       useBudget: createSvgUseBudget(svgEl),
     },
-    unitScale,
+    rootViewport.matrix,
   );
 
   const paths: ColoredPath[] = [...byColor.values()].map((bucket) => ({
