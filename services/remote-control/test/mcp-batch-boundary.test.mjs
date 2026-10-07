@@ -201,6 +201,20 @@ for (const protocol of ['2025-03-26', '2025-11-25']) {
         const phone = await pairPhone(worker, desktop, ['read', 'control']);
         const credentials = await authorizeMcp(worker, phone, 'kerfdesk:read kerfdesk:control');
         const pending = await post(worker, credentials, protocol, tool(9000));
+        assert.equal(pending.status, 200);
+        // Start the read immediately: Miniflare shares the body with a collectible Undici response.
+        const pendingBody = pending.text();
+        let pendingReadState = 'pending';
+        let pendingReadError;
+        void pendingBody.then(
+          () => {
+            pendingReadState = 'completed';
+          },
+          (error) => {
+            pendingReadState = 'failed';
+            pendingReadError = error;
+          },
+        );
         const original = await desktop.inbox.next('command');
         const invalid = [
           [],
@@ -276,8 +290,17 @@ for (const protocol of ['2025-03-26', '2025-11-25']) {
           desktop.inbox.queue.some((message) => ['command', 'cancel'].includes(message.type)),
           false,
         );
+        assert.ifError(pendingReadError);
+        assert.equal(
+          pendingReadState,
+          'pending',
+          'Rejected traffic must leave the original response pending until its desktop result',
+        );
         desktop.send({ type: 'result', requestId: original.requestId, result: workspace });
-        assert.deepEqual(results(await pending.text())[0].result.structuredContent, workspace);
+        const pendingReplies = results(await pendingBody);
+        assert.equal(pendingReplies.length, 1);
+        assert.equal(pendingReplies[0].id, 9000);
+        assert.deepEqual(pendingReplies[0].result.structuredContent, workspace);
         // Validation of all members precedes registration: this ID was never reserved by the invalid pair.
         const next = await post(worker, credentials, protocol, tool(2));
         const nextCommand = await desktop.inbox.next('command');
