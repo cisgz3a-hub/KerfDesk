@@ -257,6 +257,19 @@ describe('live canvas status reconciliation', () => {
     expect(finished?.endedAtMs).toBe(6_000);
   });
 
+  it.each(['stopped', 'disconnected', 'errored'] as const)(
+    'cannot turn a %s interruption into a completed display',
+    (lifecycle) => {
+      const interrupted = {
+        ...startLiveCanvasRun(plan(), 1_000),
+        lifecycle,
+        endedAtMs: 1_600,
+        timing: { kind: 'unavailable' as const, reason: 'settlement did not complete' },
+      };
+      expect(completeLiveCanvasRun(interrupted, 2_000)).toBe(interrupted);
+    },
+  );
+
   it('preserves the last confirmed prefix when a run stops or errors', () => {
     const current = state();
     const advanced = liveCanvasStatusPatch(current, report(5), acceptedStreamer()).liveCanvasRun;

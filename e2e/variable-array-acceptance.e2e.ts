@@ -102,7 +102,7 @@ async function createVariableBadge(page: Page): Promise<void> {
     mimeType: 'text/csv',
     buffer: Buffer.from(`name\n${names.join('\n')}\n`),
   });
-  await page.getByRole('button', { name: 'CSV: name', exact: true }).click();
+  await page.getByRole('button', { name: 'Insert column', exact: true }).click();
   await page.getByRole('button', { name: 'Serial', exact: true }).click();
   await page.getByRole('spinbutton', { name: 'Variable serial start', exact: true }).fill('10');
   await page.getByRole('button', { name: 'Reset', exact: true }).click();

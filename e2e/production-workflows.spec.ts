@@ -64,6 +64,7 @@ test('creates arrays, nests them, previews them, and saves one undoable project'
     'true',
   );
   await page.getByRole('button', { name: 'Nest selection' }).click();
+  await page.getByRole('button', { name: 'Accept best valid layout', exact: true }).click();
 
   await (await toolbarCommand(page, 'Preview')).click();
   await expect(
@@ -122,6 +123,7 @@ test('outline-nests complementary vector parts that rectangular bounds cannot fi
   await runMenuCommand(page, 'Arrange', 'Quick Nest...');
   await page.getByRole('spinbutton', { name: 'Part spacing (mm)' }).fill('0');
   await page.getByRole('button', { name: 'Nest selection' }).click();
+  await page.getByRole('button', { name: 'Accept best valid layout', exact: true }).click();
   await saveProjectAs(page, kerfdesk);
 
   const saved = await savedProject(kerfdesk);
@@ -302,7 +304,12 @@ test('imports a CLB library and links its preset to a cut layer', async ({ page,
   );
   await page.getByRole('button', { name: 'Link selected material preset to layer' }).click();
   await expect(page.getByText('Linked preset to layer.', { exact: true })).toBeVisible();
-  await expect(page.getByText(/Linked preset is current at revision/)).toBeVisible();
+  await expect(
+    page
+      .getByRole('tabpanel', { name: 'Materials' })
+      .getByRole('status')
+      .filter({ hasText: /Linked preset is current at revision/ }),
+  ).toBeVisible();
 });
 
 test('builds bounded variable text sequences with wrap, reverse, and reset', async ({
@@ -323,7 +330,7 @@ test('builds bounded variable text sequences with wrap, reverse, and reset', asy
     mimeType: 'text/csv',
     buffer: Buffer.from('name,material\nBracket,Birch\nPanel,Acrylic\n'),
   });
-  await page.getByRole('button', { name: 'CSV: name' }).click();
+  await page.getByRole('button', { name: 'Insert column' }).click();
   await page.getByRole('button', { name: 'Serial' }).click();
   await page.getByRole('spinbutton', { name: 'Variable serial start' }).fill('100');
   await expect(

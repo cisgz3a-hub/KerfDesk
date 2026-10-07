@@ -27,7 +27,7 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
       };
       if (name.trim() === '' || name.length > 200 || book.inactive.length >= 99) return null;
       const id = crypto.randomUUID();
-      const next = duplicate ? withoutBook(current) : blankSheet(current);
+      const next = duplicate ? duplicateSheet(current) : blankSheet(current);
       const sheetBook: ProjectSheetBook = {
         activeId: id,
         activeName: name.trim(),
@@ -114,6 +114,12 @@ function archiveCurrent(
 }
 function withoutBook(project: Project): Project {
   const { sheetBook: _book, ...content } = project;
+  return content;
+}
+/** Copy current artwork, including already fixed row text. The original run
+ * and its observations stay archived; the copy requires a fresh explicit allocation. */
+function duplicateSheet(project: Project): Project {
+  const { productionManifest: _manifest, ...content } = withoutBook(project);
   return content;
 }
 function blankSheet(project: Project): Project {

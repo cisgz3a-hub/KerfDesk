@@ -47,7 +47,6 @@ import { VectorRepairDialogHost } from './VectorRepairDialogHost';
 import { OffsetShapesDialogHost } from './OffsetShapesDialogHost';
 import { SettingsWindowHost } from '../settings/SettingsWindowHost';
 import { redoSteps, undoSteps } from '../state/undo-history';
-import { ProjectSheetsBar } from './ProjectSheetsBar';
 import { JointResizeDialogHost } from './JointResizeDialogHost';
 import { StampPreparationDialogHost } from './StampPreparationDialogHost';
 import { AiAssistantDialogHost } from '../ai/AiAssistantDialog';
@@ -119,7 +118,6 @@ export function CommandShell(): JSX.Element {
       <Toolbar commands={commands} machineKind={machineKind} />
       <NumericEditsBar />
       <WorkspaceContextBar commands={commands} />
-      <ProjectSheetsBar />
       <BitmapDialog />
       {adjustDialogOpen && selectedRaster !== null ? (
         <AdjustDialog image={selectedRaster} onClose={() => setAdjustDialogOpen(false)} />
