@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { ORIGIN, start, connectDesktop, pairPhone, authorizeMcp, workspace } from './support.mjs';
 import { closeSocket } from './post-release-support.mjs';
 import { operationReceipt } from './control-support.mjs';
+import { startObservedRateWorker, admissionWindow, rateCall } from './rate-window-support.mjs';
 
 const tool = (id, name = 'get_workspace', args = {}) => ({
   jsonrpc: '2.0',
@@ -327,8 +328,8 @@ for (const protocol of ['2025-03-26', '2025-11-25']) {
   test(
     `workerd: ${protocol} canonical 100-Abort batch is accepted with bounded per-member admission and release`,
     { timeout: 20_000 },
-    async () => {
-      const worker = start({ clientRateLimit: 1, abortRateLimit: 2 });
+    async (t) => {
+      const worker = startObservedRateWorker({ clientRateLimit: 1, abortRateLimit: 2 });
       let desktop;
       try {
         desktop = await connectDesktop(worker);
@@ -349,10 +350,14 @@ for (const protocol of ['2025-03-26', '2025-11-25']) {
                   : workspace,
             });
         });
+        const epoch = await admissionWindow(worker);
+        const calls = [];
         const ordinary = await post(worker, credentials, protocol, tool(1000));
+        calls.push(rateCall(ordinary, epoch, 'CLIENT_LIMIT', true));
         assert.equal(ordinary.status, 200);
         await ordinary.text();
         const deniedOrdinary = await post(worker, credentials, protocol, tool(1001));
+        calls.push(rateCall(deniedOrdinary, epoch, 'CLIENT_LIMIT', false));
         assert.equal(deniedOrdinary.status, 429);
         await deniedOrdinary.text();
         const batch = Array.from({ length: 100 }, (_, index) =>
@@ -361,6 +366,7 @@ for (const protocol of ['2025-03-26', '2025-11-25']) {
         const response = await post(worker, credentials, protocol, batch, {
           'Content-Type': 'APPLICATION/JSON',
         });
+        calls.push(rateCall(response, epoch, 'ABORT_LIMIT', true));
         assert.equal(response.status, 200, await response.clone().text());
         const replies = results(await response.text());
         assert.equal(replies.length, 100);
@@ -379,16 +385,23 @@ for (const protocol of ['2025-03-26', '2025-11-25']) {
         const next = await post(worker, credentials, protocol, [
           tool(0, 'abort_job', { requestId: randomUUID() }),
         ]);
+        calls.push(rateCall(next, epoch, 'ABORT_LIMIT', true));
         assert.equal(next.status, 200);
         const reply = results(await next.text())[0].result.structuredContent;
         assert.notEqual(reply.error?.code, 'unavailable');
-        assert.equal(
-          (
-            await post(worker, credentials, protocol, [
-              tool(101, 'abort_job', { requestId: randomUUID() }),
-            ])
-          ).status,
-          429,
+        const limited = await post(worker, credentials, protocol, [
+          tool(101, 'abort_job', { requestId: randomUUID() }),
+        ]);
+        calls.push(rateCall(limited, epoch, 'ABORT_LIMIT', false));
+        assert.equal(limited.status, 429);
+        await limited.text();
+        t.diagnostic(
+          JSON.stringify({
+            admissionEpoch: epoch,
+            startedUtc: new Date(calls[0].started).toISOString(),
+            endedUtc: new Date(calls.at(-1).ended).toISOString(),
+            calls,
+          }),
         );
       } finally {
         closeSocket(desktop?.socket);
