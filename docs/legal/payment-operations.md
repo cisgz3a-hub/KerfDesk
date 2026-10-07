@@ -1,6 +1,16 @@
 # KerfDesk payment and privacy operations
 
-Prepared 7 October 2026 for the sole proprietor Johannes Stephanus Stolk. Paid checkout remains closed. Public-content readiness is separate from provider/licensed-build, delivery and refund qualification, and from resolving the applicable statutory disclosure questions in publishing-notes.md. This is an operator process, not a claim that live payment delivery has been proven. It requires no company incorporation, lawyer or Windows signing purchase.
+Prepared 7 October 2026 for the sole proprietor Johannes Stephanus Stolk. The owner authorised the checkout rollout on 7 October 2026 (ADR-562 Amendment 1); actual deployed availability is recorded separately. Public-content readiness is separate from provider/licensed-build, delivery and refund qualification, and from resolving the applicable statutory disclosure questions in publishing-notes.md. This is an operator process, not a claim that live payment delivery has been proven. It requires no company incorporation, lawyer or Windows signing purchase.
+
+## Opening and closing new checkout
+
+Before enabling payments, confirm the live catalog, approved checkout URL and production provider configuration, and retain evidence for the supported browser/phone and Windows customer journeys. Sandbox payment checks do not require a real charge. A live paid purchase or refund is a separate financial action and needs the owner's specific authorisation.
+
+The launch changes only PAYMENTS_ENABLED to true in the existing kerfdesk-desktop-licensing service configuration. Keep LICENSING_ENABLED=true, the existing signing key id, live catalog and credentials, rate-limit namespaces and LicenseAuthority binding/migration. Reconcile dashboard-only non-secret variables before deploying: Wrangler normally replaces vars but preserves secrets. In particular, ensure the configured public Paddle client token survives the deployment. Never record its private API or webhook credentials in source or an operator receipt.
+
+For an incident, set PAYMENTS_ENABLED=false and close website salesOpen, while preserving LICENSING_ENABLED=true and all existing provider/catalog/signing/storage configuration. Redeploy the same service and publish the matching availability copy. Trials can remain open. The service still accepts authenticated completed-payment notifications for existing orders and permits saved claims, activation and refresh. An existing already-created checkout can still take payment; closing new-order creation does not cancel it at Paddle. Preserve pending orders, support recovery and licences, and reconcile any payment received during the incident. Never reset the licensing database to close sales.
+
+After enabling or closing new orders, verify both public endpoints. GET /v1/public/health confirms database availability only; GET /v1/public/config confirms enabled/disabled checkout configuration. The buyer's Check payment result and successful desktop activation provide separate delivery evidence. Never claim a browser completion callback proves fulfilment.
 
 ## Support and lost keys
 

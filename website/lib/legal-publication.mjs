@@ -30,7 +30,7 @@ export function publicationReviewQuestions() {
       'Determine the applicable POPIA responsible-party address/notification and international-transfer arrangements for actual processing; factual publication is not compliance certification.',
     ],
     liveSales: [
-      'Checkout and new trials stay closed. Opening them needs separately authorised launch and provider, licensed-build, delivery and refund qualification.',
+      'The owner authorised launch under ADR-562 Amendment 1. Source flags and published pages do not prove deployed provider configuration or completed customer payment, delivery and refund checks.',
     ],
     paia: [
       'Complete the separate PAIA contact and inspection arrangements and any required Information Officer registration before describing the draft manual as effective.',
@@ -57,8 +57,8 @@ export function publicSellerContact({ privacy = false, publication = legalPublic
     ${!privacy &&
     html`<p>
       The proprietor is not VAT-registered. Paddle is the chosen authorised reseller and merchant of
-      record for purchases. Paid checkout remains closed; applicable taxes and the total will be
-      shown before a future payment.
+      record for purchases. Purchase availability is shown on the KerfDesk purchase page; applicable
+      taxes and the total are shown before payment.
     </p>`}
     <nav aria-label="Payment information">
       <a href="/pricing/">Pricing</a> · <a href="/terms/">Software terms</a> ·

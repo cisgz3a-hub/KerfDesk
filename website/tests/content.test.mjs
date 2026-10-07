@@ -182,20 +182,23 @@ describe('website copy', () => {
     assert.match(pricing, /Free has no time limit/);
     assert.match(
       pricing,
-      /Pro adds advanced tools to the Windows desktop app for US\$49\.50, paid once\. Paid checkout is closed\./,
+      /Pro adds advanced tools to the Windows desktop app for US\$49\.50, paid once\./,
     );
   });
 
   // Published Supplier Terms and the refund promise are accessible before any
   // purchase, without opening checkout or replacing a supplied app notice.
-  it('publishes the refund promise and Supplier Terms while checkout stays closed', () => {
+  it('publishes unchanged purchase rights and the refund promise for the authorised launch', () => {
     const refunds = pageText('refunds/index.html');
     const terms = pageText('terms/index.html');
-    assert.match(refunds, /Paid checkout is closed/);
-    assert.match(refunds, /There is no checkout and nothing can be bought today/);
+    assert.doesNotMatch(refunds, /Paid checkout is closed|nothing can be bought today/);
+    assert.match(refunds, /Version 1\.1\. Published: 7 October 2026/);
     assert.match(refunds, /We promise a full refund if you request it within 14 calendar days/);
     assert.match(refunds, /after activating and using Pro/);
-    assert.match(terms, /purchase provisions apply if and when you buy/);
+    assert.match(terms, /purchase provisions apply when you buy/);
+    assert.match(terms, /computer, phone or tablet/);
+    assert.match(terms, /Check payment/);
+    assert.doesNotMatch(terms, /Paid checkout.*closed|New trials are not open today/);
     assert.match(terms, /(?:do|does) not replace an installed notice/);
     for (const { file, html } of built) {
       const links = attrValues(html, 'a', 'href');

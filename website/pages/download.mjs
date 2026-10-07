@@ -53,12 +53,13 @@ function platforms(site) {
       ${button(site.appUrl, 'Open the web app', { iconName: 'arrow-right' })}
     </article>
     <article class="platform">
-      <span class="eyebrow">Preview or signed edition</span>
+      <span class="eyebrow">Windows Free and Pro</span>
       <h3>${icon('monitor')}Windows</h3>
       <p>
-        Windows 10 or 11, 64-bit (x64). The download page offers the unsigned Preview and, once it’s
-        released, the signed Windows edition with in-app updates. Testing on real Windows PCs isn’t
-        finished yet.
+        Windows 10 or 11, 64-bit (x64). The commercial Windows edition is available as an unsigned
+        installer. Windows may show an unknown publisher warning. Use the KerfDesk download page to
+        get the verified release. It opens Free; start a Pro trial or enter a purchased licence in
+        Help &gt; Licence.
       </p>
       <p>Look for ${asset(WINDOWS.file)}</p>
       ${button(site.downloadPageUrl, 'Windows downloads', {

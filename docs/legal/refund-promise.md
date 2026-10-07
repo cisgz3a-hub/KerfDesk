@@ -1,8 +1,8 @@
 # KerfDesk Refund Policy
 
-Version 1.0. Published: 7 October 2026.
+Version 1.1. Published: 7 October 2026.
 
-**Paid checkout is closed. There is no checkout and nothing can be bought today.** This is our published refund promise for a future KerfDesk Pro or optional update purchase through Paddle. It does not open sales or create a charge.
+This is our published refund promise for a KerfDesk Pro or optional update purchase through Paddle. Purchase availability is shown on the KerfDesk purchase page. Publishing this policy does not itself open sales or create a charge.
 
 ## 1. Our 14-day promise
 
