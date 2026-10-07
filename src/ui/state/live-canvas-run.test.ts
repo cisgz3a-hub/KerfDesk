@@ -227,7 +227,8 @@ describe('live canvas status reconciliation', () => {
       'stopped',
       9_000,
     ).liveCanvasRun;
-    expect(restopped?.endedAtMs).toBe(3_000);
+    expect(restopped).toBeUndefined();
+    expect(stopped?.endedAtMs).toBe(3_000);
   });
 
   it('freezes the end time when a status report finishes the run', () => {

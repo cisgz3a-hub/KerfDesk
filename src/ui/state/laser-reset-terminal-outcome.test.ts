@@ -163,6 +163,32 @@ describe('actual reset outcome supplies the first terminal canvas event', () => 
     expect(useLaserStore.getState().liveCanvasRun).toEqual(stopped);
   });
 
+  it('preserves the first controller fault through a causal reboot and another accepted Abort', async () => {
+    const context = await trackedRun();
+    context.f.emit('error:7');
+    await flush();
+    const firstFault = useLaserStore.getState().liveCanvasRun;
+    const firstInterruption = context.repository.getSnapshot().recoveryCapsule?.interruption;
+    expect(firstFault?.lifecycle).toBe('errored');
+    expect(firstInterruption?.kind).toBe('controller-error');
+    if (firstFault === null || firstFault === undefined || firstInterruption === undefined) {
+      throw new Error('Expected the genuine controller fault and its recovery interruption.');
+    }
+
+    context.f.emit('Grbl 1.1f');
+    context.f.status();
+    await vi.advanceTimersByTimeAsync(250);
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    await useLaserStore.getState().stopJob();
+    await flush();
+
+    expect(useLaserStore.getState().liveCanvasRun).toEqual(firstFault);
+    expect(context.repository.getSnapshot().recoveryCapsule?.interruption).toEqual(
+      firstInterruption,
+    );
+    expect(context.terminalSight.every((lifecycle) => lifecycle === 'errored')).toBe(true);
+  });
+
   it('accepts a causal reboot before its transport promise settles without publishing a provisional fault', async () => {
     const context = await trackedRun();
     context.f.controls.reset = 'immediate-boot';

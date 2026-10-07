@@ -103,7 +103,7 @@ export function liveCanvasLifecyclePatch(
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
   if (run === null) return {};
-  if (isTerminalCanvasLifecycle(run.lifecycle) && !isTerminalCanvasLifecycle(lifecycle)) return {};
+  if (isTerminalCanvasLifecycle(run.lifecycle)) return {};
   const timing = liveCanvasTimingForLifecycle(run.timing, lifecycle, now);
   return {
     liveCanvasRun: {

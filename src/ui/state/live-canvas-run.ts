@@ -12,6 +12,7 @@ import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
 import {
   endStampFor,
   initialLiveCanvasTiming,
+  isTerminalCanvasLifecycle,
   liveCanvasLifecyclePatch,
   liveCanvasTimingForStatus,
 } from './live-canvas-run-timing';
@@ -36,7 +37,13 @@ export function liveCanvasStatusPatch(
   now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
-  if (run === null || isProvisionalResetFreeze(state, streamer?.status)) return {};
+  if (
+    run === null ||
+    isTerminalCanvasLifecycle(run.lifecycle) ||
+    isProvisionalResetFreeze(state, streamer?.status)
+  ) {
+    return {};
+  }
   const lifecycle = lifecycleFor(
     state,
     streamer,
