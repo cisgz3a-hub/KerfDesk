@@ -4,6 +4,8 @@ export interface KerfDeskMcpBackend {
     command: string,
     args: Record<string, unknown>,
     signal?: AbortSignal,
+    /** Actual JSON-RPC ID, distinct from the command's durable UUID requestId. */
+    wireRequestId?: string | number,
   ): Promise<Record<string, unknown>>;
 }
 
@@ -48,6 +50,7 @@ export function requestMcpBackend(
   command: string,
   args: Record<string, unknown>,
   signal: AbortSignal,
+  wireRequestId?: string | number,
 ): Promise<Record<string, unknown>> {
   if (signal.aborted) return Promise.reject(new KerfDeskMcpError('cancelled'));
   return new Promise((resolve, reject) => {
@@ -56,7 +59,7 @@ export function requestMcpBackend(
     void Promise.resolve()
       .then(() => {
         if (signal.aborted) throw new KerfDeskMcpError('cancelled');
-        return backend.request(command, args, signal);
+        return backend.request(command, args, signal, wireRequestId);
       })
       .then(
         (value) => {
