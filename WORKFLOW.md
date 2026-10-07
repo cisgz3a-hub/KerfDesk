@@ -1143,7 +1143,11 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
-   (ADR-358). Use the project format to preserve editable text and machining data. Software tests
+   (ADR-358). New exports also restore their authored scene coordinate frame through explicit
+   artwork-origin metadata (ADR-570), before ordinary import placement. Older exports, or files
+   whose metadata an external editor removes, use standard SVG viewport placement and cannot
+   automatically recover that frame. Native SVG rendering is unchanged.
+   Use the project format to preserve editable text and machining data. Software tests
    do not replace rendered verification in KerfDesk and an independent vector editor.
 5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components

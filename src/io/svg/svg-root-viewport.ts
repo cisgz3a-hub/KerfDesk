@@ -2,15 +2,33 @@ import type { Bounds } from '../../core/scene';
 import type { SvgMatrix } from './svg-curve-transform';
 import { parseSvgLengthMmOrNull, type UnitScale } from './svg-units';
 import { parsePreserveAspectRatio, parseViewBox, viewBoxMatrix } from './svg-viewport';
+import { readSvgArtworkOrigin } from './svg-artwork-origin';
 
-/** Physical SVG roots map their viewBox into the declared viewport in mm. */
-export function rootSvgViewportMapping(
-  svg: Element,
-  units: UnitScale,
-): {
+type RootSvgViewport = {
   readonly bounds: Bounds;
   readonly matrix: SvgMatrix | null;
-} {
+};
+
+/** Physical SVG roots map their viewBox into the declared viewport in mm. */
+export function rootSvgViewportMapping(svg: Element, units: UnitScale): RootSvgViewport {
+  const viewport = physicalRootViewport(svg, units);
+  const origin = readSvgArtworkOrigin(svg);
+  if (viewport.matrix === null || origin === null) return viewport;
+  const { bounds, matrix } = viewport;
+  // Metadata restores artwork scene placement after the standard physical
+  // mapping. Translating bounds too keeps viewport/image clip coordinates aligned.
+  return {
+    bounds: {
+      minX: bounds.minX + origin.x,
+      minY: bounds.minY + origin.y,
+      maxX: bounds.maxX + origin.x,
+      maxY: bounds.maxY + origin.y,
+    },
+    matrix: { ...matrix, e: matrix.e + origin.x, f: matrix.f + origin.y },
+  };
+}
+
+function physicalRootViewport(svg: Element, units: UnitScale): RootSvgViewport {
   const matrix = { a: units.scaleX, b: 0, c: 0, d: units.scaleY, e: 0, f: 0 };
   const viewBox = parseViewBox(svg.getAttribute('viewBox'));
   const width = parseSvgLengthMmOrNull(svg.getAttribute('width'));
