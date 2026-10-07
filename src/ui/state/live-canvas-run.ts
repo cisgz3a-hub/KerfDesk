@@ -295,7 +295,8 @@ function controllerLifecycle(
   // Marlin's M114 is Idle-shaped but may describe a queued destination. Only
   // realtime Idle can prove a paused sender's accepted tail has drained.
   if (report.state === 'Idle' && isDrainedPausedSender(state, streamer)) return 'paused';
-  return report.state === 'Idle' && streamer?.status === 'done' ? 'finished' : null;
+  // Only the post-job settle owner may finish the run after its marker and stable Idle.
+  return null;
 }
 
 function isDrainedPausedSender(state: LaserState, streamer: StreamerState | null): boolean {

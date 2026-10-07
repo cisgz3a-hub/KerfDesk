@@ -15,6 +15,7 @@ import {
 import {
   completeLiveCanvasRun,
   liveCanvasFinishingPatch,
+  liveCanvasLifecyclePatch,
   liveCanvasTimingUnavailablePatch,
 } from './live-canvas-run';
 
@@ -153,8 +154,9 @@ async function runPostJobSettle(
             lastWriteError: message,
             safetyNotice: state.safetyNotice ?? controllerErrorNotice(null, 'command', message),
             log: pushLog(state, `[lf2] Post-job controller settle failed: ${message}`),
+            ...liveCanvasLifecyclePatch(state, 'errored'),
             ...liveCanvasTimingUnavailablePatch(
-              state,
+              { ...state, ...liveCanvasLifecyclePatch(state, 'errored') },
               'controller completion settlement could not be confirmed',
             ),
           }

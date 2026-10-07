@@ -122,6 +122,11 @@ describe('controller reboot before job settlement', () => {
           kind: 'post-job-settle',
           phase,
         });
+        expect(useLaserStore.getState().liveCanvasRun).toMatchObject({
+          lifecycle: 'running',
+          endedAtMs: null,
+          timing: { kind: 'finishing' },
+        });
       }
 
       connection.emitLine('Grbl 1.1f');
@@ -147,21 +152,89 @@ describe('controller reboot before job settlement', () => {
     },
   );
 
+  it('records a rejected drain marker as a terminal fault and retains it through later Idle', async () => {
+    const connection = await connectReady();
+    await startAndAcknowledgeJob(connection);
+    connection.emitLine('error:7');
+    await flush();
+    const fault = useLaserStore.getState().liveCanvasRun;
+    expect(useLaserStore.getState()).toMatchObject({
+      controllerOperation: null,
+      streamer: { status: 'done' },
+      liveCanvasRun: {
+        lifecycle: 'errored',
+        endedAtMs: expect.any(Number),
+        timing: {
+          kind: 'unavailable',
+          reason: 'controller completion settlement could not be confirmed',
+        },
+      },
+    });
+
+    connection.emitLine('<Idle|MPos:5,0,0|FS:0,0>');
+    connection.emitLine('<Idle|MPos:5,0,0|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().streamer).toBeNull();
+    expect(useLaserStore.getState().liveCanvasRun).toEqual(fault);
+  });
+
+  it('records an accepted Abort while the settled tail is still awaiting stable Idle', async () => {
+    const connection = await connectReady();
+    await startAndAcknowledgeJob(connection);
+    connection.emitLine('ok');
+    await flush();
+    connection.emitLine('<Idle|MPos:10,0,0|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().controllerOperation).toMatchObject({
+      kind: 'post-job-settle',
+      phase: 'awaiting-idle',
+    });
+
+    await useLaserStore.getState().stopJob();
+    await flush();
+    const stopped = useLaserStore.getState().liveCanvasRun;
+    expect(stopped).toMatchObject({
+      lifecycle: 'stopped',
+      endedAtMs: expect.any(Number),
+      timing: { kind: 'unavailable', reason: 'job stopped' },
+    });
+    connection.emitLine('Grbl 1.1f');
+    connection.emitLine('<Idle|MPos:5,0,0|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().liveCanvasRun).toEqual(stopped);
+  });
+
   it('does not turn a later idle reboot into a fault for an already settled job', async () => {
     const connection = await connectReady();
     await startAndAcknowledgeJob(connection);
     connection.emitLine('ok');
     await flush();
     connection.emitLine('<Idle|MPos:10,0,0|FS:0,0>');
+    await flush();
+    expect(useLaserStore.getState().liveCanvasRun).toMatchObject({
+      lifecycle: 'running',
+      endedAtMs: null,
+      timing: { kind: 'finishing' },
+    });
+    await vi.advanceTimersByTimeAsync(100);
+    const settledAtMs = Date.now();
     connection.emitLine('<Idle|MPos:10,0,0|FS:0,0>');
     await flush();
     expect(useLaserStore.getState().streamer).toBeNull();
-    expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('complete');
+    const completed = useLaserStore.getState().liveCanvasRun;
+    expect(completed).toMatchObject({
+      lifecycle: 'finished',
+      endedAtMs: settledAtMs,
+      timing: { kind: 'complete' },
+      route: { candidates: [], uncertain: false },
+    });
+    expect(completed?.route.confirmedRouteMm).toBe(completed?.plan.manifest.totalRouteMm);
 
     connection.emitLine('Grbl 1.1f');
     await flush();
 
     expect(useLaserStore.getState().safetyNotice).toBeNull();
     expect(useLaserStore.getState().liveCanvasRun?.timing?.kind).toBe('complete');
+    expect(useLaserStore.getState().liveCanvasRun).toEqual(completed);
   });
 });
