@@ -28,10 +28,16 @@ for (const mode of ['laser', 'cnc'] as const) {
         name: 'Artwork / Operations panel',
         exact: true,
       });
+      // Import preserves the black and red artwork as separate operations.
       await panel
+        .getByRole('button', { name: 'Use one operation for selection', exact: true })
+        .click();
+      const fill = panel
         .getByRole('radiogroup', { name: 'Mode for selected objects', exact: true })
-        .getByRole('radio', { name: 'Fill', exact: true })
-        .check();
+        .getByRole('radio', { name: 'Fill', exact: true });
+      await expect(fill).toBeVisible();
+      await fill.check();
+      await expect(fill).toBeChecked();
     }
     const prepared = await openPreparedReview(page, mode);
     const before = await composedSvgSnapshot(page);
@@ -154,6 +160,11 @@ async function openPreparedReview(page: Page, mode: 'laser' | 'cnc') {
         spindle: 0,
         wco: null,
       },
+      // Prepared-review fixture: an existing G92 XY origin at this reported position.
+      // No Set Origin command, Frame, or Start is dispatched by this workflow.
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      wcoCache: { x: 0, y: 0, z: 0 },
       controllerSessionEpoch: 7,
       controllerQualification: { kind: 'qualified', epoch: 7, settings: 'verified' },
       controllerSettings: { maxPowerS: 1000, minPowerS: 0, laserModeEnabled: mode === 'laser' },

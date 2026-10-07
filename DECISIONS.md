@@ -3028,6 +3028,22 @@ by anything other than input identity. Any other module-level mutable still
 violates the rule and needs its own ADR. Each cache declaration carries a comment
 pointing here.
 
+### 2026-10-07 clarification — stable Fill artwork subsets
+
+The uniform Fill route preserves its immutable source-array identity when every
+object contributes, and uses `stable-fill-artwork-subset.ts` for proper subsets.
+This is the same narrow transparent memoization exception: the outer WeakMap is
+keyed by the immutable source objects array, and its inner map caps at eight
+ordered membership-index entries with oldest-entry eviction. Effective Line and
+Image overrides remain excluded. Replacing or reordering the immutable source
+array invalidates selection identity; changed bindings or effective modes select
+a different membership entry. The existing layer/hatch cache keys still own
+operation identity, hatch settings and machine-space device invalidation. Power,
+speed and pass edits may reuse geometry while current group settings are rebuilt.
+No cache entry changes contour geometry, topology ownership or executable bytes.
+The unchanged-estimate, subset, invalidation, fresh-emission equivalence and
+eviction controls live in `compile-job-fill-cache.test.ts`.
+
 ### Consequences
 
 - The two caches stay in place; no refactor to a caller-threaded cache.

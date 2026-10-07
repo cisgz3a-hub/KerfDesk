@@ -28,7 +28,8 @@ test('saved Fill pools voids and gives each positive region one process owner', 
   await observeTopologyWorkers(page);
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/');
-  const project = await importTopologyProject(page, kerfdesk, 'fill');
+  const { imported, project } = await importTopologyProject(page, kerfdesk, 'fill');
+  writeFileSync(info.outputPath('fill-imported-project.json'), JSON.stringify(imported, null, 2));
   await page.screenshot({ path: info.outputPath('fill-workspace.png') });
   const gcode = await saveTopologyGcode(page, kerfdesk);
   writeFileSync(info.outputPath('fill.gcode'), gcode);
@@ -78,7 +79,7 @@ test('saved Fill pools voids and gives each positive region one process owner', 
         oracle:
           'Independent emitted G1 interpreter + rectangle edge-subinterval membership; 0.002 mm rounding margin.',
         setup:
-          'UI SVG Import; original geometry retained; process/device/order fixture seeded; C is canvas-frontmost positive contributor.',
+          'UI SVG Import per rectangle; canonical paths retained; placement/process/device/order fixture seeded; C is canvas-frontmost positive contributor.',
       },
       null,
       2,
@@ -95,7 +96,8 @@ test('saved Line finishes each inner packet before outer passes without changing
   await observeTopologyWorkers(page);
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/');
-  const project = await importTopologyProject(page, kerfdesk, 'line');
+  const { imported, project } = await importTopologyProject(page, kerfdesk, 'line');
+  writeFileSync(info.outputPath('line-imported-project.json'), JSON.stringify(imported, null, 2));
   await page.screenshot({ path: info.outputPath('line-workspace.png') });
   const gcode = await saveTopologyGcode(page, kerfdesk);
   writeFileSync(info.outputPath('line.gcode'), gcode);
@@ -138,7 +140,7 @@ test('saved Line finishes each inner packet before outer passes without changing
         oracle:
           'Independent emitted G1 interpreter, rectangle perimeters, four 2 mm tabs, 3/1 mm dashes, final-pass-only 2 mm retrace.',
         setup:
-          'UI SVG Import; original geometry retained; differing settings/passes and inside-first fixture seeded.',
+          'UI SVG Import per rectangle; canonical paths retained; placement, differing settings/passes and inside-first fixture seeded.',
       },
       null,
       2,

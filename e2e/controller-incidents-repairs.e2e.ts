@@ -94,7 +94,14 @@ test('controller incidents survive acknowledgements and reconnect in the console
     JSON.stringify(await incidents(page), null, 2),
   );
   await page.getByRole('button', { name: 'Super console', exact: true }).click();
-  await consoleDialog.getByRole('button', { name: /clear.*(incident|histor)/i }).click();
+  await expect(consoleDialog).toBeVisible();
+  const clearHistory = consoleDialog.getByRole('button', {
+    name: 'Clear incident history',
+    exact: true,
+  });
+  await expect(clearHistory).toBeVisible();
+  await expect(clearHistory).toBeEnabled();
+  await clearHistory.click();
   await expect.poll(async () => (await incidents(page)).length).toBe(0);
   await expect(table.getByText('ALARM:2', { exact: true })).toHaveCount(0);
   await consoleDialog.getByRole('button', { name: 'Close', exact: true }).click();

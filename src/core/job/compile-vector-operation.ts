@@ -12,11 +12,8 @@ import { offsetFillDiagnostics } from './offset-fill-diagnostics';
 import { commonVectorGroupFields } from './vector-group-fields';
 import { resolveFillScanDirection } from './scan-direction-policy';
 import { vectorCompilation, type VectorCompilation } from './vector-compilation';
-import {
-  vectorProcessBuckets,
-  type VectorProcessBucket,
-  type VectorArtwork,
-} from './vector-process-buckets';
+import { vectorProcessBuckets, type VectorProcessBucket } from './vector-process-buckets';
+import { stableFillArtworkSubset } from './stable-fill-artwork-subset';
 import { lineTopologyCollections } from './compile-line-topology';
 import { ownedFillMaterial } from './fill-material-ownership';
 import { normalizeClosedPolylinesNonZeroChecked } from '../geometry/polygon-difference';
@@ -88,7 +85,7 @@ export function compileVectorGroupsForLayer(
 type FillContext = {
   readonly firstFill: VectorProcessBucket | undefined;
   readonly uniformFill: boolean;
-  readonly uniformFillObjects: ReadonlyArray<VectorArtwork>;
+  readonly uniformFillObjects: ReadonlyArray<SceneObject>;
   readonly fillContours: ReadonlyMap<VectorProcessBucket, ReadonlyArray<Polyline>>;
   readonly failedObjectIds: ReadonlyArray<string> | null;
 };
@@ -112,9 +109,7 @@ function resolveFillContext(
   const uniformMembers = new Set<SceneObject>(
     uniformFill ? fillBuckets.flatMap((bucket) => bucket.objects) : [],
   );
-  const uniformFillObjects = uniformFill
-    ? objects.filter((object): object is VectorArtwork => uniformMembers.has(object))
-    : [];
+  const uniformFillObjects = uniformFill ? stableFillArtworkSubset(objects, uniformMembers) : [];
   if (fillBuckets.length > 1 && !uniformFill) {
     const byObject = new Map(
       fillBuckets.flatMap((bucket) =>

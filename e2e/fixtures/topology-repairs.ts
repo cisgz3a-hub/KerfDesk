@@ -93,24 +93,22 @@ export const lineShapes: readonly Shape[] = [
   },
 ];
 
-// The SVG enters through the actual Import control. Only precise process, canvas
-// order, optimization and offline device facts are seeded afterward; its paths stay unchanged.
+// Each rectangle enters through the actual Import control as a separate SVG.
+// Consecutive same-mode elements in one file correctly share one artwork object.
+// Process/device/order facts and the importer placement translation are seeded
+// afterward; canonical curves and compatibility polylines stay unchanged.
 export async function importTopologyProject(
   page: Page,
   fixture: KerfDeskFixture,
   mode: 'fill' | 'line',
-): Promise<Project> {
+): Promise<{ readonly imported: Project; readonly project: Project }> {
   const shapes = mode === 'fill' ? fillShapes : lineShapes;
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="300mm" height="140mm" viewBox="0 0 300 140">' +
-    shapes
-      .map(
-        (r) =>
-          `<rect id="${r.id}" fill="#000000" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`,
-      )
-      .join('') +
-    '</svg>';
-  await importComposedSvg(page, fixture, `topology-${mode}.svg`, svg, shapes.length);
+  for (const [index, shape] of shapes.entries()) {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="300mm" height="140mm" viewBox="0 0 300 140">' +
+      `<rect id="${shape.id}" fill="#000000" x="${shape.x}" y="${shape.y}" width="${shape.w}" height="${shape.h}"/></svg>`;
+    await importComposedSvg(page, fixture, `topology-${mode}-${shape.id}.svg`, svg, index + 1);
+  }
   const imported = (await composedSvgSnapshot(page)).project;
   const objects = shapes.map((shape) => configuredObject(imported, shape));
   const project: Project = {
@@ -178,7 +176,7 @@ export async function importTopologyProject(
   await expect(
     panel.getByRole('radio', { name: mode === 'fill' ? 'Fill' : 'Line', exact: true }),
   ).toBeChecked();
-  return project;
+  return { imported, project };
 }
 
 function configuredObject(project: Project, shape: Shape): ImportedSvg {
@@ -191,7 +189,8 @@ function configuredObject(project: Project, shape: Shape): ImportedSvg {
       Math.abs(object.bounds.maxY - shape.y - shape.h) < 1e-6,
   );
   if (found?.kind !== 'imported-svg') throw new Error(`Imported rectangle ${shape.id} is missing`);
-  expect(found.transform).toEqual({
+  expect([found.transform.x, found.transform.y].every(Number.isFinite)).toBe(true);
+  expect({ ...found.transform, x: 0, y: 0 }).toEqual({
     x: 0,
     y: 0,
     scaleX: 1,
@@ -205,6 +204,7 @@ function configuredObject(project: Project, shape: Shape): ImportedSvg {
   return {
     ...found,
     id: shape.id,
+    transform: { ...found.transform, x: 0, y: 0 },
     operationIds: [operationId],
     operationOverride: { byOperation: { [operationId]: shape.settings } },
   };
