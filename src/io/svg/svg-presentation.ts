@@ -18,6 +18,8 @@ import { svgOverflow, type SvgOverflow } from './svg-overflow';
 // measures the instance's content in its own user space, before viewBox placement.
 export type SvgClipTarget = {
   readonly element: Element;
+  /** The active instance viewport for geometry measured before clipping. */
+  readonly viewport?: SvgViewportSize;
   readonly contentViewport?: SvgViewportSize;
 };
 export type SvgClipReference = SvgClipTarget & {
@@ -114,7 +116,13 @@ export function presentationStateFor(
         return value !== null && value !== 'none';
       }),
     ],
-    clips: clipReferences(el, presentationValue(el, styles, 'clip-path'), parent.clips, transform),
+    clips: clipReferences(
+      el,
+      presentationValue(el, styles, 'clip-path'),
+      parent.clips,
+      transform,
+      parent.viewport,
+    ),
     ...visibilityState(property, parent, opacity),
     opacity,
     strokeOpacity,
@@ -166,13 +174,6 @@ function keyword(value: string | null): string | null {
       .trim()
       .toLowerCase() ?? null
   );
-}
-
-export function numAttr(el: Element, name: string, fallback = 0): number {
-  const raw = el.getAttribute(name);
-  if (raw === null) return fallback;
-  const parsed = Number.parseFloat(raw);
-  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 export function svgPresentationStyles(
@@ -247,9 +248,10 @@ function clipReferences(
   value: string | null,
   inherited: readonly SvgClipReference[],
   transform: SvgMatrix,
+  viewport: SvgViewportSize,
 ): readonly SvgClipReference[] {
   const id = svgClipPathId(value);
-  return id === null ? inherited : [...inherited, { id, transform, element }];
+  return id === null ? inherited : [...inherited, { id, transform, element, viewport }];
 }
 
 /** The local <clipPath> id a clip-path value names, or null for none. */

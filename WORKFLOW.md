@@ -299,6 +299,20 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
 2. Toast (info): `<filename> has no units — assuming millimeters`.
 
+#### Edge — SVG shape positions or sizes use percentages (ADR-570)
+1. Supported rectangles, lines, circles, ellipses and `<use>` positions retain their layout in the
+   nearest SVG or symbol viewport. X coordinates and widths use its width; Y coordinates and
+   heights use its height. A circle's percentage radius uses the normalized viewport diagonal.
+   ViewBox dimensions remain the reference under meet, slice and none; a viewport without a
+   viewBox uses its absolute user-coordinate size before the 96-DPI conversion.
+2. Percentage clip shapes use the viewport where the clip is defined. Object-box scaling follows
+   that length resolution; ordinary fractional clip coordinates still scale directly with the
+   artwork's box. Differently sized copies measure their own geometry before clipping.
+3. Numeric and absolute geometry lengths keep their existing units. Geometry defined only in CSS
+   remains outside the supported primitive attributes, and CSS-only clip geometry reports its
+   error. Images still need absolute positions and sizes; unusable percentage image geometry is
+   skipped with the existing warning.
+
 #### Edge — SVG `<text>` elements
 1. Phase A ignores `<text>` elements (text → paths conversion is Phase D).
 2. Toast (info): `<filename> · 4 text elements ignored. Convert text to paths in your design tool, or wait for Phase D.`

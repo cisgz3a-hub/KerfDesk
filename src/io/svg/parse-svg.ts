@@ -42,7 +42,6 @@ import { resolveUnitScale } from './svg-units';
 import { rootSvgViewportMapping } from './svg-root-viewport';
 import {
   INITIAL_PRESENTATION_STATE,
-  numAttr,
   presentationStateFor,
   type PresentationState,
 } from './svg-presentation';
@@ -60,6 +59,7 @@ import { createSvgStyleCascade, type SvgStyleCascade } from './svg-stylesheet';
 import { svgRenderedChildren } from './svg-conditional-processing';
 import { hasSvgMarkers } from './svg-markers';
 import { rootViewportSize, viewportLength } from './svg-viewport';
+import { svgGeometryLength } from './svg-geometry-length';
 import { nestedSvgViewportState, rootSvgViewportState } from './svg-viewport-state';
 import {
   createSvgUseBudget,
@@ -216,7 +216,10 @@ function appendUseGeometry(
     ...state,
     transform: multiplySvgMatrix(
       state.transform,
-      translateSvgMatrix(numAttr(el, 'x'), numAttr(el, 'y')),
+      translateSvgMatrix(
+        svgGeometryLength(el, 'x', state.viewport) ?? 0,
+        svgGeometryLength(el, 'y', state.viewport) ?? 0,
+      ),
     ),
   };
   context.active.add(el);
@@ -260,7 +263,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   // Flatten curves/arcs to a scene-mm tolerance, not user-units, by dividing
   // the mm chord tolerance by this transform's distance stretch (audit C2).
   const t = state.transform;
-  const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d));
+  const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d), state.viewport);
   if (subs.length === 0) return;
   const stroke = visibleStroke(state, context);
   const fill = visibleFill(el, state, context);

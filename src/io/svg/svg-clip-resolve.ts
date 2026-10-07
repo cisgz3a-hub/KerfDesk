@@ -24,21 +24,20 @@ import {
   type SvgClipPresentation,
 } from './svg-clip-presentation';
 import type { SvgIdResolver } from './svg-id-resolver';
-import { svgObjectBoundingBox } from './svg-object-bbox';
-import {
-  numAttr,
-  svgClipPathId,
-  type SvgClipReference,
-  type SvgClipTarget,
-} from './svg-presentation';
+import { svgObjectBoundingBox, type SvgObjectBoxSpace } from './svg-object-bbox';
+import { svgClipPathId, type SvgClipReference, type SvgClipTarget } from './svg-presentation';
 import type { SvgStyleCascade } from './svg-stylesheet';
 import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
+import { svgGeometryLength } from './svg-geometry-length';
+import { svgViewportAt, type SvgViewportSize } from './svg-viewport';
 
 export type SvgClipShape = {
   readonly element: Element;
   /** Maps the shape's own coordinates to document millimetres. */
   readonly matrix: SvgMatrix;
   readonly rule: 'nonzero' | 'evenodd';
+  /** Clip geometry uses its definition viewport, including a use's instance context. */
+  readonly viewport?: SvgViewportSize;
   readonly clips: ReadonlyArray<ResolvedSvgClip>;
 };
 
@@ -74,15 +73,13 @@ export function createSvgClipResolver(
   return {
     resolveId,
     presentation: createSvgClipPresentation(cascade),
-    boundingBox: ({ element, contentViewport }) => {
-      const key =
-        contentViewport === undefined
-          ? 'placed'
-          : `${contentViewport.width},${contentViewport.height}`;
+    boundingBox: (target) => {
+      const { element } = target;
+      const key = clipBoxSpaceKey(target);
       const contexts = boxes.get(element) ?? new Map<string, Bounds | null>();
       boxes.set(element, contexts);
       if (!contexts.has(key))
-        contexts.set(key, svgObjectBoundingBox(element, resolveId, cascade, contentViewport));
+        contexts.set(key, svgObjectBoundingBox(element, resolveId, cascade, clipBoxSpace(target)));
       return contexts.get(key) ?? null;
     },
     serial: (element) => {
@@ -133,9 +130,23 @@ export function svgClipReferenceKey(
   const measures =
     clip?.getAttribute('clipPathUnits')?.trim() === 'objectBoundingBox' ||
     (nested !== null && nested !== 'none');
-  const size = reference.contentViewport;
-  const context = size === undefined ? 'placed' : `${size.width},${size.height}`;
-  return measures ? `${key}|${resolver.serial(reference.element)}|${context}` : key;
+  return measures
+    ? `${key}|${resolver.serial(reference.element)}|${clipBoxSpaceKey(reference)}`
+    : key;
+}
+
+function clipBoxSpace(target: SvgClipTarget): SvgObjectBoxSpace | undefined {
+  const viewport = target.contentViewport ?? target.viewport;
+  return viewport === undefined
+    ? undefined
+    : { viewport, content: target.contentViewport !== undefined };
+}
+
+function clipBoxSpaceKey(target: SvgClipTarget): string {
+  const space = clipBoxSpace(target);
+  if (space === undefined) return 'placed';
+  const { width, height } = space.viewport;
+  return `${space.content ? 'content' : 'placed'}|${width},${height}`;
 }
 
 function resolveClip(
@@ -201,13 +212,15 @@ function childShapes(
   if (tag === 'text') throw new Error(TEXT_CLIP);
   assertReadableClipContent(child, resolver.presentation);
   const matrix = multiplySvgMatrix(content, clipContentTransform(child));
-  if (tag === 'use') return shapesOfUse(child, matrix, resolver, trail);
+  const viewport = svgViewportAt(child);
+  if (tag === 'use') return shapesOfUse(child, matrix, viewport, resolver, trail);
   return [
     {
       element: child,
       matrix,
+      viewport,
       rule: clipContentRule(child, resolver.presentation),
-      clips: nestedClips(child, matrix, { element: child }, resolver, trail),
+      clips: nestedClips(child, matrix, { element: child, viewport }, resolver, trail),
     },
   ];
 }
@@ -215,6 +228,7 @@ function childShapes(
 function shapesOfUse(
   use: Element,
   useSpace: SvgMatrix,
+  viewport: SvgViewportSize,
   resolver: SvgClipResolver,
   trail: Trail,
 ): SvgClipShape[] {
@@ -231,17 +245,24 @@ function shapesOfUse(
   if (tag === 'text') throw new Error(TEXT_CLIP);
   assertReadableClipContent(target, resolver.presentation);
   const matrix = multiplySvgMatrix(
-    multiplySvgMatrix(useSpace, translateSvgMatrix(numAttr(use, 'x'), numAttr(use, 'y'))),
+    multiplySvgMatrix(
+      useSpace,
+      translateSvgMatrix(
+        svgGeometryLength(use, 'x', viewport) ?? 0,
+        svgGeometryLength(use, 'y', viewport) ?? 0,
+      ),
+    ),
     clipContentTransform(target),
   );
   return [
     {
       element: target,
       matrix,
+      viewport,
       rule: clipContentRule(target, resolver.presentation, use),
       clips: [
-        ...nestedClips(use, useSpace, { element: use }, resolver, trail),
-        ...nestedClips(target, matrix, { element: target }, resolver, trail),
+        ...nestedClips(use, useSpace, { element: use, viewport }, resolver, trail),
+        ...nestedClips(target, matrix, { element: target, viewport }, resolver, trail),
       ],
     },
   ];
