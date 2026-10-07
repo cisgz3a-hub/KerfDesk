@@ -55,13 +55,18 @@ export function svgObjectBoundingBox(
   element: Element,
   resolveId: SvgIdResolver,
   cascade: SvgStyleCascade,
+  contentViewport?: SvgViewportSize,
 ): Bounds | null {
   const box: Box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const active = new Set<Element>();
   for (let at = element.parentElement; at !== null; at = at.parentElement) active.add(at);
   const budget = createSvgUseBudget(element.ownerDocument.documentElement);
-  const space = { matrix: IDENTITY, viewport: svgViewportAt(element) };
-  contentBounds(element, space, { resolveId, cascade, active, budget }, box, 0);
+  const space = { matrix: IDENTITY, viewport: contentViewport ?? svgViewportAt(element) };
+  const context = { resolveId, cascade, active, budget };
+  // A viewport-owned clip already carries the viewBox matrix, so measure its
+  // child geometry in content coordinates, never its placement or clipped area.
+  if (contentViewport === undefined) contentBounds(element, space, context, box, 0);
+  else childrenBounds(element, space, context, box, 0);
   return Number.isFinite(box.minX) && Number.isFinite(box.minY) ? box : null;
 }
 

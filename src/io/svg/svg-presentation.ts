@@ -11,14 +11,21 @@ import {
 } from './svg-paint';
 import { NO_MARKERS, svgMarkerReferences, type SvgMarkerReferences } from './svg-markers';
 import type { SvgStyleCascade } from './svg-stylesheet';
-import type { SvgViewportSize } from './svg-viewport';
+import type { SvgRect, SvgViewportSize } from './svg-viewport';
+import { svgOverflow, type SvgOverflow } from './svg-overflow';
 
-// `element` carries the clip-path property; objectBoundingBox clips measure it.
-export type SvgClipReference = {
-  readonly id: string;
-  readonly transform: SvgMatrix;
+// Object-box clips measure `element` before clipping. A viewport-owned clip
+// measures the instance's content in its own user space, before viewBox placement.
+export type SvgClipTarget = {
   readonly element: Element;
+  readonly contentViewport?: SvgViewportSize;
 };
+export type SvgClipReference = SvgClipTarget & {
+  readonly transform: SvgMatrix;
+} & (
+    | { readonly kind?: 'path'; readonly id: string }
+    | { readonly kind: 'viewport'; readonly rectangle: SvgRect }
+  );
 
 export type PresentationState = {
   /** null while unset: SVG's initial stroke is none. */
@@ -45,6 +52,7 @@ export type PresentationState = {
   readonly markers: SvgMarkerReferences;
   /** The viewport that percentage lengths resolve against. */
   readonly viewport: SvgViewportSize;
+  readonly overflow: SvgOverflow;
 };
 
 const IDENTITY_MATRIX: SvgMatrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -66,6 +74,7 @@ export const INITIAL_PRESENTATION_STATE: PresentationState = {
   strokeWidthZero: false,
   markers: NO_MARKERS,
   viewport: { width: 100, height: 100 },
+  overflow: 'visible',
 };
 
 export function presentationStateFor(
@@ -113,6 +122,7 @@ export function presentationStateFor(
     strokeWidthZero: strokeWidthZero(property('stroke-width'), parent.strokeWidthZero),
     markers: svgMarkerReferences(property, parent.markers),
     viewport: parent.viewport,
+    overflow: svgOverflow(el, specifiedValues(el, styles, 'overflow'), parent.overflow),
   };
 }
 

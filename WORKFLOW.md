@@ -236,6 +236,11 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    opacity is skipped with a warning instead (ADR-358 Amendment 3).
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
+7. Nested SVG and symbol viewports clip overflowing artwork by default, including embedded images
+   (ADR-570). Explicit or styled `overflow: hidden` and `scroll` clip to the exact viewport;
+   `visible` and `auto` allow overflow. A standalone SVG root allows overflow by default and clips
+   only when requested. Viewport clips intersect other clips; their own clip paths use the mapped
+   content coordinates and measure object bounding boxes before clipping.
 
 #### Edge — SVG path arcs
 1. A path's `A` arcs import as cubic curves of at most a quarter turn each. Each curve's midpoint

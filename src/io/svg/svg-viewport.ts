@@ -1,8 +1,8 @@
 // SVG viewports: preserveAspectRatio, viewBox and the transform an element
 // that establishes a new viewport applies to its content
 // (SVG 2 coords.html#ViewBoxAttribute, #PreserveAspectRatioAttribute and
-// #ComputingAViewportsTransform). Clipping to the viewport is not applied;
-// content overflowing a nested viewport imports whole.
+// #ComputingAViewportsTransform). The parent-space viewport rectangle also
+// feeds the importer's clip chain (svg-viewport-state.ts).
 
 import type { SvgMatrix } from './svg-curve-transform';
 import { parseSvgLengthUserUnitsOrNull } from './svg-units';
@@ -128,7 +128,11 @@ export function svgViewportTransform(
     width: null,
     height: null,
   },
-): { readonly matrix: SvgMatrix; readonly viewport: SvgViewportSize } | null {
+): {
+  readonly matrix: SvgMatrix;
+  readonly viewport: SvgViewportSize;
+  readonly rectangle: SvgRect;
+} | null {
   const width = size.width ?? viewportLength(element, 'width', parent.width) ?? parent.width;
   const height = size.height ?? viewportLength(element, 'height', parent.height) ?? parent.height;
   const viewBox = parseViewBox(element.getAttribute('viewBox'));
@@ -140,12 +144,17 @@ export function svgViewportTransform(
     height,
   };
   if (viewBox === null) {
-    return { matrix: { a: 1, b: 0, c: 0, d: 1, e: box.x, f: box.y }, viewport: { width, height } };
+    return {
+      matrix: { a: 1, b: 0, c: 0, d: 1, e: box.x, f: box.y },
+      viewport: { width, height },
+      rectangle: box,
+    };
   }
   const aspect = parsePreserveAspectRatio(element.getAttribute('preserveAspectRatio'));
   return {
     matrix: viewBoxMatrix(viewBox, box, aspect),
     viewport: { width: viewBox.width, height: viewBox.height },
+    rectangle: box,
   };
 }
 
