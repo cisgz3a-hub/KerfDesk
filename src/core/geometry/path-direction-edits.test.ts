@@ -113,6 +113,54 @@ describe('close path', () => {
     expect(Math.max(...xs) - Math.min(...xs)).toBeCloseTo(40.2, 6);
   });
 
+  it('closes only the explicitly targeted canonical subpath', () => {
+    const curve: CurveSubpath = { start: p(0, 0), segments: lines(U.slice(1)), closed: false };
+    const original = path([open(U), open(U)], [curve, curve]);
+
+    const result = closeOpenPaths(
+      [original],
+      IDENTITY_TRANSFORM,
+      (_polyline, index) => index === 1,
+    );
+
+    expect(result.closed).toBe(1);
+    expect(result.paths[0]?.polylines[0]).toBe(original.polylines[0]);
+    expect(result.paths[0]?.curves?.[0]).toBe(curve);
+    expect(result.paths[0]?.polylines[1]).toEqual(closed([...U, p(0, 0)]));
+    expect(result.paths[0]?.curves?.[1]).toEqual({
+      ...curve,
+      closed: true,
+      segments: lines([...U.slice(1), p(0, 0)]),
+    });
+  });
+
+  it('repairs a canonical target behind a legacy closed flag without deleting its endpoint', () => {
+    const curve: CurveSubpath = { start: p(0, 0), segments: lines(U.slice(1)), closed: false };
+    const original = path([closed(U)], [curve]);
+
+    const result = closeOpenPaths([original], IDENTITY_TRANSFORM, () => true);
+
+    expect(result.closed).toBe(1);
+    expect(result.paths[0]?.polylines[0]).toEqual(closed([...U, p(0, 0)]));
+    expect(anchors(result.paths[0]?.curves?.[0])).toEqual([...U, p(0, 0)]);
+    expect(closeOpenPaths([original], IDENTITY_TRANSFORM).paths[0]).toBe(original);
+  });
+
+  it('rejects explicitly targeted mismatched pairs before asking which subpaths to close', () => {
+    const curve: CurveSubpath = { start: p(0, 0), segments: lines(U.slice(1)), closed: false };
+    const mismatched = path([open(U), open(U)], [curve]);
+    const targets: number[] = [];
+
+    const result = closeOpenPaths([mismatched], IDENTITY_TRANSFORM, (_polyline, index) => {
+      targets.push(index);
+      return true;
+    });
+
+    expect(result).toEqual({ paths: [mismatched], closed: 0, longestGapMm: 0 });
+    expect(result.paths[0]).toBe(mismatched);
+    expect(targets).toEqual([]);
+  });
+
   it('does not guess when curves and polylines do not pair up', () => {
     const curve: CurveSubpath = { start: p(0, 0), segments: lines(U.slice(1)), closed: false };
     const mismatched = path([open(U), open(U)], [curve]);

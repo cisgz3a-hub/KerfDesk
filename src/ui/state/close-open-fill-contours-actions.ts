@@ -1,3 +1,5 @@
+import { closeOpenPaths } from '../../core/geometry/path-direction-edits';
+import { compilationPolylines } from '../../core/job/compilation-polylines';
 import {
   assertNever,
   pathUsesOperation,
@@ -12,6 +14,7 @@ import {
   CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM,
   isCloseableOpenFillPolyline,
 } from '../common/fill-diagnostics';
+import { synchronizePolylineShapeGeometry } from './path-node-shape-sync';
 import { pushUndo, type StateSlice } from './scene-mutations';
 
 export type CloseOpenFillContoursActions = {
@@ -113,11 +116,7 @@ function closeShapeFillContours(
 ): ShapeObject {
   const paths = closeFillPaths(object, object.paths, fillOperations, object.transform, toleranceMm);
   if (paths === object.paths) return object;
-  return {
-    ...object,
-    paths,
-    spec: object.spec.kind === 'polyline' ? { ...object.spec, closed: true } : object.spec,
-  };
+  return synchronizePolylineShapeGeometry(object, paths, object.bounds) ?? object;
 }
 
 function closeFillPaths(
@@ -131,14 +130,16 @@ function closeFillPaths(
   const nextPaths = paths.map((path) => {
     if (!fillOperations.some((operation) => pathUsesOperation(object, path, operation)))
       return path;
-    let pathChanged = false;
-    const polylines = path.polylines.map((polyline) => {
-      if (!isCloseableOpenFillPolyline(polyline, transform, toleranceMm)) return polyline;
-      changed = true;
-      pathChanged = true;
-      return { ...polyline, closed: true };
+    const canonicalPolylines = compilationPolylines(path, transform);
+    const result = closeOpenPaths([path], transform, (_polyline, index) => {
+      const canonical = canonicalPolylines[index];
+      return (
+        canonical !== undefined && isCloseableOpenFillPolyline(canonical, transform, toleranceMm)
+      );
     });
-    return pathChanged ? { ...path, polylines } : path;
+    if (result.closed === 0) return path;
+    changed = true;
+    return result.paths[0] ?? path;
   });
   return changed ? nextPaths : paths;
 }

@@ -172,3 +172,31 @@ LightBurn behaviour, read on 2026-09-27 from `https://docs.lightburnsoftware.com
   `migrations.test.ts`: alignment round trip, invalid values refused, and the 10 to 11 to 12 steps.
 - `src/ui/app/editing-tool-shortcuts.test.ts` and `AppMenuBar.control-audit.test.tsx`: `Alt+D` and
   every new menu entry.
+
+### Amendment 1 - Tolerance Fill closure edits canonical geometry (2026-10-07)
+
+The selected **Close open Fill contours** repair follows decision 6's paired-geometry contract.
+Its default 0.5 mm tolerance, or the explicitly reviewed tolerance, measures the compiler's
+canonical contour endpoints after the object transform. A successful repair closes the exact
+curve and its paired compatibility polyline together, including an explicit seam point for the
+canvas. It creates one undo step for the selected, unlocked artwork and survives saving and
+reopening with the same compiled Fill.
+
+The shared Close Path helper accepts targeted contour eligibility for this repair. General
+**Close Path** retains its existing three-point eligibility and unrestricted gap behavior.
+A legacy project whose old Fill repair marked only the compatibility polyline closed remains
+repairable: the canonical open contour is authoritative, and a genuine final endpoint is
+retained before the closing line is added. Curve/polyline count mismatches remain untouched.
+
+Drawn polyline shapes use the existing shape synchronization helper so their specification,
+canonical curve and materialized contour agree. Ambiguous shape representations remain
+unchanged. Closing with the same straight seam does not remap stored laser or CNC tab anchors,
+as specified by ADR-494 Amendment 1. This repair does not change operation resolution or Frame,
+Start and Save G-code policy.
+
+Verification: src/ui/state/close-open-fill-contours-curves.test.ts covers a real parsed cubic
+beside a valid closed control, executable Fill gain, Undo/Redo, project round trip, physical
+tolerance after scaling, oversized and mismatched contours, legacy flag-only closure, shape
+synchronization and unchanged anchors. The shared targeted helper is covered by
+src/core/geometry/path-direction-edits.test.ts; existing general Close Path tests remain
+applicable.
