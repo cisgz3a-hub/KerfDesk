@@ -3,16 +3,14 @@ import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { ProductionManifestButton } from './ProductionManifestButton';
 import { RetainedArraysButton } from './RetainedArraysButton';
+import './ProjectSheetsBar.css';
 
 export function ProjectSheetsBar(): JSX.Element {
   const book = useStore((state) => state.project.sheetBook);
   const switchSheet = useStore((state) => state.switchProjectSheet);
   const [open, setOpen] = useState(false);
   return (
-    <div
-      aria-label="Project sheets"
-      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 8px' }}
-    >
+    <div aria-label="Project sheets" className="lf-project-sheets-bar">
       <label>
         Sheet{' '}
         <select

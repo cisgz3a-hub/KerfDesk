@@ -91,8 +91,9 @@ function termsLine(commerce) {
   and exclude any sales tax or VAT the payment provider adds at checkout.`;
   if (!commerce.salesOpen) {
     return html`<p class="plans__terms">
-      ${tax} Purchase isn’t open yet: no payment provider is live, so there’s no checkout and
-      nothing can be bought today. The terms of sale will be published before sales open.
+      ${tax} Sales and paid checkout remain closed, so nothing can be bought today. Read our
+      <a href="/terms/">software and Supplier Terms</a> and
+      <a href="/refunds/">Refund Policy</a> for a future purchase.
     </p>`;
   }
   return html`<p class="plans__terms">
@@ -159,7 +160,7 @@ function faq(commerce, plan) {
       id: 'buy-now',
       question: 'Can I buy Pro today?',
       answer:
-        'Not yet. Purchase opens soon. No payment provider is live yet, so there’s no checkout and nothing can be bought today. The terms of sale will be published before sales open.',
+        'Not yet. Sales and paid checkout remain closed, so nothing can be bought today. Our software and Supplier Terms and Refund Policy are published for a future purchase.',
     },
     {
       id: 'free-expire',
@@ -206,7 +207,7 @@ function faq(commerce, plan) {
       question: 'What about refunds?',
       answer: commerce.salesOpen
         ? html`<p>See the <a href="${commerce.refundPolicyUrl}">refund policy</a>.</p>`
-        : 'The terms of sale will be published before sales open, so you can read them before you buy.',
+        : 'Read the published Refund Policy for the promise that will apply to a future purchase.',
     },
     {
       id: 'your-copy',
@@ -231,7 +232,7 @@ export const page = {
       'KerfDesk Free runs in the browser and on the desktop, with no time limit.',
       plan &&
         `${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
-      !commerce.salesOpen && 'Purchase opens soon.',
+      !commerce.salesOpen && 'Paid checkout is closed.',
     ]
       .filter(Boolean)
       .join(' ');

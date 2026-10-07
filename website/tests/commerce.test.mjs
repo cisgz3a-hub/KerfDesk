@@ -162,7 +162,9 @@ describe('commerce configuration', () => {
     );
     assert.match(text, /only the Pro tools lock, and everything in Free keeps working/);
     assert.match(text, /A license never stops a job from running/);
-    assert.match(text, /terms of sale will be published before sales open/);
+    assert.match(text, /Sales and paid checkout remain closed/);
+    assert.match(html, /href="\/terms\/"/);
+    assert.match(html, /href="\/refunds\/"/);
     assert.doesNotMatch(html, /<form\b/i);
     assert.doesNotMatch(text, /\bBuy Pro\b/);
     assert.doesNotMatch(text, /Get the desktop app/);

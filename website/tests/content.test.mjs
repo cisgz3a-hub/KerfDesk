@@ -99,10 +99,26 @@ describe('website copy', () => {
     assert.match(license, /Later versions are all rights reserved/);
   });
 
-  // The source repository is private (ADR-524 Amendment 1), so no download,
-  // release, issue, discussion, source or bug-report link may send a visitor to
-  // GitHub. Every text file the build writes is scanned, not just the pages.
-  it('sends no visitor to GitHub and scopes external links to the provider data policy', () => {
+  // Keep source-repository routes out of customer pages (ADR-524 Amendment 1).
+  // Product downloads/support use first-party destinations; policies may link
+  // only to exact Paddle legal/support pages and the OpenAI API data policy. Scan every generated text file.
+  it('keeps repository routes out of customer pages and permits exact provider policy/support links', () => {
+    const paddlePolicies = [
+      'https://www.paddle.com/legal/buyer-terms',
+      'https://www.paddle.com/legal/refund-policy',
+      'https://www.paddle.com/legal/privacy',
+    ];
+    const external = new Map([
+      [
+        'privacy/index.html',
+        new Set([paddlePolicies[2], 'https://developers.openai.com/api/docs/guides/your-data']),
+      ],
+      ['terms/index.html', new Set([...paddlePolicies, 'https://paddle.net/'])],
+      [
+        'refunds/index.html',
+        new Set([paddlePolicies[0], paddlePolicies[1], 'https://paddle.net/']),
+      ],
+    ]);
     for (const path of walk(outDir)) {
       if (!/(\.html|\.txt|\.xml|\.css|_headers)$/.test(path)) continue;
       assert.doesNotMatch(readFileSync(path, 'utf8'), /github/i, path);
@@ -110,12 +126,10 @@ describe('website copy', () => {
     for (const { file, html } of built) {
       for (const href of attrValues(html, 'a', 'href')) {
         if (!/^https?:/.test(href)) continue;
-        if (
-          file === 'privacy/index.html' &&
-          href === 'https://developers.openai.com/api/docs/guides/your-data'
-        )
-          continue;
-        assert.equal(new URL(href).hostname, 'kerfdesk.com', `${file} links to ${href}`);
+        const url = new URL(href);
+        if (url.hostname === 'kerfdesk.com') continue;
+        assert.equal(url.protocol, 'https:', 'External policies must use HTTPS');
+        assert.ok(external.get(file)?.has(url.href), file + ': unexpected external link ' + href);
       }
     }
   });
@@ -171,20 +185,31 @@ describe('website copy', () => {
     assert.match(pricing, /Free has no time limit/);
     assert.match(
       pricing,
-      /Pro adds advanced tools to the Windows desktop app for US\$49\.50, paid once\. Purchase opens soon\./,
+      /Pro adds advanced tools to the Windows desktop app for US\$49\.50, paid once\. Paid checkout is closed\./,
     );
   });
 
-  // Refund terms belong to the terms of sale, which are published before sales
-  // open; the site only says so.
-  it('writes no refund terms', () => {
+  // Published Supplier Terms and the refund promise are accessible before any
+  // purchase, without opening checkout or replacing a supplied app notice.
+  it('publishes the refund promise and Supplier Terms while checkout stays closed', () => {
+    const refunds = pageText('refunds/index.html');
+    const terms = pageText('terms/index.html');
+    assert.match(refunds, /Paid checkout is closed/);
+    assert.match(refunds, /There is no checkout and nothing can be bought today/);
+    assert.match(refunds, /We promise a full refund if you request it within 14 calendar days/);
+    assert.match(refunds, /after activating and using Pro/);
+    assert.match(terms, /purchase provisions apply if and when you buy/);
+    assert.match(terms, /(?:do|does) not replace an installed notice/);
+    for (const { file, html } of built) {
+      const links = attrValues(html, 'a', 'href');
+      for (const policy of ['/terms/', '/refunds/', '/privacy/'])
+        assert.ok(links.includes(policy), file + ': missing policy navigation ' + policy);
+    }
     for (const { file, text } of pages) {
-      if (!/refund/i.test(text)) continue;
-      assert.match(text, /terms of sale will be published before sales open/, file);
+      if (['refunds/index.html', 'terms/index.html'].includes(file)) continue;
       assert.doesNotMatch(text, /money[- ]back|refund (window|period)|\d+[- ]day refund/i, file);
     }
   });
-
   it('tells visitors exactly what licensing and payment involve (privacy)', () => {
     const privacy = pageText('privacy/index.html');
     assert.match(privacy, new RegExp(`at ${site.licensingHost.replace(/\./g, '\\.')}`));
