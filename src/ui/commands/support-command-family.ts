@@ -1,5 +1,5 @@
 // support-command-family — Help-menu commands that open KerfDesk's support
-// page on kerfdesk.com. The source repository is private, so customers can no
+// and published policy pages on kerfdesk.com. The source repository is private, so customers can no
 // longer reach GitHub Issues or Discussions. The page, not the app, names the
 // current contact route, so it can change without a new release. The invokes
 // open a URL (not a store action), so these builders need no AppCommandContext.
@@ -11,6 +11,10 @@ import { enabled, type AppCommand } from './command-types';
 
 export const SUPPORT_URL = 'https://kerfdesk.com/support.html';
 export const REPORT_PROBLEM_URL = `${SUPPORT_URL}#report`;
+export const PRICING_URL = 'https://kerfdesk.com/pricing/';
+export const TERMS_URL = 'https://kerfdesk.com/terms/';
+export const PRIVACY_URL = 'https://kerfdesk.com/privacy/';
+export const REFUNDS_URL = 'https://kerfdesk.com/refunds/';
 
 // Open a link in a new browser tab the same way DownloadDesktopLink's anchor
 // does: a detached <a target="_blank" rel="noopener noreferrer"> click. rel
@@ -64,6 +68,46 @@ export function discussionsCommand(): AppCommand {
     'Get Help',
     'Open KerfDesk support for questions, ideas and feedback',
     () => openExternalUrl(SUPPORT_URL),
+  );
+}
+
+export function pricingCommand(): AppCommand {
+  return enabled(
+    'help.pricing',
+    'help',
+    'Pricing',
+    'Read the Free and Pro features and prices; paid checkout remains closed',
+    () => openExternalUrl(PRICING_URL),
+  );
+}
+
+export function termsCommand(): AppCommand {
+  return enabled(
+    'help.terms',
+    'help',
+    'Software and Supplier Terms',
+    'Read the published software terms and future Pro purchase rights',
+    () => openExternalUrl(TERMS_URL),
+  );
+}
+
+export function privacyCommand(): AppCommand {
+  return enabled(
+    'help.privacy',
+    'help',
+    'Privacy Notice',
+    'Read what KerfDesk stores and sends, and how to make a privacy request',
+    () => openExternalUrl(PRIVACY_URL),
+  );
+}
+
+export function refundsCommand(): AppCommand {
+  return enabled(
+    'help.refunds',
+    'help',
+    'Refund Policy',
+    'Read the refund promise for future Pro and update purchases',
+    () => openExternalUrl(REFUNDS_URL),
   );
 }
 

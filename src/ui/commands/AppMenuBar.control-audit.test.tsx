@@ -179,6 +179,10 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.check-updates': { special: 'check-updates' },
   'help.open-data-folder': { callback: 'openDataFolder' },
   'help.discussions': { url: 'https://kerfdesk.com/support.html' },
+  'help.pricing': { url: 'https://kerfdesk.com/pricing/' },
+  'help.terms': { url: 'https://kerfdesk.com/terms/' },
+  'help.privacy': { url: 'https://kerfdesk.com/privacy/' },
+  'help.refunds': { url: 'https://kerfdesk.com/refunds/' },
 };
 
 let host: HTMLDivElement;

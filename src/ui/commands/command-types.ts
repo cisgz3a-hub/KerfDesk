@@ -138,6 +138,10 @@ export type CommandId =
   | 'help.licence'
   | 'help.check-updates'
   | 'help.open-data-folder'
+  | 'help.pricing'
+  | 'help.terms'
+  | 'help.privacy'
+  | 'help.refunds'
   | 'help.discussions';
 
 export type AppCommand = {
