@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ORIGIN, start } from './support.mjs';
 
-const HEADER = 'x-audit-public-rate-calls';
+const HEADER = 'x-audit-rate-calls';
 const PERIOD_MS = 60_000;
 
-/** Wrap the real binding only to witness its call times; no clock or limiter replacement. */
+/** Wrap real public/client/Abort bindings only to witness call times; no replacement clock/limiter. */
 export function startObservedRateWorker(options = {}) {
   const source = readFileSync(new URL('../dist/index.js', import.meta.url), 'utf8');
   const matches = [...source.matchAll(/\b([A-Za-z_][A-Za-z0-9_]*_default) as default/g)];
@@ -16,14 +16,15 @@ export function startObservedRateWorker(options = {}) {
 const rateWindowWitness = { async fetch(request, env, ctx) {
   if (new URL(request.url).pathname === '/__audit_rate_window')
     return Response.json({ now: Date.now() });
-  const calls = [];
-  const PUBLIC_LIMIT = { async limit(input) {
-    const started = Date.now();
-    const result = await env.PUBLIC_LIMIT.limit(input);
-    calls.push({ started, ended: Date.now(), success: result.success });
-    return result;
-  } };
-  const response = await ${matches[0][1]}.fetch(request, { ...env, PUBLIC_LIMIT }, ctx);
+  const calls = [], limits = {};
+  for (const binding of ['PUBLIC_LIMIT', 'CLIENT_LIMIT', 'ABORT_LIMIT'])
+    limits[binding] = { async limit(input) {
+      const started = Date.now();
+      const result = await env[binding].limit(input);
+      calls.push({ binding, started, ended: Date.now(), success: result.success });
+      return result;
+    } };
+  const response = await ${matches[0][1]}.fetch(request, { ...env, ...limits }, ctx);
   if (response.status === 101 || !calls.length) return response;
   const headers = new Headers(response.headers);
   headers.set('${HEADER}', JSON.stringify(calls));
@@ -54,16 +55,26 @@ export async function admissionWindow(worker) {
   return Math.floor(now / PERIOD_MS);
 }
 
-export function publicRateCall(response, epoch, success) {
+export function rateCall(response, epoch, binding, success) {
   const calls = JSON.parse(response.headers.get(HEADER) ?? 'null');
-  assert.equal(calls?.length, 1, 'Exactly one real public binding call must be witnessed.');
+  assert.equal(calls?.length, 1, 'Exactly one real rate binding call must be witnessed.');
   const call = calls[0];
+  const evidence = JSON.stringify({ expectedBinding: binding, expectedEpoch: epoch, ...call });
+  assert.equal(call.binding, binding, 'Another admission lane was used: ' + evidence);
   assert.equal(
     Math.floor(call.started / PERIOD_MS),
     epoch,
-    'Binding call started in another window.',
+    'Binding call started in another window: ' + evidence,
   );
-  assert.equal(Math.floor(call.ended / PERIOD_MS), epoch, 'Binding call crossed a window.');
-  assert.equal(call.success, success);
+  assert.equal(
+    Math.floor(call.ended / PERIOD_MS),
+    epoch,
+    'Binding call crossed a window: ' + evidence,
+  );
+  assert.equal(call.success, success, 'Binding outcome differed: ' + evidence);
   return call;
+}
+
+export function publicRateCall(response, epoch, success) {
+  return rateCall(response, epoch, 'PUBLIC_LIMIT', success);
 }
