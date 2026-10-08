@@ -1,3 +1,4 @@
+import { artworkOperationRuns } from '../../core/artwork-order';
 import type { Project } from '../../core/scene/project';
 import type { Scene } from '../../core/scene/scene';
 import type { HeightfieldReliefObject, SceneObject } from '../../core/scene/scene-object';
@@ -45,13 +46,9 @@ export function prepareReliefAuthoringLinks(
 
 function projectedReliefIds(scene: Scene): ReadonlySet<string> {
   return new Set(
-    scene.layers
-      .filter((layer) => layer.output)
-      .flatMap((layer) =>
-        layer.cnc?.reliefProjection === undefined
-          ? []
-          : [layer.cnc.reliefProjection.reliefObjectId],
-      ),
+    artworkOperationRuns(scene).flatMap(({ layer }) =>
+      layer.cnc?.reliefProjection === undefined ? [] : [layer.cnc.reliefProjection.reliefObjectId],
+    ),
   );
 }
 function projectionDependencies(

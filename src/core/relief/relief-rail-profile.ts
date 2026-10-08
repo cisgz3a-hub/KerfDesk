@@ -7,7 +7,9 @@ import { reliefBoundaryError } from './relief-vector-boundary';
 import type { ComponentSample, ReliefComponentSampler } from './relief-authoring-sampling';
 
 type Vertex = Vec2 & { readonly u: number; readonly t: number };
+type Strip = { left0: Vertex; right0: Vertex; left1: Vertex; right1: Vertex };
 type Triangle = {
+  readonly strip: Strip;
   readonly a: Vertex;
   readonly b: Vertex;
   readonly c: Vertex;
@@ -59,9 +61,16 @@ function triangulatedSides(
     const previous = sides[i - 1],
       next = sides[i];
     if (previous === undefined || next === undefined) continue;
+    const strip = {
+      left0: previous.left,
+      right0: previous.right,
+      left1: next.left,
+      right1: next.right,
+    };
+    requireInjectiveStrip(strip);
     const triangles = [
-      orientedTriangle(previous.left, previous.right, next.right, sign),
-      orientedTriangle(previous.left, next.right, next.left, sign),
+      orientedTriangle(previous.left, previous.right, next.right, sign, strip),
+      orientedTriangle(previous.left, next.right, next.left, sign, strip),
     ];
     for (const triangle of triangles) {
       if (sign !== 0 && Math.sign(triangle.area) !== sign)
@@ -72,13 +81,37 @@ function triangulatedSides(
   }
   return out;
 }
-function orientedTriangle(a: Vertex, b: Vertex, c: Vertex, sign: number): Triangle {
+/** A bilinear Jacobian is affine in both coordinates, so its four corners bound it. */
+function requireInjectiveStrip(strip: Strip): void {
+  const { left0, right0, left1, right1 } = strip;
+  const startAlong = { x: left1.x - left0.x, y: left1.y - left0.y },
+    endAlong = { x: right1.x - right0.x, y: right1.y - right0.y },
+    startAcross = { x: right0.x - left0.x, y: right0.y - left0.y },
+    endAcross = { x: right1.x - left1.x, y: right1.y - left1.y };
+  const determinant = (a: Vec2, b: Vec2) => a.x * b.y - a.y * b.x;
+  const jacobians = [
+    determinant(startAlong, startAcross),
+    determinant(endAlong, startAcross),
+    determinant(startAlong, endAcross),
+    determinant(endAlong, endAcross),
+  ];
+  const sign = Math.sign(jacobians[0] ?? 0);
+  if (
+    jacobians.some((value) => !Number.isFinite(value) || value === 0 || Math.sign(value) !== sign)
+  )
+    throw new Error(
+      'Rail sweep folds or collapses; a single XY height cannot represent this bilinear strip.',
+    );
+}
+
+function orientedTriangle(a: Vertex, b: Vertex, c: Vertex, sign: number, strip: Strip): Triangle {
   const area = cross(a, b, c);
   if (!Number.isFinite(area) || Math.abs(area) <= 1e-10 || (sign !== 0 && Math.sign(area) !== sign))
     throw new Error(
       'Rail sweep folds or collapses; a single XY height cannot represent this surface.',
     );
   return {
+    strip,
     a,
     b,
     c,
@@ -193,7 +226,7 @@ function triangleLocation(triangle: Triangle, p: Vec2): { u: number; t: number }
     wb = cross(a, p, c) / area,
     wc = 1 - wa - wb;
   if (Math.min(wa, wb, wc) < -1e-9) return null;
-  return { u: wa * a.u + wb * b.u + wc * c.u, t: wa * a.t + wb * b.t + wc * c.t };
+  return stripLocation(triangle.strip, p);
 }
 function surroundingSections(
   sections: ReadonlyArray<ReliefProfileSection>,
@@ -236,4 +269,46 @@ function profileHeight(points: ReadonlyArray<Vec2>, u: number): number {
     }
   }
   return points[points.length - 1]?.y ?? 0;
+}
+
+/** Invert the ruled strip, so changing width does not skew a symmetric profile. */
+function stripLocation(strip: Strip, p: Vec2): { u: number; t: number } | null {
+  const { left0, right0, left1, right1 } = strip;
+  const a = { x: left1.x - left0.x, y: left1.y - left0.y },
+    b = { x: right0.x - left0.x, y: right0.y - left0.y },
+    c = { x: right1.x - left1.x - b.x, y: right1.y - left1.y - b.y },
+    q = { x: p.x - left0.x, y: p.y - left0.y };
+  const determinant = (v: Vec2, w: Vec2) => v.x * w.y - v.y * w.x;
+  const rawA = -determinant(a, c),
+    rawB = determinant(q, c) - determinant(a, b),
+    rawC = determinant(q, b);
+  const magnitude = Math.max(Math.abs(rawA), Math.abs(rawB), Math.abs(rawC));
+  if (!(magnitude > 0) || !Number.isFinite(magnitude))
+    throw new Error('Rail strip coordinates exceed the finite inversion range.');
+  const A = rawA / magnitude,
+    B = rawB / magnitude,
+    C = rawC / magnitude;
+  const roots = inverseStripRoots(A, B, C);
+  for (const v of roots) {
+    if (!insideStripFraction(v)) continue;
+    const width = { x: b.x + c.x * v, y: b.y + c.y * v };
+    const offset = { x: q.x - a.x * v, y: q.y - a.y * v };
+    const u = Math.abs(width.x) >= Math.abs(width.y) ? offset.x / width.x : offset.y / width.y;
+    if (!insideStripFraction(u)) continue;
+    return { u, t: left0.t * (1 - v) + left1.t * v };
+  }
+  return null;
+}
+
+function inverseStripRoots(A: number, B: number, C: number): ReadonlyArray<number> {
+  if (A === 0) return B === 0 ? [] : [-C / B];
+  const discriminant = B * B - 4 * A * C;
+  if (discriminant < 0) return [];
+  const root = Math.sqrt(discriminant);
+  const stable = -0.5 * (B + (B >= 0 ? root : -root));
+  return stable === 0 ? [-B / (2 * A)] : [stable / A, C / stable];
+}
+
+function insideStripFraction(value: number): boolean {
+  return Number.isFinite(value) && value >= -1e-9 && value <= 1 + 1e-9;
 }

@@ -126,7 +126,9 @@ export type GcodeMetadata = {
 // from each cell's highest point (ADR-412 Amd 1).
 // ADR-486 Amd 2 resolves Fill ownership before settings and orders compensated
 // Line parents across process groups, retaining passes before their low-power tabs.
-export const EMITTER_REVISION = 'operation-topology-fill-ownership-contour-packets-20261007-v17';
+// CNC audit: authored relief footprints, ruled rail sections, sketch diagonals
+// and tapered-inlay nonzero joins now produce the corrected geometry.
+export const EMITTER_REVISION = 'cnc-relief-footprints-inlay-nonzero-sketch-topology-20261009-v18';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

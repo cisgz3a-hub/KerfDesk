@@ -303,7 +303,9 @@ function resolveJobOriginOffset(
   return jobOriginOffset(compiled, jobOrigin, project.device);
 }
 
-function registrationBoxBounds(project: Project): JobBounds | null {
+/** Actual fixture bounds, also used to identify Frame anchor dependencies.
+ * A CNC inside profile can erase a small box; presence alone is not an anchor. */
+export function registrationBoxBounds(project: Project): JobBounds | null {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') {
     return computeRegistrationBoxBounds(project.scene, project.device);

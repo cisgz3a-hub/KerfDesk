@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ConstrainedSketch2d, SketchConstraint } from './constrained-sketch';
+export const SKETCH_MAX_RADIUS_MM = 100_000;
 const id = z
   .string()
   .regex(/^[A-Za-z_][A-Za-z_0-9-]*$/)
@@ -39,7 +40,11 @@ const sketch = z
     circles: z
       .array(
         z
-          .object({ id, centre: id, radiusMm: z.number().finite().positive().max(100_000) })
+          .object({
+            id,
+            centre: id,
+            radiusMm: z.number().finite().positive().max(SKETCH_MAX_RADIUS_MM),
+          })
           .strict(),
       )
       .max(16),
