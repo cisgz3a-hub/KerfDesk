@@ -53,8 +53,10 @@ The audit found six places where a viewer said something untrue or lost the oper
    row keeps the label "Est. time".
 3. **The program picks the first lens.** `defaultLensFor(model, machineKind)` opens a laser program
    that is flat (less than 0.001 mm of depth span) and varies its power on the power lens. Every
-   other program, and every CNC program, keeps the depth lens. The operator's own choice always wins
-   for the rest of the session.
+   known flat laser engraving at one power opens on Move kind (2026-10-08 refinement). Every CNC
+   program and every multi-depth program keeps the depth lens. The operator's own choice always wins
+   for the rest of the session. At one cutting depth, Depth / pass uses the cut colour and names that
+   depth rather than drawing a zero-span ramp.
 4. **Cut 3D swaps the surface in place.**
    - `useCncRemovalGridState` reports whether a newer grid is still being prepared. A failed or
      unavailable grid is stored as settled, not pending.
@@ -94,6 +96,19 @@ The audit found six places where a viewer said something untrue or lost the oper
      `maxTextureSize` and 8192 px, divided by the pixel ratio, and keeps the aspect ratio.
    - Preview and Cut 3D name any V-bit or engraver the cut shading draws at an assumed 60° angle.
 
+### Dense planar engraving refinement (2026-10-08)
+
+Dense laser engraving can contain hundreds of thousands of short dark moves. Translucent
+travel overlapped into opaque red bands, while fixed-width cutting strokes merged adjacent rows.
+Known laser programs now start with Travel hidden; the operator can show it and the choice survives
+refreshes. CNC and unknown-file travel defaults stay visible. Flat XY paths use one-pixel cutting
+strokes. Travel opacity scales with travel length per bounding area, the camera's millimetres per
+pixel and the XY plane's projected angle, returning to its normal opacity as zoom separates the moves.
+Coplanar travel and faint future paths use a strict depth test and never write depth over completed cuts. A small polygon depth bias
+keeps flat cutting strokes ahead of coplanar native travel lines despite GPU rounding. Every segment
+and its source mapping remains available to playback and picking. Geometry, emitted output and controller
+behaviour are unchanged. Both Classic and Studio apply the same visibility rule.
+
 ### Consequences
 
 - Job Review and the Inspector now give the same motion time for the same program on the same
@@ -119,7 +134,7 @@ The audit found six places where a viewer said something untrue or lost the oper
   - `renderedLineCss(rgbTriple(0x4fa3ff))` is `rgb(151, 209, 255)`, and the legend swatches and
     ramp stops use the rendered colours.
   - `defaultLensFor` picks power for a flat laser raster, and depth for multi-depth programs,
-    constant-power programs and CNC.
+    CNC and unknown constant-power programs. Known constant-power laser engraving uses move kind.
   - `analyzeGcodeModel` with a timing context equals `buildProgramTime` with the device's limits and
     scales, and names the device. The readouts show the Timed for row.
   - The session sends one `surface` request with transferred buffers, re-sends only the thickness for
@@ -144,3 +159,8 @@ The audit found six places where a viewer said something untrue or lost the oper
   swapped in while playback ran) and passes with it (Cut 3D opens in about 7 s and swaps).
   The existing Cut 3D suites (`cnc-3d-viewer-ab`, `depth-map-relief-worker`) still pass. A manual
   check with an orbited camera showed the same view before and after a new surface.
+
+- Dense engraving browser regression (`e2e/gcode-viewer-density.e2e.ts`): the production worker
+  parses 368,125 moves; the drawing stays readable with Travel shown in Classic, Studio and an angled
+  Iso view. A coplanar return move preserves at least 98% of the cutting stroke's blue pixels. Session tests
+  retain an explicit Travel choice across model refreshes and keep CNC/unknown defaults visible.

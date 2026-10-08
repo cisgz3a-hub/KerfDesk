@@ -17,10 +17,10 @@ export function useInspectorSession(
   analysis: GcodeInspectorAnalysis,
   source?: GcodeInspectionSource,
 ) {
-  const [travelVisible, setTravelVisible] = useState(true);
   // Null until the operator picks one; until then the program chooses.
   const [chosenLens, setLens] = useState<LensId | null>(null);
   const machineKind = source?.machineKind;
+  const [travelVisible, setTravelVisible] = useTravelVisibility(machineKind);
   const programLens = useMemo(() => defaultLensFor(model, machineKind), [model, machineKind]);
   const lens = chosenLens ?? programLens;
   const [arrowsVisible, setArrowsVisible] = useState(false);
@@ -93,6 +93,12 @@ export function useInspectorSession(
     stage,
     activeTool: toolAtSegment(sections, playhead.segmentIndex),
   };
+}
+
+// Laser travel can bury dense engraving; an explicit toggle always wins.
+function useTravelVisibility(machineKind: GcodeInspectionSource['machineKind']) {
+  const [chosen, setChosen] = useState<boolean | null>(null);
+  return [chosen ?? machineKind !== 'laser', setChosen] as const;
 }
 
 type DerivedOptions = {

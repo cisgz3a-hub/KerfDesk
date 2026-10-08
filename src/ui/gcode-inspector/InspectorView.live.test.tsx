@@ -104,6 +104,33 @@ afterEach(async () => {
 });
 
 describe('InspectorView live scene integration', () => {
+  it('hides laser travel initially and retains an explicit choice across refreshes', async () => {
+    const laser = { ...source, machineKind: 'laser' as const };
+    await render(laser);
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(false);
+    act(() => {
+      const toggle = host.querySelector<HTMLInputElement>(
+        'input[title="Show or hide non-cutting travel moves"]',
+      );
+      if (toggle === null) throw new Error('Missing travel toggle');
+      toggle.click();
+    });
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(true);
+    await render(laser);
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(true);
+    await render({ ...source, machineKind: 'cnc' });
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(true);
+  });
+
+  it('shows travel for CNC and unknown programs until the operator chooses', async () => {
+    await render();
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(true);
+    await render({ ...source, machineKind: 'cnc' });
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(true);
+    await render({ ...source, machineKind: 'laser' });
+    expect(scene.setTravelVisible).toHaveBeenLastCalledWith(false);
+  });
+
   it('preserves the preview depth lens and the timeline supplied by worker analysis', async () => {
     const model = liveInspectorModel();
     const analysis = analyzeGcodeModel(model);

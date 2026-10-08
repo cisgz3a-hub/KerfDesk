@@ -33,15 +33,17 @@ const FLAT_DEPTH_SPAN_MM = 0.001;
 /**
  * The lens a newly opened program starts on (ADR-425). A non-CNC program that
  * cuts on one plane with varying S is a raster photo or a multi-power job:
- * Depth would show it as a single-colour block, so it opens on Power. CNC
- * programs and everything else open on Depth / pass. The operator's own pick
- * always wins over this.
+ * Depth would show it as a single-colour block, so it opens on Power. A known
+ * flat laser engraving at one power opens on Move kind. CNC and multi-depth
+ * programs keep Depth / pass. The operator's own pick always wins.
  */
 export function defaultLensFor(model: InspectorRenderModel, machineKind?: 'laser' | 'cnc'): LensId {
   if (machineKind === 'cnc') return DEFAULT_LENS_ID;
   const scale = buildDepthLensScale(model);
   const flat = scale === null || scale.shallowMm - scale.deepMm < FLAT_DEPTH_SPAN_MM;
-  return flat && cutPowerVaries(model) ? 'power' : DEFAULT_LENS_ID;
+  if (!flat) return DEFAULT_LENS_ID;
+  if (cutPowerVaries(model)) return 'power';
+  return machineKind === 'laser' && scale !== null ? 'kind' : DEFAULT_LENS_ID;
 }
 
 function cutPowerVaries(model: InspectorRenderModel): boolean {
@@ -111,7 +113,8 @@ export function lensColorFn(
   if (lens === 'tool') return toolColorFn(model, palette, options.sections ?? null);
   if (lens === 'depth') {
     const scale = buildDepthLensScale(model);
-    if (scale === null) return (index) => (isTravel(index) ? travel : palette.cut);
+    if (scale === null || scale.shallowMm - scale.deepMm < FLAT_DEPTH_SPAN_MM)
+      return (index) => (isTravel(index) ? travel : palette.cut);
     return (index) =>
       isTravel(index) ? travel : rampAt(palette.depthRamp, scale.progressOf(index));
   }
@@ -235,6 +238,8 @@ function toolSwatches(
 function depthLegend(model: InspectorRenderModel, palette: LensPalette): LensLegend {
   const scale = buildDepthLensScale(model);
   if (scale === null) return { kind: 'note', note: 'No cutting depth data' };
+  if (scale.shallowMm - scale.deepMm < FLAT_DEPTH_SPAN_MM)
+    return { kind: 'note', note: `Single cutting depth: ${formatDepth(scale.deepMm)}` };
   const levelWord = scale.levelCount === 1 ? 'level' : 'levels';
   const colours = palette.look === 'studio' ? 'bright to dark' : 'pale blue to pale red';
   return {
