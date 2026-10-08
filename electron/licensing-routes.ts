@@ -1,5 +1,6 @@
 import { trustedAppRequest } from './app-route-guard.js';
 import type { LicensingRuntime } from './licensing-runtime.js';
+import { isLicenceCheckoutOperation } from './licensing-commerce.js';
 import { record } from './licensing-verification.js';
 import type { EarlyUpdates } from './update-ring-store.js';
 import type { DesktopUpdates } from './update-status.js';
@@ -140,17 +141,12 @@ async function checkout(
   runtime: LicensingRuntime,
 ): Promise<Response> {
   if (
-    !['purchase', 'renewal'].includes(String(body.operation)) ||
+    !isLicenceCheckoutOperation(body.operation) ||
     Object.keys(body).some((key) => key !== 'operation' && key !== 'licenseKey') ||
     (body.licenseKey !== undefined && typeof body.licenseKey !== 'string')
   )
     return response({ error: 'invalid_request' }, 400);
-  return response(
-    await runtime.checkout(
-      body.operation as 'purchase' | 'renewal',
-      body.licenseKey as string | undefined,
-    ),
-  );
+  return response(await runtime.checkout(body.operation, body.licenseKey as string | undefined));
 }
 
 async function readBody(request: Request): Promise<unknown> {
