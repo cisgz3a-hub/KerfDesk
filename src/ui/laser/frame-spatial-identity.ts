@@ -1,3 +1,4 @@
+import { createLastScopeProjectionCache } from './frame-spatial-projection-cache';
 import { frameSpatialOutputScene } from './frame-spatial-output-scene';
 import { defaultCncMachiningSetup } from '../../core/scene/cnc-machining-setup';
 import {
@@ -20,7 +21,7 @@ import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 
-const spatialProjects = new WeakMap<Project, Map<string, Project>>();
+const spatialProjects = createLastScopeProjectionCache<Project, Project>();
 
 /** Authored coordinates and output bindings, separate from the exact execution
  * key. Newly prepared motion bounds still qualify every Start: feed-dependent
@@ -50,7 +51,7 @@ function spatialProject(
         relative,
       })
     : '';
-  const cached = spatialProjects.get(project)?.get(scopeKey);
+  const cached = spatialProjects.get(project, scopeKey);
   if (cached !== undefined) return cached;
   const isCnc = machineKindOf(project.machine) === 'cnc';
   const { cncSetup: setup, ...base } = project;
@@ -73,9 +74,7 @@ function spatialProject(
       objects: scene.objects.map(spatialObject),
     },
   };
-  const byScope = spatialProjects.get(project) ?? new Map<string, Project>();
-  byScope.set(scopeKey, projected);
-  spatialProjects.set(project, byScope);
+  spatialProjects.set(project, scopeKey, projected);
   return projected;
 }
 
