@@ -1,4 +1,7 @@
-import type { SaveTarget } from '../../platform/types';
+import type { SaveDestinationComparison, SaveTarget } from '../../platform/types';
+import { compareSaveDestinations } from './project-save-write-coordinator-identity';
+
+export { saveTargetsShareDestination } from './project-save-write-coordinator-identity';
 
 type SaveContents = Parameters<SaveTarget['write']>[0];
 
@@ -22,6 +25,7 @@ type SelectedProjectWrite = {
 
 type DestinationWriteGroup = {
   readonly members: ReadonlySet<SelectedProjectWrite>;
+  readonly hasUnknownDestinations: boolean;
   repairTail: Promise<void>;
   repairPending: boolean;
 };
@@ -41,8 +45,9 @@ export type ProjectSaveWriteCoordinator = {
 
 /**
  * Launch every selected write immediately. Once adapter identity proves that
- * overlapping selections share a destination, replay the newest captured bytes
- * after their already-started writes so an older completion cannot stay final.
+ * overlapping selections share a destination, replay the newest captured bytes.
+ * Unproven aliases replay each destination's own bytes in request order after
+ * the selected writes, without mixing payloads or blocking selected writes.
  */
 export function createProjectSaveWriteCoordinator(): ProjectSaveWriteCoordinator {
   return new ProjectSaveWriteCoordinatorState().coordinator;
@@ -121,25 +126,49 @@ class ProjectSaveWriteCoordinatorState {
   private compareOperations(left: SelectedProjectWrite, right: SelectedProjectWrite): void {
     left.status.pendingComparisons += 1;
     right.status.pendingComparisons += 1;
-    void saveTargetsShareDestination(left.target, right.target)
-      .then((matches) => {
-        if (matches) this.mergeGroups(left, right);
-      })
-      .finally(() => {
-        left.status.pendingComparisons -= 1;
-        right.status.pendingComparisons -= 1;
+    let pendingPair: { left: SelectedProjectWrite; right: SelectedProjectWrite } | undefined = {
+      left,
+      right,
+    };
+    const settleComparison = (result: SaveDestinationComparison): void => {
+      const pair = pendingPair;
+      if (!pair) return;
+      pendingPair = undefined;
+      try {
+        if (result !== 'different') this.mergeGroups(pair.left, pair.right, result === 'unknown');
+      } finally {
+        pair.left.status.pendingComparisons -= 1;
+        pair.right.status.pendingComparisons -= 1;
         this.pruneOperations();
-      });
+      }
+    };
+    void compareSaveDestinations(left.target, right.target).then(settleComparison, () =>
+      settleComparison('unknown'),
+    );
+    // A stalled identity lookup cannot leave an older write final. Once both
+    // chosen writes settle, adopt conservative repair and retire the comparison.
+    // Late identity results cannot restart that repair or retain saved snapshots.
+    void Promise.all([left.selectedSettled, right.selectedSettled]).then(() => {
+      settleComparison('unknown');
+    });
   }
 
-  private mergeGroups(left: SelectedProjectWrite, right: SelectedProjectWrite): void {
+  private mergeGroups(
+    left: SelectedProjectWrite,
+    right: SelectedProjectWrite,
+    unknown: boolean,
+  ): void {
     const leftGroup = left.group;
     const rightGroup = right.group;
+    // No carrier joins an existing group here. Its connecting comparisons have
+    // already proved shared identity or promoted it to unknown destinations.
     if (leftGroup === rightGroup) return;
 
     const members = new Set([...leftGroup.members, ...rightGroup.members]);
     const merged: DestinationWriteGroup = {
       members,
+      hasUnknownDestinations:
+        unknown || leftGroup.hasUnknownDestinations || rightGroup.hasUnknownDestinations,
       repairTail: Promise.resolve(),
       repairPending: true,
     };
@@ -150,7 +179,7 @@ class ProjectSaveWriteCoordinatorState {
       rightGroup.repairTail,
       ...[...members].map((member) => member.selectedSettled),
     ]);
-    const repair = prerequisites.then(() => repairLatestWrite(merged));
+    const repair = prerequisites.then(() => repairCapturedWrites(merged));
     merged.repairTail = settledPromise(repair).then(() => {
       if (isCurrentGroup(merged)) merged.repairPending = false;
       this.pruneOperations();
@@ -172,6 +201,7 @@ class ProjectSaveWriteCoordinatorState {
 function newWriteGroup(operation: SelectedProjectWrite): DestinationWriteGroup {
   return {
     members: new Set([operation]),
+    hasUnknownDestinations: false,
     repairTail: Promise.resolve(),
     repairPending: false,
   };
@@ -193,23 +223,31 @@ function settledPromise(promise: Promise<unknown>): Promise<void> {
   );
 }
 
-async function repairLatestWrite(group: DestinationWriteGroup): Promise<void> {
+async function repairCapturedWrites(group: DestinationWriteGroup): Promise<void> {
   // Let successful selected-write owners publish before a repair failure asks
   // that exact handoff to become dirty again.
   await Promise.resolve();
   if (!isCurrentGroup(group)) return;
   const latest = latestWrite(group.members);
-  try {
-    await latest.target.write(latest.contents);
-  } catch (error) {
-    if (
-      isCurrentGroup(group) &&
-      latestWrite(group.members) === latest &&
-      latest.status.selectedSucceeded
-    ) {
-      await reportRestoreFailure(latest, error);
+  const writes = group.hasUnknownDestinations
+    ? [...group.members].sort(compareWriteOrder).slice(1)
+    : [latest];
+  // The earliest chosen write already ran. Replay the later snapshots in
+  // request order: aliases finish newest, distinct files keep their own bytes.
+  for (const operation of writes) {
+    if (!isCurrentGroup(group)) return;
+    try {
+      await operation.target.write(operation.contents);
+    } catch (error) {
+      if (isCurrentGroup(group) && operation === latest && latest.status.selectedSucceeded) {
+        await reportRestoreFailure(latest, error);
+      }
     }
   }
+}
+
+function compareWriteOrder(left: SelectedProjectWrite, right: SelectedProjectWrite): number {
+  return left.requestEpoch - right.requestEpoch || left.id - right.id;
 }
 
 function isCurrentGroup(group: DestinationWriteGroup): boolean {
@@ -230,46 +268,5 @@ async function reportRestoreFailure(latest: SelectedProjectWrite, error: unknown
     await latest.onRestoreFailure?.(error);
   } catch {
     // Feedback failure must not reject another Save or poison future repairs.
-  }
-}
-
-export async function saveTargetsShareDestination(
-  left: SaveTarget,
-  right: SaveTarget,
-): Promise<boolean> {
-  if (left === right) return true;
-  if (
-    left.destinationIdentity !== undefined &&
-    right.destinationIdentity !== undefined &&
-    Object.is(left.destinationIdentity, right.destinationIdentity)
-  ) {
-    return true;
-  }
-  return eitherReportsSameDestination(left, right);
-}
-
-function eitherReportsSameDestination(left: SaveTarget, right: SaveTarget): Promise<boolean> {
-  const comparisons = [reportsSameDestination(left, right), reportsSameDestination(right, left)];
-  return new Promise((resolve) => {
-    let remaining = comparisons.length;
-    for (const comparison of comparisons) {
-      void comparison.then((matches) => {
-        if (matches) {
-          resolve(true);
-          return;
-        }
-        remaining -= 1;
-        if (remaining === 0) resolve(false);
-      });
-    }
-  });
-}
-
-async function reportsSameDestination(left: SaveTarget, right: SaveTarget): Promise<boolean> {
-  if (left.isSameDestination === undefined) return false;
-  try {
-    return await left.isSameDestination(right);
-  } catch {
-    return false;
   }
 }

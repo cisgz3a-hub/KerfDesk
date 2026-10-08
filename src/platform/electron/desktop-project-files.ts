@@ -84,6 +84,13 @@ function desktopPathSaveTarget(fetchRoute: RouteFetch, ref: DesktopPathRef): Sav
     isSameDestination: async (other) =>
       isDesktopPathIdentity(other.destinationIdentity) &&
       sameDesktopPath(identity.path, other.destinationIdentity.path),
+    // Different strings can still reach one file through a junction. A path
+    // also cannot prove that a picked native handle addresses another file.
+    compareDestination: async (other) =>
+      isDesktopPathIdentity(other.destinationIdentity) &&
+      sameDesktopPath(identity.path, other.destinationIdentity.path)
+        ? 'same'
+        : 'unknown',
     write: async (data) => {
       const response = await fetchRoute(pathRoute(FILE_ROUTE, ref), {
         method: 'PUT',

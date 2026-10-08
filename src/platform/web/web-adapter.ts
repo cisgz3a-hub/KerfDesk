@@ -11,6 +11,7 @@ import type {
   FileSaveRequest,
   PlatformAdapter,
   RecentFileRef,
+  SaveDestinationComparison,
   SaveDirectoryTarget,
   SaveTarget,
 } from '../types';
@@ -124,6 +125,7 @@ function directoryFileTarget(
     displayName,
     destinationIdentity: identity,
     isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
+    compareDestination: (other) => compareWebSaveDestination(identity, other.destinationIdentity),
     write: async (data) => {
       const handle = await directory.getFileHandle(displayName, { create: true });
       const writable = await handle.createWritable();
@@ -155,6 +157,7 @@ function fileHandleTarget(
     recentRef: { kind: 'handle', handle },
     destinationIdentity: identity,
     isSameDestination: (other) => sameWebSaveDestination(identity, other.destinationIdentity),
+    compareDestination: (other) => compareWebSaveDestination(identity, other.destinationIdentity),
     write: async (data) => {
       await beforeWrite();
       const writable = await handle.createWritable();
@@ -196,17 +199,27 @@ async function requestWritePermission(handle: FileSystemFileHandle): Promise<voi
 }
 
 async function sameWebSaveDestination(left: WebSaveDestination, right: unknown): Promise<boolean> {
-  if (!isWebSaveDestination(right) || left.kind !== right.kind) return false;
+  return (await compareWebSaveDestination(left, right)) === 'same';
+}
+
+async function compareWebSaveDestination(
+  left: WebSaveDestination,
+  right: unknown,
+): Promise<SaveDestinationComparison> {
+  if (!isWebSaveDestination(right) || left.kind !== right.kind) return 'unknown';
   if (left.kind === 'file' && right.kind === 'file') {
-    return sameFileSystemEntry(left.handle, right.handle);
+    return compareFileSystemEntry(left.handle, right.handle);
   }
   if (left.kind === 'directory-file' && right.kind === 'directory-file') {
-    return (
+    if (
       left.displayName === right.displayName &&
-      (await sameFileSystemEntry(left.directory, right.directory))
-    );
+      (await compareFileSystemEntry(left.directory, right.directory)) === 'same'
+    )
+      return 'same';
+    // Different directory/name pairs can still contain linked entries. Only
+    // file-entry comparison proves those children distinct; do not guess.
   }
-  return false;
+  return 'unknown';
 }
 
 function isWebSaveDestination(value: unknown): value is WebSaveDestination {
@@ -215,10 +228,14 @@ function isWebSaveDestination(value: unknown): value is WebSaveDestination {
   return value.kind === 'directory-file' && 'directory' in value && 'displayName' in value;
 }
 
-function sameFileSystemEntry(left: FileSystemHandle, right: FileSystemHandle): Promise<boolean> {
-  if (left === right) return Promise.resolve(true);
-  if (typeof left.isSameEntry !== 'function') return Promise.resolve(false);
-  return left.isSameEntry(right);
+async function compareFileSystemEntry(
+  left: FileSystemHandle,
+  right: FileSystemHandle,
+): Promise<SaveDestinationComparison> {
+  if (left === right) return 'same';
+  if (typeof left.isSameEntry !== 'function') return 'unknown';
+  const matches = await left.isSameEntry(right);
+  return matches === true ? 'same' : matches === false ? 'different' : 'unknown';
 }
 
 async function writeAndClose(
