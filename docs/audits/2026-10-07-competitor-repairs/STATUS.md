@@ -1,5 +1,7 @@
 # Competitor-derived repair progress
 
+The entries below preserve the 7 October checkpoints. See [the 9 October integration checkpoint](INTEGRATION-2026-10-09.md) for current-main and PR work.
+
 Repair branch: `codex/fix-competitor-findings-20261007`.
 
 Implementation checkout: `D:\LaserForge\competitor-fixes-20261007`, based on refreshed main `76b5ff53e3be7df6c160a8b26820e61188595f08`. The dirty primary checkout and frozen audit checkout are preserved. Repairs proceed individually, with focused regression checks before the next implementation.
@@ -19,4 +21,4 @@ Implementation checkout: `D:\LaserForge\competitor-fixes-20261007`, based on ref
 
 All ten findings are fixed locally. Source qualification checkpoint: `da10ce94de5e81f180ee09452729359cb8139f3b`. Final checks cover all 3,598 unit files: 28,313 passed, zero failed, 29 configured skips. Source/E2E types, full lint (zero warnings), corrected full formatting and repository structure checks pass. All 22 selected browser workflows are qualified, including two unchanged isolated reruns after initial-navigation budget exhaustion. Both renderer builds pass and embed `da10ce94` / `0.1.3042`; Browser-Free retains only Line Art data and desktop retains all eight presets. All 92 production-file hashes match the frozen snapshot. Focused counts above overlap the full suite.
 
-[Final repair report](D:/LaserForge/competitor-fixes-20261007/docs/audits/2026-10-07-competitor-repairs/REPORT.md). Original failed attempts, corrected fixture results, raw traces and earlier build snapshots are retained. No branch has been pushed, merged, deployed, or qualified on hardware, provider state or installers.
+[Final repair report](D:/LaserForge/competitor-fixes-20261007/docs/audits/2026-10-07-competitor-repairs/REPORT.md). Original failed attempts, corrected fixture results, raw traces and earlier build snapshots are retained. At this 7 October checkpoint, no branch had been pushed, merged, deployed, or qualified on hardware, provider state or installers.

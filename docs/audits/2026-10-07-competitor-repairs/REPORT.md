@@ -1,5 +1,7 @@
 # Competitor-derived repairs
 
+This is the historical 7 October qualification report. See [the 9 October integration checkpoint](INTEGRATION-2026-10-09.md) for current-main reconciliation and ready-PR validation.
+
 Date: 7 October 2026. Branch: `codex/fix-competitor-findings-20261007`. Implementation checkout: `D:\LaserForge\competitor-fixes-20261007`.
 
 All ten findings from the reliability, UX and safety comparison are implemented and qualified locally. The source qualification checkpoint is `da10ce94de5e81f180ee09452729359cb8139f3b`, based on main `76b5ff53e3be7df6c160a8b26820e61188595f08`. The original audit and unrelated primary-checkout work are preserved. The report and ledger are saved in a subsequent documentation commit; the checks and renderer identities below refer to the source checkpoint.
@@ -53,4 +55,4 @@ SVG clipping follows the documented viewport intersection rule. A native Chrome 
 
 Incident history is bounded to the current app window and does not persist across an application restart. Support reports contain bounded build/device/controller/job context rather than artwork or executable content. Recovery distance estimates qualify supported arc geometry, with unknown results for unsupported or ambiguous motion.
 
-This work provides local source, test, browser and renderer-build evidence. No branch has been pushed, merged or deployed. Hosted CI, published builds, licensing/provider state, installers, physical machines and material results remain unqualified. Frame reuse and each Start's fresh executable review remain governed by ADR-565; the repairs introduce no additional policy or entitlement gate.
+This work provides local source, test, browser and renderer-build evidence. At this 7 October checkpoint, no branch had been pushed, merged or deployed. Hosted CI, published builds, licensing/provider state, installers, physical machines and material results remain unqualified. Frame reuse and each Start's fresh executable review remain governed by ADR-565; the repairs introduce no additional policy or entitlement gate.
