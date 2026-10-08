@@ -62,7 +62,7 @@ describe('moveReadout', () => {
 
   it('says when the tool reaches the pointed point', () => {
     const program = model(PROGRAM);
-    const times = new Float32Array(program.segmentCount).map((_, index) => (index + 1) * 30);
+    const times = new Float64Array(program.segmentCount).map((_, index) => (index + 1) * 30);
     const readout = moveReadout(program, times, {
       segmentIndex: 1,
       fraction: 0.5,
@@ -75,7 +75,7 @@ describe('moveReadout', () => {
 });
 
 describe('secondsAtPick', () => {
-  const times = new Float32Array([2, 6, 10]);
+  const times = new Float64Array([2, 6, 10]);
 
   it('interpolates along the move between its start and end times', () => {
     expect(secondsAtPick(times, { segmentIndex: 0, fraction: 0.5 })).toBe(1);

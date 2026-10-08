@@ -11,18 +11,16 @@ import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegments
 import { editLineMaterial, withShownMoves } from './line-shader-edits';
 import {
   encodePickIds,
-  nearestEnd,
   nearestPickedSegment,
   PICK_WINDOW_PX,
   withInstancePickIds,
 } from './pick-ids';
 import { shareProgramGeometry } from './program-lines';
+import { closestVisibleOnMove } from './pick-point';
 import type { Point3 } from './scene-parts';
 import type { ViewCamera } from './scene-setup';
 import type { RevealTargets } from './scene-toolpath';
 import type { ThreeModules } from './viewer3d-modules';
-
-type ThreeModule = typeof ThreeNamespace;
 
 export type Viewer3dPick = {
   /** Render-model segment under the pointer. */
@@ -99,6 +97,7 @@ export function createToolpathPicker(
   let targets: RevealTargets | null = null;
   let travelPick: ThreeNamespace.LineSegments | null = null;
   let built = false;
+  let clipPlanes: ThreeNamespace.Plane[] | null = null;
   return {
     setTargets: (next) => {
       pass.clear();
@@ -111,17 +110,25 @@ export function createToolpathPicker(
       if (targets === null) return null;
       if (!built) {
         built = true;
-        pass.addProgram(targets.solid);
+        pass.addProgram(targets.solid, targets.planarDensity !== null);
         travelPick = pass.add(targets.travelGhost, targets.travelSource);
       }
       if (travelPick !== null) travelPick.visible = targets.travelVisible;
       const segmentIndex = pass.read(camera, pointer);
       if (segmentIndex === null) return null;
-      return closestOnMove(three, camera, pointer, targets.positions, segmentIndex);
+      return closestVisibleOnMove(
+        three,
+        camera,
+        pointer,
+        targets.positions,
+        segmentIndex,
+        clipPlanes,
+      );
     },
     highlight: (segmentIndex) => outline.show(segmentIndex, targets?.positions ?? null),
     resize: outline.resize,
     setClipPlanes: (planes) => {
+      clipPlanes = planes;
       pass.setClipPlanes(planes);
       outline.setClipPlanes(planes);
     },
@@ -134,7 +141,7 @@ export function createToolpathPicker(
 
 type PickPass = {
   /** The solid moves, drawn from the toolpath's own GPU copy (ADR-485). */
-  readonly addProgram: (solid: RevealTargets['solid']) => void;
+  readonly addProgram: (solid: RevealTargets['solid'], planar: boolean) => void;
   readonly add: (
     ghost: RevealTargets['travelGhost'],
     source: Uint32Array,
@@ -163,13 +170,18 @@ function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPas
     clipping: true,
   });
   const savedClear = new three.Color();
-  const half = (PICK_WINDOW_PX - 1) / 2;
   return {
-    addProgram: (solid) => {
+    addProgram: (solid, planar) => {
+      // Flat stroke meshes disagree in screen-space depth across directions.
+      // Match their visible draw order; real multi-depth paths keep depth writes.
+      programMaterial.depthWrite = !planar;
+      material.depthWrite = !planar;
       if (solid === null) return;
       programGeometry = shareProgramGeometry(modules.LineSegmentsGeometry, solid.geometry);
       const lines = new modules.LineSegments2(programGeometry, programMaterial);
       // The line width is in the pick window's pixels, not the view's.
+      // Name the visible cut above its recessive coplanar travel.
+      lines.renderOrder = 1;
       lines.onBeforeRender = () => undefined;
       lines.frustumCulled = false;
       scene.add(lines);
@@ -184,16 +196,7 @@ function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPas
       return lines;
     },
     read: (camera, pointer) => {
-      const left = Math.round(pointer.xPx) - half;
-      const top = Math.round(pointer.yPx) - half;
-      camera.setViewOffset(
-        pointer.widthPx,
-        pointer.heightPx,
-        left,
-        top,
-        PICK_WINDOW_PX,
-        PICK_WINDOW_PX,
-      );
+      setPickCameraWindow(camera, pointer);
       const previousTarget = renderer.getRenderTarget();
       renderer.getClearColor(savedClear);
       const savedAlpha = renderer.getClearAlpha();
@@ -229,6 +232,18 @@ function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPas
   };
 }
 
+function setPickCameraWindow(camera: ViewCamera, pointer: PickPointer): void {
+  const half = (PICK_WINDOW_PX - 1) / 2;
+  camera.setViewOffset(
+    pointer.widthPx,
+    pointer.heightPx,
+    Math.round(pointer.xPx) - half,
+    Math.round(pointer.yPx) - half,
+    PICK_WINDOW_PX,
+    PICK_WINDOW_PX,
+  );
+}
+
 // One pixel wide in the pick window, each instance in its identity, and the
 // moves the view does not show left out.
 function createProgramPickMaterial(modules: ThreeModules) {
@@ -240,49 +255,6 @@ function createProgramPickMaterial(modules: ThreeModules) {
     withInstancePickIds(withShownMoves(shader)),
   );
   return material;
-}
-
-// The point of the picked move nearest the pointer's ray. An orthographic ray
-// starts on the near plane, which this rig puts behind the camera, so moves
-// between the two still measure correctly.
-function closestOnMove(
-  three: ThreeModule,
-  camera: ViewCamera,
-  pointer: PickPointer,
-  positions: Float32Array,
-  segmentIndex: number,
-): Viewer3dPick {
-  const ndc = new three.Vector2(
-    (pointer.xPx / Math.max(1, pointer.widthPx)) * 2 - 1,
-    1 - (pointer.yPx / Math.max(1, pointer.heightPx)) * 2,
-  );
-  const raycaster = new three.Raycaster();
-  raycaster.setFromCamera(ndc, camera);
-  if ('isOrthographicCamera' in camera) {
-    raycaster.ray.origin.set(ndc.x, ndc.y, -1).unproject(camera);
-  }
-  const start = new three.Vector3().fromArray(positions, segmentIndex * 6);
-  const end = new three.Vector3().fromArray(positions, segmentIndex * 6 + 3);
-  const onMove = new three.Vector3();
-  raycaster.ray.distanceSqToSegment(start, end, undefined, onMove);
-  const length = start.distanceTo(end);
-  const fraction = length > 0 ? Math.min(1, Math.max(0, start.distanceTo(onMove) / length)) : 1;
-  const onScreen = (point: ThreeNamespace.Vector3): { x: number; y: number } | null => {
-    const projected = point.clone().project(camera);
-    if (!Number.isFinite(projected.x) || Math.abs(projected.z) > 1) return null;
-    return {
-      x: ((projected.x + 1) / 2) * pointer.widthPx,
-      y: ((1 - projected.y) / 2) * pointer.heightPx,
-    };
-  };
-  const snap = nearestEnd({ x: pointer.xPx, y: pointer.yPx }, onScreen(start), onScreen(end));
-  const vertex = snap === null ? null : snap === 'start' ? start : end;
-  return {
-    segmentIndex,
-    fraction,
-    point: { x: onMove.x, y: onMove.y, z: onMove.z },
-    vertex: vertex === null ? null : { x: vertex.x, y: vertex.y, z: vertex.z },
-  };
 }
 
 type Outline = {

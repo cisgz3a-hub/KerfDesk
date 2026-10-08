@@ -17,7 +17,7 @@ function model(text: string): GcodeRenderModel {
 
 function timed(text: string): {
   readonly model: GcodeRenderModel;
-  readonly segTimeEndSec: Float32Array;
+  readonly segTimeEndSec: Float64Array;
   readonly motionSeconds: number;
 } {
   const built = model(text);
@@ -126,7 +126,7 @@ const LCG_MODULUS = 0x100000000;
  * source line matches, else null. */
 function linearSecondsAtLine(
   built: GcodeRenderModel,
-  segTimeEndSec: Float32Array,
+  segTimeEndSec: Float64Array,
   line: number,
 ): number | null {
   for (let index = 0; index < built.segmentCount; index += 1) {
@@ -171,7 +171,7 @@ function lcg(seed: number): () => number {
 }
 
 // Four moves ending at 1, 3, 3 (a move that takes no time) and 6 seconds.
-const ENDS = new Float32Array([1, 3, 3, 6]);
+const ENDS = new Float64Array([1, 3, 3, 6]);
 
 describe('trailStartSegment', () => {
   it('keeps every done move without a trail or before it has run its length', () => {

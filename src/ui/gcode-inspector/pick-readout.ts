@@ -36,7 +36,7 @@ const MOTION_WORD: Readonly<Record<number, string>> = {
 
 export function moveReadout(
   model: InspectorRenderModel,
-  segTimeEndSec: Float32Array | null,
+  segTimeEndSec: Float64Array | null,
   pick: Viewer3dPick,
 ): MoveReadout {
   const index = pick.segmentIndex;
@@ -57,7 +57,7 @@ export function moveReadout(
 
 /** Planner seconds at the pointed point, interpolated along its move. */
 export function secondsAtPick(
-  segTimeEndSec: Float32Array | null,
+  segTimeEndSec: Float64Array | null,
   pick: Pick<Viewer3dPick, 'segmentIndex' | 'fraction'>,
 ): number | null {
   const index = pick.segmentIndex;

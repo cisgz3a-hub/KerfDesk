@@ -102,7 +102,10 @@ Dense laser engraving can contain hundreds of thousands of short dark moves. Tra
 travel overlapped into opaque red bands, while fixed-width cutting strokes merged adjacent rows.
 Known laser programs now start with Travel hidden; the operator can show it and the choice survives
 refreshes. CNC and unknown-file travel defaults stay visible. Flat XY paths use one-pixel cutting
-strokes. Travel opacity scales with travel length per bounding area, the camera's millimetres per
+strokes. Flat classification depends on finite coordinates and Z span, including horizontal,
+vertical and stationary paths with zero XY bounding area (2026-10-09 refinement). These paths use
+the same stroke ordering; zero area leaves the ordinary travel opacity intact rather than
+dividing by zero. Travel opacity scales with travel length per bounding area, the camera's millimetres per
 pixel and the XY plane's projected angle, returning to its normal opacity as zoom separates the moves.
 Flat toolpath strokes share one transparent draw queue without writing depth against each other:
 faint future paths, travel, completed cuts, then the active playback casing and core. Their screen-space
@@ -114,6 +117,18 @@ opaque-colour overlays use the same ordered queue without blending or depth writ
 head and direction arrows retain physical depth testing. Every segment
 and its source mapping remains available to playback and picking. Geometry, emitted output and controller
 behaviour are unchanged. Both Classic and Studio apply the same visibility rule.
+
+### Cumulative playback precision refinement (2026-10-09)
+
+The Inspector's cumulative segment-end clock uses binary64 storage, matching the planner's
+summed motion time. Binary32 timestamps round neighbouring short moves to the same time after
+long raster passes: a ten-hour, 200 by 180 mm engraving followed by 0.05 mm moves can point at
+the preceding or following source move, and 100% can stop short of the final endpoint. Keep the
+full cumulative precision through worker transfer, playback, stepping and hover readouts.
+Stepping searches for the next strictly later boundary or the previous strictly earlier one;
+it skips zero-duration moves without a fixed tolerance that can erase a positive interval.
+Per-move duration storage, total estimated time, the execution timeline and emitted G-code are
+unchanged. The cumulative array adds four bytes per move; it still transfers without copying.
 
 ### Consequences
 

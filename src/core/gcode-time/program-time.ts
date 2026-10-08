@@ -37,8 +37,8 @@ export type ProgramTimeModel = {
   readonly segTargetVelocityMmPerSec: Float32Array;
   readonly segEntryVelocityMmPerSec: Float32Array;
   readonly segExitVelocityMmPerSec: Float32Array;
-  /** Cumulative seconds at each segment's end. */
-  readonly segTimeEndSec: Float32Array;
+  /** Full-precision cumulative seconds keep short moves distinct after long jobs. */
+  readonly segTimeEndSec: Float64Array;
   /** 1 where the move never sustained its programmed feed. */
   readonly segFeedLimited: Uint8Array;
   /** Motion time only. */
@@ -67,7 +67,7 @@ export function buildProgramTime(
   const segTargetVelocityMmPerSec = new Float32Array(blocks.length);
   const segEntryVelocityMmPerSec = new Float32Array(blocks.length);
   const segExitVelocityMmPerSec = new Float32Array(blocks.length);
-  const segTimeEndSec = new Float32Array(blocks.length);
+  const segTimeEndSec = new Float64Array(blocks.length);
   const segFeedLimited = new Uint8Array(blocks.length);
   let elapsed = 0;
   let cutSeconds = 0;

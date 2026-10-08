@@ -1,4 +1,5 @@
 import * as three from 'three';
+import { strokeCentrePixel } from './stroke-centre-pixel';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
@@ -34,6 +35,7 @@ interface FrameOptions {
   segmentIndex: number;
   point: Point;
   sample: Point;
+  samples?: readonly Point[];
   vertical: boolean;
   look: Viewer3dLook;
   perspective: boolean;
@@ -42,10 +44,18 @@ interface FrameOptions {
   liveMarker?: boolean;
   studioFurniture?: boolean;
   hideToolpath?: boolean;
+  hideCompleted?: boolean;
+  completedWidth?: number;
+  cameraPose?: Point;
+  cameraTarget?: Point;
 }
 
 /** Render production strokes and overlays with a fixed camera for repeatable pixel samples. */
-export function playbackStrokeFrame(options: FrameOptions): { data: string; region: Region } {
+export function playbackStrokeFrame(options: FrameOptions): {
+  data: string;
+  region: Region;
+  regions: Region[];
+} {
   const parsed = buildGcodeRenderModel(options.text);
   if (parsed.kind !== 'ok') throw new Error(parsed.reason);
   const width = 800;
@@ -76,12 +86,25 @@ export function playbackStrokeFrame(options: FrameOptions): { data: string; regi
   if (options.look === 'studio')
     applyRecolor(built.reveal, () => [79 / 255, 163 / 255, 1], srgbToLinear);
   applyReveal(built.reveal, { segmentIndex: options.segmentIndex, point: options.point });
+  if (options.hideCompleted) {
+    if (built.reveal.solid !== null) built.reveal.solid.geometry.instanceCount = 0;
+    if (built.reveal.solidGhost !== null) built.reveal.solidGhost.visible = false;
+  }
+  if (options.completedWidth !== undefined && built.fatMaterials[0] !== undefined)
+    built.fatMaterials[0].linewidth = options.completedWidth;
   const camera = frameCamera(options, width, height);
   const region = sampleRegion(options, camera, width, height);
+  const regions = (options.samples ?? [options.sample]).map((sample) =>
+    sampleRegion({ ...options, sample }, camera, width, height),
+  );
   try {
+    if (options.samples !== undefined)
+      for (const r of regions)
+        if (r.x < 0 || r.y < 0 || r.x + r.width > width || r.y + r.height > height)
+          throw new Error('Centreline sample outside the rendered viewport');
     renderer.render(scene, camera);
     // Read in the render's task: WebGL clears its drawing buffer at composite.
-    return { data: renderer.domElement.toDataURL('image/png'), region };
+    return { data: renderer.domElement.toDataURL('image/png'), region, regions };
   } finally {
     disposeChildren(scene);
     renderer.dispose();
@@ -92,6 +115,13 @@ export function playbackStrokeFrame(options: FrameOptions): { data: string; regi
 export async function strokeRegionColours(
   data: string,
   region: Region,
+): ReturnType<typeof strokeRegionsColours> {
+  return strokeRegionsColours(data, [region]);
+}
+
+export async function strokeRegionsColours(
+  data: string,
+  regions: readonly Region[],
 ): Promise<{
   cut: number;
   white: number;
@@ -110,7 +140,11 @@ export async function strokeRegionColours(
   const context = canvas.getContext('2d');
   if (context === null) throw new Error('Screenshot decoder unavailable');
   context.drawImage(image, 0, 0);
-  const pixels = context.getImageData(region.x, region.y, region.width, region.height).data;
+  // Adjacent geometric samples may land on the same pixel; count each region once.
+  const distinct = new Map(regions.map((r) => [JSON.stringify(r), r]));
+  const pixels = [...distinct.values()].flatMap((region) => [
+    ...context.getImageData(region.x, region.y, region.width, region.height).data,
+  ]);
   let cut = 0;
   let white = 0;
   let occluder = 0;
@@ -168,8 +202,10 @@ function frameCamera(options: FrameOptions, width: number, height: number): thre
     grazing: [310, 35, 40],
   } as const;
   const pose = poses[options.view ?? 'top'];
-  camera.position.set(pose[0], pose[1], pose[2]);
-  camera.lookAt(50, 35, 0);
+  const position = options.cameraPose ?? { x: pose[0], y: pose[1], z: pose[2] };
+  const target = options.cameraTarget ?? { x: 50, y: 35, z: 0 };
+  camera.position.set(position.x, position.y, position.z);
+  camera.lookAt(target.x, target.y, target.z);
   camera.updateMatrixWorld();
   return camera;
 }
@@ -185,6 +221,8 @@ function sampleRegion(
   );
   const x = Math.round(((projected.x + 1) / 2) * width);
   const y = Math.round(((1 - projected.y) / 2) * height);
+  if (options.cameraPose !== undefined)
+    return strokeCentrePixel(camera, options.sample, options.samples ?? [], width, height);
   if ((options.view ?? 'top') !== 'top' || options.liveMarker || options.studioFurniture)
     return { x: x - 1, y: y - 1, width: 2, height: 2 };
   return options.vertical

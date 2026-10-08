@@ -4,7 +4,7 @@ import { SEG_KIND } from '../../core/gcode-view';
 import type { Viewer3dSegmentsInput } from './segment-buckets';
 
 export type PlanarPathDensity = {
-  /** Travel length divided by the XY bounding area, in inverse millimetres. */
+  /** Travel per XY area (1/mm), or zero when a flat path has no area to measure. */
   readonly travelPerMm: number;
 };
 
@@ -40,7 +40,10 @@ export function planarPathDensity(segments: Viewer3dSegmentsInput): PlanarPathDe
     }
   }
   const area = (maxX - minX) * (maxY - minY);
-  return area > 0 && Number.isFinite(area) ? { travelPerMm: travelMm / area } : null;
+  if (![minX, maxX, minY, maxY, minZ, maxZ, area].every(Number.isFinite)) return null;
+  // Zero XY area does not imply depth changes: an axis-aligned retrace is flat.
+  // Keep its ordered strokes without applying an undefined area-based travel tint.
+  return { travelPerMm: area > 0 ? travelMm / area : 0 };
 }
 
 function visibleTravel(segments: Viewer3dSegmentsInput, index: number): boolean {

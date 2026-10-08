@@ -81,7 +81,6 @@ describe('planar path geometry density', () => {
   });
 
   it.each([
-    { name: 'empty program', positions: [], kinds: [] },
     {
       name: 'horizontal line',
       positions: [0, 5, 0, 10, 5, 0],
@@ -97,11 +96,39 @@ describe('planar path geometry density', () => {
       positions: [5, 5, 0, 5, 5, 0],
       kinds: [SEG_KIND.travel],
     },
-  ])('leaves $name without a density instead of dividing by zero', ({ positions, kinds }) => {
-    const density = planarPathDensity(segments(positions, kinds));
-    expect(density).toBeNull();
-    expect(planarTravelOpacity(density, 10, 0.35)).toBe(0.35);
+  ])(
+    'retains flat stroke ordering for a $name without dividing by zero',
+    ({ positions, kinds }) => {
+      const density = planarPathDensity(segments(positions, kinds));
+      expect(density).toEqual({ travelPerMm: 0 });
+      expect(planarTravelOpacity(density, 10, 0.35)).toBe(0.35);
+    },
+  );
+
+  it('leaves an empty program unclassified', () => {
+    expect(planarPathDensity(segments([], []))).toBeNull();
   });
+
+  it.each([0.0005, 0.000999])('accepts a collinear path with a %s mm Z span', (span) => {
+    expect(planarPathDensity(segments([0, 0, 0, 100, 0, span], [SEG_KIND.cut]))).toEqual({
+      travelPerMm: 0,
+    });
+  });
+
+  it.each([0.001001, 1])('keeps depth writes for a collinear path with a %s mm Z span', (span) => {
+    expect(planarPathDensity(segments([0, 0, 0, 100, 0, span], [SEG_KIND.cut]))).toBeNull();
+  });
+
+  it.each([0, 1, 2, 3, 4, 5])(
+    'does not classify a nonfinite coordinate at index %i as flat',
+    (at) => {
+      for (const value of [Number.NaN, Infinity, -Infinity]) {
+        const positions = [0, 0, 0, 100, 0, 0];
+        positions[at] = value;
+        expect(planarPathDensity(segments(positions, [SEG_KIND.cut]))).toBeNull();
+      }
+    },
+  );
 
   it('keeps a diagonal line with a finite XY bounding area finite', () => {
     const density = planarPathDensity(segments([0, 0, 0, 3, 4, 0], [SEG_KIND.travel]));

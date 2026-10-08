@@ -112,6 +112,20 @@ points, and what does this part of the job look like on its own.
    - This completes the triad item deferred by ADR-425. It changes no camera framing, stock mesh,
      G-code, controller state or Frame/Start policy.
 
+### Visible-path picking refinement (2026-10-09)
+
+The planar ID pass follows the drawn toolpath's order: recessive travel, then visible cuts,
+without depth writes between those flat strokes. Both materials retain depth testing, and
+genuine multi-depth paths retain their depth writes and nearer-move priority. The travel toggle
+and legend mask still exclude hidden moves. This also covers zero-area horizontal and vertical
+paths classified as flat by ADR-425.
+
+A new pick computes its closest point on the original move's retained interval under the current
+section and Z planes. Only original endpoints that remain in that interval and in the viewport
+can supply a fresh measurement snap; inclusive boundary endpoints still snap, and a clipping
+intersection does not become a new vertex. Previously chosen measurement points and their
+unclipped overlay remain whole when isolation changes.
+
 ### Consequences
 
 - **Picking reads pixels back synchronously.** One 13 x 13 read per animation frame while the

@@ -74,7 +74,7 @@ function mount(options: {
     root.render(
       <InspectorMoveTip
         model={PROGRAM}
-        segTimeEndSec={new Float32Array([1, 3])}
+        segTimeEndSec={new Float64Array([1, 3])}
         onLocate={onLocate}
         canvasRef={{ current: canvas }}
         handleRef={{ current: handle as unknown as Viewer3dSceneHandle }}

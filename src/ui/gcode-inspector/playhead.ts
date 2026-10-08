@@ -36,7 +36,7 @@ export type PlayheadState = {
  */
 export function playheadAtTime(
   model: InspectorRenderModel,
-  segTimeEndSec: Float32Array,
+  segTimeEndSec: Float64Array,
   seconds: number,
 ): PlayheadState {
   return playheadFromCumulative(model, segTimeEndSec, seconds);
@@ -44,16 +44,13 @@ export function playheadAtTime(
 
 function playheadFromCumulative(
   model: InspectorRenderModel,
-  cumulative: Float32Array,
+  cumulative: Float64Array,
   value: number,
 ): PlayheadState {
   if (model.segmentCount === 0) {
     return { routeMm: 0, segmentIndex: -1, point: null, segmentFraction: 0 };
   }
-  // Clamp against the cumulative array's OWN last entry, not a separately
-  // accumulated total: the array is Float32 and the total Float64, so the
-  // two disagree in the last ulp and the end of the program would land a
-  // hair short of the final vertex.
+  // This endpoint retains the same full precision as the transport's motion clock.
   const clamped = Math.min(Math.max(value, 0), cumulative[model.segmentCount - 1] ?? 0);
   const segmentIndex = indexInCumulative(cumulative, model.segmentCount, clamped);
   const start = segmentIndex === 0 ? 0 : (cumulative[segmentIndex - 1] ?? 0);
@@ -74,7 +71,7 @@ function playheadFromCumulative(
  * run its length (ADR-470).
  */
 export function trailStartSegment(
-  segTimeEndSec: Float32Array,
+  segTimeEndSec: Float64Array,
   segmentCount: number,
   seconds: number,
   windowSeconds: number,
@@ -84,38 +81,42 @@ export function trailStartSegment(
   return indexInCumulative(segTimeEndSec, segmentCount, from);
 }
 
-// Moves ending within this of the playhead count as where it already is.
-const MOVE_STEP_EPSILON_SEC = 1e-4;
-
 /**
  * Where stepping one move from `seconds` lands: the end of the next move
  * forward, or of the previous one back (0 before the first). Moves that take
  * no time are stepped over (ADR-470).
  */
 export function stepMoveSeconds(
-  segTimeEndSec: Float32Array,
+  segTimeEndSec: Float64Array,
   segmentCount: number,
   seconds: number,
   direction: 1 | -1,
 ): number {
   if (segmentCount === 0) return 0;
   if (direction > 0) {
-    const next = indexInCumulative(segTimeEndSec, segmentCount, seconds + MOVE_STEP_EPSILON_SEC);
+    const next = indexInCumulative(segTimeEndSec, segmentCount, seconds, true);
     return segTimeEndSec[next] ?? 0;
   }
-  const index = indexInCumulative(segTimeEndSec, segmentCount, seconds - MOVE_STEP_EPSILON_SEC);
+  const index = indexInCumulative(segTimeEndSec, segmentCount, seconds);
   const end = segTimeEndSec[index] ?? 0;
   // Every move ends before the playhead: the last one's end is the step.
-  if (end < seconds - MOVE_STEP_EPSILON_SEC) return end;
+  if (end < seconds) return end;
   return index === 0 ? 0 : (segTimeEndSec[index - 1] ?? 0);
 }
 
-function indexInCumulative(cumulative: Float32Array, count: number, value: number): number {
+function indexInCumulative(
+  cumulative: Float64Array,
+  count: number,
+  value: number,
+  after = false,
+): number {
   let low = 0;
   let high = count - 1;
   while (low < high) {
     const mid = (low + high) >> 1;
-    if ((cumulative[mid] ?? 0) < value) low = mid + 1;
+    const end = cumulative[mid] ?? 0;
+    // Stepping forward uses an upper bound: skip equal ends, never positive time.
+    if (end < value || (after && end === value)) low = mid + 1;
     else high = mid;
   }
   return low;
@@ -129,7 +130,7 @@ function indexInCumulative(cumulative: Float32Array, count: number, value: numbe
  * end of a large program no longer walks every segment before it. */
 export function secondsAtLine(
   model: InspectorRenderModel,
-  segTimeEndSec: Float32Array,
+  segTimeEndSec: Float64Array,
   line: number,
 ): number | null {
   const index = firstSegmentAtOrAfterLine(model.segLine, model.segmentCount, line);

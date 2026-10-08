@@ -15,7 +15,7 @@ import './inspector-pick.css';
 
 export type MovePickProps = {
   readonly model: InspectorRenderModel;
-  readonly segTimeEndSec: Float32Array | null;
+  readonly segTimeEndSec: Float64Array | null;
   /** The pointed move, and the point along it, for click-to-line. */
   readonly onLocate: (pick: Viewer3dPick) => void;
 };
