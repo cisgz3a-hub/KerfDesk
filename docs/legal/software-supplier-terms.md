@@ -1,8 +1,8 @@
 # KerfDesk Software and Supplier Terms
 
-Version 1.0. Published: 7 October 2026.
+Version 1.1. Published: 7 October 2026.
 
-**Paid checkout and new Pro trials are closed.** These are our published software and Supplier Terms. The purchase provisions apply if and when you buy KerfDesk Pro through Paddle. Publishing these terms does not enable a purchase or a trial.
+These are our published software and Supplier Terms. The purchase provisions apply when you buy KerfDesk Pro through Paddle. Purchase availability is shown on the KerfDesk purchase page. Publishing these terms does not itself enable a purchase or a trial.
 
 ## 1. Who makes KerfDesk and who sells Pro
 
@@ -28,7 +28,7 @@ A valid Pro purchase grants a non-exclusive licence to use the covered Pro tools
 
 The initial update period starts when Paddle confirms the completed Pro payment. You may keep using Pro in versions released during your covered update period, with no time limit. Buying more updates extends that period; choosing not to buy does not end your right to use covered versions. Help > Licence shows your update end date. A later release is not covered merely because you downloaded or installed it earlier or later.
 
-When the licensed Windows edition and trial are released, the Pro trial will give all Pro tools for **30 days**, without a payment card, once per Windows installation. A trial is separate from a purchase and does not renew or turn into a charge. New trials are not open today.
+An eligible Windows installation can start a Pro trial with all Pro tools for **30 days**, without a payment card, once per Windows installation. Start it in Help > Licence in the Windows app. A trial is separate from a purchase and does not renew or turn into a charge.
 
 A licence never gates Frame, Start, output, Save G-code or a running job. When trial or Pro access ends, Free remains available. Existing Pro operations in your work remain usable; selecting a new Pro tool can ask for an eligible trial or licence.
 
@@ -42,7 +42,7 @@ KerfDesk’s previews, simulations and checks are aids, not guarantees of correc
 
 ## 5. Payment, delivery and support
 
-Purchases remain closed. When opened, use only the supported KerfDesk purchase flow. A licence is fulfilled after the licensing service confirms the completed Paddle transaction for an order it created. Paddle sends your receipt; KerfDesk makes the licence available through the purchase flow for activation in the Windows app.
+Use the KerfDesk purchase page on a computer, phone or tablet, or Help > Licence in the Windows app, to start the supported purchase flow. After payment, choose Check payment in the same purchase flow to retrieve your licence. A browser purchase shows a key to save and activate in Help > Licence on Windows; it does not activate the phone or consume a device seat. Paddle sends your receipt. Only a payment confirmed by the licensing service grants the purchased rights.
 
 Keep your receipt and store your licence key securely. A browser recovery credential can be saved in that browser to recover an unfinished order. Clearing browser storage can remove it. There is no promise of an automatic licence-key email. If delivery is uncertain or a key is lost, email support@kerfdesk.com with the Paddle receipt or order reference. Do not send a full licence key or card details, and do not pay again to resolve an uncertain result.
 
@@ -50,7 +50,7 @@ We will help with software and licence problems. If a purchase cannot be deliver
 
 ## 6. Refunds and payment reversals
 
-For a future Pro or optional update purchase, **we promise a full refund if you request it within 14 calendar days after purchase**, even after activating or using Pro. No reason is required. Clear evidence of fraud or refund abuse may be refused to the extent the law allows. This promise adds to Paddle’s policy; it does not reduce statutory rights.
+For a Pro or optional update purchase, **we promise a full refund if you request it within 14 calendar days after purchase**, even after activating or using Pro. No reason is required. Clear evidence of fraud or refund abuse may be refused to the extent the law allows. This promise adds to Paddle’s policy; it does not reduce statutory rights.
 
 Duplicate or incorrect charges, an undelivered or unusable licence and any applicable legal remedies remain covered after that period. Read the [Refund Policy](https://kerfdesk.com/refunds/) for the request process and effect on licence rights. If these Supplier Terms and our Refund Policy differ, the provision that gives you greater rights applies.
 

@@ -1,7 +1,7 @@
 // Validation for website/commerce.config.mjs. The build calls
 // `assertValidCommerce` first, so the settled offer always renders complete, no
-// plan ever carries a checkout URL (purchases start in the desktop app, ADR-524
-// Amendment 2), and an open store can never ship half-configured.
+// plan carries a standalone provider payment link. Browser and desktop purchases
+// use the first-party order/claim flow (ADR-562); an open store must be complete.
 
 const BILLING = new Set(['one-time', 'yearly']);
 const PLAN_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -58,10 +58,10 @@ function planErrors(plan, index) {
   if (!BILLING.has(plan.billing)) errors.push(`${at}.billing must be one-time or yearly`);
   if (!isStringList(plan.includes)) errors.push(`${at}.includes must be a list of strings`);
   errors.push(...planTermErrors(plan, at));
-  // The licence service fulfils only the Paddle checkouts it creates for the
-  // desktop app, so a payment link here would take money without a license.
+  // The licence service fulfils only the transactions it creates. Link the
+  // first-party purchase page in the view, never a provider payment link.
   if ('checkoutUrl' in plan) {
-    errors.push(`${at}.checkoutUrl is not allowed: purchases start in the desktop app`);
+    errors.push(`${at}.checkoutUrl is not allowed: use the supported KerfDesk purchase flow`);
   }
   return errors;
 }
@@ -88,7 +88,9 @@ export function commerceErrors(commerce) {
   if (new Set(ids).size !== ids.length) errors.push('plan ids must be unique');
   if (commerce.salesOpen) {
     if (!commerce.trialOpen) {
-      errors.push('trialOpen must be true before sales open: buyers purchase in the desktop app');
+      errors.push(
+        'trialOpen must be true before sales open: the licensed Windows app must be available',
+      );
     }
     if (!ADR_ID.test(commerce.authorizingAdr ?? '')) {
       errors.push('authorizingAdr must name the commercial ADR that authorizes sales (ADR-247)');

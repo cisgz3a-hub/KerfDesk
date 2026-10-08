@@ -1,4 +1,4 @@
-// Published closed-sales Supplier Terms/refund promise and settled pricing.
+// Published Supplier Terms, refund promise and settled pricing.
 // The full commercial/PAIA review drafts and supplied app licences stay separate.
 import { readFileSync } from 'node:fs';
 import { blocksHtml, readDocument } from '../../scripts/site-pages-markdown.mjs';
@@ -13,14 +13,14 @@ export const publicPolicySources = Object.freeze([
     title: 'Software and Supplier Terms',
     source: 'docs/legal/software-supplier-terms.md',
     description:
-      'Published KerfDesk software terms and the Pro rights for a future purchase through Paddle. Paid checkout remains closed.',
+      'Published KerfDesk software terms, purchased Windows Pro rights, covered-version use and optional updates through Paddle.',
   },
   {
     path: '/refunds/',
     title: 'Refund Policy',
     source: 'docs/legal/refund-promise.md',
     description:
-      'Our 14-day full-refund promise for a future KerfDesk Pro or update purchase through Paddle. Paid checkout remains closed.',
+      'Our 14-day full-refund promise for a KerfDesk Pro or optional update purchase through Paddle, including after activation.',
   },
 ]);
 
@@ -28,7 +28,7 @@ export function publicPolicySourceErrors(source) {
   const errors = [];
   if (/\[PLACEHOLDER|Draft for review|not published or in force/i.test(source))
     errors.push('Unfinished review content cannot be a published policy.');
-  if (!source.includes('Version 1.0. Published: 7 October 2026.'))
+  if (!source.includes('Version 1.1. Published: 7 October 2026.'))
     errors.push('A published policy needs its version and confirmed publication date.');
   return errors;
 }
@@ -37,11 +37,7 @@ function policyPage(policy) {
   return {
     ...policy,
     nav: null,
-    render: ({ commerce }) => {
-      if (commerce.salesOpen || commerce.trialOpen)
-        throw new Error(
-          'Published closed-sales policies require sales and trials to remain closed.',
-        );
+    render: () => {
       const source = readFileSync(new URL('../../' + policy.source, import.meta.url), 'utf8');
       const errors = publicPolicySourceErrors(source);
       if (errors.length) throw new Error(policy.source + ': ' + errors.join(' '));

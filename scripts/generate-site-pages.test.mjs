@@ -5,6 +5,7 @@ import path from 'node:path';
 import { test } from 'node:test';
 import { attrValues } from '../website/tests/helpers.mjs';
 import { legalPublication } from '../website/legal-publication.config.mjs';
+import { commerce } from '../website/commerce.config.mjs';
 import { paymentLegalDraftPages } from '../website/pages/payment-legal-drafts.mjs';
 import {
   draftErrors,
@@ -15,7 +16,7 @@ import { publicPolicySourceErrors } from '../website/pages/payment-information.m
 import {
   buildSitePages,
   buildPublicInformationFiles,
-  closedInformationErrors,
+  publicInformationErrors,
   renderPublicInformation,
   DRAFT_DIRECTORY,
   REPO_ROOT,
@@ -93,14 +94,31 @@ test('stale/missing draft output is refused without changing a public file', asy
   }
 });
 
-test('closed draft configuration passes but changed launch flags are refused', () => {
-  const closed = { salesOpen: false, trialOpen: false };
-  const workerText = '{"PAYMENTS_ENABLED": "false"}';
-  assert.deepEqual(draftErrors({ store: closed, workerText }), []);
-  assert.ok(draftErrors({ store: { ...closed, salesOpen: true }, workerText }).length);
-  assert.ok(draftErrors({ store: { ...closed, trialOpen: true }, workerText }).length);
-  assert.ok(draftErrors({ store: closed, workerText: '{"PAYMENTS_ENABLED": "true"}' }).length);
-  assert.ok(draftErrors({ store: closed, workerText: '' }).length);
+test('full review drafts remain unpublished independently of approved live-sales flags', () => {
+  assert.deepEqual(draftErrors(), []);
+  assert.ok(draftErrors({ publication: { ...legalPublication, status: 'published' } }).length);
+  assert.ok(
+    draftErrors({ publication: { ...legalPublication, publicationDate: '2026-10-07' } }).length,
+  );
+});
+
+test('public generation accepts coherent sale states and refuses mismatched or incomplete source', () => {
+  const closed = { ...commerce, salesOpen: false, trialOpen: false };
+  const disabled = '{"PAYMENTS_ENABLED":"false"}';
+  const enabled = '{"PAYMENTS_ENABLED":"true"}';
+  assert.deepEqual(publicInformationErrors({ store: closed, workerText: disabled }), []);
+  assert.deepEqual(
+    publicInformationErrors({ store: { ...closed, trialOpen: true }, workerText: disabled }),
+    [],
+  );
+  assert.deepEqual(publicInformationErrors({ store: commerce, workerText: enabled }), []);
+  assert.ok(publicInformationErrors({ store: commerce, workerText: disabled }).length);
+  assert.ok(publicInformationErrors({ store: closed, workerText: enabled }).length);
+  assert.ok(publicInformationErrors({ workerText: '' }).length);
+  assert.ok(publicInformationErrors({ workerText: enabled + disabled }).length);
+  assert.ok(
+    publicInformationErrors({ store: { ...commerce, termsUrl: null }, workerText: enabled }).length,
+  );
 });
 
 test('publication content readiness stays separate from statutory, live-sales and PAIA questions', () => {
@@ -113,7 +131,7 @@ test('publication content readiness stays separate from statutory, live-sales an
   const questions = publicationReviewQuestions();
   assert.ok(questions.statutory.some((item) => item.includes('ECTA')));
   assert.ok(questions.statutory.some((item) => item.includes('POPIA')));
-  assert.ok(questions.liveSales.some((item) => item.includes('stay closed')));
+  assert.ok(questions.liveSales.some((item) => item.includes('do not prove')));
   assert.ok(questions.paia.some((item) => item.includes('PAIA')));
   assert.equal(legalPublication.seller.publicAddress, null);
   assert.equal(legalPublication.seller.publicTelephone, null);
@@ -122,14 +140,14 @@ test('publication content readiness stays separate from statutory, live-sales an
 
 test('finished public policy sources reject gaps and undated review content', () => {
   assert.deepEqual(
-    publicPolicySourceErrors('# Terms\n\nVersion 1.0. Published: 7 October 2026.'),
+    publicPolicySourceErrors('# Terms\n\nVersion 1.1. Published: 7 October 2026.'),
     [],
   );
   assert.ok(publicPolicySourceErrors('# Terms\n\n[PLACEHOLDER: date]').length);
   assert.ok(publicPolicySourceErrors('# Terms\n\nDraft for review.').length);
 });
 
-test('published closed-sales policies contain confirmed parties and preserve supplied app licences', async () => {
+test('published purchase policies contain confirmed parties and preserve supplied app licences', async () => {
   const files = await buildPublicInformationFiles();
   assert.ok(files.has('pricing/index.html'));
   assert.ok(files.has('refunds/index.html'));
@@ -155,17 +173,18 @@ test('published closed-sales policies contain confirmed parties and preserve sup
     /Share artwork previews and text/,
   );
   const terms = files.get('terms/index.html').toString().replace(/\s+/g, ' ');
-  assert.match(terms, /Version 1\.0\. Published: 7 October 2026/);
-  assert.match(terms, /purchase provisions apply if and when you buy/);
+  assert.match(terms, /Version 1\.1\. Published: 7 October 2026/);
+  assert.match(terms, /purchase provisions apply when you buy/);
   assert.match(terms, /Paddle is the authorised reseller and merchant of record/);
   assert.match(terms, /(?:do|does) not replace an installed notice/);
   assert.match(terms, /a requirement for machine control/);
   assert.doesNotMatch(terms, /terms replace the License|legal.service address unresolved/);
-  assert.deepEqual(closedInformationErrors({ workerText: '{"PAYMENTS_ENABLED":"false"}' }), []);
+  assert.deepEqual(publicInformationErrors({ workerText: '{"PAYMENTS_ENABLED":"true"}' }), []);
   await assert.rejects(
-    buildPublicInformationFiles({ store: { salesOpen: true, trialOpen: false } }),
-    /remain closed/,
+    buildPublicInformationFiles({ store: { ...commerce, termsUrl: null } }),
+    /termsUrl/,
   );
+  assert.doesNotMatch(terms, /Paid checkout.*closed|New trials are not open today/);
 });
 
 test('public preparation owns Terms, pricing, refunds and existing privacy outputs', async () => {
@@ -174,7 +193,7 @@ test('public preparation owns Terms, pricing, refunds and existing privacy outpu
     await mkdir(path.join(root, 'services/desktop-licensing'), { recursive: true });
     await writeFile(
       path.join(root, 'services/desktop-licensing/wrangler.jsonc'),
-      '{"PAYMENTS_ENABLED":"false"}',
+      '{"PAYMENTS_ENABLED":"true"}',
     );
     const directory = path.join(root, 'public');
     await mkdir(directory, { recursive: true });
@@ -284,10 +303,7 @@ test('all public information links resolve to app inputs and identify the Free a
       }
     }
   }
-  assert.match(
-    files.get('pricing/index.html').toString().replace(/\s+/g, ' '),
-    /Sales and paid checkout remain closed/,
-  );
+  assert.match(files.get('pricing/index.html').toString().replace(/\s+/g, ' '), /Buy Pro/);
   assert.ok(files.has('privacy/lucide-license.txt'));
   assert.ok((await stat(path.join(REPO_ROOT, 'public/privacy/lucide-license.txt'))).isFile());
 });

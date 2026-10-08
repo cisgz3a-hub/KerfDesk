@@ -21,6 +21,22 @@ on:
     types: [completed]
     branches: [main]
   workflow_dispatch:
+    inputs:
+      payment_flag:
+        description: Explicit licence Worker checkout operation (no website deployment)
+        type: choice
+        default: none
+        options:
+          [
+            none,
+            production-inspect,
+            production-open,
+            production-close,
+            sandbox-inspect,
+            sandbox-open,
+            sandbox-close,
+            sandbox-refresh-code,
+          ]
 
 # One serialized production publication lane exists. Queueing every candidate
 # prevents an obsolete historical rerun from canceling or replacing an eligible
@@ -50,7 +66,7 @@ jobs:
     # Only a push to main is a production candidate: `branches: [main]`
     # matches a triggering run's head branch, which a fork PR can also name
     # main (ADR-360).
-    if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && (inputs.payment_flag == '' || inputs.payment_flag == 'none')) || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -299,3 +315,43 @@ jobs:
           name: release-readiness-deploy-${{ steps.deployment_identity.outputs.sha }}
           path: artifacts/release-readiness/
           retention-days: 30
+
+  payment-settings:
+    name: Apply explicitly approved checkout operation
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.payment_flag != 'none' && inputs.payment_flag != '' &&
+      github.repository == 'cisgz3a-hub/KerfDesk' &&
+      github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: desktop-commercial
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - name: Verify the bounded checkout helpers
+        run: node --test scripts/apply-payment-settings.test.mjs scripts/refresh-sandbox-script.test.mjs
+      - name: Apply the specified checkout operation
+        env:
+          KERFDESK_PAYMENT_LAUNCH_CF_TOKEN: ${{ secrets.KERFDESK_PAYMENT_LAUNCH_CF_TOKEN }}
+          KERFDESK_PAYMENT_FLAG_EVIDENCE: ${{ runner.temp }}/payment-flag-evidence
+          PAYMENT_FLAG_OPERATION: ${{ inputs.payment_flag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$PAYMENT_FLAG_OPERATION" = sandbox-refresh-code ]; then
+            node scripts/refresh-sandbox-script.mjs "$PAYMENT_FLAG_OPERATION"
+          else
+            node scripts/apply-payment-settings.mjs "$PAYMENT_FLAG_OPERATION"
+          fi
+      - name: Retain redacted settings receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: payment-flag-${{ inputs.payment_flag }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/payment-flag-evidence/
+          retention-days: 7
+          if-no-files-found: warn

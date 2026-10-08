@@ -1,11 +1,12 @@
 // Default: full review drafts in ignored output. --public-info prepares the
-// finished closed-sales pages for a local build, without deployment or app gates.
+// finished public pages for a local build, without deployment or app gates.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { legalPublication } from '../website/legal-publication.config.mjs';
 import { commerce } from '../website/commerce.config.mjs';
+import { commerceErrors } from '../website/lib/commerce.mjs';
 import { site } from '../website/site.config.mjs';
 import { renderAppPrivacyDocument } from '../website/lib/layout.mjs';
 import { paymentInformationPages } from '../website/pages/payment-information.mjs';
@@ -70,14 +71,14 @@ export async function renderDrafts({ check = false, root = REPO_ROOT } = {}) {
   return directory;
 }
 
-export function closedInformationErrors({ store = commerce, workerText } = {}) {
-  const errors = [];
-  if (store.salesOpen !== false || store.trialOpen !== false)
-    errors.push(
-      'Closed-sales information requires website sales and trial flags to remain closed.',
-    );
-  if (!/"PAYMENTS_ENABLED"\s*:\s*"false"/.test(workerText ?? ''))
-    errors.push('Closed-sales information requires checked-in Worker payments to remain disabled.');
+export function publicInformationErrors({ store = commerce, workerText } = {}) {
+  const errors = commerceErrors(store);
+  const flags = [...(workerText ?? '').matchAll(/"PAYMENTS_ENABLED"\s*:\s*"(true|false)"/g)];
+  if (flags.length !== 1) {
+    errors.push('Checked-in Worker payments must have one explicit true or false flag.');
+  } else if ((flags[0][1] === 'true') !== store.salesOpen) {
+    errors.push('Website salesOpen must match checked-in Worker PAYMENTS_ENABLED.');
+  }
   return errors;
 }
 
@@ -88,7 +89,7 @@ export async function buildPublicInformationFiles({ root = REPO_ROOT, store = co
     path.join(root, 'services/desktop-licensing/wrangler.jsonc'),
     'utf8',
   );
-  const errors = closedInformationErrors({ store, workerText });
+  const errors = publicInformationErrors({ store, workerText });
   if (errors.length) throw new Error(errors.join('\n'));
   const privacy = await appPrivacyFiles();
   const files = new Map(
@@ -167,7 +168,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (args.includes('--public-info')) {
     const directory = outIndex === -1 ? undefined : path.resolve(REPO_ROOT, args[outIndex + 1]);
     console.log(
-      'Prepared closed-sales information: ' +
+      'Prepared public payment information: ' +
         (await renderPublicInformation({ check: args.includes('--check'), directory })),
     );
   } else {

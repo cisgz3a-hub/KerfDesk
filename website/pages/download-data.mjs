@@ -78,8 +78,8 @@ export function updateItems(site) {
     },
     {
       icon: 'refresh-cw',
-      title: 'Signed Windows edition',
-      body: 'Once it’s released, it checks for updates inside the app and installs only versions your license’s updates cover. An update installs after you quit KerfDesk yourself, never during a job, and it never forces a restart.',
+      title: 'Windows commercial edition',
+      body: 'The unsigned Windows edition checks for covered updates. Choose Download update, then Install when I close KerfDesk. It waits for you to close the app; it never forces a restart. A separate signed edition may use its trusted automatic-update lane.',
     },
   ];
 }
@@ -130,7 +130,10 @@ export function downloadFaq(site, commerce) {
         ${plan &&
         html`${plan.name} costs ${formatPrice(plan.price, commerce.currency)}, paid once, with a
         year of updates.`}
-        Purchase isn’t open yet. See <a href="/pricing/">pricing</a>.
+        ${commerce.salesOpen
+          ? 'Buy through the KerfDesk purchase page or Help > Licence in the Windows app.'
+          : 'Purchase isn’t open yet.'}
+        See <a href="/pricing/">pricing</a>.
       </p>`,
     },
     {

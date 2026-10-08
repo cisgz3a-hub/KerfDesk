@@ -3,6 +3,19 @@ name: Qualify published Windows upgrade
 on:
   workflow_dispatch:
     inputs:
+      qualification_mode:
+        description: Historical Free upgrade or production native developer licence
+        required: true
+        type: choice
+        default: historical-upgrade
+        options:
+          - historical-upgrade
+          - developer-licence
+      expected_source:
+        description: Exact published source SHA for developer licence qualification
+        required: false
+        type: string
+        default: 'e3820ed51a8d3e9ae8eab16f47097c4011dbd703'
       previous_version:
         description: Previously published unsigned Windows release
         required: true
@@ -19,7 +32,7 @@ permissions:
 
 jobs:
   historical-upgrade:
-    if: github.repository == 'cisgz3a-hub/KerfDesk' && github.ref == 'refs/heads/main'
+    if: github.repository == 'cisgz3a-hub/KerfDesk' && github.ref == 'refs/heads/main' && (inputs.qualification_mode == '' || inputs.qualification_mode == 'historical-upgrade')
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -67,5 +80,63 @@ jobs:
             artifacts/historical-installers/*/public-release.json
             artifacts/historical-installers/*/download-manifest.json
             artifacts/historical-installers/*/archive-*.txt
+          retention-days: 7
+          if-no-files-found: warn
+
+  native-developer-licence:
+    if: >-
+      github.repository == 'cisgz3a-hub/KerfDesk' &&
+      inputs.qualification_mode == 'developer-licence' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/codex/payment-launch-20261007')
+    runs-on: windows-latest
+    timeout-minutes: 20
+    concurrency:
+      group: native-developer-licence
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+      - name: Install the locked qualification tools
+        run: pnpm install --frozen-lockfile
+      - name: Check private-input, retention and evidence boundaries
+        run: node --test scripts/native-licence-qualification.test.mjs
+      - name: Qualify unchanged public installer with issued developer licence
+        env:
+          QUALIFICATION_VERSION: ${{ inputs.target_version }}
+          QUALIFICATION_SOURCE: ${{ inputs.expected_source }}
+          KERFDESK_NATIVE_QUALIFICATION_LICENCE: ${{ secrets.KERFDESK_NATIVE_QUALIFICATION_LICENCE }}
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:GITHUB_WORKSPACE 'artifacts/installed-qualification/licence'
+          node scripts/qualify-desktop-licence.mjs "--version=$env:QUALIFICATION_VERSION" "--source=$env:QUALIFICATION_SOURCE" "--output=$output"
+          if ($LASTEXITCODE -ne 0) { throw 'Native developer qualification failed; review the safe receipt and cleanup result.' }
+      - name: Summarise native developer evidence
+        if: always()
+        shell: pwsh
+        run: |
+          $path = Join-Path $env:GITHUB_WORKSPACE 'artifacts/installed-qualification/licence/qualification.json'
+          if (Test-Path -LiteralPath $path) {
+            $receipt = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+            "Native developer licence: passed=$($receipt.passed); exact release=$($receipt.version); source=$($receipt.source). This is developer activation/offline retention with a same-version reinstall. Paid, trial, three-device, UAC, SmartScreen and hardware evidence remain separate." >> $env:GITHUB_STEP_SUMMARY
+          }
+      - name: Retain only allowlisted public-safe observations
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: native-developer-licence-${{ inputs.target_version }}-${{ github.run_attempt }}
+          path: |
+            artifacts/installed-qualification/licence/qualification.json
+            artifacts/installed-qualification/licence/activate.json
+            artifacts/installed-qualification/licence/offline-after-restart.json
+            artifacts/installed-qualification/licence/offline-after-reinstall.json
+            artifacts/installed-qualification/licence/online-deactivation.json
+            artifacts/installed-qualification/licence/screenshots/*.png
+            artifacts/installed-qualification/licence/public-download/*/public-release.json
+            artifacts/installed-qualification/licence/public-download/*/download-manifest.json
           retention-days: 7
           if-no-files-found: warn
