@@ -87,19 +87,84 @@ export function sandboxUploadMetadata(settings, activeVersion, entrypoint, opera
   };
 }
 
-export async function readSandboxModule(response) {
+export async function readSandboxModule(response, format = {}, expectedRawDescriptor) {
+  const mimeType = (response.headers.get('content-type') ?? '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase();
+  const safeName = (name) =>
+    ['worker.js', 'sandbox-worker.js', 'worker.js.map', 'sandbox-worker.js.map'].includes(name)
+      ? name
+      : null;
+  const safeMime = (type) =>
+    [
+      'multipart/form-data',
+      'application/javascript',
+      'application/javascript+module',
+      'text/javascript+module',
+      'text/javascript',
+      'application/source-map',
+      'application/json',
+      'text/html',
+      'application/octet-stream',
+    ].includes(type)
+      ? type
+      : null;
+  format.contentType = safeMime(mimeType);
+  format.entrypoint = safeName(response.headers.get('cf-entrypoint'));
   assert.ok(response.ok, 'Sandbox module unavailable.');
-  assert.equal(
-    (response.headers.get('content-type') ?? '').split(';', 1)[0].trim().toLowerCase(),
-    'multipart/form-data',
-    'Expected a module response.',
-  );
+  if (mimeType !== 'multipart/form-data') {
+    assert.ok(
+      ['application/javascript', 'application/javascript+module'].includes(mimeType),
+      'Expected a JavaScript module response.',
+    );
+    const bytes = Buffer.from(await response.arrayBuffer());
+    format.partCount = 0;
+    format.raw = { size: bytes.length, sha256: hash(bytes) };
+    assert.ok(bytes.length, 'Sandbox module empty.');
+    assert.equal(format.raw.sha256, GOOD_CODE_SHA256, 'Sandbox module is not the attested code.');
+    const descriptor = expectedRawDescriptor ?? {
+      entrypoint: 'sandbox-worker.js',
+      filename: 'sandbox-worker.js',
+      mimeType: 'application/javascript+module',
+    };
+    if (expectedRawDescriptor) {
+      const header = response.headers.get('cf-entrypoint');
+      assert.ok(
+        header === null || header === descriptor.entrypoint,
+        'Sandbox raw entrypoint changed.',
+      );
+    }
+    // Only raw readback adopts the already-attested upload identity; multipart stays strict.
+    return {
+      entrypoint: descriptor.entrypoint,
+      filename: descriptor.filename,
+      mimeType: descriptor.mimeType,
+      bytes,
+    };
+  }
   const entrypoint = response.headers.get('cf-entrypoint');
   assert.ok(
     entrypoint && entrypoint.trim() && entrypoint !== 'metadata',
     'Sandbox entrypoint unavailable.',
   );
   const entries = [...(await response.formData()).entries()];
+  format.partCount = entries.length;
+  format.parts = await Promise.all(
+    entries.slice(0, 8).map(async ([field, file]) => {
+      const isFile = typeof file !== 'string';
+      const bytes = Buffer.from(isFile ? await file.arrayBuffer() : file);
+      return {
+        field: safeName(field),
+        filename: isFile ? safeName(file.name) : null,
+        mimeType: isFile ? safeMime(file.type) : null,
+        isFile,
+        size: bytes.length,
+        sha256: hash(bytes),
+      };
+    }),
+  );
+  format.partsTruncated = entries.length > 8;
   assert.equal(entries.length, 1, 'Expected exactly one sandbox module.');
   const [field, file] = entries[0];
   assert.equal(field, entrypoint, 'Sandbox entrypoint file unavailable.');
@@ -133,6 +198,7 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
   let initialClosedVerified = false;
   let originalBuy;
   let module;
+  let moduleFormatFailure;
   let mutationAttempted = false;
   let uploadResponseReceived = false;
   const setStage = (value) => {
@@ -203,8 +269,19 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     operationVersion = active;
   };
   const readSettings = () => api('/settings', {}, 'sandbox-settings-get');
-  const readModule = async (version, label) =>
-    readSandboxModule(await request('/content/v2?version=' + version, {}, label));
+  const readModule = async (version, label, expectedRawDescriptor) => {
+    const format = {};
+    try {
+      return await readSandboxModule(
+        await request('/content/v2?version=' + version, {}, label),
+        format,
+        expectedRawDescriptor,
+      );
+    } catch (error) {
+      moduleFormatFailure = { version, stage: label, ...format };
+      throw error;
+    }
+  };
   const publicConfig = async () => {
     setStage('sandbox-public-config-get');
     const response = await fetcher(SANDBOX_ORIGIN + '/v1/public/config', {
@@ -264,7 +341,11 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     const active = await activeVersion();
     if (mutationAttempted) await verifyOperationVersion(active);
     await verifySettings();
-    const restored = await readModule(active, 'sandbox-restored-content-get');
+    const restored = await readModule(active, 'sandbox-restored-content-get', {
+      entrypoint: module.entrypoint,
+      filename: module.filename,
+      mimeType: module.mimeType,
+    });
     setStage('sandbox-restored-content-verification');
     assert.equal(restored.entrypoint, module.entrypoint, 'Sandbox entrypoint changed.');
     assert.equal(restored.filename, module.filename, 'Sandbox module filename changed.');
@@ -462,6 +543,7 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
       health: false,
       failure,
       recovery,
+      ...(moduleFormatFailure ? { moduleFormatFailure } : {}),
     };
     try {
       await save(receipt);
