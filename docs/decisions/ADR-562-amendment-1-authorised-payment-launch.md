@@ -69,3 +69,16 @@ record only allowlisted field names and value types. Provider messages, response
 bodies, source code and credentials are never copied into receipts or logs. This
 adds diagnosis only; the attested code, binding inheritance and ownership guards
 remain unchanged.
+
+The sandbox restoration stages the module through the Versions API before an
+explicit 100% deployment. Before uploading, compare the exact active version's
+bindings and runtime with the guarded settings snapshot. Attest the uniquely
+tagged candidate's code, bindings, authority namespace and runtime while the
+original remains active, then recheck the original version and settings before
+activation. A failed or ambiguous upload acknowledgement never authorises
+activation. Lost deployment acknowledgements retain the ownership-qualified
+reconciliation and recovery above. Receipts distinguish upload attempts from
+traffic changes and expose only fixed comparison names and equality booleans.
+Cloudflare error 10057 establishes unresolved inheritance; staging is a supported
+protocol with a separate verification boundary, not a proven remedy for that
+error until the provider accepts and verifies it.
