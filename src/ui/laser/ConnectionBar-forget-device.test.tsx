@@ -115,7 +115,7 @@ describe('ConnectionBar device permission actions', () => {
     );
   });
 
-  it('surfaces a failed qualification with an inline retry action', async () => {
+  it('retries missing controller information through the open connection', async () => {
     const onRetry = vi.fn();
     const onReconnect = vi.fn();
     const host = document.createElement('div');
@@ -136,6 +136,7 @@ describe('ConnectionBar device permission actions', () => {
             epoch: 4,
             message: 'The settings response timed out.',
           }}
+          qualificationReadBlockReason={null}
           onRetryQualification={onRetry}
           onReconnectQualification={onReconnect}
         />,
@@ -146,7 +147,7 @@ describe('ConnectionBar device permission actions', () => {
       host.remove();
     };
 
-    expect(host.textContent).toContain('Controller qualification failed');
+    expect(host.textContent).toContain('Controller information unavailable');
     expect(host.textContent).toContain('The settings response timed out');
     // A recoverable failure wears the shared warning banner instead of bare
     // red text, and its actions use the standard button chrome.
@@ -161,8 +162,8 @@ describe('ConnectionBar device permission actions', () => {
     const reconnect = [...host.querySelectorAll('button')].find(
       (button) => button.textContent === 'Reconnect controller',
     );
-    await act(async () => reconnect?.click());
-    expect(onReconnect).toHaveBeenCalledOnce();
+    expect(reconnect).toBeUndefined();
+    expect(onReconnect).not.toHaveBeenCalled();
   });
 });
 

@@ -17,11 +17,18 @@ import {
 } from './project-machine-capability';
 import { currentSavedLibrariesState } from './saved-libraries-actions';
 import { preserveBrowserProProject } from './pending-pro-project';
+import {
+  productionManifestActions,
+  type ProductionManifestActions,
+} from './production-manifest-actions';
+import { retainedArrayActions, type RetainedArrayActions } from './retained-array-actions';
 import type { AppState } from './store';
+import { useUiStore } from './ui-store';
 import {
   canonicalizeOpenedProjectBed,
   type ProjectBedReconciliationNotice,
 } from './project-bed-reconciliation';
+import { projectSheetActions, type ProjectSheetActions } from './project-sheet-actions';
 
 type ProjectActionSet = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
@@ -29,14 +36,16 @@ type ProjectActionSet = (
 type ProjectActionGet = () => AppState;
 type InitialStateFactory = (project?: Project) => Partial<AppState>;
 
-export type ProjectActions = {
-  readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
-  readonly newProject: () => void;
-  readonly claimProjectOpenRequest: () => number;
-  readonly claimProjectSaveRequest: () => number;
-  readonly acceptOpenedProjectMachine: () => void;
-  readonly keepCurrentMachineForOpenedProject: () => void;
-};
+export type ProjectActions = ProjectSheetActions &
+  ProductionManifestActions &
+  RetainedArrayActions & {
+    readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
+    readonly newProject: () => void;
+    readonly claimProjectOpenRequest: () => number;
+    readonly claimProjectSaveRequest: () => number;
+    readonly acceptOpenedProjectMachine: () => void;
+    readonly keepCurrentMachineForOpenedProject: () => void;
+  };
 
 export function projectActions(
   set: ProjectActionSet,
@@ -44,12 +53,16 @@ export function projectActions(
   initialState: InitialStateFactory,
 ): ProjectActions {
   return {
+    ...projectSheetActions(set, get),
+    ...productionManifestActions(set, get),
+    ...retainedArrayActions(set),
     setProject: (project) => {
       const preserved = preserveBrowserProProject(project);
       if (preserved !== null) return { kind: 'desktop-required', features: preserved.features };
       const current = get();
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
+      useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
         ...initialState(bedResolution.project),
         ...retainedApplicationState(state),
@@ -65,7 +78,8 @@ export function projectActions(
         ? { ...resolution.loadResult, projectBedReconciled: true }
         : resolution.loadResult;
     },
-    newProject: () =>
+    newProject: () => {
+      useUiStore.getState().resetArtworkRunOrder();
       set((state) => {
         // Accepted older CNC files can have no device mirror, or an older one.
         // Carry only CNC hardware into the fresh job seed, including when the
@@ -91,7 +105,8 @@ export function projectActions(
           projectDocumentEpoch: state.projectDocumentEpoch + 1,
           projectBedReconciliation: null,
         };
-      }),
+      });
+    },
     claimProjectOpenRequest: () => {
       const nextEpoch = get().projectOpenRequestEpoch + 1;
       set({ projectOpenRequestEpoch: nextEpoch });

@@ -56,6 +56,12 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
   assert.match(text, /The unsigned Windows edition checks for updates/);
   assert.match(text, /installation starts only after you choose Install and close KerfDesk/);
   assert.match(text, /Remote access starts turned off/);
+  assert.match(text, /Configuring it does not request a draft/);
+  assert.match(text, /encrypted with operating-system secure storage/);
+  assert.match(text, /Requests set store to false/);
+  assert.match(text, /does not promise Zero Data Retention/);
+  assert.match(text, /does not attach the open project, canvas, machine settings or toolpaths/);
+  assert.match(text, /no network scan or automatic reconnect/);
   assert.match(text, /sameSite=Strict/i);
   assert.match(text, /Command arguments and workspace responses are processed in memory/);
   assert.match(text, /Separately approved machine-control clients can/);
@@ -71,9 +77,11 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
     if (href.startsWith('#') || href.startsWith('mailto:')) continue;
     const url = new URL(href, 'https://kerfdesk.com');
     if (url.origin !== 'https://kerfdesk.com') {
-      assert.equal(
-        url.href,
-        'https://www.paddle.com/legal/privacy',
+      assert.ok(
+        [
+          'https://www.paddle.com/legal/privacy',
+          'https://developers.openai.com/api/docs/guides/your-data',
+        ].includes(url.href),
         'Unexpected external notice link',
       );
       continue;

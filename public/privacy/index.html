@@ -6,7 +6,7 @@
     <title>Privacy — KerfDesk</title>
     <meta
       name="description"
-      content="Read what KerfDesk sends for updates, licensing, aggregate download statistics and optional phone or MCP access. Ordinary use needs no account."
+      content="Read what KerfDesk sends for updates, licensing, downloads, optional AI, remote access and machine connections. Ordinary use needs no account."
     />
     <meta
       http-equiv="Content-Security-Policy"
@@ -25,7 +25,7 @@
     <meta property="og:title" content="Privacy — KerfDesk" />
     <meta
       property="og:description"
-      content="Read what KerfDesk sends for updates, licensing, aggregate download statistics and optional phone or MCP access. Ordinary use needs no account."
+      content="Read what KerfDesk sends for updates, licensing, downloads, optional AI, remote access and machine connections. Ordinary use needs no account."
     />
     <meta property="og:url" content="https://kerfdesk.com/privacy/" />
     <meta
@@ -179,9 +179,9 @@
               ></span>
               <h3>Your work stays with you</h3>
               <p>
-                Saved projects and jobs stay on your computer. Approved remote clients receive
-                summaries and edits; a separate opt-in allows artwork previews and text, as
-                described below.
+                Saved projects and jobs stay on your computer. Optional AI sends only the request
+                you review. Approved remote clients receive summaries and edits; a separate opt-in
+                allows artwork previews and text, as described below.
               </p>
             </li>
           </ul>
@@ -219,7 +219,7 @@
               support page and its notices.
               <a href="#app">Part 2</a> covers the app. The download page serves installers from
               dl.kerfdesk.com. Your browser may tell the next site that you came from here, but not
-              which page.
+              which page. The optional AI section also links to OpenAI’s API data policy.
             </p>
             <h3>Download statistics</h3>
             <p>
@@ -269,20 +269,21 @@
             </ul>
             <h3>What goes over the network</h3>
             <p>
-              These are the only connections KerfDesk is built to make on its own. None of them
-              sends your projects, designs, machine details or jobs. Each service still sees
-              ordinary connection details, such as your IP address and the time.
+              Automatic update and licensing requests do not send projects, designs, machine details
+              or jobs. Optional AI, remote access, cameras and network machines make the
+              user-requested connections described below. Each service still sees ordinary
+              connection details, such as your IP address and the time.
             </p>
           </div>
           <div
             class="table-wrap"
             role="region"
-            aria-label="Connections KerfDesk makes on its own"
+            aria-label="Automatic and user-requested connections"
             tabindex="0"
           >
             <table>
               <caption>
-                Connections KerfDesk makes on its own
+                Automatic and user-requested connections
               </caption>
               <thead>
                 <tr>
@@ -369,6 +370,27 @@
                     machine and recipe summaries. Separate artwork-sharing opt-in allows PNG
                     previews and text contents. Access starts turned off, and each client needs your
                     approval. See below for permissions, cookies and retention.
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">You choose Request draft in the optional desktop AI assistant</th>
+                  <td>api.openai.com (OpenAI)</td>
+                  <td>
+                    The reviewed prompt, dimensions and task; for material requests, the listed
+                    candidate recipe names/descriptions and any photograph you select. Your API key
+                    authenticates the request. No open project, canvas, machine settings or
+                    toolpaths are attached. See below for storage and provider handling.
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">
+                    You explicitly connect a FluidNC network machine in the desktop app
+                  </th>
+                  <td>The IP address or hostname and Telnet port you enter</td>
+                  <td>
+                    Controller commands and responses use that configured TCP channel. There is no
+                    network scan or automatic reconnect. The channel is not encrypted; use a trusted
+                    network.
                   </td>
                 </tr>
               </tbody>
@@ -511,6 +533,32 @@
               payloads or credentials. You can use the ordinary desktop app without enabling remote
               access.
             </p>
+            <h3 id="ai-assistant">Optional desktop AI assistant</h3>
+            <p>
+              The assistant is optional and uses your own OpenAI API account. Configuring it does
+              not request a draft. Your API key and model are stored separately from project files,
+              encrypted with operating-system secure storage. If secure storage is unavailable,
+              configuration is refused. Forget connection removes the saved configuration.
+            </p>
+            <p>
+              When you choose Request draft, the desktop app sends your prompt, requested dimensions
+              and task to api.openai.com. A material request also sends the listed candidate recipe
+              names and descriptions, and an optional photograph you select. The interface shows the
+              candidate scope before sending. It does not attach the open project, canvas, machine
+              settings or toolpaths. Your API key authenticates this request; OpenAI also receives
+              ordinary connection details, including your IP address and request time.
+            </p>
+            <p>
+              Requests set store to false. This does not promise Zero Data Retention: OpenAI may
+              retain abuse-monitoring data under its account policies. Review
+              <a href="https://developers.openai.com/api/docs/guides/your-data"
+                >OpenAI’s API data policy</a
+              >
+              before sending private material. The response is a draft to inspect. Applying artwork
+              or a saved material recipe is a separate action, and the assistant cannot control a
+              machine. Ordinary design, recipes and output continue to work without an AI
+              connection.
+            </p>
             <h3>The camera helper</h3>
             <p>
               Network cameras are available only in the desktop app. To reach them, the desktop app
@@ -527,9 +575,10 @@
             <h3>Your machine and USB cameras</h3>
             <ul>
               <li>
-                <strong>Your machine.</strong> KerfDesk connects to your machine over a USB cable.
-                When you click Connect, you pick your machine’s port from a list. Machine commands
-                go over that cable, not over the internet or Wi-Fi.
+                <strong>Your machine.</strong> For USB, you pick your machine’s port when you click
+                Connect. The desktop app also supports an explicitly configured FluidNC Telnet
+                channel. Machine commands go to the port or network address you choose. These
+                connections do not upload a project to a KerfDesk service.
               </li>
               <li>
                 <strong>USB cameras.</strong> In a browser, KerfDesk can use a camera only after you
@@ -568,10 +617,11 @@
                 <div class="callout__body">
                   <p>
                     After your first visit, the web app keeps working with no internet connection.
-                    Design, preview and machine control all run on your computer. Lesson and CNC bit
-                    pictures you haven’t viewed yet need a connection. Running a machine with the
-                    network switched off is confirmed in software but hasn’t been tested on a real
-                    machine yet. The desktop app runs from files installed on your computer.
+                    Design, preview and machine control all run on your computer. Optional AI
+                    requests need internet access. Lesson and CNC bit pictures you haven’t viewed
+                    yet need a connection. Running a machine with the network switched off is
+                    confirmed in software but hasn’t been tested on a real machine yet. The desktop
+                    app runs from files installed on your computer.
                   </p>
                 </div>
               </div>

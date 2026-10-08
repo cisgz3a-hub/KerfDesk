@@ -53,8 +53,15 @@ export function touchRead(state, name, args) {
     const value = workspace(state);
     Object.assign(value, {
       mode: state.mode ?? 'laser',
-      capabilities: { touchEditing: state.creation },
-      artwork: state.empty ? [] : state.artwork,
+      capabilities: { touchEditing: state.creation, groupTransformBounds: true },
+      artwork: state.empty
+        ? []
+        : state.artwork.map((item) => ({
+            ...item,
+            ...(item.visible !== false && item.editable !== false && item.bounds
+              ? { transformBounds: item.bounds }
+              : {}),
+          })),
       selection: state.empty ? [] : state.selected,
       totalArtwork: state.empty ? 0 : state.artwork.length,
     });

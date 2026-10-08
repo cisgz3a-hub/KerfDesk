@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { Project } from '../../core/scene';
+import type { Layer, Project } from '../../core/scene';
 import { BROWSER_FREE_BUILD } from '../../platform/build-capabilities';
 import type { ProFeature } from '../licensing/pro-features';
 import { operationProFeature } from '../licensing/pro-operation-policy';
+import { visitWorkflowArchives } from '../../io/project/project-workflow-archives';
 
 export type PendingProProject = {
   readonly id: string;
@@ -26,12 +27,44 @@ export const usePendingProProjectStore = create<PendingProProjectState>((set) =>
 export function browserProjectProFeatures(project: Project): ReadonlyArray<ProFeature> {
   if (!BROWSER_FREE_BUILD) return [];
   const features = new Set<ProFeature>();
+  addSceneFeatures(project, features);
+  // Whole-file admission already applies to saved Pro content. Inactive
+  // workflows retain that content rather than silently hiding or deleting it.
+  const error = visitWorkflowArchives(project, (raw) => addArchivedSceneFeatures(raw, features));
+  if (error !== null) throw new Error(error);
+  return [...features];
+}
+
+function addArchivedSceneFeatures(raw: Record<string, unknown>, features: Set<ProFeature>): void {
+  const scene = raw['scene'];
+  if (
+    typeof scene !== 'object' ||
+    scene === null ||
+    !('layers' in scene) ||
+    !Array.isArray(scene.layers)
+  )
+    return;
+  for (const layer of scene.layers) {
+    if (typeof layer !== 'object' || layer === null) continue;
+    const feature = operationProFeature(layer as Pick<Layer, 'cnc'>);
+    if (feature !== null) features.add(feature);
+  }
+  if (
+    'objects' in scene &&
+    Array.isArray(scene.objects) &&
+    scene.objects.some(
+      (object) => typeof object === 'object' && object !== null && object.kind === 'relief',
+    )
+  )
+    features.add('relief');
+}
+
+function addSceneFeatures(project: Project, features: Set<ProFeature>): void {
   for (const layer of project.scene.layers) {
     const feature = operationProFeature(layer);
     if (feature !== null) features.add(feature);
   }
   if (project.scene.objects.some((object) => object.kind === 'relief')) features.add('relief');
-  return [...features];
 }
 
 /** Null means the project may load normally. No operation or artwork is removed. */

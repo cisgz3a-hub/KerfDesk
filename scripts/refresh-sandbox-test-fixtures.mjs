@@ -113,6 +113,7 @@ export function harness({
   sourceBytes = code,
   sourceExtra = false,
   sourceRaw = false,
+  expectedUploadName = sourceRaw ? 'sandbox-worker.js' : 'worker.js',
   sourceRawType = 'application/javascript',
   sourceRawHeader,
   sourceResponse,
@@ -257,7 +258,7 @@ export function harness({
         assert.equal(file.type, 'application/javascript+module');
         assert.ok(Buffer.from(await file.arrayBuffer()).equals(code));
         assert.equal(payload.keep_assets, true);
-        assert.equal(payload.main_module, sourceRaw ? 'sandbox-worker.js' : 'worker.js');
+        assert.equal(payload.main_module, expectedUploadName);
         assert.equal(payload.migrations, undefined);
         assert.equal(payload.bindings.length, original.bindings.length);
         for (const binding of payload.bindings)

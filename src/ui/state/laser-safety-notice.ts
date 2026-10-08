@@ -65,6 +65,10 @@ export type LaserSafetyNotice =
       readonly halted?: true;
     }
   | {
+      readonly kind: 'cnc-transition-unconfirmed';
+      readonly message: string;
+    }
+  | {
       readonly kind: 'stream-stalled';
       readonly message: string;
     }
@@ -101,6 +105,20 @@ export function streamStalledNotice(): LaserSafetyNotice {
   return { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE };
 }
 
+export function acknowledgementStalledNotice(resetRequested: boolean): LaserSafetyNotice {
+  const response = resetRequested
+    ? 'KerfDesk froze the job stream and requested a controller soft reset on the existing connection. '
+    : 'KerfDesk froze the job stream and queued best-effort beam-off commands; no realtime reset was requested. ';
+  return {
+    kind: 'stream-stalled',
+    message:
+      'The controller stopped acknowledging job commands. ' +
+      response +
+      'Buffered motion or output may still be active if the stop commands did not arrive. ' +
+      'Use the physical E-stop or power cutoff if the machine did not stop, then check the controller state before re-running.',
+  };
+}
+
 export const CNC_PAUSE_RESUME_STALLED_MESSAGE =
   'The controller did not confirm CNC Pause or Resume within the live-transition deadline. ' +
   'KerfDesk froze the host stream and kept the job; no controller reset was requested. Check the ' +
@@ -121,7 +139,7 @@ export function cncPauseLiftFailedNotice(reason: string): LaserSafetyNotice {
 }
 
 export function cncPauseResumeStalledNotice(): LaserSafetyNotice {
-  return { kind: 'stream-stalled', message: CNC_PAUSE_RESUME_STALLED_MESSAGE };
+  return { kind: 'cnc-transition-unconfirmed', message: CNC_PAUSE_RESUME_STALLED_MESSAGE };
 }
 
 // Audit F2: a welcome banner while the stream was still live means the
@@ -130,7 +148,7 @@ export function cncPauseResumeStalledNotice(): LaserSafetyNotice {
 // the job is over — but the head is parked mid-cut and the work is ruined
 // unless re-run from a known origin.
 export const CONTROLLER_REBOOT_DURING_JOB_MESSAGE =
-  'The controller rebooted while a job was streaming (its startup banner arrived mid-job). ' +
+  'The controller rebooted while a job was streaming or still finishing (its startup banner arrived before motion settled). ' +
   'The job was aborted and buffered motion is lost. Check the USB cable and controller power, ' +
   'then re-home before running the job again.';
 

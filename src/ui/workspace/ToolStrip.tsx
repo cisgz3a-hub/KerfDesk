@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // ToolStrip — vertical left-edge tool palette (ADR-051, Phase G). Sets the
 // drawing tool-mode in the UI store; Select is always available (and Esc
 // returns to it, wired in shortcuts.ts). Mounted as a left rail in App,
@@ -15,6 +16,8 @@ import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
 import { curveCommandNode } from '../state/path-node-command-geometry';
+import { BooleanCompoundControls } from './BooleanCompoundControls';
+import { NodeCoordinateControls } from './NodeCoordinateControls';
 import './tool-strip.css';
 
 type Tool = {
@@ -44,6 +47,8 @@ export function ToolStrip(): JSX.Element {
   const setLibraryDialogOpen = useUiStore((s) => s.setLibraryDialogOpen);
   return (
     <aside aria-label="Drawing tools" className="lf-rail lf-toolstrip">
+      <BooleanCompoundControls />
+      {toolMode.kind === 'node' ? <NodeCoordinateControls /> : null}
       {TOOLS.map((tool) => (
         <Fragment key={tool.helpKey}>
           {tool.helpKey === 'select' || tool.helpKey === 'text' ? (
@@ -111,6 +116,7 @@ function NodeCommandBar(props: {
   const join = useStore((state) => state.joinSelectedCurveNodes);
   if (selected === null || selected.handle !== undefined) return null;
   const object = project.scene.objects.find((candidate) => candidate.id === selected.objectId);
+  if (object !== undefined && isBooleanCompoundObject(object)) return null;
   const path =
     object !== undefined && 'paths' in object ? object.paths[selected.pathIndex] : undefined;
   const node = curveCommandNode(path, selected);

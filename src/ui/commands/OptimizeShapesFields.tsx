@@ -13,7 +13,7 @@ import {
   type ShapeOptimizeFitWith,
   type ShapeOptimizeOptions,
 } from '../../core/geometry/shape-optimize/shape-optimize-options';
-import { NumberInput } from '../kit/NumberInput';
+import { evaluateNumericEntry, type NumericEntryKind } from '../../core/numeric-expression';
 
 export type OptimizeShapesForm = {
   readonly smooth: boolean;
@@ -47,7 +47,11 @@ export function optionsFromForm(form: OptimizeShapesForm): ShapeOptimizeOptions 
   return clampShapeOptimizeOptions({
     smooth: form.smooth,
     smoothingMm: numberOr(form.smoothingText, DEFAULT_SHAPE_OPTIMIZE_OPTIONS.smoothingMm),
-    cornerAngleDeg: numberOr(form.cornerText, DEFAULT_SHAPE_OPTIMIZE_OPTIONS.cornerAngleDeg),
+    cornerAngleDeg: numberOr(
+      form.cornerText,
+      DEFAULT_SHAPE_OPTIMIZE_OPTIONS.cornerAngleDeg,
+      'angle',
+    ),
     fit: form.fit,
     fitToleranceMm: numberOr(form.toleranceText, DEFAULT_SHAPE_OPTIMIZE_OPTIONS.fitToleranceMm),
     fitWith: form.fitWith,
@@ -83,24 +87,28 @@ export function SmoothFields(props: {
               onChange({ smoothingText: String(sliderValue(Number(event.currentTarget.value))) })
             }
           />
-          <NumberInput
+          <input
+            type="text"
+            className="lf-input"
             value={form.smoothingText}
-            step={0.01}
+            aria-invalid={
+              evaluateNumericEntry(form.smoothingText, { kind: 'length' }).kind !== 'ok'
+            }
             disabled={!form.smooth}
-            title={`Smoothing distance along the outline, ${SMOOTHING_RANGE_MM.min} to ${SMOOTHING_RANGE_MM.max} mm. Wiggles shorter than about four times this are smoothed away.`}
+            title={`Arithmetic and units are accepted, for example 1/100in. Smoothing distance along the outline, ${SMOOTHING_RANGE_MM.min} to ${SMOOTHING_RANGE_MM.max} mm. Wiggles shorter than about four times this are smoothed away.`}
             onChange={(event) => onChange({ smoothingText: event.currentTarget.value })}
           />
         </span>
       </label>
       <label style={fieldStyle}>
         <span>Corner angle (°)</span>
-        <NumberInput
+        <input
+          type="text"
+          className="lf-input"
           value={form.cornerText}
-          min={CORNER_ANGLE_RANGE_DEG.min}
-          max={CORNER_ANGLE_RANGE_DEG.max}
-          step={1}
+          aria-invalid={evaluateNumericEntry(form.cornerText, { kind: 'angle' }).kind !== 'ok'}
           disabled={!form.smooth && !form.fit}
-          title={`A point where the outline turns by more than this is a corner: it stays exactly where it is and stays sharp. ${CORNER_ANGLE_RANGE_DEG.min} to ${CORNER_ANGLE_RANGE_DEG.max} degrees; lower keeps more corners.`}
+          title={`Arithmetic and degrees are accepted, for example 15+15deg. A point where the outline turns by more than this is a corner: it stays exactly where it is and stays sharp. ${CORNER_ANGLE_RANGE_DEG.min} to ${CORNER_ANGLE_RANGE_DEG.max} degrees; lower keeps more corners.`}
           onChange={(event) => onChange({ cornerText: event.currentTarget.value })}
         />
       </label>
@@ -123,11 +131,13 @@ export function FitFields(props: {
       />
       <label style={fieldStyle}>
         <span>Tolerance (mm)</span>
-        <NumberInput
+        <input
+          type="text"
+          className="lf-input"
           value={form.toleranceText}
-          step={0.01}
+          aria-invalid={evaluateNumericEntry(form.toleranceText, { kind: 'length' }).kind !== 'ok'}
           disabled={!form.fit}
-          title={`Farthest the fitted outline may lie from the (smoothed) outline, ${FIT_TOLERANCE_RANGE_MM.min} to ${FIT_TOLERANCE_RANGE_MM.max} mm. Larger gives fewer segments.`}
+          title={`Arithmetic and units are accepted, for example 1/100in. Farthest the fitted outline may lie from the (smoothed) outline, ${FIT_TOLERANCE_RANGE_MM.min} to ${FIT_TOLERANCE_RANGE_MM.max} mm. Larger gives fewer segments.`}
           onChange={(event) => onChange({ toleranceText: event.currentTarget.value })}
         />
       </label>
@@ -183,10 +193,23 @@ function sliderValue(position: number): number {
   return Number(value.toPrecision(2));
 }
 
-function numberOr(text: string, fallback: number): number {
-  if (text.trim() === '') return fallback;
-  const value = Number(text);
-  return Number.isFinite(value) ? value : fallback;
+export function optimizeFormProblem(form: OptimizeShapesForm): string | null {
+  const fields: Array<readonly [boolean, string, string, NumericEntryKind]> = [
+    [form.smooth, 'Smoothing', form.smoothingText, 'length'],
+    [form.smooth || form.fit, 'Corner angle', form.cornerText, 'angle'],
+    [form.fit, 'Tolerance', form.toleranceText, 'length'],
+  ];
+  for (const [enabled, label, text, kind] of fields) {
+    if (!enabled) continue;
+    const value = evaluateNumericEntry(text, { kind });
+    if (value.kind === 'invalid') return `${label}: ${value.message}.`;
+  }
+  return null;
+}
+
+function numberOr(text: string, fallback: number, kind: NumericEntryKind = 'length'): number {
+  const value = evaluateNumericEntry(text, { kind });
+  return value.kind === 'ok' ? value.value : fallback;
 }
 
 const groupStyle: React.CSSProperties = {

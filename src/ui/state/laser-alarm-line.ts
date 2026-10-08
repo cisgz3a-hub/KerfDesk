@@ -16,6 +16,7 @@ import type { LaserState } from './laser-store';
 import { advanceStream } from './laser-stream-ack';
 import { isProbeFailureAlarm } from './probe-failure-alarm';
 import { probeAlarmKeepsToolChangeHold } from './tool-change-probe-alarm';
+import { hasOwnedControllerReset } from './laser-reset-cleanup';
 
 type AlarmEvent = Extract<ControllerEvent, { readonly kind: 'alarm' }>;
 
@@ -31,19 +32,20 @@ export function handleAlarmLine(
   safeWrite: SafeWriteFn,
   alarm: AlarmEvent,
 ): void {
-  refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   // A hard-limit alarm that fires while a Verified Frame is tracing means the
   // job box runs past the travel from this origin — name the limit so the
   // operator knows which way to move (ADR-053 P3). The alarm also clears frame
   // verification and, unless a probe failed, the origin.
   const prev = get();
+  const ownedReset = hasOwnedControllerReset(prev.controllerOperation);
+  if (!ownedReset) refs.writeEpoch = (refs.writeEpoch ?? 0) + 1;
   // A missed touch-off probe stops the probe, not the held job; Continue waits
   // for a fresh Idle again (tool-change-probe-alarm.ts). A text alarm names no
   // probe code, so it never keeps the hold.
   const keepToolChangeHold = alarm.code !== null && probeAlarmKeepsToolChangeHold(prev, alarm.code);
   set({
     ...alarmRecordPatch(prev, alarm),
-    ...(keepToolChangeHold ? { toolChangeIdleSeen: false } : {}),
+    ...alarmOwnershipPatch(prev, ownedReset, keepToolChangeHold),
     // ALARM:N supersedes any prior Run/Hold report. Clearing it lets the
     // numbered alarm itself be the exact recovery evidence for Home.
     statusReport: null,
@@ -56,8 +58,6 @@ export function handleAlarmLine(
     motionOperation: null,
     // Wake completes in Alarm. Retain its exact owner until its continuation
     // records that terminal outcome; every other operation is cancelled here.
-    controllerOperation:
-      prev.controllerOperation?.kind === 'recovery' ? prev.controllerOperation : null,
     fireActive: false,
     frameVerification: null,
     framedRun: null,
@@ -67,13 +67,26 @@ export function handleAlarmLine(
     homingProof: null,
     trustedPositionEpoch: (prev.trustedPositionEpoch ?? 0) + 1,
     // The alarmed controller discards its pending work; owed acks are gone.
-    pendingUntrackedAcks: 0,
-    pendingTransportWrites: 0,
     ...frameLimitPatch(prev, alarm),
   });
   cancelControllerLifecycleRefs(refs, alarm.code === null ? alarm.raw : `ALARM:${alarm.code}`);
   if (alarm.code !== null) noteAlarmBeforeBanner(refs, alarm.code);
-  if (!keepToolChangeHold) advanceStream(set, get, refs, safeWrite, 'alarm');
+  if (!keepToolChangeHold && !ownedReset) advanceStream(set, get, refs, safeWrite, 'alarm');
+}
+
+function alarmOwnershipPatch(
+  state: LaserState,
+  ownedReset: boolean,
+  keepToolChangeHold: boolean,
+): Partial<LaserState> {
+  return {
+    ...(keepToolChangeHold ? { toolChangeIdleSeen: false } : {}),
+    ...(ownedReset ? { statusSequence: state.statusSequence + 1 } : {}),
+    controllerOperation:
+      state.controllerOperation?.kind === 'recovery' ? state.controllerOperation : null,
+    pendingUntrackedAcks: ownedReset ? state.pendingUntrackedAcks : 0,
+    pendingTransportWrites: ownedReset ? (state.pendingTransportWrites ?? 0) : 0,
+  };
 }
 
 // A failed probe (ALARM:4/5) stopped only the probe move, so the controller

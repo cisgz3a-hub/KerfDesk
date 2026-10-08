@@ -5,6 +5,7 @@ import { useStore } from '../state';
 import { pageArtworkObject } from './page-artwork-object';
 import type { PreparedArtworkPage } from './paged-artwork-source';
 import { usePagedImportStore, type PagedImportRequest } from './paged-import-store';
+import { PageImageSourceNote } from './PageImageSourceNote';
 
 export function PagedImportDialog(): JSX.Element | null {
   const request = usePagedImportStore((state) => state.request);
@@ -227,7 +228,7 @@ function PagePreview({
       </Field>
       <p>{page.note}</p>
       {mode === 'image' ? (
-        <p>The source image is preserved; the working engraving preview may be sampled.</p>
+        <PageImageSourceNote resolutionEditable={page.resolutionEditable} />
       ) : null}
       {mode === 'image' && page.resolutionEditable ? (
         <Field label="Resolution" unit="DPI">

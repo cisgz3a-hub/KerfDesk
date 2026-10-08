@@ -21,7 +21,12 @@ import {
 import { qualifyWithoutSettingsDump } from './laser-module-probe';
 import type { LaserState, LiveRefs } from './laser-store';
 import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
-import { awaitHandshakeIdle } from './laser-handshake-idle-query';
+import {
+  awaitHandshakeIdle,
+  captureHandshakeIdleOwner,
+  handshakeIsCurrent,
+  ownsHandshakeIdleWait,
+} from './laser-handshake-idle-query';
 import type { TranscriptSource } from './laser-transcript';
 
 type SetFn = (
@@ -389,23 +394,25 @@ async function waitForHandshakeIdle(
     throw new Error('This controller cannot provide a fresh Idle status for qualification.');
   }
   const idle = waitForFreshIdle(refs, { kind: 'connection-handshake' });
+  const owner = captureHandshakeIdleOwner(refs);
   try {
     if (realtimeQuery !== null) {
       await safeWrite(realtimeQuery, undefined, 'system');
       return await awaitHandshakeIdle(refs, idle, safeWrite, realtimeQuery);
     }
-    await Promise.all([
-      idle,
-      startControllerCommand(refs, safeWrite, {
-        kind: 'connection-handshake',
-        label: 'initial controller status query',
-        command: `${queuedQuery ?? ''}\n`,
-        source: 'system',
-      }),
-    ]);
+    const command = startControllerCommand(refs, safeWrite, {
+      kind: 'connection-handshake',
+      label: 'initial controller status query',
+      command: queuedQuery + '\n',
+      source: 'system',
+    });
+    owner.command = refs.controllerCommand;
+    await Promise.all([idle, command]);
     return true;
   } catch (error) {
-    cancelControllerLifecycleRefs(refs, 'Initial controller qualification failed.');
+    if (ownsHandshakeIdleWait(refs, owner)) {
+      cancelControllerLifecycleRefs(refs, 'Initial controller qualification failed.');
+    }
     await idle.catch(() => undefined);
     throw error;
   }
@@ -435,12 +442,4 @@ function waitForNextControllerLine(refs: LiveRefs, timeoutMs: number): Promise<b
     }, timeoutMs);
     refs.onLineArrived = onLineArrived;
   });
-}
-
-function handshakeIsCurrent(
-  refs: LiveRefs,
-  connection: NonNullable<LiveRefs['connection']>,
-  writeEpoch: number,
-): boolean {
-  return refs.connection === connection && (refs.writeEpoch ?? 0) === writeEpoch;
 }

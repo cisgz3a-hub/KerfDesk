@@ -9,6 +9,10 @@ import { projectAutosaveService, type AutosaveDurableWriteResult } from '../stat
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useAutosave } from './use-autosave';
+import { mockPlatform } from '../../__fixtures__/file-actions';
+import { useConfirmSaveStore } from '../state/confirm-save-store';
+import type { AutosaveDurableClearResult } from '../state/autosave-durable';
+import { confirmDiscardAsync } from './confirm-discard';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -70,6 +74,78 @@ afterEach(async () => {
 });
 
 describe('useAutosave interval snapshots', () => {
+  it('does not queue or unload a discarded snapshot while cleanup is pending, then saves only the next job', async () => {
+    const write = mockWriter();
+    const writeOnUnload = vi.spyOn(autosave, 'writeAutosave').mockReturnValue({
+      kind: 'ok',
+      savedAt: 1,
+      storageKey: 'autosave-hook-test',
+    });
+    let finish!: (result: AutosaveDurableClearResult) => void;
+    const clear = vi.spyOn(projectAutosaveService, 'clearCurrent').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await mountHook();
+    const pending = confirmDiscardAsync(mockPlatform(), 'start a new project');
+    useConfirmSaveStore.getState().choose('discard');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(clear).toHaveBeenCalledOnce();
+    await tick(3);
+    window.dispatchEvent(new Event('beforeunload'));
+    expect(write).not.toHaveBeenCalled();
+    expect(writeOnUnload).not.toHaveBeenCalled();
+    await act(async () => {
+      finish({ kind: 'ok' });
+    });
+    if (await pending) useStore.getState().newProject();
+    useStore.getState().setProjectNotes('The next job');
+    await tick();
+    window.dispatchEvent(new Event('beforeunload'));
+    expect(write).toHaveBeenCalledOnce();
+    expect(write.mock.calls[0]?.[0].notes).toBe('The next job');
+    expect(writeOnUnload).toHaveBeenCalledOnce();
+    expect(writeOnUnload.mock.calls[0]?.[0].notes).toBe('The next job');
+  });
+
+  it.each(['artwork', 'placement'] as const)(
+    'continues backing up later %s edits and stops the old New request',
+    async (change) => {
+      const write = mockWriter();
+      let finish!: (result: AutosaveDurableClearResult) => void;
+      vi.spyOn(projectAutosaveService, 'clearCurrent').mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      await mountHook();
+      const pending = confirmDiscardAsync(mockPlatform(), 'start a new project');
+      useConfirmSaveStore.getState().choose('discard');
+      await act(async () => {
+        await Promise.resolve();
+      });
+      if (change === 'artwork') useStore.getState().setProjectNotes('Keep these later edits');
+      else useStore.getState().setJobPlacement({ anchor: 'back-right' });
+      await tick();
+      expect(write).toHaveBeenCalledOnce();
+      if (change === 'artwork')
+        expect(write.mock.calls[0]?.[0].notes).toBe('Keep these later edits');
+      else expect(write.mock.calls[0]?.[0].jobSetup.placement.anchor).toBe('back-right');
+      await act(async () => {
+        finish({ kind: 'ok' });
+      });
+      await expect(pending).resolves.toBe(false);
+      if (change === 'artwork')
+        expect(useStore.getState().project.notes).toBe('Keep these later edits');
+      else expect(useStore.getState().jobPlacement.anchor).toBe('back-right');
+      expect(useStore.getState().dirty).toBe(true);
+    },
+  );
   it('saves an unchanged dirty scene once across repeated ticks and pointer updates', async () => {
     const write = mockWriter();
     const source = useStore.getState().project;

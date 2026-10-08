@@ -1,11 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { PRICING_URL, PRIVACY_URL, REFUNDS_URL, TERMS_URL } from '../common/site-page-urls';
 import {
   REPORT_PROBLEM_URL,
   SUPPORT_URL,
   discussionsCommand,
   openExternalUrl,
+  pricingCommand,
+  privacyCommand,
+  refundsCommand,
   reportBugCommand,
   supportReportCommand,
+  termsCommand,
 } from './support-command-family';
 
 afterEach(() => {
@@ -18,6 +23,22 @@ describe('support commands', () => {
     expect(REPORT_PROBLEM_URL).toBe('https://kerfdesk.com/support.html#report');
     for (const command of [reportBugCommand(), discussionsCommand()])
       expect(`${command.label} ${command.title}`).not.toMatch(/github/i);
+  });
+
+  it('opens the pricing and policy pages that ship with the web app', () => {
+    expect(PRICING_URL).toBe('https://kerfdesk.com/pricing/');
+    expect(TERMS_URL).toBe('https://kerfdesk.com/terms/');
+    expect(PRIVACY_URL).toBe('https://kerfdesk.com/privacy/');
+    expect(REFUNDS_URL).toBe('https://kerfdesk.com/refunds/');
+    expect(pricingCommand().id).toBe('help.pricing');
+    expect(termsCommand().id).toBe('help.terms');
+    expect(privacyCommand().id).toBe('help.privacy');
+    expect(refundsCommand().id).toBe('help.refunds');
+    const policies = [pricingCommand(), termsCommand(), privacyCommand(), refundsCommand()];
+    for (const command of policies) {
+      expect(command.family).toBe('help');
+      expect(command.enabled).toBe(true);
+    }
   });
 
   it('registers enabled Help-family commands with stable ids', () => {

@@ -1,3 +1,4 @@
+import { isJsonContentType } from '@modelcontextprotocol/server';
 import {
   COOKIE_NAME,
   MAX_BYTES,
@@ -84,8 +85,7 @@ export async function boundedText(
   }
 }
 export async function bodyJson(request: Request, maximum = MAX_BYTES): Promise<unknown> {
-  if (request.headers.get('Content-Type')?.split(';')[0].trim() !== 'application/json')
-    throw new RequestFailure(415);
+  if (!isJsonContentType(request.headers.get('Content-Type'))) throw new RequestFailure(415);
   try {
     return JSON.parse(await boundedText(request, maximum));
   } catch (error) {

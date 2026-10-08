@@ -4,6 +4,11 @@ import test from 'node:test';
 import { start, ORIGIN, connectDesktop, pairPhone, authorizeMcp, workspace } from './support.mjs';
 import { operationReceipt } from './control-support.mjs';
 import { mcpPost, toolCall, closeSocket } from './post-release-support.mjs';
+import {
+  startObservedRateWorker,
+  admissionWindow,
+  publicRateCall,
+} from './rate-window-support.mjs';
 
 const NETWORK = '198.51.100.73';
 const phoneRequest = (worker, phone, name, args = {}, headers = {}) =>
@@ -39,8 +44,8 @@ const consume = async (response, expected = 200) => {
   return response.text();
 };
 
-test('workerd: two normal phones on one IP keep 80 polls/minute and approved Abort after public quota exhaustion', async () => {
-  const worker = start({ rateLimit: 60 });
+test('workerd: two normal phones on one IP keep 80 polls/minute and approved Abort after public quota exhaustion', async (t) => {
+  const worker = startObservedRateWorker({ rateLimit: 60 });
   let desktop;
   try {
     desktop = await connectDesktop(worker);
@@ -49,6 +54,8 @@ test('workerd: two normal phones on one IP keep 80 polls/minute and approved Abo
       await pairPhone(worker, desktop, ['read', 'control']),
     ];
     const sent = respond(desktop);
+    const epoch = await admissionWindow(worker);
+    const publicCalls = [];
     for (let index = 0; index < 61; index++) {
       const denied = await worker.dispatchFetch(`${ORIGIN}/api/pair/claim`, {
         method: 'POST',
@@ -59,8 +66,18 @@ test('workerd: two normal phones on one IP keep 80 polls/minute and approved Abo
         },
         body: '{}',
       });
+      publicCalls.push(publicRateCall(denied, epoch, index < 60));
       await consume(denied, index < 60 ? 400 : 429);
     }
+    t.diagnostic(
+      JSON.stringify({
+        publicRateWindow: epoch,
+        startedUtc: new Date(publicCalls[0].started).toISOString(),
+        endedUtc: new Date(publicCalls.at(-1).ended).toISOString(),
+        admitted: publicCalls.filter((call) => call.success).length,
+        denied: publicCalls.filter((call) => !call.success).length,
+      }),
+    );
     for (let index = 0; index < 80; index++)
       await consume(await phoneRequest(worker, phones[index % 2], 'get_workspace'));
     await consume(await phoneRequest(worker, phones[0], 'abort_job', { requestId: randomUUID() }));
@@ -206,6 +223,9 @@ test('workerd: reserved admission supports legacy Abort-only batches; mixed/inva
       429,
     );
     await consume(await mcpPost(worker, credentials, [{ ...abort(7), id: null }]), 429);
+    const modern = abort(70);
+    modern.params._meta = { 'io.modelcontextprotocol/protocolVersion': '2026-07-28' };
+    await consume(await mcpPost(worker, credentials, [modern]), 429);
     await consume(
       await mcpPost(
         worker,

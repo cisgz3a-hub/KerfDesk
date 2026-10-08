@@ -44,6 +44,10 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   // Both schema-11 branches add optional fields; preserve either variant.
   10: (raw) => ({ ...raw, schemaVersion: 11 }),
   11: (raw) => ({ ...raw, schemaVersion: 12 }),
+  // Existing projects have no fitted text or retained workflow records.
+  12: (raw) => ({ ...raw, schemaVersion: 13 }),
+  // Existing geometry remains ordinary artwork; no compound intent is invented.
+  13: (raw) => ({ ...raw, schemaVersion: 14 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

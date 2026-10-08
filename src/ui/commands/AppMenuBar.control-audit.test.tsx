@@ -89,6 +89,9 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.weld': { callback: 'weldSelection' },
   'tools.union-silhouette': { callback: 'unionSilhouette' },
   'tools.join-paths': { callback: 'joinPaths' },
+  'tools.resize-joints': { callback: 'resizeJoints' },
+  'tools.prepare-stamp': { callback: 'prepareStamp' },
+  'tools.ai-assistant': { callback: 'openAiAssistant' },
   'tools.offset-shapes': { callback: 'offsetShapes' },
   'tools.rubber-band-outline': { callback: 'addRubberBandOutline' },
   'tools.close-paths': { callback: 'closeSelectedPaths' },
@@ -179,6 +182,10 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'help.check-updates': { special: 'check-updates' },
   'help.open-data-folder': { callback: 'openDataFolder' },
   'help.discussions': { url: 'https://kerfdesk.com/support.html' },
+  'help.pricing': { url: 'https://kerfdesk.com/pricing/' },
+  'help.terms': { url: 'https://kerfdesk.com/terms/' },
+  'help.privacy': { url: 'https://kerfdesk.com/privacy/' },
+  'help.refunds': { url: 'https://kerfdesk.com/refunds/' },
 };
 
 let host: HTMLDivElement;

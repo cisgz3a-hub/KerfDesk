@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT, flagMetadata, guardedSettings } from './apply-payment-settings.mjs';
+import { readRetainedSandboxBundle } from './retained-sandbox-bundle.mjs';
 
 export const SANDBOX_WORKER = 'kerfdesk-desktop-licensing-sandbox';
 export const SANDBOX_ORIGIN = 'https://kerfdesk-desktop-licensing-sandbox.cisgz3a.workers.dev';
@@ -179,7 +180,10 @@ export async function readSandboxModule(response, format = {}, expectedRawDescri
   return { entrypoint, filename: file.name, mimeType: file.type, bytes };
 }
 
-export async function refreshSandboxScript({ operation, token, output }, fetcher = fetch) {
+export async function refreshSandboxScript(
+  { operation, token, output, retainedBundle },
+  fetcher = fetch,
+) {
   const base =
     'https://api.cloudflare.com/client/v4/accounts/' +
     ACCOUNT +
@@ -193,6 +197,8 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
   let httpStatus = null;
   let originalVersion;
   let sourceVersion;
+  const sourceKind =
+    retainedBundle === undefined ? 'historical-version' : 'retained-attested-bundle';
   let currentVersion;
   let before;
   let initialClosedVerified = false;
@@ -366,8 +372,9 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     operation: 'sandbox-refresh-code',
     operationTag,
     operationVersion: operationVersion ?? null,
+    sourceKind,
     sourceVersion: sourceVersion ?? null,
-    sourceVersionPrefix: GOOD_VERSION_PREFIX,
+    sourceVersionPrefix: retainedBundle === undefined ? GOOD_VERSION_PREFIX : null,
     codeSha256: GOOD_CODE_SHA256,
     originalVersion: originalVersion ?? null,
     version: currentVersion ?? null,
@@ -407,6 +414,10 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
   };
   try {
     assert.equal(operation, 'sandbox-refresh-code', 'Only sandbox code refresh is supported.');
+    if (retainedBundle !== undefined) {
+      setStage('sandbox-retained-bundle-verification');
+      module = readRetainedSandboxBundle(retainedBundle, GOOD_CODE_SHA256);
+    }
     assert.ok(
       typeof token === 'string' && token.length >= 20,
       'Cloudflare credential unavailable.',
@@ -418,15 +429,17 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     initialClosedVerified = true;
     await publicConfig();
     originalBuy = await buyHtml();
-    const result = await api('/versions?deployable=true', {}, 'sandbox-good-version-discovery');
-    assert.ok(Array.isArray(result?.items), 'Sandbox version list unavailable.');
-    const candidates = result.items
-      .map(({ id }) => id)
-      .filter((id) => typeof id === 'string' && id.startsWith(GOOD_VERSION_PREFIX));
-    assert.equal(candidates.length, 1, 'Attested sandbox version must resolve uniquely.');
-    assert.ok(uuid.test(candidates[0]), 'Attested sandbox version requires a full UUID.');
-    sourceVersion = candidates[0];
-    module = await readModule(sourceVersion, 'sandbox-attested-content-get');
+    if (retainedBundle === undefined) {
+      const result = await api('/versions?deployable=true', {}, 'sandbox-good-version-discovery');
+      assert.ok(Array.isArray(result?.items), 'Sandbox version list unavailable.');
+      const candidates = result.items
+        .map(({ id }) => id)
+        .filter((id) => typeof id === 'string' && id.startsWith(GOOD_VERSION_PREFIX));
+      assert.equal(candidates.length, 1, 'Attested sandbox version must resolve uniquely.');
+      assert.ok(uuid.test(candidates[0]), 'Attested sandbox version requires a full UUID.');
+      sourceVersion = candidates[0];
+      module = await readModule(sourceVersion, 'sandbox-attested-content-get');
+    }
     const boundary = await activeVersion();
     setStage('sandbox-pre-mutation-version-check');
     assert.equal(boundary, originalVersion, 'Sandbox deployment changed before refresh.');
@@ -562,6 +575,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     operation: process.argv[2],
     token: process.env.KERFDESK_PAYMENT_LAUNCH_CF_TOKEN,
     output: process.env.KERFDESK_PAYMENT_FLAG_EVIDENCE,
+    retainedBundle: process.env.KERFDESK_PAYMENT_SANDBOX_ATTESTED_BUNDLE || undefined,
   })
     .then((receipt) => console.log(JSON.stringify(receipt)))
     .catch((error) => {

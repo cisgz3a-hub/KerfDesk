@@ -28,6 +28,7 @@ import {
 export type WeldSelectionPlan = {
   readonly object: ImportedSvg;
   readonly layers: ReadonlyArray<Layer>;
+  readonly operands: ReadonlyArray<VectorSceneObject>;
 };
 
 /** Build every geometry and operation change before Zustand publishes it. */
@@ -94,7 +95,11 @@ export function planWeldSelection(
 
   const welded = weldVectorObjects(preparedObjects, resultId);
   if (welded.kind === 'error') return welded;
-  return ok({ object: welded.value, layers: insertClonedLayers(scene.layers, clonedLayers) });
+  return ok({
+    object: welded.value,
+    layers: insertClonedLayers(scene.layers, clonedLayers),
+    operands: preparedObjects,
+  });
 }
 
 function operationBuckets(

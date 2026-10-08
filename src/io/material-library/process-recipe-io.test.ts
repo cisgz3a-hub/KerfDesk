@@ -30,7 +30,7 @@ describe('process recipe library documents', () => {
     const result = deserializeMaterialLibrary(encoded);
     expect(result).toEqual({ kind: 'ok', library: document });
     if (result.kind === 'ok') expect(serializeMaterialLibrary(result.library)).toBe(encoded);
-    expect(JSON.parse(encoded).librarySchemaVersion).toBe(2);
+    expect(JSON.parse(encoded).librarySchemaVersion).toBe(MATERIAL_LIBRARY_SCHEMA_VERSION);
   });
 
   it('loads version-one single-preset libraries and reports newer schemas', () => {
@@ -39,7 +39,9 @@ describe('process recipe library documents', () => {
       deserializeMaterialLibrary(JSON.stringify({ ...base, librarySchemaVersion: 1 })),
     ).toEqual({ kind: 'ok', library: base });
     expect(
-      deserializeMaterialLibrary(JSON.stringify({ ...base, librarySchemaVersion: 3 })).kind,
+      deserializeMaterialLibrary(
+        JSON.stringify({ ...base, librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION + 1 }),
+      ).kind,
     ).toBe('schema-too-new');
   });
 

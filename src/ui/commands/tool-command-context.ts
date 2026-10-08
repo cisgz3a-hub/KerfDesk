@@ -12,6 +12,7 @@ import type {
   CommandShellCallbacks,
 } from './app-command-context-types';
 import type { AppCommandContext } from './command-types';
+import { openBooleanDialog } from './boolean-dialog-store';
 import {
   applyImageMaskAction,
   cropImageAction,
@@ -20,14 +21,7 @@ import {
   traceImageAction,
 } from './image-command-actions';
 
-export function toolCommandContext(
-  callbacks: CommandShellCallbacks,
-  app: ReturnType<typeof useStore.getState>,
-  platform: ReturnType<typeof usePlatform>,
-  dialogs: CommandDialogs,
-  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
-  selection: CommandSelection,
-): Pick<
+type ToolCommandContext = Pick<
   AppCommandContext,
   | 'boxGenerator'
   | 'barcodeGenerator'
@@ -48,6 +42,8 @@ export function toolCommandContext(
   | 'weldSelection'
   | 'unionSilhouette'
   | 'joinPaths'
+  | 'resizeJoints'
+  | 'prepareStamp'
   | 'subtractSelection'
   | 'intersectSelection'
   | 'excludeSelection'
@@ -58,7 +54,16 @@ export function toolCommandContext(
   | 'applyImageMask'
   | 'cropImage'
   | 'removeImageMask'
-> {
+>;
+
+export function toolCommandContext(
+  callbacks: CommandShellCallbacks,
+  app: ReturnType<typeof useStore.getState>,
+  platform: ReturnType<typeof usePlatform>,
+  dialogs: CommandDialogs,
+  pushToast: ReturnType<typeof useToastStore.getState>['pushToast'],
+  selection: CommandSelection,
+): ToolCommandContext {
   return {
     boxGenerator: callbacks.requestBoxGenerator,
     barcodeGenerator: callbacks.requestBarcodeGenerator,
@@ -81,12 +86,18 @@ export function toolCommandContext(
     ),
     multiFileTrace: callbacks.requestMultiFileTrace,
     convertSelectionToPath: app.convertSelectionToPath,
-    weldSelection: app.weldSelection,
+    weldSelection: () => openBooleanDialog('weld'),
     unionSilhouette: callbacks.requestUnionSilhouette,
     joinPaths: callbacks.requestJoinPaths,
-    subtractSelection: () => app.booleanSelection('subtract'),
-    intersectSelection: () => app.booleanSelection('intersect'),
-    excludeSelection: () => app.booleanSelection('exclude'),
+    ...(callbacks.requestResizeJoints === undefined
+      ? {}
+      : { resizeJoints: callbacks.requestResizeJoints }),
+    ...(callbacks.requestPrepareStamp === undefined
+      ? {}
+      : { prepareStamp: callbacks.requestPrepareStamp }),
+    subtractSelection: () => openBooleanDialog('subtract'),
+    intersectSelection: () => openBooleanDialog('intersect'),
+    excludeSelection: () => openBooleanDialog('exclude'),
     convertToBitmap: callbacks.requestConvertToBitmap,
     fillSelectionSeparately: app.fillSelectionSeparately,
     closeSelectedOpenFillContours: app.closeSelectedOpenFillContours,

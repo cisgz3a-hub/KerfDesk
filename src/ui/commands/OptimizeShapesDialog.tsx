@@ -9,11 +9,14 @@ import type { VectorSceneObject } from '../../core/geometry/vector-path-tools';
 import { Button } from '../kit/Button';
 import { Dialog, DialogActions } from '../kit/Dialog';
 import { optimizeShapesStatus } from '../state/optimize-shapes-notice';
-import type { OptimizeShapesPlan } from '../state/optimize-shapes-plan';
+import { optimizedSceneObject, type OptimizeShapesPlan } from '../state/optimize-shapes-plan';
+import { isVectorPathObject } from '../../core/geometry';
+import { VectorComparisonPreview } from './VectorComparisonPreview';
 import {
   FitFields,
   SmoothFields,
   optionsFromForm,
+  optimizeFormProblem,
   type OptimizeShapesForm,
 } from './OptimizeShapesFields';
 import {
@@ -36,12 +39,24 @@ export function OptimizeShapesDialog(props: {
   const [form, setForm] = useState(props.initial);
   const [applying, setApplying] = useState(false);
   const options = useMemo(() => optionsFromForm(form), [form]);
+  const problem = optimizeFormProblem(form);
   const nothingOn = !form.smooth && !form.fit;
   const preview = useOptimizeShapesPreview(props.targets, options);
+  const after = useMemo(
+    () =>
+      preview.kind === 'ready' && problem === null
+        ? preview.plan.objects.flatMap((entry) => {
+            const object = optimizedSceneObject(entry) ?? entry.source;
+            return isVectorPathObject(object) ? [object] : [];
+          })
+        : [],
+    [preview, problem],
+  );
   const { onApply } = props;
   useEffect(() => {
-    if (applying && preview.kind === 'ready') onApply(options, preview.plan, form);
-  }, [applying, preview, options, form, onApply]);
+    if (applying && problem === null && preview.kind === 'ready')
+      onApply(options, preview.plan, form);
+  }, [applying, preview, options, form, onApply, problem]);
   const onChange = (patch: Partial<OptimizeShapesForm>): void => {
     setApplying(false);
     setForm((current) => ({ ...current, ...patch }));
@@ -54,21 +69,31 @@ export function OptimizeShapesDialog(props: {
       onClose={props.onCancel}
       onSubmit={(event) => {
         event.preventDefault();
-        if (!nothingOn) setApplying(true);
+        if (!nothingOn && problem === null) setApplying(true);
       }}
     >
       <div style={fieldsStyle}>
         <SmoothFields form={form} onChange={onChange} />
         <FitFields form={form} onChange={onChange} />
       </div>
+      <VectorComparisonPreview
+        before={props.targets}
+        after={after}
+        label="Optimize Shapes before and after"
+      />
       <p role="status" aria-live="polite" style={statusStyle}>
-        {nothingOn
-          ? 'Turn on Smooth or Fit to change the outlines.'
-          : statusText(preview, props.locked)}
+        {problem ??
+          (nothingOn
+            ? 'Turn on Smooth or Fit to change the outlines.'
+            : statusText(preview, props.locked))}
       </p>
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button variant="primary" type="submit" disabled={nothingOn || applying}>
+        <Button
+          variant="primary"
+          type="submit"
+          disabled={nothingOn || applying || problem !== null}
+        >
           {applying ? 'Optimizing...' : 'Optimize'}
         </Button>
       </DialogActions>

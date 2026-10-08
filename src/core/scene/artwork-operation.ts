@@ -126,6 +126,7 @@ export function createArtworkOperations(
 }
 
 export function artworkOperationName(object: SceneObject): string {
+  if (object.name?.trim()) return object.name.trim();
   switch (object.kind) {
     case 'text':
       return cleanName(object.content, 'Text');

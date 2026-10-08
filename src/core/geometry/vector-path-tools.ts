@@ -1,8 +1,7 @@
+import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM, flattenColoredPathCurves } from '../scene/curve-path';
 import { type PathD } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
 import {
-  DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
-  flattenColoredPathCurves,
   IDENTITY_TRANSFORM,
   type Bounds,
   type ColoredPath,
@@ -10,7 +9,7 @@ import {
   type Polyline,
   type SceneObject,
   type Vec2,
-} from '../scene';
+} from '../scene/scene-object';
 import { applyTransform } from '../scene/transform';
 import { materializedStrokeFields } from './stroke-transform';
 
@@ -127,8 +126,9 @@ function displaySource(object: VectorSceneObject): string {
 
 function objectPowerScale(
   object: VectorSceneObject,
-): Pick<ImportedSvg, 'locked' | 'operationOverride' | 'powerScale'> {
+): Pick<ImportedSvg, 'name' | 'locked' | 'operationOverride' | 'powerScale'> {
   return {
+    ...(object.name === undefined ? {} : { name: object.name }),
     ...(object.locked === undefined ? {} : { locked: object.locked }),
     ...(object.operationOverride === undefined
       ? {}

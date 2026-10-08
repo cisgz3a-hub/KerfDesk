@@ -78,6 +78,23 @@ test.describe('workspace shell acceptance', () => {
     expect(compactBox?.width ?? 0).toBeGreaterThan(300);
     expect(compactBox?.height ?? 0).toBeGreaterThan(200);
 
+    const sheets = page.getByRole('button', { name: 'Project sheets…', exact: true });
+    await expectInsideViewport(page, sheets);
+    await sheets.focus();
+    await page.keyboard.press('Enter');
+    const sheetDialog = page.getByRole('dialog', { name: 'Project sheets', exact: true });
+    await expect(sheetDialog.getByRole('combobox', { name: 'Active project sheet' })).toBeVisible();
+    await expect(sheetDialog.getByRole('button', { name: 'Production run…' })).toBeVisible();
+    await expect(sheetDialog.getByRole('button', { name: 'Saved arrays…' })).toBeVisible();
+    await sheetDialog.getByRole('button', { name: 'Production run…' }).click();
+    await expect(page.getByRole('dialog', { name: 'Production run', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheetDialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(sheetDialog).toHaveCount(0);
+    await expect(sheets).toBeFocused();
+    expect((await canvas.boundingBox())?.height ?? 0).toBeGreaterThan(200);
+
     await page.getByRole('tab', { name: 'Machine', exact: true }).click();
     await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
     expect((await canvas.boundingBox())?.width ?? 0).toBeGreaterThan(150);

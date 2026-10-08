@@ -9,6 +9,7 @@ import { resampleBuffer } from '../../core/image-resample';
 import type { RawImageData } from '../../core/trace';
 import { freezeGif, isGif } from '../import/freeze-gif';
 import { readImageHeader } from './image-header-reader';
+import { maskTraceSourcePixels } from './trace-source-mask';
 import { PREVIEW_MAX_EDGE_PX, scaleToCap } from './trace-decode-cap';
 import {
   orientationCanvasTransform,
@@ -76,6 +77,16 @@ type HeaderImageInfo = {
 export async function loadImageAsRawData(
   file: File,
   maxEdge: number = PREVIEW_MAX_EDGE_PX,
+  signal?: AbortSignal,
+): Promise<RawImageData> {
+  const pixels = await decodeImageAsRawData(file, maxEdge, signal);
+  checkTraceSignal(signal);
+  return maskTraceSourcePixels(file, pixels);
+}
+
+async function decodeImageAsRawData(
+  file: File,
+  maxEdge: number,
   signal?: AbortSignal,
 ): Promise<RawImageData> {
   checkTraceSignal(signal);

@@ -11,6 +11,7 @@ import {
 import { TraceSettingsControls } from './TraceSettingsControls';
 import { PhotoOutputGuidance } from './PhotoOutputGuidance';
 import { traceSettingEdits } from './trace-setting-edits';
+import { TraceWorkflowGuide } from './TraceWorkflowGuide';
 import './tracer-dialog.css';
 
 // Slots keep this layout independent of worker state and commit ownership.
@@ -46,6 +47,12 @@ export function TraceDialogView(props: {
           {props.preview}
         </section>
         <aside className="lf-trace-dialog-controls" aria-label="Trace controls">
+          <TraceWorkflowGuide
+            source={props.source}
+            settings={props.settings}
+            output={props.output.traceOutput}
+            photoShading={props.output.photoShading === true}
+          />
           <fieldset disabled={props.busy} className="lf-trace-commit-fields">
             <PresetPicker
               machineKind={props.output.machineKind}

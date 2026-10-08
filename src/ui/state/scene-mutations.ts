@@ -365,6 +365,7 @@ export function applyReimport(
   const inheritedPaths = inheritPathOperationIds(existing, incoming);
   const replaced: ImportedSvg = {
     ...incomingContent,
+    ...(existing.name === undefined ? {} : { name: existing.name }),
     // Source paint does not replace the operator's existing artwork settings.
     ...(existing.operationOverride === undefined
       ? {}
@@ -460,6 +461,7 @@ export function applyUpsertText(
   if (existing !== undefined) {
     const preserved: TextObject = {
       ...text,
+      ...(existing.name === undefined ? {} : { name: existing.name }),
       ...(existing.powerScale === undefined ? {} : { powerScale: existing.powerScale }),
       ...(existing.operationOverride === undefined
         ? {}

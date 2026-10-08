@@ -2,7 +2,9 @@ import type { CommandFamily, CommandId } from '../commands/command-types';
 import { EDITING_TOOLS_COMMAND_HELP } from './editing-tools-command-help';
 import { FILE_COMMAND_HELP } from './file-command-help';
 import { MACHINE_MOVE_COMMAND_HELP } from './machine-move-command-help';
+import { POLICY_COMMAND_HELP } from './policy-command-help';
 import { SETTINGS_COMMAND_HELP } from './settings-command-help';
+import { SUPPORT_COMMAND_HELP } from './support-command-help';
 
 export type CommandHelpTopic = {
   readonly family: CommandFamily;
@@ -10,10 +12,17 @@ export type CommandHelpTopic = {
 };
 
 export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
+  'tools.ai-assistant': {
+    family: 'tools',
+    tooltip:
+      'Configure an optional desktop AI connection. Review generated editable vector artwork or suggestions from your saved material library before applying anything.',
+  },
   ...FILE_COMMAND_HELP,
   ...EDITING_TOOLS_COMMAND_HELP,
   ...MACHINE_MOVE_COMMAND_HELP,
   ...SETTINGS_COMMAND_HELP,
+  ...POLICY_COMMAND_HELP,
+  ...SUPPORT_COMMAND_HELP,
   'edit.undo': {
     family: 'edit',
     tooltip:
@@ -188,6 +197,14 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'tools.join-paths': {
     family: 'tools',
     tooltip: 'Join nearby open endpoints with matching operations, colour and artwork settings.',
+  },
+  'tools.resize-joints': {
+    family: 'tools',
+    tooltip: 'Review straight receiving slots and notches against measured material thickness.',
+  },
+  'tools.prepare-stamp': {
+    family: 'tools',
+    tooltip: 'Prepare a mirrored stamp face and graded shoulders, then review the height map.',
   },
   'tools.subtract': {
     family: 'tools',
@@ -368,23 +385,5 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
   'help.safety': {
     family: 'help',
     tooltip: 'Machine-safety and liability information — read before running a job.',
-  },
-  'help.report-bug': {
-    family: 'help',
-    tooltip: 'Open KerfDesk support in your browser and see what to include in a problem report.',
-  },
-  'help.support-report': {
-    family: 'help',
-    tooltip:
-      'Save a text file with your KerfDesk version, machine, recent problems and, in the desktop app, its log. Read it, then email it to support@kerfdesk.com. It never includes your licence key.',
-  },
-  'help.open-data-folder': {
-    family: 'help',
-    tooltip:
-      'Open the folder where the desktop app keeps your settings, licence and support log, for example to back it up or when KerfDesk support asks for a file from it. Your projects are saved wherever you choose, not here.',
-  },
-  'help.discussions': {
-    family: 'help',
-    tooltip: 'Open KerfDesk support in your browser for questions, ideas and feedback.',
   },
 };

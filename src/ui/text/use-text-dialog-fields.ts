@@ -1,3 +1,4 @@
+import type { TextBoxSettings } from '../../core/scene/text-box';
 import { useMemo, useState } from 'react';
 import {
   DEFAULT_TEXT_COLOR,
@@ -37,6 +38,7 @@ export type DialogValues = TextDialogNumericValues & {
   readonly embeddedFonts: ReadonlyArray<EmbeddedFont>;
   readonly importedFont?: EmbeddedFont;
   readonly pathText?: PathTextSettings;
+  readonly textBox?: TextBoxSettings;
   readonly pathGuide?: SceneObject;
   readonly variableTemplate?: VariableTemplate;
 };
@@ -50,6 +52,7 @@ export type DialogFields = {
   readonly setLineHeight: (value: number) => void;
   readonly setLetterSpacing: (value: number) => void;
   readonly setBendDeg: (value: number) => void;
+  readonly setTextBox: (value: TextBoxSettings | undefined) => void;
   readonly setWeldOverlaps: (value: boolean) => void;
   readonly importFont: (file: File) => Promise<void>;
   readonly fontAvailable: boolean;
@@ -95,6 +98,21 @@ export function useTextDialogFields(
     pathEnabled: path.enabled,
     guides: path.guides,
     ...path.setters,
+    setTextBox: (textBox) => {
+      basic.setters.setTextBox(textBox);
+      if (textBox !== undefined) {
+        basic.setters.setBendDeg(0);
+        path.setters.setPathEnabled(false);
+      }
+    },
+    setBendDeg: (value) => {
+      basic.setters.setBendDeg(value);
+      if (value !== 0) basic.setters.setTextBox(undefined);
+    },
+    setPathEnabled: (enabled) => {
+      path.setters.setPathEnabled(enabled);
+      if (enabled) basic.setters.setTextBox(undefined);
+    },
     variableEnabled,
     setVariableEnabled,
   };
@@ -139,13 +157,7 @@ function variableTemplateValue(
 
 function useBasicFields(state: TextDialogState) {
   const editing = state.mode === 'edit';
-  const [content, setContent] = useState(
-    editing && state.variableTemplate !== undefined
-      ? variableTemplateToSource(state.variableTemplate)
-      : editing
-        ? state.content
-        : '',
-  );
+  const [content, setContent] = useState(initialContent(state));
   const [sizeMm, setSizeMm] = useState(
     initialTextSizeMm(editing ? state.sizeMm : DEFAULT_TEXT_SIZE_MM),
   );
@@ -159,9 +171,21 @@ function useBasicFields(state: TextDialogState) {
     initialTextLetterSpacing(editing ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING),
   );
   const [bendDeg, setBendDeg] = useState(initialTextBend(editing ? (state.bendDeg ?? 0) : 0));
+  const [textBox, setTextBox] = useState<TextBoxSettings | undefined>(
+    editing ? state.textBox : undefined,
+  );
   const [weldOverlaps, setWeldOverlaps] = useState(editing ? (state.weldOverlaps ?? false) : true);
   return {
-    values: { content, sizeMm, alignment, lineHeight, letterSpacing, bendDeg, weldOverlaps },
+    values: {
+      content,
+      sizeMm,
+      alignment,
+      lineHeight,
+      letterSpacing,
+      bendDeg,
+      weldOverlaps,
+      ...(textBox === undefined ? {} : { textBox }),
+    },
     setters: {
       setContent,
       setSizeMm,
@@ -170,6 +194,7 @@ function useBasicFields(state: TextDialogState) {
       setLetterSpacing,
       setBendDeg,
       setWeldOverlaps,
+      setTextBox,
     },
   };
 }
@@ -252,4 +277,11 @@ function textGuides(project: Project, state: TextDialogState): ReadonlyArray<Sce
       'paths' in object &&
       object.paths.some((path) => path.polylines.some((line) => line.points.length >= 2)),
   );
+}
+
+function initialContent(state: TextDialogState): string {
+  if (state.mode !== 'edit') return '';
+  return state.variableTemplate === undefined
+    ? state.content
+    : variableTemplateToSource(state.variableTemplate);
 }

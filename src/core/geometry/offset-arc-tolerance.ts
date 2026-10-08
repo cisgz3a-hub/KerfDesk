@@ -8,7 +8,7 @@
 // amendment 1). Only these tools pass it; Clipper's default is left alone for
 // every other caller.
 
-import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM } from '../scene';
+import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM } from '../scene/curve-path';
 import { VECTOR_PATH_PRECISION_DECIMALS } from './vector-path-regions';
 
 // Clipper's default arc tolerance: the offset distance divided by 500.

@@ -45,6 +45,7 @@ import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
 import { normalizeControllerPatch } from './project-controller-normalization';
+import { normalizeBooleanCompound } from './normalize-boolean-compound';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -97,7 +98,15 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
   const shapeError = validateProjectShape(workingRaw);
   if (shapeError !== null) return { kind: 'invalid', reason: shapeError };
 
-  const project = normalizeProject(workingRaw);
+  let project: Project;
+  try {
+    project = normalizeProject(workingRaw);
+  } catch (error) {
+    return {
+      kind: 'invalid',
+      reason: error instanceof Error ? error.message : 'Could not normalize project geometry',
+    };
+  }
 
   if (migratedFrom !== undefined) {
     return { kind: 'ok', project, migratedFrom };
@@ -456,10 +465,12 @@ function normalizeSceneObject(obj: unknown): unknown {
     obj['kind'] === 'imported-svg'
       ? normalizeLibraryAssetProvenance(rawLibraryProvenance)
       : undefined;
-  const normalized = withNormalizedTraceSettings(
-    libraryProvenance === undefined
-      ? withoutLibraryProvenance
-      : { ...withoutLibraryProvenance, libraryProvenance },
+  const normalized = normalizeBooleanCompound(
+    withNormalizedTraceSettings(
+      libraryProvenance === undefined
+        ? withoutLibraryProvenance
+        : { ...withoutLibraryProvenance, libraryProvenance },
+    ),
   );
   if (obj['kind'] !== 'text') return normalized;
   if (typeof obj['letterSpacing'] === 'number') return normalized;

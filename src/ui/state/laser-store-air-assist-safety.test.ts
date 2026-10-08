@@ -286,19 +286,22 @@ describe('laser store air assist safety cleanup', () => {
     expect(useLaserStore.getState().streamer).toBeNull();
   });
 
-  it('sends soft reset before coolant off when disconnecting a job stopped by error', async () => {
+  it('joins the error stop reset and sends coolant off before closing exactly once', async () => {
     const close = vi.fn(async () => undefined);
     const write = vi.fn<(data: string) => Promise<void>>(async () => undefined);
     const connection = makeConnection(write, close);
     await connectWith(connection);
     await startTestLaserJob('G21\nG90\nM3 S0\nG1 X1\nM5\n');
+    write.mockClear();
     connection.emitLine('error:7');
     expect(useLaserStore.getState().streamer?.status).toBe('errored');
 
-    write.mockClear();
     await useLaserStore.getState().disconnect();
 
-    expect(write).toHaveBeenCalledWith(RT_SOFT_RESET);
+    const written = write.mock.calls.map(([line]) => line);
+    expect(written.filter((line) => line === RT_SOFT_RESET)).toHaveLength(1);
+    expect(written.filter((line) => line === 'M5\n')).toHaveLength(1);
+    expect(written.filter((line) => line === 'M9\n')).toHaveLength(1);
     expect(write).toHaveBeenCalledWith('M9\n');
     expect(write.mock.calls.findIndex(([line]) => line === RT_SOFT_RESET)).toBeLessThan(
       write.mock.calls.findIndex(([line]) => line === 'M9\n'),

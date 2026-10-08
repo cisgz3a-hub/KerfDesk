@@ -1,18 +1,13 @@
-// laser-stream-hold — names the state where the controller keeps answering
-// status queries but has stopped acknowledging the lines already sent to it.
+// laser-stream-hold — observes a responsive controller waiting on job replies.
+// The live bar and log record that wait without treating a temporary pause as
+// transport loss. Programmed dwell, Marlin busy responses and scheduling gaps
+// retain the existing watchdog allowances (ADR-345).
 //
-// The ack watchdog (`detectStreamStall`) only knew how to raise a safety
-// notice, and the copy of that notice described the transport-loss path (a
-// frozen stream and a requested soft reset) that this path never takes. On a
-// Creality Falcon A1 Pro the maintainer saw the machine sit Idle for about a
-// minute mid-burn and then carry on by itself: the link was alive the whole
-// time and the sender was simply waiting for the controller. The live bar now
-// says exactly that, with the count and the age of the unacknowledged lines,
-// the log records the facts once per episode, and the safety notice is kept
-// for the case that never resolves.
-//
-// Nothing here writes to the controller or refuses anything (rule 7 /
-// ADR-228): it is telemetry about a wait the app was already doing (ADR-345).
+// This module does not write controller commands. At the existing sustained
+// acknowledgement threshold it signals the caller to freeze host refill and
+// make the driver's bounded stop/beam-off attempt on the current connection.
+// The caller publishes the factual containment notice; telemetry remains
+// available while the wait or recovery is unresolved.
 
 import type { StreamerState } from '../../core/controllers/grbl';
 import type { LaserSafetyNotice } from './laser-safety-notice';
@@ -42,7 +37,7 @@ export function observeStreamHoldTick(
   state: LaserState,
   refs: StallObservationRefs,
   now: number,
-): void {
+): boolean {
   // Only a controller that is not polled while it streams relies on its busy
   // keepalive to show it is working (MA-9).
   const busyAt =
@@ -50,7 +45,16 @@ export function observeStreamHoldTick(
   const stall = detectStreamStall(state.streamer, state.statusReport, refs.stallProbe, now, busyAt);
   refs.stallProbe = stall.probe;
   const hold = streamHoldFromProbe(state, stall.probe, now, currentJobLineError(refs, state));
-  if (hold !== null || (state.streamHold ?? null) !== null) set(streamHoldPatch(state, refs, hold));
+  const contain =
+    hold !== null && !isStreamDwell(hold) && hold.observedAt - hold.since >= STREAM_HOLD_NOTICE_MS;
+  if (hold !== null || (state.streamHold ?? null) !== null) {
+    const patch = { ...streamHoldPatch(state, refs, hold) };
+    // The caller now performs containment at the existing notice threshold.
+    // Its warning describes the actual stop request rather than this wait.
+    if (contain) delete patch.safetyNotice;
+    set(patch);
+  }
+  return contain;
 }
 
 /** How long the sent lines must go unacknowledged before the bar names it. */

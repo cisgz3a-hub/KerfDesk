@@ -101,15 +101,18 @@ describe('website copy', () => {
 
   // Keep source-repository routes out of customer pages (ADR-524 Amendment 1).
   // Product downloads/support use first-party destinations; policies may link
-  // only to Paddle's exact legal/support pages. Scan every generated text file.
-  it('keeps repository routes out of customer pages and permits exact Paddle policy/support links', () => {
+  // only to the providers' exact legal/support pages. Scan every generated text file.
+  it('keeps repository routes out of customer pages and permits exact provider policy/support links', () => {
     const paddlePolicies = [
       'https://www.paddle.com/legal/buyer-terms',
       'https://www.paddle.com/legal/refund-policy',
       'https://www.paddle.com/legal/privacy',
     ];
     const external = new Map([
-      ['privacy/index.html', new Set([paddlePolicies[2]])],
+      [
+        'privacy/index.html',
+        new Set([paddlePolicies[2], 'https://developers.openai.com/api/docs/guides/your-data']),
+      ],
       ['terms/index.html', new Set([...paddlePolicies, 'https://paddle.net/'])],
       [
         'refunds/index.html',

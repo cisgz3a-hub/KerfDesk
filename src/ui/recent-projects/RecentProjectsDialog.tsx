@@ -22,6 +22,7 @@ import {
 } from './recent-projects-store';
 import { openRecentProject } from './open-recent-project';
 import { RecentProjectLimitField } from './RecentProjectLimitField';
+import { LocalProjectSnapshots } from './LocalProjectSnapshots';
 
 export function RecentProjectsDialog(props: { readonly platform: PlatformAdapter }): JSX.Element {
   const entries = useRecentProjectsStore((state) => state.entries);
@@ -48,6 +49,7 @@ export function RecentProjectsDialog(props: { readonly platform: PlatformAdapter
   return (
     <Dialog title="Recent Projects" size="lg" onClose={close}>
       {notice === null ? null : <NoticePanel notice={notice} onChooseFile={chooseFile} />}
+      <LocalProjectSnapshots platform={platform} onRestored={close} />
       {ordered.length === 0 ? (
         <p style={emptyStyle}>
           No recent projects yet. Projects you open or save on this computer are listed here.

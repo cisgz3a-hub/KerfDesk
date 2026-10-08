@@ -1,6 +1,12 @@
 import { markErrored } from '../../core/controllers/grbl';
 import type { LaserSafetyAction } from './laser-safety-notice';
-import { streamStalledNotice, writeFailedNotice } from './laser-safety-notice';
+import {
+  acknowledgementStalledNotice,
+  streamStalledNotice,
+  writeFailedNotice,
+} from './laser-safety-notice';
+import { noResetStopLines, driverQuickStops, quickStopPatch } from './laser-quick-stop';
+import { frameProofReset } from './laser-session-reset';
 import type { LaserState, LiveRefs } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import {
@@ -12,6 +18,7 @@ import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-discon
 import { buildPortClosePatch, isActiveJob } from './laser-store-helpers';
 import { detectActiveStreamHeartbeatLoss } from './laser-stream-heartbeat';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { streamResetRecord } from './job-stop-request';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -34,6 +41,57 @@ export function streamWriteOwner(state: LaserState): StreamWriteOwner {
   };
 }
 
+/** A responsive controller may hold its program temporarily. Only the
+ * existing dwell/busy-aware hold watchdog calls this at its full notice
+ * deadline. Freeze first; recover on the same port when a reset is supported. */
+export function containStalledStreamAcknowledgements(
+  set: SetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+): void {
+  let stopped: LaserState | null = null;
+  const resetRequested = isGrblFamilyDriver(refs.driver) && refs.driver.realtime.softReset !== null;
+  set((state) => {
+    if (state.streamer?.status !== 'streaming') return {};
+    stopped = state;
+    return {
+      streamer: markErrored(state.streamer),
+      ...(resetRequested ? { streamReset: streamResetRecord(state) } : {}),
+      safetyNotice: state.safetyNotice ?? acknowledgementStalledNotice(resetRequested),
+      ...liveCanvasLifecyclePatch(state, 'errored'),
+      ...frameProofReset(),
+    };
+  });
+  if (stopped === null || refs.connection === null) return;
+  if (resetRequested) {
+    void runGrblDisconnectTransaction(set, refs, safeWrite, {
+      retainConnection: true,
+      action: 'stop',
+    }).catch(() => undefined);
+  } else void requestQueuedStallStop(set, refs, safeWrite, stopped);
+}
+
+async function requestQueuedStallStop(
+  set: SetFn,
+  refs: LiveRefs,
+  safeWrite: SafeWriteFn,
+  state: LaserState,
+): Promise<void> {
+  const connection = refs.connection;
+  const epoch = state.streamerEpoch;
+  try {
+    for (const line of noResetStopLines(refs.driver, state)) {
+      if (refs.connection !== connection) return;
+      await safeWrite(line, 'stop', 'system');
+    }
+    if (driverQuickStops(refs.driver))
+      set((current) => (current.streamerEpoch === epoch ? quickStopPatch(current) : {}));
+  } catch {
+    // Keep the original acknowledgement-loss incident and physical-stop
+    // guidance; transport rejection is also recorded by safeWrite.
+  }
+}
+
 export function containLostStreamHeartbeat(
   set: SetFn,
   state: LaserState,
@@ -52,7 +110,10 @@ export function containLostStreamHeartbeat(
   );
   refs.heartbeatProbe = heartbeat.probe;
   if (!heartbeat.lost) return false;
-  set((current) => ({ safetyNotice: current.safetyNotice ?? streamStalledNotice() }));
+  set((current) => ({
+    safetyNotice: current.safetyNotice ?? streamStalledNotice(),
+    streamReset: streamResetRecord(current),
+  }));
   // Freeze synchronously, then quarantine after the bounded reset transaction
   // so a late banner/ok cannot enter a future job.
   const connection = refs.connection;
@@ -71,12 +132,14 @@ export function containActiveStreamWriteFailure(
   owner: StreamWriteOwner,
 ): void {
   let shouldQuarantine = false;
+  const resetsController = isLiveRefs(refs) && isGrblFamilyDriver(refs.driver);
   set((state) => {
     if (!streamWriteOwnerMatches(state, owner)) return state;
     if (!isActiveJob(state.streamer) || state.streamer === null) return state;
     shouldQuarantine = true;
     return {
       streamer: markErrored(state.streamer),
+      ...(resetsController ? { streamReset: streamResetRecord(state) } : {}),
       safetyNotice: state.safetyNotice ?? writeFailedNotice(action),
       ...liveCanvasLifecyclePatch(state, 'errored'),
     };

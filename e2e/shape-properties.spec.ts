@@ -1,4 +1,4 @@
-import { toolbarCommand } from './fixtures/workspace-ui';
+import { saveProjectAs } from './fixtures/project-save';
 import { expect, test, type KerfDeskFixture, type Page } from './fixtures/kerfdesk-test';
 
 test.beforeEach(async ({ page }) => {
@@ -12,13 +12,13 @@ test('edits a drawn rectangle as canonical geometry and undoes the edit', async 
   kerfdesk,
 }) => {
   await drawRectangle(page);
-  const cornerRadius = page.getByRole('spinbutton', { name: 'Rectangle corner radius' });
+  const cornerRadius = page.getByRole('textbox', { name: 'Rectangle corner radius', exact: true });
   await expect(cornerRadius).toHaveValue('0');
   await cornerRadius.fill('6');
   await cornerRadius.press('Tab');
   await expect(cornerRadius).toHaveValue('6');
 
-  await (await toolbarCommand(page, 'Save As...')).click();
+  await saveProjectAs(page, kerfdesk);
   const saved = await savedProject(kerfdesk);
   const rectangle = saved.scene.objects.find(
     (object) => object.kind === 'shape' && object.spec?.kind === 'rect',
@@ -26,6 +26,7 @@ test('edits a drawn rectangle as canonical geometry and undoes the edit', async 
   expect(rectangle?.spec).toMatchObject({ cornerRadiusMm: 6 });
   expect(JSON.stringify(rectangle?.paths)).toContain('cubic');
 
+  await page.getByLabel('KerfDesk workspace', { exact: true }).focus();
   await page.keyboard.press('Control+z');
   await expect(cornerRadius).toHaveValue('0');
 });
@@ -46,7 +47,7 @@ async function drawRectangle(page: Page): Promise<void> {
     .getByRole('tablist', { name: 'Edit artwork or operation' })
     .getByRole('tab', { name: 'Artwork', exact: true })
     .click();
-  await expect(page.getByRole('spinbutton', { name: 'Rectangle width' })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Rectangle width', exact: true })).toBeVisible();
 }
 
 async function savedProject(kerfdesk: KerfDeskFixture): Promise<SavedProject> {

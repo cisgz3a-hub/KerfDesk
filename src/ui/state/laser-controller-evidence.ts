@@ -8,6 +8,7 @@ export function invalidateControllerSessionEvidence(state: LaserState): Partial<
     controllerSessionEpoch: nextEpoch,
     statusReport: null,
     statusObservation: null,
+    statusResponseObservation: null,
     wcoCache: null,
     controllerSettings: null,
     controllerSettingsObservation: null,

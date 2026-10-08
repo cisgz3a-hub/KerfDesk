@@ -1,5 +1,6 @@
 import { findFontEntry, textToPolylines, type TextRenderResult } from '../../core/text';
 import type { EmbeddedFont, TextAlignment } from '../../core/scene';
+import type { TextBoxSettings } from '../../core/scene/text-box';
 import { loadFont } from './font-loader';
 
 export type RenderTextGeometryInput = {
@@ -11,6 +12,7 @@ export type RenderTextGeometryInput = {
   readonly lineHeight: number;
   readonly letterSpacing: number;
   readonly color: string;
+  readonly textBox?: TextBoxSettings;
 };
 
 /** Routes editable text to the outline-font or native CNC stroke renderer. */
@@ -24,6 +26,7 @@ export async function renderTextGeometry(
     lineHeight: input.lineHeight,
     letterSpacing: input.letterSpacing,
     color: input.color,
+    ...(input.textBox === undefined ? {} : { textBox: input.textBox }),
   };
   if (findFontEntry(input.fontKey)?.geometry === 'single-line') {
     return textToPolylines({
