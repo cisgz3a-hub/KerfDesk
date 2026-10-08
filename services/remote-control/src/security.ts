@@ -79,7 +79,11 @@ export async function boundedText(
       combined.set(chunk, offset);
       offset += chunk.byteLength;
     }
-    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(combined);
+    try {
+      return new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(combined);
+    } catch {
+      throw new RequestFailure(400);
+    }
   } finally {
     await reader.cancel().catch(() => undefined);
   }
