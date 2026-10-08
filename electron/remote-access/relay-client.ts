@@ -89,7 +89,9 @@ class RemoteRelayClient {
   requestId = randomUUID;
   send(message: RelayMessage): boolean {
     if (this.socket?.readyState !== WebSocket.OPEN) return false;
-    this.socket.send(JSON.stringify({ v: 1, ...message }));
+    const frame = JSON.stringify({ v: 1, ...message });
+    if (Buffer.byteLength(frame, 'utf8') > MCP_MAX_RESULT_BYTES) return false;
+    this.socket.send(frame);
     return true;
   }
   cancelRequests(): void {
@@ -183,17 +185,23 @@ class RemoteRelayClient {
         scopes.includes('control') && this.options.canRequest(clientId, scopes, true),
       );
       const result = mcpOutputSchemas[name].safeParse(raw);
+      if (!result.success) throw new KerfDeskMcpError('failed');
       if (
-        !result.success ||
-        Buffer.byteLength(JSON.stringify(result.data), 'utf8') > MCP_MAX_RESULT_BYTES
+        this.canReply(
+          generation,
+          controller,
+          clientId,
+          scopes,
+          mcpCommandScope(name) === 'control',
+        ) &&
+        !this.send({ type: 'result', requestId, result: result.data })
       )
         throw new KerfDeskMcpError('failed');
+    } catch (error: unknown) {
       if (
         this.canReply(generation, controller, clientId, scopes, mcpCommandScope(name) === 'control')
       )
-        this.send({ type: 'result', requestId, result: result.data });
-    } catch (error: unknown) {
-      if (generation === this.generation) this.error(requestId, mcpErrorCode(error));
+        this.error(requestId, mcpErrorCode(error));
     } finally {
       if (this.commands.get(requestId)?.controller === controller) this.commands.delete(requestId);
     }
