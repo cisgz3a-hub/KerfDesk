@@ -119,6 +119,7 @@ function makeLaserStateActions() {
     normalizeFrameReportUnits: async () => undefined,
     confirmProbePlateRemoved: () => undefined,
     clearTranscript: () => undefined,
+    clearIncidentHistory: () => undefined,
     requestControllerStatus: async () => undefined,
   };
 }

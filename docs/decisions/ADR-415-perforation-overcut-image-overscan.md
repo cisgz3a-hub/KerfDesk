@@ -75,6 +75,8 @@ slow one.
 
 ### Consequences
 
+The fragmented-contour ordering limitation below is superseded for new scoped Jobs by [ADR-486 Amendment 2](ADR-486-amendment-2-topology-before-process-settings.md). Original closed parent identities now survive tabs/perforation through inside-first ordering.
+
 - Output changes only for operations that turn a setting on, so no snapshot changes.
 - Saved projects are schema 10; older KerfDesk builds refuse them with the existing "newer version"
   message.

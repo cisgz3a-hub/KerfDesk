@@ -9,12 +9,15 @@ import { pushLog } from './laser-store-helpers';
 import { appendTranscript, systemTranscriptEntry } from './laser-transcript';
 // Type-only, erased at compile time — no runtime cycle with laser-store.
 import type { LaserState } from './laser-store';
+import { publishControllerIncident } from './laser-incident-publish';
 
 export function appendSystemNotice(
   state: LaserState,
   refs: { nextTranscriptId?: number },
   line: string,
-): Pick<LaserState, 'log' | 'transcript'> {
+  incident = false,
+): Pick<LaserState, 'log' | 'transcript' | 'incidentHistory'> {
+  if (incident) return publishControllerIncident(refs, state, line, 'message');
   // Draw the id from the ONE shared owner — refs.nextTranscriptId, the same
   // counter controller in/out lines use — and advance it. Deriving lastId+1
   // independently would hand this notice the id the next controller line is

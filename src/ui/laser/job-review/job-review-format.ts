@@ -109,3 +109,7 @@ export function toolPlanLabels(
 ): ReadonlyArray<string> {
   return (plan ?? []).map((entry, index) => `${index + 1}. ${entry.name ?? 'Active bit'}`);
 }
+
+export function uniqueReviewWarnings(warnings: ReadonlyArray<string>): ReadonlyArray<string> {
+  return [...new Set(warnings)];
+}

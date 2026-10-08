@@ -56,6 +56,35 @@ function cncGroups(project: Project) {
   };
 }
 describe('exact projected relief output integration', () => {
+  it.each(['engrave', 'profile-on-path'] as const)(
+    'preserves open projected %s motion with authoritative empty omission evidence',
+    (cutType) => {
+      const original = reliefProjectionProject();
+      const project = {
+        ...original,
+        scene: {
+          ...original.scene,
+          layers: original.scene.layers.map((layer) =>
+            layer.id === 'engrave'
+              ? { ...layer, cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, ...layer.cnc, cutType } }
+              : layer,
+          ),
+        },
+      };
+      const { result, groups } = cncGroups(project);
+      expect(result.job.cncCompilation?.omittedOpenContours).toEqual([]);
+      expect(result.job.cncCompilation?.omittedOpenContourSources).toEqual([]);
+      expect(groups).toHaveLength(1);
+      const pass = groups[0]?.passes[0];
+      if (pass?.kind !== 'path3d') throw new Error('Missing projected cutting motion');
+      expect(pass.closed).toBe(false);
+      expect(pass.points.length).toBeGreaterThan(1);
+      expect(pass.points.some((point) => point.z < 0)).toBe(true);
+      expect(result.job.cncCompilation?.reliefPlans).toContainEqual(
+        expect.objectContaining({ stage: 'projection', targetObjectId: 'relief' }),
+      );
+    },
+  );
   it('warns when final tool grouping engraves before the target machining despite artwork order', () => {
     const original = toolReorderedProject();
     const { result, groups } = cncGroups(original);

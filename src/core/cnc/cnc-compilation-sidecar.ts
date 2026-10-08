@@ -9,6 +9,7 @@ import type {
 } from '../job/job';
 import { DEFAULT_CNC_LAYER_SETTINGS, type Scene } from '../scene';
 import type { CncCompilationEvidence } from './cnc-compilation-artifact';
+import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
 import type { VCarveLadder } from './vcarve-ladder';
 
 export function offsetDiagnosticsForStatus(
@@ -61,6 +62,7 @@ export function buildCncCompilationSidecar(
   stepoverOperations: ReadonlyArray<CncStepoverCompilationEvidence>,
   reliefPlans: ReadonlyArray<CncReliefPlanningEvidence>,
   offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>,
+  openContourOmissions: CncOpenContourOmissions,
 ): CncCompilationSidecar {
   const exactOffsetDiagnostics = uniqueOffsetDiagnostics([
     ...offsetLadderDiagnostics,
@@ -84,6 +86,8 @@ export function buildCncCompilationSidecar(
     stepoverOperations,
     reliefPlans,
     offsetLadderDiagnostics: exactOffsetDiagnostics,
+    omittedOpenContours: openContourOmissions.counts,
+    omittedOpenContourSources: openContourOmissions.sources,
   };
 }
 

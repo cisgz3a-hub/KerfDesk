@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "recordedAtUtc": "2026-10-08T17:27:54.603Z",
+  "recordedAtUtc": "2026-10-08T17:46:23.985Z",
   "scope": "Completed CNC, retained relief and bounded parametric build; PR preparation after main integration.",
   "implementationBase": "88433fec3d0e44e0b4793e086af34d6c4760bdfb",
-  "mainIntegrated": "d60ecfc9bd46659a9d23c3c906c7f912dddcdf50",
+  "mainIntegrated": "a397bb70764259a081ef286ea420ff178314a543",
   "branch": "codex/cnc-leaders-build-20261008",
   "priorCompletedVerification": {
     "sourceFiles": 8055,
@@ -89,6 +89,36 @@
       "mockedTestsPassed": 61,
       "scopedLint": "passed",
       "adrNumbers": "passed"
+    },
+    "competitorRepairsIntegration": {
+      "commit": "a397bb70764259a081ef286ea420ff178314a543",
+      "method": "Merge latest origin/main after freezing the scoped implementation in 08afe91ca8213f31e7bc38bf2d5e94cc4d1edfe9.",
+      "overlappingFiles": [
+        "src/core/cnc/compile-cnc-job.ts",
+        "src/core/job/job.ts",
+        "src/ui/laser/job-review/job-review-model.ts"
+      ],
+      "contentConflicts": ["src/core/cnc/compile-cnc-job.ts"],
+      "resolution": "Keep the extracted compiled-operation type and projected-operation branch; require and collect exact open-contour omission evidence in both compiler paths. Preserve the moved compilation sidecar, projected/rest/tapered evidence and advisory review mapping.",
+      "independentReview": "Read-only semantic review found no loss of compilation evidence or change to Frame/Start policy.",
+      "initialRegressionTests": {
+        "passed": 39,
+        "failed": 0,
+        "files": 3
+      },
+      "verification": "Bounded merged-source checks continue. Earlier whole-lint, type and unit results belong to the pre-competitor-merge source.",
+      "lineLimitRepairs": {
+        "scope": "Moved the existing operation-group type to the operation-result helper and unchanged warning de-duplication to the display helper.",
+        "initialLint": "Two integration files exceeded max-lines by three and one lines.",
+        "scopedRerun": "Seven affected source/regression files pass ESLint and formatting; file-size, export and ADR checks pass.",
+        "preRepairTestRun": {
+          "sourceTreeSha256": "b80c48acaf43931ac86f16fac74cc10b7636eb7f895c69d8ad524ccc6f2c409e",
+          "passed": 422,
+          "failed": 0,
+          "skipped": 0,
+          "files": 45
+        }
+      }
     }
   },
   "publicationScope": {
@@ -96,7 +126,8 @@
     "exclude": "Old interface screenshot churn, screenshots, PIDs, raw trace/report archives, generated benchmark outputs and binaries remain local.",
     "proprietaryLicenseVerified": true,
     "mergeOrReleaseAuthorized": false,
-    "stagedFiles": 367
+    "stagedFiles": 367,
+    "implementationCommit": "08afe91ca8213f31e7bc38bf2d5e94cc4d1edfe9"
   },
   "qualificationLimits": {
     "physicalHardware": "Not operated or qualified.",
@@ -143,6 +174,41 @@
     }
   ],
   "finalIntegratedSource": {
+    "sourceFiles": 8205,
+    "sourceTreeSha256": "0aa226ec42b94a92b34f32e7c04c19b47d739e59992fe612cc8f9e2319365210",
+    "integratedBaseCommit": "a397bb70764259a081ef286ea420ff178314a543",
+    "tests": "444 unit/component tests passed across 47 files with no skips. Scoped ESLint, formatting, file-size, public-export and ADR checks pass. Merged-source type, build, browser, benchmark and hosted receipts are recorded in the PR.",
+    "wholeLint": {
+      "status": "incomplete locally for this merged source",
+      "notes": "The complete local scan passed for the retained pre-merge source at the repository heap of 5120 MiB. Scoped merge lint and exact-head hosted full lint qualify this merge separately."
+    },
+    "pendingAtPRCreation": [
+      "Main/e2e/Electron types on merged source",
+      "Renderer builds",
+      "34 standard Chrome workflows including CNC/laser omission review",
+      "Desktop and Browser-Free production checks",
+      "Final benchmark source stamp",
+      "Exact-head hosted CI"
+    ],
+    "sourceContracts": {
+      "merged-scoped-eslint": "passed",
+      "merged-scoped-prettier": "passed",
+      "merged-file-size": "passed",
+      "merged-exports": "passed",
+      "merged-adrs": "passed"
+    },
+    "unitTests": {
+      "sourceTreeSha256": "0aa226ec42b94a92b34f32e7c04c19b47d739e59992fe612cc8f9e2319365210",
+      "passed": 444,
+      "failed": 0,
+      "skipped": 0,
+      "total": 444,
+      "files": 47,
+      "failedFiles": 0,
+      "success": true
+    }
+  },
+  "preCompetitorMergeVerification": {
     "sourceFiles": 8116,
     "sourceTreeSha256": "017ec100186682093a33a429b693216a0b8fb5830d5ff32ba39f769eb8ac4dcd",
     "baseCommit": "2cd5600ac519fadd7095a4367bbd57db1efef70d",

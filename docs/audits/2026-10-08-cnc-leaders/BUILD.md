@@ -90,7 +90,7 @@ Both renderer builds report the existing circular manual-chunk dependency io →
 
 Local software completion is separate from hosted CI, a pull request, packaged Windows installer, publication and physical-machine qualification. No installer was packaged, launched or installed; no physical controller or machine Frame, Start, air cut or material cut was operated. Simulated Frame/Start/controller workflows were exercised in Chrome. Rotary remains a reference JSON study. Measured competitor comparisons and physical qualification are the next evidence work before making efficiency or machine-support claims.
 
-Completed source, tests, scripts and authored records are being committed for a ready-for-review PR on codex/cnc-leaders-build-20261008. Generated bundles and raw artifacts remain local. The primary checkout and its unrelated changes were preserved, and the previous test servers were stopped. The coordinating release chat owns merge and publication.
+Completed source, tests, scripts and authored records are retained in commit 08afe91ca8213f31e7bc38bf2d5e94cc4d1edfe9 on codex/cnc-leaders-build-20261008. A draft source PR is opened after the current-main merge and meaningful scoped verification; final build, browser and hosted receipts complete its qualification. Generated bundles and raw artifacts remain local. The primary checkout and its unrelated changes were preserved, and the previous test servers were stopped. The coordinating release chat owns merge and publication.
 
 
 ## PR integration review repairs
@@ -103,3 +103,10 @@ The 9 October review corrected four retained-state defects before final PR check
 - Project loading rejects multiple retained geometry authorities on one vector, matching the design editors’ contract.
 
 These defects were reproduced with focused failing regressions, then repaired. Final integrated-source results and its digest are recorded separately in pr-verification.json. The earlier complete 8 October suite remains identified by its own source digest.
+
+
+## Competitor repair merge
+
+Main a397bb70764259a081ef286ea420ff178314a543 brings the separately reviewed competitor repairs. The only content conflict was the extracted CNC operation result type: the resolution preserves relief projection and requires exact open-contour omission evidence on both compile branches. The moved job sidecar retains relief/rest/inlay evidence, and Job Review retains exact-program reach warnings alongside advisory omissions. Two new integration regressions assert that both supported open projected cutting modes retain real 3D motion with authoritative empty omission arrays. A read-only integration review found no semantic loss or Frame/Start policy change.
+
+The compact verification record separates the earlier full unit, Chrome and static runs from this merged source. The complete local lint scan passed before this merge; it has not been repeated on the newly merged source. Scoped checks and exact-head hosted full lint qualify the merge separately. Final renderer, browser and benchmark receipts are added to the PR before handoff.

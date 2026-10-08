@@ -157,7 +157,7 @@ async function runOwnedReset(
     owner.resetAccepted = true;
   } catch (error) {
     resetError = error;
-    failOwnedResetWrite(owner, action);
+    failOwnedResetWrite(owner, action, error);
   }
   acceptOwnedResetWrite(owner, options.keepErroredStreamer === true);
   transaction.finishResetWrite(owner.boundaryObserved ? null : resetError);

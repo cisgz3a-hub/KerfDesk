@@ -34,8 +34,10 @@ import {
   originTileDetail,
   originTileValue,
   toolPlanLabels,
+  uniqueReviewWarnings,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
+import { buildReviewedOmissions, type JobReviewOmissions } from './job-review-omissions';
 import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectArchiveCapacityWarnings } from './archive-capacity-warnings';
@@ -72,7 +74,7 @@ export type JobReviewAcknowledgement =
   | { readonly kind: 'laser-unverified'; readonly prompt: string }
   | { readonly kind: 'cnc'; readonly prompt: string };
 
-export type JobReviewModel = {
+export type JobReviewModel = JobReviewOmissions & {
   readonly machineKind: MachineKind;
   readonly stats: ReadonlyArray<JobReviewStatTile>;
   readonly warnings: ReadonlyArray<string>;
@@ -104,6 +106,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   return {
     machineKind,
+    ...buildReviewedOmissions(args.prepared, outputScope),
     stats: buildStatTiles(
       args.prepared,
       machineKind,
@@ -114,7 +117,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
     // warnings; the intent set (raster upsample, trace-as-vector, fill heat)
     // was previously only a transient toast, so it joins the review here.
     // The M7 check runs against the exact prepared program, not the settings.
-    warnings: dedupe([
+    warnings: uniqueReviewWarnings([
       ...args.prepared.warnings,
       ...detectM7AirAssistWarnings(
         args.prepared.gcode,
@@ -208,7 +211,7 @@ function buildSecondPassReviewModel(args: JobReviewModelArgs): JobReviewModel {
       gcodeTile(prepared.gcode),
       originTile(prepared.jobOrigin),
     ],
-    warnings: dedupe([
+    warnings: uniqueReviewWarnings([
       ...prepared.warnings,
       ...detectM7AirAssistWarnings(
         prepared.gcode,
@@ -434,8 +437,4 @@ function buildAcknowledgement(
   )
     ? { kind: 'laser-unverified', prompt: LASER_MODE_UNVERIFIED_START_PROMPT }
     : { kind: 'laser-verified' };
-}
-
-function dedupe(warnings: ReadonlyArray<string>): ReadonlyArray<string> {
-  return [...new Set(warnings)];
 }

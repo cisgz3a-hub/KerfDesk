@@ -11,6 +11,9 @@ import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
 // Consumers that only operate on vectors (optimizer, planner, estimator's
 // vector path) filter on kind. The emit strategy dispatches based on kind.
 
+import type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+export type { CncCompilationSidecar } from './cnc-compilation-sidecar-types';
+
 import { representedCncCoordinateMm } from '../cnc/coordinate-representation';
 import type { ArcMove } from '../geometry/arc-fit';
 import { sampleCircularArcPoints } from '../geometry/arc-representation';
@@ -40,11 +43,17 @@ export type CutSegment = {
   // closed segment, the last point equals the first by construction.
   readonly polyline: ReadonlyArray<Vec2>;
   readonly closed: boolean;
-  /** Nesting of this contour inside its own path, from the path's carried
+  /** Source-path nesting (ADR-531), or surviving compiled run nesting when a
+   * topologyContour is present (ADR-486 Amd 2). From the path's carried
    *  forest (ADR-531): `depth` among the contours sharing `forest`, a key
    *  unique to one path of one object. Inside-first ordering reads it instead
    *  of probing those contours; absent, it probes as before. */
-  readonly nesting?: { readonly forest: string; readonly depth: number };
+  readonly nesting?: {
+    readonly forest: string;
+    readonly depth: number;
+    /** New compiled operation/run contour identity. Absent on historical Jobs. Plain archive data. */
+    readonly topologyContour?: string;
+  };
   /** Estimator-only 3D edge geometry for a two-point CNC segment. */
   readonly plannerMotion?: {
     readonly distanceMm: number;
@@ -71,6 +80,8 @@ export type FillSegment = CutSegment & {
 };
 
 export type CutGroup = {
+  /** New topology packet scope. Historical groups without it retain legacy optimization/replay. */
+  readonly topologyScope?: string;
   readonly kind: 'cut';
   /** Timing-only CNC projection: an emitted spindle/tool transition drains
    * preceding motion before this group's first move. */
@@ -377,6 +388,14 @@ export type Group = CutGroup | FillGroup | RasterGroup | CncGroup;
 // which must never refuse the job (rule 7). Surfaced in the Job Review warnings
 // list. Optional on Job so every existing Job literal stays valid.
 export type JobDiagnostic =
+  | {
+      readonly kind: 'fill-ownership-failed';
+      readonly layerId: string;
+      readonly layerName: string;
+      readonly runScope: string;
+      readonly objectIds: ReadonlyArray<string>;
+      readonly count: number;
+    }
   | { readonly kind: 'offset-fill-failed'; readonly layerName: string }
   | {
       readonly kind: 'offset-fill-pass-limit';
@@ -471,14 +490,6 @@ export type CncReliefPlanningEvidence = {
   readonly toolTipDiameterMm?: number;
   readonly rowSpacingMm?: number;
   readonly scallopMm?: number;
-};
-
-/** Structured-clone-safe CNC evidence retained with the exact compiled Job. */
-export type CncCompilationSidecar = {
-  readonly vcarveOperations: ReadonlyArray<CncVCarveCompilationEvidence>;
-  readonly offsetLadderDiagnostics?: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
-  readonly stepoverOperations?: ReadonlyArray<CncStepoverCompilationEvidence>;
-  readonly reliefPlans?: ReadonlyArray<CncReliefPlanningEvidence>;
 };
 
 export type Job = {

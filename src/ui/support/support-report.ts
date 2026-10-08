@@ -8,6 +8,9 @@ import type { MachineKind } from '../../core/scene';
 import type { LicenceStatus } from '../../platform/types';
 import type { EditionValue } from '../licensing/edition';
 import type { RendererProblem } from './renderer-problems';
+import type { SerialTranscriptEntry } from '../state/laser-transcript';
+import { incidentReportLines } from './support-report-incidents';
+import { redactSupportReportText } from './support-report-redaction';
 
 export type DesktopLogFact =
   | { readonly kind: 'none' }
@@ -31,12 +34,10 @@ export type SupportReportFacts = {
     readonly lines: ReadonlyArray<string>;
   };
   readonly machineConsole: ReadonlyArray<string>;
+  readonly controllerIncidents?: ReadonlyArray<SerialTranscriptEntry>;
   readonly problems: ReadonlyArray<RendererProblem>;
   readonly desktopLog: DesktopLogFact;
 };
-
-// KD1.<licence id>.<secret>, the key format the licensing service issues.
-const LICENCE_KEY = /\bKD\d+\.[\w-]+\.[\w-]+/g;
 
 export function formatSupportReport(facts: SupportReportFacts): string {
   const sections = [
@@ -62,11 +63,16 @@ export function formatSupportReport(facts: SupportReportFacts): string {
     section('Machine', facts.machine),
     section(settingsTitle(facts.machineSettings.readAt), facts.machineSettings.lines, 'Not read.'),
     section('Machine console, newest last', facts.machineConsole, 'Empty.'),
+    section(
+      'Retained controller incidents, newest last',
+      incidentReportLines(facts.controllerIncidents ?? []),
+      'None.',
+    ),
     section('Problems in this window, newest last', facts.problems.map(problemLines), 'None.'),
     ...(facts.app === 'electron' ? [section('Desktop log, newest last', logLines(facts))] : []),
   ];
   const text = `${sections.map((lines) => lines.join('\n')).join('\n\n')}\n`;
-  return text.replace(LICENCE_KEY, 'KD1.[licence key removed]');
+  return redactSupportReportText(text);
 }
 
 function section(

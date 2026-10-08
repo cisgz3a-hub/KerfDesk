@@ -1,5 +1,6 @@
 import { compileCncProjectedOperation } from './compile-cnc-projected-operation';
 import { tagArtworkGroup, type CompiledCncOperation } from './compile-cnc-operation-result';
+import type { CncOperationGroups } from './compile-cnc-operation-result';
 import { cncGroupForPasses } from './compile-cnc-pass-group';
 // compileCncJob — Scene + DeviceProfile + CncMachineConfig → Job of CncGroups.
 //
@@ -30,6 +31,11 @@ import type {
   CncReliefPlanningEvidence,
   CncStepoverCompilationEvidence,
 } from '../job/job';
+import type {
+  CncOpenContourOmission,
+  CncOpenContourOmissionSource,
+} from '../job/cnc-compilation-sidecar-types';
+import { cncOpenContourOmissions } from './cnc-open-contour-omissions';
 import type { ReliefMaterializationFailure } from '../relief/relief-materialization-failure';
 import { isProfileCutType } from './compile-cnc-helpers';
 import { compileReliefGroupsForLayer } from './compile-cnc-relief';
@@ -145,6 +151,8 @@ function compileCncSnapshot(
   const stepoverOperations: CncStepoverCompilationEvidence[] = [];
   const offsetLadderDiagnostics: CncOffsetLadderCompilationEvidence[] = [];
   const reliefPlans: CncReliefPlanningEvidence[] = [];
+  const omittedOpenContours: CncOpenContourOmission[] = [];
+  const omittedOpenContourSources: CncOpenContourOmissionSource[] = [];
   const sourceObjects = scene.objects;
   const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   for (const [operationIndex, run] of artworkOperationRuns(scene).entries()) {
@@ -162,6 +170,8 @@ function compileCncSnapshot(
     clearingGroups.push(...operation.clearingGroups);
     profileGroups.push(...operation.profileGroups);
     reliefPlans.push(...operation.reliefPlans);
+    omittedOpenContours.push(...operation.openContourOmissions.counts);
+    omittedOpenContourSources.push(...operation.openContourOmissions.sources);
     offsetLadderDiagnostics.push(...operation.offsetLadderDiagnostics);
     if (operation.stepoverOperation !== undefined) {
       stepoverOperations.push(operation.stepoverOperation);
@@ -176,6 +186,7 @@ function compileCncSnapshot(
     stepoverOperations,
     reliefPlans,
     offsetLadderDiagnostics,
+    { counts: omittedOpenContours, sources: omittedOpenContourSources },
   );
   return {
     kind: 'compiled',
@@ -232,6 +243,7 @@ function compileCncOperation(
       ...vectorGroups.clearingGroups,
     ],
     profileGroups: vectorGroups.profileGroups,
+    openContourOmissions: cncOpenContourOmissions(layer, contours),
     reliefPlans: relief.evidence.plans,
     offsetLadderDiagnostics: [
       ...vectorGroups.offsetLadderDiagnostics,
@@ -245,13 +257,6 @@ function compileCncOperation(
       : {}),
   };
 }
-
-type CncOperationGroups = {
-  readonly clearingGroups: ReadonlyArray<CncGroup>;
-  readonly profileGroups: ReadonlyArray<CncGroup>;
-  readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
-  readonly stepoverUsed: boolean;
-};
 
 function compileVectorOperationGroups(
   layer: Layer,
