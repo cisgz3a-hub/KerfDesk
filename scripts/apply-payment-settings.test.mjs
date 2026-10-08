@@ -297,6 +297,84 @@ test('the absolute 240s recovery deadline stops further requests before any roll
   assert.ok(run.calls.at(-1).url.endsWith('/versions?deployable=true'));
 });
 
+const sandboxTarget = {
+  environment: 'sandbox',
+  signing: 'sandbox-20260929',
+  authority: 'SandboxLicenseAuthority',
+};
+const sandboxSettings = () => {
+  const value = settings();
+  value.bindings.find(({ name }) => name === 'PADDLE_ENVIRONMENT').text = 'sandbox';
+  value.bindings.find(({ name }) => name === 'SIGNING_KEY_ID').text = sandboxTarget.signing;
+  Object.assign(
+    value.bindings.find(({ name }) => name === 'LICENSE_AUTHORITY'),
+    {
+      class_name: sandboxTarget.authority,
+      namespace_id: 'b5b0cb9d97f4404582f884ff2b1a6ba8',
+    },
+  );
+  return value;
+};
+
+test('sandbox accepts its existing hidden or correctly formatted public client token without rewriting it', () => {
+  const value = sandboxSettings();
+  assert.equal(guardedSettings(value, sandboxTarget), 'false');
+  Object.assign(
+    value.bindings.find(({ name }) => name === 'PADDLE_CLIENT_TOKEN'),
+    {
+      type: 'plain_text',
+      text: 'test_' + 'A1b'.repeat(9),
+    },
+  );
+  const before = structuredClone(value);
+  assert.equal(guardedSettings(value, sandboxTarget), 'false');
+  assert.deepEqual(value, before);
+  assert.deepEqual(
+    flagMetadata(value, originalVersion, 'false').bindings.find(
+      ({ name }) => name === 'PADDLE_CLIENT_TOKEN',
+    ),
+    { name: 'PADDLE_CLIENT_TOKEN', type: 'inherit', version_id: originalVersion },
+  );
+});
+
+test('sandbox refuses blank, malformed and live public client tokens', () => {
+  for (const text of [
+    undefined,
+    null,
+    '',
+    ' ',
+    'test_',
+    'test_' + 'a'.repeat(26),
+    'test_' + 'a'.repeat(28),
+    'live_' + 'a'.repeat(27),
+    'test_' + '_'.repeat(27),
+    'test_' + 'a'.repeat(26) + '!',
+    'test_' + 'a'.repeat(27) + '\n',
+    ' test_' + 'a'.repeat(27),
+  ]) {
+    const value = sandboxSettings();
+    Object.assign(
+      value.bindings.find(({ name }) => name === 'PADDLE_CLIENT_TOKEN'),
+      { type: 'plain_text', text },
+    );
+    assert.throws(() => guardedSettings(value, sandboxTarget));
+  }
+});
+
+test('production refuses every plaintext client token, including correctly formatted live and sandbox tokens', () => {
+  for (const prefix of ['live_', 'test_']) {
+    const value = settings();
+    Object.assign(
+      value.bindings.find(({ name }) => name === 'PADDLE_CLIENT_TOKEN'),
+      {
+        type: 'plain_text',
+        text: prefix + 'a'.repeat(27),
+      },
+    );
+    assert.throws(() => guardedSettings(value, target));
+  }
+});
+
 test('wrong environment, namespace, missing secrets and duplicate bindings stop before mutation', () => {
   for (const mutate of [
     (value) => {
