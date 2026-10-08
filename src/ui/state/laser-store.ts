@@ -3,18 +3,13 @@
 // (ADR-094); this file must not hardcode any protocol bytes.
 import { create } from 'zustand';
 import { acknowledgeSafetyNotice } from './laser-disconnect-safety';
-import {
-  type GrblSettingRow,
-  idleCollector,
-  type SettingsCollectorState,
-  type StatusReport,
-  type StreamerState,
+import type {
+  GrblSettingRow,
+  SettingsCollectorState,
+  StatusReport,
+  StreamerState,
 } from '../../core/controllers/grbl';
-import {
-  grblDriver,
-  type ControllerCapabilities,
-  type ControllerDriver,
-} from '../../core/controllers';
+import type { ControllerCapabilities, ControllerDriver } from '../../core/controllers';
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerKind, DeviceProfile } from '../../core/devices';
 import type { ControllerSettingsSnapshot } from '../../core/preflight';
@@ -97,6 +92,7 @@ import type { StallProbe } from './laser-stream-stall';
 import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
 import { firmwareReportActions } from './controller-firmware-report-action';
 import { surfaceProbeActions } from './laser-surface-probe-actions';
+import { createLaserStoreRefs } from './laser-store-refs';
 
 export { describeAutofocusResult, type AutofocusResult } from './autofocus-action';
 export { hasCustomOrigin, hasCustomXyOrigin, type WorkCoordinateOffset } from './origin-actions';
@@ -375,36 +371,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
     forgetFinalizations: WeakMap<SerialConnection, Promise<void>>;
   };
 
-const refs: LiveRefs = {
-  connection: null,
-  safetyNoticeAcknowledgementRevision: 0,
-  driver: grblDriver,
-  unsubscribeLine: null,
-  unsubscribeClose: null,
-  pollHandle: null,
-  settingsCollector: idleCollector(),
-  settingsCollectorSessionEpoch: null,
-  onLineArrived: null,
-  nextTranscriptId: 1,
-  stallProbe: null,
-  qualificationTimer: null,
-  qualificationDeadline: null,
-  runControllerQualification: null,
-  heartbeatProbe: null,
-  connectAttemptRevision: 0,
-  forgetIntentRevision: 0,
-  closeRequests: new WeakMap(),
-  intentionalDisconnects: new WeakMap(),
-  forgetFinalizations: new WeakMap(),
-  controllerCommand: null,
-  controllerIdleWait: null,
-  controllerResetWait: null,
-  controllerStatusWait: null,
-  pauseResumeTransition: null,
-  writeEpoch: 0,
-  pendingResetCleanup: null,
-  untrackedAckReservations: [],
-};
+const refs: LiveRefs = createLaserStoreRefs();
 bindLiveJobTransportLedger(refs);
 
 async function safeWrite(
