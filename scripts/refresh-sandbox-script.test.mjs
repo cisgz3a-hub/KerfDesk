@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { gzipSync } from 'node:zlib';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -107,6 +109,168 @@ test('the real fixed code SHA rejects unverified fixture bytes before mutation',
   });
   assert.equal(adapter.mutations.length, 0);
 });
+test('retained attested bundle restores without historical lookup and reconciles lost ACKs privately', async (t) => {
+  attestFixture(t);
+  const retainedBundle = ' \r\n' + gzipSync(code).toString('base64') + '\r\n';
+  for (const loseUploadResponse of [false, true]) {
+    for (const [readbackRaw, readbackRawHeader] of [
+      [false, null],
+      [true, null],
+      [true, 'match'],
+    ]) {
+      const adapter = harness({
+        versions: [],
+        expectedUploadName: 'sandbox-worker.js',
+        loseUploadResponse,
+        readbackRaw,
+        readbackRawHeader,
+      });
+      const receipt = await run(adapter, { retainedBundle });
+      assert.equal(receipt.outcome, 'verified');
+      assert.equal(receipt.sourceKind, 'retained-attested-bundle');
+      assert.equal(receipt.sourceVersion, null);
+      assert.equal(receipt.sourceVersionPrefix, null);
+      assert.equal(receipt.codeSha256, GOOD_CODE_SHA256);
+      assert.equal(receipt.codeVerified, true);
+      assert.equal(receipt.protectedSettingsUnchanged, true);
+      assert.equal(receipt.buyHtmlUnchanged, true);
+      assert.equal(receipt.health, true);
+      assert.equal(receipt.flag, 'false');
+      assert.equal(receipt.uploadResponseReceived, !loseUploadResponse);
+      if (loseUploadResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
+      assert.deepEqual(
+        adapter.mutations.map(({ method }) => method),
+        ['PUT'],
+      );
+      const beforeUpload = adapter.calls.slice(
+        0,
+        adapter.calls.findIndex(({ method }) => method === 'PUT'),
+      );
+      assert.ok(!beforeUpload.some(({ url }) => /\/(?:versions|content)(?:\/|\?)/u.test(url)));
+      assert.ok(
+        !adapter.calls.some(({ url }) => url.includes('content/v2?version=' + goodVersion)),
+      );
+      for (const privateValue of [retainedBundle, code.toString(), token])
+        assert.ok(!JSON.stringify(receipt).includes(privateValue));
+    }
+  }
+});
+
+test('the real fixed SHA rejects an unverified retained bundle before every provider request', async () => {
+  const adapter = harness();
+  await assert.rejects(
+    run(adapter, { retainedBundle: gzipSync(code).toString('base64') }),
+    (error) => {
+      assert.equal(error.receipt.failure.stage, 'sandbox-retained-bundle-verification');
+      assert.equal(error.receipt.mutationAttempted, false);
+      return true;
+    },
+  );
+  assert.equal(adapter.calls.length, 0);
+});
+
+test('malformed, noncanonical, oversized or wrong-pin retained inputs refuse before every provider request', async (t) => {
+  attestFixture(t);
+  const compressed = gzipSync(code);
+  const corruptedCrc = Buffer.from(compressed);
+  corruptedCrc[corruptedCrc.length - 8] ^= 1;
+  const inputs = [
+    '',
+    null,
+    {},
+    token,
+    'AB==',
+    'A'.repeat(65540),
+    compressed.toString('base64').slice(0, 4) + '\n' + compressed.toString('base64').slice(4),
+    Buffer.from('{"private":"' + token + '"}').toString('base64'),
+    gzipSync(Buffer.from(token)).toString('base64'),
+    gzipSync(Buffer.alloc(0)).toString('base64'),
+    gzipSync(Buffer.alloc(72533)).toString('base64'),
+    gzipSync(Buffer.concat([code, Buffer.from('\n')])).toString('base64'),
+    compressed.subarray(0, -1).toString('base64'),
+    corruptedCrc.toString('base64'),
+    Buffer.concat([compressed, Buffer.alloc(1)]).toString('base64'),
+    Buffer.concat([gzipSync(Buffer.alloc(0)), compressed]).toString('base64'),
+  ];
+  for (const retainedBundle of inputs) {
+    const adapter = harness();
+    await assert.rejects(run(adapter, { retainedBundle }), (error) => {
+      assert.deepEqual(error.receipt.failure, {
+        stage: 'sandbox-retained-bundle-verification',
+        httpStatus: null,
+      });
+      assert.equal(error.receipt.sourceKind, 'retained-attested-bundle');
+      assert.equal(error.receipt.sourceVersion, null);
+      assert.equal(error.receipt.mutationAttempted, false);
+      assert.equal(error.receipt.flag, null);
+      for (const privateValue of [token, code.toString(), retainedBundle])
+        if (typeof privateValue === 'string' && privateValue)
+          assert.ok(!JSON.stringify(error.receipt).includes(privateValue));
+      return true;
+    });
+    assert.equal(adapter.calls.length, 0);
+    assert.equal(adapter.mutations.length, 0);
+  }
+});
+
+test('retained-source failed health restores only its owned deployment, including lost ACKs', async (t) => {
+  attestFixture(t);
+  const retainedBundle = gzipSync(code).toString('base64');
+  for (const loseUploadResponse of [false, true]) {
+    for (const concurrentAfterUpload of [false, true]) {
+      const adapter = harness({
+        expectedUploadName: 'sandbox-worker.js',
+        badHealth: true,
+        loseUploadResponse,
+        concurrentAfterUpload,
+      });
+      await assert.rejects(run(adapter, { retainedBundle }), (error) => {
+        assert.equal(error.receipt.sourceKind, 'retained-attested-bundle');
+        assert.equal(error.receipt.sourceVersion, null);
+        assert.equal(error.receipt.recovery.closedVerified, !concurrentAfterUpload);
+        if (!concurrentAfterUpload) assert.equal(error.receipt.recovery.ownershipVerified, true);
+        assert.equal(error.receipt.recovery.rollbackAttempted, !concurrentAfterUpload);
+        return true;
+      });
+      assert.deepEqual(
+        adapter.mutations.map(({ method }) => method),
+        concurrentAfterUpload ? ['PUT'] : ['PUT', 'POST'],
+      );
+      assert.equal(adapter.version(), concurrentAfterUpload ? unrelatedVersion : originalVersion);
+    }
+  }
+});
+
+test('the CLI maps the optional retained secret to private pre-request validation', () => {
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'data:text/javascript,' +
+        encodeURIComponent(
+          'globalThis.fetch = () => { throw new Error("No provider calls allowed"); };',
+        ),
+      resolve('scripts/refresh-sandbox-script.mjs'),
+      'sandbox-refresh-code',
+    ],
+    {
+      encoding: 'utf8',
+      env: {
+        KERFDESK_PAYMENT_LAUNCH_CF_TOKEN: token,
+        KERFDESK_PAYMENT_SANDBOX_ATTESTED_BUNDLE: token,
+      },
+    },
+  );
+  assert.equal(child.status, 1);
+  assert.equal(child.stdout, '');
+  const receipt = JSON.parse(child.stderr);
+  assert.equal(receipt.sourceKind, 'retained-attested-bundle');
+  assert.equal(receipt.sourceVersion, null);
+  assert.equal(receipt.failure.stage, 'sandbox-retained-bundle-verification');
+  assert.equal(receipt.mutationAttempted, false);
+  assert.ok(!child.stderr.includes(token));
+});
+
 test('attested content must be exactly one JavaScript module with a matching cf-entrypoint', async (t) => {
   attestFixture(t);
   await assert.rejects(readSandboxModule(content({ extra: true })));

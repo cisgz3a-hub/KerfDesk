@@ -47,6 +47,16 @@ the existing SandboxLicenseAuthority namespace and assets, and keeps checkout
 closed while health is verified. Production script replacement is outside this
 operation. The main-only protected deployment job retains a redacted receipt.
 
+Historical content lookup returned the exact September bundle despite requesting
+the October version UUID; the cause of that content ambiguity remains unverified.
+The protected sandbox operator may instead decode the retained 72,532-byte October
+bundle from the encrypted KERFDESK_PAYMENT_SANDBOX_ATTESTED_BUNDLE environment secret.
+Canonical bounded gzip/base64 and the same immutable SHA are verified before any
+provider request. The receipt identifies retained-attested-bundle with no source
+version claim. Without that input, historical lookup retains its exact SHA guard.
+The owner authorised transfer, sandbox restoration and removal of this temporary
+secret after qualification; all current settings and recovery guards still apply.
+
 Both operator changes stamp the created version with a unique operation annotation.
 Recovery verifies the active UUID and unique matching annotation before restoring
 the original closed version. An unrelated or ambiguous deployment is left intact
