@@ -6,6 +6,13 @@ import { insertBefore, MAIN, type ShaderSource } from './line-shader-edits';
 
 type StrokeKind = 'fat' | 'native';
 
+/** Only a full, opaque, wider completed batch can cover its own thin ghost. */
+export type CoveredGhost = {
+  readonly start: { value: number };
+  readonly end: { value: number };
+  readonly eligible: (geometry: ThreeNamespace.BufferGeometry) => boolean;
+};
+
 const PLANE_MATRIX = 'kerfdeskXYPlaneMatrix';
 const VIEWPORT = 'kerfdeskDepthViewport';
 const PLANE = 'vKerfdeskXYPlane';
@@ -80,9 +87,11 @@ export function installXYPlaneDepth(
   three: typeof ThreeNamespace,
   material: ThreeNamespace.Material,
   kind: StrokeKind,
+  covered?: CoveredGhost,
 ): void {
   const planeMatrix = new three.Matrix4();
   const viewport = new three.Vector4();
+  const coveredEnabled = { value: 0 };
   const compile = material.onBeforeCompile;
   const render = material.onBeforeRender;
   const cacheKey = material.customProgramCacheKey();
@@ -91,8 +100,32 @@ export function installXYPlaneDepth(
     shader.uniforms[PLANE_MATRIX] = { value: planeMatrix };
     shader.uniforms[VIEWPORT] = { value: viewport };
     Object.assign(shader, withXYPlaneDepth(shader, kind));
+    if (covered && kind === 'fat') {
+      shader.uniforms.kerfdeskCoveredStart = covered.start;
+      shader.uniforms.kerfdeskCoveredEnd = covered.end;
+      shader.uniforms.kerfdeskCoveredEnabled = coveredEnabled;
+      // This runs after the helper has decided whether plane depth applies.
+      // A ramp or edge-on fallback must keep its original ghost coverage.
+      shader.vertexShader = appendMain(
+        insertBefore(
+          shader.vertexShader,
+          MAIN,
+          `uniform float kerfdeskCoveredStart;
+uniform float kerfdeskCoveredEnd;
+uniform float kerfdeskCoveredEnabled;
+`,
+        ),
+        `
+  if ( kerfdeskCoveredEnabled > 0.5 && abs( ${PLANE}.z ) > 1e-8
+    && float( gl_InstanceID ) >= kerfdeskCoveredStart
+    && float( gl_InstanceID ) < kerfdeskCoveredEnd )
+    gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
+`,
+      );
+    }
   };
-  material.customProgramCacheKey = () => cacheKey + '-xy-plane-depth-' + kind;
+  material.customProgramCacheKey = () =>
+    cacheKey + '-xy-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
   material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
     render.call(material, renderer, scene, camera, geometry, object, group);
     planeMatrix
@@ -101,5 +134,6 @@ export function installXYPlaneDepth(
       .transpose();
     // Current viewport is in drawing-buffer pixels, including target/window and DPR.
     renderer.getCurrentViewport(viewport);
+    coveredEnabled.value = covered?.eligible(geometry) ? 1 : 0;
   };
 }

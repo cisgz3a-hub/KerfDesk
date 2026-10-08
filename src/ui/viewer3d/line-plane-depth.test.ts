@@ -152,3 +152,52 @@ describe('raster plane depth against an independent ray oracle', () => {
     },
   );
 });
+
+describe('covered constant-Z ghost range', () => {
+  it('shares trail cells and enables culling only for the caller-admitted full geometry', () => {
+    const material = new LineMaterial();
+    const full = new three.BufferGeometry();
+    const simplified = new three.BufferGeometry();
+    const start = { value: 3 };
+    const end = { value: 7 };
+    installXYPlaneDepth(three, material, 'fat', {
+      start,
+      end,
+      eligible: (geometry) => geometry === full,
+    });
+    const shader = compiled(material, material);
+    expect(shader.uniforms.kerfdeskCoveredStart).toBe(start);
+    expect(shader.uniforms.kerfdeskCoveredEnd).toBe(end);
+    expect(shader.vertexShader.lastIndexOf('abs( vKerfdeskXYPlane.z )')).toBeGreaterThan(
+      shader.vertexShader.lastIndexOf('vKerfdeskXYPlane = kerfdeskXYPlaneMatrix'),
+    );
+    const camera = new three.PerspectiveCamera();
+    const object = new three.LineSegments();
+    const renderer = {
+      getCurrentViewport: (viewport: three.Vector4) => viewport.set(0, 0, 800, 600),
+    };
+    for (const [geometry, expected] of [
+      [full, 1],
+      [simplified, 0],
+      [full, 1],
+    ] as const) {
+      material.onBeforeRender(
+        renderer as never,
+        new three.Scene(),
+        camera,
+        geometry,
+        object,
+        {} as never,
+      );
+      expect(shader.uniforms.kerfdeskCoveredEnabled?.value).toBe(expected);
+    }
+    start.value = 10;
+    end.value = 12;
+    expect(shader.uniforms.kerfdeskCoveredStart?.value).toBe(10);
+    expect(shader.uniforms.kerfdeskCoveredEnd?.value).toBe(12);
+    expect(material.customProgramCacheKey()).toContain('-covered-ghost');
+    material.dispose();
+    full.dispose();
+    simplified.dispose();
+  });
+});

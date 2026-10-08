@@ -14,8 +14,11 @@ import { disposeChildren } from './scene-furniture';
 import { clipObjects } from './scene-isolate';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 
-function fixture(visible: Uint8Array | null = null) {
-  const parsed = buildGcodeRenderModel('G21 G90\nG0 X10\nM3 S500\nG1 X110 F600\nG1 Y50');
+function fixture(
+  visible: Uint8Array | null = null,
+  text = 'G21 G90\nG0 X10\nM3 S500\nG1 X110 F600\nG1 Y50',
+) {
+  const parsed = buildGcodeRenderModel(text);
   if (parsed.kind !== 'ok') throw new Error(parsed.reason);
   const built = buildToolpathObjects({
     three,
@@ -148,5 +151,76 @@ describe('toolpath progress geometry', () => {
     expect(disposeGeometry).toHaveBeenCalledOnce();
     expect(disposeGhost).toHaveBeenCalledOnce();
     expect(f.group.children).toHaveLength(0);
+  });
+});
+
+// Uniform, unfaded opaque colours make flat/ramp depth batches equivalent;
+// a lens or trail must restore source-order rendering before the next frame.
+describe('mixed-depth batch integration', () => {
+  const mixed = 'G21 G90\nM3 S500\nG1 X100 Z1 F600\nG1 X0\nG1 Y10 Z0';
+
+  it('keeps one reveal buffer and changes modes when lens or trail colours differ', () => {
+    const f = fixture(null, mixed);
+    const solid = f.reveal.solid!;
+    const geometry = solid.geometry;
+    const visibleCompleted = () =>
+      f.objects.filter((object) => object.renderOrder === 1 && object.visible);
+    expect(f.reveal.planarDensity).toBeNull();
+    expect(visibleCompleted()).toHaveLength(2);
+    applyReveal(f.reveal, { segmentIndex: 2, point: { x: 0, y: 5, z: 0.5 } });
+    expect(solid.geometry).toBe(geometry);
+    expect(geometry.instanceCount).toBe(2);
+    for (const object of visibleCompleted())
+      expect((object as LineSegments2).geometry).toBe(geometry);
+
+    applyRecolor(f.reveal, (index) => (index === 0 ? [1, 0, 0] : [0, 0, 1]));
+    expect(visibleCompleted()).toHaveLength(1);
+    applyRecolor(f.reveal, () => [0, 1, 0]);
+    expect(visibleCompleted()).toHaveLength(2);
+    applyReveal(f.reveal, { segmentIndex: 2, point: { x: 0, y: 5, z: 0.5 }, trailFrom: 0 });
+    expect(visibleCompleted()).toHaveLength(1);
+    applyReveal(f.reveal, { segmentIndex: 2, point: { x: 0, y: 5, z: 0.5 } });
+    expect(visibleCompleted()).toHaveLength(2);
+    applyReveal(f.reveal, null);
+    expect(f.reveal.solidGhost?.visible).toBe(false);
+    expect(geometry.instanceCount).toBe(3);
+    disposeChildren(f.group);
+  });
+
+  it('clips all fast and fallback materials while retaining the original source identities', () => {
+    const f = fixture(null, mixed);
+    const planes = [new three.Plane(new three.Vector3(1, 0, 0), -25)];
+    clipObjects(f.group, planes);
+    for (const material of f.fatMaterials) expect(material.clippingPlanes).toBe(planes);
+    expect(f.reveal.solid!.geometry.getAttribute('instanceStart').count).toBe(3);
+    disposeChildren(f.group);
+  });
+
+  it('starts the active ghost at the same placed Float32 point and clears it at full reveal', () => {
+    const f = fixture(null, mixed);
+    const tail = f.reveal.ghostTail!;
+    const point = { x: 0.123456789, y: 5.123456789, z: 0.5123456789 };
+    applyReveal(f.reveal, { segmentIndex: 2, point });
+    expect(tail.index.value).toBe(2);
+    expect(tail.point.value.toArray()).toEqual([...f.reveal.active.positions().subarray(3)]);
+    expect(tail.point.value.z).toBe(Math.fround(point.z));
+    const placed = tail.point.value;
+    applyRecolor(f.reveal, (index) => (index ? [1, 0, 0] : [0, 0, 1]));
+    expect(tail.point.value).toBe(placed);
+    expect(tail.index.value).toBe(2);
+    applyReveal(f.reveal, null);
+    expect(tail.index.value).toBe(-1);
+    expect(f.reveal.solidGhost?.visible).toBe(false);
+    disposeChildren(f.group);
+  });
+
+  it('keeps the whole active ghost context when its current move is filtered out', () => {
+    const f = fixture(new Uint8Array([1, 0, 1]), mixed);
+    applyReveal(f.reveal, { segmentIndex: 1, point: { x: 50, y: 0, z: 1 } });
+    expect(f.reveal.active.object.visible).toBe(false);
+    expect(f.reveal.ghostTail!.index.value).toBe(-1);
+    setToolpathTravelVisibility(f.reveal, true);
+    expect(f.reveal.ghostTail!.index.value).toBe(-1);
+    disposeChildren(f.group);
   });
 });

@@ -9,6 +9,8 @@ import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineS
 import { editLineMaterial, withShownMoves } from './line-shader-edits';
 import { addXYPlaneFlags, installXYPlaneDepth, XY_PLANE_ATTRIBUTE } from './line-plane-depth';
 import { addTrail, setTrail, type TrailUniforms } from './line-trail';
+import { createDepthBatches } from './line-depth-batches';
+import { installGhostTail, type GhostTailState } from './line-ghost-tail';
 import {
   COLOR_STRIDE,
   createProgramGeometry,
@@ -49,6 +51,8 @@ export type RevealTargets = {
   readonly active: CurrentMove;
   /** The faint copy of every solid move shown during playback. */
   readonly solidGhost: { visible: boolean } | null;
+  /** Full-resolution playback ghosts start the active move at its placed playhead. */
+  readonly ghostTail: (GhostTailState & { readonly enabled: { value: boolean } }) | null;
   readonly travelGhost: ReturnType<typeof lineSegmentsObject> | null;
   /** The solid moves in program order: instance i is move i (ADR-485). */
   readonly solid: {
@@ -61,6 +65,10 @@ export type RevealTargets = {
     /** Red, green, blue and shown per move, rewritten in place by a lens. */
     readonly colors: Uint16Array;
     readonly colorBuffer: { needsUpdate: boolean };
+    readonly depthBatches: Pick<
+      ReturnType<typeof createDepthBatches>,
+      'refreshColors' | 'sync' | 'split'
+    > | null;
   } | null;
   readonly travel: {
     readonly geometry: ThreeNamespace.BufferGeometry;
@@ -85,6 +93,8 @@ export function applyRecolor(
   targets.fadeColor = hexRgb(targets.background).map(channel) as [number, number, number];
   writeProgramColors(targets.solid.colors, colorOf, encode);
   targets.solid.colorBuffer.needsUpdate = true;
+  targets.solid.depthBatches?.refreshColors();
+  targets.active.useHardwareDepth(targets.solid.depthBatches?.split ?? false);
   if (targets.detail !== null) paintDetailLines(targets.detail.levels, targets.solid.colors);
   return true;
 }
@@ -103,6 +113,7 @@ export function applyReveal(targets: RevealTargets | null, playhead: PlayheadMar
     targets.solid.geometry.instanceCount = count;
     const trailing = playhead?.trailFrom !== undefined;
     setTrail(targets.solid.trail, first, count, trailing ? targets.fadeColor : null);
+    targets.solid.depthBatches?.sync();
   }
   if (targets.travel !== null) {
     const source = targets.travelSource;
@@ -133,15 +144,26 @@ function applyActiveMove(
   for (const ghost of [targets.solidGhost, targets.travelGhost]) {
     if (ghost !== null) ghost.visible = playhead !== null;
   }
+  targets.active.useHardwareDepth(targets.solid?.depthBatches?.split ?? false);
   targets.activeSegment = partial ? (playhead?.segmentIndex ?? -1) : -1;
+
   setToolpathTravelVisibility(targets, targets.travelVisible);
-  if (partial && playhead?.point != null) {
-    const base = playhead.segmentIndex * 6;
-    const { point } = playhead;
-    targets.active.place(targets.positions.subarray(base, base + 3), [point.x, point.y, point.z]);
-  }
+  if (partial && playhead?.point != null)
+    placeActiveMove(targets, playhead.segmentIndex, playhead.point);
 }
 
+function placeActiveMove(
+  targets: RevealTargets,
+  index: number,
+  point: { x: number; y: number; z: number },
+): void {
+  const base = index * 6;
+  targets.active.place(targets.positions.subarray(base, base + 3), [point.x, point.y, point.z]);
+  if (targets.ghostTail) {
+    const placed = targets.active.positions();
+    targets.ghostTail.point.value.set(placed[3] ?? 0, placed[4] ?? 0, placed[5] ?? 0);
+  }
+}
 export function setToolpathTravelVisibility(targets: RevealTargets | null, visible: boolean): void {
   if (targets === null) return;
   targets.travelVisible = visible;
@@ -149,6 +171,8 @@ export function setToolpathTravelVisibility(targets: RevealTargets | null, visib
     targets.activeSegment >= 0 &&
     targets.moveFilter?.[targets.activeSegment] !== 0 &&
     (visible || targets.segKind[targets.activeSegment] !== SEG_KIND.travel);
+  if (targets.ghostTail)
+    targets.ghostTail.index.value = targets.active.object.visible ? targets.activeSegment : -1;
 }
 
 export type ToolpathBuildArgs = {
@@ -179,21 +203,24 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
   const program = programColors(args.segments, args.theme);
   const planarDensity = planarPathDensity(args.segments);
   const objects: Object3D[] = [];
-  let fatMaterials: LineMaterialType[] = [];
+  let fatMaterials: ReadonlyArray<LineMaterialType> = [];
   let travelObject: Object3D | null = null;
   let travelLine: TravelLine | null = null;
   let solidTarget: RevealTargets['solid'] = null;
   let travelTarget: RevealTargets['travel'] = null;
   let solidGhost: RevealTargets['solidGhost'] = null;
+  let ghostTail: RevealTargets['ghostTail'] = null;
   let detail: DetailTargets | null = null;
   let travelGhost: RevealTargets['travelGhost'] = null;
   const active = createCurrentMove(args, planarDensity !== null);
   objects.push(active.object);
   if (program.shown > 0) {
-    const solid = buildSolid(args, program.colors, planarDensity !== null);
-    objects.push(solid.lines, solid.ghost);
+    const coreWidth = active.materials[1]?.linewidth ?? 4;
+    const solid = buildSolid(args, program.colors, planarDensity !== null, coreWidth);
+    objects.push(...solid.objects);
     fatMaterials = solid.materials;
     solidGhost = solid.ghost;
+    ghostTail = solid.ghostTail;
     solidTarget = solid.target;
     detail = solid.detail;
   }
@@ -224,6 +251,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
       background: args.theme.background,
       active,
       solidGhost,
+      ghostTail,
       travelGhost,
       detail,
     },
@@ -248,7 +276,12 @@ function buildTravel(args: ToolpathBuildArgs, positions: Float32Array) {
 }
 // The done moves as fat lines, and their faint copy for the moves to come,
 // both drawn from one GPU copy of the program (ADR-485).
-function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolean) {
+function buildSolid(
+  args: ToolpathBuildArgs,
+  colors: Uint16Array,
+  planar: boolean,
+  coreWidth: number,
+) {
   const { geometry, colorBuffer } = createProgramGeometry(
     args.three,
     args.LineSegmentsGeometry,
@@ -271,7 +304,6 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolea
     polygonOffsetUnits: -1,
   });
   const trail = addTrail(args.three, material);
-  if (!planar) installXYPlaneDepth(args.three, material, 'fat');
   const lines = new args.LineSegments2(geometry, material);
   lines.renderOrder = 1;
   const ghostMaterial = fatLineMaterial(args, {
@@ -283,29 +315,72 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolea
     depthFunc: args.three.LessDepth,
   });
   editLineMaterial(ghostMaterial, 'kerfdesk-shown-moves', withShownMoves);
-  if (!planar) installXYPlaneDepth(args.three, ghostMaterial, 'fat');
   const ghost = new args.LineSegments2(
     shareProgramGeometry(args.LineSegmentsGeometry, geometry),
     ghostMaterial,
   );
   ghost.renderOrder = -1;
   ghost.visible = false;
+  const { ghostTail, depthBatches } = solidDepthParts(
+    args,
+    colors,
+    planar,
+    lines,
+    ghost,
+    trail,
+    coreWidth,
+  );
+  const strokes = depthBatches ?? {
+    objects: [lines, ghost],
+    materials: [material, ghostMaterial],
+    lines,
+    ghost,
+  };
   const target: NonNullable<RevealTargets['solid']> = {
     geometry,
     total: colors.length / COLOR_STRIDE,
     trail,
     colors,
     colorBuffer,
+    depthBatches,
   };
   return {
-    lines,
-    ghost,
-    materials: [material, ghostMaterial],
+    objects: strokes.objects,
+    ghost: strokes.ghost,
+    ghostTail,
+    materials: strokes.materials,
     target,
-    detail: detailOf(args, lines, ghost, colors),
+    detail: detailOf(args, strokes.lines, strokes.ghost, colors),
   };
 }
 
+function solidDepthParts(
+  args: ToolpathBuildArgs,
+  colors: Uint16Array,
+  planar: boolean,
+  lines: LineSegments2Module.LineSegments2,
+  ghost: LineSegments2Module.LineSegments2,
+  trail: TrailUniforms,
+  coreWidth: number,
+) {
+  if (planar) return { ghostTail: null, depthBatches: null };
+  const ghostTail = {
+    index: { value: -1 },
+    point: { value: new args.three.Vector3() },
+    enabled: { value: true },
+    coreWidthCSS: { value: coreWidth },
+  };
+  installGhostTail(args.three, ghost.material, ghost.geometry, ghostTail);
+  const depthBatches = createDepthBatches({
+    three: args.three,
+    LineSegments2: args.LineSegments2,
+    lines,
+    ghost,
+    trail,
+    colors,
+  });
+  return { ghostTail, depthBatches };
+}
 // A big program's simplified drawings, unless a legend filter is on: they
 // stand for every move (ADR-485).
 function detailOf(

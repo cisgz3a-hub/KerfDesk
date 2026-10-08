@@ -17,6 +17,7 @@ import {
 import { applyTravelLook } from '../../src/ui/viewer3d/scene-travel-look';
 import { srgbToLinear, type Viewer3dLook } from '../../src/ui/viewer3d/viewer3d-look';
 import { resolveViewer3dTheme } from '../../src/ui/viewer3d/viewer3d-theme';
+import { clipObjects } from '../../src/ui/viewer3d/scene-isolate';
 
 interface Point {
   x: number;
@@ -46,6 +47,10 @@ interface FrameOptions {
   hideToolpath?: boolean;
   hideCompleted?: boolean;
   completedWidth?: number;
+  /** Compare the fast branch with the exact source-ordered meshes from the same factory. */
+  sourceOrder?: boolean;
+  retainCurrentGhost?: boolean;
+  clipMinX?: number;
   cameraFar?: number;
   cameraUp?: Point;
   pixelRatio?: number;
@@ -65,6 +70,7 @@ export function playbackStrokeFrame(options: FrameOptions): {
   const width = options.viewport?.width ?? 800;
   const height = options.viewport?.height ?? 400;
   const renderer = new three.WebGLRenderer({ antialias: true });
+  renderer.localClippingEnabled = true;
   renderer.setPixelRatio(options.pixelRatio ?? 1);
   renderer.setSize(width, height);
   const theme = resolveViewer3dTheme();
@@ -91,6 +97,25 @@ export function playbackStrokeFrame(options: FrameOptions): {
   if (options.look === 'studio')
     applyRecolor(built.reveal, () => [79 / 255, 163 / 255, 1], srgbToLinear);
   applyReveal(built.reveal, { segmentIndex: options.segmentIndex, point: options.point });
+  if (options.retainCurrentGhost && built.reveal.ghostTail)
+    built.reveal.ghostTail.enabled.value = false;
+  if (options.clipMinX !== undefined)
+    clipObjects(group, [new three.Plane(new three.Vector3(1, 0, 0), -options.clipMinX)]);
+  if (options.sourceOrder !== undefined) {
+    if (built.reveal.solid?.depthBatches == null)
+      throw new Error('Source-order comparison requires a mixed-depth batch');
+    const strokes = built.objects.slice(1, 7);
+    if (strokes.length !== 6 || strokes.some((object) => !('isLineSegments2' in object)))
+      throw new Error('Expected original completed/ghost meshes followed by their depth batches');
+    if (
+      strokes[0]?.visible ||
+      strokes.filter((object) => object.renderOrder === 1 && object.visible).length !== 2
+    )
+      throw new Error('Comparison input did not admit the fast depth branch');
+    if (options.sourceOrder) built.reveal.active.useHardwareDepth(false);
+    if (options.sourceOrder)
+      for (const [index, stroke] of strokes.entries()) stroke.visible = index < 2;
+  }
   if (options.hideCompleted) {
     if (built.reveal.solid !== null) built.reveal.solid.geometry.instanceCount = 0;
     if (built.reveal.solidGhost !== null) built.reveal.solidGhost.visible = false;
