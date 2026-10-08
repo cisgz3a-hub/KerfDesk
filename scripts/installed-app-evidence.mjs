@@ -9,7 +9,7 @@ export const OWNER_FILE = '.kerfdesk-installer-qualification-owner.json';
 
 // Explicit qualification contracts. The sentinel test keeps the current
 // contract aligned with the canonical writer; historical schema 12 stays 12.
-export const CURRENT_QUALIFICATION_PROJECT_SCHEMA = 14;
+export const CURRENT_QUALIFICATION_PROJECT_SCHEMA = 15;
 export const HISTORICAL_QUALIFICATION_PROJECT_SCHEMA = 12;
 
 export function parseArgs(argv) {
@@ -191,8 +191,9 @@ export function validateProject(bytes, { schemaMode = 'current' } = {}) {
     assert.ok(
       project.schemaVersion === HISTORICAL_QUALIFICATION_PROJECT_SCHEMA ||
         project.schemaVersion === 13 ||
+        project.schemaVersion === 14 ||
         project.schemaVersion === CURRENT_QUALIFICATION_PROJECT_SCHEMA,
-      'Expected known upgrade project schema (12, 13 or 14)',
+      'Expected known upgrade project schema (12, 13, 14 or 15)',
     );
   }
   assert.equal(

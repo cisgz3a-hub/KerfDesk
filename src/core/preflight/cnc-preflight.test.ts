@@ -136,7 +136,7 @@ describe('runCncPreflight', () => {
     );
   });
 
-  it('reports adaptive island pockets instead of claiming a valid plan', () => {
+  it('discloses entry and cleanup limits for verified adaptive island pockets', () => {
     const base = projectWithCnc({ cutType: 'pocket', pocketStrategy: 'adaptive' });
     const outer = squareObject('outer', '#ff0000', 30);
     const island = squareObject('island', '#ff0000', 10);
@@ -149,12 +149,11 @@ describe('runCncPreflight', () => {
       scene: { ...base.scene, objects: [outer, movedIsland] },
     };
     const result = runCncPreflight(project, config, GOOD_GCODE);
-    expect(result.issues).toContainEqual(
-      expect.objectContaining({
-        code: 'cnc-adaptive-clearing-invalid',
-        message: expect.stringContaining('island-free'),
-      }),
-    );
+    const issue = result.issues.find((entry) => entry.code === 'cnc-adaptive-clearing-invalid');
+    expect(issue?.message).toContain('verified partitions');
+    expect(issue?.message).toContain('plunge-feed seed slotting');
+    expect(issue?.message).toContain('seed slotting and final wall cleanup can engage more stock');
+    expect(issue?.message).toContain('physical efficiency is unqualified');
   });
 
   it('reports adaptive clearing when optimal load exceeds half the bit diameter', () => {

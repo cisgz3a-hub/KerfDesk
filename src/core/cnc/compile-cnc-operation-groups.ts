@@ -13,6 +13,7 @@ import { pocketPassLinks } from './pocket-stay-down-links';
 import { resolveRestPocketOperation } from './cnc-rest-operation';
 import { zPassDepths } from './depth-passes';
 import { compileStraightInlayGroupsWithEvidence } from './inlay-pair-operation';
+import { compileTaperedInlayGroups } from './tapered-inlay-operation';
 import { applyRampEntry, enforceCutDirection } from './motion-polish';
 import { machineFrameHandedness } from './machine-frame-handedness';
 import { applyProfileLeadPasses } from './profile-lead-passes';
@@ -32,6 +33,28 @@ export function compiledInlayGroups(
   readonly femalePocketPassLimited: boolean;
   readonly stepoverUsed: boolean;
 } | null {
+  if (settings.cutType === 'inlay-pair' && settings.taperedInlay !== undefined) {
+    const tool = layerCncTool(config, settings);
+    const intent = settings.taperedInlay;
+    return compileTaperedInlayGroups(
+      polylines,
+      settings,
+      config,
+      (pieceSettings, passes, piece) => {
+        const group = cncGroupForPasses(layer, pieceSettings, tool, passes, device, config, {
+          includeRampEntry: false,
+          retractBetweenPasses: true,
+        });
+        return group === null
+          ? null
+          : {
+              ...group,
+              pairedInlay: { kind: 'tapered-v', piece, pairId: layer.id, settings: intent },
+            };
+      },
+      jogAxisSignsForOrigin(device.origin).x,
+    );
+  }
   return compileStraightInlayGroupsWithEvidence(
     polylines,
     settings,

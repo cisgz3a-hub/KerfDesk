@@ -1,3 +1,4 @@
+import { CncStageCuttingPresetRows } from './CncStageCuttingPresetRows';
 import { cncSettingsForStage, cncStageRecipe } from '../../core/cnc/cnc-stage-settings';
 import { nominalChiploadMm } from '../../core/cnc/nominal-chipload';
 import {
@@ -117,7 +118,7 @@ function StageFields(props: Props & { readonly stage: Stage }): JSX.Element {
       {recipe !== undefined ? (
         <>
           {(['feedMmPerMin', 'plungeMmPerMin', 'spindleRpm', 'depthPerPassMm'] as const)
-            .filter((key) => stage.id !== 'relief-finish' || key !== 'depthPerPassMm')
+            .filter((key) => !stage.id.startsWith('relief-') || key !== 'depthPerPassMm')
             .map((key) => (
               <NumberField
                 key={key}
@@ -131,6 +132,13 @@ function StageFields(props: Props & { readonly stage: Stage }): JSX.Element {
                 onCommit={(value) => patch({ [key]: value })}
               />
             ))}
+          <CncStageCuttingPresetRows
+            layer={props.layer}
+            effective={effective}
+            tool={stage.tool}
+            recipe={recipe}
+            onChange={setRecipe}
+          />
           <button
             type="button"
             disabled={starter === null}
@@ -153,12 +161,7 @@ function StageFields(props: Props & { readonly stage: Stage }): JSX.Element {
           </button>
         </>
       ) : null}
-      {stage.id === 'profile-finish' ? (
-        <p className="lf-cnc-settings-hint">
-          A finish depth per pass smaller than the cut depth makes several true-wall passes, keeping
-          tabs and part order.
-        </p>
-      ) : null}
+      <ProfileStageNote stage={stage.id} />
     </fieldset>
   );
 }
@@ -188,7 +191,10 @@ function stagesFor(
     add('pocket-rough', 'Pocket roughing', settings.pocketRoughToolId);
   if (settings.cutType === 'v-carve' && (settings.vCarveFlatDepthEnabled ?? true))
     add('v-clear', 'V-carve clearing', settings.vClearToolId);
-  if (hasRelief) add('relief-finish', 'Relief finishing', settings.reliefFinishToolId);
+  if (hasRelief) {
+    add('relief-finish', 'Relief finishing', settings.reliefFinishToolId);
+    add('relief-rest-finish', 'Relief rest finishing', settings.reliefRestFinishToolId);
+  }
   if (
     (settings.cutType === 'profile-inside' || settings.cutType === 'profile-outside') &&
     (settings.finishAllowanceMm ?? 0) > 0
@@ -199,4 +205,13 @@ function stagesFor(
       tool: layerCncTool(machine, settings),
     });
   return stages;
+}
+
+function ProfileStageNote(props: { readonly stage: CncCuttingStage }): JSX.Element | null {
+  return props.stage === 'profile-finish' ? (
+    <p className="lf-cnc-settings-hint">
+      A finish depth per pass smaller than the cut depth makes several true-wall passes, keeping
+      tabs and part order.
+    </p>
+  ) : null;
 }

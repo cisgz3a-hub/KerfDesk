@@ -3,6 +3,7 @@
 // cap, refuse, or authorize a plan.
 
 import type { Job } from '../../core/job';
+import { reliefProjectionOrderWarnings } from './cnc-relief-projection-order-warnings';
 import { DEFAULT_RELIEF_SCALLOP_MM, MAX_HEIGHTMAP_CELLS } from '../../core/relief';
 // Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel.
 import { reliefScallopBallRadiusMm } from '../../core/relief/relief-finishing';
@@ -34,6 +35,7 @@ export function detectCncReliefPlanningWarnings(
       stepoverOperations(project, compiled, sourceGeometryChecks),
     ),
     ...compiledReliefPlanningWarnings(project, compiled?.reliefPlans ?? []),
+    ...reliefProjectionOrderWarnings(project, compiledJob),
     ...sourceReliefPlanningWarnings(project, compiled, sourceGeometryChecks),
     ...(sourceGeometryChecks === 'full' ? mixedReliefLayerWarnings(project) : []),
   ];
@@ -65,6 +67,8 @@ function compiledReliefPlanningWarnings(
   return plans.flatMap((plan) => [
     ...oversizedReliefGridWarnings(project, plan),
     ...compiledReliefScallopWarnings(project, plan),
+    ...compiledRestPlanningWarnings(project, plan),
+    ...compiledProjectionWarnings(project, plan),
     ...(plan.stage === 'finishing'
       ? [
           `Relief "${plan.source}" on layer "${layerNameFor(project, plan.layerId)}" uses ` +
@@ -75,6 +79,67 @@ function compiledReliefPlanningWarnings(
         ]
       : []),
   ]);
+}
+
+function compiledRestPlanningWarnings(
+  project: Project,
+  plan: CncReliefPlan,
+): ReadonlyArray<string> {
+  if (plan.stage !== 'rest-finishing') return [];
+  const values = [
+    plan.residualThresholdMm === undefined
+      ? ''
+      : `Threshold ${format(plan.residualThresholdMm)} mm.`,
+    plan.selectedCells === undefined
+      ? ''
+      : `Selected ${plan.selectedCells.toLocaleString('en-US')} target cells.`,
+    plan.maximumResidualMm === undefined
+      ? ''
+      : `Largest remaining-stock upper estimate ${format(plan.maximumResidualMm)} mm.`,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const predecessor =
+    plan.predecessorToolId === undefined
+      ? 'the finishing cutter'
+      : `cutter "${plan.predecessorToolId}"`;
+  return [
+    `Relief "${plan.source}" on layer "${layerNameFor(project, plan.layerId)}" predicts stock after ${predecessor}` +
+      targetRevisionLabel(plan) +
+      ' from the actual predecessor G1 moves and sampled cutter geometry. ' +
+      'Remaining stock is a conservative upper estimate, not measured material; uncertain contact retains more fine finishing. ' +
+      values +
+      ' Fine paths still use sampled contact checks rather than a continuous swept-volume proof. Check the stock and finishing preview before running.',
+    ...(plan.restFallbackReason === undefined
+      ? []
+      : [`Relief "${plan.source}" rest finishing: ${plan.restFallbackReason}`]),
+  ];
+}
+function compiledProjectionWarnings(project: Project, plan: CncReliefPlan): ReadonlyArray<string> {
+  if (plan.stage !== 'projection') return [];
+  const depth =
+    plan.verticalDepthMm === undefined
+      ? 'a vertical depth'
+      : `a ${format(plan.verticalDepthMm)} mm vertical depth`;
+  const spacing =
+    plan.requestedSampleSpacingMm === undefined
+      ? ''
+      : ` Requested path spacing is ${format(plan.requestedSampleSpacingMm)} mm.`;
+  return [
+    `Projection on relief "${plan.source}" on layer "${layerNameFor(project, plan.layerId)}" uses ${depth}` +
+      targetRevisionLabel(plan) +
+      ` and a ${format(plan.cellSizeMm)} mm sampled surface grid.` +
+      spacing +
+      ' Prepare the named surface before this operation; projection does not verify actual remaining stock. ' +
+      'Depth is measured along Z rather than the surface normal. Cutter reach and excluded stock can lift paths, so nominal depth may not be reached everywhere. ' +
+      'Sampled contact checks are not a continuous swept-volume proof. Check the 3D preview before running.',
+    ...(plan.restFallbackReason === undefined
+      ? []
+      : [`Relief "${plan.source}" projection: ${plan.restFallbackReason}`]),
+  ];
+}
+function targetRevisionLabel(plan: CncReliefPlan): string {
+  return plan.targetRevision === undefined ? '' : ` at target revision ${plan.targetRevision}`;
 }
 
 function mixedReliefLayerWarnings(project: Project): ReadonlyArray<string> {
@@ -108,7 +173,12 @@ function compiledReliefScallopWarnings(
   plan: CncReliefPlan,
 ): ReadonlyArray<string> {
   const ball = compiledScallopBall(plan);
-  if (plan.stage !== 'finishing' || ball === null || plan.scallopMm === undefined) return [];
+  if (
+    (plan.stage !== 'finishing' && plan.stage !== 'rest-finishing') ||
+    ball === null ||
+    plan.scallopMm === undefined
+  )
+    return [];
   if (!(plan.scallopMm > ball.radiusMm)) return [];
   return [
     scallopWarning(

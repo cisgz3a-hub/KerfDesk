@@ -1,3 +1,5 @@
+import { DeviceSetupCncWrapStudy } from './DeviceSetupCncWrapStudy';
+import { DeviceSetupCncSides } from './DeviceSetupCncSides';
 import { useCallback, useEffect, useState } from 'react';
 import { CHIPLOAD_MATERIALS } from '../../../core/cnc';
 import type { CncMachineConfig, CncStock, CncTiling, CncTool, Layer } from '../../../core/scene';
@@ -9,6 +11,7 @@ import { CncToolPicture } from '../../machine/CncToolPicture';
 import type { CncStartupOperationDraft } from '../../state/cnc-startup-setup';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { DeviceSetupCncBitLibrary } from './DeviceSetupCncBitLibrary';
+import { DeviceSetupCncNamedSetup } from './DeviceSetupCncNamedSetup';
 import { DeviceSetupCncStockFields } from './DeviceSetupCncStockFields';
 import { DeviceSetupCncProfiles } from './DeviceSetupCncProfiles';
 import { DeviceSetupCncTilingFields } from './DeviceSetupCncTilingFields';
@@ -46,9 +49,7 @@ export function DeviceSetupCncJobStep(props: {
           operation-specific depth, feed, plunge, and running spindle speed.
         </span>
       </div>
-      <SetupCard title="Saved setup profiles">
-        <DeviceSetupCncProfiles machine={machine} onApply={editMachine} />
-      </SetupCard>
+      <CurrentSetupCards state={props.state} dispatch={props.dispatch} machine={machine} />
       <MaterialAndBitCards
         machine={machine}
         customTools={props.customTools}
@@ -83,6 +84,41 @@ export function DeviceSetupCncJobStep(props: {
         </SetupCard>
       </MachineSetupFieldAnchor>
     </section>
+  );
+}
+
+function CurrentSetupCards(props: {
+  readonly state: DeviceSetupStepProps['state'];
+  readonly dispatch: DeviceSetupStepProps['dispatch'];
+  readonly machine: CncMachineConfig;
+}): JSX.Element {
+  const editMachine = (machine: CncMachineConfig): void =>
+    props.dispatch({ kind: 'edit-machine', machine });
+  const editSetup = (setup: DeviceSetupStepProps['state']['cncSetupDraft']): void =>
+    props.dispatch({ kind: 'edit-cnc-setup', setup });
+  return (
+    <>
+      <SetupCard title="Current machining setup">
+        <DeviceSetupCncNamedSetup setup={props.state.cncSetupDraft} onChange={editSetup} />
+      </SetupCard>
+      <SetupCard title="Sides and registration">
+        <DeviceSetupCncSides
+          setup={props.state.cncSetupDraft}
+          stock={props.machine.stock}
+          onChange={editSetup}
+        />
+      </SetupCard>
+      <SetupCard title="CNC wrap capability">
+        <DeviceSetupCncWrapStudy
+          machine={props.machine}
+          setup={props.state.cncSetupDraft}
+          onChange={editSetup}
+        />
+      </SetupCard>
+      <SetupCard title="Saved setup profiles">
+        <DeviceSetupCncProfiles machine={props.machine} onApply={editMachine} />
+      </SetupCard>
+    </>
   );
 }
 

@@ -1,3 +1,7 @@
+import { normalizeCncReliefAuthoringSettings } from './project-cnc-relief-authoring-settings';
+import { normalizeCncPocketRestStock } from '../../core/cnc/cnc-pocket-rest-stock-settings';
+import { normalizeCncTaperedInlay } from '../../core/cnc/tapered-inlay-settings';
+import { normalizeCncCuttingPreset } from '../../core/cnc/cutting-preset-normalize';
 import { isChiploadMaterialKey } from '../../core/cnc';
 import {
   CNC_CUT_TYPES,
@@ -90,8 +94,17 @@ function normalizeCncLayerField(out: Record<string, unknown>): void {
       ? raw['cutType']
       : d.cutType,
     ...optionalCncLayerFields(raw),
+    ...(normalizeCncPocketRestStock(raw['pocketRestStock']) === undefined
+      ? {}
+      : { pocketRestStock: normalizeCncPocketRestStock(raw['pocketRestStock']) }),
+    ...normalizeCncReliefAuthoringSettings(raw),
+    ...(normalizeCncTaperedInlay(raw['taperedInlay']) === undefined
+      ? {}
+      : { taperedInlay: normalizeCncTaperedInlay(raw['taperedInlay']) }),
     // Validated as an intact physical recipe before normalization.
-    ...(raw['stageRecipes'] === undefined ? {} : { stageRecipes: raw['stageRecipes'] }),
+    ...(raw['stageRecipes'] === undefined
+      ? {}
+      : { stageRecipes: normalizeStagePresetSnapshots(raw['stageRecipes']) }),
     depthMm: positiveOr(raw['depthMm'], d.depthMm),
     depthPerPassMm: positiveOr(raw['depthPerPassMm'], d.depthPerPassMm),
     // 0 = automatic medial sampling and flat-core pitch (H.3).
@@ -122,6 +135,7 @@ function optionalCncLayerFields(raw: Record<string, unknown>): Record<string, un
     ...normalizeInlayFields(raw),
     ...(isChiploadMaterialKey(raw['materialKey']) ? { materialKey: raw['materialKey'] } : {}),
     ...optionalCncFeedSource(raw),
+    ...optionalCncCuttingPreset(raw),
     ...(typeof raw['vClearToolId'] === 'string' ? { vClearToolId: raw['vClearToolId'] } : {}),
     ...(typeof raw['pocketRoughToolId'] === 'string'
       ? { pocketRoughToolId: raw['pocketRoughToolId'] }
@@ -183,6 +197,22 @@ function normalizeProfileLead(value: unknown): Record<string, unknown> {
 function optionalCncFeedSource(raw: Record<string, unknown>): Record<string, unknown> {
   const feedSource = normalizeCncFeedSource(raw['feedSource'], raw['materialKey']);
   return feedSource === undefined ? {} : { feedSource };
+}
+
+function normalizeStagePresetSnapshots(value: unknown): unknown {
+  if (!isObject(value)) return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, stage]) => {
+      if (!isObject(stage)) return [key, stage];
+      const { cuttingPreset: _preset, ...settings } = stage;
+      return [key, { ...settings, ...optionalCncCuttingPreset(stage) }];
+    }),
+  );
+}
+
+function optionalCncCuttingPreset(raw: Record<string, unknown>): Record<string, unknown> {
+  const cuttingPreset = normalizeCncCuttingPreset(raw['cuttingPreset']);
+  return cuttingPreset === null ? {} : { cuttingPreset };
 }
 
 function normalizeInlayFields(raw: Record<string, unknown>): Record<string, unknown> {

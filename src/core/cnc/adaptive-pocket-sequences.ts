@@ -12,6 +12,8 @@ import {
 
 export type AdaptivePocketSequence = {
   readonly entryCenter: Vec2;
+  // Island partitions can have elongated innermost loops: clear them at plunge feed before radial rings.
+  readonly seedRings?: ReadonlyArray<Polyline>;
   readonly entryRadiusMm: number;
   readonly finishRings: ReadonlyArray<Polyline>;
   readonly rings: ReadonlyArray<Polyline>;

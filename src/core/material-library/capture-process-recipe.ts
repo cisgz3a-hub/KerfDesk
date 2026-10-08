@@ -21,7 +21,7 @@ import {
   type ProcessRecipeResult,
   type ProcessRecipeStep,
 } from './process-recipe';
-import { captureRecipeCnc, RECIPE_TOOL_FIELDS } from './process-recipe-tools';
+import { captureRecipeCnc, recipeCncToolIds } from './process-recipe-tools';
 
 export function captureProcessRecipe(
   project: Project,
@@ -40,8 +40,8 @@ export function captureProcessRecipe(
         : [operation],
     );
   if (operations.length === 0) return invalid('The selected artwork has no operations to save.');
-  const steps = operations.map((operation) => captureStep(project, object, operation));
-  const tools = captureTools(project, steps);
+  const steps = operations.map((operation) => captureProcessRecipeStep(project, object, operation));
+  const tools = captureProcessRecipeTools(project, steps);
   if (tools.kind === 'invalid') return tools;
   return {
     kind: 'ok',
@@ -56,7 +56,11 @@ export function captureProcessRecipe(
   };
 }
 
-function captureStep(project: Project, object: SceneObject, operation: Layer): ProcessRecipeStep {
+export function captureProcessRecipeStep(
+  project: Project,
+  object: SceneObject,
+  operation: Layer,
+): ProcessRecipeStep {
   const effective = effectiveOperationForObject(operation, object);
   const settings = captureLayerOperationSettings(effective);
   return {
@@ -94,16 +98,14 @@ function pathBindings(
   return pathSteps.every((steps) => steps.length === operations.length) ? {} : { pathSteps };
 }
 
-function captureTools(
+export function captureProcessRecipeTools(
   project: Project,
   steps: ReadonlyArray<ProcessRecipeStep>,
 ): ProcessRecipeResult<NonNullable<ProcessRecipe['tools']>> {
   if (project.machine?.kind !== 'cnc') return { kind: 'ok', value: [] };
   const machine = project.machine;
   const available = [...machine.tools, layerCncTool(machine, {})];
-  const ids = new Set(
-    steps.flatMap((step) => RECIPE_TOOL_FIELDS.flatMap((field) => step.cnc?.[field] ?? [])),
-  );
+  const ids = new Set(steps.flatMap((step) => recipeCncToolIds(step.cnc)));
   const tools = [];
   for (const id of ids) {
     const tool = available.find((candidate) => candidate.id === id);

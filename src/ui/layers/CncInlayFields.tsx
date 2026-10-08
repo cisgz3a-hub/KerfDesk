@@ -1,25 +1,57 @@
-import type { CncLayerSettings, Layer } from '../../core/scene';
-import { NumberField } from './CncLayerPrimitives';
+import { type CncLayerSettings, type Layer } from '../../core/scene';
+import { DEFAULT_CNC_TAPERED_INLAY } from '../../core/scene/cnc-tapered-inlay';
+import { NumberField, Row, selectStyle } from './CncLayerPrimitives';
+import { CncTaperedInlayFields } from './CncTaperedInlayFields';
 import { RailSection } from '../kit';
 
-export function CncInlayFields(props: {
+type InlayFieldsProps = {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-}): JSX.Element | null {
+};
+
+export function CncInlayFields(props: InlayFieldsProps): JSX.Element | null {
   if (props.settings.cutType !== 'inlay-pair') return null;
-  const pocketDepthMm = props.settings.inlayPocketDepthMm ?? Math.min(3, props.settings.depthMm);
   return (
     <RailSection
       label="Inlay fit"
-      badge={`${props.settings.inlayAllowanceMm ?? 0.1} mm clearance`}
-      hint="Set the matching pocket depth, the gap between pocket and insert edges and the layout of the mirrored insert."
+      badge={props.settings.taperedInlay === undefined ? 'Straight pair' : 'Linked V-bit pair'}
+      hint="Choose a straight profile pair or a tapered V-bit pair; both derive from this artwork."
     >
+      <Row label="Pair method">
+        <select
+          value={props.settings.taperedInlay === undefined ? 'straight' : 'tapered-v'}
+          style={selectStyle}
+          aria-label={`Inlay pair method for ${props.layer.color}`}
+          title="Generate a straight end-mill pair or a linked tapered pair using the selected pointed V-bit."
+          onChange={(event) =>
+            props.onCommit({
+              taperedInlay:
+                event.target.value === 'tapered-v' ? { ...DEFAULT_CNC_TAPERED_INLAY } : undefined,
+            })
+          }
+        >
+          <option value="straight">Straight end-mill pair</option>
+          <option value="tapered-v">Tapered V-bit pair</option>
+        </select>
+      </Row>
+      {props.settings.taperedInlay === undefined ? (
+        <StraightInlayFields {...props} />
+      ) : (
+        <CncTaperedInlayFields {...props} intent={props.settings.taperedInlay} />
+      )}
+    </RailSection>
+  );
+}
+
+function StraightInlayFields(props: InlayFieldsProps): JSX.Element {
+  return (
+    <>
       <NumberField
         layer={props.layer}
         label="Pocket depth"
         unit="mm"
-        value={pocketDepthMm}
+        value={props.settings.inlayPocketDepthMm ?? Math.min(3, props.settings.depthMm)}
         min={0.05}
         max={200}
         step={0.25}
@@ -48,6 +80,6 @@ export function CncInlayFields(props: {
         title="Gap between the original pocket and the automatically mirrored insert."
         onCommit={(inlayPairSpacingMm) => props.onCommit({ inlayPairSpacingMm })}
       />
-    </RailSection>
+    </>
   );
 }

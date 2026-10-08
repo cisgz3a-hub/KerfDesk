@@ -90,8 +90,11 @@ export function applyHeightfieldReliefPatch(
   const canonicalChanged =
     widthPatchChangesSource(relief, patch.targetWidthMm) ||
     mappingPatchChangesSource(relief, patch);
+  // A physical/mapping edit changes the baked source. Detach editable intent
+  // deliberately; Undo restores the retained document with its matching field.
+  const { reliefAuthoring: _authoring, ...withoutAuthoring } = relief;
   return {
-    ...relief,
+    ...(canonicalChanged ? withoutAuthoring : relief),
     ...common,
     reliefSource: {
       ...relief.reliefSource,
@@ -101,23 +104,33 @@ export function applyHeightfieldReliefPatch(
             physicalWidthMm: widthResolution.physicalWidthMm,
             physicalHeightMm: widthResolution.physicalHeightMm,
           }),
-      mapping: {
-        ...relief.reliefSource.mapping,
-        ...(widthResolution === undefined ? {} : { aspect: widthResolution.aspect }),
-        ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
-        ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
-        ...(patch.gamma === undefined
-          ? {}
-          : { curve: { ...relief.reliefSource.mapping.curve, gamma: patch.gamma } }),
-        ...(patch.inputLowCode === undefined ? {} : { inputLowCode: patch.inputLowCode }),
-        ...(patch.inputHighCode === undefined ? {} : { inputHighCode: patch.inputHighCode }),
-        ...(patch.inclusionThreshold === undefined
-          ? {}
-          : { inclusionThreshold: patch.inclusionThreshold }),
-        ...(patch.outsideMask === undefined ? {} : { outsideMask: patch.outsideMask }),
-      },
+      mapping: heightfieldMappingAfterPatch(
+        relief.reliefSource.mapping,
+        patch,
+        widthResolution?.aspect,
+      ),
       revision: relief.reliefSource.revision + (canonicalChanged ? 1 : 0),
     },
+  };
+}
+
+function heightfieldMappingAfterPatch(
+  mapping: ReliefHeightfieldMapping,
+  patch: ReliefParamPatch,
+  aspect: ReliefHeightfieldMapping['aspect'] | undefined,
+): ReliefHeightfieldMapping {
+  return {
+    ...mapping,
+    ...(aspect === undefined ? {} : { aspect }),
+    ...(patch.reliefDepthMm === undefined ? {} : { maxDepthMm: patch.reliefDepthMm }),
+    ...(patch.polarity === undefined ? {} : { polarity: patch.polarity }),
+    ...(patch.gamma === undefined ? {} : { curve: { ...mapping.curve, gamma: patch.gamma } }),
+    ...(patch.inputLowCode === undefined ? {} : { inputLowCode: patch.inputLowCode }),
+    ...(patch.inputHighCode === undefined ? {} : { inputHighCode: patch.inputHighCode }),
+    ...(patch.inclusionThreshold === undefined
+      ? {}
+      : { inclusionThreshold: patch.inclusionThreshold }),
+    ...(patch.outsideMask === undefined ? {} : { outsideMask: patch.outsideMask }),
   };
 }
 

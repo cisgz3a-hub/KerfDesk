@@ -1,3 +1,4 @@
+import { defaultCncMachiningSetup } from '../../core/scene/cnc-machining-setup';
 import {
   LASER_MACHINE_CONFIG,
   DEFAULT_CNC_LAYER_SETTINGS,
@@ -9,6 +10,10 @@ import {
   type SceneObject,
 } from '../../core/scene';
 import type { ObjectOperationSettingsOverride } from '../../core/scene/scene-object';
+import type { CncStageRecipe } from '../../core/scene/cnc-stage-recipe';
+import type { CncTwoSidedSetup } from '../../core/scene/cnc-two-sided-setup';
+import type { Scene } from '../../core/scene/scene';
+import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
 import type { DeviceProfile } from '../../core/devices';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
@@ -34,18 +39,90 @@ function spatialProject(project: Project): Project {
   const cached = spatialProjects.get(project);
   if (cached !== undefined) return cached;
   const isCnc = machineKindOf(project.machine) === 'cnc';
+  const { cncSetup: setup, ...base } = project;
+  const scene = spatialCncSideScene(project);
   const projected = {
-    ...project,
+    ...base,
+    ...(isCnc && setup?.twoSided !== undefined
+      ? {
+          cncSetup: {
+            ...defaultCncMachiningSetup(),
+            twoSided: spatialCncSideSetup(setup.twoSided),
+          },
+        }
+      : {}),
     machine: project.machine ?? LASER_MACHINE_CONFIG,
     device: spatialDevice(project.device),
     scene: {
-      ...project.scene,
-      layers: project.scene.layers.map((layer) => spatialLayer(layer, isCnc)),
-      objects: project.scene.objects.map(spatialObject),
+      ...scene,
+      layers: scene.layers.map((layer) => spatialLayer(layer, isCnc)),
+      objects: scene.objects.map(spatialObject),
     },
   };
   spatialProjects.set(project, projected);
   return projected;
+}
+
+/** Only the active side contributes coordinates; inactive intent remains in
+ * the unprojected execution/review key. Unknown future fields stay conservative. */
+function spatialCncSideSetup(side: CncTwoSidedSetup): CncTwoSidedSetup {
+  const sideB = side.activeSide === 'B';
+  return {
+    ...side,
+    sideAObjectIds: sideB ? [] : side.sideAObjectIds,
+    sideBObjectIds: sideB ? side.sideBObjectIds : [],
+    flipAxis: sideB ? side.flipAxis : 'x',
+    sideBStockOriginMm: sideB ? side.sideBStockOriginMm : { x: 0, y: 0 },
+    registration: [],
+  };
+}
+
+/** Match the side membership filter without materializing or compiling geometry.
+ * Projection targets and live authoring links still supply active coordinates. */
+function spatialCncSideScene(project: Project): Scene {
+  const scene = project.scene;
+  const side = project.machine?.kind === 'cnc' ? project.cncSetup?.twoSided : undefined;
+  if (side === undefined) return scene;
+  const ids = new Set(side.activeSide === 'A' ? side.sideAObjectIds : side.sideBObjectIds);
+  retainSpatialReliefProjections(scene, ids);
+  for (const object of scene.outputDependencies ?? []) ids.add(object.id);
+  retainSpatialReliefLinks(
+    new Map(
+      [...scene.objects, ...(scene.outputDependencies ?? [])].map((object) => [object.id, object]),
+    ),
+    ids,
+  );
+  return {
+    ...scene,
+    objects: scene.objects.filter((object) => ids.has(object.id)),
+    ...(scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: scene.artworkOrder.filter((id) => ids.has(id)) }),
+  };
+}
+
+function retainSpatialReliefProjections(scene: Scene, ids: Set<string>): void {
+  for (const layer of scene.layers) {
+    const projection = layer.output ? layer.cnc?.reliefProjection : undefined;
+    if (projection !== undefined) ids.add(projection.reliefObjectId);
+  }
+}
+
+function retainSpatialReliefLinks(
+  objects: ReadonlyMap<string, SceneObject>,
+  ids: Set<string>,
+): void {
+  const pending = [...ids];
+  for (const id of pending) {
+    const object = objects.get(id);
+    if (object?.kind !== 'relief' || object.reliefSource.kind !== 'heightfield-v1') continue;
+    if (!('reliefAuthoring' in object) || object.reliefAuthoring === undefined) continue;
+    for (const linkedId of reliefAuthoringLinkIds(object.reliefAuthoring)) {
+      if (ids.has(linkedId)) continue;
+      ids.add(linkedId);
+      pending.push(linkedId);
+    }
+  }
 }
 
 /** Warning/timing metadata, process scales and idle button configuration do
@@ -104,11 +181,38 @@ function spatialLayer(layer: Layer, isCnc: boolean): Layer {
   };
 }
 
-/** The compiler and CNC editor use this same implicit layer default. Feed
- * provenance/material labels are display metadata; all depth/tool/strategy,
- * tab and future coordinate fields still participate in spatial identity. */
+/** The compiler and CNC editor use this same implicit layer default. Saved
+ * cutting records are provenance, not compiled coordinates. Neutralize primary
+ * and stage process values only here; exact execution retains their real values.
+ * Depth/tool/strategy, tabs and future coordinate fields remain spatial inputs. */
 function spatialCncSettings(cnc: CncLayerSettings): CncLayerSettings {
-  const { materialKey: _material, feedSource: _source, ...coordinates } = cnc;
+  const {
+    materialKey: _material,
+    feedSource: _source,
+    cuttingPreset: _preset,
+    stageRecipes,
+    ...coordinates
+  } = cnc;
+  return {
+    ...coordinates,
+    feedMmPerMin: 1,
+    plungeMmPerMin: 1,
+    spindleRpm: 0,
+    ...(stageRecipes === undefined
+      ? {}
+      : {
+          stageRecipes: Object.fromEntries(
+            Object.entries(stageRecipes).map(([stage, recipe]) => [
+              stage,
+              recipe === undefined ? undefined : spatialCncStageRecipe(recipe),
+            ]),
+          ),
+        }),
+  };
+}
+
+function spatialCncStageRecipe(recipe: CncStageRecipe): CncStageRecipe {
+  const { cuttingPreset: _preset, ...coordinates } = recipe;
   return { ...coordinates, feedMmPerMin: 1, plungeMmPerMin: 1, spindleRpm: 0 };
 }
 

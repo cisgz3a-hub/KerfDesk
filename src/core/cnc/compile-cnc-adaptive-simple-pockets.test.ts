@@ -1,6 +1,6 @@
 // ADR-154 Amendment 3 through the real compiler: simple pockets the adaptive
 // verifier refused at the default settings compile, and a pocket whose
-// innermost ring would cut a slot is still refused.
+// innermost ring would cut a slot uses a reviewed offset-pocket fallback.
 
 import { describe, expect, it } from 'vitest';
 import { ciBudgetMs } from '../../__fixtures__/ci-budget';
@@ -16,6 +16,7 @@ import {
   type Scene,
   type Vec2,
 } from '../scene';
+import { findCncAdaptivePocketIssues } from './cnc-adaptive-issues';
 import { resolveAdaptivePocketOperation } from './adaptive-pocket-operation';
 import { collectLayerPolylines, compileCncJob } from './compile-cnc-job';
 
@@ -107,7 +108,7 @@ describe('adaptive pockets at the default settings', () => {
   );
 
   it(
-    'still refuse a rectangle whose innermost ring would cut a slot',
+    'discloses offset fallback when an adaptive innermost ring would cut a slot',
     () => {
       // The innermost ring of a 10 x 40 mm pocket runs 30 mm along its middle,
       // beyond the disk the entry helix clears: a full slot, 1.5875 mm of
@@ -124,7 +125,16 @@ describe('adaptive pockets at the default settings', () => {
         kind: 'error',
         reason: 'Adaptive verification simulated radial engagement above the configured limit.',
       });
-      expect(cncGroupCount(scene)).toBe(0);
+      expect(cncGroupCount(scene)).toBe(1);
+      expect(
+        findCncAdaptivePocketIssues(scene, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG),
+      ).toEqual([
+        {
+          layerId: layer.id,
+          reason:
+            'Offset pocket fallback: Adaptive verification simulated radial engagement above the configured limit.',
+        },
+      ]);
     },
     ciBudgetMs(20_000, 60_000),
   );

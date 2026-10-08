@@ -7,3 +7,18 @@ export type {
   ReliefHeightfieldProvenance,
   ReliefHeightfieldSourceKind,
 } from './relief-heightfield';
+export type {
+  ReliefAuthoringDocument,
+  ReliefComponent,
+  ReliefComponentSource,
+  ReliefCombineMode,
+  ReliefLevel,
+  ReliefSculptStroke,
+  ReliefShapeSource,
+  ReliefVectorMask,
+} from './relief-authoring';
+export type {
+  ReliefRailProfileSource,
+  ReliefOpenRail,
+  ReliefProfileSection,
+} from './relief-rail-profile';

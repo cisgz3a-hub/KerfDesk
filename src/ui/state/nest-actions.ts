@@ -23,6 +23,7 @@ import {
   transformedBBox,
   type SceneObject,
 } from '../../core/scene';
+import { productionNestActions, type ProductionNestActions } from './production-nest-actions';
 import { pushUndo } from './scene-mutations';
 import { outlineForNestUnit } from './nest-outline';
 import type { AppState } from './store';
@@ -47,7 +48,7 @@ export type QuickNestActionResult =
     }
   | { readonly ok: false; readonly reason: string };
 
-export type NestActions = {
+export type NestActions = ProductionNestActions & {
   readonly quickNestSelection: (options: QuickNestOptions) => QuickNestActionResult;
   readonly prepareNestSelection: (options: QuickNestOptions) => PreparedNestResult;
   readonly acceptNestSelection: (draft: PreparedNest, layout: NestLayout) => QuickNestActionResult;
@@ -57,6 +58,7 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function nestActions(set: Setter, get: () => AppState): NestActions {
   return {
+    ...productionNestActions(set, get),
     prepareNestSelection: (options) => prepareNest(get(), options),
     acceptNestSelection: (draft, layout) => {
       if (get().project !== draft.project)

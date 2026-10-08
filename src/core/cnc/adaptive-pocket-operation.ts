@@ -39,6 +39,12 @@ export function resolveAdaptivePocketOperation(
   if (settings.cutType !== 'pocket' || settings.pocketStrategy !== 'adaptive') {
     return { kind: 'not-requested' };
   }
+  if (settings.pocketRestStock !== undefined)
+    return {
+      kind: 'error',
+      reason:
+        'Explicit previous-stock rest uses the disclosed offset-pocket fallback for adaptive strategy.',
+    };
   if (tool.kind !== 'end-mill') {
     return { kind: 'error', reason: 'Adaptive clearing requires an end mill.' };
   }
@@ -78,8 +84,7 @@ export function adaptivePocketPasses(
       const zMm = depths[depthIndex];
       if (zMm === undefined) continue;
       const startZMm = depthIndex === 0 ? 0 : (depths[depthIndex - 1] ?? 0);
-      const roughing = roughingPass(sequence, startZMm, zMm, direction);
-      if (roughing !== null) passes.push(roughing);
+      passes.push(...sequenceRoughingPasses(sequence, startZMm, zMm, direction));
       const finishRings =
         direction === undefined
           ? sequence.finishRings
@@ -123,7 +128,7 @@ export function adaptivePocketPassesForSettings(
           ? undefined
           : { cutDirection: settings.cutDirection, handedness },
       )
-    : [];
+    : null;
 }
 
 function withoutRepeatedPoints(points: ReadonlyArray<Vec2>): ReadonlyArray<Vec2> {
@@ -163,4 +168,41 @@ function roughingPass(
     polyline,
     closed: false,
   };
+}
+
+function sequenceRoughingPasses(
+  sequence: AdaptivePocketSequence,
+  startZMm: number,
+  zMm: number,
+  direction?: { readonly cutDirection: CncCutDirection; readonly handedness: FrameHandedness },
+): ReadonlyArray<CncPass> {
+  const seed = sequence.seedRings;
+  if (seed === undefined) {
+    const legacy = roughingPass(sequence, startZMm, zMm, direction);
+    return legacy === null ? [] : [legacy];
+  }
+  const foundation = roughingPass(
+    { ...sequence, rings: [...seed, ...sequence.rings] },
+    startZMm,
+    zMm,
+    direction,
+  );
+  if (foundation === null) return [];
+  const entryEnd = foundation.start;
+  const seedPoints = [entryEnd, ...seed.flatMap((ring) => ring.points)];
+  const seedEnd = seedPoints[seedPoints.length - 1] ?? entryEnd;
+  const radialPoints = [seedEnd, ...sequence.rings.flatMap((ring) => ring.points)];
+  // The helix emitter requires a two-point contour tail. Keep it stationary so
+  // full-width seed slotting starts in the following explicit plunge-feed pass.
+  const passes: CncPass[] = [{ ...foundation, polyline: [entryEnd, entryEnd] }];
+  if (seedPoints.length > 1)
+    passes.push({
+      kind: 'path3d',
+      closed: false,
+      lateralFeed: 'plunge',
+      points: seedPoints.map((point) => ({ ...point, z: zMm })),
+    });
+  if (radialPoints.length > 1)
+    passes.push({ kind: 'contour', closed: false, zMm, polyline: radialPoints });
+  return passes;
 }

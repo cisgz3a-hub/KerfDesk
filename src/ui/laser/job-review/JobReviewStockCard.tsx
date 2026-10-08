@@ -1,3 +1,4 @@
+import type { CncMachineConfig, Project } from '../../../core/scene';
 // CNC "Material & stock" card for the Job Review dialog (ADR-224 v2): the
 // project material the feeds were seeded from, the stock footprint, its
 // origin offset, and the safe-Z clearance — the physical setup the shown
@@ -19,12 +20,26 @@ const NO_PROJECT_MATERIAL = MANUAL_FEEDS_LABEL;
 
 export function JobReviewStockCard(): JSX.Element | null {
   const machine = useStore((s) => s.project.machine);
+  const setup = useStore((s) => s.project.cncSetup);
   if (machine?.kind !== 'cnc') return null;
   const { stock, params } = machine;
+  const stockOrigin = activeStockOrigin(machine, setup);
   const material =
     CHIPLOAD_MATERIALS.find((entry) => entry.value === stock.materialKey)?.label ??
     NO_PROJECT_MATERIAL;
   const items = [
+    { label: 'Setup', value: setup?.name ?? 'Setup 1' },
+    { label: 'Datum', value: 'G54 · stock top Z0' },
+    { label: 'Fixtures', value: String(setup?.fixtures.length ?? 0) },
+    ...(setup?.twoSided === undefined
+      ? []
+      : [
+          {
+            label: 'Side',
+            value:
+              setup.twoSided.activeSide + ' · flip around ' + setup.twoSided.flipAxis.toUpperCase(),
+          },
+        ]),
     { label: 'Material', value: material },
     {
       label: 'Stock',
@@ -32,7 +47,7 @@ export function JobReviewStockCard(): JSX.Element | null {
     },
     {
       label: 'Stock origin',
-      value: `X ${formatMm(stock.originOffset.x)} · Y ${formatMm(stock.originOffset.y)}`,
+      value: `X ${formatMm(stockOrigin.x)} · Y ${formatMm(stockOrigin.y)}`,
     },
     { label: 'Safe Z', value: `${formatMm(params.safeZMm)} mm above stock` },
   ];
@@ -49,4 +64,10 @@ export function JobReviewStockCard(): JSX.Element | null {
       </div>
     </section>
   );
+}
+
+function activeStockOrigin(machine: CncMachineConfig, setup: Project['cncSetup']) {
+  return setup?.twoSided?.activeSide === 'B'
+    ? setup.twoSided.sideBStockOriginMm
+    : machine.stock.originOffset;
 }

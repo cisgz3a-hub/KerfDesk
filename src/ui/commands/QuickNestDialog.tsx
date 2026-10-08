@@ -16,6 +16,7 @@ export type QuickNestDialogProps = {
   readonly onStop?: () => void;
   readonly onAcceptBest?: () => void;
   readonly onReset?: () => void;
+  readonly onProduction?: () => void;
 };
 type NestForm = {
   readonly bin: QuickNestOptions['bin'];
@@ -90,6 +91,11 @@ export function QuickNestDialog(props: QuickNestDialogProps): JSX.Element {
           </p>
         )}
       </fieldset>
+      {props.onProduction !== undefined && (
+        <Button disabled={props.running} onClick={props.onProduction}>
+          Quantity production across sheets
+        </Button>
+      )}
       <NestDraftProgress {...props} />
       <NestDialogActions {...props} hasDraft={hasDraft} permitted={permitted.length > 0} />
     </Dialog>
