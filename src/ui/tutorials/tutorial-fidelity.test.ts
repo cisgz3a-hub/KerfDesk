@@ -23,6 +23,7 @@ const NON_MENU_PREFIXES = [
   'Top toolbar',
   'Left drawing toolbar',
   'Machine controls',
+  'Machine toolbar',
   'Artwork / Operations',
   'Machine Setup',
   'CNC Machine Setup',

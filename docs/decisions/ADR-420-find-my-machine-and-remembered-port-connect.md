@@ -112,6 +112,26 @@ hidden behind **Check essentials** and **Review setup**. The Machine stage now o
 The shortcut opens the existing Review stage; the final Save keeps its validation, atomic project
 update and explicitly queued firmware-write behavior. The live connection stays in place.
 
+#### Amendment 2 - Compact connection toolbar and anchored jog controls (2026-10-08)
+
+The maintainer approved the compact top-bar preview: the connection group moves beside the
+numeric transforms, and the jog controls occupy its former position at the top of the machine
+rail. The toolbar keeps the machine name, status, Connect/Disconnect, Machine Setup and the
+connection-options menu visible. Its machine-name dropdown contains the full profile, fitted
+Laser module selector and supported FluidNC network connection form. Native Tab navigation
+remains inside the form until focus leaves it; Escape returns focus to the machine name. Input
+inside the dropdown does not dispatch workspace or machine shortcuts, except the existing Abort
+shortcut. Connection failures, qualification notices and recovery remain visible outside that
+dropdown. A narrow window wraps the connection group onto a second top row. Detected-settings
+notifications belong to the always-mounted toolbar and remain active when the rail is collapsed.
+
+The rail keeps its heading, existing jog controls and current status above an independently
+scrolling lower tools region. The upper region can also scroll, retaining access to conditional
+Focus/Z and recovery controls. If the measured machine body is at most 192 px high, one whole-rail
+scroller replaces the two regions so the controls remain reachable. The existing Frame/Start
+dock stays outside those scrollers. Connection actions, jog cancellation, ordinary workspace
+shortcuts, qualification, output and the ADR-565 Frame/Start contract are unchanged.
+
 #### Existing consequences
 
 - On Windows, and for adapters with a USB serial number elsewhere, a machine set up once connects

@@ -1,5 +1,5 @@
-// LaserWindow — Phase B controller panel. Connection, status, jog, job
-// controls. Renders alongside the Cuts/Layers panel on the right rail.
+// LaserWindow — status, jog and job controls on the machine rail. Connection
+// and machine-profile settings live in the workspace's compact top bar.
 
 import { useState } from 'react';
 import type { GrblState } from '../../core/controllers/grbl';
@@ -18,22 +18,18 @@ import { CollapsibleRailSection } from './CollapsibleRailSection';
 import { ConsolePanel } from './ConsolePanel';
 import { SuperConsoleLauncher } from './super-console/SuperConsoleLauncher';
 import { AlarmBanner } from './AlarmBanner';
-import { ControllerConnectionControls } from './ControllerConnectionControls';
-import { DetectedSettingsToast } from './DetectedSettingsToast';
 import { openMachineSetup } from './device-setup';
 import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { MoveToPositionSection } from './MoveToPositionSection';
 import { JobControls } from './JobControls';
 import { MachineHoursSection } from './MachineHoursSection';
-import { LaserModuleRow } from './LaserModuleRow';
 import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
-import { jobAwareConfirm } from '../state/job-aware-dialogs';
-import { clearStartBlockers } from './start-blocker-invalidation';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
-import { useToastStore } from '../state/toast-store';
 import './LaserWindow.css';
+
+export { forgetControllerAndClearStartBlockers } from './controller-connection-actions';
 
 export function LaserWindow({
   dockedJobActions = false,
@@ -79,71 +75,44 @@ export function LaserWindow({
       className="lf-rail lf-machine-rail"
       style={panelStyle}
     >
-      <DetectedSettingsToast />
       <MachineRailHeading machineKind={machineKind} onCollapse={machinePanel.toggle} />
-      <ControllerConnectionControls
-        machineKind={machineKind}
-        autofocusBusy={autofocusBusy}
-        motionOperation={motionOperation}
-        controllerOperation={controllerOperation}
-        onForget={confirmForgetController}
-      />
-      {controllerDisplay.showAlarmBanner && (
-        <AlarmBanner
-          code={alarmCode}
-          controllerKind={controllerKind}
-          homingEnabled={homingEnabled}
-          homeFromAlarm={control.homeFromAlarm}
-          canUnlock={control.canUnlock}
-          resetRequired={control.resetRequired}
-          onHome={control.runHome}
+      <section className="lf-machine-primary-controls" aria-label="Jog and machine status">
+        {controllerDisplay.showAlarmBanner && (
+          <AlarmBanner
+            code={alarmCode}
+            controllerKind={controllerKind}
+            homingEnabled={homingEnabled}
+            homeFromAlarm={control.homeFromAlarm}
+            canUnlock={control.canUnlock}
+            resetRequired={control.resetRequired}
+            onHome={control.runHome}
+            onConfigureHoming={openHomingSetup}
+            onUnlock={control.runUnlock}
+            onReset={control.runReset}
+          />
+        )}
+        {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
+        <JogPad disabled={jogPadDisabled} />
+        <StatusDisplay />
+      </section>
+      <section className="lf-machine-details" aria-label="Machine tools">
+        <MoveToPositionSection disabled={jogPadDisabled} />
+        <ProbePanel />
+        <JobControls
+          setupExtras={<CncUtilitiesPanel />}
+          dockedJobActions={dockedJobActions}
+          disabled={connection.kind !== 'connected' || autofocusBusy}
+          onConfigureAutofocus={() =>
+            openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' })
+          }
           onConfigureHoming={openHomingSetup}
-          onUnlock={control.runUnlock}
-          onReset={control.runReset}
+          onStartJob={() => void runStartJobFlow()}
         />
-      )}
-      {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
-      <StatusDisplay />
-      <LaserModuleRow />
-      <JogPad disabled={jogPadDisabled} />
-      <MoveToPositionSection disabled={jogPadDisabled} />
-      <ProbePanel />
-      <JobControls
-        setupExtras={<CncUtilitiesPanel />}
-        dockedJobActions={dockedJobActions}
-        disabled={connection.kind !== 'connected' || autofocusBusy}
-        onConfigureAutofocus={() =>
-          openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' })
-        }
-        onConfigureHoming={openHomingSetup}
-        onStartJob={() => void runStartJobFlow()}
-      />
-      <MachineHoursSection />
-      <MachineConsoleSection />
+        <MachineHoursSection />
+        <MachineConsoleSection />
+      </section>
     </aside>
   );
-}
-
-function confirmForgetController(): void {
-  if (
-    !jobAwareConfirm(
-      'Forget this controller, remove its browser serial permission, and clear all controller and recovery state? Your canvas and machine profile will stay open.',
-    )
-  ) {
-    return;
-  }
-  void forgetControllerAndClearStartBlockers();
-}
-
-export async function forgetControllerAndClearStartBlockers(): Promise<void> {
-  try {
-    await useLaserStore.getState().forgetDevice?.();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    useToastStore.getState().pushToast(`Forget Controller could not finish: ${message}`, 'error');
-  } finally {
-    clearStartBlockers();
-  }
 }
 
 function useJogBlocked(): boolean {
@@ -287,16 +256,14 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 }
 
 const panelStyle: React.CSSProperties = {
-  // Explicit width + flexShrink: 0 so this rail cannot push the workspace
-  // canvas off-screen when its sub-panels (ConsolePanel, etc.)
-  // collectively grow. overflowY scrolls the column internally instead of
-  // forcing the parent flexbox to stretch — without this, on a narrower
-  // window the canvas (flex:1, minWidth:0) collapses to zero.
+  // The primary controls and lower machine tools own separate scrollers so
+  // opening Console or History does not move the jog pad out of view. This
+  // outer rail stays within the workspace body above its Frame/Start dock.
   // Surface chrome and spacing come from .lf-machine-rail; layout only here.
   width: '100%',
   height: '100%',
   boxSizing: 'border-box',
-  overflowY: 'auto',
+  overflowY: 'hidden',
   overflowX: 'hidden',
   fontFamily: 'system-ui, sans-serif',
   display: 'flex',

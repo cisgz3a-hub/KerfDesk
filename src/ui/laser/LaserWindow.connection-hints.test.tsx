@@ -10,6 +10,7 @@ import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { LaserWindow } from './LaserWindow';
+import { MachineConnectionToolbar } from './MachineConnectionToolbar';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -36,7 +37,10 @@ describe('LaserWindow connection hints', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={unsupportedPlatform}>
-            <LaserWindow />
+            <>
+              <MachineConnectionToolbar />
+              <LaserWindow />
+            </>
           </PlatformProvider>,
         );
       });

@@ -26,7 +26,7 @@ import { ConvertBitmapDialogHost } from './ConvertBitmapDialogHost';
 import { runImagePickAction } from './image-pick-action';
 import { MultiFileTraceDialogHost } from './MultiFileTraceDialog';
 import { MultiFileTraceProgressPanel } from './MultiFileTraceProgress';
-import { NumericEditsBar } from './NumericEditsBar';
+import { WorkspaceTopBar } from './WorkspaceTopBar';
 import { ProjectNotesDialog } from './ProjectNotesDialog';
 import { selectedConvertibleVectors, selectedObjectIds } from './selection-command-state';
 import { UndoHistoryDialog } from './UndoHistoryDialog';
@@ -116,7 +116,7 @@ export function CommandShell(): JSX.Element {
     <>
       <AppMenuBar commands={commands} machineKind={machineKind} />
       <Toolbar commands={commands} machineKind={machineKind} />
-      <NumericEditsBar />
+      <WorkspaceTopBar />
       <WorkspaceContextBar commands={commands} />
       <BitmapDialog />
       {adjustDialogOpen && selectedRaster !== null ? (
