@@ -66,7 +66,6 @@ export function guardedSettings(settings, target) {
     'HASH_SECRET',
     'DERIVATION_SECRET',
     'PADDLE_API_KEY',
-    'PADDLE_CLIENT_TOKEN',
     'PADDLE_WEBHOOK_SECRET',
   ]) {
     assert.ok(
@@ -74,6 +73,15 @@ export function guardedSettings(settings, target) {
       'Required protected binding unavailable.',
     );
   }
+  const clientToken = bindings.find(({ name }) => name === 'PADDLE_CLIENT_TOKEN');
+  assert.ok(
+    clientToken?.type === 'secret_text' ||
+      (target.environment === 'sandbox' &&
+        clientToken?.type === 'plain_text' &&
+        typeof clientToken.text === 'string' &&
+        /^test_[A-Za-z0-9]{27}$/u.test(clientToken.text)),
+    'Required Paddle client token binding unavailable or invalid.',
+  );
   assert.ok(
     bindings.some(({ name }) => name === 'REQUEST_RATE_LIMITER'),
     'Request limiter unavailable.',

@@ -292,6 +292,7 @@ function harness({
     mutations,
     flag: () => value.bindings.find(({ name }) => name === 'PAYMENTS_ENABLED').text,
     version: () => version,
+    binding: (name) => structuredClone(value.bindings.find((binding) => binding.name === name)),
   };
 }
 const run = (adapter, extra = {}) =>
@@ -411,6 +412,67 @@ test('refresh preserves current authority/resources/assets and verifies fresh co
     ),
   );
 });
+test('refresh and lost-ACK readback preserve an existing public sandbox token by inheritance without recording it', async (t) => {
+  attestFixture(t);
+  const publicToken = 'test_' + 'A1b'.repeat(9);
+  for (const loseUploadResponse of [false, true]) {
+    const value = settings();
+    const binding = { name: 'PADDLE_CLIENT_TOKEN', type: 'plain_text', text: publicToken };
+    Object.assign(
+      value.bindings.find(({ name }) => name === binding.name),
+      binding,
+    );
+    const adapter = harness({ initialSettings: value, loseUploadResponse });
+    const receipt = await run(adapter);
+    assert.equal(receipt.outcome, 'verified');
+    assert.equal(receipt.protectedSettingsUnchanged, true);
+    assert.equal(receipt.flag, 'false');
+    assert.deepEqual(adapter.binding(binding.name), binding);
+    assert.deepEqual(
+      adapter.mutations[0].payload.bindings.find(({ name }) => name === binding.name),
+      {
+        name: binding.name,
+        type: 'inherit',
+        version_id: originalVersion,
+      },
+    );
+    assert.equal(adapter.mutations.length, 1);
+    assert.ok(!JSON.stringify(receipt).includes(publicToken));
+    assert.ok(!JSON.stringify(adapter.mutations).includes(publicToken));
+  }
+});
+
+test('refresh detects a changed but valid public sandbox token and restores the original binding', async (t) => {
+  attestFixture(t);
+  const value = settings();
+  const binding = {
+    name: 'PADDLE_CLIENT_TOKEN',
+    type: 'plain_text',
+    text: 'test_' + 'A1b'.repeat(9),
+  };
+  Object.assign(
+    value.bindings.find(({ name }) => name === binding.name),
+    binding,
+  );
+  const adapter = harness({
+    initialSettings: value,
+    postChange: (current) => {
+      current.bindings.find(({ name }) => name === binding.name).text = 'test_' + 'c2D'.repeat(9);
+    },
+  });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.failure.stage, 'sandbox-protected-settings-verification');
+    assert.equal(error.receipt.recovery.closedVerified, true);
+    assert.ok(!JSON.stringify(error.receipt).includes(binding.text));
+    return true;
+  });
+  assert.deepEqual(adapter.binding(binding.name), binding);
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT', 'POST'],
+  );
+});
+
 test('already active attested code is verified without uploading or changing any setting', async (t) => {
   attestFixture(t);
   const adapter = harness({ currentIsGood: true });
