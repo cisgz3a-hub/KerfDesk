@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
-import { FIXTURE_NAME } from './installed-app-evidence.mjs';
+import {
+  FIXTURE_NAME,
+  CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+  HISTORICAL_QUALIFICATION_PROJECT_SCHEMA,
+} from './installed-app-evidence.mjs';
 import { validateUpgradeProject } from './verify-upgrade-project.mjs';
 
-const fixture = {
-  schemaVersion: 12,
+const historicalFixture = {
+  schemaVersion: HISTORICAL_QUALIFICATION_PROJECT_SCHEMA,
   device: {
     name: 'Upgrade retention fixture',
     bedWidth: 321,
@@ -40,11 +44,13 @@ const fixture = {
     layers: [{ id: 'line-fixture', mode: 'line' }],
   },
 };
+const fixture = { ...historicalFixture, schemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA };
+const knownUpgrade = { schemaMode: 'known-upgrade' };
 const encoded = (value) => Buffer.from(JSON.stringify(value));
 
 test('installed project qualification matches the canonical writer schema before native execution', async () => {
-  // This fixture also represents authenticated public 1.0.2 and 1.0.3 saves.
-  // Require an explicit qualification update if the app's persistence format changes.
+  // Require an explicit current qualification update when the writer changes.
+  // The public 1.0.2/1.0.3 contract remains separately represented as schema 12.
   const source = await readFile(new URL('../src/core/scene/project.ts', import.meta.url), 'utf8');
   const versions = [
     ...source.matchAll(/^export const PROJECT_SCHEMA_VERSION = (\d+) as const;$/gm),
@@ -54,8 +60,8 @@ test('installed project qualification matches the canonical writer schema before
   assert.deepEqual(validateUpgradeProject(encoded(fixture)), fixture);
 });
 
-test('historical project qualification refuses legacy, future and malformed schema versions', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 13, '12', null, undefined]) {
+test('current project qualification refuses historical, future and malformed schema versions', () => {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 15, '14', null, undefined]) {
     assert.throws(
       () => validateUpgradeProject(encoded({ ...fixture, schemaVersion })),
       /Expected current project schema/,
@@ -63,7 +69,7 @@ test('historical project qualification refuses legacy, future and malformed sche
   }
 });
 
-test('historical project qualification compares actual geometry, operations and machine configuration', () => {
+test('current project qualification compares actual geometry, operations and machine configuration', () => {
   assert.deepEqual(validateUpgradeProject(encoded(fixture), fixture), fixture);
   for (const mutate of [
     (value) => {
@@ -92,4 +98,55 @@ test('historical project qualification compares actual geometry, operations and 
     mutate(changed);
     assert.throws(() => validateUpgradeProject(encoded(changed), fixture));
   }
+});
+
+test('the known upgrade contract accepts historical retention and current migration without rewriting old saves', () => {
+  assert.equal(historicalFixture.schemaVersion, 12);
+  assert.deepEqual(
+    validateUpgradeProject(encoded(historicalFixture), undefined, knownUpgrade),
+    historicalFixture,
+  );
+  assert.deepEqual(
+    validateUpgradeProject(encoded(historicalFixture), historicalFixture, knownUpgrade),
+    historicalFixture,
+  );
+  assert.deepEqual(
+    validateUpgradeProject(encoded(fixture), historicalFixture, knownUpgrade),
+    fixture,
+  );
+  assert.throws(
+    () => validateUpgradeProject(encoded(fixture), historicalFixture),
+    /Expected current project schema/,
+  );
+  assert.throws(
+    () => validateUpgradeProject(encoded(historicalFixture), fixture, knownUpgrade),
+    /schema downgrade/,
+  );
+});
+
+test('known upgrade qualification keeps schema, scene and machine evidence strict', () => {
+  for (const schemaVersion of [11, 15, '12', '13', '14', null, undefined]) {
+    assert.throws(
+      () =>
+        validateUpgradeProject(
+          encoded({ ...historicalFixture, schemaVersion }),
+          undefined,
+          knownUpgrade,
+        ),
+      /Expected known upgrade project schema/,
+    );
+  }
+  const moved = structuredClone(fixture);
+  moved.scene.objects[0].paths[0].polylines[0].points.forEach((point) => {
+    point.x += 1;
+  });
+  assert.throws(
+    () => validateUpgradeProject(encoded(moved), historicalFixture, knownUpgrade),
+    /artwork\/operations changed/,
+  );
+  const machine = { ...fixture, machine: { kind: 'cnc' } };
+  assert.throws(
+    () => validateUpgradeProject(encoded(machine), historicalFixture, knownUpgrade),
+    /Saved machine/,
+  );
 });

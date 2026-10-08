@@ -12,6 +12,7 @@ import type { TraceResult } from './use-trace-worker-client';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { checkTraceSignal } from './trace-cancellation';
 import { rawImageHasTransparency } from './raw-image-transparency';
+import { maskTraceSourceResult } from './trace-source-mask';
 import {
   traceAtCommitGrid,
   type TraceCommitGridContext,
@@ -63,5 +64,6 @@ export async function resolveTraceCommitResult(args: {
     args.boundaryMode ?? 'crop',
     args.signal,
   );
-  return { ...result, sourceHasTransparency };
+  checkTraceSignal(args.signal);
+  return { ...maskTraceSourceResult(args.file, result), sourceHasTransparency };
 }

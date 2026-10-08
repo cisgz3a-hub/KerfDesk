@@ -14,6 +14,7 @@ import { hasUnsettledStreamAcks, streamerCanPauseForMpg } from './laser-store-he
 import { steppedStreamerPatch } from './tool-change-hold-entry';
 import type { AckSettlement, GetFn, HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
 import {
   containActiveStreamWriteFailure,
   streamWriteOwner,
@@ -120,7 +121,9 @@ export function advanceStreamBy(
   // the batch started from detects exactly the step that entered the hold.
   set((state) => ({
     ...steppedStreamerPatch(state, s, stepped.state),
-    ...(stepped.state.status === 'errored' ? liveCanvasLifecyclePatch(state, 'errored') : {}),
+    ...(stepped.state.status === 'errored' && !isProvisionalResetFreeze(state)
+      ? liveCanvasLifecyclePatch(state, 'errored')
+      : {}),
   }));
   if (finishedStreaming) {
     beginPostJobSettle(set, get, refs, safeWrite);

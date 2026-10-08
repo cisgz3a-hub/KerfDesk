@@ -13,12 +13,8 @@
 // when the number cannot be typed.
 
 import { useState } from 'react';
-import {
-  formatFieldNumber,
-  parseFieldNumber,
-  unitSuffix,
-  type EntityField,
-} from './design-field-format';
+import { evaluateNumericEntry } from '../../core/numeric-expression';
+import { formatFieldNumber, unitSuffix, type EntityField } from './design-field-format';
 import { useDesignStudioStore } from './design-studio-store';
 
 export function ShapeInspectorField(props: {
@@ -36,9 +32,12 @@ export function ShapeInspectorField(props: {
 
   const commit = (): void => {
     if (draft === null) return;
-    const parsed = parseFieldNumber(draft);
+    const result = evaluateNumericEntry(draft.replace(',', '.'), {
+      kind: field.unit === 'mm' ? 'length' : 'angle',
+    });
     setDraft(null);
-    if (parsed === null) return;
+    if (result.kind !== 'ok') return;
+    const parsed = result.value;
     if (field.min !== undefined && parsed < field.min) return;
     editEntityField(entityId, field.key, parsed);
   };
@@ -94,7 +93,7 @@ function editableTooltip(field: EntityField): string {
   const unit = unitSuffix(field.unit);
   const measured = unit === '' ? field.label : `${field.label} in ${unit}`;
   const floor = field.min === undefined ? '' : ` Minimum ${field.min}.`;
-  return `${measured}. Type a value and press Enter to apply; Esc cancels. Hover to see it measured on the shape.${floor}`;
+  return `${measured}. Type a value, arithmetic or units and press Enter to apply; Esc cancels. Hover to see it measured on the shape.${floor}`;
 }
 
 function derivedTooltip(field: EntityField): string {

@@ -107,6 +107,20 @@
   }
 }
 @media (max-width: 700px) {
+  /* Keep transform controls compact at laptop widths to preserve drawing space. */
+  .lf-numeric-edits {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+  .lf-numeric-edits-fields {
+    gap: 6px 4px;
+  }
+  .lf-numeric-field-group {
+    gap: 4px;
+  }
+  .lf-numeric-edit-field .lf-input {
+    width: 58px;
+  }
   .lf-numeric-edit-divider {
     display: none;
   }

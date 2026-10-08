@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // What Optimize Shapes (LightBurn gap LBG-T22) does to the selection, shared by
 // the dialog's live status line and Apply so the user gets what the status
 // promised. The dialog works through the contours a slice of time at a time;
@@ -66,6 +67,7 @@ export function optimizeShapesSelection(
   let locked = 0;
   for (const object of scene.objects) {
     if (!ids.has(object.id) || !isVectorPathObject(object) || isRegistrationBox(object)) continue;
+    if (isBooleanCompoundObject(object)) continue;
     if (object.locked === true) locked += 1;
     else targets.push(object);
   }
@@ -136,7 +138,7 @@ export function planReusing(
 /** The object with its optimized paths, or null when none of them changed. */
 export function optimizedSceneObject(entry: OptimizedObject): SceneObject | null {
   const { source: object, result } = entry;
-  if (result.paths === object.paths) return null;
+  if (isBooleanCompoundObject(object) || result.paths === object.paths) return null;
   const bounds = boundsForPaths(result.paths) ?? object.bounds;
   if (object.kind === 'imported-svg' || object.kind === 'traced-image') {
     return { ...object, paths: result.paths, bounds };

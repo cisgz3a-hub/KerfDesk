@@ -241,7 +241,9 @@ describe('intentional GRBL connection teardown', () => {
     const disconnect = useLaserStore.getState().disconnect();
     await flush();
 
-    expect(useLaserStore.getState().streamer?.status).toBe('cancelled');
+    // Explicit Disconnect keeps the interrupted stream until its real close;
+    // every reply remains frozen and no queued job bytes refill.
+    expect(useLaserStore.getState().streamer?.status).toBe('errored');
     expect(safetyEvents(events, 'old')).toEqual([`old:write:${JSON.stringify(RT_SOFT_RESET)}`]);
 
     connection.emitLine('ok');

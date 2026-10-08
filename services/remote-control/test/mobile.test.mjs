@@ -210,7 +210,8 @@ test(
         ),
       );
       await page.getByRole('button', { name: 'Edit', exact: true }).click();
-      if (await page.locator('#edit-forms').isVisible()) await openTask(page, 'operation-task');
+      await page.locator('#edit-forms').waitFor({ state: 'visible' });
+      await openTask(page, 'operation-task');
       await page.locator('#operation-form [name=powerPercent]').waitFor({ state: 'visible' });
       await page.waitForFunction(
         () => document.querySelector('#operation-form [name=powerPercent]').value === '30',

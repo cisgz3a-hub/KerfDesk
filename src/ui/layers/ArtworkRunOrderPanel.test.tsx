@@ -6,6 +6,7 @@ import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { useUiStore } from '../state/ui-store';
 import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
+import { ArtworkNumberingPrompt } from '../workspace/ArtworkNumberingPrompt';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -25,6 +26,95 @@ afterEach(async () => {
 });
 
 describe('ArtworkRunOrderPanel', () => {
+  it.each(['mounted', 'retired'] as const)(
+    'does not let a %s panel clear numbering started in the replacement document',
+    async (mode) => {
+      importArtwork('Previous');
+      const host = await renderPanel();
+      await act(async () => buttonByText(host, 'Number on canvas').click());
+      const previous = useStore.getState().project;
+      const loaded = {
+        ...previous,
+        scene: { ...previous.scene, objects: [svgObj('Next', ['#000000'])] },
+      };
+      const retiringRoot = mode === 'retired' ? roots.pop() : undefined;
+      await act(async () => {
+        useStore.getState().setProject(loaded);
+        useStore.getState().beginInteraction();
+        useUiStore.getState().startArtworkNumbering(['Next']);
+        useUiStore.getState().setArtworkRunFocus({
+          objectIds: ['Next'],
+          position: 1,
+          color: '#000000',
+        });
+        retiringRoot?.unmount();
+      });
+
+      expect(useStore.getState().project.scene.objects[0]?.id).toBe('Next');
+      expect(useStore.getState().pendingUndo?.project.scene.objects[0]?.id).toBe('Next');
+      expect(useUiStore.getState().artworkNumbering).toMatchObject({
+        kind: 'active',
+        nextPosition: 1,
+      });
+      expect(useUiStore.getState().artworkRunFocus?.objectIds).toEqual(['Next']);
+    },
+  );
+
+  it('retires numbering when New replaces the document while the panel stays mounted', async () => {
+    importArtwork('Previous');
+    const host = await renderPanel();
+    await act(async () => buttonByText(host, 'Number on canvas').click());
+    expect(useStore.getState().pendingUndo).not.toBeNull();
+    expect(host.textContent).toContain('Click artwork for run #1');
+
+    await act(async () => useStore.getState().newProject());
+
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(useStore.getState().pendingUndo).toBeNull();
+    expect(useUiStore.getState().artworkNumbering.kind).toBe('idle');
+    expect(useUiStore.getState().artworkRunFocus).toBeNull();
+    expect(host.textContent).not.toContain('Click artwork for run');
+    expect(host.textContent).toContain('Import or draw artwork');
+  });
+
+  it('retires the old numbering owner on Open without restoring the previous document', async () => {
+    importArtwork('Previous');
+    const previous = useStore.getState().project;
+    const loaded = {
+      ...previous,
+      scene: { ...previous.scene, objects: [svgObj('Next', ['#000000'])] },
+    };
+    const host = await renderPanel();
+    await act(async () => buttonByText(host, 'Number on canvas').click());
+    await act(async () => useStore.getState().setProject(loaded));
+
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual(['Next']);
+    expect(useStore.getState().pendingUndo).toBeNull();
+    expect(useUiStore.getState().artworkNumbering.kind).toBe('idle');
+    expect(host.querySelector('[aria-label="Canvas numbering controls"]')).toBeNull();
+    await act(async () => buttonByText(host, 'Number on canvas').click());
+    expect(useUiStore.getState().artworkNumbering).toMatchObject({
+      kind: 'active',
+      nextPosition: 1,
+    });
+    expect(useStore.getState().pendingUndo?.project.scene.objects[0]?.id).toBe('Next');
+  });
+
+  it('keeps Cancel available when the same numbering document becomes empty', async () => {
+    importArtwork('Previous');
+    const host = await renderPanel();
+    await act(async () => buttonByText(host, 'Number on canvas').click());
+    await act(async () => useStore.getState().removeSceneObject('Previous'));
+
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(host.querySelector('[aria-label="Canvas numbering controls"]')).not.toBeNull();
+    await act(async () => buttonByText(host, 'Cancel').click());
+    expect(useStore.getState().project.scene.objects.map((object) => object.id)).toEqual([
+      'Previous',
+    ]);
+    expect(useUiStore.getState().artworkNumbering.kind).toBe('idle');
+  });
+
   it('focuses a run unit and moves it by exact number', async () => {
     importArtwork('Johann');
     importArtwork('Box');
@@ -201,7 +291,14 @@ async function renderPanel(): Promise<HTMLDivElement> {
   document.body.appendChild(host);
   const root = createRoot(host);
   roots.push(root);
-  await act(async () => root.render(<ArtworkRunOrderPanel />));
+  await act(async () =>
+    root.render(
+      <>
+        <ArtworkRunOrderPanel />
+        <ArtworkNumberingPrompt />
+      </>,
+    ),
+  );
   return host;
 }
 

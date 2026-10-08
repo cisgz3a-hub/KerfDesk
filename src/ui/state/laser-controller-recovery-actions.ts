@@ -17,6 +17,12 @@ import {
   type ControllerLifecycleRefs,
 } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import {
+  hasCoordinatedControllerReset,
+  abandonOwnedResetRecovery,
+  ownedResetCleanupResult,
+} from './laser-owned-reset-recovery';
+import { frameProofReset } from './laser-session-reset';
 import type { LaserState } from './laser-store';
 import type { ControllerWakeOutcome } from './laser-store-action-types';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
@@ -72,6 +78,11 @@ async function runWake(
     }));
     throw new Error(message);
   }
+  if (hasCoordinatedControllerReset(get().controllerOperation)) {
+    throw new Error(
+      'The controller reset is already awaiting its startup response. Reconnect to replace the unresolved recovery.',
+    );
+  }
   const softReset = driver().realtime.softReset;
   if (softReset === null) throw new Error('This controller cannot be woken by soft reset.');
   // Read before the reset: the reboot banner ends the homing-state latch.
@@ -88,16 +99,20 @@ async function runWake(
     recovery.assertOwned();
     resetSent = true;
     if (recovery.observedAlarm()) {
+      await finishOwnedRecoveryCleanup(get, recovery);
+      recovery.assertOwned();
       set(wokeIntoAlarmPatch(alarmNotice));
       return 'alarm';
     }
     set(afterResetPatch);
     await waitForFreshIdle(refs, { kind: 'recovery', requiredReports: 1 });
+    await finishOwnedRecoveryCleanup(get, recovery);
     recovery.assertOwned();
     set((state) =>
       state.controllerOperation?.kind === 'recovery'
         ? {
             controllerOperation: null,
+            lastWriteError: null,
             log: pushLog(state, '[lf2] Controller recovery confirmed after fresh Idle.'),
           }
         : {},
@@ -106,19 +121,50 @@ async function runWake(
   } catch (err) {
     // Reconnect, another Wake, or another operation may own the controller
     // now. An obsolete Promise must not clear or annotate that owner's state.
-    if (!recovery.owns()) throw err;
+    if (!recovery.owns()) {
+      if (resetSent) recovery.assertOwned();
+      throw err;
+    }
     if (resetSent && recovery.observedAlarm()) {
+      await finishOwnedRecoveryCleanup(get, recovery);
+      recovery.assertOwned();
       set(wokeIntoAlarmPatch(alarmNotice));
       return 'alarm';
     }
-    const message = err instanceof Error ? err.message : String(err);
-    set((state) => ({
-      controllerOperation: releaseRecoveryOperation(state),
-      lastWriteError: message,
-      log: pushLog(state, `[lf2] Controller recovery failed: ${message}`),
-    }));
+    publishOwnedRecoveryFailure(set, get, err);
     throw err;
   }
+}
+
+function publishOwnedRecoveryFailure(set: SetFn, get: GetFn, error: unknown): void {
+  const operation = get().controllerOperation;
+  if (operation === null) return;
+  const owner = controllerOperationOwner(operation);
+  const cleanupResolved = abandonOwnedResetRecovery(operation);
+  const message = error instanceof Error ? error.message : String(error);
+  set((state) => {
+    if (
+      state.controllerOperation === null ||
+      controllerOperationOwner(state.controllerOperation) !== owner
+    )
+      return {};
+    return {
+      controllerOperation:
+        !cleanupResolved && hasCoordinatedControllerReset(state.controllerOperation)
+          ? state.controllerOperation
+          : releaseRecoveryOperation(state),
+      lastWriteError: message,
+      log: pushLog(state, '[lf2] Controller recovery failed: ' + message),
+    };
+  });
+}
+
+async function finishOwnedRecoveryCleanup(get: GetFn, recovery: RecoveryOwnership): Promise<void> {
+  const completion = ownedResetCleanupResult(get().controllerOperation);
+  if (completion === null) return;
+  const error = await completion;
+  recovery.assertOwned();
+  if (error !== null) throw error;
 }
 
 async function sendOwnedReset(
@@ -148,9 +194,7 @@ function afterResetPatch(state: LaserState): Partial<LaserState> {
     accessoryCache: null,
     workOriginActive: originSurvives,
     workOriginSource: originSurvives ? 'unknown' : 'none',
-    frameVerification: null,
-    framedRun: null,
-    frameTrace: null,
+    ...frameProofReset(),
     motionOperation: null,
     controllerOperation: continueControllerOperation(state.controllerOperation, {
       kind: 'recovery',
@@ -238,7 +282,6 @@ function beginOwnedRecovery(
       controllerReportsAlarm(state) &&
       (currentWriteEpoch === expectedWriteEpoch + 1 ||
         (currentWriteEpoch === expectedWriteEpoch &&
-          state.statusReport?.state === 'Alarm' &&
           state.statusSequence > evidence.statusSequence))
     );
   };

@@ -102,3 +102,33 @@ describe('a halted Marlin', () => {
     expect(useLaserStore.getState().safetyNotice?.message).toContain(HALT_ADVICE);
   });
 });
+
+it.each([false, true])(
+  'retains halted-firmware advice when live Forget joins Disconnect: %s',
+  async (joinDisconnect) => {
+    const sim = await connectMarlinIdle(5_000);
+    await startTestLaserJob('M3 I S0\nG1 X10 F600 S100\nG1 X20\nM5 I\n', {
+      streamingMode: 'ping-pong',
+    });
+    await vi.advanceTimersByTimeAsync(20);
+    // Simulate the firmware kill() while a host job is active. The serial
+    // transport still accepts later writes, but halted firmware executes none.
+    await sim.port.connection.write('M112\n');
+    await vi.advanceTimersByTimeAsync(20);
+    expect(sim.state().isHalted).toBe(true);
+    const haltedNotice = useLaserStore.getState().safetyNotice;
+    expect(haltedNotice).toMatchObject({ kind: 'controller-error', halted: true });
+
+    const disconnect = joinDisconnect ? useLaserStore.getState().disconnect() : null;
+    const forget = useLaserStore.getState().forgetDevice?.();
+    expect(forget).toBeDefined();
+    await vi.advanceTimersByTimeAsync(1_100);
+    await Promise.all([disconnect, forget]);
+
+    expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+    expect(useLaserStore.getState().safetyNotice).toBe(haltedNotice);
+    expect(useLaserStore.getState().safetyNotice?.message).toContain(HALT_ADVICE);
+    useLaserStore.getState().clearSafetyNotice();
+    expect(useLaserStore.getState().safetyNotice).toBeNull();
+  },
+);

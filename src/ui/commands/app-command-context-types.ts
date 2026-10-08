@@ -23,6 +23,8 @@ export type CommandShellCallbacks = {
   readonly requestQuickNest: () => void;
   readonly requestUnionSilhouette: () => void;
   readonly requestJoinPaths: () => void;
+  readonly requestResizeJoints?: () => void;
+  readonly requestPrepareStamp?: () => void;
   /** Open the ADR-410 Offset Shapes dialog. */
   readonly requestOffsetShapes: () => void;
   readonly requestPrintAndCut: () => void;

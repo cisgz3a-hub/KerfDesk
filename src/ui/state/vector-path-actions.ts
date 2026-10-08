@@ -1,3 +1,18 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
+import {
+  replaceSelectedAtEarliest,
+  replaceIdsAtEarliest,
+  selectedVectorObjects,
+  expectedSelection,
+  uniqueWeldId,
+  uniqueObjectId,
+  placeRetainedCompound,
+  compoundSceneBudgetIsValid,
+} from './vector-path-selection';
+import { pruneDesignTreeOrder } from '../../core/scene/design-hierarchy-order';
+export { uniqueObjectId } from './vector-path-selection';
+import { retainBooleanCompoundResult } from '../../core/geometry/boolean-compound';
+import { booleanCompoundActions, type BooleanCompoundActions } from './boolean-compound-actions';
 import {
   combineVectorObjects,
   isVectorPathObject,
@@ -32,16 +47,25 @@ import { pruneOrphanLayers, pushUndo, type StateSlice } from './scene-mutations'
 import { planWeldSelection } from './vector-path-weld-plan';
 import { vectorRepairActions, type VectorRepairActions } from './vector-repair-actions';
 
-export type VectorPathActions = VectorRepairActions & {
-  readonly convertSelectionToPath: () => void;
-  readonly weldSelection: () => void;
-  // ADR-103 G1 — subject = bottom-most selected object, clips = the rest.
-  readonly booleanSelection: (op: VectorBooleanOp) => void;
-  // ADR-103 G1 — adds a NEW offset object; the sources stay.
-  readonly offsetSelection: (deltaMm: number) => void;
-  // ADR-103 G6 — relieve sharp corners in place, one undo step.
-  readonly dogboneSelection: (bitDiameterMm: number) => void;
+export type VectorCombineOptions = {
+  readonly keepOperands?: boolean;
+  readonly retainCompound?: boolean;
+  readonly expectedProject?: Project;
+  readonly expectedIds?: ReadonlyArray<string>;
+  readonly isCurrent?: () => boolean;
 };
+
+export type VectorPathActions = VectorRepairActions &
+  BooleanCompoundActions & {
+    readonly convertSelectionToPath: () => void;
+    readonly weldSelection: (options?: VectorCombineOptions) => void;
+    // ADR-103 G1 â€” subject = bottom-most selected object, clips = the rest.
+    readonly booleanSelection: (op: VectorBooleanOp, options?: VectorCombineOptions) => void;
+    // ADR-103 G1 â€” adds a NEW offset object; the sources stay.
+    readonly offsetSelection: (deltaMm: number) => void;
+    // ADR-103 G6 â€” relieve sharp corners in place, one undo step.
+    readonly dogboneSelection: (bitDiameterMm: number) => void;
+  };
 
 export type VectorPathState = StateSlice & {
   readonly selectedObjectId: string | null;
@@ -50,7 +74,7 @@ export type VectorPathState = StateSlice & {
   readonly additionalSelectedIds: ReadonlySet<string>;
 };
 
-type VectorPathMutation = {
+export type VectorPathMutation = {
   readonly project: Project;
   readonly selectedObjectId: string | null;
   readonly selectedPathNode: null;
@@ -61,7 +85,11 @@ type VectorPathMutation = {
   readonly dirty: true;
 };
 
-type VectorPathSet = (fn: (state: VectorPathState) => VectorPathMutation | VectorPathState) => void;
+export type VectorPathSet = (
+  fn: (state: VectorPathState) => VectorPathMutation | VectorPathState,
+  onCommitted?: () => void,
+  isCurrent?: () => boolean,
+) => void;
 
 export function vectorPathActions(
   set: VectorPathSet,
@@ -70,9 +98,35 @@ export function vectorPathActions(
 ): VectorPathActions {
   return {
     ...vectorRepairActions(set),
+    ...booleanCompoundActions(set),
     convertSelectionToPath: () => set((state) => convertSelectionToPathMutation(state)),
-    weldSelection: () => weldSet((state) => weldSelectionMutation(state)),
-    booleanSelection: (op) => copySet((state) => booleanSelectionMutation(state, op)),
+    weldSelection: (options = {}) =>
+      (options.keepOperands ? copySet : weldSet)(
+        (state) =>
+          expectedSelection(state, options)
+            ? weldSelectionMutation(
+                state,
+                options.keepOperands === true,
+                options.retainCompound === true,
+              )
+            : state,
+        undefined,
+        options.isCurrent,
+      ),
+    booleanSelection: (op, options = {}) =>
+      copySet(
+        (state) =>
+          expectedSelection(state, options)
+            ? booleanSelectionMutation(
+                state,
+                op,
+                options.keepOperands === true,
+                options.retainCompound === true,
+              )
+            : state,
+        undefined,
+        options.isCurrent,
+      ),
     offsetSelection: (deltaMm) => copySet((state) => offsetSelectionMutation(state, deltaMm)),
     dogboneSelection: (bitDiameterMm) =>
       set((state) => dogboneSelectionMutation(state, bitDiameterMm)),
@@ -90,7 +144,7 @@ function dogboneSelectionMutation(
   let changed = false;
   for (const object of selected) {
     // Per-object skip on error (no qualifying corners / open contour) is the
-    // intended silent behavior — dogbone a selection, relieve what qualifies,
+    // intended silent behavior â€” dogbone a selection, relieve what qualifies,
     // leave the rest (WORKFLOW F-CNC26; CNV-04 keeps this one silent).
     const result = dogboneOperationRegions(object, bitDiameterMm, scene.layers);
     if (result.kind === 'error') {
@@ -126,6 +180,7 @@ function convertSelectionToPathMutation(
     if (!selectedIds.has(object.id) || object.locked === true || !isVectorPathObject(object)) {
       continue;
     }
+    if (isBooleanCompoundObject(object)) continue;
     const materialized = materializeVectorObject(object, object.id);
     scene = replaceObject(scene, object.id, materialized);
     changed = true;
@@ -143,7 +198,11 @@ function convertSelectionToPathMutation(
   };
 }
 
-function weldSelectionMutation(state: VectorPathState): VectorPathMutation | VectorPathState {
+function weldSelectionMutation(
+  state: VectorPathState,
+  keepOperands = false,
+  retainCompound = false,
+): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length === 0 || selected.some((object) => object.locked === true)) return state;
   const weldResult = planWeldSelection(
@@ -158,24 +217,39 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
     useToastStore.getState().pushToast(weldResult.error.message, 'warning');
     return state;
   }
-  const welded = weldResult.value.object;
+  const captured = retainBooleanCompoundResult(
+    weldResult.value.object,
+    'weld',
+    weldResult.value.operands,
+    retainCompound,
+  );
+  if (captured.kind === 'error') {
+    useToastStore.getState().pushToast(captured.error.message, 'warning');
+    return state;
+  }
+  const welded = captured.value;
   const removeIds = new Set(selected.map((object) => object.id));
   let scene: Scene = {
     ...state.project.scene,
-    objects: replaceSelectedAtEarliest(state.project.scene.objects, removeIds, welded),
+    objects: keepOperands
+      ? [...state.project.scene.objects, welded]
+      : replaceSelectedAtEarliest(state.project.scene.objects, removeIds, welded),
     layers: weldResult.value.layers,
     ...(state.project.scene.artworkOrder === undefined
       ? {}
       : {
-          artworkOrder: replaceIdsAtEarliest(
-            canonicalArtworkOrder(state.project.scene),
-            removeIds,
-            welded.id,
-          ),
+          artworkOrder: keepOperands
+            ? [...canonicalArtworkOrder(state.project.scene), welded.id]
+            : replaceIdsAtEarliest(
+                canonicalArtworkOrder(state.project.scene),
+                removeIds,
+                welded.id,
+              ),
         }),
   };
-  scene = removeObjectIdsFromGroups(scene, removeIds);
-  scene = pruneOrphanLayers(scene);
+  if (!keepOperands) scene = removeObjectIdsFromGroups(scene, removeIds);
+  scene = pruneDesignTreeOrder(pruneOrphanLayers(scene));
+  if (!compoundSceneBudgetIsValid(state.project.scene, scene, retainCompound)) return state;
   return {
     project: { ...state.project, scene },
     selectedObjectId: welded.id,
@@ -188,38 +262,12 @@ function weldSelectionMutation(state: VectorPathState): VectorPathMutation | Vec
   };
 }
 
-function replaceSelectedAtEarliest(
-  objects: ReadonlyArray<SceneObject>,
-  removeIds: ReadonlySet<string>,
-  replacement: SceneObject,
-): ReadonlyArray<SceneObject> {
-  let inserted = false;
-  return objects.flatMap((object) => {
-    if (!removeIds.has(object.id)) return [object];
-    if (inserted) return [];
-    inserted = true;
-    return [replacement];
-  });
-}
-
-function replaceIdsAtEarliest(
-  ids: ReadonlyArray<string>,
-  removeIds: ReadonlySet<string>,
-  replacementId: string,
-): ReadonlyArray<string> {
-  let inserted = false;
-  return ids.flatMap((id) => {
-    if (!removeIds.has(id)) return [id];
-    if (inserted) return [];
-    inserted = true;
-    return [replacementId];
-  });
-}
-
 // Replace the selection with one combined object (weld's shape, different op).
 function booleanSelectionMutation(
   state: VectorPathState,
   op: VectorBooleanOp,
+  keepOperands = false,
+  retainCompound = false,
 ): VectorPathMutation | VectorPathState {
   const selected = selectedVectorObjects(state.project.scene, selectedObjectIds(state));
   if (selected.length < 2 || selected.some((object) => object.locked === true)) return state;
@@ -229,13 +277,28 @@ function booleanSelectionMutation(
     return state;
   }
   const prepared = prepareIndependentArtwork(state.project.scene, combineResult.value, selected[0]);
-  const combined = prepared.object;
+  const captured = retainBooleanCompoundResult(prepared.object, op, selected, retainCompound);
+  if (captured.kind === 'error') {
+    useToastStore.getState().pushToast(captured.error.message, 'warning');
+    return state;
+  }
+  const combined = captured.value;
   const removeIds = new Set(selected.map((object) => object.id));
   let scene = prepared.scene;
-  for (const id of removeIds) scene = removeObject(scene, id);
-  scene = removeObjectIdsFromGroups(scene, removeIds);
+  if (!keepOperands) {
+    for (const id of removeIds) scene = removeObject(scene, id);
+    scene = removeObjectIdsFromGroups(scene, removeIds);
+  }
   scene = addObject(scene, combined);
-  scene = pruneOrphanLayers(scene);
+  scene = placeRetainedCompound(
+    state.project.scene,
+    scene,
+    removeIds,
+    combined,
+    retainCompound && !keepOperands,
+  );
+  scene = pruneDesignTreeOrder(pruneOrphanLayers(scene));
+  if (!compoundSceneBudgetIsValid(state.project.scene, scene, retainCompound)) return state;
   return {
     project: { ...state.project, scene },
     selectedObjectId: combined.id,
@@ -348,29 +411,3 @@ function prepareDogboneEdit(
     object: created.object as ImportedSvg,
   };
 }
-
-function selectedVectorObjects(
-  scene: Scene,
-  selectedIds: ReadonlyArray<string>,
-): ReadonlyArray<VectorSceneObject> {
-  const selected = new Set(selectedIds);
-  return scene.objects.filter(
-    (object): object is VectorSceneObject => selected.has(object.id) && isVectorPathObject(object),
-  );
-}
-
-function uniqueWeldId(scene: Scene): string {
-  return uniqueObjectId(scene, 'welded');
-}
-
-export function uniqueObjectId(scene: Scene, base: string): string {
-  const used = new Set(scene.objects.map((object) => object.id));
-  if (!used.has(`${base}-paths`)) return `${base}-paths`;
-  for (let index = 2; index <= MAX_ID_SUFFIX; index += 1) {
-    const id = `${base}-paths-${index}`;
-    if (!used.has(id)) return id;
-  }
-  return `${base}-paths-${crypto.randomUUID()}`;
-}
-
-const MAX_ID_SUFFIX = 1000;

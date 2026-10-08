@@ -17,6 +17,8 @@ import {
   prepareProfile,
   summarizeDialogResults,
   validateProject,
+  CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+  HISTORICAL_QUALIFICATION_PROJECT_SCHEMA,
 } from './installed-app-evidence.mjs';
 import { bounded, findDebugger, launchInstalledApp } from './installed-app-process.mjs';
 
@@ -231,7 +233,7 @@ test('build badge assertions fail for stale version, wrong commit and missing id
 
 function projectFixture() {
   return {
-    schemaVersion: 12,
+    schemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA,
     workspace: { width: 300, height: 300, units: 'mm' },
     jobSetup: { placement: 'fixture' },
     scene: {
@@ -271,17 +273,52 @@ test('disk evidence rejects missing source, missing geometry and changed millime
   changed.scene.objects[0].paths[0].polylines[0].points[1].x = 200;
   assert.throws(() => validateProject(Buffer.from(JSON.stringify(changed))), /millimetre geometry/);
   assert.throws(
-    () => validateProject(Buffer.from('{"schemaVersion":12,"scene":{"objects":[]}}')),
+    () =>
+      validateProject(
+        Buffer.from(
+          JSON.stringify({
+            schemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+            scene: { objects: [] },
+          }),
+        ),
+      ),
     /exactly one/,
   );
 });
 
 test('disk evidence rejects stale, future and malformed project schemas', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 13, '12', null, undefined]) {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 15, '14', null, undefined]) {
     const stale = { ...projectFixture(), schemaVersion };
     assert.throws(
       () => validateProject(Buffer.from(JSON.stringify(stale))),
       /Expected current project schema/,
+    );
+  }
+});
+
+test('historical schemas require the explicit known-upgrade contract and retain their identity', () => {
+  const options = { schemaMode: 'known-upgrade' };
+  for (const schemaVersion of [
+    HISTORICAL_QUALIFICATION_PROJECT_SCHEMA,
+    13,
+    CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+  ]) {
+    const project = { ...projectFixture(), schemaVersion };
+    const bytes = Buffer.from(JSON.stringify(project));
+    assert.deepEqual(validateProject(bytes, options), project);
+  }
+  assert.throws(
+    () => validateProject(Buffer.from(JSON.stringify(projectFixture())), { schemaMode: 'any' }),
+    /Unknown qualification schema mode/,
+  );
+  for (const schemaVersion of [11, 15, '12', '13', '14', null]) {
+    assert.throws(
+      () =>
+        validateProject(
+          Buffer.from(JSON.stringify({ ...projectFixture(), schemaVersion })),
+          options,
+        ),
+      /Expected known upgrade project schema/,
     );
   }
 });

@@ -1,4 +1,5 @@
-import { parseCommand, type GrantProps } from './protocol.js';
+import { isJsonContentType, isLegacyRequest } from '@modelcontextprotocol/server';
+import { MAX_BYTES, parseCommand, type GrantProps } from './protocol.js';
 import { digest, json } from './security.js';
 
 export const rateLimited = () => json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' });
@@ -6,13 +7,18 @@ export const rateLimited = () => json({ error: 'rate_limited' }, 429, { 'Retry-A
 /** Classification reserves bounded verification capacity; it never grants authority. */
 export async function abortRequest(request: Request, path: string): Promise<boolean> {
   if (request.method !== 'POST' || !['/api/client/command', '/mcp'].includes(path)) return false;
+  if (!isJsonContentType(request.headers.get('Content-Type'))) return false;
   try {
     const body: unknown = await request.clone().json();
     if (path === '/api/client/command') return parseCommand(body)?.name === 'abort_job';
-    // The installed SDK also accepts legacy batches, bounded to 100 messages.
-    // Only an entirely valid Abort batch may spend the reserved lane.
     const messages = Array.isArray(body) ? body : [body];
-    return messages.length > 0 && messages.length <= 100 && messages.every(abortToolMessage);
+    return (
+      messages.length > 0 &&
+      messages.length <= 100 &&
+      messages.every(abortToolMessage) &&
+      (!Array.isArray(body) ||
+        (await isLegacyRequest(request, body, { maxRequestBodySize: MAX_BYTES })))
+    );
   } catch {
     return false;
   }

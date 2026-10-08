@@ -203,7 +203,12 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
       const args = { ...admission, artworkIds: ['art-1'], action };
       const result = await client.callTool({ name: 'arrange_artwork', arguments: args });
       expect(result.isError).not.toBe(true);
-      expect(request).toHaveBeenLastCalledWith('arrange_artwork', args, expect.any(AbortSignal));
+      expect(request).toHaveBeenLastCalledWith(
+        'arrange_artwork',
+        args,
+        expect.any(AbortSignal),
+        expect.anything(),
+      );
       expect(result.structuredContent?.history).toEqual({ canUndo: true, canRedo: false });
     }
     const args = {
@@ -220,7 +225,12 @@ describe.each([false, true])('authoring SDK contract (modern=%s)', (modern) => {
     };
     const result = await client.callTool({ name: 'update_text', arguments: args });
     expect(result.isError).not.toBe(true);
-    expect(request).toHaveBeenLastCalledWith('update_text', args, expect.any(AbortSignal));
+    expect(request).toHaveBeenLastCalledWith(
+      'update_text',
+      args,
+      expect.any(AbortSignal),
+      expect.anything(),
+    );
     expect(JSON.stringify(result)).not.toContain('privateStack');
   });
 

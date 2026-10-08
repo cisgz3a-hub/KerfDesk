@@ -131,6 +131,10 @@ export function PreviewStatsPanel(props: {
         <summary title="Show path distances and the estimated time breakdown.">
           Distances and time details
         </summary>
+        <p>
+          Time uses the current motion and streaming settings. Preview shows planned geometry; it
+          does not measure machine movement or the material result.
+        </p>
         <div style={statsGridStyle} aria-label="Preview distance statistics">
           <span>Cut</span>
           <strong>{formatMm(stats.cutMm)}</strong>

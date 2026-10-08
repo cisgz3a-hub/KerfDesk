@@ -29,7 +29,7 @@ describe('CNC stage recipe persistence', () => {
   it('roundtrips physical values intact under schema 12', () => {
     const prepared = prepareProjectForPersistence(project());
     if (prepared.kind !== 'ok') throw new Error(prepared.reason);
-    expect(JSON.parse(prepared.json).schemaVersion).toBe(12);
+    expect(JSON.parse(prepared.json).schemaVersion).toBe(14);
     const loaded = deserializeProject(prepared.json);
     if (loaded.kind !== 'ok') throw new Error('Load failed');
     expect(loaded.project.scene.layers[0]?.cnc?.stageRecipes?.['relief-finish']).toEqual(recipe);

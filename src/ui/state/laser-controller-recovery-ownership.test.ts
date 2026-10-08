@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { grblDriver } from '../../core/controllers';
 import { parseStatusReport } from '../../core/controllers/grbl';
-import { makeConnection, connectWith } from './laser-store-motion-operation.test-support';
+import {
+  makeConnection,
+  connectWith,
+  framedRunCandidate,
+} from './laser-store-motion-operation.test-support';
 import { settleTestGrblHandshake } from './laser-test-start-helpers';
 import { useLaserStore, type LaserState } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
@@ -21,6 +25,7 @@ beforeEach(() => {
   useLaserStore.setState(initialLaserState());
 });
 afterEach(async () => {
+  await vi.advanceTimersByTimeAsync(1_000);
   vi.useRealTimers();
   await useLaserStore.getState().disconnect();
   resetStore();
@@ -138,10 +143,13 @@ describe('Wake continuation belongs to its exact recovery owner', () => {
     'follows a canonical Abort of the same recovery into %s',
     async (terminal) => {
       const held = deferredWrite();
+      const cleanup = deferredWrite();
       let resetCount = 0;
       const port = makeConnection(async (data) => {
         if (data === '?') port.emitLine(IDLE);
         if (data === '\x18' && ++resetCount === 2) await held.pending;
+        if (data === 'M5\n' && resetCount === 2) await cleanup.pending;
+        if (data === 'M5\n' || data === 'M9\n') port.emitLine('ok');
       });
       await connectWith(port);
       await settleTestGrblHandshake();
@@ -163,6 +171,18 @@ describe('Wake continuation belongs to its exact recovery owner', () => {
       if (terminal === 'numbered-alarm') port.emitLine('ALARM:3');
       if (terminal !== 'idle') port.emitLine("Grbl 1.1f ['$' for help]");
       port.emitLine(terminal === 'idle' ? IDLE : '<Alarm|MPos:50.000,60.000,0.000|FS:0,0>');
+      await microtasks();
+      if (terminal === 'idle') await vi.advanceTimersByTimeAsync(500);
+      expect(wake.value).toBe('pending');
+      expect(controllerOperationOwner(useLaserStore.getState().controllerOperation!)).toBe(
+        controllerOperationOwner(owner),
+      );
+      await expect(
+        useLaserStore
+          .getState()
+          .frame({ minX: 0, minY: 0, maxX: 10, maxY: 10 }, 1000, framedRunCandidate()),
+      ).rejects.toThrow('controller operation is active');
+      cleanup.release();
       await microtasks();
       expect(wake.value).toBe(terminal === 'idle' ? 'idle' : 'alarm');
       expect(useLaserStore.getState().controllerOperation).toBeNull();

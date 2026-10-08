@@ -1,3 +1,4 @@
+import { cloneSelectionGroups } from './clone-selection-groups';
 import {
   addLayer,
   addObject,
@@ -240,14 +241,9 @@ export function prepareClipboardPaste(
       const mapped = cloned.idMap.get(id);
       return mapped === undefined ? [] : [mapped];
     }),
-    groups: groups.map((group) => ({
-      ...structuredClone(group),
-      id: crypto.randomUUID(),
-      objectIds: group.objectIds.flatMap((id) => {
-        const mapped = cloned.idMap.get(id);
-        return mapped === undefined ? [] : [mapped];
-      }),
-    })),
+    groups: cloneSelectionGroups(groups, new Set(cloned.idMap.keys()), cloned.idMap, () =>
+      crypto.randomUUID(),
+    ),
   };
 }
 

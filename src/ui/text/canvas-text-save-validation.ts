@@ -29,8 +29,9 @@ export function canvasTextUnchanged(original: TextObject | null, next: TextObjec
     keys.every((key) => original[key] === next[key]) &&
     (original.bendDeg ?? 0) === (next.bendDeg ?? 0) &&
     (original.weldOverlaps ?? false) === (next.weldOverlaps ?? false) &&
-    sameValue(original.pathText, next.pathText) &&
-    sameValue(original.variableTemplate, next.variableTemplate) &&
+    (['textBox', 'pathText', 'variableTemplate'] as const).every((key) =>
+      sameValue(original[key], next[key]),
+    ) &&
     // Reopening linked text rebuilds its geometry against the current guide,
     // even if the lettering settings themselves have not changed.
     (next.pathText === undefined || samePlacement(original, next))

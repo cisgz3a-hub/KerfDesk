@@ -21,6 +21,7 @@ import { mpgCommandBlockMessage, pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import type { TranscriptSource } from './laser-transcript';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
+import type { ResetCleanupRefs } from './laser-reset-cleanup';
 import { machineSettingsWriteBlockReason } from './machine-settings-write-readiness';
 import { beginReportUnitsWrite, retainControllerReportUnits } from './controller-report-units';
 import { requalifyWithoutSettingsDump } from './laser-module-probe';
@@ -45,11 +46,12 @@ function settingsControllerOperation(label: string) {
   return interactiveControllerOperation(label, 'terminal-exchange');
 }
 
-export type GrblSettingsActionRefs = ControllerLifecycleRefs & {
-  driver: ControllerDriver;
-  settingsCollector: SettingsCollectorState;
-  settingsCollectorSessionEpoch: number | null;
-};
+export type GrblSettingsActionRefs = ControllerLifecycleRefs &
+  Partial<ResetCleanupRefs> & {
+    driver: ControllerDriver;
+    settingsCollector: SettingsCollectorState;
+    settingsCollectorSessionEpoch: number | null;
+  };
 
 export function grblSettingsActions(
   set: SetFn,
@@ -72,6 +74,7 @@ async function readMachineSettingsAction(
   const settingsQuery = refs.driver.commands.settingsQuery;
   const blocked = machineSettingsReadBlockReason(get(), {
     settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
+    resetCleanupPending: refs.pendingResetCleanup != null,
   });
   if (blocked !== null) return blockRead(set, get, blocked);
   const qualificationEpoch = get().controllerSessionEpoch;

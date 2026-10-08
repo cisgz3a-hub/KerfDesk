@@ -20,17 +20,17 @@ afterEach(async () => {
   useLaserStore.setState(initialLaser);
 });
 
-it('real Abort does not treat a recovery status update as a replacement owner', async () => {
+function recoveryConnection() {
   const lineHandlers = new Set<(line: string) => void>();
   const emitLine = (line: string) => {
     for (const handler of lineHandlers) handler(line);
   };
-  let holdReset = false;
-  let finishReset: () => void = () => undefined;
+  let resetHeld = false;
+  let resolveReset: () => void = () => undefined;
   const write = vi.fn(async (line: string) => {
-    if (holdReset && line === '\x18') {
+    if (resetHeld && line === '\x18') {
       await new Promise<void>((resolve) => {
-        finishReset = resolve;
+        resolveReset = resolve;
       });
     }
   });
@@ -52,39 +52,85 @@ it('real Abort does not treat a recovery status update as a replacement owner', 
       requestPort: async () => ({ open: async () => connection }),
     },
   };
-  await useLaserStore.getState().connect(adapter);
-  emitLine('Grbl 1.1f');
-  emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  return {
+    adapter,
+    write,
+    emitLine,
+    holdReset: () => {
+      resetHeld = true;
+    },
+    finishReset: () => {
+      resetHeld = false;
+      resolveReset();
+    },
+  };
+}
+
+async function settleWakeBeforeTeardown(
+  connection: ReturnType<typeof recoveryConnection>,
+  wake: Promise<unknown>,
+) {
+  connection.finishReset();
+  connection.emitLine('Grbl 1.1f');
   await flush();
-  emitLine('ok');
+  connection.emitLine('ok');
+  connection.emitLine('ok');
+  connection.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  await wake.catch(() => undefined);
+}
+
+it('real Abort does not treat a recovery status update as a replacement owner', async () => {
+  const f = recoveryConnection();
+  await useLaserStore.getState().connect(f.adapter);
+  f.emitLine('Grbl 1.1f');
+  f.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+  await flush();
+  f.emitLine('ok');
   await flush();
   const wake = useLaserStore.getState().wakeController();
-  await flush();
-  expect(useLaserStore.getState().controllerOperation).toMatchObject({
-    kind: 'recovery',
-    phase: 'awaiting-idle',
-  });
-  const ownerBefore = useLaserStore.getState().controllerOperation;
-  holdReset = true;
-  const prepared = desktopCloseController.prepare(80);
-  const preparedReply = vi.fn();
-  void prepared.then(preparedReply);
-  expect(write).toHaveBeenLastCalledWith('\x18');
-  emitLine('<Run|MPos:0.000,0.000,0.000|FS:0,0>');
-  expect(useLaserStore.getState().controllerOperation).toEqual(ownerBefore);
-  expect(useLaserStore.getState().controllerOperation).not.toBe(ownerBefore);
-  finishReset();
-  await flush();
-  const actualNotice = desktopCloseController.getNotice();
-  const approval = desktopCloseController.approve(80);
-  desktopCloseController.keepOpen();
-  await prepared;
-  holdReset = false;
-  emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
-  await wake;
-  expect(actualNotice?.kind).not.toBe('failed');
-  expect(preparedReply).toHaveBeenCalledExactlyOnceWith({ status: 'ready', dirty: false });
-  expect(approval).toEqual({ status: 'approved' });
+  void wake.catch(() => undefined);
+  let recoverySettled = false;
+  try {
+    await flush();
+    const ownerBefore = useLaserStore.getState().controllerOperation;
+    expect(ownerBefore).toMatchObject({ kind: 'recovery', phase: 'awaiting-idle' });
+    const privateOwner = controllerOperationOwner(ownerBefore!);
+    f.holdReset();
+    const prepared = desktopCloseController.prepare(80);
+    const preparedReply = vi.fn();
+    void prepared.then(preparedReply);
+    expect(f.write).toHaveBeenLastCalledWith('\x18');
+    f.emitLine('<Run|MPos:0.000,0.000,0.000|FS:0,0>');
+    const continued = useLaserStore.getState().controllerOperation;
+    expect(continued).toMatchObject({ kind: 'recovery', phase: 'reset', idleReports: 0 });
+    expect(controllerOperationOwner(continued!)).toBe(privateOwner);
+    expect(continued).not.toBe(ownerBefore);
+    f.finishReset();
+    await flush();
+    const actualNotice = desktopCloseController.getNotice();
+    const approval = desktopCloseController.approve(80);
+    desktopCloseController.keepOpen();
+    await prepared;
+    expect(actualNotice?.kind).not.toBe('failed');
+    expect(preparedReply).toHaveBeenCalledExactlyOnceWith({ status: 'ready', dirty: false });
+    expect(approval).toEqual({ status: 'approved' });
+
+    f.emitLine('Grbl 1.1f');
+    await flush();
+    expect(f.write).toHaveBeenCalledWith('M5\n');
+    expect(f.write).toHaveBeenCalledWith('M9\n');
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+    expect(controllerOperationOwner(useLaserStore.getState().controllerOperation!)).toBe(
+      privateOwner,
+    );
+    f.emitLine('ok');
+    f.emitLine('ok');
+    f.emitLine('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+    await expect(wake).resolves.toBe('idle');
+    recoverySettled = true;
+  } finally {
+    if (!recoverySettled) await settleWakeBeforeTeardown(f, wake);
+  }
 });
 
 const continuations: ReadonlyArray<{

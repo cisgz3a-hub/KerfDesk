@@ -42,6 +42,7 @@ function makeLaserState(): LaserState {
     controllerSettings: null,
     controllerSettingsObservation: null,
     controllerBuildInfo: null,
+    controllerFirmwareReport: null,
     controllerBuildInfoRawLines: [],
     controllerBuildInfoObservation: null,
     controllerQualification: { kind: 'qualified', epoch: 0, settings: 'verified' },
@@ -98,7 +99,13 @@ function makeLaserState(): LaserState {
     setOriginAtProgramPoint: async () => ({ x: 0, y: 0 }),
     configureGrblLaserSetup: async () => undefined,
     readMachineSettings: async () => undefined,
+    readFirmwareReport: async () => {
+      throw new Error('No firmware fixture');
+    },
+    measureSurfaceGrid: async () => ({ kind: 'failed', reason: 'No surface fixture' }),
     retryControllerQualification: async () => undefined,
+    getMachineSettingsReadBlockReason: () => null,
+    getControllerReconnectRecommended: () => false,
     writeGrblSetting: async () => undefined,
     sendConsoleCommand: async () => undefined,
     selectPrimaryWcsForFrame: async () => ({ kind: 'already-g54' as const }),

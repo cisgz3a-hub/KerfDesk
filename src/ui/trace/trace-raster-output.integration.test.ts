@@ -41,6 +41,7 @@ import {
 import { emitGcode } from '../../io/gcode/emit-gcode';
 import { applyRasterizedTraceToExisting } from '../state/rasterized-trace-mutation';
 import { buildRasterTraceOutput } from './trace-raster-output';
+import { createImageMaskPixelTest } from '../../core/raster/image-mask';
 
 function imageOperation(): Layer {
   return {
@@ -106,6 +107,70 @@ const CASES = [
 ] as const;
 
 describe('one-dimensional raster trace output', () => {
+  it('keeps a transformed native clip and external mask on raster output so outline padding cannot engrave outside it', async () => {
+    const baseSource = sourceRaster();
+    const source = {
+      ...baseSource,
+      imageMaskId: 'external-mask',
+      imageClip: [
+        {
+          color: '#000000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 2, y: 2 },
+                { x: 18, y: 2 },
+                { x: 18, y: 18 },
+                { x: 2, y: 18 },
+              ],
+            },
+            {
+              closed: true,
+              points: [
+                { x: 8, y: 8 },
+                { x: 12, y: 8 },
+                { x: 12, y: 12 },
+                { x: 8, y: 12 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const traced = oneDimensionalTrace(
+      'centerline',
+      { minX: 20, minY: 100, maxX: 180, maxY: 100 },
+      [
+        { x: 20, y: 100 },
+        { x: 180, y: 100 },
+      ],
+    );
+    const operation = imageOperation();
+    const raster = await buildRasterTraceOutput(source, traced, [operation]);
+    expect(raster.imageMaskId).toBe('external-mask');
+    expect(raster.imageClip?.[0]?.polylines[0]?.points[0]).toEqual({ x: 12, y: 12 });
+    expect(source.imageClip[0]?.polylines[0]?.points[0]).toEqual({ x: 2, y: 2 });
+    const contains = createImageMaskPixelTest(
+      raster,
+      undefined,
+      raster.pixelWidth,
+      raster.pixelHeight,
+    )!;
+    const project = createProject();
+    const group = compileJob(
+      { ...project.scene, objects: [raster], layers: [{ ...operation, color: raster.color }] },
+      project.device,
+    ).groups[0];
+    expect(group?.kind).toBe('raster');
+    if (group?.kind !== 'raster') throw new Error('Missing raster compile');
+    // Pixel membership, rather than a byte-identical resample, is the shared contract.
+    expect(contains(Math.floor(raster.pixelWidth / 2), Math.floor(raster.pixelHeight / 2))).toBe(
+      false,
+    );
+    expect([...group.sValues].some((value) => value > 0)).toBe(true);
+    expect(group.sValues[Math.floor(group.sValues.length / 2)]).toBe(0);
+  });
   it.each(CASES)('builds, compiles, and emits a $label trace', async ({ trace }) => {
     const source = sourceRaster();
     const operation = imageOperation();

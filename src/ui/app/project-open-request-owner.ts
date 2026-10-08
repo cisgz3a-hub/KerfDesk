@@ -13,14 +13,19 @@ export function claimProjectOpenRequest(
   claimRequestEpoch: () => number,
   getRequestEpoch: () => number,
   getProjectDocumentEpoch: () => number,
+  getProject?: () => unknown,
 ): ProjectOpenRequestOwner {
   const requestEpoch = claimRequestEpoch();
   let projectDocumentEpoch = getProjectDocumentEpoch();
+  let project = getProject?.();
   const isCurrent = (): boolean =>
-    getRequestEpoch() === requestEpoch && getProjectDocumentEpoch() === projectDocumentEpoch;
+    getRequestEpoch() === requestEpoch &&
+    getProjectDocumentEpoch() === projectDocumentEpoch &&
+    (getProject === undefined || getProject() === project);
   return {
     adoptCurrentDocument: () => {
       projectDocumentEpoch = getProjectDocumentEpoch();
+      project = getProject?.();
     },
     isCurrent,
     pushToast: (message, variant) => {

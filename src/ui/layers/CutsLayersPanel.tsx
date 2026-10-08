@@ -12,6 +12,7 @@ import { ArtworkRunOrderPanel } from './ArtworkRunOrderPanel';
 import { LayerRow } from './LayerRow';
 import { MaterialLibraryPanel } from './MaterialLibraryPanel';
 import { OperationListHeader } from './OperationListTools';
+import { DesignHierarchyPanel } from './DesignHierarchyPanel';
 import { SelectedObjectProperties } from './SelectedObjectProperties';
 import './cuts-layers-panel.css';
 import './artwork-inspector.css';
@@ -79,6 +80,7 @@ function LayersView({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.
     <>
       {layers.length === 0 ? <EmptyArtwork /> : null}
       <SelectedObjectProperties />
+      <DesignHierarchyPanel />
       {layers.length > 0 ? <OperationList layers={layers} /> : null}
     </>
   );

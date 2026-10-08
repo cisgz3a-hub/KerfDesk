@@ -2,7 +2,10 @@
 // for the job stream. Split from laser-line-handler when the untracked-ack
 // attribution pushed that file past the 400-line cap.
 
-import { wipeInFlight, type StreamerState } from '../../core/controllers/grbl';
+import { markErrored, wipeInFlight, type StreamerState } from '../../core/controllers/grbl';
+import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
+import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { frameProofReset } from './laser-session-reset';
 import { driverQuickStops, noResetStopLines, quickStopPatch } from './laser-quick-stop';
 import { armResetCleanup, resetCleanupLines } from './laser-reset-cleanup';
 import {
@@ -57,10 +60,9 @@ export function handleErrorLine(
       : {};
   set({
     lastError: rejection.code,
-    frameVerification: null,
-    framedRun: null,
-    frameTrace: null,
+    ...frameProofReset(),
     ...errorNoticePatch(state, rejection, rejectedLine),
+    ...plannedRejectionResetPatch(state, refs, rejection, ackSettlement),
     ...motionErrorPatch,
   });
   if (ackSettlement.owner === 'untracked') {
@@ -69,10 +71,10 @@ export function handleErrorLine(
     return;
   }
   // A halted controller runs nothing more, so no stop line is written to it.
+  advanceStream(set, get, refs, safeWrite, 'error');
   if (rejection.halted !== true) {
     requestRealtimeStopAfterStreamError(set, get, refs, state, safeWrite);
   }
-  advanceStream(set, get, refs, safeWrite, 'error');
 }
 
 // Checksum-mode retransmission is not implemented (ADR-094 v1): the sender
@@ -87,6 +89,7 @@ export function handleResendLine(
 ): void {
   const current = get();
   set({
+    ...plannedStreamResetPatch(current, refs),
     frameVerification: null,
     framedRun: null,
     frameTrace: null,
@@ -107,8 +110,13 @@ export function handleResendLine(
       undefined,
     ),
   });
+  // Resend is not a terminal acknowledgement; retain its exact owed line.
+  set((state) =>
+    state.streamer === null || isStoppedStreamErrorEcho(state.streamer)
+      ? {}
+      : { streamer: markErrored(state.streamer), ...liveCanvasLifecyclePatch(state, 'errored') },
+  );
   requestRealtimeStopAfterStreamError(set, get, refs, current, safeWrite);
-  advanceStream(set, get, refs, safeWrite, 'error');
 }
 
 // Abort (user or auto-abort-after-error) sends realtime reset plus a queued
@@ -129,7 +137,9 @@ function errorNoticePatch(
     return { safetyNotice: controllerHaltedNotice(rejection.raw ?? 'kill() called') };
   }
   if (isStoppedStreamErrorEcho(state.streamer)) return {};
-  return { safetyNotice: state.safetyNotice ?? rejectionNotice(state, rejection, rejectedLine) };
+  const previous =
+    state.safetyNotice?.kind === 'cnc-transition-unconfirmed' ? null : state.safetyNotice;
+  return { safetyNotice: previous ?? rejectionNotice(state, rejection, rejectedLine) };
 }
 
 function rejectionNotice(
@@ -152,6 +162,35 @@ function isStoppedStreamErrorEcho(streamer: StreamerState | null): boolean {
   return streamer !== null && ['cancelled', 'errored', 'disconnected'].includes(streamer.status);
 }
 
+function plannedRejectionResetPatch(
+  state: LaserState,
+  refs: HandlerRefs,
+  rejection: ControllerRejection,
+  ackSettlement: AckSettlement,
+): Partial<Pick<LaserState, 'streamReset'>> {
+  return ackSettlement.owner === 'stream' && rejection.halted !== true
+    ? plannedStreamResetPatch(state, refs)
+    : {};
+}
+
+function streamCanStillHaveBufferedMotion(streamer: StreamerState | null): boolean {
+  return (
+    streamer !== null && ['streaming', 'paused', 'done', 'tool-change'].includes(streamer.status)
+  );
+}
+
+function plannedStreamResetPatch(
+  state: LaserState,
+  refs: HandlerRefs,
+): Partial<Pick<LaserState, 'streamReset'>> {
+  // Checkpoint subscribers archive the first errored observation. Record this
+  // planned reset before publishing that terminal state, while the pre-error
+  // stream and motion still describe whether position may be lost.
+  return refs.driver.realtime.softReset !== null && streamCanStillHaveBufferedMotion(state.streamer)
+    ? { streamReset: streamResetRecord(state) }
+    : {};
+}
+
 function requestRealtimeStopAfterStreamError(
   set: SetFn,
   get: GetFn,
@@ -159,10 +198,7 @@ function requestRealtimeStopAfterStreamError(
   state: LaserState,
   safeWrite: SafeWriteFn,
 ): void {
-  const streamer = state.streamer;
-  const streamCanStillHaveBufferedMotion =
-    streamer !== null && ['streaming', 'paused', 'done', 'tool-change'].includes(streamer.status);
-  if (!streamCanStillHaveBufferedMotion) return;
+  if (!streamCanStillHaveBufferedMotion(state.streamer)) return;
   const driver = refs.driver;
   const softReset = driver.realtime.softReset;
   if (softReset === null) {
@@ -174,6 +210,16 @@ function requestRealtimeStopAfterStreamError(
     void (async () => {
       for (const line of lines) await safeWrite(line, 'stop', 'system');
     })().catch(() => undefined);
+    return;
+  }
+  if (isGrblFamilyDriver(driver)) {
+    set({ streamReset: streamResetRecord(state) });
+    void runGrblDisconnectTransaction(set, refs, safeWrite, {
+      retainConnection: true,
+      action: 'stop',
+      keepErroredStreamer: true,
+      cleanupLines: resetCleanupLines(driver),
+    }).catch(() => undefined);
     return;
   }
   clearCncLiveCaps();

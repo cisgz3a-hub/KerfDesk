@@ -9,7 +9,8 @@ import {
   type OffsetDirection,
 } from '../../core/geometry/offset-shapes';
 import type { ImportedSvg, Scene } from '../../core/scene';
-import { Button, Dialog, DialogActions, NumberInput } from '../kit';
+import { Button, Dialog, DialogActions } from '../kit';
+import { evaluateNumericEntry } from '../../core/numeric-expression';
 import { offsetShapesTargets, type OffsetShapesRequest } from '../state/offset-shapes-actions';
 import { OffsetShapesPreview } from './OffsetShapesPreview';
 
@@ -52,7 +53,8 @@ export function OffsetShapesDialog(props: {
   });
   const request = useMemo<OffsetShapesRequest>(() => {
     const { distanceText, ...rest } = form;
-    return { ...rest, distanceMm: distanceText.trim() === '' ? Number.NaN : Number(distanceText) };
+    const entry = evaluateNumericEntry(distanceText, { kind: 'length' });
+    return { ...rest, distanceMm: entry.kind === 'ok' ? entry.value : Number.NaN };
   }, [form]);
   const previewRequest = useDeferredValue(request);
   const sources = useMemo(
@@ -102,11 +104,14 @@ function OffsetShapesFields(props: {
     <div style={fieldsStyle}>
       <label style={fieldStyle}>
         <span>Offset distance (mm)</span>
-        <NumberInput
+        <input
+          type="text"
+          inputMode="decimal"
+          className="lf-input"
+          aria-label="Offset distance"
+          aria-invalid={evaluateNumericEntry(form.distanceText, { kind: 'length' }).kind !== 'ok'}
           value={form.distanceText}
-          min={0}
-          step="any"
-          title="How far the new outline sits from the selected shapes."
+          title="How far the new outline sits from the selected shapes. Type arithmetic or units such as 1/8in."
           onChange={(event) => onChange({ distanceText: event.currentTarget.value })}
         />
       </label>

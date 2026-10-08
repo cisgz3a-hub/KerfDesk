@@ -16,9 +16,13 @@ beforeEach(() => {
   ensureFramedRunInvalidationSubscriptions();
 });
 afterEach(async () => {
+  // Disconnect joins any reset started at the last body tick. Keep that clock
+  // alive through its bounded boot and cleanup windows before discarding it.
+  const disconnect = useLaserStore.getState().disconnect();
+  await vi.advanceTimersByTimeAsync(2_000);
+  await disconnect;
   vi.clearAllTimers();
   vi.useRealTimers();
-  await useLaserStore.getState().disconnect();
   useExperimentalLaserFeatures.getState().resetFeatures();
   vi.restoreAllMocks();
 });

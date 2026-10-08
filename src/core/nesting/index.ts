@@ -1,6 +1,9 @@
 export {
   quickNest,
   type NestItem,
+  type NestRotation,
+  type NestOptions,
+  nestRotation,
   type NestPlacement,
   type NestRect,
   type QuickNestResult,
@@ -8,6 +11,7 @@ export {
 export {
   compactOutlineNest,
   outlineNest,
+  validateNest,
   OUTLINE_NEST_ITEM_LIMIT,
   type NestOutline,
   type OutlineNestItem,

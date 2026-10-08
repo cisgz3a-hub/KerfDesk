@@ -12,6 +12,8 @@ import {
   type Project,
   type SceneObject,
 } from '../../core/scene';
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
+import type { ImportedSvg } from '../../core/scene/scene-object';
 import { compactLineGeometry } from '../../core/scene/compact-line-geometry';
 import { stringifyProjectJson } from './stringify-project-json';
 
@@ -49,11 +51,28 @@ function withCurveGeometry(project: Project): Project {
 function withSerializableObject(object: SceneObject): SceneObject {
   if (object.kind === 'raster-image' && object.imageClip !== undefined)
     return { ...object, imageClip: serializablePaths(object.imageClip) };
+  if (isBooleanCompoundObject(object)) return withSerializableCompound(object);
   if (!('paths' in object)) return object;
   if (object.kind === 'traced-image') {
     return { ...object, paths: object.paths.map(compactLineGeometry) };
   }
   return { ...object, paths: serializablePaths(object.paths) };
+}
+
+export function withSerializableCompound(
+  object: ImportedSvg & { readonly booleanCompound: NonNullable<ImportedSvg['booleanCompound']> },
+): ImportedSvg {
+  return {
+    ...object,
+    paths: serializablePaths(object.paths),
+    booleanCompound: {
+      ...object.booleanCompound,
+      operands: object.booleanCompound.operands.map((operand) => ({
+        ...operand,
+        object: { ...operand.object, paths: serializablePaths(operand.object.paths) },
+      })),
+    },
+  };
 }
 
 function serializablePaths(paths: readonly ColoredPath[]): readonly ColoredPath[] {

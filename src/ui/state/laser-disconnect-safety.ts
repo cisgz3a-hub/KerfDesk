@@ -68,7 +68,19 @@ export function unconfirmedDisconnectStopNotice(
     : disconnectStopUnconfirmedNotice();
 }
 
-export function retainedDisconnectSafetyNotice(state: LaserState): LaserSafetyNotice | null {
+export function safetyNoticeBeforeDisconnect(
+  state: LaserState,
+  driver: ControllerDriver,
+): LaserSafetyNotice | null {
+  return (
+    unconfirmedDisconnectStopNotice(state, driver) ??
+    retainedUnavailableTransportSafetyNotice(state)
+  );
+}
+
+export function retainedDisconnectSafetyNotice(
+  state: Pick<LaserState, 'safetyNotice'>,
+): LaserSafetyNotice | null {
   const notice = state.safetyNotice;
   if (notice?.kind === 'disconnect-stop-unconfirmed') return notice;
   return notice?.kind === 'write-failed' && notice.action === 'disconnect' ? notice : null;
@@ -99,6 +111,38 @@ export function safetyNoticeLeavesPhysicalStopUncertain(notice: LaserSafetyNotic
     return true;
   }
   return notice.kind === 'write-failed' && PHYSICAL_STOP_UNCERTAIN_WRITE_ACTIONS.has(notice.action);
+}
+
+export function acknowledgeSafetyNotice(
+  notice: LaserSafetyNotice | null,
+  refs: { safetyNoticeAcknowledgementRevision?: number },
+): { safetyNotice: null } {
+  if (notice !== null) {
+    refs.safetyNoticeAcknowledgementRevision = (refs.safetyNoticeAcknowledgementRevision ?? 0) + 1;
+  }
+  return { safetyNotice: null };
+}
+/** A delayed teardown may retain an incident until the operator acknowledges
+ * it. After that acknowledgement, only the current/new incident may survive. */
+export function disconnectSafetyNoticeReader(
+  get: () => LaserState,
+  refs: { readonly safetyNoticeAcknowledgementRevision?: number },
+  snapshot: () => LaserSafetyNotice | null,
+): () => LaserSafetyNotice | null {
+  const revision = refs.safetyNoticeAcknowledgementRevision ?? 0;
+  return () =>
+    (refs.safetyNoticeAcknowledgementRevision ?? 0) === revision ? snapshot() : get().safetyNotice;
+}
+/** Forget clears stale incidents after successful live cleanup, while retaining
+ * unconfirmed stops and any failure newly raised by that disconnect. */
+export function retainedLiveForgetSafetyNotice(
+  notice: LaserSafetyNotice | null,
+  precedingNotice: LaserSafetyNotice | null,
+  disconnectFailed: boolean,
+): LaserSafetyNotice | null {
+  return notice === precedingNotice && !disconnectFailed && !isControllerHaltedNotice(notice)
+    ? retainedDisconnectSafetyNotice({ safetyNotice: notice })
+    : notice;
 }
 
 export function withRetainedDisconnectSafety(

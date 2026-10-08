@@ -139,7 +139,7 @@ function controlTitle(readiness: AirAssistReadiness, label: string): string {
   if (readiness === 'defaults') {
     return 'Review and apply missing air-assist settings before turning manual air on.';
   }
-  return `${label}. Jobs use each layer's Job Air checkbox automatically.`;
+  return `${label}. Jobs use each layer's Job Air checkbox automatically. ON/OFF shows the last controller command or reported output, not measured airflow.`;
 }
 
 function AirOutputUnsetNotice(props: {

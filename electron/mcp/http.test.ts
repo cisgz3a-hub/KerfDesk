@@ -59,7 +59,12 @@ describe.each([false, true])('portable HTTP factory (modern=%s)', (modern) => {
       const result = await client.callTool({ name: 'get_app_status', arguments: {} });
       expect(result.structuredContent).toMatchObject({ revision: 'workspace-1' });
       expect(JSON.stringify(result)).not.toContain('secret-key');
-      expect(request).toHaveBeenCalledWith('get_app_status', {}, expect.any(AbortSignal));
+      expect(request).toHaveBeenCalledWith(
+        'get_app_status',
+        {},
+        expect.any(AbortSignal),
+        expect.anything(),
+      );
     } finally {
       await client.close();
       await handler.close();

@@ -12,7 +12,7 @@
 import { differenceD, FillRule, inflatePathsD, intersectD, xorD, type PathsD } from 'clipper2-ts';
 import { EndType, JoinType } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
-import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene';
+import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene/scene-object';
 import {
   boundsForPaths,
   pathDToPolyline,

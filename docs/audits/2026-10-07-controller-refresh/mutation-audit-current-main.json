@@ -1,0 +1,154 @@
+{
+  "kind": "final-current-main-bounded-mutation-audit",
+  "baseHead": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+  "capturedAt": "2026-10-07T11:13:33.154Z",
+  "completedAt": "2026-10-07T11:17:54.529Z",
+  "source": {
+    "isolatedCopy": true,
+    "gitSnapshot": false,
+    "manifestSha256": "243dddd1f85e0bf55dfe82b9c254a2fe032a008cdced82ed5221d92c22ae9749",
+    "lockSha256": "0e952fe3ae10023a1eeb24a0dcda1589b1ededbbed4367a7e44e4053a278e975",
+    "sourceConfigFilesCompared": 7827,
+    "differences": 0
+  },
+  "runner": {
+    "vitest": "4.1.11",
+    "workers": 1,
+    "localAccommodation": "Private cache and file-system allow-list for an NTFS dependency junction; repository test setup, include patterns and assertions retained."
+  },
+  "baselineBefore": {
+    "tests": 76,
+    "files": 7,
+    "passed": 76
+  },
+  "baselineAfter": {
+    "tests": 76,
+    "files": 7,
+    "passed": 76
+  },
+  "selectedFaults": 6,
+  "assertionDetected": 5,
+  "survived": 1,
+  "invalidRuns": 0,
+  "faults": [
+    {
+      "id": "p1-stale-reconnect",
+      "description": "Remove the reconnect click-time recommendation guard.",
+      "result": "assertion-detected",
+      "selectedRun": {
+        "tests": 10,
+        "passed": 8,
+        "failedAssertions": 2
+      },
+      "representativeFailure": {
+        "title": "ControllerConnectionControls current reconnect ownership rechecks a stale enabled Reconnect controller when the same port finishes recovery before React updates",
+        "assertion": "AssertionError: expected \"vi.fn()\" to be called once, but got 2 times",
+        "location": "src/ui/laser/ControllerConnectionControls-reconnect.test.tsx:252:29"
+      },
+      "selectedTestFiles": ["src/ui/laser/ControllerConnectionControls-reconnect.test.tsx"]
+    },
+    {
+      "id": "p2-reset-keeps-spatial-frame-proof",
+      "description": "Do not revoke completed spatial Frame proof at reset ownership claim.",
+      "result": "survived",
+      "selectedRun": {
+        "tests": 10,
+        "passed": 10,
+        "failedAssertions": 0
+      },
+      "representativeFailure": null,
+      "selectedTestFiles": ["src/ui/laser/ControllerConnectionControls-reconnect.test.tsx"]
+    },
+    {
+      "id": "p3-alarm-advances-owned-write-epoch",
+      "description": "Always advance the Alarm/Sleep write epoch while cleanup owns a write.",
+      "result": "assertion-detected",
+      "selectedRun": {
+        "tests": 11,
+        "passed": 9,
+        "failedAssertions": 2
+      },
+      "representativeFailure": {
+        "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through Alarm and owns the next Frame Abort",
+        "assertion": "AssertionError: expected 1 to be +0 // Object.is equality",
+        "location": "src/ui/state/laser-reset-cleanup-interruption.test.ts:273:63"
+      },
+      "selectedTestFiles": ["src/ui/state/laser-reset-cleanup-interruption.test.ts"]
+    },
+    {
+      "id": "p4-failed-completed-owner-not-released",
+      "description": "Keep the completed failed cleanup transaction joinable by a later Abort.",
+      "result": "assertion-detected",
+      "selectedRun": {
+        "tests": 36,
+        "passed": 34,
+        "failedAssertions": 2
+      },
+      "representativeFailure": {
+        "title": "post-reset cleanup interrupted while its transport is pending keeps an interrupted cleanup fenced when a second boot arrives before M5 transport settles",
+        "assertion": "AssertionError: expected [] to have a length of 1 but got +0",
+        "location": "src/ui/state/laser-reset-cleanup-interruption.test.ts:203:56"
+      },
+      "selectedTestFiles": [
+        "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+        "src/ui/state/laser-reset-owner-cancellation.test.ts",
+        "src/ui/state/laser-reset-response-ownership.test.ts"
+      ]
+    },
+    {
+      "id": "p5-alarm-skips-post-await-owner-check",
+      "description": "Complete an observed-Alarm Wake after owned cleanup without rechecking the caller ownership.",
+      "result": "assertion-detected",
+      "selectedRun": {
+        "tests": 23,
+        "passed": 22,
+        "failedAssertions": 1
+      },
+      "representativeFailure": {
+        "title": "Wake Alarm completion cannot clear a replacement owner checks ownership after the reset Alarm cleanup await",
+        "assertion": "AssertionError: expected 'alarm' to contain 'superseded'",
+        "location": "src/ui/state/laser-recovery-alarm-owner.test.ts:74:30"
+      },
+      "selectedTestFiles": [
+        "src/ui/state/laser-recovery-alarm-owner.test.ts",
+        "src/ui/state/laser-controller-recovery-ownership.test.ts"
+      ]
+    },
+    {
+      "id": "p6-skip-unconfirmed-best-effort-cleanup",
+      "description": "Skip the restored no-greeting best-effort M5/M9 dispatch while retaining the failure fence.",
+      "result": "assertion-detected",
+      "selectedRun": {
+        "tests": 25,
+        "passed": 7,
+        "failedAssertions": 18
+      },
+      "representativeFailure": {
+        "title": "causal reset response ownership keeps error-triggered reset debt fenced after a missing greeting, then recovers at a late boot",
+        "assertion": "AssertionError: expected [] to have a length of 1 but got +0",
+        "location": "src/ui/state/laser-reset-response.test-support.ts:130:54"
+      },
+      "selectedTestFiles": [
+        "src/ui/state/laser-reset-response-ownership.test.ts",
+        "src/ui/state/laser-stream-ack-stall.test.ts"
+      ]
+    }
+  ],
+  "survivorInterpretation": "p2 removes one duplicate revocation guard. The real app invalidation subscription still revokes completed Frame synchronously after reset changes the controller session epoch; all ten real-Frame UI cases passed. No observable contract breach or test-coverage gap is demonstrated by this single-guard omission.",
+  "limits": [
+    "Six selected faults; no exhaustive mutation or coverage score.",
+    "Overlapping focused runs are not added together.",
+    "Interrupted pre-extraction audit excluded from final credit.",
+    "No timeout, configuration or syntax failure credited as detecting a fault.",
+    "Controller transport and responses simulated; no hardware, deployment or release qualification."
+  ],
+  "selectedTestFiles": [
+    "src/ui/laser/ControllerConnectionControls-reconnect.test.tsx",
+    "src/ui/state/laser-controller-recovery-ownership.test.ts",
+    "src/ui/state/laser-recovery-alarm-owner.test.ts",
+    "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+    "src/ui/state/laser-reset-owner-cancellation.test.ts",
+    "src/ui/state/laser-reset-response-ownership.test.ts",
+    "src/ui/state/laser-stream-ack-stall.test.ts"
+  ]
+}

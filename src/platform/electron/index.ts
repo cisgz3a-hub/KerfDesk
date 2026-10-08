@@ -6,3 +6,5 @@ export { createDesktopSupportLogReader } from './support-log';
 export { createDesktopJobActivityReporter } from './job-activity';
 export { createDesktopWindowCommands } from './desktop-window';
 export { createDesktopSerialAdapter } from './desktop-serial';
+export { createDesktopMachineNetwork } from './desktop-machine-network';
+export { createDesktopAiAssistant } from './desktop-ai';
