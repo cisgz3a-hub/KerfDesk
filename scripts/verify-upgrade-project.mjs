@@ -62,8 +62,33 @@ export function validateUpgradeProject(bytes, previous, options) {
       previous.parkedCncMachine,
       'Saved parked CNC machine configuration changed',
     );
+    assert.deepEqual(
+      canonicalUpgradeCncSetup(project, project.schemaVersion),
+      canonicalUpgradeCncSetup(previous, project.schemaVersion),
+      'Saved CNC machining setup changed',
+    );
   }
   return project;
+}
+
+function canonicalUpgradeCncSetup(project, currentSchemaVersion) {
+  if (project.cncSetup !== undefined) return project.cncSetup;
+  // Schema 15's reader supplies the canonical empty setup for CNC/parked-CNC
+  // projects whose older save omitted it. Compare those effective settings;
+  // missing empty defaults do not erase any retained name, notes or fixtures.
+  if (
+    currentSchemaVersion < 15 ||
+    (project.machine?.kind !== 'cnc' && project.parkedCncMachine?.kind !== 'cnc')
+  )
+    return undefined;
+  return {
+    id: 'cnc-setup-1',
+    name: 'Setup 1',
+    notes: '',
+    wcs: 'G54',
+    zDatum: 'stock-top',
+    fixtures: [],
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
@@ -89,6 +114,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     { ...options, expectedSchemaVersion },
   );
   console.log(
-    'Saved artwork, geometry, workspace, job setup, optimization and machine configuration verified.',
+    'Saved artwork, geometry, workspace, job setup, machining setup, optimization and machine configuration verified.',
   );
 }

@@ -263,6 +263,111 @@ test('qualification retains admitted optimization and parked CNC values through 
   );
 });
 
+test('qualification retains admitted CNC setup identity, notes and fixture prisms', () => {
+  const previous = {
+    ...fixture,
+    cncSetup: {
+      id: 'retained-setup',
+      name: 'Retained setup',
+      notes: 'Inspect the left clamp before Frame',
+      wcs: 'G54',
+      zDatum: 'stock-top',
+      fixtures: [
+        {
+          id: 'left-clamp',
+          name: 'Left clamp',
+          xMm: 4,
+          yMm: 6,
+          widthMm: 12,
+          heightMm: 8,
+          bottomZMm: -2,
+          topZMm: 10,
+        },
+      ],
+    },
+  };
+  assert.deepEqual(validateUpgradeProject(encoded(previous), previous), previous);
+  for (const mutate of [
+    (value) => {
+      value.cncSetup.id = 'other-setup';
+    },
+    (value) => {
+      value.cncSetup.name = 'Other setup';
+    },
+    (value) => {
+      value.cncSetup.notes = 'Other clamp notes';
+    },
+    ...['xMm', 'yMm', 'widthMm', 'heightMm', 'bottomZMm', 'topZMm'].map((key) => (value) => {
+      value.cncSetup.fixtures[0][key] += 1;
+    }),
+    (value) => {
+      value.cncSetup.fixtures[0].id = 'other-clamp';
+    },
+    (value) => {
+      value.cncSetup.fixtures[0].name = 'Other clamp';
+    },
+    (value) => {
+      value.cncSetup.fixtures = [];
+    },
+    (value) => {
+      delete value.cncSetup;
+    },
+  ]) {
+    const changed = structuredClone(previous);
+    mutate(changed);
+    assert.throws(
+      () => validateUpgradeProject(encoded(changed), previous),
+      /Saved CNC machining setup changed/,
+    );
+  }
+});
+
+test('CNC setup comparison preserves missing older fields and their applicable defaults', () => {
+  const defaultSetup = {
+    id: 'cnc-setup-1',
+    name: 'Setup 1',
+    notes: '',
+    wcs: 'G54',
+    zDatum: 'stock-top',
+    fixtures: [],
+  };
+  for (const schemaVersion of [12, 13, 14]) {
+    for (const active of [true, false]) {
+      const previous = {
+        ...historicalFixture,
+        schemaVersion,
+        ...(active ? { machine: { kind: 'cnc' } } : { parkedCncMachine: { kind: 'cnc' } }),
+      };
+      const current = { ...previous, schemaVersion: fixture.schemaVersion, cncSetup: defaultSetup };
+      assert.deepEqual(validateUpgradeProject(encoded(previous), previous, knownUpgrade), previous);
+      assert.deepEqual(validateUpgradeProject(encoded(current), previous, knownUpgrade), current);
+      const missingDefault = { ...current };
+      delete missingDefault.cncSetup;
+      assert.deepEqual(
+        validateUpgradeProject(encoded(missingDefault), previous, knownUpgrade),
+        missingDefault,
+      );
+      const changed = structuredClone(current);
+      changed.cncSetup.name = 'Unexpected nondefault setup';
+      assert.throws(
+        () => validateUpgradeProject(encoded(changed), previous, knownUpgrade),
+        /Saved CNC machining setup changed/,
+      );
+    }
+  }
+  for (const previous of [historicalFixture, fixture]) {
+    const current = { ...fixture, cncSetup: defaultSetup };
+    assert.throws(
+      () => validateUpgradeProject(encoded(current), previous, knownUpgrade),
+      /Saved CNC machining setup changed/,
+    );
+  }
+  const missing = { ...fixture, machine: { kind: 'cnc' } };
+  const normalized = { ...missing, cncSetup: defaultSetup };
+  assert.deepEqual(validateUpgradeProject(encoded(normalized), missing), normalized);
+  assert.deepEqual(validateUpgradeProject(encoded(missing), normalized), missing);
+});
+
 test('schema discovery reads the exact installed source without evaluating it', async () => {
   const sourceSha = 'a'.repeat(40);
   for (const schemaVersion of [12, 14, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
