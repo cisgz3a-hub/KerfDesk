@@ -41,7 +41,10 @@ function sequenceIsContained(
     x: sequence.entryCenter.x + sequence.entryRadiusMm,
     y: sequence.entryCenter.y,
   };
-  if (!linkedRingsAreContained(sequence.rings, entryEnd, geometry)) return false;
+  if (
+    !linkedRingsAreContained([...(sequence.seedRings ?? []), ...sequence.rings], entryEnd, geometry)
+  )
+    return false;
   return independentRingsAreContained(sequence.finishRings, geometry);
 }
 

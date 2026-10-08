@@ -1,3 +1,4 @@
+import { cncSideHeader } from '../../core/cnc/cnc-two-sided-setup';
 // emitGcode — runs the Phase A pipeline (compile → emit → preflight) over a
 // Project and returns the G-code string plus the preflight verdict. Pure: no
 // I/O. Callers partition factual compile-integrity issues from advisories; they
@@ -183,14 +184,20 @@ export function emitPreparedGcodeWithCncPassSpans(
     prepared.project,
     body,
   );
-  const gcode = options.metadata
-    ? gcodeMetadataHeader(
-        options.metadata,
-        headerAssumptionsFor(prepared.project, job),
-        prepared.project.device,
-      ) + body
-    : body;
-  const spans = cncEmission !== null && options.metadata === undefined ? cncEmission.spans : null;
+  const sideHeader = cncSideHeader(prepared.project);
+  const gcode =
+    sideHeader +
+    (options.metadata
+      ? gcodeMetadataHeader(
+          options.metadata,
+          headerAssumptionsFor(prepared.project, job),
+          prepared.project.device,
+        ) + body
+      : body);
+  const spans =
+    cncEmission !== null && options.metadata === undefined && sideHeader === ''
+      ? cncEmission.spans
+      : null;
   return { gcode, preflight, spans };
 }
 

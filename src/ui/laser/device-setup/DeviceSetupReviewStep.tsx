@@ -28,6 +28,12 @@ export function DeviceSetupReviewStep({
   return (
     <section className="lf-setup-review">
       <SoftwareStatus issues={issues} />
+      {state.machineKind === 'cnc' ? (
+        <p>
+          Machining setup: <strong>{state.cncSetupDraft.name}</strong> · G54 · stock top Z0 ·{' '}
+          {state.cncSetupDraft.fixtures.length} fixture envelopes
+        </p>
+      ) : null}
       <div className="lf-setup-review-grid">
         <DeviceSetupReviewSections
           state={state}

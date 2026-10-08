@@ -280,6 +280,7 @@ export function canvasPlanRetentionKey(
   const serialized = JSON.stringify({
     scene: project.scene,
     machine: project.machine,
+    cncSetup: project.cncSetup,
     device: retainedDeviceFields(project.device),
     optimization: project.optimization,
     variables: project.variables,

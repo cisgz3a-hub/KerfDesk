@@ -7,8 +7,28 @@ import {
   type MachineKind,
 } from '../scene';
 
+export type ProcessRecipeGeometry = 'any' | 'closed' | 'open' | 'circular';
+
+/** All supplied conditions must match. Names are exact, case-insensitive labels. */
+export type ProcessRecipeSelector = {
+  readonly geometry: ProcessRecipeGeometry;
+  readonly objectName?: string | undefined;
+  readonly groupPath?: ReadonlyArray<string> | undefined;
+  readonly objectKind?: 'text' | 'shape' | 'imported-svg' | 'traced-image' | undefined;
+};
+
+export type ProcessRecipeRole = {
+  readonly id: string;
+  readonly name: string;
+  readonly required: boolean;
+  readonly stepIndices: ReadonlyArray<number>;
+  readonly selector: ProcessRecipeSelector;
+};
+
 export type ProcessRecipeStep = {
   readonly name: string;
+  /** Step indices that must precede this operation. */
+  readonly dependsOn?: ReadonlyArray<number>;
   readonly color: string;
   readonly output: boolean;
   readonly visible: boolean;
@@ -28,6 +48,8 @@ export type ProcessRecipe = {
   /** Present only for artwork with independently assigned paths. Entries index steps. */
   readonly pathSteps?: ReadonlyArray<ReadonlyArray<number>>;
   readonly tools?: ReadonlyArray<CncTool>;
+  /** Semantic selection replaces positional pathSteps for a machining template. */
+  readonly roles?: ReadonlyArray<ProcessRecipeRole>;
 };
 
 export type ProcessRecipeResult<T> =
@@ -47,6 +69,7 @@ export function canonicalProcessRecipe(recipe: ProcessRecipe): ProcessRecipe {
     machineKind: recipe.machineKind,
     steps: recipe.steps.map((step) => ({
       name: step.name,
+      ...(step.dependsOn === undefined ? {} : { dependsOn: [...step.dependsOn] }),
       color: step.color,
       output: step.output,
       visible: step.visible,
@@ -59,6 +82,20 @@ export function canonicalProcessRecipe(recipe: ProcessRecipe): ProcessRecipe {
     ...(recipe.pathSteps === undefined
       ? {}
       : { pathSteps: recipe.pathSteps.map((indices) => [...indices]) }),
+    ...(recipe.roles === undefined
+      ? {}
+      : {
+          roles: recipe.roles.map((role) => ({
+            ...role,
+            stepIndices: [...role.stepIndices],
+            selector: {
+              ...role.selector,
+              ...(role.selector.groupPath === undefined
+                ? {}
+                : { groupPath: [...role.selector.groupPath] }),
+            },
+          })),
+        }),
     ...(recipe.tools === undefined
       ? {}
       : { tools: recipe.tools.map((tool) => orderedJsonCopy(tool) as CncTool) }),
@@ -75,4 +112,8 @@ function orderedJsonCopy(value: unknown): unknown {
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, item]) => [key, orderedJsonCopy(item)]),
   );
+}
+
+export function sameRecipeValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(orderedJsonCopy(a)) === JSON.stringify(orderedJsonCopy(b));
 }

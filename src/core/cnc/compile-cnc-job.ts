@@ -1,3 +1,5 @@
+import { compileCncProjectedOperation } from './compile-cnc-projected-operation';
+import { tagArtworkGroup, type CompiledCncOperation } from './compile-cnc-operation-result';
 import { cncGroupForPasses } from './compile-cnc-pass-group';
 // compileCncJob — Scene + DeviceProfile + CncMachineConfig → Job of CncGroups.
 //
@@ -144,6 +146,7 @@ function compileCncSnapshot(
   const offsetLadderDiagnostics: CncOffsetLadderCompilationEvidence[] = [];
   const reliefPlans: CncReliefPlanningEvidence[] = [];
   const sourceObjects = scene.objects;
+  const allSourceObjects = [...sourceObjects, ...(scene.outputDependencies ?? [])];
   for (const [operationIndex, run] of artworkOperationRuns(scene).entries()) {
     const operation = compileCncOperation(
       sourceObjects,
@@ -153,6 +156,7 @@ function compileCncSnapshot(
       config,
       vcarveLayers,
       sourceGeometry?.get(operationIndex),
+      allSourceObjects,
     );
     if (operation.kind === 'relief-materialization-failed') return operation;
     clearingGroups.push(...operation.clearingGroups);
@@ -179,16 +183,6 @@ function compileCncSnapshot(
   };
 }
 
-type CompiledCncOperation = {
-  readonly kind: 'compiled';
-  readonly layerId: string;
-  readonly clearingGroups: ReadonlyArray<CncGroup>;
-  readonly profileGroups: ReadonlyArray<CncGroup>;
-  readonly reliefPlans: ReadonlyArray<CncReliefPlanningEvidence>;
-  readonly offsetLadderDiagnostics: ReadonlyArray<CncOffsetLadderCompilationEvidence>;
-  readonly stepoverOperation?: CncStepoverCompilationEvidence;
-};
-
 function compileCncOperation(
   sourceObjects: Scene['objects'],
   run: { readonly layer: Layer; readonly priorityObjectId: string },
@@ -197,9 +191,22 @@ function compileCncOperation(
   config: CncMachineConfig,
   vcarveLayers: CncCompilationEvidence['vcarveLayers'],
   sourceGeometry?: CncOperationSourceGeometry,
+  allSourceObjects: Scene['objects'] = sourceObjects,
 ): CompiledCncOperation | ReliefMaterializationFailure {
   const { layer, priorityObjectId } = run;
   const settings = layer.cnc ?? DEFAULT_CNC_LAYER_SETTINGS;
+  if (settings.reliefProjection !== undefined) {
+    return compileCncProjectedOperation(
+      sourceObjects,
+      allSourceObjects,
+      layer,
+      settings,
+      priorityObjectId,
+      device,
+      config,
+      sourceGeometry,
+    );
+  }
   const relief = compileReliefGroupsForLayer(sourceObjects, layer, settings, device, config);
   if (relief.kind === 'relief-materialization-failed') return relief;
   // The private artifact owns these contours and the validated ladder for this operation.
@@ -334,10 +341,6 @@ function tagFinishedGroup(
   return tagArtworkGroup(restAwareVCarveGroup(group, clearing, polylines), sourceObjectId);
 }
 
-function tagArtworkGroup(group: CncGroup, sourceObjectId: string): CncGroup {
-  return { ...group, sourceObjectId };
-}
-
 export { collectLayerPolylines } from './collect-cnc-contours';
 
 export function cncGroupForLayer(
@@ -400,6 +403,10 @@ function cncGroupForLayerResolvedWithEvidence(
     ),
   );
   const includeRampEntry = recordsRampEntry(settings, result.rampedEntry);
+  const options = {
+    includeRampEntry,
+    ...(result.restStock === undefined ? {} : { restStock: result.restStock }),
+  };
   const groups = profileStageRuns(led).flatMap((run) => {
     const stageSettings = run.finishing
       ? cncSettingsForStage(settings, 'profile-finish', tool)
@@ -411,12 +418,12 @@ function cncGroupForLayerResolvedWithEvidence(
       run.passes,
       device,
       config,
-      run.finishing ? { cuttingStage: 'profile-finish', includeRampEntry } : { includeRampEntry },
+      run.finishing ? { ...options, cuttingStage: 'profile-finish' } : options,
     );
     return group === null ? [] : [group];
   });
   return {
-    group: cncGroupForPasses(layer, settings, tool, led, device, config, { includeRampEntry }),
+    group: cncGroupForPasses(layer, settings, tool, led, device, config, options),
     groups,
     offsetFailed: result.offsetFailed,
     passLimited: result.passLimited,

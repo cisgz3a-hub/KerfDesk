@@ -16,6 +16,7 @@ export type ProcessRecipeControls = {
   readonly select: (id: string) => void;
   readonly status: string;
   readonly save: () => void;
+  readonly saveTemplate: () => void;
   readonly apply: () => void;
   readonly remove: () => void;
 };
@@ -26,6 +27,7 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
   const selected = useStore((state) => state.selectedObjectId);
   const additional = useStore((state) => state.additionalSelectedIds);
   const saveRecipe = useStore((state) => state.saveSelectedProcessRecipe);
+  const saveTemplateRecipe = useStore((state) => state.saveSelectedMachiningTemplate);
   const applyRecipe = useStore((state) => state.applyProcessRecipeToSelection);
   const deleteRecipe = useStore((state) => state.deleteProcessRecipe);
   const edition = useEdition();
@@ -42,6 +44,22 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
       result.kind === 'invalid'
         ? result.reason
         : `Saved ${result.value.name} (${result.value.steps.length} steps).`,
+    );
+    if (result.kind === 'ok') {
+      select(result.value.id);
+      setName('');
+    }
+  };
+  const saveTemplate = (): void => {
+    const result = saveTemplateRecipe(name);
+    setStatus(
+      result.kind === 'invalid'
+        ? result.reason
+        : 'Saved ' +
+            result.value.name +
+            ' with ' +
+            (result.value.roles?.length ?? 0) +
+            ' semantic roles. Review the selectors before applying.',
     );
     if (result.kind === 'ok') {
       select(result.value.id);
@@ -68,10 +86,23 @@ export function useProcessRecipeControls(): ProcessRecipeControls {
     deleteRecipe(recipe.id);
     setStatus(`Deleted ${recipe.name}.`);
   };
-  return { kind, name, setName, count, recipes, recipe, select, status, save, apply, remove };
+  return {
+    kind,
+    name,
+    setName,
+    count,
+    recipes,
+    recipe,
+    select,
+    status,
+    save,
+    saveTemplate,
+    apply,
+    remove,
+  };
 }
 
-function recipeProFeature(recipe: ProcessRecipe): ProFeature | null {
+export function recipeProFeature(recipe: ProcessRecipe): ProFeature | null {
   for (const step of recipe.steps) {
     const feature = operationProFeature(step);
     if (feature !== null) return feature;

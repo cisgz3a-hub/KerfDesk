@@ -48,6 +48,7 @@ const MIGRATORS: Readonly<Record<number, Migrator>> = {
   12: (raw) => ({ ...raw, schemaVersion: 13 }),
   // Existing geometry remains ordinary artwork; no compound intent is invented.
   13: (raw) => ({ ...raw, schemaVersion: 14 }),
+  14: (raw) => ({ ...raw, schemaVersion: 15 }),
 };
 
 function migrateV3ToV4(raw: RawProject): RawProject | MigrationFailure {

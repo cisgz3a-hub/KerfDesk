@@ -8,6 +8,9 @@ import type { Vec2 } from './scene-object';
 import type { CncFeedSource } from './cnc-feed-source';
 import type { CncCuttingStage, CncStageRecipe } from './cnc-stage-recipe';
 import type { CncTool } from './cnc-tool';
+import type { CncCuttingPreset } from './cnc-cutting-preset';
+import type { CncTaperedInlaySettings } from './cnc-tapered-inlay';
+import type { CncPocketRestStockSettings } from './cnc-pocket-rest-stock';
 import { DEFAULT_CNC_TOOLS } from './cnc-tool-starters';
 
 export type { CncTool, CncToolKind } from './cnc-tool';
@@ -97,6 +100,8 @@ export type CncProfileLeadSettings = {
 };
 
 export type CncLayerSettings = {
+  // Saved numeric/context snapshot; layer values remain explicit per-job overrides.
+  readonly cuttingPreset?: CncCuttingPreset;
   // Absent stages retain the shared layer values. Recipes are bound to a cutter.
   readonly stageRecipes?: Partial<Readonly<Record<CncCuttingStage, CncStageRecipe>>>;
   readonly cutType: CncCutType;
@@ -110,6 +115,17 @@ export type CncLayerSettings = {
   // Relief finishing (H.8): the bit that skims the true surface after
   // roughing. Absent = roughing only (the part stays one allowance proud).
   readonly reliefFinishToolId?: string;
+  // Optional rest finishing uses the named preceding finish pass as predicted stock.
+  readonly reliefRestFinishToolId?: string;
+  readonly reliefRestResidualMm?: number;
+  readonly reliefRestScallopMm?: number;
+  // Explicit vertical engraving depth below the selected relief surface.
+  readonly reliefProjection?: {
+    readonly reliefObjectId: string;
+    readonly depthMm: number;
+    readonly depthConvention: 'vertical';
+    readonly sampleSpacingMm: number;
+  };
   // Ball-nose scallop height target driving the finishing row spacing.
   readonly reliefScallopMm?: number;
   // ADR-423 finishing strategy. Absent = 'raster' (the serpentine alone);
@@ -142,6 +158,8 @@ export type CncLayerSettings = {
   // Pocket-only two-bit rest machining. This larger end mill clears the bulk
   // first; the layer's selected bit then cuts only geometrically remaining stock.
   readonly pocketRoughToolId?: string;
+  // Opt-in actual planned-route residuals; absent retains historical two-tool rest output.
+  readonly pocketRestStock?: CncPocketRestStockSettings | undefined;
   // Enforce climb or conventional cutting on profile/pocket toolpaths.
   readonly cutDirection?: CncCutDirection;
   // Total cut depth below stock top (positive). For V-carve this becomes the
@@ -156,6 +174,8 @@ export type CncLayerSettings = {
   readonly inlayPocketDepthMm?: number;
   readonly inlayAllowanceMm?: number;
   readonly inlayPairSpacingMm?: number;
+  // Absent preserves the legacy straight pair; present owns both tapered pieces.
+  readonly taperedInlay?: CncTaperedInlaySettings | undefined;
   readonly feedMmPerMin: number; // XY cutting feed
   readonly plungeMmPerMin: number; // Z plunge feed
   readonly spindleRpm: number; // S value; GRBL $30 should equal spindleMaxRpm

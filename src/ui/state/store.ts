@@ -1,3 +1,13 @@
+import type { currentMaterialLibraryState } from './material-library-actions';
+import type { currentSavedLibrariesState } from './saved-libraries-actions';
+import { initialState } from './store-initial-state';
+import { partGeneratorActions, type PartGeneratorActions } from './part-generator-actions';
+import {
+  constrainedSketchActions,
+  type ConstrainedSketchActions,
+} from './constrained-sketch-actions';
+import { reliefAuthoringActions, type ReliefAuthoringActions } from './relief-authoring-actions';
+import { reliefLinkMutationSetter } from './relief-link-mutation';
 import { observeDesignHierarchyDocument } from './design-hierarchy-store';
 import { proOperationMutationSetter } from '../licensing/pro-operation-mutation';
 import type { SvgFragmentActions } from './svg-fragment-mutation';
@@ -33,8 +43,6 @@ import { imageImportActions } from './import-actions';
 import { machineActions, type MachineActions } from './machine-actions';
 import { projectActions, type ProjectActions } from './project-actions';
 import type { ProjectBedReconciliationNotice } from './project-bed-reconciliation';
-import { initialProjectWorkspaceState } from './store-initial-project-state';
-import { createStartupProject } from './startup-project';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
 import {
   rasterAdjustmentActions,
@@ -42,11 +50,7 @@ import {
 } from './raster-adjustment-actions';
 import { reliefParamActions, type ReliefParamPatch } from './relief-param-actions';
 import { externalGcodeActions, type ExternalGcodePreview } from './external-gcode-actions';
-import {
-  CNC_LIBRARY_STATE_DEFAULTS,
-  cncLibraryActions,
-  type CncLibrarySlice,
-} from './cnc-library-actions';
+import { cncLibraryActions, type CncLibrarySlice } from './cnc-library-actions';
 import {
   cncLiveCapsActions,
   type CncLiveCapsActions,
@@ -64,27 +68,13 @@ import {
   closeOpenFillContoursActions,
   type CloseOpenFillContoursActions,
 } from './close-open-fill-contours-actions';
-import {
-  DEFAULT_LAYER_DEFAULTS_STATE,
-  layerDefaultActions,
-  type LayerDefaultsState,
-} from './layer-default-actions';
+import { layerDefaultActions, type LayerDefaultsState } from './layer-default-actions';
 import {
   airAssistDefaultActions,
   type AirAssistDefaultActions,
 } from './air-assist-default-actions';
-import {
-  MATERIAL_LIBRARY_STATE_DEFAULTS,
-  type currentMaterialLibraryState,
-  materialLibraryActions,
-  type MaterialLibraryActions,
-} from './material-library-actions';
-import {
-  SAVED_LIBRARIES_STATE_DEFAULTS,
-  type currentSavedLibrariesState,
-  savedLibrariesActions,
-  type SavedLibrariesActions,
-} from './saved-libraries-actions';
+import { materialLibraryActions, type MaterialLibraryActions } from './material-library-actions';
+import { savedLibrariesActions, type SavedLibrariesActions } from './saved-libraries-actions';
 import { libraryActions, type LibraryActions } from './material-library-store-actions';
 import { objectPropertiesActions, type ObjectPropertiesActions } from './object-properties-actions';
 import { operationActions, type OperationActions } from './operation-actions';
@@ -154,7 +144,10 @@ export const DEFAULT_OUTPUT_SCOPE_SETTINGS: OutputScopeSettings = {
   useSelectionOrigin: false,
 };
 
-export type AppState = ObjectPropertiesActions &
+export type AppState = PartGeneratorActions &
+  ConstrainedSketchActions &
+  ReliefAuthoringActions &
+  ObjectPropertiesActions &
   OperationActions &
   ArtworkOrderActions &
   MachineSetupActions &
@@ -392,103 +385,65 @@ export type AppState = ObjectPropertiesActions &
     readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
   };
 
-const initialState = (
-  project = createStartupProject(),
-): Pick<
-  AppState,
-  | 'project'
-  | 'projectDocumentEpoch'
-  | 'projectOpenRequestEpoch'
-  | 'projectSaveRequestEpoch'
-  | 'projectSavedRequestEpoch'
-  | 'projectSaveWriteCoordinator'
-  | 'probeSetupEpoch'
-  | 'cachedCncMachine'
-  | 'projectBedReconciliation'
-  | 'cncLiveCaps'
-  | 'selectedObjectId'
-  | 'selectedPathNode'
-  | 'selectedPathNodes'
-  | 'additionalSelectedIds'
-  | 'previewMode'
-  | 'cncLibrary'
-  | 'externalGcodePreview'
-  | 'undoStack'
-  | 'redoStack'
-  | 'pendingUndo'
-  | 'cursorMm'
-  | 'jobPlacement'
-  | 'outputScopeSettings'
-  | 'registrationArtworkOutputSnapshot'
-  | 'dirty'
-  | 'savedName'
-  | 'lastSaveTarget'
-  | 'copiedLayerSettings'
-  | 'sceneClipboard'
-  | 'layerDefaults'
-> &
-  ReturnType<typeof currentMaterialLibraryState> &
-  ReturnType<typeof currentSavedLibrariesState> => ({
-  ...initialProjectWorkspaceState(project),
-  ...CNC_LIBRARY_STATE_DEFAULTS,
-  layerDefaults: DEFAULT_LAYER_DEFAULTS_STATE,
-  ...MATERIAL_LIBRARY_STATE_DEFAULTS,
-  ...SAVED_LIBRARIES_STATE_DEFAULTS,
+export const useStore = create<AppState>((rawSet, get) => {
+  const set = reliefLinkMutationSetter(rawSet);
+  return {
+    ...initialState(),
+    ...projectActions(set, get, initialState),
+    ...objectInsertActions(set, get),
+    ...imageImportActions(set, get),
+    ...breakApartActions(proOperationMutationSetter(set, get)),
+    ...rasterAdjustmentActions(set),
+    ...reliefParamActions(set),
+    ...reliefAuthoringActions(set, get),
+    ...constrainedSketchActions(set, get),
+    ...partGeneratorActions(set, get),
+    ...externalGcodeActions(set),
+    ...cncLibraryActions(set),
+    ...cncLiveCapsActions(set),
+    ...layerActions(proOperationMutationSetter(set, get)),
+    ...machineActions(set, get),
+    ...airAssistDefaultActions(set, get),
+    ...fillSelectionActions(set),
+    ...vectorPathActions(set, get),
+    ...editingToolsActions(set, proOperationMutationSetter(set, get), get),
+    ...closeOpenFillContoursActions(set),
+    ...layerDefaultActions(set),
+    ...materialLibraryActions(set),
+    ...savedLibrariesActions(set, get),
+    ...libraryActions(proOperationMutationSetter(set, get)),
+    ...objectPropertiesActions(set),
+    ...operationActions(proOperationMutationSetter(set, get)),
+    ...artworkOrderActions(set),
+    ...cncTabActions(set),
+    ...imageEditActions(set),
+    ...imageMaskActions(set),
+    ...sceneClipboardActions(proOperationMutationSetter(set, get)),
+    ...sceneGroupActions(set),
+    ...sceneLockActions(set),
+    ...generatedSceneActions(proOperationMutationSetter(set, get)),
+    ...projectOptimizationActions(set),
+    ...projectNotesActions(set),
+    ...selectionTransformActions(set),
+    ...registrationActions(set),
+    ...boardCaptureActions(set),
+    ...boardTileActions(proOperationMutationSetter(set, get)),
+    ...pathNodeEditActions(set),
+    ...pathNodeCurveCommandActions(set),
+    ...objectDeleteActions(set),
+    ...arrayActions(proOperationMutationSetter(set, get)),
+    ...nestActions(set, get),
+    ...printCutProjectActions(set),
+    ...variableDataActions(set),
+    ...sceneActions(set, proOperationMutationSetter(set, get)),
+    ...duplicateAction(proOperationMutationSetter(set, get)),
+    ...fitToSelectionAction(get),
+    ...historyActions(set),
+    ...viewActions(set),
+    ...interactionActions(set),
+    ...saveTrackingActions(set, get),
+  };
 });
-
-export const useStore = create<AppState>((set, get) => ({
-  ...initialState(),
-  ...projectActions(set, get, initialState),
-  ...objectInsertActions(set, get),
-  ...imageImportActions(set, get),
-  ...breakApartActions(proOperationMutationSetter(set, get)),
-  ...rasterAdjustmentActions(set),
-  ...reliefParamActions(set),
-  ...externalGcodeActions(set),
-  ...cncLibraryActions(set),
-  ...cncLiveCapsActions(set),
-  ...layerActions(proOperationMutationSetter(set, get)),
-  ...machineActions(set, get),
-  ...airAssistDefaultActions(set, get),
-  ...fillSelectionActions(set),
-  ...vectorPathActions(set, get),
-  ...editingToolsActions(set, proOperationMutationSetter(set, get), get),
-  ...closeOpenFillContoursActions(set),
-  ...layerDefaultActions(set),
-  ...materialLibraryActions(set),
-  ...savedLibrariesActions(set, get),
-  ...libraryActions(proOperationMutationSetter(set, get)),
-  ...objectPropertiesActions(set),
-  ...operationActions(proOperationMutationSetter(set, get)),
-  ...artworkOrderActions(set),
-  ...cncTabActions(set),
-  ...imageEditActions(set),
-  ...imageMaskActions(set),
-  ...sceneClipboardActions(proOperationMutationSetter(set, get)),
-  ...sceneGroupActions(set),
-  ...sceneLockActions(set),
-  ...generatedSceneActions(proOperationMutationSetter(set, get)),
-  ...projectOptimizationActions(set),
-  ...projectNotesActions(set),
-  ...selectionTransformActions(set),
-  ...registrationActions(set),
-  ...boardCaptureActions(set),
-  ...boardTileActions(proOperationMutationSetter(set, get)),
-  ...pathNodeEditActions(set),
-  ...pathNodeCurveCommandActions(set),
-  ...objectDeleteActions(set),
-  ...arrayActions(proOperationMutationSetter(set, get)),
-  ...nestActions(set, get),
-  ...printCutProjectActions(set),
-  ...variableDataActions(set),
-  ...sceneActions(set, proOperationMutationSetter(set, get)),
-  ...duplicateAction(proOperationMutationSetter(set, get)),
-  ...fitToSelectionAction(get),
-  ...historyActions(set),
-  ...viewActions(set),
-  ...interactionActions(set),
-  ...saveTrackingActions(set, get),
-}));
 
 // Attach only after every action slice and the composed store are initialized.
 observeDesignHierarchyDocument(useStore.subscribe);

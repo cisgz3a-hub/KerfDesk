@@ -61,6 +61,7 @@ function invalidRestRoughToolIssue(
 ): PreflightIssue | null {
   if (
     settings.cutType !== 'pocket' ||
+    settings.pocketRestStock !== undefined ||
     settings.pocketRoughToolId === undefined ||
     settings.pocketStrategy === 'adaptive' ||
     settings.helixEntry !== undefined

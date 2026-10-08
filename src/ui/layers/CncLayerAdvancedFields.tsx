@@ -1,3 +1,4 @@
+import { ReliefAdvancedCncControls } from './ReliefAdvancedCncControls';
 // CNC operation numbers and the sections each cut type needs (ADR-481). Native
 // disclosures keep their controls mounted; each summary names its current state
 // and its tooltip says what it holds.
@@ -13,6 +14,7 @@ import { CncFeedPresetRows } from './CncFeedPresetRows';
 import { FeedsCalculatorRow } from './FeedsCalculatorRow';
 import { NumberField } from './CncLayerPrimitives';
 import { PocketFillRow } from './PocketFillRow';
+import { CncPocketStockRestFields } from './CncPocketStockRestFields';
 import { AdaptivePocketFields } from './AdaptivePocketFields';
 import { CncInlayFields } from './CncInlayFields';
 import { CncEntryFields } from './CncEntryFields';
@@ -29,9 +31,15 @@ export function CncLayerAdvancedGroup(props: {
   return (
     <div className="lf-cnc-settings-fields" role="group" aria-label="Cut refinements">
       <ClearingFields {...props} />
+      <CncPocketStockRestFields
+        layer={props.layer}
+        settings={props.settings}
+        onCommit={props.onCommit}
+      />
       <CncInlayFields layer={props.layer} settings={props.settings} onCommit={props.onCommit} />
       <CutTypeSections {...props} />
       <CncStageRecipeFields {...props} />
+      <ReliefAdvancedCncControls {...props} />
       <FeedHelperRows
         layer={props.layer}
         settings={props.settings}
@@ -185,7 +193,7 @@ function FeedHelperRows(props: {
       <RailSection
         label="Saved feeds"
         badge={presetCount === 0 ? 'None yet' : `${presetCount} saved`}
-        hint="Reuse a tested set of feed, plunge, spindle speed, depth per pass and stepover, or save these values for next time."
+        hint="Preview saved tool, material and machine context before copying cutting values. Source and trial notes stay with the record."
       >
         <CncFeedPresetRows
           layer={props.layer}

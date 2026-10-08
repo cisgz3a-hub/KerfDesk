@@ -1,3 +1,4 @@
+import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { describe, expect, it } from 'vitest';
 import {
   clipRectangle,
@@ -15,7 +16,7 @@ describe('schema 9 owned image clip persistence', () => {
     const original = ownedClipProject();
     const prepared = prepareProjectForPersistence(original);
     if (prepared.kind !== 'ok') throw Error(prepared.reason);
-    expect(JSON.parse(prepared.json).schemaVersion).toBe(14);
+    expect(JSON.parse(prepared.json).schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     const loaded = deserializeProject(prepared.json);
     if (loaded.kind !== 'ok') throw Error('Expected schema 9 artwork.');
     expect(loaded.migratedFrom).toBeUndefined();
@@ -46,15 +47,15 @@ describe('schema 9 owned image clip persistence', () => {
     const migrated = migrateToCurrent(legacy, 8);
     expect(migrated).toEqual({
       kind: 'ok',
-      raw: { ...legacy, schemaVersion: 14 },
-      steps: [8, 9, 10, 11, 12, 13],
+      raw: { ...legacy, schemaVersion: PROJECT_SCHEMA_VERSION },
+      steps: [8, 9, 10, 11, 12, 13, 14],
     });
     if (migrated.kind === 'ok') expect(migrated.raw['scene']).toBe(legacy.scene);
     expect(JSON.stringify(legacy)).toBe(before);
     const loaded = deserializeProject(before);
     if (loaded.kind !== 'ok') throw Error('Expected legacy artwork to migrate.');
     expect(loaded.migratedFrom).toBe(8);
-    expect(loaded.project.schemaVersion).toBe(14);
+    expect(loaded.project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(loaded.project.scene.objects).toEqual(legacy.scene.objects);
     expect(loaded.project.scene.objects[0]).not.toHaveProperty('imageClip');
     expect(compileJob(loaded.project.scene, loaded.project.device)).toEqual(

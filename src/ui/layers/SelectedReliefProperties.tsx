@@ -5,6 +5,7 @@
 // panel is the mirror case — ADR-101 §3).
 
 import { useState } from 'react';
+import { ReliefAuthoringDialog } from './ReliefAuthoringDialog';
 // Deep import: core/relief's public barrel is a ratcheted over-cap legacy
 // barrel and may only shrink; keep the established exports intact.
 import { reliefPhysicalDimensions } from '../../core/relief/relief-physical-dimensions';
@@ -30,10 +31,14 @@ import { ReliefSourceMeaning } from './ReliefSourceMeaning';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
-function ReliefHeading(): JSX.Element {
+function ReliefHeading(props: {
+  readonly relief: ReliefObject;
+  readonly epoch: number;
+}): JSX.Element {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
       <h3 style={headingStyle}>Relief</h3>
+      <ReliefEditorLaunch key={`${props.epoch}:${props.relief.id}`} relief={props.relief} />
     </div>
   );
 }
@@ -56,7 +61,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
   const widthMm = reliefPropertyWidthMm(relief, physical.targetScaleX);
   return (
     <section aria-label="Relief properties" style={sectionStyle}>
-      <ReliefHeading />
+      <ReliefHeading relief={relief} epoch={projectDocumentEpoch} />
       <p style={metaStyle}>
         {relief.source} — {reliefMeta(relief)}
       </p>
@@ -118,6 +123,27 @@ export function SelectedReliefProperties(): JSX.Element | null {
   );
 }
 
+function ReliefEditorLaunch(props: { readonly relief: ReliefObject }): JSX.Element | null {
+  const [editorOpen, setEditorOpen] = useState(false);
+  if (props.relief.reliefSource.kind !== 'heightfield-v1') return null;
+  return (
+    <>
+      <button
+        title="Edit retained relief components, vector clips and sculpt strokes"
+        type="button"
+        onClick={() => setEditorOpen(true)}
+      >
+        Edit relief components…
+      </button>
+      {editorOpen ? (
+        <ReliefAuthoringDialog
+          relief={props.relief as HeightfieldReliefObject}
+          onClose={() => setEditorOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
 function ReliefGeometryDisclosures(props: { readonly relief: ReliefObject }): JSX.Element {
   return (
     <>

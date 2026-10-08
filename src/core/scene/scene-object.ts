@@ -1,3 +1,5 @@
+import type { ConstrainedSketch2d } from '../sketch-constraints/constrained-sketch';
+import type { PartGeneratorSource } from '../parts/part-generator';
 // SceneObject â€” the discriminated union the rest of the pipeline pattern-matches
 // against. Phase A ships one variant (ImportedSvg); ADR-014 commits to adding
 // 'text' (Phase D) and 'traced-image' (Phase E) without touching code outside
@@ -11,6 +13,7 @@ export type { ColoredPath, SubpathNesting } from './colored-path';
 
 import type { VariableTemplate } from './variable-template';
 import type { ReliefHeightfield } from './relief/relief-heightfield';
+import type { ReliefAuthoringDocument } from './relief/relief-authoring';
 import type { LayerPowerMode, TabLayoutMode } from './layer';
 import type { LaserTabAnchor } from './laser-tab-anchor';
 
@@ -196,6 +199,8 @@ export type LibraryAssetProvenance = {
 
 export type ImportedSvg = ObjectPowerScale & {
   readonly kind: 'imported-svg';
+  readonly constrainedSketch?: ConstrainedSketch2d;
+  readonly partGenerator?: PartGeneratorSource;
   readonly booleanCompound?: BooleanCompound;
   readonly id: string;
   readonly source: string; // filename for display (e.g. 'logo.svg')
@@ -555,6 +560,7 @@ export type MeshReliefObject = ReliefObjectCommon & {
 /** Canonical scalar-field CNC relief (ADR-291). */
 export type HeightfieldReliefObject = ReliefObjectCommon & {
   readonly reliefSource: ReliefHeightfield;
+  readonly reliefAuthoring?: ReliefAuthoringDocument;
 };
 
 /** CNC relief backed by exactly one discriminated durable source. */

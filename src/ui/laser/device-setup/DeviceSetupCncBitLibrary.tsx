@@ -6,6 +6,8 @@ import {
 } from '../../../core/scene';
 import { CncToolManager } from '../../machine/CncLibraryPanels';
 
+import type { CncToolAssemblyMetadata } from '../../../core/cnc/cnc-tool-assembly';
+
 export function DeviceSetupCncBitLibrary(props: {
   readonly machine: CncMachineConfig;
   readonly customTools: ReadonlyArray<CncTool>;
@@ -38,6 +40,12 @@ export function DeviceSetupCncBitLibrary(props: {
     props.onChangeCustomTools(nextCustomTools);
     props.onChange(nextMachine);
   };
+  const changeAssembly = (toolId: string, assembly: CncToolAssemblyMetadata): void => {
+    const update = (tool: CncTool): CncTool =>
+      tool.id === toolId ? toolWithAssembly(tool, assembly) : tool;
+    props.onChangeCustomTools(props.customTools.map(update));
+    props.onChange({ ...props.machine, tools: props.machine.tools.map(update) });
+  };
   return (
     <>
       <CncToolManager
@@ -46,6 +54,7 @@ export function DeviceSetupCncBitLibrary(props: {
         onAddTool={addTool}
         onDeleteTool={deleteTool}
         onChangeFluteCount={changeFluteCount}
+        onChangeToolAssembly={changeAssembly}
       />
       <p style={hintStyle}>
         Library, default-bit, and Tool Plan changes stay in this draft until final Save.
@@ -91,3 +100,14 @@ const hintStyle: React.CSSProperties = {
   fontSize: 11,
   lineHeight: 1.35,
 };
+
+function toolWithAssembly(tool: CncTool, assembly: CncToolAssemblyMetadata): CncTool {
+  const {
+    fluteLengthMm: _flutes,
+    stickoutMm: _stickout,
+    shankDiameterMm: _shank,
+    holderSegments: _holders,
+    ...cutter
+  } = tool;
+  return { ...cutter, ...assembly };
+}

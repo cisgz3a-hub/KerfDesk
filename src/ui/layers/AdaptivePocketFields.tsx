@@ -30,7 +30,10 @@ export function AdaptivePocketFields(props: {
         onCommit={(adaptiveOptimalLoadMm) => props.onCommit({ adaptiveOptimalLoadMm })}
       />
       <p role="note" style={feedbackBoundaryStyle}>
-        Geometry only — no live load sensing or automatic feed adjustment.
+        Geometry only — no live load sensing or automatic feed adjustment. Island partitions use
+        independent entries, plunge-feed seed slotting and final wall cleanup; those phases can
+        engage more stock than the clearing-ring limit. Unverified plans use a disclosed
+        offset-pocket fallback.
       </p>
     </>
   );

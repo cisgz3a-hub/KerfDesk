@@ -1,9 +1,9 @@
 import { isPositiveD } from 'clipper2-ts';
+import { adaptiveIslandSequences } from './adaptive-pocket-islands';
 import type { Polyline } from '../scene';
 import {
   canonicalAdaptivePocketPaths,
   componentRegions,
-  hasNestedContours,
   toPolyline,
 } from './adaptive-pocket-geometry';
 import { sequencesForComponent, type AdaptivePocketSequence } from './adaptive-pocket-sequences';
@@ -15,6 +15,7 @@ export type AdaptivePocketPlan =
       readonly ok: true;
       readonly sequences: ReadonlyArray<AdaptivePocketSequence>;
       readonly optimalLoadMm: number;
+      readonly islandPartitions?: number;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -27,12 +28,22 @@ export function planAdaptivePocket(
 ): AdaptivePocketPlan {
   const issue = requestIssue(contours, toolDiameterMm, optimalLoadMm);
   if (issue !== null) return { ok: false, reason: issue };
-  if (hasNestedContours(contours)) return islandFailure();
+
   const original = canonicalAdaptivePocketPaths(contours);
   if (original === null || original.length === 0) {
     return { ok: false, reason: 'Adaptive clearing could not build a closed pocket region.' };
   }
-  if (original.some((path) => !isPositiveD(path))) return islandFailure();
+  if (original.some((path) => !isPositiveD(path))) {
+    const island = adaptiveIslandSequences(original, toolDiameterMm, optimalLoadMm);
+    return island.ok
+      ? {
+          ok: true,
+          sequences: island.sequences,
+          optimalLoadMm,
+          islandPartitions: island.partitionCount,
+        }
+      : island;
+  }
   const sequences: AdaptivePocketSequence[] = [];
   for (const component of componentRegions(original)) {
     const componentSequences = sequencesForComponent(component, toolDiameterMm, optimalLoadMm);
@@ -65,14 +76,6 @@ function requestIssue(
   return contours.some((contour) => !contour.closed || contour.points.length < MIN_POINTS)
     ? 'Adaptive clearing requires closed pocket contours.'
     : null;
-}
-
-function islandFailure(): AdaptivePocketPlan {
-  return {
-    ok: false,
-    reason:
-      'Adaptive clearing currently requires island-free pockets; use Offset rings for island pockets.',
-  };
 }
 
 function positiveFinite(value: number): boolean {

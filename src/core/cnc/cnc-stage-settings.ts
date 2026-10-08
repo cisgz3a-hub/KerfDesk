@@ -18,9 +18,10 @@ export function cncSettingsForStage(
 ): CncLayerSettings {
   const recipe = cncStageRecipe(settings, stage, tool);
   if (recipe === undefined) return settings;
-  const { feedSource: _source, ...manual } = settings;
+  const { feedSource: _source, cuttingPreset: _primaryPreset, ...manual } = settings;
   return {
     ...manual,
+    ...(recipe.cuttingPreset === undefined ? {} : { cuttingPreset: recipe.cuttingPreset }),
     feedMmPerMin: recipe.feedMmPerMin,
     plungeMmPerMin: recipe.plungeMmPerMin,
     spindleRpm: recipe.spindleRpm,

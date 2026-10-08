@@ -3,6 +3,11 @@
 // project until the final atomic Save action.
 
 import type { Dispatch } from 'react';
+import {
+  defaultCncMachiningSetup,
+  type CncMachiningSetup,
+} from '../../../core/scene/cnc-machining-setup';
+import { validateCncMachiningSetup } from '../../../io/project/project-cnc-setup-validator';
 import { selectControllerDriver } from '../../../core/controllers';
 import { controllerProfileForSelection } from './device-setup-controller-selection';
 import { explicitMachineKindsForProfile } from '../../../core/devices/device-profile';
@@ -60,6 +65,7 @@ export type DeviceSetupState = {
   readonly draftMachine: MachineConfig;
   // Retain CNC values when the operator briefly switches Laser -> CNC -> Laser.
   readonly cncDraft: CncMachineConfig;
+  readonly cncSetupDraft: CncMachiningSetup;
   readonly presetApplied: boolean;
   readonly firmwareBackupConfirmed: boolean;
   readonly queuedFirmwareWriteIds: ReadonlyArray<number>;
@@ -73,6 +79,7 @@ export type DeviceSetupAction =
   | { readonly kind: 'restore'; readonly state: DeviceSetupState }
   | { readonly kind: 'edit'; readonly patch: Partial<DeviceProfile> }
   | { readonly kind: 'edit-machine'; readonly machine: MachineConfig }
+  | { readonly kind: 'edit-cnc-setup'; readonly setup: CncMachiningSetup }
   | {
       readonly kind: 'set-machine-kinds';
       readonly machineKinds: readonly [MachineKind, ...MachineKind[]];
@@ -103,6 +110,7 @@ export type DeviceSetupDetectedFacts = {
   readonly machineKind?: MachineKind;
   readonly machine?: MachineConfig;
   readonly fallbackCncMachine?: CncMachineConfig;
+  readonly cncSetup?: CncMachiningSetup;
 };
 
 export type DeviceSetupStepProps = {
@@ -135,6 +143,7 @@ export function initDeviceSetup(
     draft: profile,
     draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
     cncDraft,
+    cncSetupDraft: facts.cncSetup ?? defaultCncMachiningSetup(),
     presetApplied: false,
     firmwareBackupConfirmed: false,
     queuedFirmwareWriteIds: [],
@@ -196,6 +205,7 @@ function reduceDraftAction(
   state: DeviceSetupState,
   action: Exclude<DeviceSetupAction, { readonly kind: 'next' | 'back' | 'go' | 'restore' }>,
 ): DeviceSetupState {
+  if (action.kind === 'edit-cnc-setup') return { ...state, cncSetupDraft: action.setup };
   switch (action.kind) {
     case 'edit':
       return invalidateFirmwarePlan(state, {
@@ -220,7 +230,7 @@ function reduceDraftAction(
       return {
         ...state,
         firmwareBackupConfirmed: action.confirmed,
-        queuedFirmwareWriteIds: action.confirmed ? state.queuedFirmwareWriteIds : [],
+        queuedFirmwareWriteIds: confirmedFirmwareWrites(state, action.confirmed),
       };
     case 'toggle-firmware-write':
       return toggleFirmwareWrite(state, action.id);
@@ -231,6 +241,9 @@ function reduceDraftAction(
   }
 }
 
+function confirmedFirmwareWrites(state: DeviceSetupState, confirmed: boolean): readonly number[] {
+  return confirmed ? state.queuedFirmwareWriteIds : [];
+}
 function editMachineDraft(state: DeviceSetupState, machine: MachineConfig): DeviceSetupState {
   if (machine.kind === 'laser') {
     return invalidateFirmwarePlan(state, {
@@ -300,6 +313,7 @@ function applyPreset(state: DeviceSetupState, profile: DeviceProfile): DeviceSet
     machineKind,
     draftMachine: machineKind === 'cnc' ? cncDraft : LASER_MACHINE_CONFIG,
     cncDraft,
+
     presetApplied: true,
     // Picking a catalog card replaces the draft with that profile verbatim, so
     // any earlier "Use detected values" no longer describes what is on screen.
@@ -356,6 +370,8 @@ export function machineSetupValidationIssues(state: DeviceSetupState): ReadonlyA
     issues.push(`${driver.label} cannot run KerfDesk CNC jobs. Choose a GRBL-family controller.`);
   }
   if (state.machineKind === 'cnc') {
+    const setupError = validateCncMachiningSetup(state.cncSetupDraft);
+    if (setupError !== null) issues.push(setupError);
     const params = state.cncDraft.params;
     if (!positive(params.safeZMm)) issues.push('CNC safe Z must be greater than zero.');
     if (!positive(params.spindleMaxRpm)) {

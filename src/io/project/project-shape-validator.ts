@@ -1,3 +1,7 @@
+import { validateRetainedVectorSources } from './project-retained-vector-source-validator';
+import { validateCncMachiningSetup } from './project-cnc-setup-validator';
+import { validateProcessRecipeApplications } from './project-process-recipe-validator';
+import { validateProductionNestDefinition } from './project-production-nest-validator';
 import { optionalSceneGroups } from './project-group-hierarchy-validator';
 import { validateBooleanCompound } from '../../core/scene/boolean-compound';
 import { validateDesignTreeOrder } from './project-design-tree-validator';
@@ -20,6 +24,7 @@ import { validateOptionalArtworkOrder } from './project-artwork-order-validator'
 import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
 import * as reliefField from './project-relief-heightfield-validator';
+import { validateReliefAuthoringObject } from './project-relief-authoring-validator';
 import { validateSingleReliefSource } from './project-relief-source-authority';
 import { validateProjectJobSetup } from './project-job-setup-validator';
 import { validateOperationIds } from './project-operation-id-validator';
@@ -87,6 +92,9 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateProjectSheets(raw['sheetBook'], validateProjectShape),
     validateProductionManifest(raw['productionManifest'], validateProjectShape),
     validateFixtureTemplates(raw['fixtureTemplates']),
+    validateCncMachiningSetup(raw['cncSetup']),
+    validateProcessRecipeApplications(raw['processRecipeApplications']),
+    validateProductionNestDefinition(raw['productionNest']),
     validateRetainedArrays(raw['arrayLayouts'], validateProjectShape),
     validateScene(scene),
   ]);
@@ -182,6 +190,7 @@ function validateSceneObject(obj: unknown, path: string): string | null {
 }
 function validateImportedVector(obj: Record<string, unknown>, path: string): string | null {
   return (
+    validateRetainedVectorSources(obj, path) ??
     validateVectorObject(obj, path) ??
     validateBooleanCompound(
       obj['booleanCompound'],
@@ -223,6 +232,7 @@ function validateReliefObject(obj: Record<string, unknown>, path: string): strin
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
     validateReliefSource(obj, path),
+    validateReliefAuthoringObject(obj, path),
     requirePositiveNumber(obj, `${path}.targetWidthMm`),
     requirePositiveNumber(obj, `${path}.reliefDepthMm`),
     requireString(obj, `${path}.color`),

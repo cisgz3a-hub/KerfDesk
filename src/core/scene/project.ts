@@ -10,6 +10,9 @@ import type { ProjectSheetBook } from './project-sheets';
 import type { FixtureTemplate } from '../camera/fixtures/fixture-template';
 import type { ProductionManifest } from './production-manifest';
 import type { RetainedArrayLayout } from './retained-array';
+import type { CncMachiningSetup } from './cnc-machining-setup';
+import type { ProcessRecipeApplication } from '../material-library/process-recipe-application';
+import type { ProductionNestDefinition } from '../nesting/production-nest';
 
 // v9 preserves owned image clips. Older readers would engrave the full source
 // bitmap if allowed to silently ignore its clip geometry.
@@ -21,7 +24,8 @@ import type { RetainedArrayLayout } from './retained-array';
 // v13 preserves text-frame layout and reviewable manufacturing workflow intent.
 // Older readers must not silently rebuild wrapped/fitted text without its frame.
 // v14 retains editable Boolean sources and independent design-tree ordering.
-export const PROJECT_SCHEMA_VERSION = 14 as const;
+// v15 retains editable relief composition and reviewed machining setup/template intent.
+export const PROJECT_SCHEMA_VERSION = 15 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
@@ -161,6 +165,9 @@ export type Project = {
   readonly productionManifest?: ProductionManifest;
   readonly arrayLayouts?: readonly RetainedArrayLayout[];
   // Absent on laser projects saved before CNC support — treated as laser.
+  readonly cncSetup?: CncMachiningSetup;
+  readonly processRecipeApplications?: ReadonlyArray<ProcessRecipeApplication>;
+  readonly productionNest?: ProductionNestDefinition;
   readonly machine?: MachineConfig;
   // The CNC setup (stock, bits, params, tiling) kept while the project is in
   // Laser mode, so saving a laser job does not throw the router setup away.

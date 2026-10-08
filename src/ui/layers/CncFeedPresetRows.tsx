@@ -1,35 +1,41 @@
-// Apply and save CNC feeds/speeds presets without squeezing both operations
-// into one overflowing row. Presets remain advanced helpers: they patch the
-// editable layer values and never change cut type, total depth, or tabs.
-
 import { useState } from 'react';
 import type { CncLayerSettings, Layer } from '../../core/scene';
+import type { CncCuttingContext, CncCuttingPreset } from '../../core/scene/cnc-cutting-preset';
+import { cncCuttingPresetPatch, previewCncCuttingPreset } from '../../core/cnc/cutting-preset';
 import { useStore } from '../state';
-import { feedPresetPatch } from '../state/cnc-library-actions';
+import { currentCncCuttingContext } from '../state/cnc-cutting-context';
 import { Row, selectStyle } from './CncLayerPrimitives';
+import { CncCuttingPresetPreview, CncSavedCuttingRecord } from './CncCuttingPresetPreview';
+import { CncSaveCuttingPresetRows } from './CncSaveCuttingPresetRows';
+import { CncPresetTransferRows } from './CncPresetTransferRows';
 
-export function CncFeedPresetRows(props: {
+type Props = {
   readonly layer: Layer;
   readonly settings: CncLayerSettings;
   readonly onCommit: (patch: Partial<CncLayerSettings>) => void;
-}): JSX.Element {
+};
+export function CncFeedPresetRows(props: Props): JSX.Element {
   const presets = useStore((s) => s.cncLibrary.feedPresets);
-  const saveCncFeedPreset = useStore((s) => s.saveCncFeedPreset);
-  const [saveName, setSaveName] = useState('');
-  const trimmedName = saveName.trim();
+  const machine = useStore((s) => s.project.machine);
+  const device = useStore((s) => s.project.device);
+  const [selectedId, setSelectedId] = useState('');
+  const context = currentCncCuttingContext(
+    props.settings,
+    machine?.kind === 'cnc' ? machine : null,
+    device,
+  );
+  const selected = presets.find((preset) => preset.id === selectedId);
   return (
     <>
+      <CncSavedCuttingRecord settings={props.settings} context={context} />
       <Row label="Apply preset">
         <select
-          value=""
+          value={selectedId}
           disabled={presets.length === 0}
-          onChange={(event) => {
-            const preset = presets.find((candidate) => candidate.id === event.target.value);
-            if (preset !== undefined) props.onCommit(feedPresetPatch(preset));
-          }}
+          onChange={(event) => setSelectedId(event.target.value)}
           aria-label={`Apply feeds preset for ${props.layer.color}`}
-          title="Apply a saved feeds/speeds preset to this layer."
           style={selectStyle}
+          title="Preview saved cutting data and context before applying values."
         >
           <option value="">{presets.length === 0 ? 'No saved presets' : 'Choose preset…'}</option>
           {presets.map((preset) => (
@@ -39,40 +45,85 @@ export function CncFeedPresetRows(props: {
           ))}
         </select>
       </Row>
-      <Row label="Save preset">
-        <input
-          type="text"
-          value={saveName}
-          onChange={(event) => setSaveName(event.target.value)}
-          placeholder="Preset name"
-          aria-label={`New feeds preset name for ${props.layer.color}`}
-          title="Name for saving this layer's feeds/speeds as a preset."
-          style={presetNameStyle}
+      {selected === undefined ? null : (
+        <SelectedPresetPanel
+          key={selected.id}
+          {...props}
+          preset={selected}
+          context={context}
+          canApply={machine?.kind === 'cnc'}
+          onClose={() => setSelectedId('')}
         />
-        <button
-          type="button"
-          disabled={trimmedName.length === 0}
-          onClick={() => {
-            if (trimmedName.length === 0) return;
-            saveCncFeedPreset(trimmedName, props.settings);
-            setSaveName('');
-          }}
-          aria-label={`Save feeds preset for ${props.layer.color}`}
-          title="Save this layer's feed, plunge, spindle, depth/pass, and stepover under a name."
-          style={saveButtonStyle}
-        >
-          Save
-        </button>
-      </Row>
+      )}
+      <CncSaveCuttingPresetRows layer={props.layer} settings={props.settings} context={context} />
+      <CncPresetTransferRows presets={presets} />
     </>
   );
 }
-
-const presetNameStyle: React.CSSProperties = {
-  flex: '1 1 120px',
-  minWidth: 0,
-  boxSizing: 'border-box',
-  padding: '2px 6px',
-  fontSize: 12,
+function SelectedPresetPanel(
+  props: Props & {
+    readonly preset: CncCuttingPreset;
+    readonly context: CncCuttingContext | null;
+    readonly canApply: boolean;
+    readonly onClose: () => void;
+  },
+): JSX.Element {
+  const deletePreset = useStore((s) => s.deleteCncFeedPreset);
+  const [acknowledgedContext, setAcknowledgedContext] = useState<string | null>(null);
+  const preview = previewCncCuttingPreset(props.preset, props.settings, props.context);
+  const acknowledgementKey = JSON.stringify([props.preset, props.context]);
+  const acknowledged = acknowledgedContext === acknowledgementKey;
+  return (
+    <div style={previewStyle}>
+      <CncCuttingPresetPreview preset={props.preset} preview={preview} />
+      {preview.compatible ? null : (
+        <label style={acknowledgeStyle}>
+          <input
+            type="checkbox"
+            title="Acknowledge the different or unknown tool, material or machine context before copying these values once."
+            checked={acknowledged}
+            onChange={(event) =>
+              setAcknowledgedContext(event.target.checked ? acknowledgementKey : null)
+            }
+          />
+          I reviewed the different or unknown context; copy these values once.
+        </label>
+      )}
+      <button
+        type="button"
+        disabled={!props.canApply || (!preview.compatible && !acknowledged)}
+        aria-label={`Apply reviewed feeds preset for ${props.layer.color}`}
+        title="Copy the reviewed cutting values into this operation and retain a snapshot of the record."
+        onClick={() => {
+          props.onCommit(cncCuttingPresetPatch(props.preset));
+          props.onClose();
+        }}
+      >
+        Apply reviewed values
+      </button>{' '}
+      <button
+        type="button"
+        title="Delete this library record; existing jobs retain their saved snapshots and cutting values."
+        onClick={() => {
+          deletePreset(props.preset.id);
+          props.onClose();
+        }}
+      >
+        Delete saved record
+      </button>
+    </div>
+  );
+}
+const previewStyle: React.CSSProperties = {
+  fontSize: 11,
+  margin: '6px 0',
+  padding: 6,
+  border: '1px solid var(--lf-border)',
+  borderRadius: 4,
 };
-const saveButtonStyle: React.CSSProperties = { flexShrink: 0 };
+const acknowledgeStyle: React.CSSProperties = {
+  display: 'flex',
+  gap: 6,
+  alignItems: 'start',
+  marginBottom: 6,
+};

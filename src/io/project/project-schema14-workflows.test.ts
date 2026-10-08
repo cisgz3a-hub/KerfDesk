@@ -1,3 +1,4 @@
+import { PROJECT_SCHEMA_VERSION } from '../../core/scene/project';
 import { describe, expect, it } from 'vitest';
 import { createProject, createLayer, type Project, type Scene } from '../../core/scene';
 import { compoundRectangle } from '../../core/geometry/boolean-compound.test-fixture';
@@ -15,7 +16,7 @@ describe('schema14 durable design workflows', () => {
     const loaded = deserializeProject(JSON.stringify(original));
     expect(loaded.kind).toBe('ok');
     if (loaded.kind !== 'ok') throw new Error('Legacy load failed');
-    expect(loaded.project.schemaVersion).toBe(14);
+    expect(loaded.project.schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     expect(loaded.project.scene.objects).toEqual(original.scene.objects);
     expect(loaded.project.scene.designTreeOrder).toBeUndefined();
   });

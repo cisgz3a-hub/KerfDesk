@@ -18,9 +18,11 @@ type CncGroupProvenance = Pick<
   | 'rampEntryDeg'
   | 'feedSource'
   | 'cuttingStage'
+  | 'restStock'
 >;
 
 type CncGroupProvenanceOptions = {
+  readonly restStock?: CncGroup['restStock'];
   readonly cuttingStage?: CncCuttingStage;
   readonly includeRequestedDepth?: boolean;
   readonly includeDepthPerPass?: boolean;
@@ -37,6 +39,7 @@ export function cncGroupProvenance(
 ): CncGroupProvenance {
   return {
     ...(options.cuttingStage === undefined ? {} : { cuttingStage: options.cuttingStage }),
+    ...(options.restStock === undefined ? {} : { restStock: options.restStock }),
     ...toolProvenance(tool, options.layerPrimaryTool ?? tool),
     ...depthProvenance(settings, options),
     ...entryAndFeedProvenance(settings, options),

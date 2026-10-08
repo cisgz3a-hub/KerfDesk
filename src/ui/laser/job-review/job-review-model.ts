@@ -1,3 +1,4 @@
+import { cncProgramReachWarnings } from '../../../io/cnc/cnc-program-reach';
 // buildJobReviewModel maps one successful Start preparation and its store
 // snapshots into the Job Review display model (ADR-224). Live editable sections
 // still read stores directly; compiled facts come from the prepared job.
@@ -32,6 +33,7 @@ import {
   formatGcodeSize,
   originTileDetail,
   originTileValue,
+  toolPlanLabels,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
 import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
@@ -122,6 +124,11 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
       ...detectManualAirAssistWarnings(args.prepared.prepared.job, args.project.device),
       ...detectPresetCorrectionWarnings(args.project.device),
       ...detectStaleCatalogBitWarnings(args.project, args.prepared.cncToolPlan),
+      ...cncProgramReachWarnings(
+        args.prepared.prepared.project,
+        args.prepared.gcode,
+        args.prepared.cncToolPlan,
+      ),
       ...detectAirAssistStartWarnings(
         args.prepared.prepared.job,
         args.project.device,
@@ -427,10 +434,6 @@ function buildAcknowledgement(
   )
     ? { kind: 'laser-unverified', prompt: LASER_MODE_UNVERIFIED_START_PROMPT }
     : { kind: 'laser-verified' };
-}
-
-function toolPlanLabels(plan: ReadonlyArray<CncToolPlanEntry> | undefined): ReadonlyArray<string> {
-  return (plan ?? []).map((entry, index) => `${index + 1}. ${entry.name ?? 'Active bit'}`);
 }
 
 function dedupe(warnings: ReadonlyArray<string>): ReadonlyArray<string> {

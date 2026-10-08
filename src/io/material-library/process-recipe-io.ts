@@ -5,12 +5,17 @@ import {
   type ProcessRecipeResult,
   type ProcessRecipeStep,
 } from '../../core/material-library/process-recipe';
-import { RECIPE_TOOL_FIELDS } from '../../core/material-library/process-recipe-tools';
+import { recipeCncToolIds } from '../../core/material-library/process-recipe-tools';
 import { captureLayerOperationSettings, createLayer } from '../../core/scene';
 import { isLayerColor } from '../../core/scene/layer';
 import { normalizeCncMachineConfig } from '../project/deserialize-project';
 import { normalizeLayer } from '../project/normalize-layer';
 import { validateLayerOperationSettings } from '../project/project-layer-validator';
+import {
+  parseRecipeRoles,
+  validRecipeDependencies,
+  validStepDependencies,
+} from './process-recipe-selectors-io';
 
 export function parseProcessRecipes(
   value: unknown,
@@ -20,7 +25,7 @@ export function parseProcessRecipes(
   const recipes: ProcessRecipe[] = [];
   const ids = new Set<string>();
   for (const raw of value) {
-    const parsed = parseRecipe(raw);
+    const parsed = parseProcessRecipe(raw);
     if (parsed.kind === 'invalid') return parsed;
     if (ids.has(parsed.value.id)) return invalid(`duplicate process recipe id: ${parsed.value.id}`);
     ids.add(parsed.value.id);
@@ -29,19 +34,20 @@ export function parseProcessRecipes(
   return { kind: 'ok', value: recipes };
 }
 
-function parseRecipe(value: unknown): ProcessRecipeResult<ProcessRecipe> {
+export function parseProcessRecipe(value: unknown): ProcessRecipeResult<ProcessRecipe> {
   if (!isRecord(value) || !validRecipeHeader(value))
     return invalid('Process recipe metadata is invalid');
-  const parsedSteps = parseSteps(value.steps, value.machineKind);
+  const boundedMetadata = value.roles !== undefined;
+  const parsedSteps = parseSteps(value.steps, value.machineKind, boundedMetadata);
   if (parsedSteps.kind === 'invalid') return parsedSteps;
   const steps = parsedSteps.value;
-  if (!validPathSteps(value.pathSteps, steps.length))
-    return invalid('Process recipe path assignments are invalid');
-  const tools =
-    value.machineKind === 'cnc'
-      ? normalizeCncMachineConfig({ kind: 'cnc', tools: value.tools })?.tools
-      : undefined;
-  if (!validRecipeTools(value.tools, tools, value.machineKind))
+  const topologyError = recipeTopologyProblem(value, steps);
+  if (topologyError !== null) return invalid(topologyError);
+  const roles = parseRecipeRoles(value.roles, steps.length);
+  if (roles === null) return invalid('Process recipe selectors are invalid');
+  const pathSteps = validPathSteps(value.pathSteps, steps.length) ? value.pathSteps : undefined;
+  const tools = normalizedRecipeTools(value);
+  if (!validRecipeTools(value.tools, tools, value.machineKind, boundedMetadata))
     return invalid('Process recipe cutters are invalid');
   if (!validToolReferences(tools, steps))
     return invalid('Process recipe cutter references are invalid');
@@ -54,21 +60,42 @@ function parseRecipe(value: unknown): ProcessRecipeResult<ProcessRecipe> {
       revision: value.revision,
       machineKind: value.machineKind,
       steps,
-      ...(value.pathSteps === undefined ? {} : { pathSteps: value.pathSteps }),
+      ...(pathSteps === undefined ? {} : { pathSteps }),
       ...(tools === undefined ? {} : { tools }),
+      ...(roles === undefined ? {} : { roles }),
     }),
   };
+}
+
+function normalizedRecipeTools(value: Record<string, unknown>): ProcessRecipe['tools'] {
+  return value.machineKind === 'cnc'
+    ? normalizeCncMachineConfig({ kind: 'cnc', tools: value.tools })?.tools
+    : undefined;
+}
+function recipeTopologyProblem(
+  value: Record<string, unknown>,
+  steps: ReadonlyArray<ProcessRecipeStep>,
+): string | null {
+  if (!validRecipeDependencies(steps))
+    return 'Process recipe step dependencies are invalid or cyclic';
+  if (value.roles !== undefined && (value.machineKind !== 'cnc' || value.pathSteps !== undefined))
+    return 'Process recipe selectors are invalid';
+  if (!validPathSteps(value.pathSteps, steps.length))
+    return 'Process recipe path assignments are invalid';
+  return null;
 }
 
 type RecipeHeader = Pick<ProcessRecipe, 'id' | 'name' | 'description' | 'revision' | 'machineKind'>;
 function validRecipeHeader(
   value: Record<string, unknown>,
 ): value is Record<string, unknown> & RecipeHeader {
+  const label = value.roles === undefined ? nonempty : boundedLabel;
   return (
-    nonempty(value.id) &&
-    nonempty(value.name) &&
-    nonempty(value.revision) &&
+    label(value.id) &&
+    label(value.name) &&
+    label(value.revision) &&
     typeof value.description === 'string' &&
+    (value.roles === undefined || value.description.length <= 10000) &&
     (value.machineKind === 'laser' || value.machineKind === 'cnc')
   );
 }
@@ -76,12 +103,13 @@ function validRecipeHeader(
 function parseSteps(
   value: unknown,
   kind: ProcessRecipe['machineKind'],
+  boundedMetadata: boolean,
 ): ProcessRecipeResult<ReadonlyArray<ProcessRecipeStep>> {
-  if (!Array.isArray(value) || value.length === 0)
+  if (!Array.isArray(value) || value.length === 0 || (boundedMetadata && value.length > 256))
     return invalid('Process recipe needs at least one step');
   const steps: ProcessRecipeStep[] = [];
   for (const raw of value) {
-    const step = parseStep(raw, kind);
+    const step = parseProcessRecipeStep(raw, kind, boundedMetadata);
     if (step.kind === 'invalid') return step;
     steps.push(step.value);
   }
@@ -92,12 +120,15 @@ function validRecipeTools(
   value: unknown,
   tools: ProcessRecipe['tools'],
   kind: ProcessRecipe['machineKind'],
+  boundedMetadata: boolean,
 ): boolean {
   if (kind === 'laser') return value === undefined;
+  const label = boundedMetadata ? boundedLabel : nonempty;
   return (
     Array.isArray(value) &&
+    (!boundedMetadata || value.length <= 256) &&
     sameJson(tools, value) &&
-    (tools ?? []).every((tool) => nonempty(tool.id) && nonempty(tool.name))
+    (tools ?? []).every((tool) => label(tool.id) && label(tool.name))
   );
 }
 
@@ -108,19 +139,16 @@ function validToolReferences(
   const ids = new Set(tools?.map((tool) => tool.id));
   return (
     ids.size === (tools?.length ?? 0) &&
-    steps.every((step) =>
-      RECIPE_TOOL_FIELDS.every(
-        (field) => step.cnc?.[field] === undefined || ids.has(step.cnc[field] as string),
-      ),
-    )
+    steps.every((step) => recipeCncToolIds(step.cnc).every((id) => ids.has(id)))
   );
 }
 
-function parseStep(
+export function parseProcessRecipeStep(
   value: unknown,
   machineKind: ProcessRecipe['machineKind'],
+  boundedMetadata = true,
 ): ProcessRecipeResult<ProcessRecipeStep> {
-  if (!isRecord(value) || !validStepHeader(value))
+  if (!isRecord(value) || !validStepHeader(value, boundedMetadata))
     return invalid('Process recipe step metadata is invalid');
   if (
     !isMaterialRecipe(value.settings) ||
@@ -135,12 +163,13 @@ function parseStep(
     return invalid('Process recipe step settings are incomplete or unsupported');
   const normalized = normalizeLayer({ cnc: value.cnc });
   const cnc = isRecord(normalized) ? normalized.cnc : undefined;
-  if (!validCncSettings(value.cnc, cnc, machineKind))
+  if (!validCncSettings(value.cnc, cnc, machineKind, boundedMetadata))
     return invalid('Process recipe CNC settings are invalid');
   return {
     kind: 'ok',
     value: {
       name: value.name,
+      ...(value.dependsOn === undefined ? {} : { dependsOn: value.dependsOn }),
       color: value.color,
       output: value.output,
       visible: value.visible,
@@ -155,18 +184,21 @@ function parseStep(
 
 type StepHeader = Pick<
   ProcessRecipeStep,
-  'name' | 'color' | 'output' | 'visible' | 'scanOffsetCalibrationMode'
+  'name' | 'dependsOn' | 'color' | 'output' | 'visible' | 'scanOffsetCalibrationMode'
 >;
 function validStepHeader(
   value: Record<string, unknown>,
+  boundedMetadata: boolean,
 ): value is Record<string, unknown> & StepHeader {
+  const label = boundedMetadata ? boundedLabel : nonempty;
   return (
-    nonempty(value.name) &&
+    label(value.name) &&
     typeof value.color === 'string' &&
     isLayerColor(value.color) &&
     typeof value.output === 'boolean' &&
     typeof value.visible === 'boolean' &&
-    validCalibrationMode(value.scanOffsetCalibrationMode)
+    validCalibrationMode(value.scanOffsetCalibrationMode) &&
+    validStepDependencies(value.dependsOn, 256)
   );
 }
 
@@ -178,9 +210,11 @@ function validCncSettings(
   raw: unknown,
   normalized: unknown,
   kind: ProcessRecipe['machineKind'],
+  boundedMetadata: boolean,
 ): boolean {
   if (kind === 'laser') return raw === undefined;
-  return isRecord(raw) && sameJson(normalized, raw) && nonempty(raw.toolId);
+  const label = boundedMetadata ? boundedLabel : nonempty;
+  return isRecord(raw) && sameJson(normalized, raw) && label(raw.toolId);
 }
 
 function validPathSteps(value: unknown, count: number): value is ProcessRecipe['pathSteps'] {
@@ -218,6 +252,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 function nonempty(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+function boundedLabel(value: unknown): value is string {
+  return nonempty(value) && value.length <= 200;
 }
 function invalid(reason: string): { readonly kind: 'invalid'; readonly reason: string } {
   return { kind: 'invalid', reason };

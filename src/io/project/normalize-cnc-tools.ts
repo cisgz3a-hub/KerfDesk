@@ -1,5 +1,6 @@
 // Rebuilds a loaded project's CNC tool list for deserializeProject.
 
+import { normalizeCncToolAssembly } from '../../core/cnc/cnc-tool-assembly';
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import { DEFAULT_CNC_TOOLS, type CncTool } from '../../core/scene';
 
@@ -33,7 +34,7 @@ function normalizeCncTool(tool: unknown): CncTool | null {
   if (!isObject(tool)) return null;
   const core = normalizeCncToolCore(tool);
   if (core === null) return null;
-  return { ...core, ...normalizeCncToolMetadata(tool) };
+  return { ...core, ...normalizeCncToolMetadata(tool), ...normalizeCncToolAssembly(tool) };
 }
 
 function normalizeCncToolCore(tool: Record<string, unknown>): CncTool | null {

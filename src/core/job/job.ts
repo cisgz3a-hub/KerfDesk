@@ -1,3 +1,5 @@
+import type { Cnc2dStockEvidence } from '../cnc/cnc-pocket-stock';
+import type { CncTaperedInlaySettings } from '../scene/cnc-tapered-inlay';
 // Job — the intermediate representation that sits between Scene and G-code.
 // Scene → Job is the compile step (core/job/compile-job.ts). Job → Plan is the
 // optimize step (core/plan, no-op in MVP Phase A). Plan → string is the
@@ -303,8 +305,15 @@ export function cncPassEntryDepthMm(pass: CncPass): number {
 }
 
 export type CncGroup = {
+  readonly restStock?: Cnc2dStockEvidence;
   /** Explicit independent recipe used for this compiled stage. */
   readonly cuttingStage?: CncCuttingStage;
+  readonly pairedInlay?: {
+    readonly kind: 'tapered-v';
+    readonly piece: 'pocket' | 'plug';
+    readonly pairId: string;
+    readonly settings: CncTaperedInlaySettings;
+  };
   readonly kind: 'cnc';
   readonly layerId: string;
   readonly sourceObjectId?: string;
@@ -441,8 +450,18 @@ export type CncStepoverCompilationEvidence = {
 /** Materialized planning grid and finishing geometry for one relief source. */
 export type CncReliefPlanningEvidence = {
   readonly layerId: string;
+  /** Projection target identity in the actual ordered job, independent of display filenames. */
+  readonly targetObjectId?: string;
   readonly source: string;
-  readonly stage: 'roughing' | 'finishing';
+  readonly stage: 'roughing' | 'finishing' | 'rest-finishing' | 'projection';
+  readonly predecessorToolId?: string;
+  readonly targetRevision?: number;
+  readonly residualThresholdMm?: number;
+  readonly maximumResidualMm?: number;
+  readonly selectedCells?: number;
+  readonly restFallbackReason?: string;
+  readonly verticalDepthMm?: number;
+  readonly requestedSampleSpacingMm?: number;
   readonly widthCells: number;
   readonly heightCells: number;
   readonly cellSizeMm: number;

@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { generateMaterialTestGrid } from '../../core/job';
+import { createProject } from '../../core/scene';
 import { recipeProject } from '../../core/material-library/process-recipe.test-fixture';
 import {
   experimentBounds,
@@ -10,7 +12,7 @@ import { deserializeMaterialLibrary, serializeMaterialLibrary } from '../../io/m
 import { parseMaterialExperiments } from '../../io/material-library/material-experiment-io';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
-import { captureArtworkExperiment } from './capture-material-experiment';
+import { captureArtworkExperiment, captureGridExperiment } from './capture-material-experiment';
 import { testExperiment } from './material-experiment.test-fixture';
 
 describe('portable material experiment workflow', () => {
@@ -25,6 +27,33 @@ describe('portable material experiment workflow', () => {
     expect(value.cells.map((cell) => cell.process.steps[0]?.settings.speed)).toEqual([
       3000, 3000, 1000, 1000,
     ]);
+  });
+  it('keeps grid child IDs bounded and distinct while preserving ordinary IDs', () => {
+    const grid = generateMaterialTestGrid({
+      rows: 2,
+      columns: 12,
+      speedMin: 1000,
+      speedMax: 5000,
+      powerMin: 10,
+      powerMax: 40,
+      cellWidthMm: 5,
+      cellHeightMm: 4,
+    });
+    const ordinaryId = '67a32e53-086b-41c4-af11-6dc253e491c1';
+    const ids = [ordinaryId, `${'g'.repeat(199)}a`, `${'g'.repeat(199)}b`];
+    const records = ids.map((id) =>
+      captureGridExperiment(createProject(), grid, id, '2026-10-07T03:00:00Z'),
+    );
+    const processIds = records.flatMap((record) => record.cells.map((cell) => cell.process.id));
+    expect(new Set(processIds).size).toBe(72);
+    expect(processIds.every((id) => id.length <= 200)).toBe(true);
+    expect(
+      records.every((record) =>
+        record.cells.every((cell) => cell.process.id.endsWith(`-${cell.row}-${cell.column}`)),
+      ),
+    ).toBe(true);
+    expect(records[0]?.cells[0]?.process.id).toBe(`${ordinaryId}-0-0`);
+    expect(parseMaterialExperiments(records).kind).toBe('ok');
   });
   it('perspective-picks exact cells, leaves gaps unselected and rejects crossed registration', () => {
     const value = {

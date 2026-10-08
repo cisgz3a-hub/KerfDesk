@@ -1,3 +1,6 @@
+import { MachiningTemplateEditor } from './MachiningTemplateEditor';
+import { ProcessRecipeTemplateReview } from './ProcessRecipeTemplateReview';
+import { RetainedProcessRecipeControls } from './RetainedProcessRecipeControls';
 import type { ProcessRecipe } from '../../core/material-library/process-recipe';
 import { Button } from '../kit';
 import {
@@ -35,11 +38,21 @@ export function ProcessRecipePanel(): JSX.Element {
       >
         Save selected process
       </Button>
+      {model.kind === 'cnc' ? (
+        <Button
+          disabled={model.count === 0 || model.name.trim() === ''}
+          onClick={model.saveTemplate}
+        >
+          Save selected machining template
+        </Button>
+      ) : null}
       <RecipePicker recipes={model.recipes} recipe={model.recipe} onChange={model.select} />
       {model.recipe === undefined ? null : <RecipeSummary recipe={model.recipe} />}
       <div style={buttonRowStyle}>
         <Button
-          disabled={model.recipe === undefined || model.count === 0}
+          disabled={
+            model.recipe === undefined || model.count === 0 || model.recipe.roles !== undefined
+          }
           title="Replace only selected artwork operations. Undo restores the previous process."
           onClick={model.apply}
         >
@@ -53,6 +66,13 @@ export function ProcessRecipePanel(): JSX.Element {
           Delete recipe
         </Button>
       </div>
+      {model.recipe?.roles === undefined ? null : (
+        <>
+          <MachiningTemplateEditor recipe={model.recipe} />
+          <ProcessRecipeTemplateReview recipe={model.recipe} />
+        </>
+      )}
+      <CncRetainedTemplates cnc={model.kind === 'cnc'} />
       {model.count !== 1 ? (
         <p style={hintStyle}>
           Select one artwork to save a process. Select one or more to apply a saved recipe.
@@ -113,6 +133,9 @@ function RecipeSummary({ recipe }: { readonly recipe: ProcessRecipe }): JSX.Elem
             {recipe.machineKind === 'cnc'
               ? `${step.cnc?.cutType}, ${step.cnc?.feedMmPerMin} mm/min, ${step.cnc?.depthMm} mm deep`
               : `${step.settings.mode}, ${step.settings.power}%, ${step.settings.speed} mm/min, ${step.settings.passes} pass${step.settings.passes === 1 ? '' : 'es'}`}
+            {step.dependsOn?.length
+              ? ' (after steps ' + step.dependsOn.map((value) => value + 1).join(', ') + ')'
+              : ''}
             {step.output ? '' : ' (disabled)'}
             {step.visible ? '' : ' (hidden)'}
           </li>
@@ -125,4 +148,8 @@ function RecipeSummary({ recipe }: { readonly recipe: ProcessRecipe }): JSX.Elem
       )}
     </>
   );
+}
+
+function CncRetainedTemplates({ cnc }: { readonly cnc: boolean }): JSX.Element | null {
+  return cnc ? <RetainedProcessRecipeControls /> : null;
 }

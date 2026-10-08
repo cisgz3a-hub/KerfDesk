@@ -1,3 +1,6 @@
+import { buildCncToolPrograms, type CncToolProgram } from '../../io/cnc/cnc-tool-programs';
+import { cncProgramReachWarnings } from '../../io/cnc/cnc-program-reach';
+import { cncProgramFacts, type CncProgramFacts } from '../../io/cnc/cnc-program-facts';
 import { emitPreparedGcode, type EmitGcodeOptions, type PreparedOutput } from '../../io/gcode';
 import type { PreflightResult } from '../../core/preflight';
 import { sceneObjectUsesOperation, type Scene, type Vec2 } from '../../core/scene';
@@ -48,6 +51,8 @@ export type SaveOutputEmission =
     }
   | {
       readonly kind: 'emitted';
+      readonly cncProgramFacts?: CncProgramFacts;
+      readonly cncToolPrograms?: ReadonlyArray<CncToolProgram>;
       readonly gcode: string;
       readonly preflight: ReturnType<typeof emitPreparedGcode>['preflight'];
       readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
@@ -78,11 +83,21 @@ export function emitSavePreparedOutput(
   if (isFactualEmissionRefusal) {
     return { kind: 'emission-refused', ...emitted, gcode: '' };
   }
+  const { warnings: toolWarnings, ...artifacts } = cncSaveArtifacts(prepared, options, emitted);
   return {
     kind: 'emitted',
     ...emitted,
     cncVCarveDepths: compiledVCarveLayerDepths(prepared.job),
-    machineWarnings,
+    ...artifacts,
+    machineWarnings: [
+      ...machineWarnings,
+      ...toolWarnings,
+      ...cncProgramReachWarnings(
+        prepared.project,
+        emitted.gcode,
+        artifacts.cncProgramFacts?.toolPlan,
+      ),
+    ],
     placement: {
       jobOriginOffset: prepared.jobOriginOffset,
       reliefIds: outputReliefIds(prepared.project.scene),
@@ -90,6 +105,24 @@ export function emitSavePreparedOutput(
   };
 }
 
+function cncSaveArtifacts(
+  prepared: Extract<PreparedOutput, { readonly ok: true }>,
+  options: EmitGcodeOptions,
+  combinedEmission: ReturnType<typeof emitPreparedGcode>,
+): {
+  readonly cncProgramFacts?: CncProgramFacts;
+  readonly cncToolPrograms?: ReadonlyArray<CncToolProgram>;
+  readonly warnings: ReadonlyArray<string>;
+} {
+  if (prepared.project.machine?.kind !== 'cnc') return { warnings: [] };
+  const facts = cncProgramFacts(prepared.job, prepared.project);
+  const result = buildCncToolPrograms(prepared, options, combinedEmission);
+  return {
+    cncProgramFacts: facts,
+    ...(result.kind === 'ready' ? { cncToolPrograms: result.programs } : {}),
+    warnings: result.kind === 'unavailable' ? [result.message] : [],
+  };
+}
 // The reliefs an output operation carves, as the CNC compiler picks them.
 function outputReliefIds(scene: Scene): ReadonlyArray<string> {
   const output = scene.layers.filter((layer) => layer.output);

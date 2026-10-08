@@ -1,3 +1,4 @@
+import type { CncToolPlanEntry } from '../../state/cnc-tool-plan';
 // Pure display formatters for the pre-start Job Review dialog (ADR-224).
 // No store reads — every function maps a value to operator-facing text.
 
@@ -101,4 +102,10 @@ export function formatOnOff(value: boolean | undefined): string {
 
 function humanizeToken(token: string): string {
   return token.split('-').join(' ');
+}
+
+export function toolPlanLabels(
+  plan: ReadonlyArray<CncToolPlanEntry> | undefined,
+): ReadonlyArray<string> {
+  return (plan ?? []).map((entry, index) => `${index + 1}. ${entry.name ?? 'Active bit'}`);
 }

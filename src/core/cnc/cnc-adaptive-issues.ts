@@ -27,7 +27,16 @@ export function findCncAdaptivePocketIssues(
       settings,
       layerCncTool(config, settings),
     );
-    if (operation.kind === 'error') issues.push({ layerId: layer.id, reason: operation.reason });
+    if (operation.kind === 'error')
+      issues.push({ layerId: layer.id, reason: 'Offset pocket fallback: ' + operation.reason });
+    else if (operation.kind === 'ok' && operation.plan.islandPartitions !== undefined)
+      issues.push({
+        layerId: layer.id,
+        reason:
+          'Island adaptive uses ' +
+          operation.plan.islandPartitions +
+          ' verified partitions with independent entries and plunge-feed seed slotting that may engage full cutter width. The radial limit applies to clearing rings; seed slotting and final wall cleanup can engage more stock; coverage is simulated; physical efficiency is unqualified.',
+      });
   }
   return issues;
 }

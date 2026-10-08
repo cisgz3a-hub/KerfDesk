@@ -1,4 +1,6 @@
 import type { MaterialTestGrid } from '../../core/job';
+import { sha256Hex } from '../../core/relief/sha256';
+import { MAX_MATERIAL_EXPERIMENT_ID_CHARS } from '../../io/material-library/material-experiment-io';
 import { captureProcessRecipe } from '../../core/material-library/capture-process-recipe';
 import type {
   ExperimentCell,
@@ -16,7 +18,7 @@ export function captureGridExperiment(
   const source: Project = { ...project, machine: { kind: 'laser' }, scene: grid.scene };
   const cells = grid.cells.map((cell): ExperimentCell => {
     const process = captureProcessRecipe(source, cell.objectId, {
-      id: `${id}-${cell.row}-${cell.column}`,
+      id: experimentProcessId(id, `-${cell.row}-${cell.column}`),
       name: `Cell ${cell.row + 1}, ${cell.column + 1}`,
       description: '',
       revision: '1',
@@ -58,7 +60,7 @@ export function captureArtworkExperiment(
   const object = project.scene.objects.find((item) => item.id === objectId);
   if (object === undefined) throw new Error('Select one artwork to record its process.');
   const process = captureProcessRecipe(project, objectId, {
-    id: `${id}-process`,
+    id: experimentProcessId(id, '-process'),
     name: 'Tested process',
     description: '',
     revision: '1',
@@ -87,6 +89,14 @@ export function captureArtworkExperiment(
       },
     ],
   };
+}
+
+function experimentProcessId(experimentId: string, suffix: string): string {
+  const ordinary = `${experimentId}${suffix}`;
+  if (ordinary.length <= MAX_MATERIAL_EXPERIMENT_ID_CHARS) return ordinary;
+  const digest = sha256Hex([new TextEncoder().encode(JSON.stringify(experimentId))]);
+  const ending = `-${digest}${suffix}`;
+  return `${experimentId.slice(0, MAX_MATERIAL_EXPERIMENT_ID_CHARS - ending.length)}${ending}`;
 }
 
 function experimentHeader(

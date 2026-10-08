@@ -2,6 +2,7 @@ import { findRegistrationBoxes } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { QuickNestDialog } from './QuickNestDialog';
+import { ProductionNestDialogHost } from './ProductionNestDialogHost';
 import { useEffect, useRef, useState } from 'react';
 import { startNestingSearch, type NestingSearch } from './nesting-worker-client';
 import type { NestingProgress } from '../../core/nesting/layout-nest';
@@ -14,6 +15,7 @@ export function QuickNestDialogHost(props: { readonly onClose: () => void }): JS
   const [progress, setProgress] = useState<NestingProgress | null>(null);
   const [draft, setDraft] = useState<PreparedNest | null>(null);
   const [running, setRunning] = useState(false);
+  const [production, setProduction] = useState(false);
   const owner = useRef<{ search: NestingSearch | null } | null>(null);
   useEffect(
     () => () => {
@@ -29,6 +31,8 @@ export function QuickNestDialogHost(props: { readonly onClose: () => void }): JS
     setProgress(null);
     setRunning(false);
   };
+  if (production)
+    return <ProductionNestDialogHost onClose={props.onClose} onBack={() => setProduction(false)} />;
   return (
     <QuickNestDialog
       boardAvailable={boardAvailable}
@@ -39,6 +43,10 @@ export function QuickNestDialogHost(props: { readonly onClose: () => void }): JS
       onCancel={() => {
         reset();
         props.onClose();
+      }}
+      onProduction={() => {
+        reset();
+        setProduction(true);
       }}
       onReset={reset}
       onStop={() => owner.current?.search?.cancel()}

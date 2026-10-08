@@ -1,0 +1,215 @@
+{
+  "schemaVersion": 1,
+  "recordedAtUtc": "2026-10-08T17:27:54.603Z",
+  "scope": "Completed CNC, retained relief and bounded parametric build; PR preparation after main integration.",
+  "implementationBase": "88433fec3d0e44e0b4793e086af34d6c4760bdfb",
+  "mainIntegrated": "d60ecfc9bd46659a9d23c3c906c7f912dddcdf50",
+  "branch": "codex/cnc-leaders-build-20261008",
+  "priorCompletedVerification": {
+    "sourceFiles": 8055,
+    "sourceTreeSha256": "6d46757eac36630db0a4eb93ee345d77ab3b58bea4a630fd9b5383b31e3bcc79",
+    "sourceMatchesBeforeMainIntegration": true,
+    "fullVitest": {
+      "files": {
+        "passed": 3696,
+        "skipped": 18,
+        "total": 3714
+      },
+      "tests": {
+        "passed": 28559,
+        "skipped": 29,
+        "total": 28588,
+        "failed": 0
+      },
+      "durationSeconds": 1500.36
+    },
+    "standardChrome": {
+      "passed": 312,
+      "skipped": 11,
+      "failed": 0,
+      "flaky": 0,
+      "skipReasons": {
+        "optInPerformance": 1,
+        "requiresExternalDocumentCorpus": 10
+      }
+    },
+    "desktopProduction": {
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0
+    },
+    "browserFreeProduction": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "benchmark": {
+      "workflows": 8,
+      "topLevelVariantRecords": 11,
+      "generatedNestingSheetPrograms": 2,
+      "requestedPanels": 12,
+      "placedPanels": 12,
+      "sheets": 2
+    },
+    "rendererBuilds": [
+      {
+        "capability": "browser-free",
+        "indexHtmlSha256": "78ea4de5d4051c447212e86a51da9248190e3ce790dc473d84f7f00da864d975",
+        "status": "passed"
+      },
+      {
+        "capability": "desktop",
+        "indexHtmlSha256": "21f919e7614e3393fbcc7250c97c63b5544225e5bca8398258c657d266268539",
+        "status": "passed"
+      }
+    ],
+    "notes": "These completed broad results identify the pre-integration source. Integrated-source checks and exact-head hosted results are recorded separately."
+  },
+  "mainIntegration": {
+    "method": "Fast-forward to fetched origin/main before selective staging",
+    "conflicts": [],
+    "pendingImplementationFilesPreserved": 353,
+    "sourceEditedForIntegration": false,
+    "validation": "Static and unit integration checks passed. Subsequent renderer/Chrome and exact-head hosted results are recorded in the PR.",
+    "preliminaryChecks": {
+      "mainTypecheck": "passed",
+      "e2eTypecheck": "passed",
+      "electronTypecheck": "passed",
+      "adrNumbers": "passed",
+      "fileSize": "passed",
+      "publicExportRatchet": "passed",
+      "dependencyLicences": "passed",
+      "notes": "Checks before final independent-review repairs; post-repair checks will supersede these for the exact PR source."
+    },
+    "additionalMainIntegration": {
+      "commit": "d60ecfc9bd46659a9d23c3c906c7f912dddcdf50",
+      "files": 5,
+      "scope": "Operator scripts and one ADR amendment; no overlap with owned source.",
+      "sourceTreeSha256Unchanged": true,
+      "mockedTestsPassed": 61,
+      "scopedLint": "passed",
+      "adrNumbers": "passed"
+    }
+  },
+  "publicationScope": {
+    "include": "Completed source, regression tests, benchmark scripts, two ADRs and six authored audit/build reports with this compact verification record.",
+    "exclude": "Old interface screenshot churn, screenshots, PIDs, raw trace/report archives, generated benchmark outputs and binaries remain local.",
+    "proprietaryLicenseVerified": true,
+    "mergeOrReleaseAuthorized": false,
+    "stagedFiles": 367
+  },
+  "qualificationLimits": {
+    "physicalHardware": "Not operated or qualified.",
+    "installer": "Not packaged or installed for this build.",
+    "competitorMeasurements": null,
+    "physicalMeasurements": null,
+    "rotary": "Offline reference study only; execution qualification pending.",
+    "buildWarnings": [
+      "Existing io -> core -> io chunk cycle",
+      "Some renderer chunks exceed 750 KiB warning threshold"
+    ],
+    "providerAndDeployment": "No changes performed in this PR task."
+  },
+  "inScopeReviewRepairs": [
+    {
+      "area": "C04 preset Frame projection",
+      "status": "locally verified",
+      "scope": "Retained preset snapshot identity/provenance is neutral for Frame; current executable output still retains exact cutting values. Active-side projection retains current IDs/datum/flip and required relief sources, while inactive-side datum/artwork/flip metadata no longer expires unchanged Frame.",
+      "focusedTests": {
+        "files": 12,
+        "passed": 135,
+        "failed": 0
+      }
+    },
+    {
+      "area": "D02 retained sketch path bindings",
+      "status": "locally verified",
+      "scope": "Named sketch paths preserve or remove matching tabs and recipe baselines; contradictory Boolean/retained sources are rejected. Manual materialized path identity receives the same safe-regeneration review as generated parts.",
+      "focusedTests": {
+        "files": 6,
+        "passed": 46,
+        "failed": 0
+      }
+    },
+    {
+      "area": "D03 regenerated part manual geometry",
+      "status": "locally verified",
+      "scope": "Deleting or reordering materialized paths must not assign hole machining operations to restored outside boundaries.",
+      "focusedTests": {
+        "files": 4,
+        "passed": 21,
+        "failed": 0
+      }
+    }
+  ],
+  "finalIntegratedSource": {
+    "sourceFiles": 8116,
+    "sourceTreeSha256": "017ec100186682093a33a429b693216a0b8fb5830d5ff32ba39f769eb8ac4dcd",
+    "baseCommit": "2cd5600ac519fadd7095a4367bbd57db1efef70d",
+    "tests": "1,242 integration tests passed across 147 files; the corrected fixture was rerun with 8 tests passing. Main/e2e/Electron types, full lint, source contracts and selected formatting passed. Renderer/Chrome checks continue in parallel with exact-head hosted CI.",
+    "unitTests": {
+      "passed": 1242,
+      "failed": 0,
+      "skipped": 0,
+      "total": 1242,
+      "files": {
+        "passed": 147,
+        "failed": 0,
+        "total": 147
+      },
+      "success": true
+    },
+    "sourceMatchesBenchmark": false,
+    "benchmark": {
+      "status": "passed",
+      "workflows": 8,
+      "topLevelVariantRecords": 11,
+      "placedPanels": 12,
+      "sheets": 2,
+      "competitorMeasurements": null,
+      "physicalMeasurements": null,
+      "sourceTreeSha256": "0f0df7ea5a6019504d40975ad5ae18744714b6d6f1f35a4186f4a986f2b1114b",
+      "productionSourceUnchangedSinceRecordedRun": true
+    },
+    "sourceContracts": {
+      "file-size": "passed",
+      "public-exports": "passed",
+      "adr-numbers": "passed",
+      "dependency-licences": "passed",
+      "privacy": "passed",
+      "action-pins": "passed"
+    },
+    "formatting": {
+      "status": "passed",
+      "selectedFiles": 367
+    },
+    "integrationUnitSourceTreeSha256": "0f0df7ea5a6019504d40975ad5ae18744714b6d6f1f35a4186f4a986f2b1114b",
+    "fixtureTypingCorrection": {
+      "files": ["src/ui/state/constrained-sketch-bindings.test.ts"],
+      "productionSourceUnchanged": true,
+      "rerun": {
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "typechecks": {
+      "main": "passed",
+      "e2e": "passed",
+      "electron": "passed"
+    },
+    "wholeLint": {
+      "status": "passed",
+      "heapMiB": 5120
+    },
+    "verificationBaseCommit": "2cd5600ac519fadd7095a4367bbd57db1efef70d",
+    "integratedBaseCommit": "d60ecfc9bd46659a9d23c3c906c7f912dddcdf50",
+    "pendingAtPRCreation": [
+      "Renderer builds",
+      "32 standard Chrome workflows",
+      "Desktop and Browser-Free production checks",
+      "Final benchmark source stamp",
+      "Hosted CI"
+    ]
+  }
+}

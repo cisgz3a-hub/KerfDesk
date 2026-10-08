@@ -53,6 +53,7 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
   const [state, dispatch] = useReducer(deviceSetupReducer, project.device, (seed) => {
     const initial = initDeviceSetup(seed, detected, {
       detectedControllerKind,
+      ...(project.cncSetup === undefined ? {} : { cncSetup: project.cncSetup }),
       controllerRead: lastReadAt !== null,
       machine:
         project.machine?.kind === 'cnc'
@@ -124,6 +125,7 @@ function useDetectedSetupSync(
       kind: 'detected-updated',
       ...(detected === null ? (connected ? {} : { detected: {} }) : { detected }),
       detectedControllerKind,
+
       ...(controllerRead ? { controllerRead: true } : connected ? {} : { controllerRead: false }),
     });
   }, [connected, controllerRead, detected, detectedControllerKind, dispatch]);
