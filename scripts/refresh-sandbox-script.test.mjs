@@ -551,6 +551,61 @@ test('changed public buy HTML fails and verifies restoration of current checkout
   });
   assert.equal(adapter.flag(), 'false');
 });
+test('upload HTTP400 diagnostics survive original-closed recovery and successful applied readback', async (t) => {
+  attestFixture(t);
+  const retainedBundle = gzipSync(code).toString('base64');
+  const uploadErrorBody = {
+    success: false,
+    errors: [
+      {
+        code: 10021,
+        message: 'TypeError: inherited ASSETS binding ' + token + code.toString(),
+        source: { pointer: token },
+        documentation_url: token,
+      },
+    ],
+    result: token,
+  };
+  for (const uploadErrorAfterApply of [false, true]) {
+    const adapter = harness({
+      expectedUploadName: 'sandbox-worker.js',
+      uploadErrorBody,
+      uploadErrorAfterApply,
+      refuseUpload: !uploadErrorAfterApply,
+    });
+    let receipt;
+    if (uploadErrorAfterApply) {
+      receipt = await run(adapter, { retainedBundle });
+      assert.equal(receipt.outcome, 'verified');
+      assert.equal(receipt.reconciliation.readBackVerified, true);
+      assert.deepEqual(receipt.reconciliation.initialFailure, {
+        stage: 'sandbox-code-upload',
+        httpStatus: 400,
+      });
+    } else
+      await assert.rejects(run(adapter, { retainedBundle }), (error) => {
+        receipt = error.receipt;
+        assert.deepEqual(receipt.failure, { stage: 'sandbox-code-upload', httpStatus: 400 });
+        assert.equal(receipt.recovery.closedVerified, true);
+        assert.equal(receipt.recovery.rollbackAttempted, false);
+        return true;
+      });
+    assert.equal(receipt.apiFailure.stage, 'sandbox-code-upload');
+    assert.equal(receipt.apiFailure.httpStatus, 400);
+    assert.deepEqual(receipt.apiFailure.errors.codes, [10021]);
+    assert.deepEqual(receipt.apiFailure.errors.exceptionTypes, ['TypeError']);
+    assert.deepEqual(receipt.apiFailure.errors.identifiers, ['SandboxLicenseAuthority', 'ASSETS']);
+    assert.equal(receipt.apiFailure.metadataShape.types.bindings, 'array');
+    assert.equal(receipt.apiFailure.metadataShape.types.keep_assets, 'boolean');
+    for (const privateValue of [token, code.toString(), retainedBundle])
+      assert.ok(!JSON.stringify(receipt).includes(privateValue));
+    assert.deepEqual(
+      adapter.mutations.map(({ method }) => method),
+      ['PUT'],
+    );
+  }
+});
+
 test('applied upload with lost acknowledgement is reconciled by exact code/settings/assets/health proof', async (t) => {
   attestFixture(t);
   const adapter = harness({ loseUploadResponse: true });
