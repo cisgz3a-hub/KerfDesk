@@ -26,6 +26,7 @@ import {
 import { pushUndo } from './scene-mutations';
 import { outlineForNestUnit } from './nest-outline';
 import type { AppState } from './store';
+import { rigidNestDependencies, rigidNestMembers } from './nest-dependencies';
 
 export type QuickNestOptions = {
   readonly bin: 'workspace' | 'board';
@@ -187,13 +188,9 @@ function prepareNest(state: AppState, options: QuickNestOptions): PreparedNestRe
       )
       .map((object) => object.id),
   );
-  if (hasPartialMovableGroup(state, movableIds))
-    return {
-      ok: false,
-      reason:
-        'Select every member of each group and unlock/show it before nesting. Groups must stay rigid.',
-    };
-  const units = nestUnits(state, movableIds);
+  const dependencies = rigidNestDependencies(state.project.scene, movableIds);
+  if (!dependencies.ok) return dependencies;
+  const units = nestUnits(state, movableIds, dependencies.neighbours);
   if (units.length === 0) return { ok: false, reason: 'Select unlocked visible artwork to nest.' };
   const bin = resolveBin(state, options.bin);
   if (bin === null) return { ok: false, reason: 'Place a board before nesting into the board.' };
@@ -254,24 +251,23 @@ function applyNestPlan(
   };
 }
 
-function nestUnits(state: AppState, movableIds: ReadonlySet<string>): NestUnit[] {
+function nestUnits(
+  state: AppState,
+  movableIds: ReadonlySet<string>,
+  neighbours: ReadonlyMap<string, ReadonlySet<string>>,
+): NestUnit[] {
   const consumed = new Set<string>();
-  const neighbours = rigidGroupNeighbours(state, movableIds);
   const units: NestUnit[] = [];
   for (const object of state.project.scene.objects) {
     if (!movableIds.has(object.id) || consumed.has(object.id)) continue;
-    const members = rigidGroupMembers(object.id, neighbours);
+    const members = rigidNestMembers(object.id, neighbours);
     members.forEach((id) => consumed.add(id));
     const objects = state.project.scene.objects.filter((item) => members.has(item.id));
     const bounds = combinedBBox(objects);
     if (bounds === null) continue;
-    const groupIds = (state.project.scene.groups ?? [])
-      .filter(
-        (group) => group.objectIds.length > 1 && group.objectIds.every((id) => members.has(id)),
-      )
-      .map((group) => group.id);
     units.push({
-      id: groupIds.length === 0 ? 'object:' + object.id : 'group:' + groupIds.sort().join('+'),
+      // Scene object IDs are unique. Group IDs are opaque and may contain separators.
+      id: 'object:' + object.id,
       objects,
       bounds,
       ...outlineForNestUnit(objects, bounds),
@@ -279,48 +275,6 @@ function nestUnits(state: AppState, movableIds: ReadonlySet<string>): NestUnit[]
   }
   return units;
 }
-function hasPartialMovableGroup(state: AppState, movableIds: ReadonlySet<string>): boolean {
-  return (state.project.scene.groups ?? []).some(
-    (group) =>
-      group.objectIds.length > 1 &&
-      group.objectIds.some((id) => movableIds.has(id)) &&
-      !group.objectIds.every((id) => movableIds.has(id)),
-  );
-}
-function rigidGroupNeighbours(
-  state: AppState,
-  movableIds: ReadonlySet<string>,
-): ReadonlyMap<string, ReadonlySet<string>> {
-  const neighbours = new Map<string, Set<string>>();
-  for (const group of state.project.scene.groups ?? []) {
-    const first = group.objectIds[0];
-    if (first === undefined || !group.objectIds.every((id) => movableIds.has(id))) continue;
-    for (const id of group.objectIds) {
-      const from = neighbours.get(first) ?? new Set<string>();
-      from.add(id);
-      neighbours.set(first, from);
-      const to = neighbours.get(id) ?? new Set<string>();
-      to.add(first);
-      neighbours.set(id, to);
-    }
-  }
-  return neighbours;
-}
-function rigidGroupMembers(
-  first: string,
-  neighbours: ReadonlyMap<string, ReadonlySet<string>>,
-): ReadonlySet<string> {
-  const members = new Set<string>(),
-    pending = [first];
-  while (pending.length > 0) {
-    const id = pending.pop();
-    if (id === undefined || members.has(id)) continue;
-    members.add(id);
-    for (const other of neighbours.get(id) ?? []) if (!members.has(other)) pending.push(other);
-  }
-  return members;
-}
-
 function placeUnit(unit: NestUnit, placement: NestPlacement): SceneObject[] {
   const angle = nestRotation(placement);
   const rotated = angle !== 0 ? rotateUnit(unit, angle) : [...unit.objects];

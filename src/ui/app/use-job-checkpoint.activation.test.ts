@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createStreamer,
+  onAck,
   step,
   type StatusReport,
   type StreamerState,
@@ -47,6 +48,14 @@ function baseStreamer(): StreamerState {
   return step(createStreamer(GCODE)).state;
 }
 
+function streamerAfterAcks(count: number): StreamerState {
+  let streamer = baseStreamer();
+  for (let index = 0; index < count; index += 1) {
+    streamer = step(onAck(streamer, 'ok').state).state;
+  }
+  return streamer;
+}
+
 async function waitForAck(repo: RecoveryRepository, count: number): Promise<void> {
   await vi.waitFor(() => expect(repo.getSnapshot().activeRun?.ackedLines).toBe(count));
 }
@@ -68,10 +77,10 @@ describe('checkpoint progress during accepted-run activation', () => {
     await repo.stageArtifact(await executionArtifact('run-activation'));
     await repo.armFreshStart('run-activation', NOW);
     const updateProgress = vi.spyOn(repo, 'updateProgress');
-    const base = baseStreamer();
+    const observed = streamerAfterAcks(13);
     useLaserStore.setState({
       activeRunId: 'run-activation',
-      streamer: { ...base, completed: 10 },
+      streamer: observed,
       connection: { kind: 'connected' },
       statusReport: IDLE_STATUS,
     });
@@ -81,16 +90,57 @@ describe('checkpoint progress during accepted-run activation', () => {
     expect(repo.getSnapshot().activeRun).toBeNull();
     expect(reportFailure).not.toHaveBeenCalled();
 
+    expect(observed.completed).toBe(13);
+    expect(observed.status).toBe('streaming');
     await repo.activateFreshRun('run-activation', NOW);
-    await waitForAck(repo, 10);
+    // No later controller event is needed to persist these actual ACK/refill
+    // transitions. Activation only updates storage; it does not replay work.
+    await waitForAck(repo, 13);
+    expect(updateProgress.mock.calls.map(([, ackedLines]) => ackedLines)).toEqual([13]);
+    expect(useLaserStore.getState().activeRunId).toBe('run-activation');
+    expect(useLaserStore.getState().streamer).toBe(observed);
+    expect(repo.getSnapshot().lastCompletedReceipt).toBeNull();
+    expect(repo.getSnapshot().recoveryCapsule).toBeNull();
     expect(reportFailure).not.toHaveBeenCalled();
 
     // The benign no-op must not consume the once-only real failure reporter.
     updateProgress.mockResolvedValueOnce({ ok: false, error: 'storage-unavailable' });
-    useLaserStore.setState({ streamer: { ...base, completed: 35 } });
+    useLaserStore.setState({ streamer: streamerAfterAcks(38) });
     await vi.waitFor(() =>
       expect(reportFailure).toHaveBeenCalledWith({ ok: false, error: 'storage-unavailable' }),
     );
+  });
+
+  it('does not apply another live owner acknowledgement count when an older archive activates', async () => {
+    const repo = repository();
+    const reportFailure = vi.fn();
+    await repo.initialize();
+    uninstall = installJobCheckpointTracking(() => LATER, repo, reportFailure);
+    await repo.stageArtifact(await executionArtifact('older-archive'));
+    await repo.armFreshStart('older-archive', NOW);
+    const updateProgress = vi.spyOn(repo, 'updateProgress');
+    const otherRun = streamerAfterAcks(13);
+    useLaserStore.setState({
+      activeRunId: 'other-live-run',
+      streamer: otherRun,
+      connection: { kind: 'connected' },
+      statusReport: IDLE_STATUS,
+    });
+
+    // Drain the unrelated live run's initial observation before checking the
+    // activation callback. Its prior writes cannot be attributed to activation.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const priorWrites = [...updateProgress.mock.calls];
+    const priorFailures = [...reportFailure.mock.calls];
+    await repo.activateFreshRun('older-archive', NOW);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(repo.getSnapshot().activeRun).toMatchObject({ runId: 'older-archive', ackedLines: 0 });
+    expect(updateProgress.mock.calls).toEqual(priorWrites);
+    expect(reportFailure.mock.calls).toEqual(priorFailures);
+    expect(useLaserStore.getState().activeRunId).toBe('other-live-run');
+    expect(useLaserStore.getState().streamer).toBe(otherRun);
+    expect(repo.getSnapshot().lastCompletedReceipt).toBeNull();
+    expect(repo.getSnapshot().recoveryCapsule).toBeNull();
   });
 
   it('defers clean terminal persistence through activation without a false storage warning', async () => {

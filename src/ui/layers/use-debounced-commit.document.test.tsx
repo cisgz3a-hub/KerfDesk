@@ -61,32 +61,35 @@ afterEach(async () => {
 });
 
 describe('debounced numeric document ownership', () => {
-  it('refuses an old queued timer and blur before React renders the replacement document', async () => {
-    await mount();
-    await act(async () => change('14'));
-    const oldField = probe.current;
-    await act(async () => {
-      useStore.getState().newProject();
-      root?.render(<Probe value={33} />);
-      // Run both old callbacks before the new epoch can reach the rendered hook.
-      vi.advanceTimersByTime(300);
-      oldField?.onBlur();
-    });
-    expect(commit).not.toHaveBeenCalled();
-    expect(probe.current?.displayValue).toBe('33');
+  it.each([20, 33])(
+    'refuses an old queued timer and blur before React renders replacement value %s',
+    async (replacementValue) => {
+      await mount();
+      await act(async () => change('14'));
+      const oldField = probe.current;
+      await act(async () => {
+        useStore.getState().newProject();
+        root?.render(<Probe value={replacementValue} />);
+        // Run both old callbacks before the new epoch can reach the rendered hook.
+        vi.advanceTimersByTime(300);
+        oldField?.onBlur();
+      });
+      expect(commit).not.toHaveBeenCalled();
+      expect(probe.current?.displayValue).toBe(String(replacementValue));
 
-    await act(async () => {
-      change('25');
-      // A late handler from the old document cannot alter the new draft or timer.
-      oldField?.onBlur();
-      const input = document.createElement('input');
-      input.value = '40';
-      oldField?.onChange({ target: input } as React.ChangeEvent<HTMLInputElement>);
-    });
-    expect(probe.current?.displayValue).toBe('25');
-    await act(async () => vi.advanceTimersByTime(300));
-    expect(commit).toHaveBeenCalledExactlyOnceWith(25);
-  });
+      await act(async () => {
+        change('25');
+        // A late handler from the old document cannot alter the new draft or timer.
+        oldField?.onBlur();
+        const input = document.createElement('input');
+        input.value = '40';
+        oldField?.onChange({ target: input } as React.ChangeEvent<HTMLInputElement>);
+      });
+      expect(probe.current?.displayValue).toBe('25');
+      await act(async () => vi.advanceTimersByTime(300));
+      expect(commit).toHaveBeenCalledExactlyOnceWith(25);
+    },
+  );
 
   it.each(['new', 'open'] as const)(
     '%s replaces a matching parsed draft even when the canonical value is unchanged',
