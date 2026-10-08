@@ -14,6 +14,7 @@ let uninstall: (() => void) | undefined;
 afterEach(() => {
   uninstall?.();
   useLaserStore.setState(initialLaserState());
+  vi.restoreAllMocks();
 });
 
 it('defers progress during post-accept archival and retries after activation without a false storage warning', async () => {
@@ -36,6 +37,7 @@ it('defers progress during post-accept archival and retries after activation wit
     }),
   );
   const reportFailure = vi.fn();
+  const updateProgress = vi.spyOn(repository, 'updateProgress');
   uninstall = installJobCheckpointTracking(() => now, repository, reportFailure);
   const streamer = step(createStreamer(gcode)).state;
   useLaserStore.setState({
@@ -46,12 +48,33 @@ it('defers progress during post-accept archival and retries after activation wit
   useLaserStore.setState({ streamer: { ...streamer, completed: 25 } });
   await new Promise((resolve) => setTimeout(resolve, 20));
   expect(reportFailure).not.toHaveBeenCalled();
+  expect(updateProgress).not.toHaveBeenCalled();
   expect(repository.getSnapshot().pendingStart?.runId).toBe('archiving-run');
   await repository.stageArtifact(
     await createCurrentTestExecutionArtifact({ runId: 'archiving-run', gcode, createdAtIso: now }),
   );
   await repository.activateFreshRun('archiving-run', now);
+
+  // Activation retries the deferred observation without another controller event.
+  await vi.waitFor(() => expect(repository.getSnapshot().activeRun?.ackedLines).toBe(25));
+  expect(updateProgress.mock.calls.map(([, ackedLines]) => ackedLines)).toEqual([25]);
+
+  // Once that retry is queued, ordinary streaming keeps the 25-line interval.
   useLaserStore.setState({ streamer: { ...streamer, completed: 26 } });
-  await vi.waitFor(() => expect(repository.getSnapshot().activeRun?.ackedLines).toBe(26));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  expect(repository.getSnapshot().activeRun?.ackedLines).toBe(25);
+  expect(updateProgress.mock.calls.map(([, ackedLines]) => ackedLines)).toEqual([25]);
+  useLaserStore.setState({ streamer: { ...streamer, completed: 50 } });
+  await vi.waitFor(() => expect(repository.getSnapshot().activeRun?.ackedLines).toBe(50));
+  expect(updateProgress.mock.calls.map(([, ackedLines]) => ackedLines)).toEqual([25, 50]);
+
+  // An interruption persists its exact first acknowledgement even below the
+  // next interval; trailing buffered acknowledgements cannot move that point.
+  useLaserStore.setState({ streamer: { ...streamer, status: 'errored', completed: 51 } });
+  useLaserStore.setState({ streamer: { ...streamer, status: 'errored', completed: 52 } });
+  await vi.waitFor(() => expect(repository.getSnapshot().recoveryCapsule?.ackedLines).toBe(51));
+  expect(repository.getSnapshot().recoveryCapsule?.runId).toBe('archiving-run');
+  expect(repository.getSnapshot().activeRun).toBeNull();
+  expect(updateProgress.mock.calls.map(([, ackedLines]) => ackedLines)).toEqual([25, 50]);
   expect(reportFailure).not.toHaveBeenCalled();
 });

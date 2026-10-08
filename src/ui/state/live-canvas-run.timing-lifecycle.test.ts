@@ -371,4 +371,24 @@ describe('live countdown lifecycle integration', () => {
       }
     },
   );
+  it.each(TERMINAL_LIFECYCLES)(
+    'preserves a %s run across later Hold, Door, Alarm and terminal patches',
+    (lifecycle) => {
+      const current = startedState();
+      if (current.liveCanvasRun == null) throw new Error('Expected a live run');
+      const terminal = {
+        ...current,
+        liveCanvasRun: { ...current.liveCanvasRun, lifecycle, endedAtMs: 5000 },
+      };
+      for (const state of ['Hold', 'Door', 'Alarm'] as const) {
+        expect(
+          liveCanvasStatusPatch(terminal, { ...report(0), state, subState: 0 }, null, 90000),
+        ).toEqual({});
+      }
+      for (const next of ['stopped', 'disconnected', 'errored'] as const) {
+        expect(liveCanvasLifecyclePatch(terminal, next, 90000)).toEqual({});
+      }
+      expect(terminal.liveCanvasRun.endedAtMs).toBe(5000);
+    },
+  );
 });

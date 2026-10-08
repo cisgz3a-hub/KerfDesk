@@ -18,6 +18,7 @@ import {
 import { currentSavedLibrariesState } from './saved-libraries-actions';
 import { preserveBrowserProProject } from './pending-pro-project';
 import type { AppState } from './store';
+import { useUiStore } from './ui-store';
 import {
   canonicalizeOpenedProjectBed,
   type ProjectBedReconciliationNotice,
@@ -50,6 +51,7 @@ export function projectActions(
       const current = get();
       const resolution = resolveProjectMachineCapability(project, current.cncLibrary.customTools);
       const bedResolution = canonicalizeOpenedProjectBed(resolution.project, current.project);
+      useUiStore.getState().resetArtworkRunOrder();
       set((state) => ({
         ...initialState(bedResolution.project),
         ...retainedApplicationState(state),
@@ -65,7 +67,8 @@ export function projectActions(
         ? { ...resolution.loadResult, projectBedReconciled: true }
         : resolution.loadResult;
     },
-    newProject: () =>
+    newProject: () => {
+      useUiStore.getState().resetArtworkRunOrder();
       set((state) => {
         // Accepted older CNC files can have no device mirror, or an older one.
         // Carry only CNC hardware into the fresh job seed, including when the
@@ -91,7 +94,8 @@ export function projectActions(
           projectDocumentEpoch: state.projectDocumentEpoch + 1,
           projectBedReconciliation: null,
         };
-      }),
+      });
+    },
     claimProjectOpenRequest: () => {
       const nextEpoch = get().projectOpenRequestEpoch + 1;
       set({ projectOpenRequestEpoch: nextEpoch });

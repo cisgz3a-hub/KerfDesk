@@ -6,6 +6,7 @@ import { DEFAULT_OUTPUT_SCOPE } from '../../core/scene';
 import { deserializeProject } from '../../io/project/deserialize-project';
 import { resolveJobPlacement } from '../job-placement';
 import { startLiveCanvasRun } from '../state/canvas-motion-plan';
+import { liveCanvasStartPatch } from '../state/live-canvas-run';
 import { initialLaserState } from '../state/laser-store-helpers';
 import { useLaserStore } from '../state/laser-store';
 import { useStore } from '../state/store';
@@ -16,7 +17,7 @@ import {
   IDLE_CANVAS_PLAN_DELAY_MS,
   useCanvasMotionOverlay,
 } from './use-canvas-motion-overlay';
-import type { StatusReport } from '../../core/controllers/grbl';
+import { createStreamer, type StatusReport } from '../../core/controllers/grbl';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -38,6 +39,87 @@ afterEach(async () => {
 });
 
 describe('idle canvas motion plan', () => {
+  it('rejects old completed ownership on the first canvas mount after identical Open', async () => {
+    const plan = await mountWithFinishedRun();
+    await act(async () => root?.unmount());
+    root = null;
+    host?.remove();
+    const project = useStore.getState().project;
+    useStore.getState().setProject(project);
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    await act(async () => {
+      root = createRoot(host as HTMLDivElement);
+      root.render(createElement(StoreHarness));
+    });
+
+    expect(observedOverlay?.run ?? null).toBeNull();
+    expect(useLaserStore.getState().liveCanvasRun).toBeNull();
+    expect(observedOverlay?.plan).not.toBe(plan);
+  });
+
+  it('preserves owned terminal motion while its sender is awaiting controller settlement', async () => {
+    const plan = await mountWithFinishedRun();
+    await act(async () => {
+      useLaserStore.setState({
+        streamer: { ...createStreamer('G1 X10'), status: 'done' },
+        liveCanvasRun: { ...liveCanvasStartPatch(plan, 1234).liveCanvasRun!, lifecycle: 'errored' },
+      });
+      useStore.getState().newProject();
+    });
+
+    expect(observedOverlay?.run?.lifecycle).toBe('errored');
+    expect(observedOverlay?.plan).toBe(plan);
+    expect(useLaserStore.getState().liveCanvasRun?.plan).toBe(plan);
+    await act(async () => useLaserStore.setState({ streamer: null }));
+    expect(observedOverlay?.run ?? null).toBeNull();
+    expect(useLaserStore.getState().liveCanvasRun).toBeNull();
+  });
+
+  it('detaches finished history before empty selected output can prepare a replacement', async () => {
+    const plan = await mountWithFinishedRun();
+    await act(async () => {
+      useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true });
+      useStore.getState().selectObject(null);
+    });
+
+    expect(useLaserStore.getState().liveCanvasRun).toBeNull();
+    expect(observedOverlay?.run ?? null).toBeNull();
+    expect(observedOverlay?.plan).not.toBe(plan);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, IDLE_CANVAS_PLAN_DELAY_MS + 50));
+    });
+    expect(observedOverlay).toBeNull();
+  });
+
+  it('detaches finished history on Open even when the loaded output is identical', async () => {
+    await mountWithFinishedRun();
+    const project = useStore.getState().project;
+    const epoch = useStore.getState().projectDocumentEpoch;
+    await act(async () => useStore.getState().setProject(project));
+
+    expect(useStore.getState().projectDocumentEpoch).toBe(epoch + 1);
+    expect(useLaserStore.getState().liveCanvasRun).toBeNull();
+    expect(observedOverlay?.run ?? null).toBeNull();
+  });
+
+  it('keeps the exact in-flight plan while the next canvas or selection changes', async () => {
+    const plan = await mountWithFinishedRun();
+    await act(async () => {
+      useLaserStore.setState({ liveCanvasRun: startLiveCanvasRun(plan) });
+    });
+    await act(async () => {
+      useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true });
+      useStore.getState().selectObject(null);
+      useStore.getState().newProject();
+    });
+
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(observedOverlay?.run?.lifecycle).toBe('running');
+    expect(observedOverlay?.plan).toBe(plan);
+    expect(useLaserStore.getState().liveCanvasRun?.plan).toBe(plan);
+  });
+
   it('builds markers through the prepared-output pipeline', async () => {
     const decoded = deserializeProject(readFileSync('e2e/fixtures/project-basic.lf2', 'utf8'));
     if (decoded.kind !== 'ok') throw new Error(`Fixture failed to load: ${decoded.kind}`);
@@ -237,6 +319,30 @@ describe('idle canvas motion plan', () => {
     expect(observedOverlay).toBeNull();
   });
 });
+
+async function mountWithFinishedRun() {
+  const decoded = deserializeProject(readFileSync('e2e/fixtures/project-basic.lf2', 'utf8'));
+  if (decoded.kind !== 'ok') throw new Error('Fixture did not load');
+  useStore.getState().setProject(decoded.project);
+  useStore.setState({ jobPlacement: { startFrom: 'absolute', anchor: 'front-left' } });
+  useLaserStore.setState(initialLaserState());
+  host = document.createElement('div');
+  document.body.appendChild(host);
+  await act(async () => {
+    root = createRoot(host as HTMLDivElement);
+    root.render(createElement(StoreHarness));
+  });
+  await waitForPublishedOverlay();
+  const plan = observedOverlay?.plan;
+  if (plan === undefined) throw new Error('Expected a current idle marker plan');
+  await act(async () => {
+    useLaserStore.setState({
+      liveCanvasRun: { ...liveCanvasStartPatch(plan, 1000).liveCanvasRun!, lifecycle: 'finished' },
+    });
+  });
+  expect(observedOverlay?.run?.lifecycle).toBe('finished');
+  return plan;
+}
 
 function Harness(props: { readonly project: Parameters<typeof useCanvasMotionOverlay>[0] }) {
   harnessRenders += 1;

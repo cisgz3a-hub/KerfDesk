@@ -338,6 +338,8 @@ export type OpenProjectCtx = ProjectOpenCompletionContext & {
   readonly claimProjectOpenRequest: () => number;
   readonly getProjectOpenRequestEpoch: () => number;
   readonly getProjectDocumentEpoch: () => number;
+  /** Current immutable revision; edits during the picker/parser retire publication. */
+  readonly getProject?: () => Project;
   /** Rechecked after asynchronous reading/parsing, immediately before replacing the document. */
   readonly stillAllowed?: () => boolean;
   /** The machine open now. A LightBurn project opens on it (ADR-388); without
@@ -356,6 +358,7 @@ export async function handleOpenProject(
     ctx.claimProjectOpenRequest,
     ctx.getProjectOpenRequestEpoch,
     ctx.getProjectDocumentEpoch,
+    ctx.getProject,
   );
   const ownedCtx: OpenProjectCtx = {
     ...ctx,

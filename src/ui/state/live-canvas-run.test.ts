@@ -12,6 +12,7 @@ import { INITIAL_ROUTE_RECONCILIATION } from '../../core/job/live-route-reconcil
 import { fingerprintGcode } from '../../core/recovery';
 import { startLiveCanvasRun, type CanvasMotionPlan } from './canvas-motion-plan';
 import {
+  completeLiveCanvasRun,
   liveCanvasLifecyclePatch,
   liveCanvasStartPatch,
   liveCanvasStatusPatch,
@@ -158,12 +159,15 @@ describe('live canvas status reconciliation', () => {
     expect(outlier?.accuracyReason).toContain('Route match uncertain');
   });
 
-  it('confirms the full Marlin route only after done plus Idle', () => {
+  it('confirms the full Marlin route only after marker-backed settlement', () => {
     const current = state(plan('settle-only'));
     const before = liveCanvasStatusPatch(current, report(10), acceptedStreamer()).liveCanvasRun;
     expect(before?.route).toEqual(INITIAL_ROUTE_RECONCILIATION);
     const done = { ...acceptedStreamer(), status: 'done' as const };
-    const finished = liveCanvasStatusPatch(current, report(10, 'Idle'), done).liveCanvasRun;
+    const awaiting = liveCanvasStatusPatch(current, report(10, 'Idle'), done).liveCanvasRun;
+    expect(awaiting?.lifecycle).toBe('running');
+    expect(awaiting?.route).toEqual(INITIAL_ROUTE_RECONCILIATION);
+    const finished = completeLiveCanvasRun(awaiting ?? null);
     expect(finished?.lifecycle).toBe('finished');
     expect(finished?.route.confirmedRouteMm).toBe(finished?.plan.manifest.totalRouteMm);
   });
@@ -227,10 +231,11 @@ describe('live canvas status reconciliation', () => {
       'stopped',
       9_000,
     ).liveCanvasRun;
-    expect(restopped?.endedAtMs).toBe(3_000);
+    expect(restopped).toBeUndefined();
+    expect(stopped?.endedAtMs).toBe(3_000);
   });
 
-  it('freezes the end time when a status report finishes the run', () => {
+  it('freezes the end time only when driver settlement finishes the run', () => {
     const current = {
       ...state(),
       liveCanvasRun: liveCanvasStartPatch(plan(), 1_000).liveCanvasRun,
@@ -244,9 +249,12 @@ describe('live canvas status reconciliation', () => {
     expect(running?.endedAtMs).toBeNull();
 
     const done = { ...acceptedStreamer(), status: 'done' as const };
-    const finished = liveCanvasStatusPatch(current, report(10, 'Idle'), done, 5_000).liveCanvasRun;
+    const awaiting = liveCanvasStatusPatch(current, report(10, 'Idle'), done, 5_000).liveCanvasRun;
+    expect(awaiting?.lifecycle).toBe('running');
+    expect(awaiting?.endedAtMs).toBeNull();
+    const finished = completeLiveCanvasRun(awaiting ?? null, 6_000);
     expect(finished?.lifecycle).toBe('finished');
-    expect(finished?.endedAtMs).toBe(5_000);
+    expect(finished?.endedAtMs).toBe(6_000);
   });
 
   it('preserves the last confirmed prefix when a run stops or errors', () => {

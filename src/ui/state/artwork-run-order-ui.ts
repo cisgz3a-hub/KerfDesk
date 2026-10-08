@@ -26,6 +26,7 @@ export type ArtworkRunOrderUiState = {
   ) => void;
   readonly undoArtworkNumbering: () => void;
   readonly finishArtworkNumbering: () => void;
+  readonly resetArtworkRunOrder: () => void;
 };
 
 type ArtworkRunOrderSetter = (
@@ -86,5 +87,6 @@ export function artworkRunOrderUiSlice(set: ArtworkRunOrderSetter): ArtworkRunOr
         };
       }),
     finishArtworkNumbering: () => set({ artworkNumbering: { kind: 'idle' } }),
+    resetArtworkRunOrder: () => set({ artworkNumbering: { kind: 'idle' }, artworkRunFocus: null }),
   };
 }
