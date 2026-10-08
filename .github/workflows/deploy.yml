@@ -333,7 +333,7 @@ jobs:
         with:
           node-version: 22
       - name: Verify the bounded checkout helpers
-        run: node --test scripts/apply-payment-settings.test.mjs scripts/refresh-sandbox-script.test.mjs scripts/cloudflare-error-diagnostics.test.mjs
+        run: node --test scripts/apply-payment-settings.test.mjs scripts/refresh-sandbox-script.test.mjs scripts/refresh-sandbox-staging.test.mjs scripts/sandbox-restoration-guards.test.mjs scripts/cloudflare-error-diagnostics.test.mjs
       - name: Apply the specified checkout operation
         env:
           KERFDESK_PAYMENT_LAUNCH_CF_TOKEN: ${{ secrets.KERFDESK_PAYMENT_LAUNCH_CF_TOKEN }}
