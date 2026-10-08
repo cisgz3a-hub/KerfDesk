@@ -9,6 +9,7 @@ import { readRetainedSandboxBundle } from './retained-sandbox-bundle.mjs';
 import {
   attestSandboxVersion,
   readAttestedSandboxModule,
+  sandboxUploadSettings,
   sandboxReceiptBindingName,
   sandboxSettingsFingerprint as fingerprint,
 } from './sandbox-restoration-guards.mjs';
@@ -59,7 +60,7 @@ export function sandboxUploadMetadata(settings, activeVersion, entrypoint, opera
       /^kerfdesk-sandbox-refresh-[0-9a-f-]{36}$/u.test(operationTag),
     'Sandbox refresh operation tag unavailable.',
   );
-  const metadata = flagMetadata(settings, activeVersion, 'false');
+  const metadata = flagMetadata(sandboxUploadSettings(settings), activeVersion, 'false');
   return {
     ...metadata,
     ...(settings.tags !== undefined ? { tags: settings.tags } : {}),
