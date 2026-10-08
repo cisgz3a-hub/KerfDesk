@@ -41,7 +41,9 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('operation-topology-fill-ownership-contour-packets-20261007-v17');
+    expect(EMITTER_REVISION).toBe(
+      'cnc-relief-footprints-inlay-nonzero-sketch-topology-20261009-v18',
+    );
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {
