@@ -44,8 +44,13 @@ export function createMarkers(three: ThreeModule, scene: ThreeNamespace.Scene): 
   scene.add(marker);
   const liveMarker = createMarker(three, LIVE_MARKER_COLOR);
   liveMarker.visible = false;
-  liveMarker.renderOrder = 3;
+  // Share the foreground queue with planar strokes, above the active move,
+  // measurement aids and Studio origin triad. Keep the live colour opaque.
+  liveMarker.renderOrder = 12;
+  liveMarker.material.transparent = true;
+  liveMarker.material.blending = three.NoBlending;
   liveMarker.material.depthTest = false;
+  liveMarker.material.depthWrite = false;
   scene.add(liveMarker);
   return { marker, liveMarker };
 }

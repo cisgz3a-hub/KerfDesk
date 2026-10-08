@@ -101,6 +101,7 @@ type StrokeFixture = typeof import('./fixtures/playback-stroke-viewer');
 test('active playback stays in front of coplanar retraces and crossings', async ({
   page,
 }, info) => {
+  test.setTimeout(150_000);
   await page.goto('/');
   const cases = [
     {
@@ -123,33 +124,35 @@ test('active playback stays in front of coplanar retraces and crossings', async 
   for (const scenario of cases) {
     for (const look of ['classic', 'studio'] as const) {
       for (const perspective of [false, true]) {
-        const result = await page.evaluate(
-          async (options) => {
-            const path = '/e2e/fixtures/playback-stroke-viewer.ts';
-            const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
-            const frame = fixture.playbackStrokeFrame(options);
-            return {
-              data: frame.data,
-              pixels: await fixture.strokeRegionColours(frame.data, frame.region),
-            };
-          },
-          { ...scenario, look, perspective },
-        );
-        const name = `${scenario.name}-${look}-${perspective ? 'perspective' : 'ortho'}`;
-        const path = info.outputPath(name + '.png');
-        await writeFile(
-          path,
-          Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'),
-        );
-        await info.attach(name, { path, contentType: 'image/png' });
-        expect(
-          result.pixels.cut,
-          `${name}: completed cuts must not leak through the active core`,
-        ).toBe(0);
-        expect(
-          result.pixels.white,
-          `${name}: the active core must remain visible`,
-        ).toBeGreaterThanOrEqual(result.pixels.total * 0.95);
+        for (const view of ['top', 'iso', 'x-angle', 'grazing'] as const) {
+          const result = await page.evaluate(
+            async (options) => {
+              const path = '/e2e/fixtures/playback-stroke-viewer.ts';
+              const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
+              const frame = fixture.playbackStrokeFrame(options);
+              return {
+                data: frame.data,
+                pixels: await fixture.strokeRegionColours(frame.data, frame.region),
+              };
+            },
+            { ...scenario, look, perspective, view },
+          );
+          const name = `${scenario.name}-${look}-${view}-${perspective ? 'perspective' : 'ortho'}`;
+          const path = info.outputPath(name + '.png');
+          await writeFile(
+            path,
+            Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'),
+          );
+          await info.attach(name, { path, contentType: 'image/png' });
+          expect(
+            result.pixels.cut,
+            `${name}: completed cuts must not leak through the active core`,
+          ).toBe(0);
+          expect(
+            result.pixels.white,
+            `${name}: the active core must remain visible`,
+          ).toBeGreaterThanOrEqual(result.pixels.total * 0.95);
+        }
       }
     }
   }
@@ -180,4 +183,138 @@ test('playback depth testing retains occlusion by a nearer cutting plane', async
   await writeFile(path, Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'));
   await info.attach('nearer-cutting-plane', { path, contentType: 'image/png' });
   expect(result.pixels.cut).toBeGreaterThan(result.pixels.total * 0.5);
+});
+
+test('planar playback remains occluded by nearer scene geometry', async ({ page }, info) => {
+  test.setTimeout(150_000);
+  await page.goto('/');
+  for (const look of ['classic', 'studio'] as const) {
+    for (const perspective of [false, true]) {
+      for (const view of ['top', 'iso', 'x-angle', 'grazing'] as const) {
+        const result = await page.evaluate(
+          async (options) => {
+            const path = '/e2e/fixtures/playback-stroke-viewer.ts';
+            const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
+            const frame = fixture.playbackStrokeFrame({
+              text: 'G21 G90\nM4 S500\nG0 X0 Y50\nG1 X100 F3000\nG0 X75 Y65\nG1 Y15\nM5',
+              segmentIndex: 3,
+              point: { x: 75, y: 35, z: 0 },
+              sample: { x: 75, y: 50, z: 0 },
+              vertical: true,
+              occluderZ: 1,
+              ...options,
+            });
+            return {
+              data: frame.data,
+              pixels: await fixture.strokeRegionColours(frame.data, frame.region),
+            };
+          },
+          { look, perspective, view },
+        );
+        const name =
+          'scene-occlusion-' + look + '-' + view + '-' + (perspective ? 'perspective' : 'ortho');
+        const path = info.outputPath(name + '.png');
+        await writeFile(
+          path,
+          Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'),
+        );
+        await info.attach(name, { path, contentType: 'image/png' });
+        expect(
+          result.pixels.white,
+          name + ': nearer scene geometry must hide the active core',
+        ).toBe(0);
+        expect(result.pixels.cut, name + ': nearer scene geometry must hide completed cuts').toBe(
+          0,
+        );
+        expect(result.pixels.occluder, name + ': the opaque scene plane must remain visible').toBe(
+          result.pixels.total,
+        );
+      }
+    }
+  }
+});
+
+test('live-position marker remains red above completed and active planar strokes', async ({
+  page,
+}, info) => {
+  test.setTimeout(150_000);
+  await page.goto('/');
+  for (const look of ['classic', 'studio'] as const) {
+    for (const perspective of [false, true]) {
+      for (const view of ['top', 'iso', 'x-angle', 'grazing'] as const) {
+        const result = await page.evaluate(
+          async (options) => {
+            const path = '/e2e/fixtures/playback-stroke-viewer.ts';
+            const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
+            const frame = fixture.playbackStrokeFrame({
+              text: 'G21 G90\nM4 S500\nG0 X0 Y50\nG1 X100 F3000\nG0 X75 Y65\nG1 Y15\nM5',
+              segmentIndex: 3,
+              point: { x: 75, y: 35, z: 0 },
+              sample: { x: 75, y: 50, z: 0 },
+              vertical: true,
+              liveMarker: true,
+              ...options,
+            });
+            return {
+              data: frame.data,
+              pixels: await fixture.strokeRegionColours(frame.data, frame.region),
+            };
+          },
+          { look, perspective, view },
+        );
+        const name =
+          'live-marker-' + look + '-' + view + '-' + (perspective ? 'perspective' : 'ortho');
+        const path = info.outputPath(name + '.png');
+        await writeFile(
+          path,
+          Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'),
+        );
+        await info.attach(name, { path, contentType: 'image/png' });
+        expect(result.pixels.live, name + ': live marker must retain its exact red colour').toBe(
+          result.pixels.total,
+        );
+      }
+    }
+  }
+});
+
+test('Studio origin arrows and dot remain above planar playback', async ({ page }, info) => {
+  await page.goto('/');
+  for (const scenario of [
+    { sample: { x: 5, y: 0, z: 0 }, kind: 'axis', liveMarker: false },
+    { sample: { x: 0, y: 0, z: 0 }, kind: 'origin', liveMarker: false },
+    { sample: { x: 0, y: 0, z: 0 }, kind: 'live', liveMarker: true },
+  ] as const) {
+    for (const hideToolpath of [true, false]) {
+      const result = await page.evaluate(
+        async (options) => {
+          const path = '/e2e/fixtures/playback-stroke-viewer.ts';
+          const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
+          const frame = fixture.playbackStrokeFrame({
+            text: 'G21 G90\nM4 S500\nG0 X0 Y-10\nG0 X-50 Y0\nG1 X50 F3000\nG1 X-50\nM5',
+            segmentIndex: 3,
+            point: { x: -10, y: 0, z: 0 },
+            vertical: false,
+            look: 'studio',
+            perspective: false,
+            studioFurniture: true,
+            ...options,
+          });
+          return {
+            data: frame.data,
+            pixels: await fixture.strokeRegionColours(frame.data, frame.region),
+          };
+        },
+        { ...scenario, hideToolpath },
+      );
+      const kind = scenario.kind;
+      const name = 'studio-' + kind + '-' + (hideToolpath ? 'baseline' : 'playback');
+      const path = info.outputPath(name + '.png');
+      await writeFile(path, Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'));
+      await info.attach(name, { path, contentType: 'image/png' });
+      expect(result.pixels[kind], name + ': triad must retain its exact foreground colour').toBe(
+        result.pixels.total,
+      );
+    }
+  }
 });

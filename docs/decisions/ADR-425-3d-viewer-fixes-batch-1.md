@@ -104,10 +104,14 @@ Known laser programs now start with Travel hidden; the operator can show it and 
 refreshes. CNC and unknown-file travel defaults stay visible. Flat XY paths use one-pixel cutting
 strokes. Travel opacity scales with travel length per bounding area, the camera's millimetres per
 pixel and the XY plane's projected angle, returning to its normal opacity as zoom separates the moves.
-Coplanar travel and faint future paths use a strict depth test and never write depth over completed cuts. A small polygon depth bias
-keeps flat cutting strokes ahead of coplanar native travel lines despite GPU rounding. Both active
-playback strokes use a stronger flat-path bias so retraces and crossings stay bold; depth testing
-still lets nearer geometry occlude a 3D move. Every segment
+Flat toolpath strokes share one transparent draw queue without writing depth against each other:
+faint future paths, travel, completed cuts, then the active playback casing and core. Their screen-space
+widths and depth slopes therefore cannot hide an active retrace or crossing, even at grazing angles.
+All still depth-test against scene geometry, with a small work-plane bias. Nonplanar paths retain
+their existing depth writes and occlusion. Foreground aids remain above planar strokes: hover and
+measurement highlights, Studio origin arrows and dot, then the red live-position marker. These
+opaque-colour overlays use the same ordered queue without blending or depth writes; the simulated
+head and direction arrows retain physical depth testing. Every segment
 and its source mapping remains available to playback and picking. Geometry, emitted output and controller
 behaviour are unchanged. Both Classic and Studio apply the same visibility rule.
 

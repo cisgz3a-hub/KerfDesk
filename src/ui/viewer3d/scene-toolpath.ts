@@ -261,7 +261,13 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolea
     vertexColors: true,
     linewidth: planar ? 1 : FAT_LINE_PX,
     alphaToCoverage: planar,
-    // Native travel lines and stroke meshes can round equal depth differently.
+    // Sort flat travel, completed cuts and the active move together without
+    // their screen-space stroke meshes writing depth against each other.
+    transparent: planar,
+    // MSAA coverage alone smooths these opaque-colour strokes, as before.
+    blending: planar ? args.three.NoBlending : args.three.NormalBlending,
+    depthWrite: !planar,
+    // Bias flat strokes slightly ahead of the work plane.
     polygonOffset: planar,
     polygonOffsetFactor: -1,
     polygonOffsetUnits: -1,

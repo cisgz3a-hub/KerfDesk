@@ -40,12 +40,16 @@ export function createCurrentMove(
     { color: args.theme.arrow, linewidth: CORE_PX },
   ].map((stroke, order) => {
     const material = new args.LineMaterial({
+      // The flat toolpath shares one ordered draw queue. Its different stroke
+      // directions must not occlude each other through slope-dependent depth.
+      transparent: planar,
+      blending: planar ? args.three.NoBlending : args.three.NormalBlending,
+      depthWrite: !planar,
       ...stroke,
-      // Both strokes sit ahead of the completed flat cuts' (-1, -1) bias.
-      // Keep depth testing so nearer geometry still occludes a 3D move.
+      // Keep depth testing against scene geometry, with a small work-plane bias.
       polygonOffset: planar,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
     });
     material.toneMapped = false;
     material.resolution.set(args.viewWidth, args.viewHeight);
