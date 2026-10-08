@@ -82,18 +82,21 @@ export function workspace(state) {
     truncated: false,
     permissions: { canEdit: state.scopes.includes('edit'), artworkSharingEnabled: state.sharing },
     history: state.history,
+    capabilities: { touchEditing: true, groupTransformBounds: true },
     artwork: [
       {
         id: 'text-1',
         type: 'text',
         name: 'MCP test',
         bounds: { xMm: 20, yMm: 20, widthMm: 50, heightMm: 10 },
+        transformBounds: { xMm: 20, yMm: 20, widthMm: 50, heightMm: 10 },
       },
       {
         id: 'rectangle-1',
         type: 'rectangle',
         name: '<script>literal artwork</script>',
         bounds: { xMm: 20, yMm: 40, widthMm: 50, heightMm: 20 },
+        transformBounds: { xMm: 20, yMm: 40, widthMm: 50, heightMm: 20 },
       },
     ],
     operations: [
@@ -124,6 +127,7 @@ export function workspace(state) {
   if (state.oldDesktop) {
     delete value.permissions;
     delete value.history;
+    delete value.capabilities;
   }
   if (state.extraText) {
     value.artwork.push({ id: state.extraText.artworkId, type: 'text', name: state.extraText.text });

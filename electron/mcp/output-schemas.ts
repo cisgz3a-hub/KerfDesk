@@ -56,6 +56,7 @@ export const mcpOutputSchemas = {
           type: label,
           name: label.optional(),
           bounds: bounds.optional(),
+          transformBounds: bounds.optional(),
           operationId: id.optional(),
           visible: z.boolean().optional(),
           editable: z.boolean().optional(),

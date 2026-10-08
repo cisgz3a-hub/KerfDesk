@@ -93,6 +93,7 @@ describe('remote snapshots expose only the agreed metadata', () => {
         visible: true,
         editable: true,
         bounds: { xMm: 0, yMm: 0, widthMm: 10, heightMm: 20 },
+        transformBounds: { xMm: 0, yMm: 0, widthMm: 10, heightMm: 20 },
         operationId: 'operation',
       },
     ]);

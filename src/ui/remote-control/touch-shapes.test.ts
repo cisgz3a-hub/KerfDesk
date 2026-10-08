@@ -111,7 +111,10 @@ it.each(commands)(
     adapter.dispose();
     adapter = testAdapter({ canWrite: () => false });
     const workspace = await adapter.execute('get_workspace', {});
-    expect(workspace.ok && workspace.data.capabilities).toEqual({ touchEditing: true });
+    expect(workspace.ok && workspace.data.capabilities).toEqual({
+      touchEditing: true,
+      groupTransformBounds: true,
+    });
     expect(workspace.ok && workspace.data.permissions).toMatchObject({ canEdit: false });
     expect(resultCode(await adapter.execute(command, writeArgs(adapter, values)))).toBe(
       'read_only',
@@ -126,7 +129,10 @@ it.each(commands)(
     const state = useStore.getState();
     useStore.setState({ project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG } });
     const workspace = await adapter.execute('get_workspace', {});
-    expect(workspace.ok && workspace.data.capabilities).toEqual({ touchEditing: false });
+    expect(workspace.ok && workspace.data.capabilities).toEqual({
+      touchEditing: false,
+      groupTransformBounds: true,
+    });
     expect(resultCode(await adapter.execute(command, writeArgs(adapter, values)))).toBe(
       'unsupported_operation',
     );
