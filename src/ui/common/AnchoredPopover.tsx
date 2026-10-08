@@ -10,6 +10,8 @@ type PopoverProps = {
   readonly className?: string;
   readonly children: ReactNode;
   readonly initialFocus?: string;
+  /** Forms keep native Tab navigation inside, then dismiss when focus leaves. */
+  readonly closeOnTab?: boolean;
   /** Keep controls inside their owning modal's focus boundary when needed. */
   readonly portalHost?: Element | null;
   readonly onClose: () => void;
@@ -72,8 +74,13 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
       className={`lf-anchored-popover ${props.className ?? ''}`}
       style={position}
       onKeyDownCapture={props.onKeyDownCapture}
+      onBlur={(event) => {
+        if (props.closeOnTab !== false) return;
+        const next = event.relatedTarget;
+        if (!(next instanceof Node) || !event.currentTarget.contains(next)) props.onClose();
+      }}
       onKeyDown={(event) => {
-        if (event.key === 'Escape' || event.key === 'Tab') {
+        if (event.key === 'Escape' || (event.key === 'Tab' && props.closeOnTab !== false)) {
           if (event.key === 'Escape') event.preventDefault();
           event.stopPropagation();
           anchorRef.current?.focus();

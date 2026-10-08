@@ -11,12 +11,14 @@ import type { ConnectControllerOptions } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { ConnectionBar } from './ConnectionBar';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
+import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 import { controllerActionFailureHandler } from './report-controller-action-failure';
 import { FluidNcNetworkConnect } from './FluidNcNetworkConnect';
 
 type Props = {
+  readonly layout?: 'card' | 'compact';
   readonly machineKind: MachineKind;
   readonly autofocusBusy: boolean;
   readonly motionOperation: ReturnType<typeof useLaserStore.getState>['motionOperation'];
@@ -36,6 +38,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);
   const controllerKind = useStore((state) => state.project.device.controllerKind);
+  const machineName = useStore((state) => state.project.device.name || 'Unnamed machine');
   const supportsSerial = platform.serial.isSupported();
   const isFileOnlyProfile = isFileOnlyController(controllerKind);
   // One builder with the menu Connect, read at click time, so the profile's
@@ -71,8 +74,11 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <ConnectionBar
+        layout={props.layout ?? 'card'}
+        machineName={machineName}
         machine={<ConnectedMachineProfile />}
-        setup={<DeviceSetupControls />}
+        details={props.layout === 'compact' ? <MachineDetailsContent /> : undefined}
+        setup={<DeviceSetupControls compact={props.layout === 'compact'} />}
         onChoosePort={() => void choosePort().catch(controllerActionFailureHandler('Connect'))}
         autoConnect={autoConnect.enabled}
         onAutoConnectChange={autoConnect.change}
@@ -95,6 +101,15 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
           isFileOnlyProfile
         }
       />
+      {props.layout !== 'compact' && <FluidNcNetworkConnect />}
+    </>
+  );
+}
+
+function MachineDetailsContent(): JSX.Element {
+  return (
+    <>
+      <LaserModuleRow />
       <FluidNcNetworkConnect />
     </>
   );
@@ -118,7 +133,7 @@ function ConnectionHints(props: {
 }): JSX.Element | null {
   if (props.isFileOnlyProfile) {
     return (
-      <p style={hintStyle}>
+      <p className="lf-connection-hint" style={hintStyle}>
         This profile is file-export only: use Save G-code… to write an experimental .rd job and run
         it from the machine panel. Live Ruida streaming is not available in this build.
       </p>
@@ -126,7 +141,7 @@ function ConnectionHints(props: {
   }
   if (!props.supportsSerial) {
     return (
-      <p style={hintStyle}>
+      <p className="lf-connection-hint" style={hintStyle}>
         Your browser doesn&apos;t support WebSerial. Use Chrome, Edge, Brave (may require enabling
         under Brave Shields/flags), or Arc, or install the Windows desktop app.
       </p>

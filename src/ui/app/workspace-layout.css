@@ -20,6 +20,11 @@
   background: var(--lf-bg-1);
 }
 
+.lf-workspace-panels[data-layout='spacious'] {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .lf-workspace-panels--compact {
   width: clamp(320px, 34vw, 400px);
   max-width: min(430px, calc(100% - 100px));
@@ -38,12 +43,20 @@
   min-height: 120px;
 }
 
-/* Machine controls scroll their whole rail, including the heading. Artwork
-   keeps its heading and tabs outside its scroller and needs more room. */
+/* Reserve enough room for the heading above the job dock. Short machine
+   bodies fall back to scrolling the whole rail; a floor for both separate
+   scrollers would push Frame and Start below the viewport. */
 .lf-workspace-panels--compact[data-collapsed='false'][data-active-panel='machine']
   > .lf-workspace-panel-body {
-  flex-basis: 64px;
+  flex: 1 1 200px;
   min-height: 64px;
+}
+
+.lf-workspace-panels--compact[data-collapsed='false'][data-active-panel='machine']
+  > .lf-workspace-panel-body,
+.lf-workspace-machine-body {
+  container-type: size;
+  container-name: machine-rail-body;
 }
 
 .lf-workspace-panels--compact > .lf-workspace-job-actions {
@@ -98,11 +111,17 @@
   overflow: hidden;
 }
 
+.lf-workspace-machine-body {
+  min-height: 64px;
+}
+
 .lf-workspace-desktop-panels {
   display: flex;
   min-height: 0;
   min-width: 0;
-  flex: 1;
+  /* A remembered Spacious layout can outlive a tall window. Preserve a small
+     machine body and dock, then use the outer panel's scroll fallback. */
+  flex: 1 0 176px;
 }
 
 .lf-workspace-resizable-panel {
