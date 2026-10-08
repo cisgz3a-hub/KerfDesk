@@ -1375,7 +1375,10 @@ the completed physical Frame is the spatial source of truth.
   proven to address the same physical file. Once identity is established, the coordinator waits only
   in its background repair path and replays the newest captured bytes after overlapping or late older
   writes. Chromium compares picker handles with `FileSystemHandle.isSameEntry`; retained subsequent
-  Save also carries exact target identity. Slow identity checks never delay another selected write.
+  Save also carries exact target identity. When different handles or Windows paths cannot prove whether
+  they reach the same file, later captured writes replay in request order after overlapping writes
+  settle. Each chosen file receives its own captured bytes. Slow identity checks never delay another
+  selected write.
 - Only the latest request for the current document may publish the remembered target/name, clear
   dirty/autosave state, or show ordinary success/failure feedback. A stale selected write still runs.
 
