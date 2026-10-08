@@ -37,6 +37,8 @@ describe('D1 distinct owned failures with equal diagnostic text', () => {
     expect(first).toBeDefined();
     if (first === undefined) throw new Error('Expected the original transport rejection.');
     expect(useLaserStore.getState().lastWriteError).toBe(message);
+    const precedingNotice = useLaserStore.getState().safetyNotice;
+    expect(precedingNotice).toMatchObject({ kind: 'write-failed', action: 'console' });
     failConsole = false;
     hangCleanup = true;
     const closing = useLaserStore.getState().disconnect();
@@ -49,13 +51,19 @@ describe('D1 distinct owned failures with equal diagnostic text', () => {
     expect(later[0]?.raw).toContain('stop before disconnect failed');
     expect(later[0]?.at).toBeGreaterThan(first.at);
     expect(controller.closeCount()).toBe(1);
-    expect(useLaserStore.getState().safetyNotice).toMatchObject({
-      kind: 'write-failed',
-      action: 'disconnect',
+    expect(useLaserStore.getState().safetyNotice).toBe(precedingNotice);
+    expect(incidentHistory()).toContainEqual(first);
+    expect(later[0]).toMatchObject({
+      direction: 'system',
+      source: 'system',
+      kind: 'error',
+      incident: true,
+      raw: '[lf2] Controller stop before disconnect failed: ' + message,
     });
     const beforeLate = incidentHistory();
     finishCleanup();
     await flushConnect();
     expect(incidentHistory()).toEqual(beforeLate);
+    expect(useLaserStore.getState().safetyNotice).toBe(precedingNotice);
   });
 });
