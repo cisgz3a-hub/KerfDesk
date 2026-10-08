@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRemoteRendererQueue } from './renderer-queue.js';
 import { createRemoteRelayClient } from './relay-client.js';
 import { REMOTE_ORIGIN } from './relay-types.js';
+import { MCP_MAX_RESULT_BYTES } from '../mcp/input-schemas.js';
 
 const captured = vi.hoisted(() => {
   const sockets: FakeSocket[] = [];
@@ -11,6 +12,7 @@ const captured = vi.hoisted(() => {
     static OPEN = 1;
     readyState = 1;
     readonly sent: Record<string, unknown>[] = [];
+    readonly frames: string[] = [];
     readonly handlers = new Map<string, ((...args: unknown[]) => void)[]>();
     constructor(
       readonly url: URL,
@@ -22,6 +24,7 @@ const captured = vi.hoisted(() => {
       this.handlers.set(name, [...(this.handlers.get(name) ?? []), handler]);
     }
     send(value: string) {
+      this.frames.push(value);
       this.sent.push(JSON.parse(value) as Record<string, unknown>);
     }
     close() {
@@ -57,7 +60,7 @@ let relay: ReturnType<typeof createRemoteRelayClient>;
 let session: string;
 let permitted: boolean;
 let fetcher: ReturnType<typeof vi.fn<typeof fetch>>;
-let connection: ReturnType<typeof vi.fn>;
+let connection: ReturnType<typeof vi.fn<(connected: boolean) => void>>;
 beforeEach(() => {
   captured.sockets.length = 0;
   permitted = true;
@@ -65,7 +68,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetcher);
   queue = createRemoteRendererQueue();
   session = queue.attach();
-  connection = vi.fn();
+  connection = vi.fn<(connected: boolean) => void>();
   relay = createRemoteRelayClient({
     queue,
     onMessage: vi.fn(),
@@ -85,12 +88,41 @@ async function connect() {
   socket.receive({ type: 'connected', deviceId: identity.deviceId });
   return socket;
 }
-const command = (requestId = randomUUID()) => ({
+const command = (requestId: string = randomUUID()) => ({
   type: 'command',
   requestId,
   clientId: 'client',
   scopes: ['read'],
   command: { name: 'get_app_status', args: {} },
+});
+
+const jsonBytes = (value: unknown) => Buffer.byteLength(JSON.stringify(value), 'utf8');
+function materialResult(dataBytes: number) {
+  const recipes = Array.from({ length: 200 }, (_, i) => ({
+    id: `recipe-${i}`,
+    name: 'N',
+    materialName: 'M',
+    powerPercent: 30,
+    speedMmPerMin: 1500,
+    passes: 1,
+  }));
+  const result = { revision: 'r1', recipes, total: 200, truncated: false };
+  let remaining = dataBytes - jsonBytes(result);
+  for (const recipe of recipes) {
+    for (const key of ['name', 'materialName'] as const) {
+      const added = Math.min(1535, remaining);
+      const size = added + 1;
+      recipe[key] = '材'.repeat(Math.floor(size / 3)) + ['', 'A', 'é'][size % 3];
+      remaining -= added;
+    }
+  }
+  expect(remaining).toBe(0);
+  expect(jsonBytes(result)).toBe(dataBytes);
+  return result;
+}
+const recipesCommand = (requestId: string) => ({
+  ...command(requestId),
+  command: { name: 'list_material_recipes', args: {} },
 });
 
 describe('fixed native relay transport', () => {
@@ -202,6 +234,82 @@ describe('fixed native relay transport', () => {
     expect(socket.sent).toEqual([
       { v: 1, type: 'result', requestId: message.requestId, result: output },
     ]);
+  });
+
+  it.each(['8'.repeat(36), '界'.repeat(128), '🛠'.repeat(64)])(
+    'holds the complete UTF-8 result envelope at its exact byte ceiling for %s',
+    async (requestId: string) => {
+      const socket = await connect();
+      const overhead = jsonBytes({ v: 1, type: 'result', requestId, result: null }) - 4;
+      const response = materialResult(MCP_MAX_RESULT_BYTES - overhead);
+      socket.receive(recipesCommand(requestId));
+      const request = queue.poll(session).requests[0]!;
+      queue.complete(session, request.id, response);
+      await flush();
+      expect(socket.sent).toEqual([{ v: 1, type: 'result', requestId, result: response }]);
+      expect(Buffer.byteLength(socket.frames[0]!, 'utf8')).toBe(MCP_MAX_RESULT_BYTES);
+      expect(socket.sent[0]!.result).toEqual(response);
+    },
+  );
+
+  it.each([1, 84])(
+    'returns a fixed bounded error for a result envelope %i bytes too large and stays usable',
+    async (excess: number) => {
+      const socket = await connect();
+      const requestId = '8'.repeat(36);
+      const overhead = jsonBytes({ v: 1, type: 'result', requestId, result: null }) - 4;
+      const response = materialResult(MCP_MAX_RESULT_BYTES - overhead + excess);
+      socket.receive(recipesCommand(requestId));
+      queue.complete(session, queue.poll(session).requests[0]!.id, response);
+      await flush();
+      expect(socket.sent).toEqual([
+        {
+          v: 1,
+          type: 'error',
+          requestId,
+          error: { code: 'failed', message: 'The desktop request could not be completed.' },
+        },
+      ]);
+      expect(Buffer.byteLength(socket.frames[0]!, 'utf8')).toBeLessThan(MCP_MAX_RESULT_BYTES);
+      expect(socket.readyState).toBe(1);
+      expect(connection).toHaveBeenLastCalledWith(true);
+      const next = command();
+      socket.receive(next);
+      queue.complete(session, queue.poll(session).requests[0]!.id, output);
+      await flush();
+      expect(socket.sent[1]).toEqual({
+        v: 1,
+        type: 'result',
+        requestId: next.requestId,
+        result: output,
+      });
+    },
+  );
+
+  it('counts serialized Unicode and escaped identifier overhead instead of character length', async () => {
+    const socket = await connect();
+    const requestId = '界'.repeat(123) + '"\\\n';
+    const response = materialResult(MCP_MAX_RESULT_BYTES - 84);
+    const frame = { v: 1, type: 'result', requestId, result: response };
+    expect(JSON.stringify(frame).length).toBeLessThan(MCP_MAX_RESULT_BYTES);
+    expect(jsonBytes(frame)).toBeGreaterThan(MCP_MAX_RESULT_BYTES);
+    socket.receive(recipesCommand(requestId));
+    queue.complete(session, queue.poll(session).requests[0]!.id, response);
+    await flush();
+    expect(socket.sent[0]).toMatchObject({ type: 'error', requestId, error: { code: 'failed' } });
+    expect(
+      socket.frames.every((value) => Buffer.byteLength(value, 'utf8') <= MCP_MAX_RESULT_BYTES),
+    ).toBe(true);
+  });
+
+  it('suppresses a fixed result error after the client permission is revoked', async () => {
+    const socket = await connect();
+    socket.receive(recipesCommand('8'.repeat(36)));
+    const request = queue.poll(session).requests[0]!;
+    permitted = false;
+    queue.complete(session, request.id, { revision: 'r1', recipes: 'private renderer detail' });
+    await flush();
+    expect(socket.sent).toEqual([]);
   });
 
   it('retains read receipts for a read/control token after only its local control deadline expires', async () => {

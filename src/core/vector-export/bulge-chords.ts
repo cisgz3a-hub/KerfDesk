@@ -15,7 +15,7 @@
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
-import { flattenCurveSubpath } from '../scene/curve-path';
+import { flattenArtworkCurve } from './affine-curves';
 import type {
   CubicPathSegment,
   EllipticalArcPathSegment,
@@ -82,7 +82,7 @@ function flattenEllipticalArc(
   segment: EllipticalArcPathSegment,
   tolerance: number,
 ): ReadonlyArray<Vec2> {
-  const result = flattenCurveSubpath(
+  const result = flattenArtworkCurve(
     { start: from, segments: [segment], closed: false },
     { toleranceMm: tolerance },
   );

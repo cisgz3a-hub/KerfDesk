@@ -14,6 +14,8 @@ import {
   type Bounds,
   type ColoredPath,
   type CurveSubpath,
+  type EllipticalArcPathSegment,
+  type PathSegment,
   type Project,
   type SceneObject,
 } from '../../core/scene';
@@ -22,9 +24,22 @@ import {
   affineMaxGain,
   curvesBounds,
   transformCurveSubpathExact,
+  type AffineMatrix,
 } from '../../core/vector-export/affine-curves';
 import { provenContourGroups } from '../../core/vector-export/proven-contour-groups';
-import { decimalGridAtMost, type DecimalGrid } from '../../core/vector-export/decimal-grid';
+import {
+  artworkArcEncodingRoundoff,
+  artworkArcPoint,
+  artworkSvgEncodingError,
+  retainArtworkArc,
+  retainedArtworkArc,
+} from '../../core/vector-export/artwork-parametric-arc';
+import {
+  decimalGridAtMost,
+  gridIndex,
+  snapToGrid,
+  type DecimalGrid,
+} from '../../core/vector-export/decimal-grid';
 import { formatSvgPathData, quantizeCurves } from '../../core/vector-export/svg-path-data';
 import { svgMatrixAttribute, svgObjectMatrix, xmlText } from './export-svg-paths';
 
@@ -45,14 +60,13 @@ export function vectorPathElement(
   project: Project,
   options: SvgVectorOptions,
 ): SvgVectorElement {
-  const matrix = svgObjectMatrix(object.transform);
-  const grid = localGrid(options.precisionMm, affineMaxGain(matrix));
-  const curves = quantizeCurves(path.curves ?? path.polylines.map(polylineToCurveSubpath), grid);
+  const geometry = vectorGeometry(object, path, options.precisionMm);
+  const { curves, grid } = geometry;
   const operation = project.scene.layers.find((layer) => pathUsesOperation(object, path, layer));
   const fill =
     operation !== undefined && effectiveOperationForObject(operation, object).mode === 'fill';
   const paint: Paint = {
-    transform: ' transform="' + svgMatrixAttribute(object.transform) + '"',
+    transform: ' transform="' + geometry.transform + '"',
     color: xmlText(path.color),
     fillRule: path.fillRule ?? (object.kind === 'text' ? 'nonzero' : 'evenodd'),
   };
@@ -67,8 +81,144 @@ export function vectorPathElement(
       : strokedPath(stroked, grid, paint);
   return {
     markup: closedMarkup + strokeMarkup,
-    bounds: curvesBounds(curves.map((curve) => transformCurveSubpathExact(curve, matrix))),
+    bounds: geometry.bounds,
   };
+}
+
+type VectorGeometry = {
+  readonly curves: CurveSubpath[];
+  readonly grid: DecimalGrid | null;
+  readonly bounds: Bounds | null;
+  readonly transform: string;
+};
+
+function vectorGeometry(
+  object: VectorObject,
+  path: ColoredPath,
+  precisionMm: number | null,
+): VectorGeometry {
+  const matrix = svgObjectMatrix(object.transform);
+  const authored = path.curves ?? path.polylines.map(polylineToCurveSubpath);
+  if (object.transform.scaleX === 0 || object.transform.scaleY === 0) {
+    return singularGeometry(authored, matrix, precisionMm);
+  }
+  const axes = [Math.abs(object.transform.scaleX), Math.abs(object.transform.scaleY)];
+  if (Math.min(...axes) / Math.max(...axes) <= Number.EPSILON) {
+    const rebased = rebasedGeometry(authored, matrix, precisionMm);
+    if (rebased !== null) return rebased;
+  }
+  const grid = localGrid(precisionMm, affineMaxGain(matrix));
+  const curves = quantizeCurves(authored, grid);
+  return {
+    curves,
+    grid,
+    bounds: curvesBounds(curves.map((curve) => transformCurveSubpathExact(curve, matrix))),
+    transform: svgMatrixAttribute(object.transform),
+  };
+}
+
+/** Avoid numerically singular renderer CTMs while retaining exact arc encoding. */
+function rebasedGeometry(
+  authored: readonly CurveSubpath[],
+  matrix: AffineMatrix,
+  precisionMm: number | null,
+): VectorGeometry | null {
+  const grid = localGrid(precisionMm, 1);
+  const linear = { ...matrix, e: 0, f: 0 };
+  const curves = quantizeCurves(
+    authored.map((curve) => splitRebasedArcs(transformCurveSubpathExact(curve, linear))),
+    grid,
+  );
+  // An exact source-local A remains available when floating endpoint fields
+  // cannot faithfully represent the rebased arc. Numeric output can instead
+  // use the formatter's proven world-tolerance fallback.
+  if (grid === null && !exactSvgArcs(curves)) return null;
+  const translation = { a: 1, b: 0, c: 0, d: 1, e: matrix.e, f: matrix.f };
+  return {
+    curves,
+    grid,
+    bounds: curvesBounds(curves.map((curve) => transformCurveSubpathExact(curve, translation))),
+    transform: `matrix(1 0 0 1 ${matrix.e} ${matrix.f})`,
+  };
+}
+
+function splitRebasedArcs(curve: CurveSubpath): CurveSubpath {
+  return {
+    ...curve,
+    segments: curve.segments.flatMap<PathSegment>((segment) =>
+      segment.kind === 'elliptical-arc' ? splitRebasedArc(segment) : [segment],
+    ),
+  };
+}
+
+/** Exact quarter arcs keep the excursion's turnaround as an explicit endpoint. */
+function splitRebasedArc(segment: EllipticalArcPathSegment): EllipticalArcPathSegment[] {
+  const arc = retainedArtworkArc(segment);
+  if (arc === null) return [segment];
+  const turns = Math.abs(arc.delta) / (Math.PI / 2);
+  const count = Math.max(1, Math.ceil(turns - 4 * Number.EPSILON * Math.max(1, turns)));
+  return Array.from({ length: count }, (_, index) => {
+    const theta1 = arc.theta1 + (arc.delta * index) / count;
+    const delta = arc.delta / count;
+    const to = index === count - 1 ? segment.to : artworkArcPoint(arc, theta1 + delta);
+    return retainArtworkArc({ ...segment, largeArc: false, to }, { ...arc, theta1, delta });
+  });
+}
+
+function exactSvgArcs(curves: readonly CurveSubpath[]): boolean {
+  for (const curve of curves) {
+    let from = curve.start;
+    for (const segment of curve.segments) {
+      if (
+        segment.kind === 'elliptical-arc' &&
+        !(artworkSvgEncodingError(from, segment) <= artworkArcEncodingRoundoff(from, segment))
+      ) {
+        return false;
+      }
+      from = segment.to;
+    }
+  }
+  return true;
+}
+
+/** Singular CTMs suppress paint; write the projected traversal under translation. */
+function singularGeometry(
+  authored: readonly CurveSubpath[],
+  matrix: AffineMatrix,
+  precisionMm: number | null,
+): VectorGeometry {
+  const grid = localGrid(precisionMm, 1);
+  // Snap once, from unquantized source, in WORLD coordinates. Taking integer
+  // grid differences afterwards adds no further displacement and keeps large
+  // translations out of the local coordinates consumed by SVG renderers.
+  const world = quantizeCurves(
+    authored.map((curve) => transformCurveSubpathExact(curve, matrix)),
+    grid,
+  );
+  const x = grid === null ? matrix.e : snapToGrid(matrix.e, grid);
+  const y = grid === null ? matrix.f : snapToGrid(matrix.f, grid);
+  const relative = (point: { readonly x: number; readonly y: number }) =>
+    grid === null
+      ? { x: point.x - x, y: point.y - y }
+      : {
+          x: (gridIndex(point.x, grid) - gridIndex(x, grid)) * grid.step,
+          y: (gridIndex(point.y, grid) - gridIndex(y, grid)) * grid.step,
+        };
+  const curves = world.map((curve) => ({
+    ...curve,
+    start: relative(curve.start),
+    segments: curve.segments.map((segment) =>
+      segment.kind === 'cubic'
+        ? {
+            ...segment,
+            control1: relative(segment.control1),
+            control2: relative(segment.control2),
+            to: relative(segment.to),
+          }
+        : { ...segment, to: relative(segment.to) },
+    ),
+  }));
+  return { curves, grid, bounds: curvesBounds(world), transform: `matrix(1 0 0 1 ${x} ${y})` };
 }
 
 type Paint = { readonly transform: string; readonly color: string; readonly fillRule: string };

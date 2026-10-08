@@ -2,22 +2,38 @@ import type { ConstrainedSketch2d, SketchSolveResult } from './constrained-sketc
 import { sketchAt } from './sketch-indexed';
 import { sketchJacobian, type SketchEvaluator } from './sketch-jacobian';
 import { sketchMatrixRank } from './sketch-linear';
+import { parseConstrainedSketch, SKETCH_MAX_RADIUS_MM } from './sketch-validation';
 export const SKETCH_SOLVE_TOLERANCE_MM = 1e-5;
 export function summarizeSketchSolve(
   sketch: ConstrainedSketch2d,
-  values: readonly number[],
+  inputValues: readonly number[],
   evaluate: SketchEvaluator,
 ): SketchSolveResult {
+  if (inputValues.some((value) => !Number.isFinite(value)))
+    return { kind: 'invalid', reason: 'The sketch solve contains nonfinite coordinates.' };
+  // Remove roundoff at the supported radius boundary before evaluating the retained result.
+  const values = inputValues.map((value, index) =>
+    index >= sketch.points.length * 2 &&
+    value > SKETCH_MAX_RADIUS_MM &&
+    value - SKETCH_MAX_RADIUS_MM <= SKETCH_SOLVE_TOLERANCE_MM / 2
+      ? SKETCH_MAX_RADIUS_MM
+      : value,
+  );
   const residual = evaluate(values),
     maximumResidualMm = Math.max(0, ...residual.map((item) => Math.abs(item.value)));
-  const rank = sketchMatrixRank(
-    sketchJacobian(
-      values,
-      residual.map((item) => item.value),
-      evaluate,
-    ),
-    values.length,
+  if (residual.some((item) => !Number.isFinite(item.value)))
+    return {
+      kind: 'invalid',
+      reason: 'The sketch solve contains a nonfinite constraint residual.',
+    };
+  const jacobian = sketchJacobian(
+    values,
+    residual.map((item) => item.value),
+    evaluate,
   );
+  if (jacobian.some((row) => row.some((value) => !Number.isFinite(value))))
+    return { kind: 'invalid', reason: 'The sketch solve contains a nonfinite derivative.' };
+  const rank = sketchMatrixRank(jacobian, values.length);
   const conflicts = new Map<string, number>();
   for (const item of residual)
     if (Math.abs(item.value) > SKETCH_SOLVE_TOLERANCE_MM)
@@ -36,6 +52,14 @@ export function summarizeSketchSolve(
   };
   if (solved.circles.some((circle) => circle.radiusMm <= 0))
     return { kind: 'invalid', reason: 'The solved circle diameter is not positive.' };
+  if (
+    maximumResidualMm <= SKETCH_SOLVE_TOLERANCE_MM &&
+    parseConstrainedSketch(solved).kind === 'invalid'
+  )
+    return {
+      kind: 'invalid',
+      reason: 'The solved sketch leaves the supported coordinate or radius range.',
+    };
   return {
     kind: 'solved',
     status:

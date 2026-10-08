@@ -26,8 +26,8 @@ export function collectLayerPolylines(
 
 /**
  * The planner's view of a layer's contours. A V-carve layer resolves each text
- * object's own glyphs with non-zero fill first (ADR-286); every other cut type
- * reads the raw pool exactly as before. This is the one place the rule is
+ * object's own glyphs with non-zero fill first (ADR-286). A tapered inlay uses
+ * the same filled V-bit source. Every other cut type reads the raw pool. The rule is
  * applied, so the compiler, the H.7 clearing stage and the design-time notes
  * cannot disagree about where the material is.
  */
@@ -35,7 +35,11 @@ export function layerPolylinesFromContours(
   layer: Layer,
   contours: ReadonlyArray<CollectedCncContour>,
 ): ReadonlyArray<Polyline> {
-  if (layer.cnc?.cutType !== 'v-carve') return contours.map((contour) => contour.polyline);
+  const settings = layer.cnc;
+  const resolvesFilledVBitSource =
+    settings?.cutType === 'v-carve' ||
+    (settings?.cutType === 'inlay-pair' && settings.taperedInlay !== undefined);
+  if (!resolvesFilledVBitSource) return contours.map((contour) => contour.polyline);
   return mergeTextObjectContours(contours);
 }
 

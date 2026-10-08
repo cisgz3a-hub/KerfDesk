@@ -154,7 +154,7 @@ try {
     $receipt.saveDialog = Invoke-UpgradeHelper 'Save' 'save-dialog' $saved 'Save As...'
     Wait-UpgradeTitle $saved
   }
-  & node (Join-Path $PSScriptRoot 'verify-upgrade-project.mjs') $saved $(if ($Phase -eq 'reopen') { $Project })
+  & node (Join-Path $PSScriptRoot 'verify-upgrade-project.mjs') --expected-source $ExpectedCommit $saved $(if ($Phase -eq 'reopen') { $Project })
   if ($LASTEXITCODE -ne 0) { throw 'Saved project did not retain its scene or machine settings.' }
   $machine = Open-UpgradeMachine
   $receipt.machine = Read-UpgradeMachine $machine

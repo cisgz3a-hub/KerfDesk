@@ -92,7 +92,7 @@ async function boundBody(request: Request, url: URL): Promise<Request> {
   // The library's JSON/form parsers are preceded by a real streamed size bound.
   if (request.body) {
     const maximum =
-      url.pathname === '/mcp'
+      url.pathname === '/mcp' || url.pathname === '/api/client/command'
         ? MAX_BYTES
         : url.pathname === '/authorize'
           ? 16 * 1024
