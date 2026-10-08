@@ -59,6 +59,8 @@ async function pose(loaded) {
     const x = image.left - box.left - surface.clientLeft;
     const y = image.top - box.top - surface.clientTop;
     return {
+      surfaceWidth: surface.clientWidth,
+      surfaceHeight: surface.clientHeight,
       scale: Number(surface.dataset.canvasScale),
       centreX: viewport.xMm + ((surface.clientWidth / 2 - x) * viewport.widthMm) / image.width,
       centreY: viewport.yMm + ((surface.clientHeight / 2 - y) * viewport.heightMm) / image.height,
@@ -72,6 +74,41 @@ function sameScene(actual, expected, message) {
       Math.abs(actual[key] - expected[key]) < 0.02,
       message + ': ' + key + ' ' + actual[key] + ' != ' + expected[key],
     );
+}
+async function rotateCanvas(loaded, kind) {
+  await loaded.page.setViewportSize({ width: 844, height: 390 });
+  if (kind === 'app')
+    await loaded.page.locator('#widget').evaluate((frame) => {
+      frame.style.height = '390px';
+    });
+  // A fresh observer's initial delivery fences native layout after both mutations.
+  await loaded.surface.locator('#preview-surface').evaluate((surface) => {
+    globalThis.__canvasResizeFence = { width: null, height: null };
+    const fence = globalThis.__canvasResizeFence;
+    fence.observer = new globalThis.ResizeObserver(() => {
+      fence.width = surface.clientWidth;
+      fence.height = surface.clientHeight;
+    });
+    fence.observer.observe(surface);
+  });
+  try {
+    // Playwright's clock mocks animation frames, but ResizeObserver is native.
+    // Fence delivery for the final surface layout independently of the camera assertions.
+    await loaded.surface.waitForFunction(
+      () => {
+        const surface = globalThis.document.querySelector('#preview-surface');
+        const fence = globalThis.__canvasResizeFence;
+        return fence.width === surface.clientWidth && fence.height === surface.clientHeight;
+      },
+      null,
+      { timeout: 5000 },
+    );
+  } finally {
+    await loaded.surface.evaluate(() => {
+      globalThis.__canvasResizeFence.observer.disconnect();
+      delete globalThis.__canvasResizeFence;
+    });
+  }
 }
 async function startPan(loaded, dx = -30, dy = 20) {
   await visibleCanvas(loaded);
@@ -164,22 +201,11 @@ for (const kind of ['phone', 'app']) {
         await startPan(loaded);
         await loaded.page.mouse.up();
         const beforeRotation = await pose(loaded);
-        await loaded.page.setViewportSize({ width: 844, height: 390 });
-        if (kind === 'app')
-          await loaded.page.locator('#widget').evaluate((frame) => {
-            frame.style.height = '390px';
-          });
-        await loaded.surface.evaluate(
-          () =>
-            new Promise((resolve) =>
-              globalThis.requestAnimationFrame(() => globalThis.requestAnimationFrame(resolve)),
-            ),
-        );
-        sameScene(
-          await pose(loaded),
-          beforeRotation,
-          'Rotation must retain world centre and px/mm',
-        );
+        await rotateCanvas(loaded, kind);
+        const afterRotation = await pose(loaded);
+        assert.ok(afterRotation.surfaceWidth > beforeRotation.surfaceWidth);
+        assert.ok(afterRotation.surfaceHeight < beforeRotation.surfaceHeight);
+        sameScene(afterRotation, beforeRotation, 'Rotation must retain world centre and px/mm');
         assert.equal(writes(loaded.state).length, 0);
         assert.deepEqual(loaded.errors, []);
       } finally {
