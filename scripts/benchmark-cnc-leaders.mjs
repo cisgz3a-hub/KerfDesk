@@ -27,12 +27,11 @@ async function softwareIdentity() {
     'pnpm-lock.yaml',
     'vite.config.ts',
   ].sort();
-  const records = await Promise.all(
-    paths.map(async (path) => ({
-      path,
-      sha256: hash(await readFile(path)),
-    })),
-  );
+  // Bound open file handles when hashing a large source tree on Windows.
+  const records = [];
+  for (const path of paths) {
+    records.push({ path, sha256: hash(await readFile(path)) });
+  }
   const buildInfo = await load('platform/web/build-info.ts');
   return {
     version: buildInfo.appVersion(),
