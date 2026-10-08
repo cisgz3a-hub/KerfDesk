@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { machineKindOf } from '../../../core/scene';
 import { helpProps } from '../../help/help-topics';
-import { Button } from '../../kit';
+import { Button, Icon } from '../../kit';
 import { useStore } from '../../state';
 import {
   browserLocalStorage,
@@ -16,7 +16,9 @@ import { useLaserStore } from '../../state/laser-store';
 import { shouldPromptDeviceSetup } from './device-setup-nudge';
 import { openMachineSetup, useMachineSetupDialogStore } from './machine-setup-dialog-store';
 
-export function DeviceSetupControls(): JSX.Element {
+export function DeviceSetupControls({
+  compact = false,
+}: { readonly compact?: boolean } = {}): JSX.Element {
   const [configured, setConfigured] = useState<ReadonlySet<string>>(() => {
     const storage = browserLocalStorage();
     return storage === null ? new Set() : loadConfiguredSignatures(storage);
@@ -36,8 +38,9 @@ export function DeviceSetupControls(): JSX.Element {
         variant={needsSetup ? 'primary' : 'default'}
         onClick={() => openMachineSetup()}
         {...helpProps('control:laser.machine-setup.launch')}
+        aria-label={compact ? 'Machine Setup' : undefined}
       >
-        Machine Setup
+        {compact ? <Icon name="sliders" size={16} /> : 'Machine Setup'}
       </Button>
       {needsSetup && (
         <p style={mutedNoteStyle} role="note">

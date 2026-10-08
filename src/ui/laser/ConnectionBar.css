@@ -1,0 +1,233 @@
+.lf-connection-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  background: var(--lf-bg-0);
+  overflow-wrap: anywhere;
+}
+
+.lf-connection-card[data-state='connected'] {
+  border-left: 3px solid var(--lf-success);
+}
+
+.lf-connection-card[data-state='failed'] {
+  border-left: 3px solid var(--lf-danger);
+}
+
+.lf-connection-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.lf-connection-card-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--lf-text-sm);
+  font-weight: 600;
+}
+
+.lf-connection-card[data-state='connected'] .lf-connection-card-status {
+  color: var(--lf-success-fg);
+}
+
+.lf-connection-card .lf-connection-card-more {
+  flex: 0 0 auto;
+  min-width: 28px;
+  min-height: 26px;
+  padding: 0 6px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.lf-connection-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.lf-connection-card-actions > .lf-btn {
+  flex: 1 1 100%;
+}
+
+.lf-connection-card-actions > p {
+  flex-basis: 100%;
+}
+
+.lf-connection-card-error {
+  margin: 0;
+  color: var(--lf-danger-fg);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.lf-connected-profile {
+  display: grid;
+  gap: 2px;
+}
+
+.lf-connected-profile-name {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.lf-connected-profile-detail,
+.lf-connected-profile-port {
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+
+.lf-connection-menu {
+  width: 220px;
+}
+
+.lf-connection-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 9px;
+  color: var(--lf-text);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lf-connection-menu-item:hover:not(:disabled),
+.lf-connection-menu-item:focus-visible {
+  background: var(--lf-tint-accent);
+}
+
+.lf-connection-menu-item:focus-visible {
+  outline: 1px solid var(--lf-accent);
+  outline-offset: -1px;
+}
+
+.lf-connection-menu-item:disabled {
+  color: var(--lf-text-faint);
+  cursor: default;
+}
+
+.lf-connection-menu-check {
+  color: var(--lf-accent);
+  visibility: hidden;
+}
+
+.lf-connection-menu-item[aria-checked='true'] .lf-connection-menu-check {
+  visibility: visible;
+}
+
+.lf-connection-compact {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.lf-connection-compact-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lf-connection-compact-row > .lf-btn {
+  flex-shrink: 0;
+  min-height: 32px;
+  white-space: nowrap;
+}
+
+.lf-connection-compact-row > .lf-connection-machine-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 3px 8px;
+  text-align: left;
+}
+
+.lf-connection-machine-summary {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.lf-connection-machine-name {
+  overflow: hidden;
+  max-width: 205px;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lf-connection-machine-status {
+  color: var(--lf-text-muted);
+  font-size: 11px;
+}
+
+.lf-connection-compact[data-state='connected'] .lf-connection-machine-status {
+  color: var(--lf-success-fg);
+}
+
+.lf-connection-compact[data-state='failed'] .lf-connection-machine-status {
+  color: var(--lf-danger);
+}
+
+.lf-connection-compact .lf-connection-card-more {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+  font-size: 17px;
+}
+
+.lf-connection-compact .lf-connection-card-error {
+  max-width: 520px;
+  margin: 0;
+}
+
+.lf-connection-machine-popover {
+  display: grid;
+  gap: 10px;
+  width: 350px;
+  padding: 12px;
+}
+
+.lf-connection-machine-popover-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  padding-right: 34px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-connection-machine-popover-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  min-width: 0;
+  padding: 0;
+}
+
+.lf-connection-machine-popover .lf-connected-profile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

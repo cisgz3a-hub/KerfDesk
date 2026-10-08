@@ -6,6 +6,13 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT, flagMetadata, guardedSettings } from './apply-payment-settings.mjs';
 import { readRetainedSandboxBundle } from './retained-sandbox-bundle.mjs';
+import {
+  attestSandboxVersion,
+  readAttestedSandboxModule,
+  sandboxReceiptBindingName,
+  sandboxSettingsFingerprint as fingerprint,
+} from './sandbox-restoration-guards.mjs';
+import { readCloudflareFailure } from './cloudflare-error-diagnostics.mjs';
 
 export const SANDBOX_WORKER = 'kerfdesk-desktop-licensing-sandbox';
 export const SANDBOX_ORIGIN = 'https://kerfdesk-desktop-licensing-sandbox.cisgz3a.workers.dev';
@@ -17,30 +24,8 @@ const target = {
   signing: 'sandbox-20260929',
   authority: 'SandboxLicenseAuthority',
 };
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
-const canonical = (value) => {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object')
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, canonical(value[key])]),
-    );
-  return value;
-};
-const fingerprint = (settings) => {
-  const protectedFields = Object.fromEntries(
-    Object.entries(settings).filter(
-      ([key]) => !['annotations', 'exports_reconciliation'].includes(key),
-    ),
-  );
-  protectedFields.bindings = settings.bindings
-    .map(canonical)
-    .sort((a, b) => a.name.localeCompare(b.name));
-  return hash(JSON.stringify(canonical(protectedFields)));
-};
-
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 export function guardSandboxRefresh(settings) {
   assert.equal(
     guardedSettings(settings, target),
@@ -88,97 +73,8 @@ export function sandboxUploadMetadata(settings, activeVersion, entrypoint, opera
   };
 }
 
-export async function readSandboxModule(response, format = {}, expectedRawDescriptor) {
-  const mimeType = (response.headers.get('content-type') ?? '')
-    .split(';', 1)[0]
-    .trim()
-    .toLowerCase();
-  const safeName = (name) =>
-    ['worker.js', 'sandbox-worker.js', 'worker.js.map', 'sandbox-worker.js.map'].includes(name)
-      ? name
-      : null;
-  const safeMime = (type) =>
-    [
-      'multipart/form-data',
-      'application/javascript',
-      'application/javascript+module',
-      'text/javascript+module',
-      'text/javascript',
-      'application/source-map',
-      'application/json',
-      'text/html',
-      'application/octet-stream',
-    ].includes(type)
-      ? type
-      : null;
-  format.contentType = safeMime(mimeType);
-  format.entrypoint = safeName(response.headers.get('cf-entrypoint'));
-  assert.ok(response.ok, 'Sandbox module unavailable.');
-  if (mimeType !== 'multipart/form-data') {
-    assert.ok(
-      ['application/javascript', 'application/javascript+module'].includes(mimeType),
-      'Expected a JavaScript module response.',
-    );
-    const bytes = Buffer.from(await response.arrayBuffer());
-    format.partCount = 0;
-    format.raw = { size: bytes.length, sha256: hash(bytes) };
-    assert.ok(bytes.length, 'Sandbox module empty.');
-    assert.equal(format.raw.sha256, GOOD_CODE_SHA256, 'Sandbox module is not the attested code.');
-    const descriptor = expectedRawDescriptor ?? {
-      entrypoint: 'sandbox-worker.js',
-      filename: 'sandbox-worker.js',
-      mimeType: 'application/javascript+module',
-    };
-    if (expectedRawDescriptor) {
-      const header = response.headers.get('cf-entrypoint');
-      assert.ok(
-        header === null || header === descriptor.entrypoint,
-        'Sandbox raw entrypoint changed.',
-      );
-    }
-    // Only raw readback adopts the already-attested upload identity; multipart stays strict.
-    return {
-      entrypoint: descriptor.entrypoint,
-      filename: descriptor.filename,
-      mimeType: descriptor.mimeType,
-      bytes,
-    };
-  }
-  const entrypoint = response.headers.get('cf-entrypoint');
-  assert.ok(
-    entrypoint && entrypoint.trim() && entrypoint !== 'metadata',
-    'Sandbox entrypoint unavailable.',
-  );
-  const entries = [...(await response.formData()).entries()];
-  format.partCount = entries.length;
-  format.parts = await Promise.all(
-    entries.slice(0, 8).map(async ([field, file]) => {
-      const isFile = typeof file !== 'string';
-      const bytes = Buffer.from(isFile ? await file.arrayBuffer() : file);
-      return {
-        field: safeName(field),
-        filename: isFile ? safeName(file.name) : null,
-        mimeType: isFile ? safeMime(file.type) : null,
-        isFile,
-        size: bytes.length,
-        sha256: hash(bytes),
-      };
-    }),
-  );
-  format.partsTruncated = entries.length > 8;
-  assert.equal(entries.length, 1, 'Expected exactly one sandbox module.');
-  const [field, file] = entries[0];
-  assert.equal(field, entrypoint, 'Sandbox entrypoint file unavailable.');
-  assert.ok(typeof file !== 'string' && file.name, 'Sandbox module file unavailable.');
-  assert.ok(
-    ['application/javascript+module', 'text/javascript+module'].includes(file.type),
-    'Sandbox module must remain JavaScript module syntax.',
-  );
-  const bytes = Buffer.from(await file.arrayBuffer());
-  assert.ok(bytes.length, 'Sandbox module empty.');
-  assert.equal(hash(bytes), GOOD_CODE_SHA256, 'Sandbox module is not the attested code.');
-  return { entrypoint, filename: file.name, mimeType: file.type, bytes };
-}
+export const readSandboxModule = (response, format, expectedRawDescriptor) =>
+  readAttestedSandboxModule(response, GOOD_CODE_SHA256, format, expectedRawDescriptor);
 
 export async function refreshSandboxScript(
   { operation, token, output, retainedBundle },
@@ -201,10 +97,16 @@ export async function refreshSandboxScript(
     retainedBundle === undefined ? 'historical-version' : 'retained-attested-bundle';
   let currentVersion;
   let before;
+  let beforeVersionResources;
+  let versionResourceFailure;
+  let stagedVersionVerified = false;
+  let deploymentAttempted = false;
+  let deploymentResponseReceived = false;
   let initialClosedVerified = false;
   let originalBuy;
   let module;
   let moduleFormatFailure;
+  let apiFailure;
   let mutationAttempted = false;
   let uploadResponseReceived = false;
   const setStage = (value) => {
@@ -225,6 +127,10 @@ export async function refreshSandboxScript(
       signal: signal(),
     });
     httpStatus = response.status;
+    if (!response.ok && !apiFailure) {
+      const diagnostic = await readCloudflareFailure(response, init?.body);
+      apiFailure = { stage: label, httpStatus: response.status, ...diagnostic };
+    }
     assert.ok(response.ok, 'Cloudflare request failed.');
     return response;
   };
@@ -273,6 +179,32 @@ export async function refreshSandboxScript(
     if (operationVersion)
       assert.equal(active, operationVersion, 'Sandbox refresh ownership is ambiguous.');
     operationVersion = active;
+    return version;
+  };
+  const attestResources = (info, expected, label) => {
+    const diagnostic = {};
+    setStage(label);
+    try {
+      return attestSandboxVersion(info, expected, before, diagnostic, beforeVersionResources);
+    } catch (error) {
+      versionResourceFailure ??= { stage: label, ...diagnostic };
+      throw error;
+    }
+  };
+  const readVersionResources = async (version, label) =>
+    attestResources(await api('/versions/' + version, {}, label + '-get'), version, label);
+  const verifyCandidate = async () => {
+    const info = await verifyOperationVersion(operationVersion);
+    attestResources(info, operationVersion, 'sandbox-staged-resource-verification');
+    const restored = await readModule(operationVersion, 'sandbox-staged-content-get', {
+      entrypoint: module.entrypoint,
+      filename: module.filename,
+      mimeType: module.mimeType,
+    });
+    setStage('sandbox-staged-content-verification');
+    for (const key of ['entrypoint', 'filename', 'mimeType'])
+      assert.equal(restored[key], module[key], 'Sandbox staged module identity changed.');
+    stagedVersionVerified = true;
   };
   const readSettings = () => api('/settings', {}, 'sandbox-settings-get');
   const readModule = async (version, label, expectedRawDescriptor) => {
@@ -345,8 +277,9 @@ export async function refreshSandboxScript(
   };
   const verifyRestoration = async () => {
     const active = await activeVersion();
-    if (mutationAttempted) await verifyOperationVersion(active);
+    if (deploymentAttempted) await verifyOperationVersion(active);
     await verifySettings();
+    await readVersionResources(active, 'sandbox-restored-resource-verification');
     const restored = await readModule(active, 'sandbox-restored-content-get', {
       entrypoint: module.entrypoint,
       filename: module.filename,
@@ -380,9 +313,15 @@ export async function refreshSandboxScript(
     version: currentVersion ?? null,
     mutationAttempted,
     uploadResponseReceived,
-    mutated: uploadResponseReceived ? true : mutationAttempted ? null : false,
+    stagingAttempted: mutationAttempted,
+    stagedVersion: operationVersion ?? null,
+    stagedVersionVerified,
+    deploymentAttempted,
+    deploymentResponseReceived,
+    mutated: deploymentResponseReceived ? true : deploymentAttempted ? null : false,
     realMoneyTransaction: false,
     productionCalls: false,
+    ...(apiFailure ? { apiFailure } : {}),
   });
   const save = async (receipt) => {
     if (!output) return;
@@ -400,7 +339,13 @@ export async function refreshSandboxScript(
       codeVerified: true,
       protectedSettingsUnchanged: true,
       authorityNamespace: namespace,
-      protectedBindingNames: before.bindings.map(({ name }) => name).sort(),
+      protectedBindingNames: before.bindings
+        .map(({ name }) => sandboxReceiptBindingName(name))
+        .filter(Boolean)
+        .sort(),
+      protectedBindingNamesRedacted: before.bindings.some(
+        ({ name }) => sandboxReceiptBindingName(name) === null,
+      ),
       publicConfigEnabled: false,
       buyHtmlUnchanged: true,
       buyHtmlSha256: originalBuy.sha256,
@@ -429,6 +374,10 @@ export async function refreshSandboxScript(
     initialClosedVerified = true;
     await publicConfig();
     originalBuy = await buyHtml();
+    beforeVersionResources = await readVersionResources(
+      originalVersion,
+      'sandbox-original-resource-verification',
+    );
     if (retainedBundle === undefined) {
       const result = await api('/versions?deployable=true', {}, 'sandbox-good-version-discovery');
       assert.ok(Array.isArray(result?.items), 'Sandbox version list unavailable.');
@@ -465,8 +414,46 @@ export async function refreshSandboxScript(
         module.filename,
       );
       mutationAttempted = true;
-      await api('?bindings_inherit=strict', { method: 'PUT', body: form }, 'sandbox-code-upload');
+      const uploaded = await api(
+        '/versions?bindings_inherit=strict',
+        { method: 'POST', body: form },
+        'sandbox-code-upload',
+      );
       uploadResponseReceived = true;
+      setStage('sandbox-staged-version-identity');
+      assert.ok(uuid.test(uploaded?.id), 'Sandbox staged version unavailable.');
+      operationVersion = uploaded.id;
+      await verifyCandidate();
+      await verifySettings();
+      const activationBoundary = await activeVersion();
+      setStage('sandbox-activation-boundary-check');
+      assert.equal(
+        activationBoundary,
+        originalVersion,
+        'Sandbox deployment changed before activation.',
+      );
+      await verifySettings();
+      const finalBoundary = await activeVersion();
+      setStage('sandbox-final-pre-deployment-version-check');
+      assert.equal(
+        finalBoundary,
+        originalVersion,
+        'Sandbox deployment changed after settings read.',
+      );
+      deploymentAttempted = true;
+      await api(
+        '/deployments',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            strategy: 'percentage',
+            versions: [{ version_id: operationVersion, percentage: 100 }],
+          }),
+        },
+        'sandbox-staged-deployment',
+      );
+      deploymentResponseReceived = true;
     }
     await verifyRestoration();
     return await success();
@@ -475,12 +462,30 @@ export async function refreshSandboxScript(
     const recovery = { mode: 'not-needed', rollbackAttempted: false, closedVerified: false };
     if (mutationAttempted) {
       recovering = true;
-      // A lost acknowledgement may still have installed exactly the attested closed configuration.
-      try {
-        await verifyRestoration();
-        return await success({ initialFailure: failure, readBackVerified: true });
-      } catch {
-        recovery.reconciliationFailure = { stage, httpStatus };
+      // Only an attempted activation can have changed the active deployment.
+      if (deploymentAttempted) {
+        try {
+          await verifyRestoration();
+          return await success({ initialFailure: failure, readBackVerified: true });
+        } catch {
+          recovery.reconciliationFailure = { stage, httpStatus };
+        }
+      } else if (!uploadResponseReceived) {
+        // Discover an ambiguous staged upload for evidence, never automatically activate it.
+        try {
+          const result = await api('/versions?deployable=true', {}, 'sandbox-staging-discovery');
+          const matches = result?.items?.filter(
+            (item) => item?.annotations?.['workers/tag'] === operationTag,
+          );
+          setStage('sandbox-staging-discovery-verification');
+          assert.equal(matches?.length, 1, 'Sandbox staged upload unavailable or ambiguous.');
+          assert.ok(uuid.test(matches[0].id), 'Sandbox staged UUID unavailable.');
+          operationVersion = matches[0].id;
+          await verifyCandidate();
+          recovery.stagingReadBackVerified = true;
+        } catch {
+          recovery.stagingVerificationFailure = { stage, httpStatus };
+        }
       }
       recovery.mode = 'not-restored-unowned-deployment';
       recovery.requestAcknowledged = false;
@@ -492,7 +497,8 @@ export async function refreshSandboxScript(
           recovery.mode = 'original-closed-sandbox-deployment-already-active';
           verifyOriginal = true;
         } else {
-          // A lost PUT acknowledgement never grants ownership of the active deployment.
+          assert.ok(deploymentAttempted, 'This operation never attempted activation.');
+          // Only this operation's uniquely owned activated version permits rollback.
           await verifyOperationVersion(active);
           recovery.ownershipVerified = true;
           const boundary = await activeVersion();
@@ -557,6 +563,7 @@ export async function refreshSandboxScript(
       failure,
       recovery,
       ...(moduleFormatFailure ? { moduleFormatFailure } : {}),
+      ...(versionResourceFailure ? { versionResourceFailure } : {}),
     };
     try {
       await save(receipt);

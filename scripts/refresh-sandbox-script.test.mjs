@@ -112,7 +112,7 @@ test('the real fixed code SHA rejects unverified fixture bytes before mutation',
 test('retained attested bundle restores without historical lookup and reconciles lost ACKs privately', async (t) => {
   attestFixture(t);
   const retainedBundle = ' \r\n' + gzipSync(code).toString('base64') + '\r\n';
-  for (const loseUploadResponse of [false, true]) {
+  for (const loseDeploymentResponse of [false, true]) {
     for (const [readbackRaw, readbackRawHeader] of [
       [false, null],
       [true, null],
@@ -121,7 +121,7 @@ test('retained attested bundle restores without historical lookup and reconciles
       const adapter = harness({
         versions: [],
         expectedUploadName: 'sandbox-worker.js',
-        loseUploadResponse,
+        loseDeploymentResponse,
         readbackRaw,
         readbackRawHeader,
       });
@@ -136,17 +136,17 @@ test('retained attested bundle restores without historical lookup and reconciles
       assert.equal(receipt.buyHtmlUnchanged, true);
       assert.equal(receipt.health, true);
       assert.equal(receipt.flag, 'false');
-      assert.equal(receipt.uploadResponseReceived, !loseUploadResponse);
-      if (loseUploadResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
+      assert.equal(receipt.deploymentResponseReceived, !loseDeploymentResponse);
+      if (loseDeploymentResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
       assert.deepEqual(
-        adapter.mutations.map(({ method }) => method),
-        ['PUT'],
+        adapter.mutations.map(({ kind }) => kind),
+        ['stage', 'activate'],
       );
       const beforeUpload = adapter.calls.slice(
         0,
-        adapter.calls.findIndex(({ method }) => method === 'PUT'),
+        adapter.calls.findIndex(({ method }) => method === 'POST'),
       );
-      assert.ok(!beforeUpload.some(({ url }) => /\/(?:versions|content)(?:\/|\?)/u.test(url)));
+      assert.ok(beforeUpload.some(({ url }) => url.endsWith('/versions/' + originalVersion)));
       assert.ok(
         !adapter.calls.some(({ url }) => url.includes('content/v2?version=' + goodVersion)),
       );
@@ -216,27 +216,31 @@ test('malformed, noncanonical, oversized or wrong-pin retained inputs refuse bef
 test('retained-source failed health restores only its owned deployment, including lost ACKs', async (t) => {
   attestFixture(t);
   const retainedBundle = gzipSync(code).toString('base64');
-  for (const loseUploadResponse of [false, true]) {
-    for (const concurrentAfterUpload of [false, true]) {
+  for (const loseDeploymentResponse of [false, true]) {
+    for (const concurrentAfterDeployment of [false, true]) {
       const adapter = harness({
         expectedUploadName: 'sandbox-worker.js',
         badHealth: true,
-        loseUploadResponse,
-        concurrentAfterUpload,
+        loseDeploymentResponse,
+        concurrentAfterDeployment,
       });
       await assert.rejects(run(adapter, { retainedBundle }), (error) => {
         assert.equal(error.receipt.sourceKind, 'retained-attested-bundle');
         assert.equal(error.receipt.sourceVersion, null);
-        assert.equal(error.receipt.recovery.closedVerified, !concurrentAfterUpload);
-        if (!concurrentAfterUpload) assert.equal(error.receipt.recovery.ownershipVerified, true);
-        assert.equal(error.receipt.recovery.rollbackAttempted, !concurrentAfterUpload);
+        assert.equal(error.receipt.recovery.closedVerified, !concurrentAfterDeployment);
+        if (!concurrentAfterDeployment)
+          assert.equal(error.receipt.recovery.ownershipVerified, true);
+        assert.equal(error.receipt.recovery.rollbackAttempted, !concurrentAfterDeployment);
         return true;
       });
       assert.deepEqual(
-        adapter.mutations.map(({ method }) => method),
-        concurrentAfterUpload ? ['PUT'] : ['PUT', 'POST'],
+        adapter.mutations.map(({ kind }) => kind),
+        concurrentAfterDeployment ? ['stage', 'activate'] : ['stage', 'activate', 'rollback'],
       );
-      assert.equal(adapter.version(), concurrentAfterUpload ? unrelatedVersion : originalVersion);
+      assert.equal(
+        adapter.version(),
+        concurrentAfterDeployment ? unrelatedVersion : originalVersion,
+      );
     }
   }
 });
@@ -293,27 +297,27 @@ test('attested raw and multipart representation transitions verify the upload id
     [true, true, null, 'application/javascript'],
     [true, true, 'match', 'application/javascript'],
   ]) {
-    for (const loseUploadResponse of [false, true]) {
+    for (const loseDeploymentResponse of [false, true]) {
       const adapter = harness({
         sourceRaw,
         readbackRaw,
         readbackRawHeader,
         sourceRawType,
         sourceRawHeader: 'historical.js',
-        loseUploadResponse,
+        loseDeploymentResponse,
       });
       const receipt = await run(adapter);
       assert.equal(receipt.outcome, 'verified');
       assert.equal(receipt.codeVerified, true);
       assert.equal(receipt.protectedSettingsUnchanged, true);
       assert.equal(receipt.flag, 'false');
-      assert.equal(adapter.mutations.length, 1);
+      assert.equal(adapter.mutations.length, 2);
       assert.equal(
         adapter.mutations[0].payload.main_module,
         sourceRaw ? 'sandbox-worker.js' : 'worker.js',
       );
-      assert.equal(receipt.uploadResponseReceived, !loseUploadResponse);
-      if (loseUploadResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
+      assert.equal(receipt.deploymentResponseReceived, !loseDeploymentResponse);
+      if (loseDeploymentResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
       assert.ok(adapter.calls.some(({ url }) => url.includes('content/v2?version=' + nextVersion)));
       assert.ok(!JSON.stringify(receipt).includes(code.toString()));
       assert.ok(!JSON.stringify(receipt).includes(token));
@@ -374,15 +378,15 @@ test('credential-shaped names and MIME are redacted on refusal and mismatched ra
         );
       if (mode === 'raw-source') assert.equal(format.contentType, null);
       if (mode === 'readback') {
-        assert.equal(error.receipt.failure.stage, 'sandbox-restored-content-get');
-        assert.equal(error.receipt.recovery.ownershipVerified, true);
+        assert.equal(error.receipt.failure.stage, 'sandbox-staged-content-get');
+        assert.equal(error.receipt.deploymentAttempted, false);
         assert.equal(error.receipt.recovery.closedVerified, true);
       } else assert.equal(error.receipt.mutationAttempted, false);
       return true;
     });
     assert.deepEqual(
-      adapter.mutations.map(({ method }) => method),
-      mode === 'readback' ? ['PUT', 'POST'] : [],
+      adapter.mutations.map(({ kind }) => kind),
+      mode === 'readback' ? ['stage'] : [],
     );
   }
 });
@@ -420,7 +424,7 @@ test('refresh preserves current authority/resources/assets and verifies fresh co
   assert.equal(receipt.codeVerified, true);
   assert.equal(receipt.buyHtmlUnchanged, true);
   assert.equal(receipt.protectedSettingsUnchanged, true);
-  assert.equal(adapter.mutations.length, 1);
+  assert.equal(adapter.mutations.length, 2);
   assert.ok(!JSON.stringify(receipt).includes(token));
   assert.ok(
     adapter.calls.every(
@@ -432,14 +436,14 @@ test('refresh preserves current authority/resources/assets and verifies fresh co
 test('refresh and lost-ACK readback preserve an existing public sandbox token by inheritance without recording it', async (t) => {
   attestFixture(t);
   const publicToken = 'test_' + 'A1b'.repeat(9);
-  for (const loseUploadResponse of [false, true]) {
+  for (const loseDeploymentResponse of [false, true]) {
     const value = settings();
     const binding = { name: 'PADDLE_CLIENT_TOKEN', type: 'plain_text', text: publicToken };
     Object.assign(
       value.bindings.find(({ name }) => name === binding.name),
       binding,
     );
-    const adapter = harness({ initialSettings: value, loseUploadResponse });
+    const adapter = harness({ initialSettings: value, loseDeploymentResponse });
     const receipt = await run(adapter);
     assert.equal(receipt.outcome, 'verified');
     assert.equal(receipt.protectedSettingsUnchanged, true);
@@ -453,7 +457,7 @@ test('refresh and lost-ACK readback preserve an existing public sandbox token by
         version_id: originalVersion,
       },
     );
-    assert.equal(adapter.mutations.length, 1);
+    assert.equal(adapter.mutations.length, 2);
     assert.ok(!JSON.stringify(receipt).includes(publicToken));
     assert.ok(!JSON.stringify(adapter.mutations).includes(publicToken));
   }
@@ -485,8 +489,8 @@ test('refresh detects a changed but valid public sandbox token and restores the 
   });
   assert.deepEqual(adapter.binding(binding.name), binding);
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT', 'POST'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate', 'rollback'],
   );
 });
 
@@ -521,8 +525,8 @@ test('nested current limiter changes trigger rollback to the original current cl
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT', 'POST'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate', 'rollback'],
   );
   assert.equal(adapter.flag(), 'false');
 });
@@ -551,17 +555,69 @@ test('changed public buy HTML fails and verifies restoration of current checkout
   });
   assert.equal(adapter.flag(), 'false');
 });
-test('applied upload with lost acknowledgement is reconciled by exact code/settings/assets/health proof', async (t) => {
+test('upload HTTP400 diagnostics survive staged readback without activating an ambiguous upload', async (t) => {
   attestFixture(t);
-  const adapter = harness({ loseUploadResponse: true });
+  const retainedBundle = gzipSync(code).toString('base64');
+  const uploadErrorBody = {
+    success: false,
+    errors: [
+      {
+        code: 10021,
+        message: 'TypeError: inherited ASSETS binding ' + token + code.toString(),
+        source: { pointer: token },
+        documentation_url: token,
+      },
+    ],
+    result: token,
+  };
+  for (const uploadErrorAfterApply of [false, true]) {
+    const adapter = harness({
+      expectedUploadName: 'sandbox-worker.js',
+      uploadErrorBody,
+      uploadErrorAfterApply,
+      refuseUpload: !uploadErrorAfterApply,
+    });
+    await assert.rejects(run(adapter, { retainedBundle }), (error) => {
+      const receipt = error.receipt;
+      assert.deepEqual(receipt.failure, { stage: 'sandbox-code-upload', httpStatus: 400 });
+      assert.equal(receipt.recovery.closedVerified, true);
+      assert.equal(receipt.recovery.rollbackAttempted, false);
+      assert.equal(receipt.deploymentAttempted, false);
+      assert.equal(receipt.stagedVersionVerified, uploadErrorAfterApply);
+      assert.equal(receipt.mutated, false);
+      assert.equal(receipt.apiFailure.stage, 'sandbox-code-upload');
+      assert.equal(receipt.apiFailure.httpStatus, 400);
+      assert.deepEqual(receipt.apiFailure.errors.codes, [10021]);
+      assert.deepEqual(receipt.apiFailure.errors.exceptionTypes, ['TypeError']);
+      assert.deepEqual(receipt.apiFailure.errors.identifiers, [
+        'SandboxLicenseAuthority',
+        'ASSETS',
+      ]);
+      assert.equal(receipt.apiFailure.metadataShape.types.bindings, 'array');
+      assert.equal(receipt.apiFailure.metadataShape.types.keep_assets, 'boolean');
+      for (const privateValue of [token, code.toString(), retainedBundle])
+        assert.ok(!JSON.stringify(receipt).includes(privateValue));
+      return true;
+    });
+    assert.equal(adapter.version(), originalVersion);
+    assert.deepEqual(
+      adapter.mutations.map(({ kind }) => kind),
+      ['stage'],
+    );
+  }
+});
+
+test('applied deployment with lost acknowledgement is reconciled by exact code/settings/assets/health proof', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ loseDeploymentResponse: true });
   const receipt = await run(adapter);
   assert.equal(receipt.outcome, 'verified');
-  assert.equal(receipt.uploadResponseReceived, false);
+  assert.equal(receipt.deploymentResponseReceived, false);
   assert.equal(receipt.mutated, null);
   assert.equal(receipt.reconciliation.readBackVerified, true);
-  assert.equal(receipt.reconciliation.initialFailure.stage, 'sandbox-code-upload');
+  assert.equal(receipt.reconciliation.initialFailure.stage, 'sandbox-staged-deployment');
   assert.equal(receipt.flag, 'false');
-  assert.equal(adapter.mutations.length, 1);
+  assert.equal(adapter.mutations.length, 2);
   assert.ok(!JSON.stringify(receipt).includes(token));
 });
 test('failed refresh health proof never opens checkout and restores only the original current version', async (t) => {
@@ -578,8 +634,8 @@ test('failed refresh health proof never opens checkout and restores only the ori
   });
   assert.equal(adapter.flag(), 'false');
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT', 'POST'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate', 'rollback'],
   );
 });
 test('refused upload is reconciled without printing private provider or network error bodies', async (t) => {
@@ -607,7 +663,7 @@ test('a deployment arriving after the final settings read stops before upload', 
 
 test('a concurrent post-upload deployment is left untouched even with matching code and settings', async (t) => {
   attestFixture(t);
-  const adapter = harness({ concurrentAfterUpload: true });
+  const adapter = harness({ concurrentAfterDeployment: true });
   await assert.rejects(run(adapter), (error) => {
     assert.equal(error.receipt.failure.stage, 'sandbox-operation-ownership-verification');
     assert.equal(error.receipt.recovery.mode, 'not-restored-unowned-deployment');
@@ -618,8 +674,8 @@ test('a concurrent post-upload deployment is left untouched even with matching c
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate'],
   );
   assert.equal(adapter.version(), unrelatedVersion);
 });
@@ -637,13 +693,13 @@ test('a deployment arriving during rollback ownership read prevents rollback', a
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate'],
   );
   assert.equal(adapter.version(), unrelatedVersion);
 });
 
-test('lost upload acknowledgement never permits rollback without exact top-level version ownership', async (t) => {
+test('lost deployment acknowledgement never permits rollback without exact top-level version ownership', async (t) => {
   attestFixture(t);
   for (const uploadOwnership of [
     'missing',
@@ -652,9 +708,12 @@ test('lost upload acknowledgement never permits rollback without exact top-level
     'wrong-id',
     'unavailable',
   ]) {
-    const adapter = harness({ loseUploadResponse: true, uploadOwnership });
+    const adapter = harness({
+      loseDeploymentResponse: true,
+      ownershipAfterDeployment: uploadOwnership,
+    });
     await assert.rejects(run(adapter), (error) => {
-      assert.equal(error.receipt.uploadResponseReceived, false);
+      assert.equal(error.receipt.deploymentResponseReceived, false);
       assert.equal(error.receipt.recovery.mode, 'not-restored-unowned-deployment');
       assert.equal(error.receipt.recovery.rollbackAttempted, false);
       assert.equal(error.receipt.recovery.closedVerified, false);
@@ -663,8 +722,8 @@ test('lost upload acknowledgement never permits rollback without exact top-level
       return true;
     });
     assert.deepEqual(
-      adapter.mutations.map(({ method }) => method),
-      ['PUT'],
+      adapter.mutations.map(({ kind }) => kind),
+      ['stage', 'activate'],
     );
     assert.equal(adapter.version(), nextVersion);
   }
@@ -672,37 +731,37 @@ test('lost upload acknowledgement never permits rollback without exact top-level
 
 test('a lost acknowledgement followed by an unrelated deployment never reverts that deployment', async (t) => {
   attestFixture(t);
-  const adapter = harness({ loseUploadResponse: true, concurrentAfterUpload: true });
+  const adapter = harness({ loseDeploymentResponse: true, concurrentAfterDeployment: true });
   await assert.rejects(run(adapter), (error) => {
     assert.equal(error.receipt.recovery.observedVersion, unrelatedVersion);
     assert.equal(error.receipt.recovery.rollbackAttempted, false);
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate'],
   );
   assert.equal(adapter.version(), unrelatedVersion);
 });
 
-test('owned upload with lost acknowledgement and failed health can restore the original closed version', async (t) => {
+test('owned deployment with lost acknowledgement and failed health can restore the original closed version', async (t) => {
   attestFixture(t);
-  const adapter = harness({ loseUploadResponse: true, badHealth: true });
+  const adapter = harness({ loseDeploymentResponse: true, badHealth: true });
   await assert.rejects(run(adapter), (error) => {
-    assert.equal(error.receipt.uploadResponseReceived, false);
+    assert.equal(error.receipt.deploymentResponseReceived, false);
     assert.equal(error.receipt.recovery.ownershipVerified, true);
     assert.equal(error.receipt.recovery.rollbackAttempted, true);
     assert.equal(error.receipt.recovery.closedVerified, true);
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT', 'POST'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate', 'rollback'],
   );
   assert.equal(adapter.version(), originalVersion);
 });
 
-test('unapplied ambiguous upload verifies the already-original closed version without POST', async (t) => {
+test('unapplied ambiguous upload verifies the already-original closed version without deployment', async (t) => {
   attestFixture(t);
   const adapter = harness({ loseUploadBeforeApply: true });
   await assert.rejects(run(adapter), (error) => {
@@ -712,31 +771,28 @@ test('unapplied ambiguous upload verifies the already-original closed version wi
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage'],
   );
   assert.equal(adapter.version(), originalVersion);
 });
 
-test('duplicate operation tags cannot establish ownership or permit rollback', async (t) => {
+test('duplicate operation tags cannot permit activation or rollback', async (t) => {
   attestFixture(t);
   for (const loseUploadResponse of [false, true]) {
     const adapter = harness({ duplicateOperationTag: true, loseUploadResponse });
     await assert.rejects(run(adapter), (error) => {
-      assert.equal(
-        error.receipt.recovery.ownershipFailure.stage,
-        'sandbox-operation-uniqueness-verification',
-      );
       assert.equal(error.receipt.recovery.rollbackAttempted, false);
-      assert.equal(error.receipt.recovery.closedVerified, false);
-      assert.equal(error.receipt.flag, null);
+      assert.equal(error.receipt.deploymentAttempted, false);
+      assert.equal(error.receipt.recovery.closedVerified, true);
+      assert.equal(error.receipt.flag, 'false');
       return true;
     });
     assert.deepEqual(
-      adapter.mutations.map(({ method }) => method),
-      ['PUT'],
+      adapter.mutations.map(({ kind }) => kind),
+      ['stage'],
     );
-    assert.equal(adapter.version(), nextVersion);
+    assert.equal(adapter.version(), originalVersion);
   }
 });
 
@@ -750,8 +806,8 @@ test('a concurrent gradual deployment cannot establish rollback ownership', asyn
     return true;
   });
   assert.deepEqual(
-    adapter.mutations.map(({ method }) => method),
-    ['PUT'],
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate'],
   );
 });
 

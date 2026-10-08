@@ -98,16 +98,40 @@ export const content = ({
   if (extra) form.set('extra.js', new Blob(['export {};'], { type: mimeType }), 'extra.js');
   return new Response(form, { headers: { 'cf-entrypoint': entrypoint } });
 };
+
+export function versionResources(value) {
+  return {
+    bindings: structuredClone(value.bindings),
+    script: {
+      placement: structuredClone(value.placement ?? { mode: 'off' }),
+      named_handlers: [{ name: 'SandboxLicenseAuthority', handlers: [] }],
+    },
+    script_runtime: {
+      compatibility_date: value.compatibility_date,
+      compatibility_flags: structuredClone(value.compatibility_flags),
+      usage_model: value.usage_model,
+      ...(value.limits === undefined ? {} : { limits: structuredClone(value.limits) }),
+      migration_tag: 'sandbox-v1',
+      exports: {
+        SandboxLicenseAuthority: { type: 'durable-object', storage: 'sqlite', state: 'created' },
+      },
+    },
+  };
+}
 const ok = (result) => Response.json({ success: true, result });
 export function harness({
   versions = [{ id: goodVersion }],
   initialSettings,
   changeVersionAtBoundary = false,
   changeVersionAfterSettingsRead = false,
-  concurrentAfterUpload = false,
+  concurrentAfterDeployment = false,
+  concurrentAfterStage = false,
+  concurrentAtActivationSettings = false,
+  concurrentScriptSettingsChange,
   concurrentDuringRollbackOwnership = false,
   postUploadGradual = false,
   uploadOwnership = 'owned',
+  ownershipAfterDeployment,
   duplicateOperationTag = false,
   loseUploadBeforeApply = false,
   sourceBytes = code,
@@ -120,8 +144,16 @@ export function harness({
   readbackRaw = false,
   readbackRawHeader = null,
   loseUploadResponse = false,
+  loseDeploymentResponse = false,
+  loseDeploymentBeforeApply = false,
   refuseUpload = false,
+  uploadErrorBody,
+  uploadErrorAfterApply = false,
+  deploymentErrorBody,
   postChange,
+  originalResourceChange,
+  stagedResourceChange,
+  stagedCode = code,
   badHealth = false,
   changedBuy = false,
   currentIsGood = false,
@@ -130,14 +162,29 @@ export function harness({
   let value = initialSettings ?? settings();
   const original = structuredClone(value);
   let version = currentIsGood ? goodVersion : originalVersion;
-  let deployedCode = currentIsGood ? code : Buffer.from('old dispatcher');
-  let deployedName = 'worker.js';
-  let reads = 0;
-  let settingsReads = 0;
-  let ownershipReads = 0;
-  let uploadedTag;
-  const calls = [];
-  const mutations = [];
+  const originalId = version;
+  let reads = 0,
+    settingsReads = 0,
+    healthFailures = 0;
+  let uploadedTag, staged;
+  let activated = false;
+  const records = new Map([
+    [
+      originalId,
+      {
+        value: original,
+        bytes: currentIsGood ? code : Buffer.from('old dispatcher'),
+        name: 'worker.js',
+      },
+    ],
+  ]);
+  const calls = [],
+    mutations = [];
+  const authorityState = {
+    licence: 'existing-private-entitlement',
+    orders: ['existing-paid-order'],
+    devices: 2,
+  };
   const fetcher = async (url, init = {}) => {
     calls.push({ url, method: init.method ?? 'GET' });
     const endpoint = new URL(url);
@@ -149,7 +196,13 @@ export function harness({
       assert.ok(!endpoint.pathname.endsWith('/kerfdesk-desktop-licensing'));
       if (endpoint.pathname.endsWith('/settings')) {
         settingsReads += 1;
-        if (changeVersionAfterSettingsRead && settingsReads === 2) version = unrelatedVersion;
+        if (concurrentScriptSettingsChange && staged && settingsReads === 4)
+          concurrentScriptSettingsChange(value);
+        if (
+          (changeVersionAfterSettingsRead && settingsReads === 2) ||
+          (concurrentAtActivationSettings && staged && settingsReads === 4)
+        )
+          version = unrelatedVersion;
         return failedSettingsStatus
           ? new Response(token, { status: failedSettingsStatus })
           : ok(value);
@@ -157,38 +210,44 @@ export function harness({
       if (endpoint.pathname.includes('/versions/')) {
         const selected = endpoint.pathname.split('/').at(-1);
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
-        ownershipReads += 1;
-        if (selected === nextVersion && uploadOwnership === 'unavailable')
+        const ownership =
+          activated && ownershipAfterDeployment ? ownershipAfterDeployment : uploadOwnership;
+        if (selected === nextVersion && ownership === 'unavailable')
           return new Response(token, { status: 503 });
         const annotations =
           selected === nextVersion && uploadedTag
-            ? uploadOwnership === 'missing'
+            ? ownership === 'missing'
               ? {}
-              : { 'workers/tag': uploadOwnership === 'different-tag' ? fixtureTag : uploadedTag }
+              : { 'workers/tag': ownership === 'different-tag' ? fixtureTag : uploadedTag }
             : { 'workers/tag': 'unrelated-operator' };
+        const selectedValue = selected === nextVersion ? staged.value : original;
         const result = {
-          id: uploadOwnership === 'wrong-id' ? unrelatedVersion : selected,
+          id: selected === nextVersion && ownership === 'wrong-id' ? unrelatedVersion : selected,
           number: 3,
           metadata: { source: 'api', created_on: '2026-10-08T00:00:00Z' },
           annotations,
-          resources: {},
+          resources: versionResources(selectedValue),
+          ...(selectedValue.cache_options === undefined
+            ? {}
+            : { cache_options: selectedValue.cache_options }),
         };
-        if (uploadOwnership === 'nested-only') {
+        if (selected === nextVersion && ownership === 'nested-only') {
           result.metadata.annotations = annotations;
           delete result.annotations;
         }
-        if (concurrentDuringRollbackOwnership && ownershipReads === 3) version = unrelatedVersion;
+        if (selected === originalId && originalResourceChange) originalResourceChange(result);
+        if (selected === nextVersion && stagedResourceChange) stagedResourceChange(result);
+        if (concurrentDuringRollbackOwnership && healthFailures >= 2 && selected === nextVersion)
+          version = unrelatedVersion;
         return ok(result);
       }
-      if (endpoint.pathname.endsWith('/versions')) {
+      if (endpoint.pathname.endsWith('/versions') && init.method !== 'POST') {
         assert.equal(endpoint.search, '?deployable=true');
         return ok({
           items: [
             ...versions,
-            ...(uploadedTag && !refuseUpload && !loseUploadBeforeApply
-              ? [{ id: nextVersion, annotations: { 'workers/tag': uploadedTag } }]
-              : []),
-            ...(duplicateOperationTag && uploadedTag
+            ...(staged ? [{ id: nextVersion, annotations: { 'workers/tag': uploadedTag } }] : []),
+            ...(duplicateOperationTag && staged
               ? [{ id: unrelatedVersion, annotations: { 'workers/tag': uploadedTag } }]
               : []),
           ],
@@ -198,15 +257,16 @@ export function harness({
         const selected = endpoint.searchParams.get('version');
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
         if (selected === goodVersion && sourceResponse) return sourceResponse();
+        const record = records.get(selected) ?? { bytes: sourceBytes, name: 'worker.js' };
         if (selected === nextVersion && readbackRaw)
-          return new Response(deployedCode, {
+          return new Response(record.bytes, {
             headers: {
               'Content-Type': 'application/javascript',
               ...(readbackRawHeader === null
                 ? {}
                 : {
                     'cf-entrypoint':
-                      readbackRawHeader === 'match' ? deployedName : readbackRawHeader,
+                      readbackRawHeader === 'match' ? record.name : readbackRawHeader,
                   }),
             },
           });
@@ -219,18 +279,32 @@ export function harness({
           });
         return selected === goodVersion
           ? content({ bytes: sourceBytes, extra: sourceExtra })
-          : content({ bytes: deployedCode, entrypoint: deployedName, filename: deployedName });
+          : content({ bytes: record.bytes, entrypoint: record.name, filename: record.name });
       }
       if (endpoint.pathname.endsWith('/deployments') && init.method === 'POST') {
         const payload = JSON.parse(init.body);
-        assert.deepEqual(payload.versions, [
-          { version_id: currentIsGood ? goodVersion : originalVersion, percentage: 100 },
-        ]);
-        mutations.push({ method: 'POST', payload });
-        value = structuredClone(original);
-        version = currentIsGood ? goodVersion : originalVersion;
-        deployedCode = currentIsGood ? code : Buffer.from('old dispatcher');
-        return ok({ id: 'original-current-version-restored' });
+        const selected = payload.versions[0].version_id;
+        assert.deepEqual(payload.versions, [{ version_id: selected, percentage: 100 }]);
+        assert.equal(payload.strategy, 'percentage');
+        assert.ok([nextVersion, originalId].includes(selected));
+        mutations.push({
+          method: 'POST',
+          kind: selected === nextVersion ? 'activate' : 'rollback',
+          payload,
+        });
+        if (selected === nextVersion && loseDeploymentBeforeApply) throw new Error(token);
+        const record = records.get(selected);
+        value = structuredClone(record.value);
+        version = selected;
+        if (selected === nextVersion) {
+          activated = true;
+          if (postChange) postChange(value);
+          staged.value = value;
+          if (concurrentAfterDeployment) version = unrelatedVersion;
+          if (loseDeploymentResponse) throw new Error('Ambiguous activation ' + token);
+          if (deploymentErrorBody) return Response.json(deploymentErrorBody, { status: 400 });
+        }
+        return ok({ id: 'explicit-deployment' });
       }
       if (endpoint.pathname.endsWith('/deployments')) {
         reads += 1;
@@ -240,7 +314,7 @@ export function harness({
             {
               created_on: '2026-10-08T00:00:00Z',
               versions:
-                postUploadGradual && uploadedTag
+                postUploadGradual && activated
                   ? [
                       { version_id: nextVersion, percentage: 50 },
                       { version_id: unrelatedVersion, percentage: 50 },
@@ -250,7 +324,7 @@ export function harness({
           ],
         });
       }
-      if (endpoint.pathname.endsWith('/' + SANDBOX_WORKER) && init.method === 'PUT') {
+      if (endpoint.pathname.endsWith('/versions') && init.method === 'POST') {
         assert.equal(endpoint.search, '?bindings_inherit=strict');
         const payload = JSON.parse(init.body.get('metadata'));
         const file = init.body.get(payload.main_module);
@@ -266,7 +340,7 @@ export function harness({
             binding,
             binding.name === 'PAYMENTS_ENABLED'
               ? { name: 'PAYMENTS_ENABLED', type: 'plain_text', text: 'false' }
-              : { name: binding.name, type: 'inherit', version_id: originalVersion },
+              : { name: binding.name, type: 'inherit', version_id: originalId },
           );
         assert.deepEqual(payload.observability, original.observability);
         assert.deepEqual(payload.tags, original.tags);
@@ -275,17 +349,18 @@ export function harness({
           /^kerfdesk-sandbox-refresh-[0-9a-f-]{36}$/u,
         );
         uploadedTag = payload.annotations['workers/tag'];
-        mutations.push({ method: 'PUT', payload });
-        if (loseUploadBeforeApply)
-          throw new Error('Response lost before any applied change: ' + token);
-        if (refuseUpload) return new Response(token, { status: 403 });
-        version = nextVersion;
-        deployedCode = code;
-        deployedName = payload.main_module;
-        if (postChange) postChange(value);
-        if (concurrentAfterUpload) version = unrelatedVersion;
-        if (loseUploadResponse) throw new Error('Ambiguous response with ' + token);
-        return ok({ id: SANDBOX_WORKER });
+        mutations.push({ method: 'POST', kind: 'stage', payload });
+        if (loseUploadBeforeApply) throw new Error(token);
+        if (refuseUpload)
+          return uploadErrorBody
+            ? Response.json(uploadErrorBody, { status: 400 })
+            : new Response(token, { status: 403 });
+        staged = { value: structuredClone(original), bytes: stagedCode, name: payload.main_module };
+        records.set(nextVersion, staged);
+        if (concurrentAfterStage) version = unrelatedVersion;
+        if (loseUploadResponse) throw new Error('Ambiguous staged response ' + token);
+        if (uploadErrorAfterApply) return Response.json(uploadErrorBody, { status: 400 });
+        return ok({ id: nextVersion });
       }
       throw new Error('Unexpected sandbox API destination.');
     }
@@ -300,6 +375,7 @@ export function harness({
       });
     if (endpoint.pathname === '/v1/public/health') {
       const healthy = !badHealth && [goodVersion, nextVersion, unrelatedVersion].includes(version);
+      if (!healthy) healthFailures += 1;
       return Response.json(
         { ok: healthy },
         { status: healthy ? 200 : version === originalVersion ? 405 : 503 },
@@ -314,6 +390,7 @@ export function harness({
     flag: () => value.bindings.find(({ name }) => name === 'PAYMENTS_ENABLED').text,
     version: () => version,
     binding: (name) => structuredClone(value.bindings.find((binding) => binding.name === name)),
+    authorityState,
   };
 }
 export const run = (adapter, extra = {}) =>

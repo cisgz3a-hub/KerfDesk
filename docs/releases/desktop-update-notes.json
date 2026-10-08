@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "6c62d5a6bfd16210a9c6fa340e60722dba4edad0",
+  "sinceSourceSha": "e3820ed51a8d3e9ae8eab16f47097c4011dbd703",
   "highlights": [
-    "Cancelled Install and close requests no longer trigger an installer later; Free updates remain available after a failed trial request.",
-    "Phone & MCP keeps a separate Abort allowance and lets you read every Job Review warning and operation across pages.",
-    "grblHAL whole-number settings keep their intended values; reconnecting no longer leaves an old Wake error on the new connection.",
-    "Line Art is the free tracing option; the other tracing modes ask for desktop Pro access.",
-    "Large projects save in the background, with cancellation preserving your unsaved edits.",
-    "Material recipes fit MCP responses, and closing a dialog returns focus to the control that opened it."
+    "Connect and set up your machine from the compact top bar. Jog controls stay above the other machine tools, with scrolling that keeps them reachable in smaller windows.",
+    "Save material-test settings, result notes and photos together, turn selected test cells into reusable recipes, and compare recipe settings before applying them.",
+    "Preview shape combinations before applying them, keep their source paths editable, and organise artwork with named groups and drag-and-drop.",
+    "Organise projects into sheets, regenerate saved arrays, and keep batch data, serials and reviewed variants fixed when reopening a production run.",
+    "After Abort, responsive controllers recover on the same connection. Delayed startup replies get clearer messages, and later resets retain the first stop or fault result.",
+    "Your selected machine and hardware settings return next session. New starts a fresh job, and opened CNC job settings no longer replace your saved machine choice."
   ]
 }
