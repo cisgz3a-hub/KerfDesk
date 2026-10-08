@@ -46,3 +46,9 @@ It inherits every binding and secret from the current sandbox version, preserves
 the existing SandboxLicenseAuthority namespace and assets, and keeps checkout
 closed while health is verified. Production script replacement is outside this
 operation. The main-only protected deployment job retains a redacted receipt.
+
+Both operator changes stamp the created version with a unique operation annotation.
+Recovery verifies the active UUID and unique matching annotation before restoring
+the original closed version. An unrelated or ambiguous deployment is left intact
+and reported unverified. Request deadlines reserve recovery time within the job;
+the final version read and deployment write remain separate provider requests.

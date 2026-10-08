@@ -7,6 +7,7 @@ import { applyPaymentFlag, flagMetadata, guardedSettings } from './apply-payment
 
 const originalVersion = '11111111-1111-4111-8111-111111111111';
 const nextVersion = '22222222-2222-4222-8222-222222222222';
+const unrelatedVersion = '33333333-3333-4333-8333-333333333333';
 const target = {
   environment: 'live',
   signing: 'entitlement-2026-09',
@@ -61,6 +62,18 @@ function harness({
   loseRollbackResponse = false,
   changeVersionAtBoundary = false,
   inspectHttpFailure = false,
+  concurrentAfterPatch = false,
+  concurrentAfterHealth = false,
+  concurrentAtOwnershipBoundary = false,
+  originalClosedAfterLostPatch = false,
+  missingOperationAnnotation = false,
+  nestedOperationAnnotation = false,
+  wrongVersionMetadataId = false,
+  duplicateOperationTag = false,
+  versionListFailure = false,
+  unavailableRecoveryDeployment = false,
+  afterPatch,
+  afterVersionList,
   contentResponse,
 } = {}) {
   let value = settings();
@@ -69,6 +82,7 @@ function harness({
   let version = originalVersion;
   let deploymentReads = 0;
   let contentReads = 0;
+  let operationTag;
   const mutations = [];
   const calls = [];
   const fetcher = async (url, init = {}) => {
@@ -77,6 +91,8 @@ function harness({
       if (url.endsWith('/settings') && init.method === 'PATCH') {
         const payload = JSON.parse(await init.body.get('settings').text());
         mutations.push(payload);
+        operationTag = payload.annotations?.['workers/tag'];
+        assert.match(operationTag, /^payment-flag-[0-9a-f-]{36}$/u);
         assert.ok(
           payload.bindings
             .filter(({ name }) => name !== 'PAYMENTS_ENABLED')
@@ -95,6 +111,12 @@ function harness({
           limit.simple = { period: limit.simple.period, limit: limit.simple.limit };
         }
         version = nextVersion;
+        if (concurrentAfterPatch) version = unrelatedVersion;
+        if (originalClosedAfterLostPatch) {
+          version = originalVersion;
+          value = structuredClone(original);
+        }
+        afterPatch?.();
         if (losePatchResponse) throw new Error('Network lost with private-token-for-test-only');
         return ok(value);
       }
@@ -102,6 +124,37 @@ function harness({
         return inspectHttpFailure
           ? new Response('private-token-for-test-only provider body', { status: 403 })
           : ok(value);
+      if (url.includes('/versions/')) {
+        const requested = url.slice(url.lastIndexOf('/') + 1);
+        if (requested === nextVersion) {
+          const annotation = { 'workers/tag': operationTag };
+          return ok({
+            id: wrongVersionMetadataId ? unrelatedVersion : nextVersion,
+            metadata: nestedOperationAnnotation ? { annotations: annotation } : {},
+            ...(!missingOperationAnnotation && !nestedOperationAnnotation
+              ? { annotations: annotation }
+              : {}),
+          });
+        }
+        assert.ok([originalVersion, unrelatedVersion].includes(requested));
+        return ok({ id: requested, annotations: { 'workers/tag': 'another-operation' } });
+      }
+      if (url.endsWith('/versions?deployable=true')) {
+        if (versionListFailure)
+          return new Response('private-token-for-test-only provider body', { status: 403 });
+        const items = [
+          { id: originalVersion, annotations: { 'workers/tag': 'original-operation' } },
+          { id: nextVersion, annotations: { 'workers/tag': operationTag } },
+        ];
+        if (duplicateOperationTag)
+          items.push({ id: unrelatedVersion, annotations: { 'workers/tag': operationTag } });
+        if (concurrentAtOwnershipBoundary) {
+          version = unrelatedVersion;
+          value = structuredClone(original);
+        }
+        afterVersionList?.();
+        return ok({ items });
+      }
       if (url.endsWith('/deployments') && init.method === 'POST') {
         const payload = JSON.parse(init.body);
         mutations.push(payload);
@@ -113,6 +166,8 @@ function harness({
       }
       if (url.endsWith('/deployments')) {
         deploymentReads += 1;
+        if (unavailableRecoveryDeployment && deploymentReads === 3)
+          return new Response('private-token-for-test-only provider body', { status: 403 });
         if (changeVersionAtBoundary && deploymentReads === 2) version = nextVersion;
         return ok({
           deployments: [
@@ -144,14 +199,20 @@ function harness({
         clientToken: enabled ? 'public-client-token' : null,
       });
     }
-    if (url === 'https://license.kerfdesk.com/v1/public/health')
+    if (url === 'https://license.kerfdesk.com/v1/public/health') {
+      if (concurrentAfterHealth && version === nextVersion) {
+        version = unrelatedVersion;
+        value = structuredClone(original);
+      }
       return Response.json({ ok: !badHealth }, { status: badHealth ? 503 : 200 });
+    }
     throw new Error('Unexpected external destination.');
   };
   return {
     fetcher,
     mutations,
     calls,
+    currentVersion: () => version,
     currentFlag: () => value.bindings.find(({ name }) => name === 'PAYMENTS_ENABLED').text,
   };
 }
@@ -167,8 +228,276 @@ test('flag patch inherits every other binding from the active version without re
     metadata.bindings.find(({ name }) => name === 'SIGNING_PRIVATE_JWK'),
     { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: originalVersion },
   );
+  assert.deepEqual(metadata.annotations, {
+    'workers/message': 'Enable authorised checkout; preserve code and authority',
+  });
   assert.equal(metadata.bindings.length, value.bindings.length);
   assert.equal(value.bindings.find(({ name }) => name === 'PAYMENTS_ENABLED').text, 'false');
+});
+
+test('operation tags are optional, validated and unique for separate flag mutations', async () => {
+  const value = settings();
+  assert.equal(
+    flagMetadata(value, originalVersion, 'false', 'payment-operation-123').annotations[
+      'workers/tag'
+    ],
+    'payment-operation-123',
+  );
+  for (const tag of ['', 'contains spaces', 'x'.repeat(65), 123])
+    assert.throws(() => flagMetadata(value, originalVersion, 'true', tag));
+  const first = harness();
+  const second = harness();
+  const receipts = await Promise.all(
+    [first, second].map((run) =>
+      applyPaymentFlag(
+        { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+        run.fetcher,
+      ),
+    ),
+  );
+  assert.notEqual(receipts[0].operationTag, receipts[1].operationTag);
+  for (const [index, run] of [first, second].entries()) {
+    assert.equal(run.mutations[0].annotations['workers/tag'], receipts[index].operationTag);
+    assert.ok(run.calls.some(({ url }) => url.endsWith('/versions/' + nextVersion)));
+    assert.ok(run.calls.some(({ url }) => url.endsWith('/versions?deployable=true')));
+  }
+});
+
+test('a refused open verifies the original closed deployment without a rollback POST', async () => {
+  const run = harness({ refusePatch: true });
+  await assert.rejects(
+    applyPaymentFlag(
+      { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+      run.fetcher,
+    ),
+    (error) => {
+      assert.deepEqual(error.receipt.failure, {
+        stage: 'cloudflare-settings-patch',
+        httpStatus: 403,
+      });
+      assert.equal(error.receipt.recovery.mode, 'verify-original-disabled-deployment');
+      assert.equal(error.receipt.recovery.verified, true);
+      assert.equal(error.receipt.recovery.version, originalVersion);
+      assert.equal(error.receipt.recovery.requestAttempted, undefined);
+      return true;
+    },
+  );
+  assert.equal(run.currentFlag(), 'false');
+  assert.equal(run.mutations.length, 1);
+  assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+});
+
+test('a lost PATCH ACK with the original closed already active only verifies readback', async () => {
+  const run = harness({ losePatchResponse: true, originalClosedAfterLostPatch: true });
+  await assert.rejects(
+    applyPaymentFlag(
+      { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+      run.fetcher,
+    ),
+    (error) => {
+      assert.equal(error.receipt.patchResponseReceived, false);
+      assert.equal(error.receipt.recovery.mode, 'verify-original-disabled-deployment');
+      assert.equal(error.receipt.recovery.verified, true);
+      assert.equal(error.receipt.recovery.version, originalVersion);
+      return true;
+    },
+  );
+  assert.equal(run.mutations.length, 1);
+  assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+});
+
+test('post-PATCH concurrent deployment is preserved even if the PATCH acknowledgement is lost', async () => {
+  for (const losePatchResponse of [false, true]) {
+    const run = harness({ concurrentAfterPatch: true, losePatchResponse });
+    await assert.rejects(
+      applyPaymentFlag(
+        { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+        run.fetcher,
+      ),
+      (error) => {
+        assert.equal(error.receipt.patchResponseReceived, !losePatchResponse);
+        assert.equal(error.receipt.recovery.mode, 'preserve-unverified-deployment');
+        assert.equal(error.receipt.recovery.verified, false);
+        assert.equal(error.receipt.recovery.observedVersion, unrelatedVersion);
+        assert.equal(error.receipt.recovery.ownershipVerified, false);
+        assert.equal(error.receipt.flag, null);
+        assert.equal(error.receipt.version, null);
+        assert.ok(!JSON.stringify(error.receipt).includes('private-token-for-test-only'));
+        return true;
+      },
+    );
+    assert.equal(run.currentVersion(), unrelatedVersion);
+    assert.equal(run.currentFlag(), 'true');
+    assert.equal(run.mutations.length, 1);
+    assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+  }
+});
+
+test('a concurrent deployment during public checks is never replaced by failed-open recovery', async () => {
+  for (const badHealth of [false, true]) {
+    const run = harness({ concurrentAfterHealth: true, badHealth });
+    await assert.rejects(
+      applyPaymentFlag(
+        { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+        run.fetcher,
+      ),
+      (error) => {
+        assert.equal(
+          error.receipt.failure.stage,
+          badHealth ? 'public-health-get' : 'operation-deployment-verification',
+        );
+        assert.equal(error.receipt.recovery.mode, 'preserve-unverified-deployment');
+        assert.equal(error.receipt.recovery.verified, false);
+        assert.equal(error.receipt.recovery.observedVersion, unrelatedVersion);
+        return true;
+      },
+    );
+    // This unrelated deployment is closed, but belongs to someone else and is untouched.
+    assert.equal(run.currentFlag(), 'false');
+    assert.equal(run.currentVersion(), unrelatedVersion);
+    assert.equal(run.mutations.length, 1);
+    assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+  }
+});
+
+test('lost PATCH ACK requires exact top-level ownership and unique version list evidence', async () => {
+  for (const option of [
+    'missingOperationAnnotation',
+    'nestedOperationAnnotation',
+    'wrongVersionMetadataId',
+    'duplicateOperationTag',
+    'versionListFailure',
+  ]) {
+    const run = harness({ losePatchResponse: true, [option]: true });
+    await assert.rejects(
+      applyPaymentFlag(
+        { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+        run.fetcher,
+      ),
+      (error) => {
+        assert.equal(error.receipt.recovery.mode, 'preserve-unverified-deployment');
+        assert.equal(error.receipt.recovery.verified, false);
+        assert.equal(error.receipt.recovery.ownershipVerified, false);
+        assert.equal(error.receipt.recovery.requestAttempted, undefined);
+        assert.ok(!JSON.stringify(error.receipt).includes('private-token-for-test-only'));
+        return true;
+      },
+    );
+    assert.equal(run.currentVersion(), nextVersion);
+    assert.equal(run.mutations.length, 1);
+    assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+  }
+});
+
+test('lost PATCH ACK with unavailable active-version readback never sends a blind rollback', async () => {
+  const run = harness({ losePatchResponse: true, unavailableRecoveryDeployment: true });
+  await assert.rejects(
+    applyPaymentFlag(
+      { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+      run.fetcher,
+    ),
+    (error) => {
+      assert.equal(error.receipt.recovery.mode, 'preserve-unverified-deployment');
+      assert.equal(error.receipt.recovery.verified, false);
+      assert.deepEqual(error.receipt.recovery.verificationFailure, {
+        stage: 'cloudflare-deployments-get',
+        httpStatus: 403,
+      });
+      assert.equal(error.receipt.flag, null);
+      assert.equal(error.receipt.version, null);
+      assert.ok(!JSON.stringify(error.receipt).includes('private-token-for-test-only'));
+      return true;
+    },
+  );
+  assert.equal(run.currentVersion(), nextVersion);
+  assert.equal(run.mutations.length, 1);
+  assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+});
+
+test('a concurrent deployment after ownership metadata reads prevents the rollback POST', async () => {
+  const run = harness({ alterNestedLimit: true, concurrentAtOwnershipBoundary: true });
+  await assert.rejects(
+    applyPaymentFlag(
+      { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+      run.fetcher,
+    ),
+    (error) => {
+      assert.equal(error.receipt.failure.stage, 'worker-settings-verification');
+      assert.equal(error.receipt.recovery.mode, 'preserve-unverified-deployment');
+      assert.equal(
+        error.receipt.recovery.verificationFailure.stage,
+        'operation-deployment-verification',
+      );
+      assert.equal(error.receipt.recovery.verified, false);
+      return true;
+    },
+  );
+  assert.equal(run.currentVersion(), unrelatedVersion);
+  assert.equal(run.mutations.length, 1);
+  assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+});
+
+test('exhausting the 180s normal budget after PATCH preserves the 240s recovery reserve', async (context) => {
+  let now = 0;
+  context.mock.method(Date, 'now', () => now);
+  const run = harness({
+    afterPatch: () => {
+      now = 180001;
+    },
+  });
+  await assert.rejects(
+    applyPaymentFlag(
+      { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+      run.fetcher,
+    ),
+    (error) => {
+      assert.deepEqual(error.receipt.failure, {
+        stage: 'cloudflare-settings-get',
+        httpStatus: null,
+      });
+      assert.equal(error.receipt.recovery.ownershipVerified, true);
+      assert.equal(error.receipt.recovery.requestAcknowledged, true);
+      assert.equal(error.receipt.recovery.verified, true);
+      assert.equal(error.receipt.recovery.version, originalVersion);
+      return true;
+    },
+  );
+  assert.equal(run.currentFlag(), 'false');
+  assert.equal(run.mutations.length, 2);
+});
+
+test('the absolute 240s recovery deadline stops further requests before any rollback', async (context) => {
+  let now = 0;
+  context.mock.method(Date, 'now', () => now);
+  const run = harness({
+    afterPatch: () => {
+      now = 180001;
+    },
+    afterVersionList: () => {
+      now = 240001;
+    },
+  });
+  await assert.rejects(
+    applyPaymentFlag(
+      { targetName: 'production', state: 'open', token: 'private-token-for-test-only' },
+      run.fetcher,
+    ),
+    (error) => {
+      assert.equal(error.receipt.recovery.mode, 'preserve-unverified-deployment');
+      assert.deepEqual(error.receipt.recovery.verificationFailure, {
+        stage: 'cloudflare-deployments-get',
+        httpStatus: null,
+      });
+      assert.equal(error.receipt.recovery.verified, false);
+      assert.equal(error.receipt.flag, null);
+      assert.ok(!JSON.stringify(error.receipt).includes('private-token-for-test-only'));
+      return true;
+    },
+  );
+  assert.equal(run.currentVersion(), nextVersion);
+  assert.equal(run.mutations.length, 1);
+  assert.ok(!run.calls.some(({ method }) => method === 'POST'));
+  assert.ok(run.calls.at(-1).url.endsWith('/versions?deployable=true'));
 });
 
 test('wrong environment, namespace, missing secrets and duplicate bindings stop before mutation', () => {
@@ -287,6 +616,8 @@ test('a PATCH applied before its response is lost is reconciled and rolled back 
       assert.equal(error.receipt.mutationAttempted, true);
       assert.equal(error.receipt.patchResponseReceived, false);
       assert.equal(error.receipt.mutated, null);
+      assert.equal(error.receipt.recovery.ownershipVerified, true);
+      assert.equal(error.receipt.recovery.requestAttempted, true);
       assert.equal(error.receipt.recovery.verified, true);
       assert.equal(error.receipt.recovery.flag, 'false');
       assert.ok(!JSON.stringify(error.receipt).includes('private-token-for-test-only'));

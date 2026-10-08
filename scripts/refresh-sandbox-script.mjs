@@ -62,11 +62,16 @@ export function guardSandboxRefresh(settings) {
   );
 }
 
-export function sandboxUploadMetadata(settings, activeVersion, entrypoint) {
+export function sandboxUploadMetadata(settings, activeVersion, entrypoint, operationTag) {
   guardSandboxRefresh(settings);
   assert.ok(
     typeof entrypoint === 'string' && entrypoint.trim() && entrypoint !== 'metadata',
     'Module entrypoint unavailable.',
+  );
+  assert.ok(
+    typeof operationTag === 'string' &&
+      /^kerfdesk-sandbox-refresh-[0-9a-f-]{36}$/u.test(operationTag),
+    'Sandbox refresh operation tag unavailable.',
   );
   const metadata = flagMetadata(settings, activeVersion, 'false');
   return {
@@ -75,6 +80,7 @@ export function sandboxUploadMetadata(settings, activeVersion, entrypoint) {
     main_module: entrypoint,
     keep_assets: true,
     annotations: {
+      'workers/tag': operationTag,
       'workers/message':
         'Restore attested sandbox health dispatcher; preserve existing authority and closed checkout',
     },
@@ -115,6 +121,8 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     '/workers/scripts/' +
     SANDBOX_WORKER;
   const started = Date.now();
+  const operationTag = 'kerfdesk-sandbox-refresh-' + crypto.randomUUID();
+  let operationVersion;
   let recovering = false;
   let stage = 'operation-validation';
   let httpStatus = null;
@@ -167,6 +175,32 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     );
     assert.ok(uuid.test(latest.versions[0].version_id), 'Sandbox active version unavailable.');
     return latest.versions[0].version_id;
+  };
+  // Wrangler's ApiVersion has top-level annotations, separate from metadata's author/timestamps.
+  const verifyOperationVersion = async (active) => {
+    const version = await api('/versions/' + active, {}, 'sandbox-operation-version-get');
+    setStage('sandbox-operation-ownership-verification');
+    assert.equal(version?.id, active, 'Sandbox version metadata disagrees.');
+    assert.equal(
+      version?.annotations?.['workers/tag'],
+      operationTag,
+      'Active sandbox deployment is not owned by this refresh.',
+    );
+    const result = await api(
+      '/versions?deployable=true',
+      {},
+      'sandbox-operation-version-discovery',
+    );
+    setStage('sandbox-operation-uniqueness-verification');
+    assert.ok(Array.isArray(result?.items), 'Sandbox operation version list unavailable.');
+    const matches = result.items.filter(
+      (item) => item?.annotations?.['workers/tag'] === operationTag,
+    );
+    assert.equal(matches.length, 1, 'Sandbox refresh operation ownership is ambiguous.');
+    assert.equal(matches[0].id, active, 'Sandbox operation tag belongs to another version.');
+    if (operationVersion)
+      assert.equal(active, operationVersion, 'Sandbox refresh ownership is ambiguous.');
+    operationVersion = active;
   };
   const readSettings = () => api('/settings', {}, 'sandbox-settings-get');
   const readModule = async (version, label) =>
@@ -228,6 +262,7 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
   };
   const verifyRestoration = async () => {
     const active = await activeVersion();
+    if (mutationAttempted) await verifyOperationVersion(active);
     await verifySettings();
     const restored = await readModule(active, 'sandbox-restored-content-get');
     setStage('sandbox-restored-content-verification');
@@ -248,6 +283,8 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     worker: SANDBOX_WORKER,
     environment: 'sandbox',
     operation: 'sandbox-refresh-code',
+    operationTag,
+    operationVersion: operationVersion ?? null,
     sourceVersion: sourceVersion ?? null,
     sourceVersionPrefix: GOOD_VERSION_PREFIX,
     codeSha256: GOOD_CODE_SHA256,
@@ -313,11 +350,20 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     setStage('sandbox-pre-mutation-version-check');
     assert.equal(boundary, originalVersion, 'Sandbox deployment changed before refresh.');
     await verifySettings();
+    const uploadBoundary = await activeVersion();
+    setStage('sandbox-final-pre-upload-version-check');
+    assert.equal(
+      uploadBoundary,
+      originalVersion,
+      'Sandbox deployment changed after settings read.',
+    );
     if (originalVersion !== sourceVersion) {
       const form = new FormData();
       form.set(
         'metadata',
-        JSON.stringify(sandboxUploadMetadata(before, originalVersion, module.entrypoint)),
+        JSON.stringify(
+          sandboxUploadMetadata(before, originalVersion, module.entrypoint, operationTag),
+        ),
       );
       form.set(
         module.entrypoint,
@@ -332,7 +378,7 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     return await success();
   } catch {
     const failure = { stage, httpStatus };
-    const recovery = { mode: 'not-needed', closedVerified: false };
+    const recovery = { mode: 'not-needed', rollbackAttempted: false, closedVerified: false };
     if (mutationAttempted) {
       recovering = true;
       // A lost acknowledgement may still have installed exactly the attested closed configuration.
@@ -342,39 +388,65 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
       } catch {
         recovery.reconciliationFailure = { stage, httpStatus };
       }
-      recovery.mode = 'restore-original-closed-sandbox-deployment';
+      recovery.mode = 'not-restored-unowned-deployment';
       recovery.requestAcknowledged = false;
-      try {
-        await api(
-          '/deployments',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              strategy: 'percentage',
-              versions: [{ version_id: originalVersion, percentage: 100 }],
-            }),
-          },
-          'sandbox-rollback-deployment',
-        );
-        recovery.requestAcknowledged = true;
-      } catch {
-        recovery.requestFailure = { stage, httpStatus };
-      }
+      let verifyOriginal = false;
       try {
         const active = await activeVersion();
-        setStage('sandbox-rollback-version-verification');
-        assert.equal(active, originalVersion, 'Sandbox rollback version disagrees.');
-        await verifySettings();
-        await publicConfig();
-        await verifyBuy();
-        recovery.buyHtmlUnchanged = true;
-        recovery.version = active;
-        recovery.flag = 'false';
-        recovery.closedVerified = true;
-        recovery.protectedSettingsUnchanged = true;
+        recovery.observedVersion = active;
+        if (active === originalVersion) {
+          recovery.mode = 'original-closed-sandbox-deployment-already-active';
+          verifyOriginal = true;
+        } else {
+          // A lost PUT acknowledgement never grants ownership of the active deployment.
+          await verifyOperationVersion(active);
+          recovery.ownershipVerified = true;
+          const boundary = await activeVersion();
+          setStage('sandbox-rollback-ownership-boundary-check');
+          assert.equal(boundary, active, 'Sandbox deployment changed before rollback.');
+          recovery.mode = 'restore-original-closed-sandbox-deployment';
+          recovery.rollbackAttempted = true;
+          try {
+            await api(
+              '/deployments',
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  strategy: 'percentage',
+                  versions: [{ version_id: originalVersion, percentage: 100 }],
+                }),
+              },
+              'sandbox-rollback-deployment',
+            );
+            recovery.requestAcknowledged = true;
+          } catch {
+            recovery.requestFailure = { stage, httpStatus };
+          }
+          verifyOriginal = true;
+        }
       } catch {
-        recovery.verificationFailure = { stage, httpStatus };
+        recovery.ownershipFailure = { stage, httpStatus };
+      }
+      if (verifyOriginal) {
+        try {
+          const active = await activeVersion();
+          setStage('sandbox-rollback-version-verification');
+          assert.equal(active, originalVersion, 'Sandbox rollback version disagrees.');
+          await verifySettings();
+          await publicConfig();
+          await verifyBuy();
+          const boundary = await activeVersion();
+          setStage('sandbox-rollback-final-version-check');
+          assert.equal(boundary, originalVersion, 'Sandbox deployment changed during recovery.');
+          recovery.buyHtmlUnchanged = true;
+          recovery.version = active;
+          recovery.flag = 'false';
+          recovery.closedVerified = true;
+          recovery.protectedSettingsUnchanged = true;
+        } catch {
+          recovery.verificationFailure = { stage, httpStatus };
+        }
       }
     }
     const receipt = {

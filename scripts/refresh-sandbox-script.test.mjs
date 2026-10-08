@@ -18,6 +18,8 @@ import {
 const originalVersion = '11111111-1111-4111-8111-111111111111';
 const goodVersion = '202ea7dc-1111-4111-8111-111111111111';
 const nextVersion = '22222222-2222-4222-8222-222222222222';
+const unrelatedVersion = '33333333-3333-4333-8333-333333333333';
+const fixtureTag = 'kerfdesk-sandbox-refresh-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const code = Buffer.from(
   'export class SandboxLicenseAuthority {}; export default {fetch() {return new Response("ok");}};',
 );
@@ -109,6 +111,13 @@ function harness({
   versions = [{ id: goodVersion }],
   initialSettings,
   changeVersionAtBoundary = false,
+  changeVersionAfterSettingsRead = false,
+  concurrentAfterUpload = false,
+  concurrentDuringRollbackOwnership = false,
+  postUploadGradual = false,
+  uploadOwnership = 'owned',
+  duplicateOperationTag = false,
+  loseUploadBeforeApply = false,
   sourceBytes = code,
   sourceExtra = false,
   loseUploadResponse = false,
@@ -124,6 +133,9 @@ function harness({
   let version = currentIsGood ? goodVersion : originalVersion;
   let deployedCode = currentIsGood ? code : Buffer.from('old dispatcher');
   let reads = 0;
+  let settingsReads = 0;
+  let ownershipReads = 0;
+  let uploadedTag;
   const calls = [];
   const mutations = [];
   const fetcher = async (url, init = {}) => {
@@ -135,17 +147,56 @@ function harness({
           endpoint.pathname.includes('/' + SANDBOX_WORKER + '/'),
       );
       assert.ok(!endpoint.pathname.endsWith('/kerfdesk-desktop-licensing'));
-      if (endpoint.pathname.endsWith('/settings'))
+      if (endpoint.pathname.endsWith('/settings')) {
+        settingsReads += 1;
+        if (changeVersionAfterSettingsRead && settingsReads === 2) version = unrelatedVersion;
         return failedSettingsStatus
           ? new Response(token, { status: failedSettingsStatus })
           : ok(value);
+      }
+      if (endpoint.pathname.includes('/versions/')) {
+        const selected = endpoint.pathname.split('/').at(-1);
+        assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
+        ownershipReads += 1;
+        if (selected === nextVersion && uploadOwnership === 'unavailable')
+          return new Response(token, { status: 503 });
+        const annotations =
+          selected === nextVersion && uploadedTag
+            ? uploadOwnership === 'missing'
+              ? {}
+              : { 'workers/tag': uploadOwnership === 'different-tag' ? fixtureTag : uploadedTag }
+            : { 'workers/tag': 'unrelated-operator' };
+        const result = {
+          id: uploadOwnership === 'wrong-id' ? unrelatedVersion : selected,
+          number: 3,
+          metadata: { source: 'api', created_on: '2026-10-08T00:00:00Z' },
+          annotations,
+          resources: {},
+        };
+        if (uploadOwnership === 'nested-only') {
+          result.metadata.annotations = annotations;
+          delete result.annotations;
+        }
+        if (concurrentDuringRollbackOwnership && ownershipReads === 3) version = unrelatedVersion;
+        return ok(result);
+      }
       if (endpoint.pathname.endsWith('/versions')) {
         assert.equal(endpoint.search, '?deployable=true');
-        return ok({ items: versions });
+        return ok({
+          items: [
+            ...versions,
+            ...(uploadedTag && !refuseUpload && !loseUploadBeforeApply
+              ? [{ id: nextVersion, annotations: { 'workers/tag': uploadedTag } }]
+              : []),
+            ...(duplicateOperationTag && uploadedTag
+              ? [{ id: unrelatedVersion, annotations: { 'workers/tag': uploadedTag } }]
+              : []),
+          ],
+        });
       }
       if (endpoint.pathname.endsWith('/content/v2')) {
         const selected = endpoint.searchParams.get('version');
-        assert.ok([goodVersion, originalVersion, nextVersion].includes(selected));
+        assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
         return selected === goodVersion
           ? content({ bytes: sourceBytes, extra: sourceExtra })
           : content({ bytes: deployedCode });
@@ -168,7 +219,13 @@ function harness({
           deployments: [
             {
               created_on: '2026-10-08T00:00:00Z',
-              versions: [{ version_id: version, percentage: 100 }],
+              versions:
+                postUploadGradual && uploadedTag
+                  ? [
+                      { version_id: nextVersion, percentage: 50 },
+                      { version_id: unrelatedVersion, percentage: 50 },
+                    ]
+                  : [{ version_id: version, percentage: 100 }],
             },
           ],
         });
@@ -193,11 +250,19 @@ function harness({
           );
         assert.deepEqual(payload.observability, original.observability);
         assert.deepEqual(payload.tags, original.tags);
+        assert.match(
+          payload.annotations['workers/tag'],
+          /^kerfdesk-sandbox-refresh-[0-9a-f-]{36}$/u,
+        );
+        uploadedTag = payload.annotations['workers/tag'];
         mutations.push({ method: 'PUT', payload });
+        if (loseUploadBeforeApply)
+          throw new Error('Response lost before any applied change: ' + token);
         if (refuseUpload) return new Response(token, { status: 403 });
         version = nextVersion;
         deployedCode = code;
         if (postChange) postChange(value);
+        if (concurrentAfterUpload) version = unrelatedVersion;
         if (loseUploadResponse) throw new Error('Ambiguous response with ' + token);
         return ok({ id: SANDBOX_WORKER });
       }
@@ -213,7 +278,7 @@ function harness({
         headers: { 'Content-Type': 'text/html' },
       });
     if (endpoint.pathname === '/v1/public/health') {
-      const healthy = !badHealth && [goodVersion, nextVersion].includes(version);
+      const healthy = !badHealth && [goodVersion, nextVersion, unrelatedVersion].includes(version);
       return Response.json(
         { ok: healthy },
         { status: healthy ? 200 : version === originalVersion ? 405 : 503 },
@@ -226,6 +291,7 @@ function harness({
     calls,
     mutations,
     flag: () => value.bindings.find(({ name }) => name === 'PAYMENTS_ENABLED').text,
+    version: () => version,
   };
 }
 const run = (adapter, extra = {}) =>
@@ -233,11 +299,12 @@ const run = (adapter, extra = {}) =>
 
 test('upload metadata inherits every current binding and asset, without migrations or historic settings', () => {
   const value = settings();
-  const metadata = sandboxUploadMetadata(value, originalVersion, 'worker.js');
+  const metadata = sandboxUploadMetadata(value, originalVersion, 'worker.js', fixtureTag);
   assert.equal(metadata.keep_assets, true);
   assert.equal(metadata.main_module, 'worker.js');
   assert.equal(metadata.migrations, undefined);
   assert.equal(metadata.assets, undefined);
+  assert.equal(metadata.annotations['workers/tag'], fixtureTag);
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'LICENSE_AUTHORITY'),
     { name: 'LICENSE_AUTHORITY', type: 'inherit', version_id: originalVersion },
@@ -328,6 +395,8 @@ test('refresh preserves current authority/resources/assets and verifies fresh co
   assert.equal(receipt.outcome, 'verified');
   assert.equal(receipt.sourceVersion, goodVersion);
   assert.equal(receipt.version, nextVersion);
+  assert.equal(receipt.operationVersion, nextVersion);
+  assert.equal(adapter.mutations[0].payload.annotations['workers/tag'], receipt.operationTag);
   assert.equal(receipt.flag, 'false');
   assert.equal(receipt.health, true);
   assert.equal(receipt.codeVerified, true);
@@ -446,6 +515,178 @@ test('refused upload is reconciled without printing private provider or network 
   });
   assert.equal(adapter.flag(), 'false');
 });
+test('a deployment arriving after the final settings read stops before upload', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ changeVersionAfterSettingsRead: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.failure.stage, 'sandbox-final-pre-upload-version-check');
+    return true;
+  });
+  assert.equal(adapter.mutations.length, 0);
+  assert.equal(adapter.version(), unrelatedVersion);
+});
+
+test('a concurrent post-upload deployment is left untouched even with matching code and settings', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ concurrentAfterUpload: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.failure.stage, 'sandbox-operation-ownership-verification');
+    assert.equal(error.receipt.recovery.mode, 'not-restored-unowned-deployment');
+    assert.equal(error.receipt.recovery.observedVersion, unrelatedVersion);
+    assert.equal(error.receipt.recovery.rollbackAttempted, false);
+    assert.equal(error.receipt.recovery.closedVerified, false);
+    assert.equal(error.receipt.flag, null);
+    return true;
+  });
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT'],
+  );
+  assert.equal(adapter.version(), unrelatedVersion);
+});
+
+test('a deployment arriving during rollback ownership read prevents rollback', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ badHealth: true, concurrentDuringRollbackOwnership: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(
+      error.receipt.recovery.ownershipFailure.stage,
+      'sandbox-rollback-ownership-boundary-check',
+    );
+    assert.equal(error.receipt.recovery.rollbackAttempted, false);
+    assert.equal(error.receipt.recovery.closedVerified, false);
+    return true;
+  });
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT'],
+  );
+  assert.equal(adapter.version(), unrelatedVersion);
+});
+
+test('lost upload acknowledgement never permits rollback without exact top-level version ownership', async (t) => {
+  attestFixture(t);
+  for (const uploadOwnership of [
+    'missing',
+    'different-tag',
+    'nested-only',
+    'wrong-id',
+    'unavailable',
+  ]) {
+    const adapter = harness({ loseUploadResponse: true, uploadOwnership });
+    await assert.rejects(run(adapter), (error) => {
+      assert.equal(error.receipt.uploadResponseReceived, false);
+      assert.equal(error.receipt.recovery.mode, 'not-restored-unowned-deployment');
+      assert.equal(error.receipt.recovery.rollbackAttempted, false);
+      assert.equal(error.receipt.recovery.closedVerified, false);
+      assert.equal(error.receipt.flag, null);
+      assert.ok(!JSON.stringify(error.receipt).includes(token));
+      return true;
+    });
+    assert.deepEqual(
+      adapter.mutations.map(({ method }) => method),
+      ['PUT'],
+    );
+    assert.equal(adapter.version(), nextVersion);
+  }
+});
+
+test('a lost acknowledgement followed by an unrelated deployment never reverts that deployment', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ loseUploadResponse: true, concurrentAfterUpload: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.recovery.observedVersion, unrelatedVersion);
+    assert.equal(error.receipt.recovery.rollbackAttempted, false);
+    return true;
+  });
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT'],
+  );
+  assert.equal(adapter.version(), unrelatedVersion);
+});
+
+test('owned upload with lost acknowledgement and failed health can restore the original closed version', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ loseUploadResponse: true, badHealth: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.uploadResponseReceived, false);
+    assert.equal(error.receipt.recovery.ownershipVerified, true);
+    assert.equal(error.receipt.recovery.rollbackAttempted, true);
+    assert.equal(error.receipt.recovery.closedVerified, true);
+    return true;
+  });
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT', 'POST'],
+  );
+  assert.equal(adapter.version(), originalVersion);
+});
+
+test('unapplied ambiguous upload verifies the already-original closed version without POST', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ loseUploadBeforeApply: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.recovery.mode, 'original-closed-sandbox-deployment-already-active');
+    assert.equal(error.receipt.recovery.rollbackAttempted, false);
+    assert.equal(error.receipt.recovery.closedVerified, true);
+    return true;
+  });
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT'],
+  );
+  assert.equal(adapter.version(), originalVersion);
+});
+
+test('duplicate operation tags cannot establish ownership or permit rollback', async (t) => {
+  attestFixture(t);
+  for (const loseUploadResponse of [false, true]) {
+    const adapter = harness({ duplicateOperationTag: true, loseUploadResponse });
+    await assert.rejects(run(adapter), (error) => {
+      assert.equal(
+        error.receipt.recovery.ownershipFailure.stage,
+        'sandbox-operation-uniqueness-verification',
+      );
+      assert.equal(error.receipt.recovery.rollbackAttempted, false);
+      assert.equal(error.receipt.recovery.closedVerified, false);
+      assert.equal(error.receipt.flag, null);
+      return true;
+    });
+    assert.deepEqual(
+      adapter.mutations.map(({ method }) => method),
+      ['PUT'],
+    );
+    assert.equal(adapter.version(), nextVersion);
+  }
+});
+
+test('a concurrent gradual deployment cannot establish rollback ownership', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ postUploadGradual: true });
+  await assert.rejects(run(adapter), (error) => {
+    assert.equal(error.receipt.recovery.rollbackAttempted, false);
+    assert.equal(error.receipt.recovery.closedVerified, false);
+    assert.equal(error.receipt.flag, null);
+    return true;
+  });
+  assert.deepEqual(
+    adapter.mutations.map(({ method }) => method),
+    ['PUT'],
+  );
+});
+
+test('separate refresh attempts receive distinct ownership tags', async (t) => {
+  attestFixture(t);
+  const first = harness();
+  const second = harness();
+  const one = await run(first);
+  const two = await run(second);
+  assert.notEqual(one.operationTag, two.operationTag);
+  assert.equal(first.mutations[0].payload.annotations['workers/tag'], one.operationTag);
+  assert.equal(second.mutations[0].payload.annotations['workers/tag'], two.operationTag);
+});
+
 test('preflight HTTP failure writes a redacted operator receipt without any provider mutation', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'kerfdesk-sandbox-refresh-'));
   assert.equal(dirname(resolve(directory)), resolve(tmpdir()));

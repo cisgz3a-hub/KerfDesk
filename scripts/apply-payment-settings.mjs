@@ -1,6 +1,6 @@
 // Operator-only flag change. No code upload, secret retrieval or merchant request.
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -133,9 +133,14 @@ function protectedFingerprint(settings) {
   return hash(canonicalJson({ bindings, fields }));
 }
 
-export function flagMetadata(settings, version, enabled) {
+export function flagMetadata(settings, version, enabled, operationTag) {
   assert.ok(uuid.test(version), 'Active Worker version unavailable.');
   assert.ok(['true', 'false'].includes(enabled), 'Invalid payment flag.');
+  if (operationTag !== undefined)
+    assert.ok(
+      typeof operationTag === 'string' && /^[A-Za-z0-9_-]{1,64}$/u.test(operationTag),
+      'Invalid payment operation tag.',
+    );
   const fields = Object.fromEntries(
     configurationKeys
       .filter((key) => settings[key] !== undefined)
@@ -144,6 +149,7 @@ export function flagMetadata(settings, version, enabled) {
   return {
     ...fields,
     annotations: {
+      ...(operationTag === undefined ? {} : { 'workers/tag': operationTag }),
       'workers/message': `${enabled === 'true' ? 'Enable' : 'Close'} authorised checkout; preserve code and authority`,
     },
     bindings: settings.bindings.map(({ name }) =>
@@ -156,6 +162,8 @@ export function flagMetadata(settings, version, enabled) {
 
 export async function applyPaymentFlag({ targetName, state, token, output }, fetcher = fetch) {
   const target = TARGETS[targetName];
+  const started = Date.now();
+  let recovering = false;
   let stage = 'operation-validation';
   let httpStatus = null;
   let before;
@@ -166,9 +174,15 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
   let version;
   let mutationAttempted = false;
   let patchResponseReceived = false;
+  const operationTag = 'payment-flag-' + randomUUID();
   const setStage = (value) => {
     stage = value;
     httpStatus = null;
+  };
+  const signal = (requestLimit) => {
+    const remaining = started + (recovering ? 240000 : 180000) - Date.now();
+    assert.ok(remaining > 0, 'Operator verification time budget exhausted.');
+    return AbortSignal.timeout(Math.min(requestLimit, remaining));
   };
   const base =
     'https://api.cloudflare.com/client/v4/accounts/' +
@@ -181,7 +195,7 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
       ...init,
       headers: { Authorization: 'Bearer ' + token, ...init.headers },
       redirect: 'error',
-      signal: AbortSignal.timeout(30000),
+      signal: signal(30000),
     });
     httpStatus = response.status;
     assert.ok(response.ok, 'Cloudflare request failed.');
@@ -204,12 +218,34 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
     assert.ok(uuid.test(current), 'Active Worker version unavailable.');
     return current;
   };
+  const verifyOperationVersion = async (current) => {
+    // Version annotations are top-level in Cloudflare's ApiVersion contract.
+    const value = await api('/versions/' + current);
+    setStage('operation-version-ownership-verification');
+    assert.equal(value?.id, current, 'Wrong Worker version metadata.');
+    assert.equal(
+      value.annotations?.['workers/tag'],
+      operationTag,
+      'Active Worker version belongs to another operation.',
+    );
+    const result = await api('/versions?deployable=true');
+    setStage('operation-version-uniqueness-verification');
+    assert.ok(Array.isArray(result?.items), 'Deployable Worker versions unavailable.');
+    const matches = result.items.filter(
+      (item) => item.annotations?.['workers/tag'] === operationTag,
+    );
+    assert.equal(matches.length, 1, 'Worker operation ownership is ambiguous.');
+    assert.equal(matches[0].id, current, 'Operation tag belongs to another Worker version.');
+    const boundaryVersion = await activeVersion();
+    setStage('operation-deployment-verification');
+    assert.equal(boundaryVersion, current, 'Active Worker version changed during ownership check.');
+  };
   const codeFingerprint = async () => {
     setStage('cloudflare-content-get');
     const response = await fetcher(base + '/content/v2', {
       headers: { Authorization: 'Bearer ' + token },
       redirect: 'error',
-      signal: AbortSignal.timeout(30000),
+      signal: signal(30000),
     });
     httpStatus = response.status;
     assert.ok(response.ok, 'Worker content unavailable.');
@@ -270,7 +306,7 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
     const form = new FormData();
     form.set(
       'settings',
-      new Blob([JSON.stringify(flagMetadata(before, originalVersion, requested))], {
+      new Blob([JSON.stringify(flagMetadata(before, originalVersion, requested, operationTag))], {
         type: 'application/json',
       }),
       'settings.json',
@@ -302,7 +338,7 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
     const response = await fetcher(target.origin + '/v1/public/config', {
       redirect: 'error',
       cache: 'no-store',
-      signal: AbortSignal.timeout(15000),
+      signal: signal(15000),
     });
     httpStatus = response.status;
     assert.equal(response.status, 200, 'Public payment configuration unavailable.');
@@ -330,7 +366,7 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
     const response = await fetcher(target.origin + '/v1/public/health', {
       redirect: 'error',
       cache: 'no-store',
-      signal: AbortSignal.timeout(15000),
+      signal: signal(15000),
     });
     httpStatus = response.status;
     assert.equal(response.status, 200, 'Public licence health unavailable.');
@@ -346,6 +382,7 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
     operation: ['inspect', 'open', 'close'].includes(state) ? state : null,
     mutationAttempted,
     patchResponseReceived,
+    operationTag: mutationAttempted ? operationTag : null,
     mutated: patchResponseReceived ? true : mutationAttempted ? null : false,
     originalFlag: originalFlag ?? null,
     flag: requested ?? null,
@@ -388,9 +425,15 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
       );
       await patchFlag();
       version = await verifyWorker(requested);
+      await verifyOperationVersion(version);
     }
     const config = await verifyPublicConfig(requested);
     await verifyHealth();
+    if (mutationAttempted) {
+      const boundaryVersion = await activeVersion();
+      setStage('operation-deployment-verification');
+      assert.equal(boundaryVersion, version, 'Active Worker version changed during public checks.');
+    }
     const receipt = {
       ...receiptFields(),
       outcome: 'verified',
@@ -411,38 +454,64 @@ export async function applyPaymentFlag({ targetName, state, token, output }, fet
     const failure = { stage, httpStatus };
     const recovery = { mode: 'not-needed', verified: false };
     if (mutationAttempted) {
-      if (requested === 'true' && originalFlag === 'false') {
-        recovery.mode = 'restore-original-disabled-deployment';
-        recovery.requestAcknowledged = false;
-        try {
-          await api('/deployments', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              strategy: 'percentage',
-              versions: [{ version_id: originalVersion, percentage: 100 }],
-            }),
-          });
-          recovery.requestAcknowledged = true;
-        } catch {
-          recovery.requestFailure = { stage, httpStatus };
-        }
-      } else {
-        // Closing must never restore a version whose checkout flag was enabled.
-        recovery.mode = 'keep-checkout-closed';
-      }
+      recovering = true;
+      recovery.mode =
+        requested === 'true' && originalFlag === 'false'
+          ? 'preserve-unverified-deployment'
+          : 'keep-checkout-closed';
       try {
-        recovery.version = await verifyWorker(
-          'false',
-          recovery.mode === 'restore-original-disabled-deployment' ? originalVersion : undefined,
-        );
+        const current = await activeVersion();
+        recovery.observedVersion = current;
+        let expectedVersion = current;
+        if (requested === 'true' && originalFlag === 'false') {
+          if (current === originalVersion) {
+            // A refused or unacknowledged PATCH may already leave the original closed.
+            recovery.mode = 'verify-original-disabled-deployment';
+          } else {
+            recovery.mode = 'verify-operation-ownership';
+            recovery.ownershipVerified = false;
+            await verifyOperationVersion(current);
+            recovery.ownershipVerified = true;
+            recovery.mode = 'restore-original-disabled-deployment';
+            recovery.requestAttempted = true;
+            recovery.requestAcknowledged = false;
+            try {
+              await api('/deployments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  strategy: 'percentage',
+                  versions: [{ version_id: originalVersion, percentage: 100 }],
+                }),
+              });
+              recovery.requestAcknowledged = true;
+            } catch {
+              recovery.requestFailure = { stage, httpStatus };
+            }
+          }
+          expectedVersion = originalVersion;
+        } else {
+          // Closing must never restore a version whose checkout flag was enabled.
+          recovery.mode = 'keep-checkout-closed';
+          if (current !== originalVersion) await verifyOperationVersion(current);
+        }
+        recovery.version = await verifyWorker('false', expectedVersion);
         recovery.flag = 'false';
         recovery.workerVerified = true;
         recovery.publicConfigEnabled = (await verifyPublicConfig('false')).enabled;
         await verifyHealth();
         recovery.health = true;
+        const boundaryVersion = await activeVersion();
+        setStage('recovery-deployment-verification');
+        assert.equal(
+          boundaryVersion,
+          expectedVersion,
+          'Active Worker version changed during recovery.',
+        );
         recovery.verified = true;
       } catch {
+        if (recovery.mode === 'verify-operation-ownership')
+          recovery.mode = 'preserve-unverified-deployment';
         recovery.verificationFailure = { stage, httpStatus };
       }
     }
