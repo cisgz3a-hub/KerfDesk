@@ -355,17 +355,7 @@ async function runOwnedIntentionalDisconnect(
     await closeConnectionOnce(refs, connection, request.forgetRequested);
   } catch (error) {
     closeError = error;
-    if (refs.connection === connection) {
-      const message = error instanceof Error ? error.message : String(error);
-      set((state) =>
-        publishControllerIncident(
-          refs,
-          state,
-          `[lf2] Controller close failed: ${message}`,
-          'disconnect',
-        ),
-      );
-    }
+    reportOwnedConnectionCloseFailure(set, refs, connection, error);
     disconnectFailed = true;
     retainedSafetyNotice = currentSafetyNotice() ?? writeFailedNotice('disconnect');
     set({ safetyNotice: retainedSafetyNotice });
@@ -393,6 +383,24 @@ async function runOwnedIntentionalDisconnect(
   if (closeError !== null) {
     throw closeError instanceof Error ? closeError : new Error(String(closeError));
   }
+}
+
+function reportOwnedConnectionCloseFailure(
+  set: SetFn,
+  refs: LiveRefs,
+  connection: LiveConnection,
+  error: unknown,
+): void {
+  if (refs.connection !== connection) return;
+  const message = error instanceof Error ? error.message : String(error);
+  set((state) =>
+    publishControllerIncident(
+      refs,
+      state,
+      `[lf2] Controller close failed: ${message}`,
+      'disconnect',
+    ),
+  );
 }
 
 function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: SafeWriteFn): void {

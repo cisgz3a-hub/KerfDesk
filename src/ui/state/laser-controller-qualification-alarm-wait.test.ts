@@ -14,6 +14,7 @@ import {
   type ControllerQualificationScheduleRefs,
 } from './laser-controller-qualification';
 import type { LaserState } from './laser-store';
+import { initialLaserState } from './laser-store-helpers';
 
 type Harness = {
   state: LaserState;
@@ -30,6 +31,7 @@ function harness(): Harness {
   const run = vi.fn(async () => undefined);
   const h = {
     state: {
+      ...initialLaserState(),
       connection: { kind: 'connected' },
       controllerSessionEpoch: 4,
       controllerQualification: qualifyingController(4, 'reset-cleanup'),
@@ -84,6 +86,7 @@ describe('qualification while the controller waits for the operator', () => {
       report(h, 'Alarm');
     }
     expect(h.state.controllerQualification.kind).toBe('qualifying');
+    expect(h.state.incidentHistory).toHaveLength(0);
     expect(h.run).not.toHaveBeenCalled();
 
     report(h, 'Idle');
@@ -100,6 +103,8 @@ describe('qualification while the controller waits for the operator', () => {
     await vi.advanceTimersByTimeAsync(20_000);
 
     expect(h.state.controllerQualification.kind).toBe('failed');
+    expect(h.state.incidentHistory).toHaveLength(1);
+    expect(h.state.incidentHistory?.[0]?.raw).toContain('Controller information refresh timed out');
   });
 
   it('hands a handshake ended by an in-session Alarm to the scheduler', async () => {
@@ -161,6 +166,7 @@ describe('qualification while the controller waits for the operator', () => {
         await vi.advanceTimersByTimeAsync(1_000);
       }
       expect(h.state.controllerQualification.kind).toBe('qualifying');
+      expect(h.state.incidentHistory).toHaveLength(0);
 
       report(h, 'Idle');
       await vi.advanceTimersByTimeAsync(100);
@@ -186,9 +192,12 @@ describe('qualification while the controller waits for the operator', () => {
       await vi.advanceTimersByTimeAsync(1_000);
     }
     expect(h.state.controllerQualification.kind).toBe('qualifying');
+    expect(h.state.incidentHistory).toHaveLength(0);
 
     await vi.advanceTimersByTimeAsync(9_000);
     expect(h.state.controllerQualification.kind).toBe('failed');
+    expect(h.state.incidentHistory).toHaveLength(1);
+    expect(h.state.incidentHistory?.[0]?.raw).toContain('Controller information refresh timed out');
   });
 
   it('leaves a different connection or session alone', () => {

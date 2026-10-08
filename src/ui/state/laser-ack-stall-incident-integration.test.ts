@@ -6,13 +6,14 @@ import { createLaserStoreRefs } from './laser-store-refs';
 import { initialLaserState } from './laser-store-helpers';
 import { beginJobTransportWrite } from './laser-job-transport-ledger';
 import { runGrblDisconnectTransaction } from './laser-disconnect-transaction';
+import type * as DisconnectTransaction from './laser-disconnect-transaction';
 import { acknowledgementStalledNotice, writeFailedNotice } from './laser-safety-notice';
 import { containStalledStreamAcknowledgements } from './laser-stream-heartbeat-containment';
 
 // Exercise real containment/publication with isolated state and the real local ledger.
 // The reset transaction is a boundary spy; upstream reset/cleanup suites exercise its wire flow.
 vi.mock('./laser-disconnect-transaction', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./laser-disconnect-transaction')>();
+  const actual = await importOriginal<typeof DisconnectTransaction>();
   return { ...actual, runGrblDisconnectTransaction: vi.fn(async () => undefined) };
 });
 
@@ -57,6 +58,14 @@ function stalledHarness(driver: ControllerDriver = grblDriver) {
   return { ...harness, refs, safeWrite };
 }
 
+function retainedIncident(harness: ReturnType<typeof stalledHarness>) {
+  const entries = harness.get().incidentHistory;
+  expect(entries).toHaveLength(1);
+  const entry = entries?.[0];
+  if (entry === undefined) throw new Error('Expected the retained ACK-stall incident');
+  return entry;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(Date, 'now').mockReturnValue(AT);
@@ -75,7 +84,7 @@ describe('upstream acknowledgement-stall retained incident integration', () => {
     expect(state.streamer?.status).toBe('errored');
     expect(state.streamReset).not.toBeNull();
     expect(state.incidentHistory).toHaveLength(1);
-    const entry = state.incidentHistory[0];
+    const entry = retainedIncident(harness);
     expect(entry).toMatchObject({
       id: 70,
       at: AT,
@@ -126,7 +135,7 @@ describe('upstream acknowledgement-stall retained incident integration', () => {
     });
     harness.refs.writeEpoch = (harness.refs.writeEpoch ?? 0) + 1;
     beginJobTransportWrite(harness.refs);
-    expect(harness.get().incidentHistory[0]).toBe(entry);
+    expect(harness.get().incidentHistory?.[0]).toBe(entry);
     expect(entry.incidentContext?.controller.sessionEpoch).toBe(41);
     expect(entry.incidentContext?.run).toMatchObject({
       id: 'ack-stall-original-run',
@@ -142,7 +151,7 @@ describe('upstream acknowledgement-stall retained incident integration', () => {
   it('publishes one occurrence when repeated containment calls see the same stalled sender', () => {
     const harness = stalledHarness();
     containStalledStreamAcknowledgements(harness.set, harness.refs, harness.safeWrite);
-    const entry = harness.get().incidentHistory[0];
+    const entry = retainedIncident(harness);
     containStalledStreamAcknowledgements(harness.set, harness.refs, harness.safeWrite);
     expect(harness.get().incidentHistory).toEqual([entry]);
     expect(harness.get().transcript.filter((row) => row.incident)).toEqual([entry]);
@@ -157,8 +166,8 @@ describe('upstream acknowledgement-stall retained incident integration', () => {
     containStalledStreamAcknowledgements(harness.set, harness.refs, harness.safeWrite);
     expect(harness.get().safetyNotice).toBe(precedingNotice);
     expect(harness.get().incidentHistory).toHaveLength(1);
-    expect(harness.get().incidentHistory[0].raw).toBe(acknowledgementStalledNotice(true).message);
-    expect(harness.get().incidentHistory[0].raw).not.toBe(precedingNotice.message);
+    expect(retainedIncident(harness).raw).toBe(acknowledgementStalledNotice(true).message);
+    expect(retainedIncident(harness).raw).not.toBe(precedingNotice.message);
   });
 
   it.each([
@@ -197,7 +206,7 @@ describe('upstream acknowledgement-stall retained incident integration', () => {
     expect(runGrblDisconnectTransaction).not.toHaveBeenCalled();
     expect(harness.get().streamer?.status).toBe('errored');
     expect(harness.get().incidentHistory).toHaveLength(1);
-    expect(harness.get().incidentHistory[0]).toMatchObject({
+    expect(retainedIncident(harness)).toMatchObject({
       raw: acknowledgementStalledNotice(false).message,
       incidentContext: {
         controller: { selectedKind: 'marlin' },

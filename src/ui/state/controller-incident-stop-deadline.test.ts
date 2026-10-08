@@ -16,7 +16,7 @@ describe('D1 distinct owned failures with equal diagnostic text', () => {
   afterEach(endCaptureTest);
 
   it('retains a later cleanup deadline even when an earlier real write rejection had the same reason', async () => {
-    const message = 'Serial write timed out during controller disconnect.';
+    const message = 'Serial write timed out during controller reset.';
     let failConsole = false;
     let hangCleanup = false;
     let finishCleanup: () => void = () => undefined;

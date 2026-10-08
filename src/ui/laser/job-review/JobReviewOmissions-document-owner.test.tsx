@@ -135,7 +135,9 @@ function selectedIds(): string[] {
 function assertCorrespondence(model: JobReviewModel, machine: Machine): void {
   const sources = omission(model, machine);
   expect(
-    matchingReviewArtworkIds(sources.sources, useStore.getState().project.scene.objects).sort(),
+    [
+      ...matchingReviewArtworkIds(sources.sources, useStore.getState().project.scene.objects),
+    ].sort(),
   ).toEqual([...sources.objectIds].sort());
 }
 function expectNoHardware(): void {
