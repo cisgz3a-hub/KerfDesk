@@ -269,6 +269,10 @@ function axisTriad(three: ThreeModule, CSS2DObject: CSS2DObjectCtor, length: num
   ] as const) {
     const material = new three.MeshBasicMaterial({
       color: AXIS_COLORS[name],
+      // Foreground furniture must sort after the planar toolpath queue.
+      transparent: true,
+      blending: three.NoBlending,
+      depthWrite: false,
       depthTest: false,
       toneMapped: false,
     });
@@ -300,9 +304,17 @@ function axisTriad(three: ThreeModule, CSS2DObject: CSS2DObjectCtor, length: num
   }
   const dot = new three.Mesh(
     new three.SphereGeometry(length * 0.05, 16, 12),
-    new three.MeshBasicMaterial({ color: 0xe8e4de, depthTest: false, toneMapped: false }),
+    new three.MeshBasicMaterial({
+      color: 0xe8e4de,
+      transparent: true,
+      blending: three.NoBlending,
+      depthWrite: false,
+      depthTest: false,
+      toneMapped: false,
+    }),
   );
-  dot.renderOrder = 10;
+  // Retain the origin dot in front of the Z arrow when viewed from Top.
+  dot.renderOrder = 11;
   group.add(dot);
   return group;
 }

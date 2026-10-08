@@ -27,6 +27,7 @@ export function createCurrentMove(
     ToolpathBuildArgs,
     'three' | 'LineSegments2' | 'LineSegmentsGeometry' | 'LineMaterial' | 'theme'
   > & { readonly viewWidth: number; readonly viewHeight: number },
+  planar: boolean,
 ): CurrentMove {
   const geometry = new args.LineSegmentsGeometry();
   geometry.setPositions(new Float32Array(6));
@@ -38,7 +39,18 @@ export function createCurrentMove(
     { color: CASING, linewidth: CASING_PX, depthWrite: false },
     { color: args.theme.arrow, linewidth: CORE_PX },
   ].map((stroke, order) => {
-    const material = new args.LineMaterial(stroke);
+    const material = new args.LineMaterial({
+      // The flat toolpath shares one ordered draw queue. Its different stroke
+      // directions must not occlude each other through slope-dependent depth.
+      transparent: planar,
+      blending: planar ? args.three.NoBlending : args.three.NormalBlending,
+      depthWrite: !planar,
+      ...stroke,
+      // Keep depth testing against scene geometry, with a small work-plane bias.
+      polygonOffset: planar,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+    });
     material.toneMapped = false;
     material.resolution.set(args.viewWidth, args.viewHeight);
     const line = new args.LineSegments2(geometry, material);

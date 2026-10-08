@@ -2,7 +2,8 @@
 // line; Studio dashes it so a rapid never reads as a cut, whatever the lens.
 
 import type * as ThreeNamespace from 'three';
-import { TRAVEL_OPACITY, type TravelLine } from './scene-toolpath';
+import { TRAVEL_OPACITY, type RevealTargets, type TravelLine } from './scene-toolpath';
+import { planarTravelOpacity } from './planar-path-density';
 import { STUDIO_TRAVEL_COLOR, type Viewer3dLook } from './viewer3d-look';
 import type { Viewer3dTheme } from './viewer3d-theme';
 
@@ -33,6 +34,8 @@ export function applyTravelLook(
       transparent: true,
       opacity: STUDIO_TRAVEL_OPACITY,
       toneMapped: false,
+      depthWrite: false,
+      depthFunc: three.LessDepth,
     });
     if (!line.geometry.hasAttribute('lineDistance')) line.computeLineDistances();
   } else {
@@ -41,7 +44,30 @@ export function applyTravelLook(
       transparent: true,
       opacity: TRAVEL_OPACITY,
       toneMapped: false,
+      depthWrite: false,
+      depthFunc: three.LessDepth,
     });
   }
   previous.dispose();
+}
+
+/** Dense flat travel stays recessive as the view zooms and changes look. */
+export function applyTravelDensity(
+  targets: RevealTargets | null,
+  line: TravelLine | null,
+  look: Viewer3dLook,
+  mmPerPixel: number,
+): void {
+  if (targets === null) return;
+  const opacity = look === 'studio' ? STUDIO_TRAVEL_OPACITY : TRAVEL_OPACITY;
+  if (line !== null) {
+    line.material.opacity = planarTravelOpacity(targets.planarDensity, mmPerPixel, opacity);
+  }
+  if (targets.travelGhost !== null) {
+    targets.travelGhost.material.opacity = planarTravelOpacity(
+      targets.planarDensity,
+      mmPerPixel,
+      0.1,
+    );
+  }
 }
