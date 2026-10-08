@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { spawnSync } from 'node:child_process';
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 import {
   FIXTURE_NAME,
   CURRENT_QUALIFICATION_PROJECT_SCHEMA,
   HISTORICAL_QUALIFICATION_PROJECT_SCHEMA,
 } from './installed-app-evidence.mjs';
-import { validateUpgradeProject } from './verify-upgrade-project.mjs';
+import { readUpgradeProjectSchema, validateUpgradeProject } from './verify-upgrade-project.mjs';
 
 const historicalFixture = {
   schemaVersion: HISTORICAL_QUALIFICATION_PROJECT_SCHEMA,
@@ -175,5 +178,204 @@ test('known upgrade preserves schema 13/14 saves and verifies their migration to
       () => validateUpgradeProject(encoded(machine), previous, knownUpgrade),
       /Saved machine/,
     );
+  }
+});
+
+test('the authenticated installed writer fences each phase while keeping historical sources admissible', () => {
+  for (const schemaVersion of [12, 14]) {
+    const old = { ...historicalFixture, schemaVersion };
+    assert.deepEqual(
+      validateUpgradeProject(encoded(old), old, {
+        ...knownUpgrade,
+        expectedSchemaVersion: schemaVersion,
+      }),
+      old,
+    );
+    assert.deepEqual(
+      validateUpgradeProject(encoded(fixture), old, {
+        ...knownUpgrade,
+        expectedSchemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+      }),
+      fixture,
+    );
+    assert.throws(
+      () =>
+        validateUpgradeProject(encoded(old), old, {
+          ...knownUpgrade,
+          expectedSchemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+        }),
+      /differs from the authenticated installed writer/,
+    );
+  }
+  for (const expectedSchemaVersion of [0, 1.5, '15', null, NaN, Infinity])
+    assert.throws(
+      () =>
+        validateUpgradeProject(encoded(fixture), undefined, {
+          ...knownUpgrade,
+          expectedSchemaVersion,
+        }),
+      /writer schema is invalid/,
+    );
+});
+
+test('qualification retains admitted optimization and parked CNC values through schema migration', () => {
+  const previous = {
+    ...historicalFixture,
+    schemaVersion: 14,
+    optimization: {
+      reduceTravelMoves: true,
+      travelPolicy: 'nearest-neighbor',
+      insideFirst: true,
+      removeOverlappingLines: false,
+      layerPriority: 'project-order',
+      pathDirection: 'allow-reverse',
+      startPoint: 'machine-origin',
+      closedShapeStart: 'drawn',
+    },
+    parkedCncMachine: {
+      kind: 'cnc',
+      stock: { thicknessMm: 18, widthMm: 321, heightMm: 234, originOffset: { x: 2, y: 3 } },
+      tools: [{ id: 'retained-tool', name: 'Retained tool', kind: 'end-mill', diameterMm: 3.175 }],
+      toolId: 'retained-tool',
+      params: { safeZMm: 12, spindleMaxRpm: 12000, spindleSpinupSec: 3, coolant: 'off' },
+    },
+  };
+  const current = { ...previous, schemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA };
+  const options = { ...knownUpgrade, expectedSchemaVersion: CURRENT_QUALIFICATION_PROJECT_SCHEMA };
+  assert.deepEqual(validateUpgradeProject(encoded(current), previous, options), current);
+  const changedOptimization = structuredClone(current);
+  changedOptimization.optimization.insideFirst = false;
+  assert.throws(
+    () => validateUpgradeProject(encoded(changedOptimization), previous, options),
+    /Saved optimization settings changed/,
+  );
+  const lostParked = structuredClone(current);
+  delete lostParked.parkedCncMachine;
+  assert.throws(
+    () => validateUpgradeProject(encoded(lostParked), previous, options),
+    /Saved parked CNC machine configuration changed/,
+  );
+  const changedParked = structuredClone(current);
+  changedParked.parkedCncMachine.params.safeZMm = 1;
+  assert.throws(
+    () => validateUpgradeProject(encoded(changedParked), previous, options),
+    /Saved parked CNC machine configuration changed/,
+  );
+});
+
+test('schema discovery reads the exact installed source without evaluating it', async () => {
+  const sourceSha = 'a'.repeat(40);
+  for (const schemaVersion of [12, 14, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
+    const schema = await readUpgradeProjectSchema(
+      sourceSha,
+      '/review-root',
+      async (file, args, options) => {
+        assert.equal(file, 'git');
+        assert.deepEqual(args, ['show', `${sourceSha}:src/core/scene/project.ts`]);
+        assert.equal(options.cwd, '/review-root');
+        assert.equal(options.windowsHide, true);
+        return {
+          stdout: `throw new Error('Never evaluate historical source');\r\nexport const PROJECT_SCHEMA_VERSION = ${schemaVersion} as const;\r\n`,
+        };
+      },
+    );
+    assert.equal(schema, schemaVersion);
+  }
+});
+
+test('schema discovery refuses missing, ambiguous and malformed writer declarations', async () => {
+  for (const stdout of [
+    '',
+    'export const PROJECT_SCHEMA_VERSION = 14 as const;\nexport const PROJECT_SCHEMA_VERSION = 15 as const;\n',
+    'export const PROJECT_SCHEMA_VERSION = 15.5 as const;\n',
+    'export const PROJECT_SCHEMA_VERSION = "15" as const;\n',
+    'export const PROJECT_SCHEMA_VERSION = 0 as const;\n',
+    'export const PROJECT_SCHEMA_VERSION = 9007199254740992 as const;\n',
+  ])
+    await assert.rejects(
+      readUpgradeProjectSchema('a'.repeat(40), '/review-root', async () => ({ stdout })),
+      /writer schema/,
+    );
+  await assert.rejects(readUpgradeProjectSchema('main'), /exact installed source/);
+  await assert.rejects(
+    readUpgradeProjectSchema('a'.repeat(40), '/review-root', async () => {
+      throw new Error('Historical source is missing from qualification checkout');
+    }),
+    /Historical source is missing/,
+  );
+});
+
+test('the actual CLI fences the saved schema against each installed source in local Git history', async () => {
+  const temp = await mkdtemp(join(tmpdir(), 'kerfdesk-upgrade-writer-'));
+  try {
+    await mkdir(join(temp, 'scripts'));
+    await mkdir(join(temp, 'src/core/scene'), { recursive: true });
+    for (const name of ['verify-upgrade-project.mjs', 'installed-app-evidence.mjs'])
+      await copyFile(new URL(`./${name}`, import.meta.url), join(temp, 'scripts', name));
+    const script = join(temp, 'scripts', 'verify-upgrade-project.mjs');
+    const git = (...args) => {
+      const result = spawnSync(
+        'git',
+        [
+          '-c',
+          'user.name=Qualification fixture',
+          '-c',
+          'user.email=qualification@example.invalid',
+          '-c',
+          'commit.gpgSign=false',
+          ...args,
+        ],
+        { cwd: temp, encoding: 'utf8' },
+      );
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, result.stderr);
+      return result.stdout.trim();
+    };
+    git('init', '--quiet');
+    const sourceCommits = {};
+    for (const schemaVersion of [14, CURRENT_QUALIFICATION_PROJECT_SCHEMA]) {
+      await writeFile(
+        join(temp, 'src/core/scene/project.ts'),
+        `export const PROJECT_SCHEMA_VERSION = ${schemaVersion} as const;\n`,
+      );
+      git('add', '--', 'src/core/scene/project.ts');
+      git('commit', '--quiet', '-m', `Writer schema ${schemaVersion}`);
+      sourceCommits[schemaVersion] = git('rev-parse', 'HEAD');
+    }
+    const oldPath = join(temp, 'historical project.lf2');
+    const currentPath = join(temp, 'current project.lf2');
+    await writeFile(currentPath, encoded(fixture));
+    const cli = (...args) => {
+      const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+      assert.ifError(result.error);
+      return result;
+    };
+    for (const schemaVersion of [12, 14]) {
+      await writeFile(oldPath, encoded({ ...historicalFixture, schemaVersion }));
+      const historical = cli(oldPath, oldPath);
+      assert.equal(historical.status, 0, historical.stderr);
+      const candidate = cli(
+        '--expected-source',
+        sourceCommits[CURRENT_QUALIFICATION_PROJECT_SCHEMA],
+        currentPath,
+        oldPath,
+      );
+      assert.equal(candidate.status, 0, candidate.stderr);
+      const stale = cli(
+        '--expected-source',
+        sourceCommits[CURRENT_QUALIFICATION_PROJECT_SCHEMA],
+        oldPath,
+        oldPath,
+      );
+      assert.equal(stale.status, 1);
+      assert.match(stale.stderr, /differs from the authenticated installed writer/);
+    }
+    const baseline = cli('--expected-source', sourceCommits[14], oldPath, oldPath);
+    assert.equal(baseline.status, 0, baseline.stderr);
+    const wrongBaselineWriter = cli('--expected-source', sourceCommits[14], currentPath, oldPath);
+    assert.equal(wrongBaselineWriter.status, 1);
+    assert.match(wrongBaselineWriter.stderr, /differs from the authenticated installed writer/);
+  } finally {
+    await rm(temp, { recursive: true, force: true });
   }
 });
