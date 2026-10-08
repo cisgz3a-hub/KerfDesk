@@ -62,3 +62,10 @@ Recovery verifies the active UUID and unique matching annotation before restorin
 the original closed version. An unrelated or ambiguous deployment is left intact
 and reported unverified. Request deadlines reserve recovery time within the job;
 the final version read and deployment write remain separate provider requests.
+
+A rejected upload may record bounded numeric Cloudflare error codes, fixed error
+categories and known binding or JavaScript exception names. Metadata diagnostics
+record only allowlisted field names and value types. Provider messages, response
+bodies, source code and credentials are never copied into receipts or logs. This
+adds diagnosis only; the attested code, binding inheritance and ownership guards
+remain unchanged.

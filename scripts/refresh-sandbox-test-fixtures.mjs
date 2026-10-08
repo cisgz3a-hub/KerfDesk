@@ -121,6 +121,8 @@ export function harness({
   readbackRawHeader = null,
   loseUploadResponse = false,
   refuseUpload = false,
+  uploadErrorBody,
+  uploadErrorAfterApply = false,
   postChange,
   badHealth = false,
   changedBuy = false,
@@ -278,13 +280,17 @@ export function harness({
         mutations.push({ method: 'PUT', payload });
         if (loseUploadBeforeApply)
           throw new Error('Response lost before any applied change: ' + token);
-        if (refuseUpload) return new Response(token, { status: 403 });
+        if (refuseUpload)
+          return uploadErrorBody
+            ? Response.json(uploadErrorBody, { status: 400 })
+            : new Response(token, { status: 403 });
         version = nextVersion;
         deployedCode = code;
         deployedName = payload.main_module;
         if (postChange) postChange(value);
         if (concurrentAfterUpload) version = unrelatedVersion;
         if (loseUploadResponse) throw new Error('Ambiguous response with ' + token);
+        if (uploadErrorAfterApply) return Response.json(uploadErrorBody, { status: 400 });
         return ok({ id: SANDBOX_WORKER });
       }
       throw new Error('Unexpected sandbox API destination.');

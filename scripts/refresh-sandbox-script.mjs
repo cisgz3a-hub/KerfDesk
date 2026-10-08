@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { ACCOUNT, flagMetadata, guardedSettings } from './apply-payment-settings.mjs';
 import { readRetainedSandboxBundle } from './retained-sandbox-bundle.mjs';
+import { readCloudflareFailure } from './cloudflare-error-diagnostics.mjs';
 
 export const SANDBOX_WORKER = 'kerfdesk-desktop-licensing-sandbox';
 export const SANDBOX_ORIGIN = 'https://kerfdesk-desktop-licensing-sandbox.cisgz3a.workers.dev';
@@ -205,6 +206,7 @@ export async function refreshSandboxScript(
   let originalBuy;
   let module;
   let moduleFormatFailure;
+  let apiFailure;
   let mutationAttempted = false;
   let uploadResponseReceived = false;
   const setStage = (value) => {
@@ -225,6 +227,10 @@ export async function refreshSandboxScript(
       signal: signal(),
     });
     httpStatus = response.status;
+    if (!response.ok && !apiFailure) {
+      const diagnostic = await readCloudflareFailure(response, init?.body);
+      apiFailure = { stage: label, httpStatus: response.status, ...diagnostic };
+    }
     assert.ok(response.ok, 'Cloudflare request failed.');
     return response;
   };
@@ -383,6 +389,7 @@ export async function refreshSandboxScript(
     mutated: uploadResponseReceived ? true : mutationAttempted ? null : false,
     realMoneyTransaction: false,
     productionCalls: false,
+    ...(apiFailure ? { apiFailure } : {}),
   });
   const save = async (receipt) => {
     if (!output) return;
