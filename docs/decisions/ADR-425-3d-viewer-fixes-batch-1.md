@@ -105,7 +105,9 @@ refreshes. CNC and unknown-file travel defaults stay visible. Flat XY paths use 
 strokes. Travel opacity scales with travel length per bounding area, the camera's millimetres per
 pixel and the XY plane's projected angle, returning to its normal opacity as zoom separates the moves.
 Coplanar travel and faint future paths use a strict depth test and never write depth over completed cuts. A small polygon depth bias
-keeps flat cutting strokes ahead of coplanar native travel lines despite GPU rounding. Every segment
+keeps flat cutting strokes ahead of coplanar native travel lines despite GPU rounding. Both active
+playback strokes use a stronger flat-path bias so retraces and crossings stay bold; depth testing
+still lets nearer geometry occlude a 3D move. Every segment
 and its source mapping remains available to playback and picking. Geometry, emitted output and controller
 behaviour are unchanged. Both Classic and Studio apply the same visibility rule.
 

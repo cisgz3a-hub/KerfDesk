@@ -27,6 +27,7 @@ export function createCurrentMove(
     ToolpathBuildArgs,
     'three' | 'LineSegments2' | 'LineSegmentsGeometry' | 'LineMaterial' | 'theme'
   > & { readonly viewWidth: number; readonly viewHeight: number },
+  planar: boolean,
 ): CurrentMove {
   const geometry = new args.LineSegmentsGeometry();
   geometry.setPositions(new Float32Array(6));
@@ -38,7 +39,14 @@ export function createCurrentMove(
     { color: CASING, linewidth: CASING_PX, depthWrite: false },
     { color: args.theme.arrow, linewidth: CORE_PX },
   ].map((stroke, order) => {
-    const material = new args.LineMaterial(stroke);
+    const material = new args.LineMaterial({
+      ...stroke,
+      // Both strokes sit ahead of the completed flat cuts' (-1, -1) bias.
+      // Keep depth testing so nearer geometry still occludes a 3D move.
+      polygonOffset: planar,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
+    });
     material.toneMapped = false;
     material.resolution.set(args.viewWidth, args.viewHeight);
     const line = new args.LineSegments2(geometry, material);

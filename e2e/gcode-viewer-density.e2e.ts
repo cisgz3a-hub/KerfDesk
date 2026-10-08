@@ -1,3 +1,4 @@
+import { writeFile } from 'node:fs/promises';
 import { expect, test, type Locator, type Page } from './fixtures/kerfdesk-test';
 
 type Fixture = typeof import('./fixtures/dense-laser-viewer');
@@ -93,4 +94,90 @@ test('coplanar traversal cannot repaint a completed cut', async ({ page }, info)
   expect(after.cut).toBeGreaterThanOrEqual(before.cut * 0.98);
   await view.getByLabel('Colour lens').selectOption('depth');
   await expect(view).toContainText('Single cutting depth: 0.00 mm');
+});
+
+type StrokeFixture = typeof import('./fixtures/playback-stroke-viewer');
+
+test('active playback stays in front of coplanar retraces and crossings', async ({
+  page,
+}, info) => {
+  await page.goto('/');
+  const cases = [
+    {
+      name: 'retrace',
+      text: 'G21 G90\nM4 S500\nG0 X0 Y50\nG1 X100 F3000\nG1 X0\nM5',
+      segmentIndex: 2,
+      point: { x: 50, y: 50, z: 0 },
+      sample: { x: 75, y: 50, z: 0 },
+      vertical: false,
+    },
+    {
+      name: 'crossing',
+      text: 'G21 G90\nM4 S500\nG0 X0 Y50\nG1 X100 F3000\nG0 X75 Y65\nG1 Y15\nM5',
+      segmentIndex: 3,
+      point: { x: 75, y: 35, z: 0 },
+      sample: { x: 75, y: 50, z: 0 },
+      vertical: true,
+    },
+  ];
+  for (const scenario of cases) {
+    for (const look of ['classic', 'studio'] as const) {
+      for (const perspective of [false, true]) {
+        const result = await page.evaluate(
+          async (options) => {
+            const path = '/e2e/fixtures/playback-stroke-viewer.ts';
+            const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
+            const frame = fixture.playbackStrokeFrame(options);
+            return {
+              data: frame.data,
+              pixels: await fixture.strokeRegionColours(frame.data, frame.region),
+            };
+          },
+          { ...scenario, look, perspective },
+        );
+        const name = `${scenario.name}-${look}-${perspective ? 'perspective' : 'ortho'}`;
+        const path = info.outputPath(name + '.png');
+        await writeFile(
+          path,
+          Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'),
+        );
+        await info.attach(name, { path, contentType: 'image/png' });
+        expect(
+          result.pixels.cut,
+          `${name}: completed cuts must not leak through the active core`,
+        ).toBe(0);
+        expect(
+          result.pixels.white,
+          `${name}: the active core must remain visible`,
+        ).toBeGreaterThanOrEqual(result.pixels.total * 0.95);
+      }
+    }
+  }
+});
+
+test('playback depth testing retains occlusion by a nearer cutting plane', async ({
+  page,
+}, info) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const path = '/e2e/fixtures/playback-stroke-viewer.ts';
+    const fixture = (await import(/* @vite-ignore */ path)) as StrokeFixture;
+    const frame = fixture.playbackStrokeFrame({
+      text: 'G21 G90\nM4 S500\nG0 X0 Y50 Z1\nG1 X100 F3000\nG0 Z0\nG1 X0\nM5',
+      segmentIndex: 3,
+      point: { x: 50, y: 50, z: 0 },
+      sample: { x: 75, y: 50, z: 0 },
+      vertical: false,
+      look: 'classic',
+      perspective: false,
+    });
+    return {
+      data: frame.data,
+      pixels: await fixture.strokeRegionColours(frame.data, frame.region),
+    };
+  });
+  const path = info.outputPath('nearer-cutting-plane.png');
+  await writeFile(path, Buffer.from(result.data.slice(result.data.indexOf(',') + 1), 'base64'));
+  await info.attach('nearer-cutting-plane', { path, contentType: 'image/png' });
+  expect(result.pixels.cut).toBeGreaterThan(result.pixels.total * 0.5);
 });

@@ -186,7 +186,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
   let solidGhost: RevealTargets['solidGhost'] = null;
   let detail: DetailTargets | null = null;
   let travelGhost: RevealTargets['travelGhost'] = null;
-  const active = createCurrentMove(args);
+  const active = createCurrentMove(args, planarDensity !== null);
   objects.push(active.object);
   if (program.shown > 0) {
     const solid = buildSolid(args, program.colors, planarDensity !== null);
