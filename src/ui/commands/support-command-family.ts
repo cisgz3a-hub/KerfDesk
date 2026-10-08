@@ -74,7 +74,7 @@ export function pricingCommand(): AppCommand {
     'help.pricing',
     'help',
     'Pricing',
-    'Open the KerfDesk Free and Pro prices, and what each edition includes',
+    'Read the Free and Pro features and prices',
     () => openExternalUrl(PRICING_URL),
   );
 }
@@ -83,8 +83,8 @@ export function termsCommand(): AppCommand {
   return enabled(
     'help.terms',
     'help',
-    'Software terms',
-    'Open the KerfDesk software supplier terms and Refund Policy',
+    'Software and Supplier Terms',
+    'Read the published Software and Supplier Terms and Pro purchase rights',
     () => openExternalUrl(TERMS_URL),
   );
 }
@@ -93,8 +93,8 @@ export function privacyCommand(): AppCommand {
   return enabled(
     'help.privacy',
     'help',
-    'Privacy',
-    'Open the KerfDesk Privacy Notice: what KerfDesk sends over the network, and your rights',
+    'Privacy Notice',
+    'Read what KerfDesk stores and sends, and how to make a privacy request',
     () => openExternalUrl(PRIVACY_URL),
   );
 }
@@ -104,7 +104,7 @@ export function refundsCommand(): AppCommand {
     'help.refunds',
     'help',
     'Refund Policy',
-    'Open the KerfDesk Refund Policy for Pro licences and update extensions',
+    'Read the refund promise for Pro licences and optional update purchases',
     () => openExternalUrl(REFUNDS_URL),
   );
 }
