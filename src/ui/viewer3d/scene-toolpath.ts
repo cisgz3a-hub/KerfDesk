@@ -18,6 +18,7 @@ import {
 import { createDetailLines, paintDetailLines } from './detail-lines';
 import { createCurrentMove, type CurrentMove } from './scene-current-move';
 import type { DetailTargets } from './scene-detail';
+import { planarPathDensity, type PlanarPathDensity } from './planar-path-density';
 import { buildTravelBucket, revealCount, type Viewer3dSegmentsInput } from './segment-buckets';
 import type { PlayheadMarker } from './viewer3d-scene';
 import type { Viewer3dTheme } from './viewer3d-theme';
@@ -35,6 +36,7 @@ const GHOST_OPACITY = 0.18;
 export type RevealTargets = {
   activeSegment: number;
   travelVisible: boolean;
+  readonly planarDensity: PlanarPathDensity | null;
   /** What an old trail fades toward: the background, encoded as the lines are. */
   fadeColor: readonly [number, number, number];
   readonly background: number;
@@ -174,6 +176,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
 } {
   const travelBucket = buildTravelBucket(args.segments);
   const program = programColors(args.segments, args.theme);
+  const planarDensity = planarPathDensity(args.segments);
   const objects: Object3D[] = [];
   let fatMaterials: LineMaterialType[] = [];
   let travelObject: Object3D | null = null;
@@ -183,10 +186,10 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
   let solidGhost: RevealTargets['solidGhost'] = null;
   let detail: DetailTargets | null = null;
   let travelGhost: RevealTargets['travelGhost'] = null;
-  const active = createCurrentMove(args);
+  const active = createCurrentMove(args, planarDensity !== null);
   objects.push(active.object);
   if (program.shown > 0) {
-    const solid = buildSolid(args, program.colors);
+    const solid = buildSolid(args, program.colors, planarDensity !== null);
     objects.push(solid.lines, solid.ghost);
     fatMaterials = solid.materials;
     solidGhost = solid.ghost;
@@ -226,6 +229,7 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     travelObject,
     travelLine,
     reveal: {
+      planarDensity,
       solid: solidTarget,
       travel: travelTarget,
       travelSource: travelBucket.sourceIndex,
@@ -246,14 +250,28 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
 
 // The done moves as fat lines, and their faint copy for the moves to come,
 // both drawn from one GPU copy of the program (ADR-485).
-function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array) {
+function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolean) {
   const { geometry, colorBuffer } = createProgramGeometry(
     args.three,
     args.LineSegmentsGeometry,
     args.segments.positions,
     colors,
   );
-  const material = fatLineMaterial(args, { vertexColors: true, linewidth: FAT_LINE_PX });
+  const material = fatLineMaterial(args, {
+    vertexColors: true,
+    linewidth: planar ? 1 : FAT_LINE_PX,
+    alphaToCoverage: planar,
+    // Sort flat travel, completed cuts and the active move together without
+    // their screen-space stroke meshes writing depth against each other.
+    transparent: planar,
+    // MSAA coverage alone smooths these opaque-colour strokes, as before.
+    blending: planar ? args.three.NoBlending : args.three.NormalBlending,
+    depthWrite: !planar,
+    // Bias flat strokes slightly ahead of the work plane.
+    polygonOffset: planar,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1,
+  });
   const trail = addTrail(args.three, material);
   const lines = new args.LineSegments2(geometry, material);
   lines.renderOrder = 1;
@@ -263,6 +281,7 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array) {
     transparent: true,
     opacity: GHOST_OPACITY,
     depthWrite: false,
+    depthFunc: args.three.LessDepth,
   });
   editLineMaterial(ghostMaterial, 'kerfdesk-shown-moves', withShownMoves);
   const ghost = new args.LineSegments2(
@@ -338,6 +357,8 @@ function lineSegmentsObject(
     transparent: opacity < 1,
     opacity,
     toneMapped: false,
+    depthWrite: false,
+    depthFunc: three.LessDepth,
   });
   const lines = new three.LineSegments(geometry, material);
   lines.renderOrder = renderOrder;

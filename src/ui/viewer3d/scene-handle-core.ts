@@ -28,10 +28,11 @@ import {
 } from './scene-detail';
 import { createMeasureOverlay, type MeasureOverlay } from './scene-measure';
 import { createToolpathPicker, type ToolpathPicker } from './scene-pick';
-import type { CameraRig } from './scene-setup';
+import type { CameraRig, ViewCamera } from './scene-setup';
+import { planarViewScale } from './planar-path-density';
 import type { Viewer3dSegmentsInput } from './segment-buckets';
 import { applyRecolor, type RevealTargets, type TravelLine } from './scene-toolpath';
-import { applyTravelLook } from './scene-travel-look';
+import { applyTravelDensity, applyTravelLook } from './scene-travel-look';
 import { createViewCube, type ViewCube } from './scene-view-cube';
 import { createStudioStage, type StudioStage } from './studio-stage';
 import type { ThreeModules } from './viewer3d-modules';
@@ -140,15 +141,7 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
   const drawFrame = (): void => {
     rig.controls.update();
     const camera = rig.viewCamera();
-    const targets = state.reveal?.detail ?? null;
-    detail.report(
-      targets === null
-        ? null
-        : applyDetail(targets, {
-            wholePath: state.playhead === null,
-            mmPerPixel: mmPerPixel(camera, state.bounds, state.viewHeight),
-          }),
-    );
+    detail.report(updateToolpathView(state, camera));
     renderer.render(scene, camera);
     if (state.overlays) cube.render(renderer, rig.camera, rig.controls.target);
     studio.renderLabels(camera);
@@ -201,6 +194,21 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     applyClipping: () => clipToolpath(core),
   };
   return { ...core, dispose: () => disposeCore(core) };
+}
+
+// Travel reads projected planar coverage; LOD keeps its nearest-point scale.
+function updateToolpathView(state: SceneState, camera: ViewCamera): Viewer3dDetail | null {
+  const scale = mmPerPixel(camera, state.bounds, state.viewHeight);
+  applyTravelDensity(
+    state.reveal,
+    state.travelLine,
+    state.stage.look,
+    planarViewScale(scale, camera.quaternion),
+  );
+  const targets = state.reveal?.detail ?? null;
+  return targets === null
+    ? null
+    : applyDetail(targets, { wholePath: state.playhead === null, mmPerPixel: scale });
 }
 
 // The travel look swaps its material, and arrows and rebuilds bring new ones,
