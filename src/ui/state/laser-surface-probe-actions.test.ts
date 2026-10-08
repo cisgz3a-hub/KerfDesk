@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
 import { useStore } from './store';
@@ -92,19 +92,59 @@ it('does not start a motion transaction without current-session report-unit evid
 it.each(['abort', 'disconnect'] as const)(
   'ends collection after %s without another probe contact or offset write',
   async (action) => {
-    const { writes } = await surfaceSimulator({ pauseFirstContact: true });
+    const { connection, writes } = await surfaceSimulator({ pauseFirstContact: true });
     const measuring = useLaserStore.getState().measureSurfaceGrid(REQUEST);
     for (let i = 0; i < 10; i += 1) await flushConnect();
     expect(writes.filter((line) => line.includes('G38.2'))).toHaveLength(1);
-    if (action === 'abort') await useLaserStore.getState().stopJob();
-    else await useLaserStore.getState().disconnect();
-    const result = await measuring;
-    expect(result).toMatchObject({ kind: 'failed', measurement: { complete: false, points: [] } });
+
+    let finishCleanup = (): void => undefined;
+    const cleanup = new Promise<void>((resolve) => {
+      finishCleanup = resolve;
+    });
+    const originalWrite = connection.write.bind(connection);
+    const write = vi.spyOn(connection, 'write').mockImplementation(async (data) => {
+      await originalWrite(data);
+      if (action === 'abort' && data === 'M9\n') await cleanup;
+    });
+    try {
+      if (action === 'abort') await useLaserStore.getState().stopJob();
+      else await useLaserStore.getState().disconnect();
+      expect(await measuring).toMatchObject({
+        kind: 'failed',
+        measurement: { complete: false, points: [] },
+      });
+      expect(writes.filter((line) => line.includes('G38.2'))).toHaveLength(1);
+      expect(writes.filter((line) => /G10|G92/.test(line))).toEqual([]);
+      expect(useLaserStore.getState().probeBusy).toBe(false);
+      if (action === 'abort') {
+        await flushConnect();
+        expect(writes).toContain('\x18');
+        expect(writes.slice(writes.indexOf('\x18'))).toContain('M9\n');
+        const resetOwner = useLaserStore.getState().controllerOperation;
+        expect(resetOwner).toMatchObject({ kind: 'recovery', phase: 'reset' });
+        expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+        expect(useLaserStore.getState().pendingTransportWrites).toBeGreaterThan(0);
+        // ACK and Idle do not release cleanup whose transport is still pending.
+        connection.emitLine('<Idle|MPos:100,200,5|WCO:100,200,-5|FS:0,0>');
+        connection.emitLine('<Idle|MPos:100,200,5|WCO:100,200,-5|FS:0,0>');
+        await flushConnect();
+        expect(useLaserStore.getState().controllerOperation).toBe(resetOwner);
+      } else {
+        expect(useLaserStore.getState().controllerOperation).toBeNull();
+        expect(useLaserStore.getState().connection.kind).toBe('disconnected');
+      }
+    } finally {
+      finishCleanup();
+      write.mockRestore();
+    }
+    await vi.waitFor(() => {
+      expect(useLaserStore.getState().controllerOperation).toBeNull();
+      expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
+    });
     expect(writes.filter((line) => line.includes('G38.2'))).toHaveLength(1);
     expect(writes.filter((line) => /G10|G92/.test(line))).toEqual([]);
     expect(useLaserStore.getState().probeBusy).toBe(false);
-    expect(useLaserStore.getState().controllerOperation).toBeNull();
-    if (action === 'abort') expect(writes).toContain('\x18');
+    if (action === 'abort') expect(useLaserStore.getState().connection.kind).toBe('connected');
   },
 );
 

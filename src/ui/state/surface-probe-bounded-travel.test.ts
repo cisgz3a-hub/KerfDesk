@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import type { SurfaceGridRequest } from '../../core/controllers/grbl/surface-grid-probe';
 import { useLaserStore } from './laser-store';
 import { initialLaserState } from './laser-store-helpers';
@@ -70,18 +70,54 @@ it('stops at a failed slow contact without moving to another grid point', async 
 });
 
 it('contains Abort during the slow contact without writing another contact or offset', async () => {
-  const { writes } = await surfaceSimulator({ contactWorkZ: 9.99, pauseContactAt: 2 });
+  const { connection, writes } = await surfaceSimulator({ contactWorkZ: 9.99, pauseContactAt: 2 });
   const measuring = useLaserStore.getState().measureSurfaceGrid(REQUEST);
   for (let i = 0; i < 10; i += 1) await flushConnect();
   expect(writes.filter((line) => line.includes('G38.2'))).toHaveLength(2);
-  await useLaserStore.getState().stopJob();
-  expect(await measuring).toMatchObject({
-    kind: 'failed',
-    measurement: { complete: false, points: [] },
+
+  const originalWrite = connection.write.bind(connection);
+  let finishCleanup = (): void => undefined;
+  const cleanup = new Promise<void>((resolve) => {
+    finishCleanup = resolve;
+  });
+  const write = vi.spyOn(connection, 'write').mockImplementation(async (data) => {
+    await originalWrite(data);
+    // The controller acknowledges M9 before its transport Promise settles.
+    if (data === 'M9\n') await cleanup;
+  });
+  try {
+    await useLaserStore.getState().stopJob();
+    expect(await measuring).toMatchObject({
+      kind: 'failed',
+      measurement: { complete: false, points: [] },
+    });
+    await flushConnect();
+    expect(writes.filter((line) => line.includes('G38.2'))).toHaveLength(2);
+    expect(writes.filter((line) => /G10|G92/.test(line))).toEqual([]);
+    expect(writes.slice(writes.indexOf('\x18'))).toContain('M5\n');
+    expect(writes.slice(writes.indexOf('\x18'))).toContain('M9\n');
+    expect(useLaserStore.getState().probeBusy).toBe(false);
+    const resetOwner = useLaserStore.getState().controllerOperation;
+    expect(resetOwner).toMatchObject({ kind: 'recovery', phase: 'reset' });
+    expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
+    expect(useLaserStore.getState().pendingTransportWrites).toBeGreaterThan(0);
+
+    // Probe cancellation cannot clear Abort's replacement cleanup owner.
+    connection.emitLine('<Idle|MPos:100,200,5|WCO:100,200,-5|FS:0,0>');
+    connection.emitLine('<Idle|MPos:100,200,5|WCO:100,200,-5|FS:0,0>');
+    await flushConnect();
+    expect(useLaserStore.getState().controllerOperation).toBe(resetOwner);
+  } finally {
+    finishCleanup();
+    write.mockRestore();
+  }
+  await vi.waitFor(() => {
+    expect(useLaserStore.getState().controllerOperation).toBeNull();
+    expect(useLaserStore.getState().pendingTransportWrites).toBe(0);
   });
   expect(writes.filter((line) => line.includes('G38.2'))).toHaveLength(2);
   expect(writes.filter((line) => /G10|G92/.test(line))).toEqual([]);
-  expect(writes).toContain('\x18');
+  expect(writes.filter((line) => line === '\x18')).toHaveLength(1);
+  expect(useLaserStore.getState().connection.kind).toBe('connected');
   expect(useLaserStore.getState().probeBusy).toBe(false);
-  expect(useLaserStore.getState().controllerOperation).toBeNull();
 });
