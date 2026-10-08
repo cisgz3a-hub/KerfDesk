@@ -337,6 +337,7 @@ jobs:
       - name: Apply the specified checkout operation
         env:
           KERFDESK_PAYMENT_LAUNCH_CF_TOKEN: ${{ secrets.KERFDESK_PAYMENT_LAUNCH_CF_TOKEN }}
+          KERFDESK_PAYMENT_SANDBOX_ATTESTED_BUNDLE: ${{ inputs.payment_flag == 'sandbox-refresh-code' && secrets.KERFDESK_PAYMENT_SANDBOX_ATTESTED_BUNDLE || '' }}
           KERFDESK_PAYMENT_FLAG_EVIDENCE: ${{ runner.temp }}/payment-flag-evidence
           PAYMENT_FLAG_OPERATION: ${{ inputs.payment_flag }}
         shell: bash
