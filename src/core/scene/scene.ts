@@ -1,3 +1,6 @@
+import { mapBooleanCompoundBindings } from '../geometry/boolean-compound';
+import { isBooleanCompoundObject } from './boolean-compound';
+import type { ImportedSvg } from './scene-object';
 // Scene — the mutable view of what's on the bed. Mutations are pure: every
 // operation returns a fresh Scene (CLAUDE.md "Mutable state — none").
 
@@ -11,6 +14,11 @@ export type Scene = {
   readonly outputDependencies?: ReadonlyArray<SceneObject>;
   readonly layers: ReadonlyArray<Layer>;
   readonly groups?: ReadonlyArray<SceneGroup>;
+  /** Presentation order for design rows; never manufacturing or canvas order. */
+  readonly designTreeOrder?: ReadonlyArray<{
+    readonly kind: 'group' | 'object';
+    readonly id: string;
+  }>;
   // Machine-output priority, intentionally separate from `objects` so changing
   // run order never changes canvas stacking or hit-testing. Missing entries
   // (legacy projects and newly inserted artwork) follow `objects` order.
@@ -18,6 +26,8 @@ export type Scene = {
 };
 
 export type SceneGroup = {
+  /** Parent design group; objectIds includes all descendant artwork. */
+  readonly parentId?: string;
   readonly id: string;
   readonly name: string;
   readonly objectIds: ReadonlyArray<string>;
@@ -135,6 +145,15 @@ export function moveLayer(scene: Scene, layerId: string, direction: LayerMoveDir
 }
 
 function assignSceneObjectColor(object: SceneObject, color: string): SceneObject {
+  if (isBooleanCompoundObject(object))
+    return mapBooleanCompoundBindings(
+      object,
+      assignOrdinarySceneObjectColor(object, color) as ImportedSvg,
+      (operand) => assignOrdinarySceneObjectColor(operand, color) as ImportedSvg,
+    );
+  return assignOrdinarySceneObjectColor(object, color);
+}
+function assignOrdinarySceneObjectColor(object: SceneObject, color: string): SceneObject {
   switch (object.kind) {
     case 'imported-svg': {
       const paths = recolorPaths(object.paths, color);

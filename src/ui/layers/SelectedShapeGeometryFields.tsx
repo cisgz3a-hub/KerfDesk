@@ -1,6 +1,7 @@
 import { selectionMetrics, type ShapeObject } from '../../core/scene';
 import type { ParametricShapeSpec } from '../../core/shapes';
 import { Field } from '../kit';
+import { evaluateNumericEntry } from '../../core/numeric-expression';
 import { useDebouncedCommit } from './use-debounced-commit';
 
 export function SelectedShapeGeometryFields(props: {
@@ -262,7 +263,14 @@ function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
     // the spec stays put, so the scale must re-trigger reconciliation or the
     // stale draft would be committed back on blur (undoing the resize).
     reconcileKey: scale,
-    parse: (input) => clampFieldValue(Number(input) / scale, props),
+    parse: (input) => {
+      const result = shapeEntry(input, props);
+      return clampFieldValue(result.kind === 'ok' ? result.value / scale : props.value, props);
+    },
+    validate: (input) => {
+      const result = shapeEntry(input, props);
+      return result.kind === 'ok' ? null : result.message;
+    },
     // Display-only rounding: a drag-resized shape stores a long float
     // (e.g. 35.107387681635146) that overflowed the box. Show a clean value
     // like LightBurn; the underlying spec keeps full precision until edited.
@@ -271,7 +279,9 @@ function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
   return (
     <Field label={props.label} {...(props.unit === undefined ? {} : { unit: props.unit })}>
       <input
-        type="number"
+        type="text"
+        inputMode="decimal"
+        aria-invalid={debounced.errorMessage !== null}
         min={props.min * scale}
         {...(props.max === undefined ? {} : { max: props.max * scale })}
         step={props.step}
@@ -279,10 +289,19 @@ function ShapeNumberInput(props: ShapeNumberFieldProps): JSX.Element {
         onChange={debounced.onChange}
         onBlur={debounced.onBlur}
         aria-label={props.ariaLabel}
-        title={`${props.ariaLabel} for the selected shape.`}
+        title={`${props.ariaLabel} for the selected shape. Arithmetic is accepted${props.unit === 'mm' ? ', including units such as 1in' : ''}.`}
         style={inputStyle}
       />
     </Field>
+  );
+}
+
+function shapeEntry(text: string, props: ShapeNumberFieldProps) {
+  return evaluateNumericEntry(
+    text,
+    props.unit === '%'
+      ? { kind: 'angle', percentOf: 100 }
+      : { kind: props.unit === 'mm' ? 'length' : 'angle' },
   );
 }
 

@@ -13,6 +13,7 @@ import { readyTracePreview } from './use-trace-preview-settlement';
 import { isTraceRequestSuperseded } from './use-trace-worker-client';
 import type { TraceResult } from './use-trace-worker-client';
 import { TracePreviewCache } from './trace-preview-cache';
+import { maskedTracePreviewDataUrl } from './trace-source-mask';
 
 export type DecodedSource = {
   readonly file: File;
@@ -21,6 +22,7 @@ export type DecodedSource = {
   readonly cache: TracePreviewCache;
   readonly retryFailedDecode: () => void;
   decoded?: DecodedTraceImage;
+  sourceDataUrl?: string | undefined;
 };
 
 type PreviewRefs = {
@@ -56,6 +58,7 @@ export function decodeTraceSource(file: File): DecodedSource {
         checkTraceSignal(controller.signal);
         const decoded = { img, hasTransparency: rawImageHasTransparency(img) };
         source.decoded = decoded;
+        source.sourceDataUrl = maskedTracePreviewDataUrl(file, img);
         return decoded;
       },
       (error: unknown) => {
@@ -183,7 +186,10 @@ export function readyPreparedPreview(
   const cached = source?.cache.get(request);
   if (cached?.preparedTrace?.result === result)
     return { ...cached, sourceHasTransparency: hasTransparency ?? cached.sourceHasTransparency };
-  const ready = readyTracePreview(request, result, hasTransparency);
+  const ready = {
+    ...readyTracePreview(request, result, hasTransparency),
+    ...(source?.sourceDataUrl === undefined ? {} : { sourceDataUrl: source.sourceDataUrl }),
+  };
   source?.cache.remember(request, ready);
   return ready;
 }

@@ -1,3 +1,4 @@
+import { cloneSelectionGroups } from './clone-selection-groups';
 import { addObject, type Scene, type SceneGroup, type SceneObject } from '../../core/scene';
 import {
   remapSceneObjectCopyDependencies,
@@ -52,20 +53,10 @@ function appendClonedGroups(
   groups: ReadonlyArray<SceneGroup>,
   idMap: ReadonlyMap<string, string>,
 ): Scene {
-  const clonedGroups = groups.flatMap((group) => cloneGroup(group, idMap));
+  const clonedGroups = cloneSelectionGroups(groups, new Set(idMap.keys()), idMap, () =>
+    crypto.randomUUID(),
+  );
   return clonedGroups.length === 0
     ? scene
     : { ...scene, groups: [...(scene.groups ?? []), ...clonedGroups] };
-}
-
-function cloneGroup(
-  group: SceneGroup,
-  idMap: ReadonlyMap<string, string>,
-): ReadonlyArray<SceneGroup> {
-  if (!group.objectIds.every((id) => idMap.has(id))) return [];
-  const objectIds = group.objectIds.flatMap((id) => {
-    const mapped = idMap.get(id);
-    return mapped === undefined ? [] : [mapped];
-  });
-  return objectIds.length < 2 ? [] : [{ ...group, id: crypto.randomUUID(), objectIds }];
 }

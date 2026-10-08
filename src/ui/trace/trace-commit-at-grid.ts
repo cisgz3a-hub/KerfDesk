@@ -13,6 +13,7 @@ import {
 } from './prepared-trace';
 import { traceImageWithBoundaryMode, type BoundaryMode } from './region-enhance-trace';
 import { rawImageHasTransparency } from './raw-image-transparency';
+import { maskTraceSourceResult } from './trace-source-mask';
 import { traceBoundaryForWorkingGrid, type TraceGrid } from './trace-boundary-grid';
 import { checkTraceSignal, isTraceAbort } from './trace-cancellation';
 import {
@@ -119,5 +120,6 @@ async function traceDecoded(
     args.signal,
     args.progress,
   );
-  return { ...result, sourceHasTransparency };
+  checkTraceSignal(args.signal);
+  return { ...maskTraceSourceResult(args.file, result), sourceHasTransparency };
 }

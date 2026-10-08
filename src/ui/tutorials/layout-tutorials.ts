@@ -132,21 +132,149 @@ export const LAYOUT_TUTORIALS: readonly Tutorial[] = [
       {
         title: 'Define the available area',
         instruction:
-          'Choose Workspace or Placed board. Enter Part spacing in millimetres and decide whether 90-degree rotation is acceptable.',
+          'Choose Workspace or Placed board. Enter Part spacing in millimetres. Choose permitted turns; Keep current grain axis restricts them to 0 and 180 degrees.',
         focus: 'Boundary and spacing',
         result: 'The packing uses your chosen area and gap.',
       },
       {
-        title: 'Choose a method and nest',
+        title: 'Choose the arrangement goal',
         instruction:
-          'Use Outline for closed vector parts, including concave outlines and holes. Use Fast for rectangular bounds or mixed image selections. Click Nest selection and inspect the result.',
-        focus: 'Outline or Fast',
-        result: 'The selected artwork is rearranged, or a message explains why it could not fit.',
+          'Choose Compact for a smaller footprint, Tidy for a regular bounds arrangement, or Grid for uniform cell spacing. Compact offers Outline and Fast methods. Enable Try more arrangements to compare a bounded set of valid layouts.',
+        focus: 'Compact · Tidy · Grid',
+        result: 'The goal and permitted orientations are explicit before calculation.',
+      },
+      {
+        title: 'Review and accept a valid draft',
+        instruction:
+          'Click Nest selection. Review the preview, stock utilisation, footprint and any bounds fallback. Stop search keeps the best complete valid draft. Accept best valid layout applies it in one undo step; Cancel leaves the artwork unchanged.',
+        focus: 'Stop search · Accept best valid layout',
+        result:
+          'Only the accepted draft rearranges the artwork. A changed document requires a fresh calculation.',
       },
     ],
-    tip: 'Disable rotation when grain, print direction or another orientation matters. Allow room for your process when choosing the gap.',
+    tip: 'Groups remain rigid and locked artwork stays an obstacle. Allow room for your process when choosing the gap. The bounded search does not prove an optimum or a physical material result.',
     keywords: ['nest', 'packing', 'material', 'board', 'spacing', 'waste'],
     related: ['array', 'board', 'select'],
+  },
+  {
+    id: 'joint-openings',
+    title: 'Resize receiving joint openings',
+    summary:
+      'Review straight slots against measured material thickness and a separate fit allowance.',
+    category: 'Layout & production',
+    machine: 'all',
+    minutes: 3,
+    location: 'Tools → Resize Joint Openings',
+    prerequisites:
+      'Selected unlocked imported or traced straight paths. Convert editable shapes or text to paths first.',
+    visual: 'nodes',
+    steps: [
+      {
+        title: 'Declare the original and target widths',
+        instruction:
+          'Enter Current opening width and Detection tolerance to find candidate geometry. Enter measured Material thickness and a separate Fit allowance. Positive allowance widens receiving openings; negative allowance tightens them.',
+        focus: 'Current width · Thickness · Fit allowance',
+        result: 'The resulting opening width is displayed before any geometry changes.',
+      },
+      {
+        title: 'Verify each numbered feature',
+        instruction:
+          'Match the numbered preview to the candidate list. Select only the enclosed rectangles or inward U-slots intended to receive material. Changing dimensions clears the feature selection so you can review it again.',
+        focus: 'Detected receiving features',
+        result:
+          'Ambiguous, curved, open and unsupported geometry is disclosed and stays unchanged.',
+      },
+      {
+        title: 'Apply and test the fit',
+        instruction:
+          'Compare dashed original outlines with the solid result. Apply selected openings changes their width in one undo step while preserving their depth and centre. Review the job again and test a fit coupon with your actual stock and process.',
+        focus: 'Apply selected openings',
+        result:
+          'The design change retains artwork identity and operations. It does not establish physical fit.',
+      },
+    ],
+    tip: 'This bounded tool does not resize finger-joint depth, tabs or every feature in a thickness-dependent design. Tool diameter and kerf compensation remain separate operation settings.',
+    keywords: ['joint', 'slot', 'thickness', 'fit', 'allowance'],
+    related: ['box', 'box-fit', 'nodes'],
+  },
+  {
+    id: 'fixtures',
+    title: 'Save and review reusable fixtures',
+    summary: 'Keep batch-placement geometry and its setup context in the project.',
+    category: 'Layout & production',
+    machine: 'all',
+    minutes: 4,
+    location: 'Tools → Camera → Pieces on the bed → Reusable fixtures',
+    prerequisites:
+      'A reviewed Find pieces scan to save; select the design before reusing a fixture.',
+    visual: 'array',
+    steps: [
+      {
+        title: 'Save the intended layout',
+        instruction:
+          'Find pieces, include the intended blanks, and place the selected sample design on its own blank if its offset should be reused. Click Save current fixture and give the geometry a name.',
+        focus: 'Save current fixture',
+        result:
+          'The project keeps included slot geometry, the sample frame, scene coordinate basis and available camera/height context.',
+      },
+      {
+        title: 'Review every reuse',
+        instruction:
+          'Select the design for the next batch and open the saved fixture. Compare the proposed design frames with the numbered slots, read setup differences, and verify the actual fixture alignment and material height. Choose the included slots and confirm the placement review.',
+        focus: 'Place reviewed selection',
+        result:
+          'The selection is moved and copied without scaling in one undo step. Current camera settings remain unchanged.',
+      },
+      {
+        title: 'Record measured placement errors',
+        instruction:
+          'Use Record placement observations to enter expected and independently observed scene coordinates for known checkpoints. Add measurement notes and save. RMS, maximum and mean offsets describe these observations at their own recorded setup.',
+        focus: 'Record placement observations',
+        result:
+          'Manual observations stay separate from the original calibration-fit residuals and from machine completion.',
+      },
+    ],
+    tip: 'A saved fixture records intent; it does not prove that blanks, the camera or the machine origin remain in the same place. Review the resulting job and complete its ordinary Frame before Start.',
+    keywords: ['fixture', 'jig', 'batch', 'camera', 'qualification', 'observation'],
+    related: ['camera', 'array', 'nest'],
+  },
+  {
+    id: 'stamp-preparation',
+    title: 'Prepare a stamp height image',
+    summary: 'Review a raised-face mask and measured taper without changing the source.',
+    category: 'Layout & production',
+    machine: 'all',
+    minutes: 4,
+    location: 'Tools → Prepare Stamp',
+    prerequisites: 'One raster with full pixel data, or only closed vector artwork.',
+    visual: 'image-tone',
+    steps: [
+      {
+        title: 'Choose the face and measured shoulder',
+        instruction:
+          'Select the artwork and open Prepare Stamp. Set the source threshold, measured taper width and optional mirror. Vector DPI sets sampling for vectors; raster pixels keep their resolution. Raw pixels and image masks define the face.',
+        focus: 'Threshold · Taper · Mirror',
+        result: 'The chosen dimensions and mirroring define a draft before artwork changes.',
+      },
+      {
+        title: 'Review the three views',
+        instruction:
+          'Click Prepare preview. Compare Source, the mirrored Face mask and Height map. Check white flat faces, graded shoulders, black recesses and the full pixel/mm extent including the added margin. Stop preparation cancels the background work.',
+        focus: 'Source · Face mask · Height map',
+        result: 'You can check the sampled geometry and its physical pixel pitch.',
+      },
+      {
+        title: 'Accept and qualify the process',
+        instruction:
+          'Confirm the review, then Apply as new image or Export PNG. The original stays unchanged. Set the displayed mm extent if importing the PNG elsewhere. Choose proportional laser power or CNC relief depth in the existing operation tools and test a physical coupon.',
+        focus: 'Apply as new image · Export PNG',
+        result:
+          'One undoable image records design intent; material depth, power and stamp quality remain unqualified.',
+      },
+    ],
+    tip: 'Image brightness, contrast, negative-image and operation settings are not baked into this preparation. Pixel pitch limits shoulder detail; no automatic depth or material calibration is inferred.',
+    keywords: ['stamp', 'rubber', 'face', 'taper', 'mirror', 'height'],
+    related: ['image-studio', 'operations', 'cnc-relief'],
   },
   {
     id: 'operations',

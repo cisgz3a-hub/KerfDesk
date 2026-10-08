@@ -3,6 +3,7 @@ import { findFontEntry } from '../../core/text';
 import { FontImportButton } from './FontImportButton';
 import { FontPicker } from './FontPicker';
 import { FontUsageHint } from './FontUsageHint';
+import { TextBoxFields } from './TextBoxFields';
 import { PathTextFields } from './PathTextFields';
 import { TextDialogNumericFields } from './TextDialogNumericFields';
 import { VariableTextFields } from './VariableTextFields';
@@ -21,15 +22,7 @@ export function TextFormattingFields(props: Props): JSX.Element {
   const outline = findFontEntry(values.fontKey)?.geometry !== 'single-line';
   return (
     <>
-      {props.variableFields === undefined ? (
-        <VariableTextFields
-          enabled={fields.variableEnabled}
-          onEnabledChange={fields.setVariableEnabled}
-          onInsert={props.onInsert ?? ((source) => fields.setContent(`${values.content}${source}`))}
-        />
-      ) : (
-        props.variableFields
-      )}
+      <TextVariables {...props} />
       <Field label="Font">
         <FontPicker
           value={values.fontKey}
@@ -72,6 +65,7 @@ export function TextFormattingFields(props: Props): JSX.Element {
         setLetterSpacing={fields.setLetterSpacing}
         setBendDeg={fields.setBendDeg}
       />
+      <TextBoxFields fields={fields} />
       <PathTextFields
         enabled={fields.pathEnabled}
         guides={fields.guides}
@@ -144,3 +138,24 @@ const alignmentLabelStyle: React.CSSProperties = {
   gap: 4,
   textTransform: 'capitalize',
 };
+
+function TextVariables(props: Props): JSX.Element {
+  const fields = props.fields;
+  const values = fields.values;
+  return (
+    <>
+      {props.variableFields === undefined ? (
+        <VariableTextFields
+          enabled={fields.variableEnabled}
+          onEnabledChange={fields.setVariableEnabled}
+          source={values.content}
+          onSourceChange={fields.setContent}
+          textValues={values}
+          onInsert={props.onInsert ?? ((source) => fields.setContent(`${values.content}${source}`))}
+        />
+      ) : (
+        props.variableFields
+      )}
+    </>
+  );
+}

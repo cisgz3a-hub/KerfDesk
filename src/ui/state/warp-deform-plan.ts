@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // What a Warp or Deform (LBG-T06) does to the scene, shared by the live canvas
 // preview and Apply so the user gets exactly what they saw. Imported and
 // traced artwork and drawn lines keep their object, transform and settings;
@@ -50,7 +51,10 @@ export function warpDeformTargets(
   const ids = new Set(selectedIds);
   return scene.objects.filter(
     (object): object is VectorSceneObject =>
-      ids.has(object.id) && object.locked !== true && isVectorPathObject(object),
+      ids.has(object.id) &&
+      object.locked !== true &&
+      !isBooleanCompoundObject(object) &&
+      isVectorPathObject(object),
   );
 }
 
@@ -81,6 +85,7 @@ export function planWarpDeform(scene: Scene, request: WarpDeformRequest): WarpDe
   let convertedShapes = 0;
   let curvesFlattened = false;
   const objects = scene.objects.map((object) => {
+    if (isBooleanCompoundObject(object)) return object;
     if (!ids.has(object.id) || object.locked === true || !isVectorPathObject(object)) {
       return object;
     }

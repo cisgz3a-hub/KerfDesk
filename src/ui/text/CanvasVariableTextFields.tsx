@@ -25,6 +25,9 @@ export function CanvasVariableTextFields(props: {
         <>
           <VariableTextControls
             variables={variables.variables}
+            source={fields.values.content}
+            onSourceChange={fields.setContent}
+            textValues={fields.values}
             firstColumn={variables.variables.csv?.headers[0]}
             onInsert={props.onInsert}
             setCsv={variables.setCsv}

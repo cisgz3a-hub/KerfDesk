@@ -28,6 +28,7 @@ export async function prepareVariableArray(
   options: {
     readonly render: VariableTextRenderer;
     readonly clock: () => Date;
+    readonly advanceVariables?: boolean;
     readonly isCurrent?: () => boolean;
   },
 ): Promise<VariableArrayResult> {
@@ -56,7 +57,9 @@ export async function prepareVariableArray(
   const slots: SceneObject[][] = [];
   for (let index = 0; index < seeds.length; index += 1) {
     if (options.isCurrent?.() === false) return cancelled();
-    const assigned = sources.map((object) => assignCopyOffset(object, index * stride));
+    const assigned = sources.map((object) =>
+      assignCopyOffset(object, options.advanceVariables === false ? 0 : index * stride),
+    );
     const slotProject = { ...state.project, scene: { ...state.project.scene, objects: assigned } };
     const rendered = await materializeVariableText(slotProject, { now }, options.render);
     if (options.isCurrent?.() === false) return cancelled();
@@ -75,7 +78,14 @@ export async function prepareVariableArray(
   const materialized = variableArrayMaterialization(spec, selectedIds, slots);
   if (materialized === null)
     return { ok: false, message: 'The variable copies have no rendered bounds.' };
-  return { ok: true, materialized };
+  return {
+    ok: true,
+    materialized: {
+      ...materialized,
+      evaluationTime: now.toISOString(),
+      advanceVariables: options.advanceVariables !== false,
+    },
+  };
 }
 
 function copyStride(offsets: readonly number[]): number {

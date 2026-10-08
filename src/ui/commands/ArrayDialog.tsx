@@ -35,10 +35,14 @@ export function ArrayDialog(props: {
   readonly selected?: ReadonlyArray<SceneObject>;
   /** Settings to open with, such as the ones last applied; the defaults when absent. */
   readonly initial?: ArrayForm;
+  readonly title?: string;
+  readonly actionLabel?: string;
   readonly onCancel: () => void;
   /** The settings behind the request, just before `onApply`. */
   readonly onSubmitForm?: (form: ArrayForm) => void;
+  readonly initialAdvanceVariables?: boolean;
   readonly onApply: (spec: ArraySpec, advanceVariables?: boolean) => void;
+  readonly onRetainChange?: (name: string | undefined) => void;
   readonly hasVariableText?: boolean;
   readonly errorMessage?: string;
   readonly preparing?: boolean;
@@ -50,14 +54,14 @@ export function ArrayDialog(props: {
   );
   const centreObjects = useMemo(() => centreObjectOptions(selected), [selected]);
   const [form, setForm] = useState(() => props.initial ?? defaultArrayForm(props.selectionBounds));
-  const [advanceVariables, setAdvanceVariables] = useState(false);
+  const [advanceVariables, setAdvanceVariables] = useState(props.initialAdvanceVariables ?? false);
   const spec = arraySpecFromForm(form, context);
   const problem = useRoomProblem(props.scene, selected, spec);
   const onChange = (patch: Partial<ArrayForm>): void =>
     setForm((current) => ({ ...current, ...patch }));
   return (
     <Dialog
-      title="Array"
+      title={props.title ?? 'Array'}
       size="sm"
       as="form"
       onClose={props.onCancel}
@@ -82,6 +86,9 @@ export function ArrayDialog(props: {
         checked={advanceVariables}
         onChange={setAdvanceVariables}
       />
+      {props.onRetainChange === undefined ? null : (
+        <RetainedArrayOption onChange={props.onRetainChange} />
+      )}
       <p role="status" aria-live="polite" style={statusStyle}>
         {props.preparing === true
           ? 'Preparing variable copies…'
@@ -90,11 +97,59 @@ export function ArrayDialog(props: {
       {props.errorMessage === undefined ? null : <p role="alert">{props.errorMessage}</p>}
       <DialogActions>
         <Button onClick={props.onCancel}>Cancel</Button>
-        <Button type="submit" variant="primary" disabled={problem !== null}>
-          Create array
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={problem !== null || props.preparing === true}
+        >
+          {props.actionLabel ?? 'Create array'}
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function RetainedArrayOption(props: {
+  readonly onChange: (name: string | undefined) => void;
+}): JSX.Element {
+  const [retained, setRetained] = useState(false);
+  const [name, setName] = useState('Array');
+  return (
+    <div>
+      <label>
+        <input
+          type="checkbox"
+          title="Capture this array's source and layout settings so count or spacing can be regenerated later."
+          checked={retained}
+          onChange={(event) => {
+            const value = event.currentTarget.checked;
+            setRetained(value);
+            props.onChange(value ? name : undefined);
+          }}
+        />{' '}
+        Keep editable array settings
+      </label>
+      {retained ? (
+        <label>
+          Array name
+          <input
+            className="lf-input"
+            aria-label="Array name"
+            title="Name the retained layout so you can find its settings when regenerating or expanding the array."
+            maxLength={200}
+            value={name}
+            onChange={(event) => {
+              setName(event.currentTarget.value);
+              props.onChange(event.currentTarget.value);
+            }}
+          />
+        </label>
+      ) : null}
+      <p>
+        Retained settings survive saving. Regenerate count or spacing from the captured source.
+        Expand to independent copies when individual edits need to remain.
+      </p>
+    </div>
   );
 }
 

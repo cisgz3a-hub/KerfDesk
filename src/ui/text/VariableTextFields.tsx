@@ -1,10 +1,14 @@
 import { DEFAULT_PROJECT_VARIABLE_DATA } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import type { DialogValues } from './use-text-dialog-fields';
 import { VariableTextControls } from './VariableTextControls';
 
 export function VariableTextFields(props: {
   readonly enabled: boolean;
+  readonly source?: string;
+  readonly onSourceChange?: (value: string) => void;
+  readonly textValues?: DialogValues;
   readonly onEnabledChange: (enabled: boolean) => void;
   readonly onInsert: (source: string) => void;
   /** Barcodes reuse these controls for their variable data (ADR-386). */
@@ -32,6 +36,9 @@ export function VariableTextFields(props: {
       {props.enabled ? (
         <VariableTextControls
           variables={variables}
+          {...(props.source === undefined ? {} : { source: props.source })}
+          {...(props.onSourceChange === undefined ? {} : { onSourceChange: props.onSourceChange })}
+          {...(props.textValues === undefined ? {} : { textValues: props.textValues })}
           firstColumn={firstColumn}
           onInsert={props.onInsert}
           setCsv={setCsv}

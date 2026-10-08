@@ -7,6 +7,11 @@ export const FIXTURE_NAME = 'installed qualification artwork.svg';
 export const FIXTURE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="24mm" height="18mm" viewBox="0 0 24 18"><path d="M2 3 L22 3 L22 15 L2 15 Z" fill="none" stroke="#123456" stroke-width="0.2"/></svg>\n`;
 export const OWNER_FILE = '.kerfdesk-installer-qualification-owner.json';
 
+// Explicit qualification contracts. The sentinel test keeps the current
+// contract aligned with the canonical writer; historical schema 12 stays 12.
+export const CURRENT_QUALIFICATION_PROJECT_SCHEMA = 14;
+export const HISTORICAL_QUALIFICATION_PROJECT_SCHEMA = 12;
+
 export function parseArgs(argv) {
   const allowed = new Set([
     'executable',
@@ -173,11 +178,23 @@ export function assertBuildMetadata(title, args) {
   return { version, commit, badge: title };
 }
 
-export function validateProject(bytes) {
+export function validateProject(bytes, { schemaMode = 'current' } = {}) {
   const project = JSON.parse(bytes.toString('utf8'));
-  // Authenticated 1.0.2/1.0.3 and the current writer emit schema 12. The
-  // release-integrity sentinel checks this against the canonical declaration.
-  assert.equal(project.schemaVersion, 12, 'Expected current project schema');
+  assert.ok(['current', 'known-upgrade'].includes(schemaMode), 'Unknown qualification schema mode');
+  if (schemaMode === 'current') {
+    assert.equal(
+      project.schemaVersion,
+      CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+      'Expected current project schema',
+    );
+  } else {
+    assert.ok(
+      project.schemaVersion === HISTORICAL_QUALIFICATION_PROJECT_SCHEMA ||
+        project.schemaVersion === 13 ||
+        project.schemaVersion === CURRENT_QUALIFICATION_PROJECT_SCHEMA,
+      'Expected known upgrade project schema (12, 13 or 14)',
+    );
+  }
   assert.equal(
     project.scene?.objects?.length,
     1,

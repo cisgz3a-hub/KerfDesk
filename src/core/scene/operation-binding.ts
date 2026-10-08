@@ -1,3 +1,6 @@
+import { mapBooleanCompoundBindings } from '../geometry/boolean-compound';
+import { isBooleanCompoundObject } from './boolean-compound';
+import type { ImportedSvg } from './scene-object';
 import { layerSubLayerOperationId, type Layer } from './layer';
 import type { ColoredPath, SceneObject } from './scene-object';
 
@@ -50,6 +53,19 @@ export function primaryOperationForObject(
 }
 
 export function bindSceneObjectToOperations(
+  object: SceneObject,
+  operationIds: ReadonlyArray<string>,
+): SceneObject {
+  if (isBooleanCompoundObject(object))
+    return mapBooleanCompoundBindings(
+      object,
+      bindOrdinaryObjectToOperations(object, operationIds) as ImportedSvg,
+      (operand) => bindOrdinaryObjectToOperations(operand, operationIds) as ImportedSvg,
+    );
+  return bindOrdinaryObjectToOperations(object, operationIds);
+}
+
+function bindOrdinaryObjectToOperations(
   object: SceneObject,
   operationIds: ReadonlyArray<string>,
 ): SceneObject {
@@ -118,6 +134,25 @@ export function operationArtworkCount(
  * IDs. Legacy color bindings are promoted while copying, so path-specific
  * imported operations remain path-specific. */
 export function remapSceneObjectOperationBindings(
+  object: SceneObject,
+  sourceOperations: ReadonlyArray<Layer>,
+  operationIdMap: ReadonlyMap<string, string>,
+): SceneObject {
+  if (isBooleanCompoundObject(object))
+    return mapBooleanCompoundBindings(
+      object,
+      remapOrdinaryObjectOperationBindings(object, sourceOperations, operationIdMap) as ImportedSvg,
+      (operand) =>
+        remapOrdinaryObjectOperationBindings(
+          operand,
+          sourceOperations,
+          operationIdMap,
+        ) as ImportedSvg,
+    );
+  return remapOrdinaryObjectOperationBindings(object, sourceOperations, operationIdMap);
+}
+
+function remapOrdinaryObjectOperationBindings(
   object: SceneObject,
   sourceOperations: ReadonlyArray<Layer>,
   operationIdMap: ReadonlyMap<string, string>,
@@ -199,6 +234,21 @@ function withoutPathOperationIds(path: ColoredPath): ColoredPath {
 }
 
 function transformOperationBindings(
+  object: SceneObject,
+  operations: ReadonlyArray<Layer>,
+  transform: (ids: ReadonlyArray<string>) => ReadonlyArray<string>,
+): SceneObject {
+  if (isBooleanCompoundObject(object))
+    return mapBooleanCompoundBindings(
+      object,
+      transformOrdinaryOperationBindings(object, operations, transform) as ImportedSvg,
+      (operand) =>
+        transformOrdinaryOperationBindings(operand, operations, transform) as ImportedSvg,
+    );
+  return transformOrdinaryOperationBindings(object, operations, transform);
+}
+
+function transformOrdinaryOperationBindings(
   object: SceneObject,
   operations: ReadonlyArray<Layer>,
   transform: (ids: ReadonlyArray<string>) => ReadonlyArray<string>,

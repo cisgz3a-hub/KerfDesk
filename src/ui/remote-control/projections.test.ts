@@ -126,7 +126,7 @@ describe('remote snapshots expose only the agreed metadata', () => {
     });
     useStore.getState().setMaterialLibrary({
       format: 'laserforge-material-library',
-      librarySchemaVersion: 2,
+      librarySchemaVersion: 3,
       libraryId: 'library',
       name: 'Materials',
       entries: Array.from({ length: 207 }, (_, index) => ({

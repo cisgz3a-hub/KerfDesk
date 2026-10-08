@@ -1,0 +1,30 @@
+.lf-project-sheets-bar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 4px 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.lf-project-sheets-bar > label {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.lf-project-sheets-bar select {
+  min-width: 0;
+  max-width: min(160px, 40vw);
+}
+
+.lf-project-sheets-bar > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}

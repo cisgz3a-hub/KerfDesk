@@ -24,6 +24,7 @@ export function planArrayFirstPlacement(
   copySources: ReadonlyArray<SceneObject>,
   placement: ArrayPlacement,
   idFactory: () => string,
+  protectIdentitySources = false,
 ): ArrayFirstPlacementPlan {
   const selectedIds = new Set(selected.map((object) => object.id));
   const copySourceIds = new Set(copySources.map((object) => object.id));
@@ -33,6 +34,7 @@ export function planArrayFirstPlacement(
     selectedIds,
     copySourceIds,
     placement,
+    protectIdentitySources,
   );
   const protectedCopies = copyObjectsAtArrayPlacement(
     copySources.filter((object) => protectedSourceIds.has(object.id)),
@@ -63,8 +65,9 @@ function protectedFirstPlacementSourceIds(
   selectedIds: ReadonlySet<string>,
   copySourceIds: ReadonlySet<string>,
   placement: ArrayPlacement,
+  protectIdentitySources: boolean,
 ): ReadonlySet<string> {
-  if (isIdentityArrayPlacement(placement)) return new Set();
+  if (!protectIdentitySources && isIdentityArrayPlacement(placement)) return new Set();
   const referencedOutsideClosure = dependencyIdsReferencedOutsideClosure(objects, copySourceIds);
   const groupBoundaryIds = copySourceIdsOnGroupBoundaries(groups, copySourceIds);
   const protectedIds = new Set(

@@ -26,7 +26,7 @@ export async function appPrivacyFiles() {
   const policy = {
     ...page,
     description:
-      'Read what KerfDesk sends for updates, licensing, aggregate download statistics and optional phone or MCP access. Ordinary use needs no account.',
+      'Read what KerfDesk sends for updates, licensing, downloads, optional AI, remote access and machine connections. Ordinary use needs no account.',
   };
   const context = {
     site,

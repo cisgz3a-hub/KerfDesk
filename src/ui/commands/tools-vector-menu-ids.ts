@@ -9,6 +9,8 @@ export const TOOLS_VECTOR_IDS: ReadonlyArray<CommandId> = [
   'tools.weld',
   'tools.union-silhouette',
   'tools.join-paths',
+  'tools.resize-joints',
+  'tools.prepare-stamp',
   'tools.offset-shapes',
   'tools.rubber-band-outline',
   'tools.close-paths',

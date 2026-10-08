@@ -181,3 +181,36 @@ describe('visible per-copy variable array workflow', () => {
     },
   );
 });
+
+describe('retained same-value variable arrays', () => {
+  it('renders and freezes current values even when per-copy advancement stays unchecked', async () => {
+    const close = await mount();
+    const label = [...host!.querySelectorAll('label')].find((label) =>
+      label.textContent?.includes('Keep editable array settings'),
+    )!;
+    const input = label.querySelector('input')!;
+    await act(async () => {
+      input.checked = true;
+      Simulate.change(input);
+    });
+    await columns('3');
+    await submit();
+    expect(close).toHaveBeenCalledOnce();
+    expect(mocks.render).toHaveBeenCalled();
+    const project = useStore.getState().project;
+    expect(project.arrayLayouts?.[0]).toMatchObject({
+      advanceVariables: false,
+      instances: expect.any(Array),
+    });
+    expect(
+      project.scene.objects
+        .filter((_, index) => index % 3 === 0)
+        .map((object) => (object.kind === 'text' ? object.content : '')),
+    ).toEqual(Array.from({ length: 6 }, () => 'A-010'));
+    expect(
+      project.scene.objects.every(
+        (object) => object.kind !== 'text' || object.variableTemplate === undefined,
+      ),
+    ).toBe(true);
+  });
+});

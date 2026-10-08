@@ -86,3 +86,35 @@ describe('variable barcode arrays', () => {
     ).toEqual(['SN-0010', 'SN-0011', 'SN-0012', 'SN-0013', 'SN-0014', 'SN-0015']);
   });
 });
+
+it('freezes retained barcode values and symbol geometry when the live cursor later changes', async () => {
+  const before = await barcodeState();
+  const prepared = await prepareVariableArray(before, GRID, {
+    render: renderFixture,
+    clock: () => NOW,
+  });
+  if (!prepared.ok) throw new Error(prepared.message);
+  const created = {
+    ...before,
+    ...applyArraySelection(before, GRID, () => crypto.randomUUID(), prepared.materialized, {
+      name: 'QR labels',
+    }),
+  };
+  const barcodes = created.project.scene.objects.filter(isBarcodeObject);
+  expect(barcodes.map((object) => object.spec.data)).toEqual([
+    'SN-0010',
+    'SN-0011',
+    'SN-0012',
+    'SN-0013',
+    'SN-0014',
+    'SN-0015',
+  ]);
+  expect(barcodes.every((object) => object.spec.variableTemplate === undefined)).toBe(true);
+  expect(decoded(barcodes[3])).toMatchObject({ ok: true, text: 'SN-0013' });
+  const output = await materializeVariableText(
+    { ...created.project, variables: { ...created.project.variables!, serialValue: 500 } },
+    { now: new Date('2030-01-01') },
+    renderFixture,
+  );
+  expect(output.ok && output.project.scene.objects.filter(isBarcodeObject)).toEqual(barcodes);
+});

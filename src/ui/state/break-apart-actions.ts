@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import {
   curveSubpathBounds,
   type Bounds,
@@ -62,6 +63,18 @@ function breakApartSelectionMutation(
   const selectedIds = selectedObjectIds(state);
   if (selectedIds.length === 0) return state;
   const selected = new Set(selectedIds);
+  if (
+    state.project.scene.objects.some(
+      (object) => selected.has(object.id) && isBooleanCompoundObject(object),
+    )
+  ) {
+    report(() =>
+      useToastStore
+        .getState()
+        .pushToast('Expand the compound before breaking its result apart.', 'warning'),
+    );
+    return state;
+  }
   const replacement = buildReplacementObjects(state.project.scene.objects, selected);
   report(() => reportSingleShapeTraces(replacement.singleShapeTraces));
   if (!replacement.changed) return state;

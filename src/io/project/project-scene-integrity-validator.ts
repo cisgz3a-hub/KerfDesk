@@ -45,10 +45,24 @@ function validateSceneArrayBudgets(arrays: SceneArrays): string | null {
   for (const group of arrays.groups) groupMembers += groupMemberCount(group);
   return (
     overBudget('scene.layers', arrays.layers.length, PROJECT_SCENE_LIMITS.layers) ??
-    overBudget('scene.objects', arrays.objects.length, PROJECT_SCENE_LIMITS.objects) ??
+    overBudget(
+      'scene.objects',
+      arrays.objects.length + retainedOperandCount(arrays.objects),
+      PROJECT_SCENE_LIMITS.objects,
+    ) ??
     overBudget('scene.groups', arrays.groups.length, PROJECT_SCENE_LIMITS.groups) ??
     overBudget('scene.groups.objectIds', groupMembers, PROJECT_SCENE_LIMITS.groupMembers)
   );
+}
+function retainedOperandCount(objects: ReadonlyArray<unknown>): number {
+  let total = 0;
+  for (const object of objects) {
+    if (!isObject(object)) continue;
+    const compound = object['booleanCompound'];
+    if (isObject(compound) && Array.isArray(compound['operands']))
+      total += compound['operands'].length;
+  }
+  return total;
 }
 
 function validateSceneIdentities(arrays: SceneArrays): string | null {
@@ -82,6 +96,7 @@ function validateUniqueIds(items: ReadonlyArray<unknown>, path: string): string 
   const seen = new Set<string>();
   for (const [index, item] of items.entries()) {
     if (!isObject(item) || typeof item['id'] !== 'string') continue;
+    if (item['id'].trim() === '') return `invalid \`${path}[${index}].id\`: blank id`;
     if (seen.has(item['id'])) return `invalid \`${path}[${index}].id\`: duplicate id`;
     seen.add(item['id']);
   }

@@ -16,7 +16,11 @@ export function ConnectedMachineProfile(): JSX.Element {
   const driver = connected
     ? selectControllerDriver(controllerKind, commandSet ?? undefined)
     : selectControllerDriver(device.controllerKind, device.controllerCommandSet);
-  const port = connected ? connectedPortText(usbIdLabel(portInfo), baudRate) : null;
+  const port = connected
+    ? portInfo?.transport === 'tcp'
+      ? 'TCP network channel'
+      : connectedPortText(usbIdLabel(portInfo), baudRate)
+    : null;
   return (
     <div
       className="lf-connected-profile"

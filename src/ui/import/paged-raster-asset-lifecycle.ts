@@ -1,6 +1,7 @@
 import type { Project, RasterImage, SceneObject } from '../../core/scene';
 import type { InteractionHistorySnapshot } from '../state/interaction-history-snapshot';
 import { IndexedDbPagedAssetLeaseRepository } from './paged-asset-indexeddb-leases';
+import { projectArchiveAssetIds } from './paged-raster-sheet-assets';
 
 export type PagedRasterOwnershipState = {
   readonly project: Project;
@@ -93,7 +94,10 @@ export class PagedRasterAssetLifecycle {
 export function collectPagedRasterAssetIds(state: PagedRasterOwnershipState): Set<string> {
   const assetIds = new Set<string>();
   const seenObjects = new Set<ReadonlyArray<SceneObject>>();
-  for (const project of projectsIn(state)) collectOnce(project.scene.objects);
+  for (const project of projectsIn(state)) {
+    collectOnce(project.scene.objects);
+    for (const assetId of projectArchiveAssetIds(project)) assetIds.add(assetId);
+  }
   if (state.sceneClipboard !== null) collectOnce(state.sceneClipboard.objects);
   return assetIds;
 
@@ -144,11 +148,23 @@ function sameOwnershipInputs(
   current: PagedRasterOwnershipState,
 ): boolean {
   return (
-    previous.project.scene.objects === current.project.scene.objects &&
+    sameProjectOwnership(previous.project, current.project) &&
     previous.undoStack === current.undoStack &&
     previous.redoStack === current.redoStack &&
-    previous.pendingUndo?.project.scene.objects === current.pendingUndo?.project.scene.objects &&
+    sameProjectOwnership(previous.pendingUndo?.project, current.pendingUndo?.project) &&
     previous.sceneClipboard?.objects === current.sceneClipboard?.objects
+  );
+}
+
+function sameProjectOwnership(
+  previous: Project | undefined,
+  current: Project | undefined,
+): boolean {
+  return (
+    previous?.scene.objects === current?.scene.objects &&
+    previous?.sheetBook === current?.sheetBook &&
+    previous?.productionManifest === current?.productionManifest &&
+    previous?.arrayLayouts === current?.arrayLayouts
   );
 }
 

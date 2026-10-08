@@ -119,7 +119,7 @@ export function hasClosedImageMaskGeometry(object: SceneObject): boolean {
   return closedMaskContours(object).length > 0;
 }
 
-function closedMaskContours(object: SceneObject): ReadonlyArray<ReadonlyArray<Vec2>> {
+export function closedMaskContours(object: SceneObject): ReadonlyArray<ReadonlyArray<Vec2>> {
   switch (object.kind) {
     case 'imported-svg':
     case 'text':

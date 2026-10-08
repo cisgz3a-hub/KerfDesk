@@ -103,7 +103,7 @@ function control(label: string): HTMLInputElement | HTMLSelectElement {
     candidate.textContent?.startsWith(label),
   );
   const found = row?.querySelector<HTMLInputElement | HTMLSelectElement>(
-    'input[type="number"], input[type="checkbox"], select',
+    'input[type="text"], input[type="checkbox"], select',
   );
   if (found === null || found === undefined) throw new Error(`${label} missing`);
   return found;
@@ -130,6 +130,11 @@ describe('Optimize Shapes dialog', () => {
   it('applies what the status line promised as one undo step and closes', async () => {
     await open([tracedCircle('a'), tracedCircle('l', true)]);
     const promised = await settled();
+    expect(
+      document.querySelector('[aria-label="Optimize Shapes before and after"]'),
+    ).not.toBeNull();
+    expect(document.querySelector('[data-testid="comparison-original"]')).not.toBeNull();
+    expect(document.querySelector('[data-testid="comparison-result"]')).not.toBeNull();
     expect(promised).toMatch(/ 1 locked object is left as it is\.$/);
 
     await act(async () => button('Optimize').click());
@@ -141,6 +146,34 @@ describe('Optimize Shapes dialog', () => {
     expect(useToastStore.getState().toasts.at(-1)?.message).toContain(
       `400 points became ${segments} segments`,
     );
+  });
+
+  it('accepts arithmetic and units and refuses invalid active settings', async () => {
+    await open([tracedCircle('a')]);
+    const before = useStore.getState().project;
+    for (const [label, value] of [
+      ['Smoothing (mm)', '1/100in'],
+      ['Corner angle (°)', '15+15deg'],
+      ['Tolerance (mm)', '0.001in'],
+    ]) {
+      const input = control(label!) as HTMLInputElement;
+      await act(async () => {
+        input.value = value!;
+        Simulate.change(input);
+      });
+    }
+    expect(await settled()).toMatch(/^400 points become/);
+    expect(button('Optimize').disabled).toBe(false);
+    const tolerance = control('Tolerance (mm)') as HTMLInputElement;
+    await act(async () => {
+      tolerance.value = '1/0';
+      Simulate.change(tolerance);
+    });
+    expect(status()).toContain('Tolerance:');
+    expect(tolerance.getAttribute('aria-invalid')).toBe('true');
+    expect(button('Optimize').disabled).toBe(true);
+    expect(useStore.getState().project).toBe(before);
+    expect(useStore.getState().undoStack).toHaveLength(0);
   });
 
   it('asks for Smooth or Fit when both are off', async () => {

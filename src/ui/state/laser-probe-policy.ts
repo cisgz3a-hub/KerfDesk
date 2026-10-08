@@ -168,7 +168,7 @@ const SPINDLE_UNKNOWN_REASON =
 // holds that observation.
 // https://github.com/gnea/grbl/blob/master/grbl/report.c
 // https://github.com/grblHAL/core/blob/master/report.c
-function spindleOffBlockReason(
+export function spindleOffBlockReason(
   speed: number | null,
   accessories: LaserState['accessoryCache'],
 ): string | null {

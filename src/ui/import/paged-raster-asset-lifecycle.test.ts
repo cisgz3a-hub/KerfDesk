@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { serializeProject } from '../../io/project';
 import {
   createProject,
   IDENTITY_TRANSFORM,
@@ -32,6 +33,52 @@ const ASSET = {
 } as const;
 
 describe('PagedRasterAssetLifecycle', () => {
+  it('retains inactive sheet source/luma assets when only the sheet book changes', async () => {
+    const previous = state(createProject());
+    const archived = {
+      id: 'image',
+      name: 'Image sheet',
+      projectJson: serializeProject(projectWith(pagedRaster('archived'))),
+    };
+    const project = {
+      ...previous.project,
+      sheetBook: { activeId: 'blank', activeName: 'Blank', inactive: [archived] },
+    };
+    const current = { ...previous, project };
+    const repository = { cancelDelete: vi.fn(async () => undefined) };
+    const lifecycle = new PagedRasterAssetLifecycle(repository);
+    await lifecycle.transition(previous, current);
+    expect(repository.cancelDelete.mock.calls).toEqual([['source-pages'], ['luma-pages']]);
+    expect([...collectPagedRasterAssetIds(current)].sort()).toEqual(['luma-pages', 'source-pages']);
+    await lifecycle.transition(current, { ...current });
+    expect(repository.cancelDelete).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps archived pages owned by undo and pending history even with a blank active sheet', () => {
+    const blank = createProject();
+    const archived = {
+      ...blank,
+      sheetBook: {
+        activeId: 'blank',
+        activeName: 'Blank',
+        inactive: [
+          {
+            id: 'image',
+            name: 'Image',
+            projectJson: serializeProject(projectWith(pagedRaster('archived'))),
+          },
+        ],
+      },
+    };
+    expect(
+      [
+        ...collectPagedRasterAssetIds(
+          state(blank, { undoStack: [archived], pendingUndo: archived }),
+        ),
+      ].sort(),
+    ).toEqual(['luma-pages', 'source-pages']);
+  });
+
   it('does not visit project/history objects on unrelated store updates', async () => {
     const readObjects = vi.fn(() => [pagedRaster('untouched')]);
     const objects = new Proxy([pagedRaster('untouched')], {

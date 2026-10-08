@@ -1,0 +1,3924 @@
+{
+  "numTotalTestSuites": 103,
+  "numPassedTestSuites": 103,
+  "numFailedTestSuites": 0,
+  "numPendingTestSuites": 0,
+  "numTotalTests": 347,
+  "numPassedTests": 347,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "numTodoTests": 0,
+  "snapshot": {
+    "added": 0,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0,
+    "didUpdate": false
+  },
+  "startTime": 1791334984606,
+  "success": true,
+  "testResults": [
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["the best recipe for a new operation (ADR-496)"],
+          "fullName": "the best recipe for a new operation (ADR-496) takes the recipe for the job material, thickness and mode",
+          "status": "passed",
+          "title": "takes the recipe for the job material, thickness and mode",
+          "duration": 1.838200000000029,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the best recipe for a new operation (ADR-496)"],
+          "fullName": "the best recipe for a new operation (ADR-496) never gives a cut a recipe for another thickness",
+          "status": "passed",
+          "title": "never gives a cut a recipe for another thickness",
+          "duration": 0.3204000000000633,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the best recipe for a new operation (ADR-496)"],
+          "fullName": "the best recipe for a new operation (ADR-496) lets an engraving take another thickness when none matches",
+          "status": "passed",
+          "title": "lets an engraving take another thickness when none matches",
+          "duration": 0.18319999999994252,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the best recipe for a new operation (ADR-496)"],
+          "fullName": "the best recipe for a new operation (ADR-496) never changes the operation mode or the material",
+          "status": "passed",
+          "title": "never changes the operation mode or the material",
+          "duration": 0.189200000000028,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the best recipe for a new operation (ADR-496)"],
+          "fullName": "the best recipe for a new operation (ADR-496) prefers this machine's recipe, then calibrated over starter",
+          "status": "passed",
+          "title": "prefers this machine's recipe, then calibrated over starter",
+          "duration": 0.407100000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["the best recipe for a new operation (ADR-496)"],
+          "fullName": "the best recipe for a new operation (ADR-496) prefers a cut over a score for a Line, and skips unsupported recipes",
+          "status": "passed",
+          "title": "prefers a cut over a score for a Line, and skips unsupported recipes",
+          "duration": 0.2015999999999849,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["job material choices (ADR-496)"],
+          "fullName": "job material choices (ADR-496) lists each material once with its thicknesses",
+          "status": "passed",
+          "title": "lists each material once with its thicknesses",
+          "duration": 10.697700000000054,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335010084,
+      "endTime": 1791335010098.6978,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/material-library/auto-recipe.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes captures backed cut settings without project/session layer fields",
+          "status": "passed",
+          "title": "captures backed cut settings without project/session layer fields",
+          "duration": 3.225900000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes captures image-mode recipe fields used by raster output",
+          "status": "passed",
+          "title": "captures image-mode recipe fields used by raster output",
+          "duration": 0.3807000000000471,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes applies recipe fields while preserving target layer identity and output toggles",
+          "status": "passed",
+          "title": "applies recipe fields while preserving target layer identity and output toggles",
+          "duration": 0.8568000000000211,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes returns a dynamic layer to Auto when the applied recipe has no power mode",
+          "status": "passed",
+          "title": "returns a dynamic layer to Auto when the applied recipe has no power mode",
+          "duration": 0.26939999999990505,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes returns a normalized layer patch without session fields",
+          "status": "passed",
+          "title": "returns a normalized layer patch without session fields",
+          "duration": 0.2898999999999887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes strips runtime extra fields from recipe patches before applying to layers",
+          "status": "passed",
+          "title": "strips runtime extra fields from recipe patches before applying to layers",
+          "duration": 0.34950000000003456,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes validates material recipes from unknown values",
+          "status": "passed",
+          "title": "validates material recipes from unknown values",
+          "duration": 0.7340000000000373,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes accepts older recipes without air assist and patches them as off",
+          "status": "passed",
+          "title": "accepts older recipes without air assist and patches them as off",
+          "duration": 0.7036000000000513,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes defaults older recipes without kerf compensation to zero",
+          "status": "passed",
+          "title": "defaults older recipes without kerf compensation to zero",
+          "duration": 0.3265999999999849,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes defaults older recipes without tabs / bridges to off",
+          "status": "passed",
+          "title": "defaults older recipes without tabs / bridges to off",
+          "duration": 0.33969999999999345,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes defaults legacy image-direction fields and clears target-local scan-offset inheritance",
+          "status": "passed",
+          "title": "defaults legacy image-direction fields and clears target-local scan-offset inheritance",
+          "duration": 0.3007000000000062,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library recipes"],
+          "fullName": "material library recipes normalizes recipe numbers for safe assignment",
+          "status": "passed",
+          "title": "normalizes recipe numbers for safe assignment",
+          "duration": 0.1957999999999629,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334995108,
+      "endTime": 1791334995116.3396,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/material-library/material-library.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["material recipe profile matching"],
+          "fullName": "material recipe profile matching ranks exact profile before machine family, laser model, optical power, then generic",
+          "status": "passed",
+          "title": "ranks exact profile before machine family, laser model, optical power, then generic",
+          "duration": 2.1831999999999425,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material recipe profile matching"],
+          "fullName": "material recipe profile matching matches diode head recipes by technology and wavelength before power-only recipes",
+          "status": "passed",
+          "title": "matches diode head recipes by technology and wavelength before power-only recipes",
+          "duration": 1.0515000000000327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material recipe profile matching"],
+          "fullName": "material recipe profile matching filters incompatible laser head metadata before ranking recipes",
+          "status": "passed",
+          "title": "filters incompatible laser head metadata before ranking recipes",
+          "duration": 0.2900000000000773,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material recipe profile matching"],
+          "fullName": "material recipe profile matching filters material, operation, and thickness mismatches before ranking",
+          "status": "passed",
+          "title": "filters material, operation, and thickness mismatches before ranking",
+          "duration": 0.2515999999999394,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material recipe profile matching"],
+          "fullName": "material recipe profile matching surfaces confidence and warning text without treating unsupported recipes as safe matches",
+          "status": "passed",
+          "title": "surfaces confidence and warning text without treating unsupported recipes as safe matches",
+          "duration": 0.45639999999991687,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335013460,
+      "endTime": 1791335013464.4563,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/material-library/material-matching.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes recreates raster output with pass-through=false",
+          "status": "passed",
+          "title": "recreates raster output with pass-through=false",
+          "duration": 13.614599999999882,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes recreates raster output with pass-through=true",
+          "status": "passed",
+          "title": "recreates raster output with pass-through=true",
+          "duration": 2.1374000000000706,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes recreates the compiled and emitted process on fresh artwork (CNC=false)",
+          "status": "passed",
+          "title": "recreates the compiled and emitted process on fresh artwork (CNC=false)",
+          "duration": 11.330600000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes recreates the compiled and emitted process on fresh artwork (CNC=true)",
+          "status": "passed",
+          "title": "recreates the compiled and emitted process on fresh artwork (CNC=true)",
+          "duration": 15.133699999999862,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes keeps unselected shared operations unchanged and copies independently to each target",
+          "status": "passed",
+          "title": "keeps unselected shared operations unchanged and copies independently to each target",
+          "duration": 0.7355999999999767,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes preserves independently assigned paths and refuses a mismatched path count atomically",
+          "status": "passed",
+          "title": "preserves independently assigned paths and refuses a mismatched path count atomically",
+          "duration": 2.4562000000000808,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes snapshots active CNC cutters and avoids conflicting destination cutter IDs",
+          "status": "passed",
+          "title": "snapshots active CNC cutters and avoids conflicting destination cutter IDs",
+          "duration": 0.8390999999999167,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["reusable ordered process recipes"],
+          "fullName": "reusable ordered process recipes reports missing cutter definitions and incompatible machine kinds",
+          "status": "passed",
+          "title": "reports missing cutter definitions and incompatible machine kinds",
+          "duration": 0.7246999999999844,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335004996,
+      "endTime": 1791335005042.7246,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/material-library/process-recipe.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["starterLibraryEntryForProfileId"],
+          "fullName": "starterLibraryEntryForProfileId returns the catalogued starter presets for a known machine profile",
+          "status": "passed",
+          "title": "returns the catalogued starter presets for a known machine profile",
+          "duration": 1.7311999999999443,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["starterLibraryEntryForProfileId"],
+          "fullName": "starterLibraryEntryForProfileId returns null for a profile that has no catalogued starters",
+          "status": "passed",
+          "title": "returns null for a profile that has no catalogued starters",
+          "duration": 0.18280000000004293,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["starterLibraryEntryForProfileId"],
+          "fullName": "starterLibraryEntryForProfileId returns null when the profile id is undefined",
+          "status": "passed",
+          "title": "returns null when the profile id is undefined",
+          "duration": 0.1348000000000411,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335019395,
+      "endTime": 1791335019397.1829,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/material-library/starter-catalog.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["material test grids that vary any two settings (ADR-497)"],
+          "fullName": "material test grids that vary any two settings (ADR-497) burns power rows by passes columns, gentlest cell first",
+          "status": "passed",
+          "title": "burns power rows by passes columns, gentlest cell first",
+          "duration": 17.694999999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test grids that vary any two settings (ADR-497)"],
+          "fullName": "material test grids that vary any two settings (ADR-497) burns speed rows by passes columns",
+          "status": "passed",
+          "title": "burns speed rows by passes columns",
+          "duration": 3.8296000000000276,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test grids that vary any two settings (ADR-497)"],
+          "fullName": "material test grids that vary any two settings (ADR-497) keeps one column per whole number of passes",
+          "status": "passed",
+          "title": "keeps one column per whole number of passes",
+          "duration": 1.1339000000000397,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test grids that vary any two settings (ADR-497)"],
+          "fullName": "material test grids that vary any two settings (ADR-497) varies hatch spacing from widest to densest",
+          "status": "passed",
+          "title": "varies hatch spacing from widest to densest",
+          "duration": 0.9363999999998214,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test grids that vary any two settings (ADR-497)"],
+          "fullName": "material test grids that vary any two settings (ADR-497) varies speed along columns and burns the feed the job runs",
+          "status": "passed",
+          "title": "varies speed along columns and burns the feed the job runs",
+          "duration": 3.4226000000001022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test grids that vary any two settings (ADR-497)"],
+          "fullName": "material test grids that vary any two settings (ADR-497) never varies one setting on both axes",
+          "status": "passed",
+          "title": "never varies one setting on both axes",
+          "duration": 0.6843000000001211,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cut test grids (ADR-497)"],
+          "fullName": "cut test grids (ADR-497) cuts each cell outline with power rows by passes columns",
+          "status": "passed",
+          "title": "cuts each cell outline with power rows by passes columns",
+          "duration": 1.4841999999998734,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["cut test grids (ADR-497)"],
+          "fullName": "cut test grids (ADR-497) has no hatch spacing to vary",
+          "status": "passed",
+          "title": "has no hatch spacing to vary",
+          "duration": 0.45440000000007785,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test runways (ADR-497)"],
+          "fullName": "material test runways (ADR-497) keeps the stored 5 mm where it is long enough",
+          "status": "passed",
+          "title": "keeps the stored 5 mm where it is long enough",
+          "duration": 0.6286000000000058,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test runways (ADR-497)"],
+          "fullName": "material test runways (ADR-497) sizes each row for its fastest cell and keeps the runway right of the origin",
+          "status": "passed",
+          "title": "sizes each row for its fastest cell and keeps the runway right of the origin",
+          "duration": 6.951800000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material test runways (ADR-497)"],
+          "fullName": "material test runways (ADR-497) sizes speed rows one by one",
+          "status": "passed",
+          "title": "sizes speed rows one by one",
+          "duration": 0.6158000000000357,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334999696,
+      "endTime": 1791334999733.6157,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/job/material-test-grid-axes.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["generateMaterialTestGrid"],
+          "fullName": "generateMaterialTestGrid creates fill layers and closed square objects for each test cell",
+          "status": "passed",
+          "title": "creates fill layers and closed square objects for each test cell",
+          "duration": 5.70270000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generateMaterialTestGrid"],
+          "fullName": "generateMaterialTestGrid adds burned speed and power labels matching the generated settings",
+          "status": "passed",
+          "title": "adds burned speed and power labels matching the generated settings",
+          "duration": 0.9652000000000953,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generateMaterialTestGrid"],
+          "fullName": "generateMaterialTestGrid burns effective speed labels and preserves requested-versus-effective feed facts",
+          "status": "passed",
+          "title": "burns effective speed labels and preserves requested-versus-effective feed facts",
+          "duration": 9.42100000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generateMaterialTestGrid"],
+          "fullName": "generateMaterialTestGrid orders rows fastest-to-slowest and columns lowest-to-highest power",
+          "status": "passed",
+          "title": "orders rows fastest-to-slowest and columns lowest-to-highest power",
+          "duration": 0.8044999999999618,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["generateMaterialTestGrid"],
+          "fullName": "generateMaterialTestGrid compiles the first emitted group as the lowest-risk cell",
+          "status": "passed",
+          "title": "compiles the first emitted group as the lowest-risk cell",
+          "duration": 2.6205999999999676,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335008489,
+      "endTime": 1791335008508.6206,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/job/material-test-grid.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) spreads evenly all the way round exactly as before when no arc is given",
+          "status": "passed",
+          "title": "spreads evenly all the way round exactly as before when no arc is given",
+          "duration": 2.506399999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) places copies from the start to the end angle, both included",
+          "status": "passed",
+          "title": "places copies from the start to the end angle, both included",
+          "duration": 0.8464000000000169,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) does not double the last copy when the end is a whole turn from the start",
+          "status": "passed",
+          "title": "does not double the last copy when the end is a whole turn from the start",
+          "duration": 0.6557999999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) runs anticlockwise when the end is below the start",
+          "status": "passed",
+          "title": "runs anticlockwise when the end is below the start",
+          "duration": 0.18389999999999418,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) places copies a set step apart, either way round",
+          "status": "passed",
+          "title": "places copies a set step apart, either way round",
+          "duration": 0.22930000000008022,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) turns rotated copies by their own angle on a partial arc",
+          "status": "passed",
+          "title": "turns rotated copies by their own angle on a partial arc",
+          "duration": 0.1937000000000353,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) keeps a single copy at the start and never divides by zero",
+          "status": "passed",
+          "title": "keeps a single copy at the start and never divides by zero",
+          "duration": 0.8532999999999902,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) keeps malformed direct-call angles finite",
+          "status": "passed",
+          "title": "keeps malformed direct-call angles finite",
+          "duration": 0.34569999999996526,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array arcs (LBG-T14)"],
+          "fullName": "circular array arcs (LBG-T14) recognises whole turns only",
+          "status": "passed",
+          "title": "recognises whole turns only",
+          "duration": 0.2703999999999951,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335009248,
+      "endTime": 1791335009254.3457,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/scene/array-circular-layout.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) lays out exactly as before when every new option is at its default",
+          "status": "passed",
+          "title": "lays out exactly as before when every new option is at its default",
+          "duration": 2.320500000000038,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) spaces copies by the distance between centres, which may be less than the design",
+          "status": "passed",
+          "title": "spaces copies by the distance between centres, which may be less than the design",
+          "duration": 0.3854000000000042,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) shifts every other row sideways and every other column up or down",
+          "status": "passed",
+          "title": "shifts every other row sideways and every other column up or down",
+          "duration": 0.36350000000004457,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) builds leftward and upward from the original, which stays put",
+          "status": "passed",
+          "title": "builds leftward and upward from the original, which stays put",
+          "duration": 0.35450000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) mirrors alternate columns and rows about the design centre",
+          "status": "passed",
+          "title": "mirrors alternate columns and rows about the design centre",
+          "duration": 0.3161999999999807,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) cancels two mirrors in the same direction, which gives a checkerboard",
+          "status": "passed",
+          "title": "cancels two mirrors in the same direction, which gives a checkerboard",
+          "duration": 0.18360000000006949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) never shifts or mirrors the original",
+          "status": "passed",
+          "title": "never shifts or mirrors the original",
+          "duration": 0.1933999999999969,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid array extras (LBG-T13)"],
+          "fullName": "grid array extras (LBG-T13) ignores non-finite shifts from a direct call",
+          "status": "passed",
+          "title": "ignores non-finite shifts from a direct call",
+          "duration": 0.16290000000003602,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335011783,
+      "endTime": 1791335011787.3162,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/scene/array-grid-layout.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements builds a deterministic row-major grid from the original position",
+          "status": "passed",
+          "title": "builds a deterministic row-major grid from the original position",
+          "duration": 2.238200000000006,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements places a circular array around the requested center",
+          "status": "passed",
+          "title": "places a circular array around the requested center",
+          "duration": 1.009200000000078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements keeps exact quadrant placement at the source for start angle 270",
+          "status": "passed",
+          "title": "keeps exact quadrant placement at the source for start angle 270",
+          "duration": 0.30550000000005184,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements keeps exact quadrant placement at the source for start angle -90",
+          "status": "passed",
+          "title": "keeps exact quadrant placement at the source for start angle -90",
+          "duration": 0.2542999999999438,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements reduces huge finite start angle 1e+308 before trigonometry",
+          "status": "passed",
+          "title": "reduces huge finite start angle 1e+308 before trigonometry",
+          "duration": 0.5923999999999978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements reduces huge finite start angle -1e+308 before trigonometry",
+          "status": "passed",
+          "title": "reduces huge finite start angle -1e+308 before trigonometry",
+          "duration": 0.30339999999989686,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements reduces huge finite start angle 1.7976931348623157e+308 before trigonometry",
+          "status": "passed",
+          "title": "reduces huge finite start angle 1.7976931348623157e+308 before trigonometry",
+          "duration": 0.2219000000000051,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements rotates copies in place over a full turn without duplicating the endpoint",
+          "status": "passed",
+          "title": "rotates copies in place over a full turn without duplicating the endpoint",
+          "duration": 0.30120000000010805,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements supports a signed partial point rotation and an identity-only count",
+          "status": "passed",
+          "title": "supports a signed partial point rotation and an identity-only count",
+          "duration": 0.26350000000002183,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements materializes every requested placement without a policy cap",
+          "status": "passed",
+          "title": "materializes every requested placement without a policy cap",
+          "duration": 1.5750999999999067,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacements"],
+          "fullName": "arrayPlacements normalizes malformed direct-call inputs without fabricating non-finite placements",
+          "status": "passed",
+          "title": "normalizes malformed direct-call inputs without fabricating non-finite placements",
+          "duration": 0.8857999999999038,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacementCount"],
+          "fullName": "arrayPlacementCount says how many placements arrayPlacements makes without making them",
+          "status": "passed",
+          "title": "says how many placements arrayPlacements makes without making them",
+          "duration": 1.1231000000000222,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["arrayPlacementCount"],
+          "fullName": "arrayPlacementCount counts a request no project could hold as the number it asks for",
+          "status": "passed",
+          "title": "counts a request no project could hold as the number it asks for",
+          "duration": 0.23900000000003274,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335007373,
+      "endTime": 1791335007383.239,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/scene/array-layout.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["planVariableBatchSequence"],
+          "fullName": "planVariableBatchSequence binds each ordered slot to the current sequence value before advancing",
+          "status": "passed",
+          "title": "binds each ordered slot to the current sequence value before advancing",
+          "duration": 2.56880000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["planVariableBatchSequence"],
+          "fullName": "planVariableBatchSequence is deterministic and does not retain or inspect seed geometry",
+          "status": "passed",
+          "title": "is deterministic and does not retain or inspect seed geometry",
+          "duration": 0.5843999999999596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["planVariableBatchSequence"],
+          "fullName": "planVariableBatchSequence adds no second slot cap or rewrite",
+          "status": "passed",
+          "title": "adds no second slot cap or rewrite",
+          "duration": 1.4488999999999805,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["planVariableBatchSequence"],
+          "fullName": "planVariableBatchSequence keeps serial-only record identity and inherited safe-integer behavior",
+          "status": "passed",
+          "title": "keeps serial-only record identity and inherited safe-integer behavior",
+          "duration": 0.3069999999999027,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["planVariableBatchSequence"],
+          "fullName": "planVariableBatchSequence uses exact bounded arithmetic for maximum safe strides",
+          "status": "passed",
+          "title": "uses exact bounded arithmetic for maximum safe strides",
+          "duration": 0.3594999999999118,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["planVariableBatchSequence"],
+          "fullName": "planVariableBatchSequence returns an unchanged cursor for an empty supplied slot list",
+          "status": "passed",
+          "title": "returns an unchanged cursor for an empty supplied slot list",
+          "duration": 0.1675999999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335014301,
+      "endTime": 1791335014307.1675,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/variables/batch-sequence.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate applies a copy slot to an injected cursor before a field-relative serial offset",
+          "status": "passed",
+          "title": "applies a copy slot to an injected cursor before a field-relative serial offset",
+          "duration": 2.600400000000036,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate reports an invalid copied serial context without throwing (NaN)",
+          "status": "passed",
+          "title": "reports an invalid copied serial context without throwing (NaN)",
+          "duration": 0.8260999999999967,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate reports an invalid copied serial context without throwing (Infinity)",
+          "status": "passed",
+          "title": "reports an invalid copied serial context without throwing (Infinity)",
+          "duration": 0.2237999999999829,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate reports an invalid copied serial context without throwing (-1)",
+          "status": "passed",
+          "title": "reports an invalid copied serial context without throwing (-1)",
+          "duration": 0.191599999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate reports an invalid copied serial context without throwing (0.5)",
+          "status": "passed",
+          "title": "reports an invalid copied serial context without throwing (0.5)",
+          "duration": 0.1772999999999456,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 0",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 0",
+          "duration": 0.41650000000004184,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 1",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 1",
+          "duration": 0.2119000000000142,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 2",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 2",
+          "duration": 0.17250000000001364,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 3",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 3",
+          "duration": 0.1675999999999931,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 4",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 4",
+          "duration": 0.19800000000009277,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 5",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 5",
+          "duration": 0.18250000000000455,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 6",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 6",
+          "duration": 0.10400000000004184,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 7",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 7",
+          "duration": 0.06919999999990978,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 8",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 8",
+          "duration": 0.07029999999997472,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 9",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 9",
+          "duration": 0.0686999999999216,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 10",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 10",
+          "duration": 0.06880000000001019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 11",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 11",
+          "duration": 0.07100000000002638,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for malformed token 12",
+          "status": "passed",
+          "title": "returns a structured error for malformed token 12",
+          "duration": 0.06189999999992324,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for a malformed template 0",
+          "status": "passed",
+          "title": "returns a structured error for a malformed template 0",
+          "duration": 0.11660000000006221,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for a malformed template 1",
+          "status": "passed",
+          "title": "returns a structured error for a malformed template 1",
+          "duration": 0.05910000000005766,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for a malformed template 2",
+          "status": "passed",
+          "title": "returns a structured error for a malformed template 2",
+          "duration": 0.05360000000007403,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate returns a structured error for a malformed template 3",
+          "status": "passed",
+          "title": "returns a structured error for a malformed template 3",
+          "duration": 0.0867999999999256,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates every typed token from one injected context",
+          "status": "passed",
+          "title": "evaluates every typed token from one injected context",
+          "duration": 0.7147999999999683,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate reports missing CSV data and out-of-range records without substituting silently",
+          "status": "passed",
+          "title": "reports missing CSV data and out-of-range records without substituting silently",
+          "duration": 0.33989999999994325,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate resolves CSV headers by exact identity before a unique canonical fallback",
+          "status": "passed",
+          "title": "resolves CSV headers by exact identity before a unique canonical fallback",
+          "duration": 0.34389999999996235,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate reports canonical header ambiguity independent of header order",
+          "status": "passed",
+          "title": "reports canonical header ambiguity independent of header order",
+          "duration": 0.20069999999998345,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate does not treat compatibility-only forms as the same CSV header",
+          "status": "passed",
+          "title": "does not treat compatibility-only forms as the same CSV header",
+          "duration": 0.11410000000000764,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate normalizes the final joined value after token boundaries are composed",
+          "status": "passed",
+          "title": "normalizes the final joined value after token boundaries are composed",
+          "duration": 0.13139999999998508,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'base operation' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'base operation' from the explicitly bound operation",
+          "duration": 0.2623999999999569,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'scale only' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'scale only' from the explicitly bound operation",
+          "duration": 0.10819999999989705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'override only' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'override only' from the explicitly bound operation",
+          "duration": 0.25139999999998963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'override with scale' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'override with scale' from the explicitly bound operation",
+          "duration": 0.1150000000000091,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'zero scale' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'zero scale' from the explicitly bound operation",
+          "duration": 0.07839999999998781,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'zero-power override' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'zero-power override' from the explicitly bound operation",
+          "duration": 0.06709999999998217,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate evaluates 'fractional scale and partial override' from the explicitly bound operation",
+          "status": "passed",
+          "title": "evaluates 'fractional scale and partial override' from the explicitly bound operation",
+          "duration": 0.09730000000001837,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["evaluateVariableTemplate"],
+          "fullName": "evaluateVariableTemplate does not replace a missing explicit operation with same-color settings",
+          "status": "passed",
+          "title": "does not replace a missing explicit operation with same-color settings",
+          "duration": 0.11520000000007258,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334994644,
+      "endTime": 1791334994653.2515,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/variables/evaluate-template.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["parseVariableCsv"],
+          "fullName": "parseVariableCsv parses RFC 4180 commas, escaped quotes, CRLF, and quoted newlines",
+          "status": "passed",
+          "title": "parses RFC 4180 commas, escaped quotes, CRLF, and quoted newlines",
+          "duration": 2.2998999999999796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv"],
+          "fullName": "parseVariableCsv preserves empty fields and an empty final field",
+          "status": "passed",
+          "title": "preserves empty fields and an empty final field",
+          "duration": 0.2918000000000802,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv"],
+          "fullName": "parseVariableCsv preserves canonically equivalent headers and records as distinct raw identities",
+          "status": "passed",
+          "title": "preserves canonically equivalent headers and records as distinct raw identities",
+          "duration": 0.24680000000000746,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv"],
+          "fullName": "parseVariableCsv rejects unterminated quotes, duplicate headers, and uneven rows",
+          "status": "passed",
+          "title": "rejects unterminated quotes, duplicate headers, and uneven rows",
+          "duration": 1.0016999999999143,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv spreadsheet exports"],
+          "fullName": "parseVariableCsv spreadsheet exports skips blank lines instead of making empty records or uneven rows",
+          "status": "passed",
+          "title": "skips blank lines instead of making empty records or uneven rows",
+          "duration": 0.4757000000000744,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv spreadsheet exports"],
+          "fullName": "parseVariableCsv spreadsheet exports keeps an explicitly quoted empty value as a record",
+          "status": "passed",
+          "title": "keeps an explicitly quoted empty value as a record",
+          "duration": 0.24350000000004002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv spreadsheet exports"],
+          "fullName": "parseVariableCsv spreadsheet exports numbers error rows as the spreadsheet shows them, blank lines included",
+          "status": "passed",
+          "title": "numbers error rows as the spreadsheet shows them, blank lines included",
+          "duration": 0.17049999999994725,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv spreadsheet exports"],
+          "fullName": "parseVariableCsv spreadsheet exports reads semicolon- and tab-separated exports by their header row",
+          "status": "passed",
+          "title": "reads semicolon- and tab-separated exports by their header row",
+          "duration": 0.25729999999998654,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv spreadsheet exports"],
+          "fullName": "parseVariableCsv spreadsheet exports keeps commas as the separator when the header row has one or has no separator",
+          "status": "passed",
+          "title": "keeps commas as the separator when the header row has one or has no separator",
+          "duration": 0.22540000000003602,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["parseVariableCsv spreadsheet exports"],
+          "fullName": "parseVariableCsv spreadsheet exports stores a line break inside a quoted cell as LF only",
+          "status": "passed",
+          "title": "stores a line break inside a quoted cell as LF only",
+          "duration": 0.19200000000000728,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335015047,
+      "endTime": 1791335015053.2253,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/variables/parse-csv.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["MaterialTestDialog settings to vary (ADR-497)"],
+          "fullName": "MaterialTestDialog settings to vary (ADR-497) swaps the other axis off a setting and generates what was chosen",
+          "status": "passed",
+          "title": "swaps the other axis off a setting and generates what was chosen",
+          "duration": 91.82120000000009,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialTestDialog settings to vary (ADR-497)"],
+          "fullName": "MaterialTestDialog settings to vary (ADR-497) cuts without hatch spacing",
+          "status": "passed",
+          "title": "cuts without hatch spacing",
+          "duration": 20.279700000000048,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialTestDialog settings to vary (ADR-497)"],
+          "fullName": "MaterialTestDialog settings to vary (ADR-497) checks the ranges it shows",
+          "status": "passed",
+          "title": "checks the ranges it shows",
+          "duration": 16.941699999999855,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialTestDialog settings to vary (ADR-497)"],
+          "fullName": "MaterialTestDialog settings to vary (ADR-497) says when the fastest cells need a longer runway than 5 mm",
+          "status": "passed",
+          "title": "says when the fastest cells need a longer runway than 5 mm",
+          "duration": 15.967599999999948,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335008031,
+      "endTime": 1791335008175.9675,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/calibration/MaterialTestDialog.axes.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["MaterialTestDialog"],
+          "fullName": "MaterialTestDialog renders grid controls and generates parsed options",
+          "status": "passed",
+          "title": "renders grid controls and generates parsed options",
+          "duration": 81.77819999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialTestDialog"],
+          "fullName": "MaterialTestDialog restores the last generated material test settings",
+          "status": "passed",
+          "title": "restores the last generated material test settings",
+          "duration": 27.156799999999976,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialTestDialog"],
+          "fullName": "MaterialTestDialog closes on Escape",
+          "status": "passed",
+          "title": "closes on Escape",
+          "duration": 11.520200000000159,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335014871,
+      "endTime": 1791335014991.5203,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/calibration/MaterialTestDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "round trips full artwork, notes, fonts, settings and unused operations in a protected envelope",
+          "status": "passed",
+          "title": "round trips full artwork, notes, fonts, settings and unused operations in a protected envelope",
+          "duration": 13.17739999999958,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "opens as a dirty new document and first Save asks for a new .lf2 destination",
+          "status": "passed",
+          "title": "opens as a dirty new document and first Save asks for a new .lf2 destination",
+          "duration": 8.778699999999844,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "cancelled or failed template open preserves the exact project and remembered destination",
+          "status": "passed",
+          "title": "cancelled or failed template open preserves the exact project and remembered destination",
+          "duration": 1.9182000000000698,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "ignores a pending read after document replacement and after a newer open request",
+          "status": "passed",
+          "title": "ignores a pending read after document replacement and after a newer open request",
+          "duration": 4.4845000000000255,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "preserves newer edits made while template bytes are being read",
+          "status": "passed",
+          "title": "preserves newer edits made while template bytes are being read",
+          "duration": 2.1799000000000888,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "saving a template snapshots dependencies and leaves ordinary Save ownership and dirty state intact",
+          "status": "passed",
+          "title": "saving a template snapshots dependencies and leaves ordinary Save ownership and dirty state intact",
+          "duration": 4.669799999999668,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "cancel/failure and late completion never publish a template as the ordinary save target",
+          "status": "passed",
+          "title": "cancel/failure and late completion never publish a template as the ordinary save target",
+          "duration": 67.6893,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334998432,
+      "endTime": 1791334998535.6892,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/app/project-template-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog submits point rotation count and signed total angle",
+          "status": "passed",
+          "title": "submits point rotation count and signed total angle",
+          "duration": 64.28650000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog submits the grid extras and converts the spacing when switching Space by",
+          "status": "passed",
+          "title": "submits the grid extras and converts the spacing when switching Space by",
+          "duration": 33.292199999999866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog submits a partial circular arc with its status",
+          "status": "passed",
+          "title": "submits a partial circular arc with its status",
+          "duration": 20.550300000000107,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog centres a circle on a selected object, which stays put",
+          "status": "passed",
+          "title": "centres a circle on a selected object, which stays put",
+          "duration": 19.59830000000011,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArrayDialog"],
+          "fullName": "ArrayDialog cancels without applying an array",
+          "status": "passed",
+          "title": "cancels without applying an array",
+          "duration": 9.021600000000035,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334998822,
+      "endTime": 1791334998969.0215,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/commands/ArrayDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Array dialog and the project limit"],
+          "fullName": "Array dialog and the project limit explains a grid the project cannot hold and keeps Create array off until it fits",
+          "status": "passed",
+          "title": "explains a grid the project cannot hold and keeps Create array off until it fits",
+          "duration": 82.4359999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Array dialog and the project limit"],
+          "fullName": "Array dialog and the project limit holds the circular and point rotation modes to the same room",
+          "status": "passed",
+          "title": "holds the circular and point rotation modes to the same room",
+          "duration": 38.74229999999989,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Array dialog and the project limit"],
+          "fullName": "Array dialog and the project limit does not count the object a circle is centred on, which is not copied",
+          "status": "passed",
+          "title": "does not count the object a circle is centred on, which is not copied",
+          "duration": 24.69230000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Array dialog and the project limit"],
+          "fullName": "Array dialog and the project limit reads rows and columns of a million as too many, without laying anything out",
+          "status": "passed",
+          "title": "reads rows and columns of a million as too many, without laying anything out",
+          "duration": 10.694099999999708,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Array dialog and the project limit"],
+          "fullName": "Array dialog and the project limit reads rows past the largest number as too many, without laying anything out",
+          "status": "passed",
+          "title": "reads rows past the largest number as too many, without laying anything out",
+          "duration": 9.973100000000159,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Array dialog and the project limit"],
+          "fullName": "Array dialog and the project limit says so when the project has no room for another copy",
+          "status": "passed",
+          "title": "says so when the project has no room for another copy",
+          "duration": 15.7817,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335002031,
+      "endTime": 1791335002213.7817,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/commands/ArrayDialogHost.limits.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Array dialog session memory"],
+          "fullName": "Array dialog session memory reopens with the settings last applied, but centred on the selection",
+          "status": "passed",
+          "title": "reopens with the settings last applied, but centred on the selection",
+          "duration": 93.78229999999985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Array dialog session memory"],
+          "fullName": "Array dialog session memory forgets settings that were cancelled",
+          "status": "passed",
+          "title": "forgets settings that were cancelled",
+          "duration": 19.38670000000002,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335010783,
+      "endTime": 1791335010896.3867,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/commands/ArrayDialogHost.memory.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow creates distinct records through the Circular dialog",
+          "status": "passed",
+          "title": "creates distinct records through the Circular dialog",
+          "duration": 89.37920000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow creates distinct records through the Point Rotation dialog",
+          "status": "passed",
+          "title": "creates distinct records through the Point Rotation dialog",
+          "duration": 19.95679999999993,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow creates six distinct badges from the actual Grid dialog",
+          "status": "passed",
+          "title": "creates six distinct badges from the actual Grid dialog",
+          "duration": 20.138300000000072,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Grid keeps the dialog open on a CSV error and leaves the source untouched",
+          "status": "passed",
+          "title": "Grid keeps the dialog open on a CSV error and leaves the source untouched",
+          "duration": 18.03650000000016,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Circular keeps the dialog open on a CSV error and leaves the source untouched",
+          "status": "passed",
+          "title": "Circular keeps the dialog open on a CSV error and leaves the source untouched",
+          "duration": 19.56179999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Point Rotation keeps the dialog open on a CSV error and leaves the source untouched",
+          "status": "passed",
+          "title": "Point Rotation keeps the dialog open on a CSV error and leaves the source untouched",
+          "duration": 20.858200000000124,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Grid cancels a pending render without applying any copies",
+          "status": "passed",
+          "title": "Grid cancels a pending render without applying any copies",
+          "duration": 12.483500000000276,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Circular cancels a pending render without applying any copies",
+          "status": "passed",
+          "title": "Circular cancels a pending render without applying any copies",
+          "duration": 14.731399999999667,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Point Rotation cancels a pending render without applying any copies",
+          "status": "passed",
+          "title": "Point Rotation cancels a pending render without applying any copies",
+          "duration": 10.059599999999591,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Grid discards a late result after the source project changes",
+          "status": "passed",
+          "title": "Grid discards a late result after the source project changes",
+          "duration": 18.168099999999868,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Circular discards a late result after the source project changes",
+          "status": "passed",
+          "title": "Circular discards a late result after the source project changes",
+          "duration": 16.07470000000012,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["visible per-copy variable array workflow"],
+          "fullName": "visible per-copy variable array workflow Point Rotation discards a late result after the source project changes",
+          "status": "passed",
+          "title": "Point Rotation discards a late result after the source project changes",
+          "duration": 11.263899999999921,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335004934,
+      "endTime": 1791335005204.264,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/commands/ArrayDialogHost.variables.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["QuickNestDialog"],
+          "fullName": "QuickNestDialog defaults to outline nesting and submits an explicit method choice",
+          "status": "passed",
+          "title": "defaults to outline nesting and submits an explicit method choice",
+          "duration": 47.66560000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335018731,
+      "endTime": 1791335018778.6655,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/commands/QuickNestDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "saves a grouped editable logo with mask/path dependencies, embedded font and associated settings",
+          "status": "passed",
+          "title": "saves a grouped editable logo with mask/path dependencies, embedded font and associated settings",
+          "duration": 13.072799999999916,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "inserts new object/group/operation/font identities into a colliding project with one undo",
+          "status": "passed",
+          "title": "inserts new object/group/operation/font identities into a colliding project with one undo",
+          "duration": 8.202899999999318,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "refuses insertion atomically when its operations would exceed the saved-project budget",
+          "status": "passed",
+          "title": "refuses insertion atomically when its operations would exceed the saved-project budget",
+          "duration": 13.803599999999278,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "refuses insertion atomically when its artwork would exceed the saved-project budget",
+          "status": "passed",
+          "title": "refuses insertion atomically when its artwork would exceed the saved-project budget",
+          "duration": 482.90719999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "allows insertion that exactly fills the saved-project operation budget",
+          "status": "passed",
+          "title": "allows insertion that exactly fills the saved-project operation budget",
+          "duration": 12.963200000000143,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "captures original paged PNG bytes and full luma so export/import needs no source database",
+          "status": "passed",
+          "title": "captures original paged PNG bytes and full luma so export/import needs no source database",
+          "duration": 6.641000000001441,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "does not save a partial item if image pages fail, and releases its read lease",
+          "status": "passed",
+          "title": "does not save a partial item if image pages fail, and releases its read lease",
+          "duration": 1.6599000000005617,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "rejects missing editable font bytes and malformed library identities",
+          "status": "passed",
+          "title": "rejects missing editable font bytes and malformed library identities",
+          "duration": 2.7833000000009633,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "matches names/categories without changing the stored collection",
+          "status": "passed",
+          "title": "matches names/categories without changing the stored collection",
+          "duration": 1.4433000000008178,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "preserves separate multi-operation associations even when destination settings match",
+          "status": "passed",
+          "title": "preserves separate multi-operation associations even when destination settings match",
+          "duration": 2.754899999999907,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "preserves custom CNC bits across colliding tool IDs without replacing destination machine settings",
+          "status": "passed",
+          "title": "preserves custom CNC bits across colliding tool IDs without replacing destination machine settings",
+          "duration": 4.063299999999799,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "retains output ordering and reuses already embedded font bytes on repeated insertion",
+          "status": "passed",
+          "title": "retains output ordering and reuses already embedded font bytes on repeated insertion",
+          "duration": 3.122400000000198,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "carries a traced object original bitmap even when only the trace is selected",
+          "status": "passed",
+          "title": "carries a traced object original bitmap even when only the trace is selected",
+          "duration": 2.4019999999982247,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334993692,
+      "endTime": 1791334994248.402,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/library/personal-artwork-model.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "persists across repository instances and atomically appends imported entries",
+          "status": "passed",
+          "title": "persists across repository instances and atomically appends imported entries",
+          "duration": 28.651800000000094,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "keeps previous data and rolls back the whole batch on a duplicate or invalid import",
+          "status": "passed",
+          "title": "keeps previous data and rolls back the whole batch on a duplicate or invalid import",
+          "duration": 7.194400000000314,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "does not lose entries from concurrent independent library writers",
+          "status": "passed",
+          "title": "does not lose entries from concurrent independent library writers",
+          "duration": 3.602600000000166,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335020929,
+      "endTime": 1791335020968.6025,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/library/personal-artwork-storage.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management links the selected preset with its source revision to the target operation",
+          "status": "passed",
+          "title": "links the selected preset with its source revision to the target operation",
+          "duration": 71.25049999999965,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "status": "passed",
+          "title": "opens saved libraries creates a blank library cancels rename and closes the dialog",
+          "duration": 40.23279999999977,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management imports CLB through the button and stores parsed units using a stub file picker",
+          "status": "passed",
+          "title": "imports CLB through the button and stores parsed units using a stub file picker",
+          "duration": 16.44210000000021,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "status": "passed",
+          "title": "launches New and Edit saves surface identity air and tab flags and cancels an edit",
+          "duration": 63.65059999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["artwork control audit: material management"],
+          "fullName": "artwork control audit: material management preserves settings and detail edits when Back is followed by Next",
+          "status": "passed",
+          "title": "preserves settings and detail edits when Back is followed by Next",
+          "duration": 59.210599999999886,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335006672,
+      "endTime": 1791335006923.2107,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/material-library/MaterialControls.audit.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "captures and applies a complete process through the library UI (CNC=false)",
+          "status": "passed",
+          "title": "captures and applies a complete process through the library UI (CNC=false)",
+          "duration": 83.06179999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "captures and applies a complete process through the library UI (CNC=true)",
+          "status": "passed",
+          "title": "captures and applies a complete process through the library UI (CNC=true)",
+          "duration": 27.176200000000335,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335017552,
+      "endTime": 1791335017663.1763,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/material-library/ProcessRecipePanel.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation supports outer tab arrow, Home and End keys with the available laser views",
+          "status": "passed",
+          "title": "supports outer tab arrow, Home and End keys with the available laser views",
+          "duration": 73.44530000000123,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation supports outer tab arrow, Home and End keys with the available cnc views",
+          "status": "passed",
+          "title": "supports outer tab arrow, Home and End keys with the available cnc views",
+          "duration": 35.150800000001254,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation retains the mounted operation numeric draft while switching inner tabs",
+          "status": "passed",
+          "title": "retains the mounted operation numeric draft while switching inner tabs",
+          "duration": 83.29310000000078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation retains the mounted artwork numeric draft while switching inner tabs",
+          "status": "passed",
+          "title": "retains the mounted artwork numeric draft while switching inner tabs",
+          "duration": 38.254399999999805,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation immediately edits the added operation only (artwork override: false)",
+          "status": "passed",
+          "title": "immediately edits the added operation only (artwork override: false)",
+          "duration": 38.529099999999744,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation immediately edits the added operation only (artwork override: true)",
+          "status": "passed",
+          "title": "immediately edits the added operation only (artwork override: true)",
+          "duration": 33.789600000000064,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation explains shared visibility and output while editing a selected artwork override",
+          "status": "passed",
+          "title": "explains shared visibility and output while editing a selected artwork override",
+          "duration": 30.942199999999502,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation keeps the Artwork view and chosen offset distance when the new copy becomes selected",
+          "status": "passed",
+          "title": "keeps the Artwork view and chosen offset distance when the new copy becomes selected",
+          "duration": 64.53759999999966,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Artwork panel navigation"],
+          "fullName": "Artwork panel navigation keeps a custom dogbone diameter across artwork selection without changing the active cutter",
+          "status": "passed",
+          "title": "keeps a custom dogbone diameter across artwork selection without changing the active cutter",
+          "duration": 73.71860000000015,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335001353,
+      "endTime": 1791335001824.7185,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/layers/ArtworkPanelNavigation.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ArtworkRunOrderList"],
+          "fullName": "ArtworkRunOrderList renders a bounded window for a 1000-job project",
+          "status": "passed",
+          "title": "renders a bounded window for a 1000-job project",
+          "duration": 49.29780000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderList"],
+          "fullName": "ArtworkRunOrderList shows matching rows when a scrolled list becomes shorter",
+          "status": "passed",
+          "title": "shows matching rows when a scrolled list becomes shorter",
+          "duration": 39.24169999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderRow position box"],
+          "fullName": "ArtworkRunOrderRow position box snaps back to the real run position when the move is refused",
+          "status": "passed",
+          "title": "snaps back to the real run position when the move is refused",
+          "duration": 5.035799999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderRow position box"],
+          "fullName": "ArtworkRunOrderRow position box keeps actual CNC steps visible and distinguishes unavailable steps from output off",
+          "status": "passed",
+          "title": "keeps actual CNC steps visible and distinguishes unavailable steps from output off",
+          "duration": 5.2965999999998985,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderRow position box"],
+          "fullName": "ArtworkRunOrderRow position box focuses artwork through its button without moving its run position",
+          "status": "passed",
+          "title": "focuses artwork through its button without moving its run position",
+          "duration": 5.602200000000039,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "offers a focusable run selection action without invoking settings or double-selecting",
+          "status": "passed",
+          "title": "offers a focusable run selection action without invoking settings or double-selecting",
+          "duration": 4.410799999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335001160,
+      "endTime": 1791335001269.411,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/layers/ArtworkRunOrderList.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel focuses a run unit and moves it by exact number",
+          "status": "passed",
+          "title": "focuses a run unit and moves it by exact number",
+          "duration": 82.51450000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel shows intentionally unified artwork as one numbered run unit",
+          "status": "passed",
+          "title": "shows intentionally unified artwork as one numbered run unit",
+          "duration": 12.140000000000327,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel virtualizes a 50-job list and starts one canvas-numbering interaction",
+          "status": "passed",
+          "title": "virtualizes a 50-job list and starts one canvas-numbering interaction",
+          "duration": 34.271000000000186,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel keeps original run numbers while searching and recovers from no matches",
+          "status": "passed",
+          "title": "keeps original run numbers while searching and recovers from no matches",
+          "duration": 15.842699999999695,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel reveals all runs and keeps edits out of an active numbering session",
+          "status": "passed",
+          "title": "reveals all runs and keeps edits out of an active numbering session",
+          "duration": 18.317299999999705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel offers a keyboard-accessible show action and opens settings for that run",
+          "status": "passed",
+          "title": "offers a keyboard-accessible show action and opens settings for that run",
+          "duration": 10.905999999999949,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["ArtworkRunOrderPanel"],
+          "fullName": "ArtworkRunOrderPanel undoes within numbering, commits Done once, and restores Cancel",
+          "status": "passed",
+          "title": "undoes within numbering, commits Done once, and restores Cancel",
+          "duration": 26.644200000000183,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335000107,
+      "endTime": 1791335000307.6443,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/layers/ArtworkRunOrderPanel.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["JobMaterialControls (ADR-496)"],
+          "fullName": "JobMaterialControls (ADR-496) sets the job material, thickness and switch",
+          "status": "passed",
+          "title": "sets the job material, thickness and switch",
+          "duration": 64.28279999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["JobMaterialControls (ADR-496)"],
+          "fullName": "JobMaterialControls (ADR-496) applies the best recipes to the operations already there and says what happened",
+          "status": "passed",
+          "title": "applies the best recipes to the operations already there and says what happened",
+          "duration": 15.592599999999948,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335014585,
+      "endTime": 1791335014665.5925,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/layers/JobMaterialControls.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["MaterialLibraryPanel preset management"],
+          "fullName": "MaterialLibraryPanel preset management surfaces stale linked revision truth and refreshes it explicitly",
+          "status": "passed",
+          "title": "surfaces stale linked revision truth and refreshes it explicitly",
+          "duration": 68.49290000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialLibraryPanel preset management"],
+          "fullName": "MaterialLibraryPanel preset management deletes a selected material preset after confirmation",
+          "status": "passed",
+          "title": "deletes a selected material preset after confirmation",
+          "duration": 25.198899999999867,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialLibraryPanel preset management"],
+          "fullName": "MaterialLibraryPanel preset management keeps a selected material preset when delete confirmation is cancelled",
+          "status": "passed",
+          "title": "keeps a selected material preset when delete confirmation is cancelled",
+          "duration": 11.86429999999973,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335008391,
+      "endTime": 1791335008496.8643,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/layers/MaterialLibraryPanel.management.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence is disabled by default, without reading or rendering artwork",
+          "status": "passed",
+          "title": "is disabled by default, without reading or rendering artwork",
+          "duration": 4.52390000000014,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence paints real rotated and mirrored paths instead of bounding boxes",
+          "status": "passed",
+          "title": "paints real rotated and mirrored paths instead of bounding boxes",
+          "duration": 6.018799999999828,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence renders canonical curved geometry and precomputed text outlines without fetching fonts",
+          "status": "passed",
+          "title": "renders canonical curved geometry and precomputed text outlines without fetching fonts",
+          "duration": 3.2967999999982567,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence preserves fill topology and current layer visibility",
+          "status": "passed",
+          "title": "preserves fill topology and current layer visibility",
+          "duration": 1.9116000000012718,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence returns a blank preview for an empty workspace, without invented bounds",
+          "status": "passed",
+          "title": "returns a blank preview for an empty workspace, without invented bounds",
+          "duration": 1.4302999999999884,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence maps a blank preview to the actual rectangular profile bed in scene coordinates for any origin",
+          "status": "passed",
+          "title": "maps a blank preview to the actual rectangular profile bed in scene coordinates for any origin",
+          "duration": 0.9202000000004773,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence does not invent a drawing bed when the empty profile geometry is malformed",
+          "status": "passed",
+          "title": "does not invent a drawing bed when the empty profile geometry is malformed",
+          "duration": 0.6731999999992695,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence discloses image placement frames without loading or returning their URL",
+          "status": "passed",
+          "title": "discloses image placement frames without loading or returning their URL",
+          "duration": 1.2632999999987078,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence refuses text whose geometry is not ready",
+          "status": "passed",
+          "title": "refuses text whose geometry is not ready",
+          "duration": 0.7683000000015454,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence refuses malformed coordinates before a canvas is painted",
+          "status": "passed",
+          "title": "refuses malformed coordinates before a canvas is painted",
+          "duration": 0.5547999999998865,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence bounds object count and raw geometry without sampling it away",
+          "status": "passed",
+          "title": "bounds object count and raw geometry without sampling it away",
+          "duration": 4.050199999999677,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence reduces image resolution to keep the bounded complete artwork payload",
+          "status": "passed",
+          "title": "reduces image resolution to keep the bounded complete artwork payload",
+          "duration": 1.169499999999971,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence refuses a PNG that cannot fit even at the minimum size",
+          "status": "passed",
+          "title": "refuses a PNG that cannot fit even at the minimum size",
+          "duration": 0.7298999999984517,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence rejects unexpected encoding and unavailable canvas safely",
+          "status": "passed",
+          "title": "rejects unexpected encoding and unavailable canvas safely",
+          "duration": 0.7240999999994528,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence cancels before rendering and if cancelled while encoding",
+          "status": "passed",
+          "title": "cancels before rendering and if cancelled while encoding",
+          "duration": 1.7543000000005122,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence drops pixels if sharing is disabled while encoding",
+          "status": "passed",
+          "title": "drops pixels if sharing is disabled while encoding",
+          "duration": 0.5963000000010652,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote artwork rendering and disclosure fence"],
+          "fullName": "remote artwork rendering and disclosure fence does not expose source paths, text or private project metadata alongside pixels",
+          "status": "passed",
+          "title": "does not expose source paths, text or private project metadata alongside pixels",
+          "duration": 0.5948000000007596,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334993712,
+      "endTime": 1791334993743.5947,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/remote-control/preview-projection.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["remote snapshots expose only the agreed metadata"],
+          "fullName": "remote snapshots expose only the agreed metadata does not expose path or credential shaped identifiers from imported documents",
+          "status": "passed",
+          "title": "does not expose path or credential shaped identifiers from imported documents",
+          "duration": 8.599900000000162,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote snapshots expose only the agreed metadata"],
+          "fullName": "remote snapshots expose only the agreed metadata never spreads file, port, camera, text, profile, licence or payment payloads",
+          "status": "passed",
+          "title": "never spreads file, port, camera, text, profile, licence or payment payloads",
+          "duration": 2.6698999999998705,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote snapshots expose only the agreed metadata"],
+          "fullName": "remote snapshots expose only the agreed metadata bounds large workspaces and recipe libraries without inventing totals",
+          "status": "passed",
+          "title": "bounds large workspaces and recipe libraries without inventing totals",
+          "duration": 11.770400000000336,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote snapshots expose only the agreed metadata"],
+          "fullName": "remote snapshots expose only the agreed metadata does not fabricate review readiness or reuse stale Frame proof",
+          "status": "passed",
+          "title": "does not fabricate review readiness or reuse stale Frame proof",
+          "duration": 3.593900000000758,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["remote snapshots expose only the agreed metadata"],
+          "fullName": "remote snapshots expose only the agreed metadata redacts path-like labels and omits invalid bounds instead of serializing infinities",
+          "status": "passed",
+          "title": "redacts path-like labels and omits invalid bounds instead of serializing infinities",
+          "duration": 0.81670000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335006536,
+      "endTime": 1791335006563.8167,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/remote-control/projections.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store lists the most recently opened or saved project first",
+          "status": "passed",
+          "title": "lists the most recently opened or saved project first",
+          "duration": 5.1930999999999585,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store moves a reopened file to the top instead of listing it twice",
+          "status": "passed",
+          "title": "moves a reopened file to the top instead of listing it twice",
+          "duration": 0.875,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store keeps two different files that share a name apart",
+          "status": "passed",
+          "title": "keeps two different files that share a name apart",
+          "duration": 0.6318999999999733,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store matches a desktop path again without asking about unrelated names",
+          "status": "passed",
+          "title": "matches a desktop path again without asking about unrelated names",
+          "duration": 0.7098999999999478,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store merges a name-only entry with the same name",
+          "status": "passed",
+          "title": "merges a name-only entry with the same name",
+          "duration": 1.1459999999999582,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store keeps the chosen number of unpinned projects, plus every pinned one",
+          "status": "passed",
+          "title": "keeps the chosen number of unpinned projects, plus every pinned one",
+          "duration": 1.6009000000000242,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store marks files that are gone as missing and keeps them listed",
+          "status": "passed",
+          "title": "marks files that are gone as missing and keeps them listed",
+          "duration": 0.9900000000000091,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store removes one entry, clears the unpinned ones, or clears everything",
+          "status": "passed",
+          "title": "removes one entry, clears the unpinned ones, or clears everything",
+          "duration": 0.61749999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store keeps the list for the session and warns once when storage keeps refusing",
+          "status": "passed",
+          "title": "keeps the list for the session and warns once when storage keeps refusing",
+          "duration": 1.6387999999999465,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects store"],
+          "fullName": "Recent Projects store applies overlapping changes one after another",
+          "status": "passed",
+          "title": "applies overlapping changes one after another",
+          "duration": 0.5578000000000429,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects dialog state and recording"],
+          "fullName": "Recent Projects dialog state and recording opens with an optional notice and closes without one",
+          "status": "passed",
+          "title": "opens with an optional notice and closes without one",
+          "duration": 0.7596999999999525,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects dialog state and recording"],
+          "fullName": "Recent Projects dialog state and recording records an opened or saved file only where the platform can reopen it",
+          "status": "passed",
+          "title": "records an opened or saved file only where the platform can reopen it",
+          "duration": 0.45460000000002765,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334997703,
+      "endTime": 1791334997718.4546,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/recent-projects/recent-projects-store.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager explains an empty list",
+          "status": "passed",
+          "title": "explains an empty list",
+          "duration": 47.7491,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager lists pinned projects first with their folder and when they were last used",
+          "status": "passed",
+          "title": "lists pinned projects first with their folder and when they were last used",
+          "duration": 39.332800000000134,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager marks a project whose file is gone and lets the operator remove it",
+          "status": "passed",
+          "title": "marks a project whose file is gone and lets the operator remove it",
+          "duration": 15.991599999999835,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager pins and unpins a project",
+          "status": "passed",
+          "title": "pins and unpins a project",
+          "duration": 16.654199999999946,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager clears the unpinned projects, or all of them",
+          "status": "passed",
+          "title": "clears the unpinned projects, or all of them",
+          "duration": 11.922199999999975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager sets how many projects to keep, within 1 to 24",
+          "status": "passed",
+          "title": "sets how many projects to keep, within 1 to 24",
+          "duration": 17.31670000000031,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager closes to reopen the chosen project",
+          "status": "passed",
+          "title": "closes to reopen the chosen project",
+          "duration": 15.238400000000183,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager comes back with the reason when the chosen file is gone",
+          "status": "passed",
+          "title": "comes back with the reason when the chosen file is gone",
+          "duration": 9.748700000000099,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["Recent Projects manager"],
+          "fullName": "Recent Projects manager offers the file picker next to a problem notice",
+          "status": "passed",
+          "title": "offers the file picker next to a problem notice",
+          "duration": 10.192800000000261,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335003439,
+      "endTime": 1791335003623.1929,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/recent-projects/RecentProjectsDialog.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["findMarks on a flattened bed picture"],
+          "fullName": "findMarks on a flattened bed picture finds rings, crosses and dots on the sheet, and nothing on the honeycomb or in the artwork block",
+          "status": "passed",
+          "title": "finds rings, crosses and dots on the sheet, and nothing on the honeycomb or in the artwork block",
+          "duration": 9.788400000000365,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findMarks on a flattened bed picture"],
+          "fullName": "findMarks on a flattened bed picture keeps only marks of the size asked for",
+          "status": "passed",
+          "title": "keeps only marks of the size asked for",
+          "duration": 183.9287000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["matchMarkPair"],
+          "fullName": "matchMarkPair takes the pair at the design spacing that lies nearest the design targets, in order",
+          "status": "passed",
+          "title": "takes the pair at the design spacing that lies nearest the design targets, in order",
+          "duration": 0.6707000000005792,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["matchMarkPair"],
+          "fullName": "matchMarkPair finds nothing when no two marks are the design spacing apart",
+          "status": "passed",
+          "title": "finds nothing when no two marks are the design spacing apart",
+          "duration": 0.6430000000000291,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findMarks through the camera model"],
+          "fullName": "findMarks through the camera model places marks on a sheet on 3 mm material from a tilted fisheye picture",
+          "status": "passed",
+          "title": "places marks on a sheet on 3 mm material from a tilted fisheye picture",
+          "duration": 4436.0466,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335013248,
+      "endTime": 1791335017879.0466,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/camera/marks/find-marks.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["grid mirror alternate"],
+          "fullName": "grid mirror alternate mirrors every other column in place in its cell",
+          "status": "passed",
+          "title": "mirrors every other column in place in its cell",
+          "duration": 7.371699999999919,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid mirror alternate"],
+          "fullName": "grid mirror alternate mirrors a multi-object design as one piece about its centre",
+          "status": "passed",
+          "title": "mirrors a multi-object design as one piece about its centre",
+          "duration": 1.0248999999998887,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["grid mirror alternate"],
+          "fullName": "grid mirror alternate keeps a rotated design inside its own box when mirrored both ways",
+          "status": "passed",
+          "title": "keeps a rotated design inside its own box when mirrored both ways",
+          "duration": 1.4748000000001866,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array centred on a selected object"],
+          "fullName": "circular array centred on a selected object leaves the centre object where it is and copies only the rest",
+          "status": "passed",
+          "title": "leaves the centre object where it is and copies only the rest",
+          "duration": 2.4978000000000975,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array centred on a selected object"],
+          "fullName": "circular array centred on a selected object centres on a locked object, which is never copied",
+          "status": "passed",
+          "title": "centres on a locked object, which is never copied",
+          "duration": 0.6872000000000753,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["circular array centred on a selected object"],
+          "fullName": "circular array centred on a selected object copies the whole selection when the centre object is no longer selected",
+          "status": "passed",
+          "title": "copies the whole selection when the centre object is no longer selected",
+          "duration": 0.5089000000000397,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335006327,
+      "endTime": 1791335006340.6873,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/state/array-extras-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["copyObjectsAtArrayPlacement"],
+          "fullName": "copyObjectsAtArrayPlacement deep-copies sources and remaps copied dependencies at the placement",
+          "status": "passed",
+          "title": "deep-copies sources and remaps copied dependencies at the placement",
+          "duration": 2.927599999999984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["copyObjectsAtArrayPlacement"],
+          "fullName": "copyObjectsAtArrayPlacement treats a 360-degree pivot turn as exact identity",
+          "status": "passed",
+          "title": "treats a 360-degree pivot turn as exact identity",
+          "duration": 0.2563999999999851,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["copyObjectsAtArrayPlacement"],
+          "fullName": "copyObjectsAtArrayPlacement treats a -360-degree pivot turn as exact identity",
+          "status": "passed",
+          "title": "treats a -360-degree pivot turn as exact identity",
+          "duration": 0.1468000000000984,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335018551,
+      "endTime": 1791335018554.2563,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/state/array-selection-copies.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) leaves new operations alone until the job has a material",
+          "status": "passed",
+          "title": "leaves new operations alone until the job has a material",
+          "duration": 3.8221000000003187,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) links the best recipe to a new operation",
+          "status": "passed",
+          "title": "links the best recipe to a new operation",
+          "duration": 2.7051000000001295,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) keeps settings when the switch is off or no recipe fits",
+          "status": "passed",
+          "title": "keeps settings when the switch is off or no recipe fits",
+          "duration": 1.0644999999999527,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) gives a new image its image recipe",
+          "status": "passed",
+          "title": "gives a new image its image recipe",
+          "duration": 1.921100000000024,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) switches an untouched operation to the new mode’s recipe",
+          "status": "passed",
+          "title": "switches an untouched operation to the new mode’s recipe",
+          "duration": 1.689600000000155,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) keeps an edited operation’s settings when its mode is switched",
+          "status": "passed",
+          "title": "keeps an edited operation’s settings when its mode is switched",
+          "duration": 1.0592999999998938,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) applies the best recipes to every operation as one undo step",
+          "status": "passed",
+          "title": "applies the best recipes to every operation as one undo step",
+          "duration": 3.509099999999762,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) names the operations with no recipe",
+          "status": "passed",
+          "title": "names the operations with no recipe",
+          "duration": 1.1269999999999527,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) keeps the job material in the project file and in undo",
+          "status": "passed",
+          "title": "keeps the job material in the project file and in undo",
+          "duration": 4.272899999999936,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["recipes that apply themselves (ADR-496)"],
+          "fullName": "recipes that apply themselves (ADR-496) refuses a malformed job material in a project file",
+          "status": "passed",
+          "title": "refuses a malformed job material in a project file",
+          "duration": 1.1864999999997963,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335003438,
+      "endTime": 1791335003460.1865,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/state/laser-recipe-seeding.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["linked material snapshots"],
+          "fullName": "linked material snapshots does not nest the previous material binding when refreshed",
+          "status": "passed",
+          "title": "does not nest the previous material binding when refreshed",
+          "duration": 5.811499999999796,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335020819,
+      "endTime": 1791335020824.8115,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/state/material-binding-snapshot.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions setMaterialLibrary loads a library without dirtying the project",
+          "status": "passed",
+          "title": "setMaterialLibrary loads a library without dirtying the project",
+          "duration": 3.4378999999998996,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions project resets preserve the loaded material library and library dirty state",
+          "status": "passed",
+          "title": "project resets preserve the loaded material library and library dirty state",
+          "duration": 1.723700000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions markMaterialLibrarySaved clears only the library dirty flag",
+          "status": "passed",
+          "title": "markMaterialLibrarySaved clears only the library dirty flag",
+          "duration": 0.8483999999998559,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions assignMaterialPresetToLayer applies a preset without linking the layer",
+          "status": "passed",
+          "title": "assignMaterialPresetToLayer applies a preset without linking the layer",
+          "duration": 4.461299999999937,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions applies a device-mismatched preset (warn, not block) per ADR-045 [LAY-01]",
+          "status": "passed",
+          "title": "applies a device-mismatched preset (warn, not block) per ADR-045 [LAY-01]",
+          "duration": 1.125300000000152,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions assignMaterialPresetToLayer is project-undoable and keeps the library clean",
+          "status": "passed",
+          "title": "assignMaterialPresetToLayer is project-undoable and keeps the library clean",
+          "duration": 1.744799999999941,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions assignMaterialPresetToLayer preserves id, color, visible, and output",
+          "status": "passed",
+          "title": "assignMaterialPresetToLayer preserves id, color, visible, and output",
+          "duration": 1.6028999999998632,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions links a layer with a last-resolved snapshot and refreshes from the active library",
+          "status": "passed",
+          "title": "links a layer with a last-resolved snapshot and refreshes from the active library",
+          "duration": 1.9367000000002008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions assignMaterialPresetToLayer applies unsupported recipes without a policy refusal",
+          "status": "passed",
+          "title": "assignMaterialPresetToLayer applies unsupported recipes without a policy refusal",
+          "duration": 1.324200000000019,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["material library store actions"],
+          "fullName": "material library store actions assignMaterialPresetToLayer no-ops for missing or identical recipes",
+          "status": "passed",
+          "title": "assignMaterialPresetToLayer no-ops for missing or identical recipes",
+          "duration": 1.3315999999999804,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334997049,
+      "endTime": 1791334997068.3315,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/state/material-library-actions.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["savedMarkErrors"],
+          "fullName": "savedMarkErrors keeps each ring to the micrometre and marks only the rejected ones",
+          "status": "passed",
+          "title": "keeps each ring to the micrometre and marks only the rejected ones",
+          "duration": 1.8712000000000444,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["savedMarkErrors"],
+          "fullName": "savedMarkErrors leaves out a ring the model could not map",
+          "status": "passed",
+          "title": "leaves out a ring the model could not map",
+          "duration": 0.21019999999998618,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335019528,
+      "endTime": 1791335019530.2102,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/camera/model/camera-model-accuracy.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["findPieces on a flattened bed picture"],
+          "fullName": "findPieces on a flattened bed picture finds each blank in rows with its centre, size and angle",
+          "status": "passed",
+          "title": "finds each blank in rows with its centre, size and angle",
+          "duration": 392.10709999999995,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findPieces on a flattened bed picture"],
+          "fullName": "findPieces on a flattened bed picture tells a blank as bright as the bed apart by its colour at the reference point",
+          "status": "passed",
+          "title": "tells a blank as bright as the bed apart by its colour at the reference point",
+          "duration": 267.0539000000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findPieces on a flattened bed picture"],
+          "fullName": "findPieces on a flattened bed picture works the same with the reference point on the bed",
+          "status": "passed",
+          "title": "works the same with the reference point on the bed",
+          "duration": 313.4222,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findPieces on a flattened bed picture"],
+          "fullName": "findPieces on a flattened bed picture marks a piece that runs off the picture as partial",
+          "status": "passed",
+          "title": "marks a piece that runs off the picture as partial",
+          "duration": 233.29770000000008,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findPieces on a flattened bed picture"],
+          "fullName": "findPieces on a flattened bed picture gives a lopsided piece a heading that fixes a full turn",
+          "status": "passed",
+          "title": "gives a lopsided piece a heading that fixes a full turn",
+          "duration": 256.58950000000004,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["findPieces through the camera model"],
+          "fullName": "findPieces through the camera model finds 3 mm blanks where they lie on the bed from a tilted fisheye picture",
+          "status": "passed",
+          "title": "finds 3 mm blanks where they lie on the bed from a tilted fisheye picture",
+          "duration": 3404.6447000000003,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335007577,
+      "endTime": 1791335012445.6448,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/camera/pieces/find-pieces.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["relativeRotationDeg"],
+          "fullName": "relativeRotationDeg takes the smallest turn between long sides",
+          "status": "passed",
+          "title": "takes the smallest turn between long sides",
+          "duration": 1.5504999999999427,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relativeRotationDeg"],
+          "fullName": "relativeRotationDeg turns square pieces by at most an eighth of a turn",
+          "status": "passed",
+          "title": "turns square pieces by at most an eighth of a turn",
+          "duration": 0.20439999999996417,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relativeRotationDeg"],
+          "fullName": "relativeRotationDeg never turns between round pieces without headings",
+          "status": "passed",
+          "title": "never turns between round pieces without headings",
+          "duration": 0.23599999999999,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["relativeRotationDeg"],
+          "fullName": "relativeRotationDeg lets headings choose the side that leads",
+          "status": "passed",
+          "title": "lets headings choose the side that leads",
+          "duration": 0.16639999999995325,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["piecePlacements"],
+          "fullName": "piecePlacements keeps the design where it is on the sample and repeats it on the other pieces",
+          "status": "passed",
+          "title": "keeps the design where it is on the sample and repeats it on the other pieces",
+          "duration": 0.9738999999999578,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["piecePlacements"],
+          "fullName": "piecePlacements moves the design itself to the first piece when its own piece is left out",
+          "status": "passed",
+          "title": "moves the design itself to the first piece when its own piece is left out",
+          "duration": 0.8040999999999485,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["piecePlacements"],
+          "fullName": "piecePlacements centres the design on each piece, long side along the long side, with no sample",
+          "status": "passed",
+          "title": "centres the design on each piece, long side along the long side, with no sample",
+          "duration": 0.341199999999958,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["pieceUnder"],
+          "fullName": "pieceUnder finds the piece whose outline holds the point",
+          "status": "passed",
+          "title": "finds the piece whose outline holds the point",
+          "duration": 0.332300000000032,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335011000,
+      "endTime": 1791335011004.3413,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/core/camera/pieces/piece-placements.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": [],
+          "fullName": "finds pieces with the design centre as the colour reference and changes nothing yet",
+          "status": "passed",
+          "title": "finds pieces with the design centre as the colour reference and changes nothing yet",
+          "duration": 64.1255999999994,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "starts a piece the camera saw only in part left out, and places on the ticked pieces as one undo step",
+          "status": "passed",
+          "title": "starts a piece the camera saw only in part left out, and places on the ticked pieces as one undo step",
+          "duration": 32.931700000001,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "places a copy on a piece once it is ticked",
+          "status": "passed",
+          "title": "places a copy on a piece once it is ticked",
+          "duration": 16.782999999999447,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "says nothing was placed, and why, when the project has no room for the copies",
+          "status": "passed",
+          "title": "says nothing was placed, and why, when the project has no room for the copies",
+          "duration": 38.01300000000083,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "asks for a selection instead of placing nothing",
+          "status": "passed",
+          "title": "asks for a selection instead of placing nothing",
+          "duration": 21.60899999999856,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "needs a live camera to search, and Clear drops the pieces",
+          "status": "passed",
+          "title": "needs a live camera to search, and Clear drops the pieces",
+          "duration": 14.918400000000474,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "says so when no piece stands out from the bed",
+          "status": "passed",
+          "title": "says so when no piece stands out from the bed",
+          "duration": 11.716700000000856,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "Clear abandons an in-flight refresh rather than letting it republish pieces",
+          "status": "passed",
+          "title": "Clear abandons an in-flight refresh rather than letting it republish pieces",
+          "duration": 29.89139999999861,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "an abandoned capture completion does not clear the newer capture busy state",
+          "status": "passed",
+          "title": "an abandoned capture completion does not clear the newer capture busy state",
+          "duration": 49.901700000000346,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "changing the camera model retires old piece placements before Place",
+          "status": "passed",
+          "title": "changing the camera model retires old piece placements before Place",
+          "duration": 16.042999999999665,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "cancelling by a source change suppresses a delayed capture result",
+          "status": "passed",
+          "title": "cancelling by a source change suppresses a delayed capture result",
+          "duration": 12.131599999998798,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on document changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on document changes without a mounted Camera panel",
+          "duration": 1.6572999999989406,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on profile changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on profile changes without a mounted Camera panel",
+          "duration": 1.200699999999415,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on bed width changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on bed width changes without a mounted Camera panel",
+          "duration": 0.5030000000006112,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on bed height changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on bed height changes without a mounted Camera panel",
+          "duration": 0.45060000000012224,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on source changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on source changes without a mounted Camera panel",
+          "duration": 0.3855999999996129,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on source epoch changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on source epoch changes without a mounted Camera panel",
+          "duration": 0.3503999999993539,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on material height changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on material height changes without a mounted Camera panel",
+          "duration": 0.334499999999025,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "a completed scan retires on height areas changes without a mounted Camera panel",
+          "status": "passed",
+          "title": "a completed scan retires on height areas changes without a mounted Camera panel",
+          "duration": 0.4477999999999156,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": [],
+          "fullName": "unmount releases the active request immediately and a later capture cannot publish",
+          "status": "passed",
+          "title": "unmount releases the active request immediately and a later capture cannot publish",
+          "duration": 25.024900000000343,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791334996547,
+      "endTime": 1791334996886.025,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/camera/pieces/PiecesControl.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["piecePixelsPerMm"],
+          "fullName": "piecePixelsPerMm keeps 2 px/mm on ordinary beds and coarsens only very large ones",
+          "status": "passed",
+          "title": "keeps 2 px/mm on ordinary beds and coarsens only very large ones",
+          "duration": 1.45049999999992,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scanBedPieces"],
+          "fullName": "scanBedPieces finds each blank where it really is, at its own height",
+          "status": "passed",
+          "title": "finds each blank where it really is, at its own height",
+          "duration": 393.5618999999997,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["scanBedPieces"],
+          "fullName": "scanBedPieces puts the raised blank several millimetres off without its height area",
+          "status": "passed",
+          "title": "puts the raised blank several millimetres off without its height area",
+          "duration": 407.2264,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335017701,
+      "endTime": 1791335018503.2263,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/camera/pieces/scan-bed-pieces.test.ts"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips preserves every line recipe setting through native Next/Save",
+          "status": "passed",
+          "title": "preserves every line recipe setting through native Next/Save",
+          "duration": 82.4672999999998,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips preserves every fill recipe setting through native Next/Save",
+          "status": "passed",
+          "title": "preserves every fill recipe setting through native Next/Save",
+          "duration": 38.29980000000023,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips preserves every image recipe setting through native Next/Save",
+          "status": "passed",
+          "title": "preserves every image recipe setting through native Next/Save",
+          "duration": 28.383699999999862,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips saves toggled air from true, reopens it, and applies it to a layer",
+          "status": "passed",
+          "title": "saves toggled air from true, reopens it, and applies it to a layer",
+          "duration": 38.46720000000005,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["existing material recipe roundtrips"],
+          "fullName": "existing material recipe roundtrips saves toggled air from false, reopens it, and applies it to a layer",
+          "status": "passed",
+          "title": "saves toggled air from false, reopens it, and applies it to a layer",
+          "duration": 24.10480000000007,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335013712,
+      "endTime": 1791335013923.1047,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/material-library/wizard/MaterialPresetWizard.roundtrip.test.tsx"
+    },
+    {
+      "assertionResults": [
+        {
+          "ancestorTitles": ["MaterialPresetWizard"],
+          "fullName": "MaterialPresetWizard creates a preset by walking every step",
+          "status": "passed",
+          "title": "creates a preset by walking every step",
+          "duration": 87.125,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        },
+        {
+          "ancestorTitles": ["MaterialPresetWizard"],
+          "fullName": "MaterialPresetWizard keeps the Next button disabled until the identity step is valid",
+          "status": "passed",
+          "title": "keeps the Next button disabled until the identity step is valid",
+          "duration": 10.808700000000044,
+          "failureMessages": [],
+          "meta": {},
+          "tags": []
+        }
+      ],
+      "startTime": 1791335017158,
+      "endTime": 1791335017255.8086,
+      "status": "passed",
+      "message": "",
+      "name": "D:/LaserForge/competitive-audit-20261007/src/ui/material-library/wizard/MaterialPresetWizard.test.tsx"
+    }
+  ]
+}
