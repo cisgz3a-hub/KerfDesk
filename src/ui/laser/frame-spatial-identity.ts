@@ -39,7 +39,7 @@ export function currentFrameSpatialSignature(
       scope,
       app.jobPlacement,
       placement?.kind === 'unresolved',
-      placement?.kind === 'known',
+      placement?.kind === 'known' || placement?.kind === 'selected-output',
     ),
     scope,
     app.jobPlacement,

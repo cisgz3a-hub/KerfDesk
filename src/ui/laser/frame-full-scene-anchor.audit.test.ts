@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Hex values are artwork colours, not UI styling. */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { JOB_ORIGIN_ANCHORS, machineSpaceJob, type JobOriginPlacement } from '../../core/job';
 import { computeFrameJobBounds } from '../../core/job/job-bounds';
@@ -167,6 +166,38 @@ describe('selected output binds the actual whole-scene placement anchor', () => 
       expect(snapshot().signature).not.toBe(before.signature);
     },
   );
+
+  it('ignores a resolved collapsed unused CNC fixture when selection origin uses selected geometry', () => {
+    installArtwork();
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: [
+            ...state.project.scene.objects,
+            createRegistrationBox({ id: 'collapsed-jig', x: 10, y: 20, widthMm: 1, heightMm: 1 }),
+          ],
+          layers: [
+            ...state.project.scene.layers,
+            {
+              ...createRegistrationLayer(),
+              output: false,
+              cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'profile-inside', depthMm: 1 },
+            },
+          ],
+        },
+      },
+    }));
+    useStore.getState().setOutputScopeSettings({ useSelectionOrigin: true });
+    const before = snapshot();
+    const execution = currentReplayExecutionSignature();
+    moveObject('collapsed-jig', 40);
+    expect(snapshot()).toEqual(before);
+    expect(currentReplayExecutionSignature()).not.toBe(execution);
+    moveObject('selected', 5);
+    expect(snapshot().signature).not.toBe(before.signature);
+  });
 
   const origins: ReadonlyArray<Origin> = [
     'front-left',

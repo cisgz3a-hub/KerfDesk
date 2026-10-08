@@ -137,7 +137,7 @@ describe('whole-scene placement bounds memo', () => {
     ).toBeUndefined();
     expect(
       frameSpatialPlacementBinding(project, { ...scope, useSelectionOrigin: true }, placement),
-    ).toBeUndefined();
+    ).toEqual({ kind: 'selected-output' });
     expect(
       frameSpatialPlacementBinding(project, { ...scope, cutSelectedGraphics: false }, placement),
     ).toBeUndefined();

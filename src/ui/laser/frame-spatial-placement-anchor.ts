@@ -12,6 +12,7 @@ import type { Scene } from '../../core/scene/scene';
 
 export type FrameSpatialPlacementBinding =
   | { readonly kind: 'known'; readonly anchor: Vec2 }
+  | { readonly kind: 'selected-output' }
   | { readonly kind: 'unresolved' };
 
 type PlacementBounds =
@@ -41,7 +42,7 @@ export function frameSpatialPlacementBinding(
   if (!scope.cutSelectedGraphics || placement.startFrom === 'absolute') return undefined;
   const result = cachedPlacementBounds(project, scope.useSelectionOrigin);
   if (result.kind === 'unresolved') return result;
-  if (scope.useSelectionOrigin && result.bounds === null) return undefined;
+  if (scope.useSelectionOrigin && result.bounds === null) return { kind: 'selected-output' };
   // The preparation pipeline uses zero offset when neither fixture nor full
   // scene produces bounds; bind that same fallback rather than inventing one.
   const anchor =
