@@ -82,3 +82,12 @@ traffic changes and expose only fixed comparison names and equality booleans.
 Cloudflare error 10057 establishes unresolved inheritance; staging is a supported
 protocol with a separate verification boundary, not a proven remedy for that
 error until the provider accepts and verifies it.
+The exact-version and settings comparison separates configured placement from
+Cloudflare's documented read-only Smart Placement analysis. Canonical placement
+preserves the exact mode, hint and target values, accepts documented equivalent
+configuration representations, and excludes only `status` and `last_analyzed_at`.
+The same configured form protects the settings fingerprint, candidate snapshot
+and sandbox upload metadata. Unknown or malformed forms still refuse before
+upload. Bounded diagnostics report only fixed field presence/types, known enums
+and equality results; they never publish target values, timestamps or unknown
+property names. This changes representation comparison, not placement behaviour.

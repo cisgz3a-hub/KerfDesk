@@ -1,19 +1,94 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gzipSync } from 'node:zlib';
+import { attestSandboxVersion, sandboxSettingsFingerprint } from './sandbox-restoration-guards.mjs';
+import { sandboxUploadMetadata } from './refresh-sandbox-script.mjs';
 import {
   originalVersion,
+  fixtureTag,
   nextVersion,
   unrelatedVersion,
   code,
   token,
   settings,
+  versionResources,
   attestFixture,
   harness,
   run,
 } from './refresh-sandbox-test-fixtures.mjs';
 const kinds = (adapter) => adapter.mutations.map(({ kind }) => kind);
 const binding = (version, name) => version.resources.bindings.find((item) => item.name === name);
+
+test('documented targeted aliases share fingerprints, snapshots and exact upload metadata', () => {
+  for (const field of ['region', 'host', 'hostname']) {
+    const canonical = { mode: 'targeted', target: [{ [field]: token }] };
+    const aliases = [{ [field]: token }, { mode: 'targeted', [field]: token }, canonical];
+    const value = settings();
+    value.placement = canonical;
+    const baseline = attestSandboxVersion(
+      { id: originalVersion, resources: versionResources(value) },
+      originalVersion,
+      value,
+    );
+    const fingerprint = sandboxSettingsFingerprint(value);
+    for (const configured of aliases) {
+      value.placement = configured;
+      assert.equal(sandboxSettingsFingerprint(value), fingerprint);
+      assert.deepEqual(
+        sandboxUploadMetadata(value, originalVersion, 'worker.js', fixtureTag).placement,
+        { mode: 'targeted', [field]: token },
+      );
+      for (const observed of aliases) {
+        const version = { id: originalVersion, resources: versionResources(value) };
+        version.resources.script.placement = {
+          ...observed,
+          status: 'SUCCESS',
+          last_analyzed_at: token,
+        };
+        const diagnostic = {};
+        assert.deepEqual(
+          attestSandboxVersion(version, originalVersion, value, diagnostic, baseline),
+          baseline,
+        );
+        assert.ok(Object.values(diagnostic.placement.fieldsEqual).every(Boolean));
+        assert.ok(!JSON.stringify(diagnostic).includes(token));
+      }
+    }
+  }
+});
+
+test('targeted provider format transitions preserve configured target through the staged restoration', async (t) => {
+  attestFixture(t);
+  for (const field of ['region', 'host', 'hostname']) {
+    const canonical = { mode: 'targeted', target: [{ [field]: token }] };
+    for (const placement of [{ [field]: token }, { mode: 'targeted', [field]: token }, canonical]) {
+      const value = settings();
+      value.placement = placement;
+      const adapter = harness({
+        initialSettings: value,
+        originalResourceChange: (version) => {
+          version.resources.script.placement = { mode: 'targeted', [field]: token };
+        },
+        stagedResourceChange: (version) => {
+          version.resources.script.placement = structuredClone(canonical);
+        },
+        postChange: (current) => {
+          current.placement = structuredClone(canonical);
+        },
+      });
+      const receipt = await run(adapter);
+      assert.equal(receipt.outcome, 'verified');
+      assert.equal(receipt.protectedSettingsUnchanged, true);
+      assert.equal(receipt.flag, 'false');
+      assert.deepEqual(kinds(adapter), ['stage', 'activate']);
+      assert.deepEqual(adapter.mutations[0].payload.placement, {
+        mode: 'targeted',
+        [field]: token,
+      });
+      assert.ok(!JSON.stringify(receipt).includes(token));
+    }
+  }
+});
 
 test('divergent active UUID bindings or runtime refuse before every upload with private diagnostics', async (t) => {
   attestFixture(t);
