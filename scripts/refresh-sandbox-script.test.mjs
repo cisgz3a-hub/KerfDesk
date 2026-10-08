@@ -120,6 +120,9 @@ function harness({
   loseUploadBeforeApply = false,
   sourceBytes = code,
   sourceExtra = false,
+  sourceRaw = false,
+  sourceRawType = 'application/javascript',
+  sourceRawHeader,
   loseUploadResponse = false,
   refuseUpload = false,
   postChange,
@@ -132,6 +135,7 @@ function harness({
   const original = structuredClone(value);
   let version = currentIsGood ? goodVersion : originalVersion;
   let deployedCode = currentIsGood ? code : Buffer.from('old dispatcher');
+  let deployedName = 'worker.js';
   let reads = 0;
   let settingsReads = 0;
   let ownershipReads = 0;
@@ -197,9 +201,16 @@ function harness({
       if (endpoint.pathname.endsWith('/content/v2')) {
         const selected = endpoint.searchParams.get('version');
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
+        if (selected === goodVersion && sourceRaw)
+          return new Response(sourceBytes, {
+            headers: {
+              ...(sourceRawType ? { 'Content-Type': sourceRawType } : {}),
+              ...(sourceRawHeader ? { 'cf-entrypoint': sourceRawHeader } : {}),
+            },
+          });
         return selected === goodVersion
           ? content({ bytes: sourceBytes, extra: sourceExtra })
-          : content({ bytes: deployedCode });
+          : content({ bytes: deployedCode, entrypoint: deployedName, filename: deployedName });
       }
       if (endpoint.pathname.endsWith('/deployments') && init.method === 'POST') {
         const payload = JSON.parse(init.body);
@@ -238,7 +249,7 @@ function harness({
         assert.equal(file.type, 'application/javascript+module');
         assert.ok(Buffer.from(await file.arrayBuffer()).equals(code));
         assert.equal(payload.keep_assets, true);
-        assert.equal(payload.main_module, 'worker.js');
+        assert.equal(payload.main_module, sourceRaw ? 'sandbox-worker.js' : 'worker.js');
         assert.equal(payload.migrations, undefined);
         assert.equal(payload.bindings.length, original.bindings.length);
         for (const binding of payload.bindings)
@@ -261,6 +272,7 @@ function harness({
         if (refuseUpload) return new Response(token, { status: 403 });
         version = nextVersion;
         deployedCode = code;
+        deployedName = payload.main_module;
         if (postChange) postChange(value);
         if (concurrentAfterUpload) version = unrelatedVersion;
         if (loseUploadResponse) throw new Error('Ambiguous response with ' + token);
@@ -389,6 +401,85 @@ test('attested content must be exactly one JavaScript module with a matching cf-
   await assert.rejects(readSandboxModule(wrongHeader));
   await assert.rejects(readSandboxModule(Response.json({ success: false })));
 });
+test('raw attested bytes normalize to a stable ESM upload and verify multipart readback, including a lost ACK', async (t) => {
+  attestFixture(t);
+  for (const sourceRawType of [
+    'application/javascript',
+    'application/javascript+module; charset=utf-8',
+  ]) {
+    for (const loseUploadResponse of [false, true]) {
+      const adapter = harness({
+        sourceRaw: true,
+        sourceRawType,
+        sourceRawHeader: 'historical.js',
+        loseUploadResponse,
+      });
+      const receipt = await run(adapter);
+      assert.equal(receipt.outcome, 'verified');
+      assert.equal(receipt.codeVerified, true);
+      assert.equal(receipt.protectedSettingsUnchanged, true);
+      assert.equal(receipt.flag, 'false');
+      assert.equal(adapter.mutations.length, 1);
+      assert.equal(adapter.mutations[0].payload.main_module, 'sandbox-worker.js');
+      assert.equal(receipt.uploadResponseReceived, !loseUploadResponse);
+      if (loseUploadResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
+      assert.ok(adapter.calls.some(({ url }) => url.includes('content/v2?version=' + nextVersion)));
+      assert.ok(!JSON.stringify(receipt).includes(code.toString()));
+      assert.ok(!JSON.stringify(receipt).includes(token));
+    }
+  }
+  const normalized = await readSandboxModule(
+    new Response(code, { headers: { 'Content-Type': 'application/javascript' } }),
+  );
+  assert.deepEqual(normalized.bytes, code);
+  assert.equal(normalized.entrypoint, 'sandbox-worker.js');
+  assert.equal(normalized.mimeType, 'application/javascript+module');
+});
+
+test('raw wrong MIME, empty, HTML, JSON and one-byte changes refuse before any upload with redacted format facts', async (t) => {
+  attestFixture(t);
+  for (const [sourceBytes, sourceRawType] of [
+    [code, 'text/javascript'],
+    [code, 'application/octet-stream'],
+    [code, null],
+    [Buffer.alloc(0), 'application/javascript'],
+    [Buffer.from('<html>' + token + '</html>'), 'application/javascript'],
+    [Buffer.from(JSON.stringify({ error: token })), 'application/javascript'],
+    [Buffer.concat([code, Buffer.from('\n')]), 'application/javascript'],
+  ]) {
+    const adapter = harness({ sourceRaw: true, sourceBytes, sourceRawType });
+    await assert.rejects(run(adapter), (error) => {
+      assert.equal(error.receipt.failure.stage, 'sandbox-attested-content-get');
+      assert.equal(error.receipt.failure.httpStatus, 200);
+      assert.equal(error.receipt.mutationAttempted, false);
+      assert.equal(error.receipt.moduleFormatFailure.contentType, sourceRawType);
+      assert.ok(!JSON.stringify(error.receipt).includes(token));
+      assert.ok(!JSON.stringify(error.receipt).includes(code.toString()));
+      return true;
+    });
+    assert.equal(adapter.mutations.length, 0);
+  }
+});
+
+test('multipart still refuses source maps and records only bounded part metadata', async () => {
+  const form = new FormData();
+  form.set('worker.js', new Blob([code], { type: 'application/javascript+module' }), 'worker.js');
+  form.set('worker.js.map', new Blob([token], { type: 'application/source-map' }), 'worker.js.map');
+  const format = {};
+  await assert.rejects(
+    readSandboxModule(new Response(form, { headers: { 'cf-entrypoint': 'worker.js' } }), format),
+  );
+  assert.equal(format.partCount, 2);
+  assert.deepEqual(
+    format.parts.map(({ field }) => field),
+    ['worker.js', 'worker.js.map'],
+  );
+  assert.equal(format.parts[1].mimeType, 'application/source-map');
+  assert.match(format.parts[1].sha256, /^[a-f0-9]{64}$/u);
+  assert.ok(!JSON.stringify(format).includes(token));
+  assert.ok(!JSON.stringify(format).includes(code.toString()));
+});
+
 test('refresh preserves current authority/resources/assets and verifies fresh code, closed checkout and health', async (t) => {
   attestFixture(t);
   const adapter = harness();
