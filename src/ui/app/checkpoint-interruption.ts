@@ -90,10 +90,16 @@ function interruptionCause(
   stopRequest: JobStopRequest | null,
 ): JobInterruption | null {
   if (!['cancelled', 'disconnected', 'errored'].includes(status)) return null;
-  if (notice === null && stopRequest !== null) {
-    return { kind: 'cancelled', message: jobStopRequestMessage(stopRequest.reason) };
+  // A retained CNC transition warning is not a terminal cause. Record the
+  // later accepted Abort, actual disconnect or fault instead of Resume guidance.
+  if (notice?.kind === 'cnc-transition-unconfirmed' && status === 'disconnected') {
+    return fallbackInterruption(status);
   }
-  if (notice === null) return fallbackInterruption(status);
+  if (notice === null || notice.kind === 'cnc-transition-unconfirmed') {
+    return stopRequest === null
+      ? fallbackInterruption(status)
+      : { kind: 'cancelled', message: jobStopRequestMessage(stopRequest.reason) };
+  }
   return {
     kind: noticeKind(status, notice),
     message: notice.message,
@@ -143,6 +149,7 @@ function noticeKind(status: StreamerStatus, notice: LaserSafetyNotice): JobInter
   // ended the job left the spindle off: the job was stopped from the app, not
   // rejected by the controller (ADR-411 Amendment 1).
   if (notice.kind === 'cnc-pause-lift-failed') return 'cancelled';
+  if (notice.kind === 'cnc-transition-unconfirmed') return fallbackInterruption(status).kind;
   return notice.kind;
 }
 

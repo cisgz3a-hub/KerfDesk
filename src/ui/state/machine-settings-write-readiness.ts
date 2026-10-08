@@ -14,6 +14,7 @@ import { machineSettingsReadBlockReason } from './machine-settings-read-readines
 type WriteReadinessRefs = {
   readonly driver: Pick<ControllerDriver, 'kind'>;
   readonly settingsCollector: { readonly kind: string };
+  readonly pendingResetCleanup?: unknown | null;
 };
 
 export function machineSettingsWriteBlockReason(
@@ -25,6 +26,7 @@ export function machineSettingsWriteBlockReason(
 ): string | null {
   const readBlocked = machineSettingsReadBlockReason(state, {
     settingsCollectionActive: refs.settingsCollector.kind === 'collecting',
+    resetCleanupPending: refs.pendingResetCleanup != null,
   });
   if (readBlocked !== null) return readBlocked;
   if (state.statusReport?.state !== 'Idle') {

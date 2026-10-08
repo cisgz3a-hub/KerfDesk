@@ -6,8 +6,11 @@ export function prepareCncPauseResumeTest(): void {
 }
 
 export async function resetCncPauseResumeTest(): Promise<void> {
+  // Let the existing reset owner finish on the clock that armed its window.
+  const disconnect = useLaserStore.getState().disconnect();
+  if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(2_000);
+  await disconnect;
   vi.useRealTimers();
-  await useLaserStore.getState().disconnect();
   useLaserStore.setState({
     connection: { kind: 'disconnected' },
     statusReport: null,

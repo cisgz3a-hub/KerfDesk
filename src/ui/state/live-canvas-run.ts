@@ -12,6 +12,7 @@ import {
   registerCanvasProgramRunDocument,
 } from './canvas-program-source';
 import { useStore } from './store';
+import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
 import {
   endStampFor,
   initialLiveCanvasTiming,
@@ -40,7 +41,13 @@ export function liveCanvasStatusPatch(
   now: number = Date.now(),
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
-  if (run === null || isTerminalCanvasLifecycle(run.lifecycle)) return {};
+  if (
+    run === null ||
+    isTerminalCanvasLifecycle(run.lifecycle) ||
+    isProvisionalResetFreeze(state, streamer?.status)
+  ) {
+    return {};
+  }
   const lifecycle = lifecycleFor(
     state,
     streamer,
@@ -309,6 +316,7 @@ function controllerLifecycle(
   // Marlin's M114 is Idle-shaped but may describe a queued destination. Only
   // realtime Idle can prove a paused sender's accepted tail has drained.
   if (report.state === 'Idle' && isDrainedPausedSender(state, streamer)) return 'paused';
+  // Only the post-job settle owner may finish the run after its marker and stable Idle.
   return null;
 }
 

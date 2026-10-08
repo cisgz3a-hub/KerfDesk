@@ -13,10 +13,11 @@
 // sent a reset byte forgets the work origin (MA-3): Marlin keeps its G92
 // position_shift through M410 (G92.cpp L95-L98).
 
-import { cancel as cancelStreamer, markErrored, wipeInFlight } from '../../core/controllers/grbl';
+import { markErrored } from '../../core/controllers/grbl';
 import type { ControllerDriver } from '../../core/controllers';
 import type { SerialConnection } from '../../platform/types';
 import { clearCncLiveCaps } from './detected-settings-action';
+import { isGrblFamilyDriver, runGrblDisconnectTransaction } from './laser-disconnect-transaction';
 import { streamResetRecord, type JobStopReason } from './job-stop-request';
 import { invalidateControllerSessionEvidence } from './laser-controller-evidence';
 import { recordControllerRecoveryReset } from './laser-controller-operation';
@@ -30,12 +31,7 @@ import {
   cancelPauseResumeTransition,
   hasPauseResumeTransition,
 } from './laser-pause-resume-transition';
-import {
-  driverQuickStops,
-  isAirOffLine,
-  noResetStopLines,
-  quickStopPatch,
-} from './laser-quick-stop';
+import { driverQuickStops, isAirOffLine, noResetStopLines } from './laser-quick-stop';
 import { armResetCleanup, resetCleanupLines, type ResetCleanupRefs } from './laser-reset-cleanup';
 import {
   disconnectStopUnconfirmedNotice,
@@ -44,13 +40,12 @@ import {
   writeFailedNotice,
   type LaserSafetyAction,
 } from './laser-safety-notice';
-import { finishedJobStateReset, frameProofReset } from './laser-session-reset';
-import { originUnknownAfterControllerReset } from './laser-status-line';
-import { isActiveJob, pushLog } from './laser-store-helpers';
+import { isActiveJob } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
-import { liveCanvasLifecyclePatch } from './live-canvas-run';
 import { cancelPendingManualMotions } from './manual-motion-intent';
 import { stopUnownedControllerMotion } from './unowned-motion-stop';
+import { unownedControllerMotion } from './unowned-controller-motion';
+import { captureStopOutcomeOwner, applyStopOutcome } from './laser-job-stop-outcome';
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -64,12 +59,14 @@ export type JobStopContext = {
     ControllerQualificationScheduleRefs & {
       readonly driver: ControllerDriver;
       readonly connection?: SerialConnection | null;
+      readonly settingsCollector?: { readonly kind: string };
+      onLineArrived?: (() => void) | null;
     };
   readonly safeWrite: (line: string, action?: LaserSafetyAction) => Promise<void>;
   readonly driver: () => ControllerDriver;
 };
 
-type StopOutcome = {
+export type StopOutcome = {
   /** A line that switches air assist off reached the transport. */
   readonly airOffSent: boolean;
   /** The driver's quickstop (Marlin M410): 'sent' once every stop line reached
@@ -79,8 +76,6 @@ type StopOutcome = {
 
 const TRANSITION_CANCELLATION_MESSAGE =
   'Pause or Resume was cancelled because the operator requested Abort.';
-const QUICK_STOP_LOG =
-  '[lf2] Abort quick-stopped the controller (M410): homing and position are unverified until you re-home or re-check the origin.';
 
 export async function runStopJob(context: JobStopContext, reason?: JobStopReason): Promise<void> {
   const connection = context.refs.connection;
@@ -98,7 +93,7 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
     // Motion nothing here owns (a Console G1, `$J=` or `$H`) first gets the stop
     // that keeps position; a cancelled jog needs no reset (ADR-375 C-2). A page
     // that is closing cannot wait for a hold to settle, so it resets at once.
-    if (reason !== 'app-closing') {
+    if (reason !== 'app-closing' && unownedControllerMotion(context.get()) !== null) {
       const motionStop = await stopUnownedControllerMotion(context);
       if (!ownsSession() || motionStop === 'superseded') return;
       if (motionStop !== 'reset') {
@@ -115,42 +110,38 @@ export async function runStopJob(context: JobStopContext, reason?: JobStopReason
     // means the last status report may not show the machine moving.
     const pauseResumeSettling = hasPauseResumeTransition(refs);
     cancelPauseResumeTransition(refs, TRANSITION_CANCELLATION_MESSAGE);
-    const outcome =
+    const pendingOutcome =
       softReset === null
-        ? await stopWithoutReset(context)
-        : await stopWithReset(context, softReset, reason, pauseResumeSettling);
-    if (!ownsConnection()) return;
-    set((state) => ({
-      // Abort ends the run, so its machine kind and any tool-change bits it never
-      // reached are no longer the operator's pending work.
-      ...finishedJobStateReset(),
-      wcoCache: null,
-      accessoryCache: null,
-      // Only a line that switched air off clears the Manual Air latch (CG-10).
-      ...(outcome.airOffSent ? { airAssistOn: false } : {}),
-      // ADR-228 amendment: Abort during a frame must kill the proof directly —
-      // an aborted trace was not completed, whatever the side effects imply.
-      ...frameProofReset(),
-      ...(softReset === null ? {} : originUnknownAfterControllerReset(state)),
-      ...quickStopOutcomePatch(state, outcome.quickStop),
-      streamer:
-        state.streamer === null
-          ? state.streamer
-          : softReset !== null
-            ? wipeInFlight(cancelStreamer(state.streamer))
-            : cancelStreamer(state.streamer),
-      ...liveCanvasLifecyclePatch(state, 'stopped'),
-    }));
+        ? stopWithoutReset(context)
+        : stopWithReset(context, softReset, reason, pauseResumeSettling);
+    const stoppedWork = captureStopOutcomeOwner(context);
+    const outcome = await pendingOutcome;
+    if (ownsConnection()) applyStopOutcome(context, outcome, softReset, stoppedWork);
   } catch (error) {
     // Another connect/disconnect owns any current UI. A cable loss without a
     // new attempt still belongs to this Abort and must report its failure.
-    if (ownsAttempt()) throw error;
+    if (ownsAttempt()) {
+      reportClosedStopWriteFailure(context);
+      throw error;
+    }
   }
 }
 
 /** Keep every delayed stop write, including banner cleanup, on its original
  * transport. The stop's own reset changes the session epoch, so that epoch
  * fences only preparation above, not its expected post-reset cleanup. */
+function reportClosedStopWriteFailure(context: JobStopContext): void {
+  if (context.refs.connection != null) return;
+  context.set((state) => {
+    const notice = state.safetyNotice;
+    // Preserve the original factual incident; a generic cable-loss fallback
+    // must still report this same operator Stop's rejected transport.
+    return notice === null || notice.kind === 'disconnect-during-job'
+      ? { safetyNotice: writeFailedNotice('stop') }
+      : {};
+  });
+}
+
 function bindStopConnection(
   context: JobStopContext,
   ownsConnection: () => boolean,
@@ -193,6 +184,7 @@ async function stopWithReset(
   pauseResumeSettling: boolean,
 ): Promise<StopOutcome> {
   const { set, refs, safeWrite, driver } = context;
+  if (isGrblFamilyDriver(driver())) return stopWithOwnedReset(context, reason, pauseResumeSettling);
   clearCncLiveCaps();
   const resetWriteEpoch = refs.writeEpoch ?? 0;
   const cleanupLines = resetCleanupLines(driver());
@@ -240,20 +232,36 @@ async function stopWithReset(
   return { airOffSent: true, quickStop: 'none' };
 }
 
+async function stopWithOwnedReset(
+  context: JobStopContext,
+  reason: JobStopReason | undefined,
+  pauseResumeSettling: boolean,
+): Promise<StopOutcome> {
+  const { set, refs, safeWrite, driver } = context;
+  set((state) => ({
+    ...(reason === undefined || state.streamer === null
+      ? {}
+      : { jobStopRequest: { reason, streamerEpoch: state.streamerEpoch } }),
+    ...(state.streamer === null
+      ? {}
+      : { streamReset: streamResetRecord(state, pauseResumeSettling) }),
+  }));
+  // Posting reset precedes taking back the hosted worker's refill queue.
+  const resetWrite = runGrblDisconnectTransaction(set, refs, safeWrite, {
+    retainConnection: true,
+    awaitResetWriteOnly: true,
+    action: 'stop',
+    cleanupLines: resetCleanupLines(driver()),
+  });
+  void resetWrite.catch(() => undefined);
+  await releaseHostedRefill(refs);
+  await resetWrite;
+  return { airOffSent: true, quickStop: 'none' };
+}
+
 // A quickstop that may have reached the controller leaves homing and position
 // unverified even when a later write failed; the log only reports one that
 // was sent in full.
-function quickStopOutcomePatch(
-  state: LaserState,
-  quickStop: StopOutcome['quickStop'],
-): Partial<LaserState> {
-  if (quickStop === 'none') return {};
-  return {
-    ...quickStopPatch(state),
-    ...(quickStop === 'sent' ? { log: pushLog(state, QUICK_STOP_LOG) } : {}),
-  };
-}
-
 // Web Serial can deliver the commanded boot banner before write() settles.
 // That observed reset boundary is stronger evidence than the stale transport
 // promise; only rethrow when no reboot was observed. A port that closed under

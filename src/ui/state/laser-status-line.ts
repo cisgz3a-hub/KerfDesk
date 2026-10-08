@@ -20,7 +20,10 @@ import { frameCompletionPatch, nextFrameDispatch, observeFrameMotion } from './l
 import type { LaserState } from './laser-store';
 import type { HandlerRefs, SafeWriteFn, SetFn } from './laser-line-shared';
 import { statusBufferPatch } from './laser-rx-capacity-evidence';
-import { statusObservationPatch } from './laser-status-observation';
+import { statusObservationPatch, statusResponseObservationPatch } from './laser-status-observation';
+import { hasOwnedControllerReset } from './laser-reset-cleanup';
+import { isProvisionalResetFreeze } from './laser-reset-terminal-state';
+import { shouldReleaseStreamerAtIdle } from './laser-terminal-stream-release';
 import { statusPositionPatch } from './laser-status-position';
 import { liveCanvasLifecyclePatch, liveCanvasStatusCompletionPatch } from './live-canvas-run';
 import { observeFreshControllerStatus } from './laser-controller-status-wait';
@@ -278,7 +281,8 @@ function handleInvalidatingReport(
   state: LaserState,
   report: StatusReport,
 ): void {
-  if (isStaleHomeAlarmReply(state, report)) set(staleHomeAlarmReplyPatch(state, report));
+  if (isStaleHomeAlarmReply(state, report))
+    set({ ...staleHomeAlarmReplyPatch(state, report), ...statusResponseObservationPatch(state) });
   else if (alreadyInReportedState(state, report)) {
     handleRepeatedInvalidatingStatus(set, refs, state, report);
   } else handleInvalidatingStatus(set, refs, state, report, state.streamer);
@@ -308,6 +312,7 @@ function handleRepeatedInvalidatingStatus(
     statusReport: report,
     statusSequence: nextSequence,
     statusObservation: null,
+    ...statusResponseObservationPatch(state),
     ...mpgOwnershipPatch(report, state),
   });
   observeStatusConsumers(set, refs, state, nextSequence, report);
@@ -324,12 +329,14 @@ function handleInvalidatingStatus(
   // The Alarm report that follows a missed touch-off probe keeps the held job
   // its ALARM:4/5 kept (tool-change-probe-alarm.ts).
   const keepToolChangeHold = alarm && isProbeAlarmedToolChangeHold(state);
-  advanceWriteEpoch(refs);
+  const ownedReset = hasOwnedControllerReset(state.controllerOperation);
+  if (!ownedReset) advanceWriteEpoch(refs);
   set({
     statusReport: report,
     statusSequence: state.statusSequence + 1,
     statusObservation: null,
-    ...(keepToolChangeHold ? {} : cancelActiveStreamerPatch(streamer)),
+    ...statusResponseObservationPatch(state),
+    ...(keepToolChangeHold || ownedReset ? {} : cancelActiveStreamerPatch(streamer)),
     ...(alarm ? {} : { alarmCode: null }),
     wcoCache: null,
     ovCache: null,
@@ -344,8 +351,7 @@ function handleInvalidatingStatus(
     motionOperation: null,
     // A reset from Sleep normally ends in Alarm; its Wake continuation must
     // still be able to identify and release its exact recovery owner.
-    controllerOperation:
-      alarm && state.controllerOperation?.kind === 'recovery' ? state.controllerOperation : null,
+    ...invalidatedOwnershipPatch(state, ownedReset, alarm),
     fireActive: false,
     frameVerification: null,
     framedRun: null,
@@ -353,18 +359,33 @@ function handleInvalidatingStatus(
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
-    pendingUntrackedAcks: 0,
-    pendingTransportWrites: 0,
     ...(keepToolChangeHold ? {} : liveCanvasLifecyclePatchForInvalidation(state, alarm)),
   });
   cancelControllerLifecycleRefs(refs, `Controller entered ${alarm ? 'Alarm' : 'Sleep'}.`);
+}
+
+function invalidatedOwnershipPatch(
+  state: LaserState,
+  ownedReset: boolean,
+  alarm: boolean,
+): Partial<LaserState> {
+  return {
+    controllerOperation:
+      ownedReset || (alarm && state.controllerOperation?.kind === 'recovery')
+        ? state.controllerOperation
+        : null,
+    pendingUntrackedAcks: ownedReset ? state.pendingUntrackedAcks : 0,
+    pendingTransportWrites: ownedReset ? (state.pendingTransportWrites ?? 0) : 0,
+  };
 }
 
 function liveCanvasLifecyclePatchForInvalidation(
   state: LaserState,
   alarm: boolean,
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
-  return liveCanvasLifecyclePatch(state, alarm ? 'errored' : 'disconnected');
+  return isProvisionalResetFreeze(state)
+    ? {}
+    : liveCanvasLifecyclePatch(state, alarm ? 'errored' : 'disconnected');
 }
 
 function advanceWriteEpoch(refs: HandlerRefs): void {
@@ -422,16 +443,6 @@ function cancelActiveStreamerPatch(
   // Alarm = the firmware wiped its buffer; in-flight lines will never be
   // acked, so drop them from the accounting too (audit F1).
   return { streamer: wipeInFlight(cancelStreamer(streamer)) };
-}
-
-function shouldReleaseStreamerAtIdle(
-  streamer: StreamerState | null,
-  controllerOperation: LaserState['controllerOperation'],
-  report: StatusReport,
-): boolean {
-  if (streamer === null || report.state !== 'Idle') return false;
-  if (streamer.status === 'errored') return true;
-  return streamer.status === 'done' && controllerOperation === null;
 }
 
 function mpgOwnershipPatch(

@@ -14,12 +14,22 @@
 
 import type { ControllerDriver } from '../../core/controllers';
 import type { LaserSafetyAction } from './laser-safety-notice';
+import type { LaserControllerOperation } from './laser-controller-operation';
 
 export const RESET_CLEANUP_BANNER_TIMEOUT_MS = 500;
 
 type PendingResetCleanup = {
   readonly lines: ReadonlyArray<string>;
-  readonly timer: ReturnType<typeof setTimeout>;
+  readonly timer: ReturnType<typeof setTimeout> | null;
+  readonly options: ResetCleanupOptions;
+  readonly write: CleanupWriteFn | null;
+};
+
+export type ResetCleanupOptions = {
+  readonly requireResetBoundary?: boolean;
+  readonly onResetBoundary?: () => void;
+  readonly onComplete?: (error: unknown | null) => void;
+  readonly onCancel?: () => void;
 };
 
 export type ResetCleanupRefs = {
@@ -29,6 +39,20 @@ export type ResetCleanupRefs = {
 };
 
 type CleanupWriteFn = (line: string, action?: LaserSafetyAction) => Promise<void>;
+
+export function hasOwnedControllerReset(operation: LaserControllerOperation | null): boolean {
+  return operation?.kind === 'recovery' && operation.phase === 'reset';
+}
+
+export function hasUnconfirmedResetCleanup(
+  refs: ResetCleanupRefs,
+  operation: LaserControllerOperation | null,
+): boolean {
+  return (
+    refs.pendingResetCleanup?.options.requireResetBoundary === true &&
+    hasOwnedControllerReset(operation)
+  );
+}
 
 /** Cleanup after a controller reset must explicitly include spindle/laser off.
  * Stock GRBL profiles may expose only M9 as their ordinary stopLaserLines. */
@@ -43,30 +67,50 @@ export function armResetCleanup(
   refs: ResetCleanupRefs,
   safeWrite: CleanupWriteFn,
   lines: ReadonlyArray<string>,
+  options: ResetCleanupOptions = {},
 ): void {
   cancelResetCleanup(refs);
   if (lines.length === 0) return;
-  const timer = setTimeout(() => {
-    flushResetCleanup(refs, safeWrite);
-  }, RESET_CLEANUP_BANNER_TIMEOUT_MS);
-  refs.pendingResetCleanup = { lines, timer };
+  const timer = options.requireResetBoundary
+    ? null
+    : setTimeout(() => {
+        flushResetCleanup(refs, safeWrite);
+      }, RESET_CLEANUP_BANNER_TIMEOUT_MS);
+  refs.pendingResetCleanup = {
+    lines,
+    timer,
+    options,
+    write: options.requireResetBoundary ? safeWrite : null,
+  };
 }
 
-/** Write the armed cleanup lines now (banner arrived, or fallback fired).
- *  Best effort: a failed write must not throw into the line pipeline — the
- *  reset itself already de-energized laser and coolant on the controller. */
-export function flushResetCleanup(refs: ResetCleanupRefs, safeWrite: CleanupWriteFn): void {
+/** Best-effort cleanup reports failure to its owner without throwing into the
+ * line pipeline. Transport acceptance does not prove physical beam-off. */
+export function flushResetCleanup(
+  refs: ResetCleanupRefs,
+  safeWrite: CleanupWriteFn,
+  cause: 'reset-boundary' | 'fallback' = 'fallback',
+): void {
   const pending = refs.pendingResetCleanup;
   if (pending === null) return;
-  clearTimeout(pending.timer);
+  if (cause === 'reset-boundary') pending.options.onResetBoundary?.();
+  if (pending.timer !== null) clearTimeout(pending.timer);
   refs.pendingResetCleanup = null;
   const generation = refs.resetCleanupGeneration;
   void (async () => {
     for (const line of pending.lines) {
       if (refs.resetCleanupGeneration !== generation) return;
-      await safeWrite(`${line}\n`, 'stop');
+      await (pending.write ?? safeWrite)(`${line}\n`, 'stop');
     }
-  })().catch(() => undefined);
+  })()
+    .then(
+      () => {
+        if (refs.resetCleanupGeneration !== generation) pending.options.onCancel?.();
+        else pending.options.onComplete?.(null);
+      },
+      (error: unknown) => pending.options.onComplete?.(error),
+    )
+    .catch(() => undefined);
 }
 
 /** Drop armed cleanup without writing (port teardown). */
@@ -74,6 +118,7 @@ export function cancelResetCleanup(refs: ResetCleanupRefs): void {
   refs.resetCleanupGeneration = (refs.resetCleanupGeneration ?? 0) + 1;
   const pending = refs.pendingResetCleanup;
   if (pending === null) return;
-  clearTimeout(pending.timer);
+  if (pending.timer !== null) clearTimeout(pending.timer);
   refs.pendingResetCleanup = null;
+  pending.options.onCancel?.();
 }

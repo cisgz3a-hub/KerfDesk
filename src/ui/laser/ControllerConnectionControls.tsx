@@ -28,6 +28,10 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const platform = usePlatform();
   const connection = useLaserStore((state) => state.connection);
   const qualification = useLaserStore((state) => state.controllerQualification);
+  const qualificationReadBlockReason = useLaserStore((state) =>
+    state.getMachineSettingsReadBlockReason(),
+  );
+  const reconnectRecommended = useLaserStore((state) => state.getControllerReconnectRecommended());
   const connectController = useLaserStore((state) => state.connect);
   const disconnectController = useLaserStore((state) => state.disconnect);
   const retryQualification = useLaserStore((state) => state.retryControllerQualification);
@@ -42,9 +46,15 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const connect = (): void => {
     void connectController(platform, connectOptions());
   };
-  const reconnect = async (): Promise<void> => {
-    await disconnectController();
-    await connectController(platform, connectOptions());
+  const reconnect = (): void => {
+    if (!useLaserStore.getState().getControllerReconnectRecommended()) return;
+    void connectController(platform, connectOptions()).catch(
+      controllerActionFailureHandler('Reconnect'),
+    );
+  };
+  const retryControllerInformation = (): void => {
+    if (useLaserStore.getState().getMachineSettingsReadBlockReason() !== null) return;
+    void retryQualification().catch(controllerActionFailureHandler('Check controller'));
   };
   // A connected machine is closed first, so the chosen port replaces it.
   const choosePort = async (): Promise<void> => {
@@ -55,7 +65,8 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   return (
     <>
       <SafetyNoticeBanner
-        onReconnect={connect}
+        onReconnect={reconnect}
+        reconnectRecommended={reconnectRecommended}
         reconnectDisabled={!supportsSerial || props.motionOperation !== null || isFileOnlyProfile}
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
@@ -74,12 +85,10 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
         }
         onForget={props.onForget}
         qualification={qualification}
-        onRetryQualification={() =>
-          void retryQualification().catch(controllerActionFailureHandler('Check controller'))
-        }
-        onReconnectQualification={() =>
-          void reconnect().catch(controllerActionFailureHandler('Reconnect'))
-        }
+        qualificationReadBlockReason={qualificationReadBlockReason}
+        reconnectRecommended={reconnectRecommended}
+        onRetryQualification={retryControllerInformation}
+        onReconnectQualification={reconnect}
         disabled={
           !supportsSerial ||
           connectionControlsBusy(props.motionOperation, props.controllerOperation) ||

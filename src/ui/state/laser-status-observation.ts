@@ -4,8 +4,9 @@ export function statusObservationPatch(
   state: LaserState,
   sequence: number,
   positionInvalidated: boolean,
-): Pick<LaserState, 'statusObservation'> {
+): Pick<LaserState, 'statusObservation' | 'statusResponseObservation'> {
   return {
+    ...statusResponseObservationPatch(state),
     statusObservation: positionInvalidated
       ? null
       : {
@@ -14,5 +15,16 @@ export function statusObservationPatch(
           sequence,
           observedAt: Date.now(),
         },
+  };
+}
+
+export function statusResponseObservationPatch(
+  state: LaserState,
+): Pick<LaserState, 'statusResponseObservation'> {
+  return {
+    statusResponseObservation: {
+      sessionEpoch: state.controllerSessionEpoch,
+      observedAt: Date.now(),
+    },
   };
 }

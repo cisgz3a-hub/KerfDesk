@@ -10,7 +10,11 @@ import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { buildMotionManifest } from '../../core/job/motion-manifest';
 import { INITIAL_ROUTE_RECONCILIATION } from '../../core/job/live-route-reconciliation';
 import { fingerprintGcode } from '../../core/recovery';
-import { startLiveCanvasRun, type CanvasMotionPlan } from './canvas-motion-plan';
+import {
+  startLiveCanvasRun,
+  type CanvasMotionPlan,
+  type LiveCanvasRun,
+} from './canvas-motion-plan';
 import {
   completeLiveCanvasRun,
   liveCanvasLifecyclePatch,
@@ -166,8 +170,9 @@ describe('live canvas status reconciliation', () => {
     const done = { ...acceptedStreamer(), status: 'done' as const };
     const awaiting = liveCanvasStatusPatch(current, report(10, 'Idle'), done).liveCanvasRun;
     expect(awaiting?.lifecycle).toBe('running');
+    expect(awaiting?.endedAtMs).toBeNull();
     expect(awaiting?.route).toEqual(INITIAL_ROUTE_RECONCILIATION);
-    const finished = completeLiveCanvasRun(awaiting ?? null);
+    const finished = completeLiveCanvasRun(awaiting ?? null, 5_000);
     expect(finished?.lifecycle).toBe('finished');
     expect(finished?.route.confirmedRouteMm).toBe(finished?.plan.manifest.totalRouteMm);
   });
@@ -257,16 +262,21 @@ describe('live canvas status reconciliation', () => {
     expect(finished?.endedAtMs).toBe(6_000);
   });
 
-  it.each(['stopped', 'disconnected', 'errored'] as const)(
-    'cannot turn a %s interruption into a completed display',
+  it.each(['stopped', 'disconnected', 'errored', 'finished'] as const)(
+    'does not replace an earlier %s outcome with a later settlement completion',
     (lifecycle) => {
-      const interrupted = {
-        ...startLiveCanvasRun(plan(), 1_000),
+      const run = state().liveCanvasRun;
+      if (run === undefined || run === null) throw new Error('Expected a live canvas run.');
+      const terminal: LiveCanvasRun = {
+        ...run,
         lifecycle,
-        endedAtMs: 1_600,
-        timing: { kind: 'unavailable' as const, reason: 'settlement did not complete' },
+        endedAtMs: 3_000,
+        timing:
+          lifecycle === 'finished'
+            ? { kind: 'complete' }
+            : { kind: 'unavailable', reason: 'Existing terminal outcome.' },
       };
-      expect(completeLiveCanvasRun(interrupted, 2_000)).toBe(interrupted);
+      expect(completeLiveCanvasRun(terminal, 9_000)).toBe(terminal);
     },
   );
 

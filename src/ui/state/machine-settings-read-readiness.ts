@@ -12,6 +12,10 @@ import type { LaserState } from './laser-store';
 export type MachineSettingsReadReadinessOptions = {
   /** The collector lives outside Zustand, so the store boundary supplies it. */
   readonly settingsCollectionActive?: boolean;
+  /** Deferred fail-off cleanup retains ownership ahead of any settings query. */
+  readonly resetCleanupPending?: boolean;
+  /** Automatic refresh requires a current-session Idle, independent of manual Alarm reads. */
+  readonly requireCurrentStatusObservation?: boolean;
 };
 
 /**
@@ -27,6 +31,9 @@ export function machineSettingsReadBlockReason(
 ): string | null {
   const transportBlock = machineSettingsTransportBlockReason(state);
   if (transportBlock !== null) return transportBlock;
+  if (options.resetCleanupPending === true) {
+    return 'Waiting for controller reset cleanup before reading machine settings.';
+  }
   const activityBlock = machineSettingsActivityBlockReason(state);
   if (activityBlock !== null) return activityBlock;
   const controllerState = state.statusReport?.state ?? null;
@@ -35,7 +42,22 @@ export function machineSettingsReadBlockReason(
   if (controllerState !== 'Idle' && !exactAlarmEvidence) {
     return 'Controller must report Idle or Alarm before reading machine settings.';
   }
+  const freshnessBlock = automaticSettingsReadBlockReason(state, options);
+  if (freshnessBlock !== null) return freshnessBlock;
   return machineSettingsOperationBlockReason(state, options);
+}
+
+function automaticSettingsReadBlockReason(
+  state: LaserState,
+  options: MachineSettingsReadReadinessOptions,
+): string | null {
+  if (options.requireCurrentStatusObservation !== true) return null;
+  if (state.statusReport?.state !== 'Idle') {
+    return 'Waiting for Idle before refreshing controller information automatically.';
+  }
+  return state.statusObservation?.sessionEpoch === state.controllerSessionEpoch
+    ? null
+    : 'Waiting for a fresh controller status before reading machine settings.';
 }
 
 function machineSettingsActivityBlockReason(state: LaserState): string | null {

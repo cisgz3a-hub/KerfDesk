@@ -120,8 +120,7 @@ export function completeLiveCanvasRun(
   run: LiveCanvasRun | null,
   now: number = Date.now(),
 ): LiveCanvasRun | null {
-  if (run === null || (isTerminalCanvasLifecycle(run.lifecycle) && run.lifecycle !== 'finished'))
-    return run;
+  if (run === null || isTerminalCanvasLifecycle(run.lifecycle)) return run;
   return {
     ...run,
     lifecycle: 'finished',

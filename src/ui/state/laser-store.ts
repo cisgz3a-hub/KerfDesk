@@ -2,6 +2,7 @@
 // controller. Firmware specifics come from the active ControllerDriver
 // (ADR-094); this file must not hardcode any protocol bytes.
 import { create } from 'zustand';
+import { acknowledgeSafetyNotice } from './laser-disconnect-safety';
 import {
   type GrblSettingRow,
   idleCollector,
@@ -26,10 +27,12 @@ import { invalidateAccessoryObservation } from './cnc-accessory-readiness';
 import type { LaserControllerOperation } from './laser-controller-operation';
 import type { ControllerBuildInfoState } from './laser-controller-build-info';
 import type { LaserModuleObservation } from './laser-module-probe';
-import type {
-  ControllerQualification,
-  ControllerQualificationScheduleRefs,
-} from './laser-controller-qualification';
+import {
+  bindControllerQualificationScheduler,
+  controllerInformationStatusActions,
+  type ControllerQualification,
+  type ControllerQualificationScheduleRefs,
+} from './laser-controller-information';
 import { controllerOperationCommandBlockMessage } from './laser-controller-operation';
 import { controllerRecoveryActions } from './laser-controller-recovery-actions';
 import { applyDetectedSettingsPatch } from './detected-settings-action';
@@ -123,6 +126,9 @@ export type LaserState = LaserStoreActions &
     readonly controllerFirmwareReport: ControllerFirmwareReport | null;
     readonly statusSequence: number;
     readonly statusObservation: ControllerObservationStamp | null;
+    /** Current communication evidence, including Alarm/Sleep replies. This does
+     * not establish position, homing, Frame or settings authority. */
+    readonly statusResponseObservation?: SessionObservationStamp | null;
     readonly alarmCode: number | null;
     // The firmware printed "Reset to continue" after a critical event: only a
     // soft reset is accepted until the reboot banner (controller-reset-required.ts).
@@ -334,6 +340,8 @@ export type LaserState = LaserStoreActions &
 
 export type LiveRefs = ControllerLifecycleRefs & {
   connection: SerialConnection | null;
+  /** Explicit acknowledgement retires notices captured by pending teardown. */
+  safetyNoticeAcknowledgementRevision?: number;
   // The active firmware driver. Selected at connect time from the device
   // profile's controllerKind; GRBL when disconnected (pre-ADR-094 behavior).
   driver: ControllerDriver;
@@ -369,6 +377,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
 
 const refs: LiveRefs = {
   connection: null,
+  safetyNoticeAcknowledgementRevision: 0,
   driver: grblDriver,
   unsubscribeLine: null,
   unsubscribeClose: null,
@@ -554,6 +563,7 @@ export const useLaserStore = create<LaserState>((set, get) => {
     ...firmwareReportActions(set, get, refs, write),
     ...surfaceProbeActions(set, get, refs, write),
     retryControllerQualification: settingsActions.readMachineSettings,
+    ...controllerInformationStatusActions(get, refs),
     ...consoleActions(set, get, refs, write),
     ...statusRequestActions(get, refs, (line, action, source) =>
       safeWrite(set, get, line, action, source),
@@ -576,7 +586,9 @@ export const useLaserStore = create<LaserState>((set, get) => {
       () => refs.driver,
     ),
     ...detectedSettingsActions(set, get),
-    clearSafetyNotice: () => set({ safetyNotice: null }),
+    clearSafetyNotice: () => set(acknowledgeSafetyNotice(get().safetyNotice, refs)),
     pushSystemNotice: (line) => set(appendSystemNotice(get(), refs, line)),
   };
 });
+
+bindControllerQualificationScheduler(useLaserStore, refs);
