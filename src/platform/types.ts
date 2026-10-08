@@ -129,6 +129,8 @@ export type FileHandle = {
   readonly recentRef?: RecentFileRef;
 };
 
+export type SaveDestinationComparison = 'same' | 'different' | 'unknown';
+
 export type SaveTarget = {
   readonly displayName: string;
   /** How Recent Projects can reach the saved file again without browsing. */
@@ -137,6 +139,9 @@ export type SaveTarget = {
   readonly destinationIdentity?: unknown;
   /** Compare adapter identities without opening, creating, or writing a file. */
   readonly isSameDestination?: (other: SaveTarget) => Promise<boolean>;
+  /** Only authoritative entry identity can prove distinct destinations. An
+   * unsupported carrier, unresolved alias or failed lookup remains unknown. */
+  readonly compareDestination?: (other: SaveTarget) => Promise<SaveDestinationComparison>;
   readonly write: (data: string | Blob) => Promise<void>;
   /** Backpressured output; cancellation discards staged bytes until finalization
    * begins. onFinalizing marks the irrevocable close, before which callers must
