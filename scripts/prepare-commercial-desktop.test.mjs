@@ -431,11 +431,24 @@ test('afterPack verifies actual ASAR metadata and explicit external terms before
   }
 });
 
-test('installed builder resolves commercial inheritance with mandatory signing and dedicated feed', async () => {
+// electron-builder logs "  • loaded configuration" to stdout, which node --test reads
+// as its own message stream. Landing right after a test message, the bullet's bytes
+// are misread as a negative message length, and the whole file fails with "Unable
+// to deserialize cloned data" (seen in CI on 2026-09-29). Its log goes to stderr.
+function builderLogToStderr(t, configModule) {
+  const { log } = createRequire(configModule)('builder-util/out/log.js');
+  const stream = log.stream;
+  log.stream = process.stderr;
+  t.after(() => {
+    log.stream = stream;
+  });
+}
+
+test('installed builder resolves commercial inheritance with mandatory signing and dedicated feed', async (t) => {
   const requireBuilder = createRequire(import.meta.resolve('electron-builder'));
-  const { getConfig } = await import(
-    pathToFileURL(requireBuilder.resolve('app-builder-lib/out/util/config/config.js')).href
-  );
+  const configModule = requireBuilder.resolve('app-builder-lib/out/util/config/config.js');
+  const { getConfig } = await import(pathToFileURL(configModule).href);
+  builderLogToStderr(t, configModule);
   const config = await getConfig(ROOT, join(ROOT, 'electron-builder.commercial.yml'), null);
   assert.equal(config.forceCodeSigning, true);
   assert.equal(config.win.verifyUpdateCodeSignature, true);

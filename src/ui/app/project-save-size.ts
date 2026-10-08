@@ -13,6 +13,9 @@ export function projectSaveNeedsWorker(project: Project): boolean {
 }
 
 function largeProject(project: Project): boolean {
+  // Archived sheets need worker validation; page-backed pixels must be embedded
+  // before a fresh Choose file click, regardless of the active scene's size.
+  if (hasExternalProjectAssets(project)) return true;
   let work = stringWork(project.notes);
   for (const font of Array.isArray(project.embeddedFonts) ? project.embeddedFonts : [])
     work += stringWork(font?.dataBase64);
@@ -24,6 +27,17 @@ function largeProject(project: Project): boolean {
     if (work >= 500_000) return true;
   }
   return work >= 500_000;
+}
+
+function hasExternalProjectAssets(project: Project): boolean {
+  return (
+    (project.sheetBook?.inactive.length ?? 0) > 0 ||
+    project.productionManifest !== undefined ||
+    (project.arrayLayouts?.length ?? 0) > 0 ||
+    project.scene.objects.some(
+      (object) => object.kind === 'raster-image' && object.imageAsset !== undefined,
+    )
+  );
 }
 
 function stringWork(value: unknown): number {

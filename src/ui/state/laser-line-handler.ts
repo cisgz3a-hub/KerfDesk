@@ -59,6 +59,8 @@ import { flushStreamAcksBefore, routeStreamAck } from './laser-stream-ack-batch'
 import type { LaserState } from './laser-store';
 import { emptyControllerBuildInfoState } from './laser-controller-build-info';
 import { hasUnsettledStreamAcks, pushLog } from './laser-store-helpers';
+import { liveCanvasLifecyclePatch } from './live-canvas-run';
+import { frameProofReset } from './laser-session-reset';
 import { isCriticalEventMessage, RESET_REQUIRED_MESSAGE } from './controller-reset-required';
 import { appendSystemNotice } from './laser-system-notice';
 import { inboundTranscriptEntry } from './laser-transcript';
@@ -392,6 +394,7 @@ function handleWelcomeLine(
     statusReport: null,
     controllerSessionEpoch: nextSessionEpoch,
     statusObservation: null,
+    statusResponseObservation: null,
     controllerSettings: null,
     controllerSettingsObservation: null,
     ...emptyControllerBuildInfoState(),
@@ -421,9 +424,7 @@ function handleWelcomeLine(
     motionOperation: null,
     ...(resetPolicy.preserveOperation ? {} : { controllerOperation: null, probeBusy: false }),
     fireActive: false,
-    frameVerification: null,
-    framedRun: null,
-    frameTrace: null,
+    ...frameProofReset(),
     homingState: 'unknown',
     homingProof: null,
     trustedPositionEpoch: (state.trustedPositionEpoch ?? 0) + 1,
@@ -437,7 +438,7 @@ function handleWelcomeLine(
   // out NOW, after the ledger reset above — its ack is unambiguous (audit
   // F2): the controller is fully booted, so the ok cannot be swallowed and
   // cannot be orphaned by this banner.
-  flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'));
+  flushResetCleanup(refs, (line, action) => safeWrite(line, action, 'system'), 'reset-boundary');
   scheduleControllerQualification(set, get, refs, nextSessionEpoch);
 }
 
@@ -468,13 +469,13 @@ function controllerResetBoundaryPolicy(state: LaserState): {
 // recovery mounted; the wiped in-flight lines will never be acked.
 function rebootDuringJobPatch(
   state: LaserState,
-): Partial<Pick<LaserState, 'streamer' | 'safetyNotice'>> {
+): Partial<Pick<LaserState, 'streamer' | 'safetyNotice' | 'liveCanvasRun'>> {
   const streamer: StreamerState | null = state.streamer;
   // 'tool-change' is an active hold with the M0 still queued and pre-M0 motion
   // possibly draining — a reboot there kills the job just like streaming/paused
   // (Codex audit: this status list was not updated when tool-change landed).
   if (streamer === null) return {};
-  if (!['idle', 'streaming', 'paused', 'tool-change'].includes(streamer.status)) {
+  if (!['idle', 'streaming', 'paused', 'tool-change', 'done'].includes(streamer.status)) {
     // A reset banner is a firmware RX-buffer boundary even for an already
     // disconnected stream. Its old in-flight lines can no longer own replies
     // from the new session, including the reconnect settings-query `ok`.
@@ -482,6 +483,7 @@ function rebootDuringJobPatch(
   }
   return {
     streamer: wipeInFlight(markErrored(streamer)),
+    ...liveCanvasLifecyclePatch(state, 'errored'),
     // First notice wins — an earlier root cause is what the operator needs.
     safetyNotice: state.safetyNotice ?? controllerRebootNotice(),
   };

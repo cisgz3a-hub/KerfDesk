@@ -98,7 +98,9 @@ function status(): string {
 }
 
 async function setDistance(value: string): Promise<void> {
-  const input = host.ownerDocument.querySelector<HTMLInputElement>('input[type="number"]');
+  const input = host.ownerDocument.querySelector<HTMLInputElement>(
+    'input[aria-label="Offset distance"]',
+  );
   if (input === null) throw new Error('distance input missing');
   await act(async () => {
     input.value = value;
@@ -107,6 +109,18 @@ async function setDistance(value: string): Promise<void> {
 }
 
 describe('Offset Shapes dialog', () => {
+  it('accepts unit arithmetic without mutating the project before Apply', async () => {
+    load(10);
+    const before = useStore.getState().project;
+    await render();
+    await setDistance('1/8in');
+    expect(useStore.getState().project).toBe(before);
+    expect(status()).toContain('16.35');
+    await act(async () => button('Offset').click());
+    const result = useStore.getState().project.scene.objects[1];
+    expect(result?.bounds.minX).toBeCloseTo(-3.175, 5);
+    expect(useStore.getState().undoStack).toHaveLength(1);
+  });
   it.each([false, true])('keeps a Pro copy pending until admission (Pro=%s)', async (pro) => {
     load(10, true);
     const requestPro = vi.fn((_feature: string, _allowed?: () => void) => false);
@@ -207,7 +221,9 @@ describe('Offset Shapes dialog', () => {
 
     await render();
 
-    const input = host.ownerDocument.querySelector<HTMLInputElement>('input[type="number"]');
+    const input = host.ownerDocument.querySelector<HTMLInputElement>(
+      'input[aria-label="Offset distance"]',
+    );
     expect(input?.value).toBe('3');
     expect(button('Bevel').getAttribute('aria-pressed')).toBe('true');
   });

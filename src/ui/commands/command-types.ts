@@ -92,6 +92,9 @@ export type CommandId =
   | 'tools.weld'
   | 'tools.union-silhouette'
   | 'tools.join-paths'
+  | 'tools.resize-joints'
+  | 'tools.prepare-stamp'
+  | 'tools.ai-assistant'
   | 'tools.subtract'
   | 'tools.intersect'
   | 'tools.exclude'
@@ -138,7 +141,11 @@ export type CommandId =
   | 'help.licence'
   | 'help.check-updates'
   | 'help.open-data-folder'
-  | 'help.discussions';
+  | 'help.discussions'
+  | 'help.pricing'
+  | 'help.terms'
+  | 'help.privacy'
+  | 'help.refunds';
 
 export type AppCommand = {
   readonly id: CommandId;
@@ -270,6 +277,9 @@ export type AppCommandContext = CommandContextSlices & {
   readonly weldSelection: () => void;
   readonly unionSilhouette: () => void;
   readonly joinPaths: () => void;
+  readonly resizeJoints?: () => void;
+  readonly prepareStamp?: () => void;
+  readonly openAiAssistant?: () => void;
   readonly subtractSelection: () => void;
   readonly intersectSelection: () => void;
   readonly excludeSelection: () => void;

@@ -6,6 +6,8 @@ import { UnsupportedAutosaveVersionError } from './autosave-record';
 import { prepareAutosaveRecordOffThread } from './autosave-preparation-client';
 import {
   autosaveStorageKeyForSession,
+  captureLocalAutosaveWriteRevision,
+  hasNewerSynchronousLocalAutosave,
   clearLocalAutosave,
   currentAutosaveSessionId,
   replaceAutosaveSessionId,
@@ -88,8 +90,9 @@ export class AutosaveDurableService {
   }
 
   write(project: Project, savedAt: number = Date.now()): Promise<AutosaveDurableWriteResult> {
+    const localWriteRevision = captureLocalAutosaveWriteRevision();
     return this.enqueue(async () => {
-      const result = await this.writeNow(project, savedAt);
+      const result = await this.writeNow(project, savedAt, localWriteRevision);
       if (result.kind !== 'failed' || !(result.error instanceof UnsupportedAutosaveVersionError)) {
         return result;
       }
@@ -102,7 +105,7 @@ export class AutosaveDurableService {
       // Synchronous unload/clear calls must never reuse a released session.
       await this.session();
       await session.guard?.release();
-      return this.writeNow(project, savedAt);
+      return this.writeNow(project, savedAt, localWriteRevision);
     });
   }
 
@@ -114,12 +117,20 @@ export class AutosaveDurableService {
     this.session().catch(() => undefined);
     // The legacy slot is a separate recovery document. Only an explicit
     // recovery restore/discard may clear it, never saving a different file.
+    const localWriteRevision = captureLocalAutosaveWriteRevision();
     const localClears = [clearAutosave({ sessionId: currentAutosaveSessionId() })];
     return this.enqueue(async () => {
       const session = await this.session();
-      // Repeat inside the queue: an earlier IndexedDB write can fail after the
-      // immediate clear and recreate this slot through the local fallback.
-      localClears.push(clearAutosave({ sessionId: session.sessionId }));
+      // Retire a fallback recreated by an earlier queued write, but leave any
+      // later synchronous unload copy written while this cleanup was waiting.
+      if (
+        !hasNewerSynchronousLocalAutosave(
+          autosaveStorageKeyForSession(session.sessionId),
+          localWriteRevision,
+        )
+      ) {
+        localClears.push(clearAutosave({ sessionId: session.sessionId }));
+      }
       // Rotation may have released the old session to another window. Only
       // the session this queued operation still owns can be cleared here.
       return combineClearResults(await this.clearNow(session.sessionId), localClears);
@@ -215,7 +226,11 @@ export class AutosaveDurableService {
     await session.guard?.release();
   }
 
-  private async writeNow(project: Project, savedAt: number): Promise<AutosaveDurableWriteResult> {
+  private async writeNow(
+    project: Project,
+    savedAt: number,
+    localWriteRevision: number,
+  ): Promise<AutosaveDurableWriteResult> {
     const session = await this.session();
     const storageKey = autosaveStorageKeyForSession(session.sessionId);
     try {
@@ -248,6 +263,11 @@ export class AutosaveDurableService {
     } catch (indexedDbError) {
       if (indexedDbError instanceof UnsupportedAutosaveVersionError) {
         return { kind: 'failed', reason: 'storage-error', error: indexedDbError };
+      }
+      // A newer unload copy bypasses this queue. A delayed fallback must not
+      // replace it with the older snapshot, regardless of equal timestamps.
+      if (hasNewerSynchronousLocalAutosave(storageKey, localWriteRevision)) {
+        return { kind: 'superseded' };
       }
       return localFallback(prepared.record, storageKey, indexedDbError);
     }

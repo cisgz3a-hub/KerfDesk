@@ -11,6 +11,8 @@ import {
 } from './super-console-filters';
 import { SuperConsoleSettingsPane } from './SuperConsoleSettingsPane';
 import { SuperConsoleTranscriptList } from './SuperConsoleTranscriptList';
+import { DiagnosticBundleReviewPanel } from './DiagnosticBundleReview';
+import { MachineProtocolInventory } from './MachineProtocolInventory';
 
 const ALL_GROUPS: ReadonlySet<SuperConsoleGroup> = new Set(
   SUPER_CONSOLE_GROUPS.map((group) => group.id),
@@ -44,6 +46,8 @@ export function SuperConsoleDialog(props: { readonly onClose: () => void }): JSX
         <ConsoleCommandDeck ariaLabel="Super console commands" enableHistory />
       </div>
       <ManualCopyFallback visible={view.visible} copyState={view.copyState} />
+      <DiagnosticBundleReviewPanel />
+      <MachineProtocolInventory />
       <SuperConsoleActions
         visibleCount={view.visible.length}
         copyState={view.copyState}

@@ -186,8 +186,25 @@ afterEach(async () => {
 });
 
 /** Real SDK handshake and dispatch through the recommended dual-era serving entry. */
-async function connectedClient(backend: KerfDeskMcpBackend, modern = false): Promise<Client> {
+async function connectedClient(
+  backend: KerfDeskMcpBackend,
+  modern = false,
+  wireCalls?: Map<string, string | number>,
+): Promise<Client> {
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const send = clientTransport.send.bind(clientTransport);
+  clientTransport.send = async (message, options) => {
+    if (
+      wireCalls &&
+      'method' in message &&
+      message.method === 'tools/call' &&
+      'id' in message &&
+      (typeof message.id === 'string' || typeof message.id === 'number') &&
+      typeof message.params?.name === 'string'
+    )
+      wireCalls.set(message.params.name, message.id);
+    await send(message, options);
+  };
   const entry = serveStdio(() => createKerfDeskMcpServer(backend), { transport: serverTransport });
   const client = new Client(
     { name: 'kerfdesk-protocol-test', version: '1.0.0' },
@@ -209,6 +226,24 @@ function responseText(result: CallToolResult): string {
 }
 
 describe.each([false, true])('official client protocol (modern=%s)', (modern) => {
+  it('forwards each actual wire request ID with its own concurrent backend call', async () => {
+    const backend = successfulBackend();
+    const request = vi.spyOn(backend, 'request');
+    const wireCalls = new Map<string, string | number>();
+    const client = await connectedClient(backend, modern, wireCalls);
+    await Promise.all([
+      client.callTool({ name: 'get_workspace', arguments: {} }),
+      client.callTool({ name: 'get_app_status', arguments: {} }),
+    ]);
+    expect(wireCalls.size).toBe(2);
+    expect(request).toHaveBeenCalledTimes(2);
+    for (const [command, args, signal, id] of request.mock.calls) {
+      expect(args).toEqual({});
+      expect(signal).toBeInstanceOf(AbortSignal);
+      expect(id).toBe(wireCalls.get(command));
+    }
+    expect(new Set(request.mock.calls.map((call) => call[3])).size).toBe(2);
+  });
   it('initialises, lists the bounded schema and calls every permitted tool', async () => {
     const backend = successfulBackend();
     const request = vi.spyOn(backend, 'request');
@@ -268,6 +303,7 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
         'transform_artwork',
         { ...writeAdmission, artworkIds: ['art-1'], transform },
         expect.any(AbortSignal),
+        expect.anything(),
       );
     }
     const result = await client.callTool({

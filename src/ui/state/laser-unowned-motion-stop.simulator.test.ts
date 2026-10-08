@@ -22,6 +22,9 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  // Settle the owned reset boot window before fake timers are discarded;
+  // Disconnect joins that same bounded owner rather than making another reset.
+  await vi.advanceTimersByTimeAsync(1_000);
   vi.useRealTimers();
   await useLaserStore.getState().disconnect();
   useLaserStore.setState({
@@ -315,7 +318,7 @@ describe('Abort completion after reconnect', () => {
 });
 
 describe('Late rejected Abort ownership', () => {
-  it('retires an old rejection while the replacement connection waits for its picker', async () => {
+  it('keeps the bounded teardown incident intact when an obsolete Abort rejection arrives during the picker', async () => {
     const original = await connectIdle({ motionMs: 5_000 });
     const pending = holdAbortCompletion(original);
     const stopping = useLaserStore
@@ -337,20 +340,22 @@ describe('Late rejected Abort ownership', () => {
     const switching = useLaserStore.getState().connect(adapter, { portSelection: 'choose' });
     await pump(1_100);
     expect(useLaserStore.getState().connection.kind).toBe('connecting');
-    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    const notice = useLaserStore.getState().safetyNotice;
+    expect(notice).toMatchObject({ kind: 'write-failed', action: 'disconnect' });
+    const writeError = useLaserStore.getState().lastWriteError;
 
     pending.reset.reject(new Error('old reset transport failed'));
     pending.release.resolve(undefined);
     await pump(10);
     expect(await stopping).toBeNull();
-    expect(useLaserStore.getState().safetyNotice).toBeNull();
-    expect(useLaserStore.getState().lastWriteError).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toBe(notice);
+    expect(useLaserStore.getState().lastWriteError).toBe(writeError);
     picker.resolve(replacementPort);
     await pump(1_100);
     await switching;
 
     expect(useLaserStore.getState().connection.kind).toBe('connected');
-    expect(useLaserStore.getState().safetyNotice).toBeNull();
+    expect(useLaserStore.getState().safetyNotice).toBe(notice);
     expect(replacement.outbound()).not.toContain('\x18');
     expect(replacement.outbound()).not.toContain('M5\n');
     expect(replacement.outbound()).not.toContain('M9\n');

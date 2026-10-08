@@ -7,6 +7,11 @@ import { SavedLibrariesButton } from '../material-library/SavedLibrariesButton';
 import { MaterialPresetWizardLauncher } from '../material-library/wizard';
 import { useStore } from '../state';
 import { ProcessRecipePanel } from '../material-library/ProcessRecipePanel';
+import { MaterialExperimentsButton } from '../material-library/MaterialExperimentsButton';
+import {
+  LinkedRecipeChangeReview,
+  MaterialRecipePreview,
+} from '../material-library/MaterialRecipePreview';
 import { buildStarterLibrary } from './material-library-builders';
 import {
   materialBindingStatus,
@@ -86,16 +91,71 @@ function EmptyMaterialLibraryPanel(): JSX.Element {
 function LoadedMaterialLibraryPanel(props: {
   readonly library: MaterialLibraryDocument;
 }): JSX.Element {
+  const selection = useMaterialLibrarySelection(props.library);
+  const {
+    layers,
+    presetOptions,
+    activeLayerId,
+    activePresetId,
+    activePresetOption,
+    activeLayer,
+    query,
+    setQuery,
+    setPresetId,
+    setTargetLayerId,
+  } = selection;
+  return (
+    <section aria-label="Material Library" style={sectionStyle}>
+      <Header />
+      <p style={libraryNameStyle}>{props.library.name}</p>
+      <JobMaterialControls library={props.library} />
+      <ProcessRecipePanel />
+      <label style={fieldStyle}>
+        <span style={labelStyle}>Search</span>
+        <input
+          aria-label="Search material recipes"
+          title="Filter recipes by material, thickness, machine or notes before reviewing and choosing a preset."
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.currentTarget.value)}
+          placeholder="Material, thickness, machine or notes"
+        />
+      </label>
+      <MaterialLibrarySelectors
+        layers={layers}
+        presetOptions={presetOptions}
+        activeLayerId={activeLayerId}
+        activePresetId={activePresetId}
+        onLayerChange={setTargetLayerId}
+        onPresetChange={setPresetId}
+      />
+      <MaterialRecipePreview
+        library={props.library}
+        preset={activePresetOption?.preset ?? null}
+        layer={activeLayer}
+      />
+      <LinkedRecipeChangeReview library={props.library} layers={layers} />
+      <MaterialPresetWizardLauncher
+        selectedPreset={activePresetOption?.preset ?? null}
+        onSaved={setPresetId}
+      />
+      <MaterialRecipeActions library={props.library} selection={selection} />
+    </section>
+  );
+}
+
+function useMaterialLibrarySelection(library: MaterialLibraryDocument) {
   const project = useStore((state) => state.project);
   const layers = useStore((state) => state.project.scene.layers);
-  const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
-  const linkMaterialPresetToLayer = useStore((state) => state.linkMaterialPresetToLayer);
-  const refreshLinkedMaterialLayer = useStore((state) => state.refreshLinkedMaterialLayer);
-  const deleteMaterialPreset = useStore((state) => state.deleteMaterialPreset);
   const [targetLayerId, setTargetLayerId] = useState('');
   const [presetId, setPresetId] = useState('');
-  const [status, setStatus] = useState('');
-  const presetOptions = materialLibraryPresetOptions(project.device, props.library.entries);
+  const [query, setQuery] = useState('');
+  const presetOptions = materialLibraryPresetOptions(project.device, library.entries).filter(
+    (option) =>
+      `${option.label} ${option.preset.description} ${option.preset.calibrationProvenance ?? ''}`
+        .toLocaleLowerCase()
+        .includes(query.trim().toLocaleLowerCase()),
+  );
   const activeLayerId = activeId(
     targetLayerId,
     layers.map((layer) => layer.id),
@@ -107,25 +167,33 @@ function LoadedMaterialLibraryPanel(props: {
   const activePresetOption =
     presetOptions.find((option) => option.preset.id === activePresetId) ?? null;
   const activeLayer = layers.find((layer) => layer.id === activeLayerId) ?? null;
+  return {
+    layers,
+    presetOptions,
+    activeLayerId,
+    activePresetId,
+    activePresetOption,
+    activeLayer,
+    query,
+    setQuery,
+    setPresetId,
+    setTargetLayerId,
+  };
+}
+
+function MaterialRecipeActions(props: {
+  readonly library: MaterialLibraryDocument;
+  readonly selection: ReturnType<typeof useMaterialLibrarySelection>;
+}): JSX.Element {
+  const { activeLayerId, activePresetId, activePresetOption, activeLayer } = props.selection;
+  const assignMaterialPresetToLayer = useStore((state) => state.assignMaterialPresetToLayer);
+  const linkMaterialPresetToLayer = useStore((state) => state.linkMaterialPresetToLayer);
+  const refreshLinkedMaterialLayer = useStore((state) => state.refreshLinkedMaterialLayer);
+  const deleteMaterialPreset = useStore((state) => state.deleteMaterialPreset);
+  const [status, setStatus] = useState('');
   const bindingStatus = materialBindingStatus(activeLayer?.materialBinding, props.library);
   return (
-    <section aria-label="Material Library" style={sectionStyle}>
-      <Header />
-      <p style={libraryNameStyle}>{props.library.name}</p>
-      <JobMaterialControls library={props.library} />
-      <ProcessRecipePanel />
-      <MaterialLibrarySelectors
-        layers={layers}
-        presetOptions={presetOptions}
-        activeLayerId={activeLayerId}
-        activePresetId={activePresetId}
-        onLayerChange={setTargetLayerId}
-        onPresetChange={setPresetId}
-      />
-      <MaterialPresetWizardLauncher
-        selectedPreset={activePresetOption?.preset ?? null}
-        onSaved={(id) => setPresetId(id)}
-      />
+    <>
       <MaterialLibraryRecipeControls
         activeLayerId={activeLayerId}
         activePresetId={activePresetId}
@@ -152,8 +220,10 @@ function LoadedMaterialLibraryPanel(props: {
         <p role="status" style={statusStyle}>
           {materialBindingStatusText(activeLayer.materialBinding, bindingStatus)}
         </p>
-      ) : null}
-    </section>
+      ) : activeLayer === null ? null : (
+        <p style={statusStyle}>Manual operation defaults · no linked recipe.</p>
+      )}
+    </>
   );
 }
 
@@ -247,6 +317,7 @@ function Header(): JSX.Element {
         <h2 style={headingStyle}>{kind === 'cnc' ? 'Process Library' : 'Material Library'}</h2>
       </div>
       <SavedLibrariesButton />
+      <MaterialExperimentsButton />
     </div>
   );
 }

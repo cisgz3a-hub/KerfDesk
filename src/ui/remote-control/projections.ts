@@ -39,10 +39,7 @@ export function selectedIds(state: AppState): string[] {
     ]),
   ];
 }
-export function workspaceProjection(
-  state: AppState,
-  shareArtwork = false,
-): Record<string, unknown> {
+export function workspaceProjection(state: AppState, shareArtwork = false) {
   const { scene } = state.project;
   const mode = state.project.machine?.kind ?? 'laser';
   const visibility = sceneLayerVisibility.lookup(scene.layers);

@@ -43,6 +43,7 @@ export type TracePreviewState =
       readonly preparedTrace?: PreparedTrace;
       readonly notices?: ReadonlyArray<TraceNotice>;
       readonly sourceHasTransparency?: boolean | undefined;
+      readonly sourceDataUrl?: string;
     }
   | { readonly kind: 'error'; readonly message: string };
 

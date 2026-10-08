@@ -93,6 +93,7 @@ describe('remote snapshots expose only the agreed metadata', () => {
         visible: true,
         editable: true,
         bounds: { xMm: 0, yMm: 0, widthMm: 10, heightMm: 20 },
+        transformBounds: { xMm: 0, yMm: 0, widthMm: 10, heightMm: 20 },
         operationId: 'operation',
       },
     ]);
@@ -126,7 +127,7 @@ describe('remote snapshots expose only the agreed metadata', () => {
     });
     useStore.getState().setMaterialLibrary({
       format: 'laserforge-material-library',
-      librarySchemaVersion: 2,
+      librarySchemaVersion: 3,
       libraryId: 'library',
       name: 'Materials',
       entries: Array.from({ length: 207 }, (_, index) => ({

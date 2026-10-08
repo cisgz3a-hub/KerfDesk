@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import {
   curveEndpointJoin,
   flattenCurveSubpath,
@@ -274,8 +275,9 @@ function isCurveCommandObject(
   object: SceneObject,
 ): object is Extract<SceneObject, { readonly paths: ReadonlyArray<ColoredPath> }> {
   return (
-    object.kind === 'imported-svg' ||
-    object.kind === 'traced-image' ||
-    (object.kind === 'shape' && object.spec.kind === 'polyline')
+    !isBooleanCompoundObject(object) &&
+    (object.kind === 'imported-svg' ||
+      object.kind === 'traced-image' ||
+      (object.kind === 'shape' && object.spec.kind === 'polyline'))
   );
 }

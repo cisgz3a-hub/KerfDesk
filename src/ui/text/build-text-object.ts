@@ -32,6 +32,7 @@ export async function buildTextObject(
     throw new TextObjectValidationError('Type some text first.', 'warning');
   }
   const safeValues = sanitizeTextDialogNumericValues(values);
+  const box = validatedTextBox(values, safeValues);
   const variable = fieldsVariableTemplate(values);
   if (!variable.ok) throw new TextObjectValidationError(variable.message, 'error');
   const rendered = await renderTextGeometry({
@@ -43,6 +44,7 @@ export async function buildTextObject(
     lineHeight: safeValues.lineHeight,
     letterSpacing: safeValues.letterSpacing,
     color: values.color,
+    ...box,
   });
   signal?.throwIfAborted();
   const placed = placeRenderedText(rendered, safeValues, values);
@@ -65,6 +67,7 @@ export async function buildTextObject(
     bendDeg: values.pathText === undefined ? safeValues.bendDeg : 0,
     ...(values.weldOverlaps === undefined ? {} : { weldOverlaps: values.weldOverlaps }),
     color: values.color,
+    ...box,
     ...(values.pathText === undefined ? {} : { pathText: values.pathText }),
     ...(variable.template === undefined ? {} : { variableTemplate: variable.template }),
     bounds: final.bounds,
@@ -107,4 +110,23 @@ function placeRenderedText(
     rendered: result.rendered,
     transform: { ...IDENTITY_TRANSFORM, x: result.origin.x, y: result.origin.y },
   };
+}
+
+function validatedTextBox(
+  values: DialogValues,
+  safe: TextDialogNumericValues,
+): Pick<TextObject, 'textBox'> {
+  if (values.textBox === undefined) return {};
+  if (values.pathText !== undefined || safe.bendDeg !== 0)
+    throw new TextObjectValidationError('Text boxes cannot also follow a path or bend.', 'warning');
+  if (
+    ![values.textBox.widthMm, values.textBox.heightMm, values.textBox.minSizeMm].every(
+      (value) => Number.isFinite(value) && value > 0,
+    )
+  )
+    throw new TextObjectValidationError(
+      'Text box dimensions and minimum font size must be positive.',
+      'warning',
+    );
+  return { textBox: values.textBox };
 }

@@ -28,6 +28,49 @@ after(async () => {
   await browser?.close();
 });
 
+async function heldStroke(loaded) {
+  await loaded.surface.waitForFunction(
+    () => {
+      const points = globalThis.document.querySelector('.touch-stroke')?.getAttribute('points');
+      return points?.trim().split(/\s+/).length >= 2;
+    },
+    null,
+    { timeout: 5000 },
+  );
+  assert.equal(await loaded.surface.locator('.touch-confirm').isVisible(), true);
+  assert.equal(
+    await loaded.surface.locator('.touch-apply').isDisabled(),
+    true,
+    'A held stroke cannot be applied before release.',
+  );
+}
+
+async function observeTouchLifecycle(loaded) {
+  await loaded.surface.evaluate(() => {
+    const trace = { primaryId: null, secondFinger: null, cancelled: null };
+    globalThis.touchLifecycleTrace = trace;
+    const receipt = (event) => ({
+      pointerId: event.pointerId,
+      primaryId: trace.primaryId,
+      isPrimary: event.isPrimary,
+      hidden: globalThis.document.querySelector('.touch-confirm').hidden,
+      disabled: globalThis.document.querySelector('.touch-apply').disabled,
+    });
+    // These bubbling observers run after the canvas and outside-canvas handlers.
+    globalThis.document.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'touch') return;
+      if (event.isPrimary) {
+        trace.primaryId = event.pointerId;
+        trace.cancelled = null;
+      } else trace.secondFinger = receipt(event);
+    });
+    globalThis.document.addEventListener('pointercancel', (event) => {
+      if (event.pointerType === 'touch' && event.isPrimary && event.pointerId === trace.primaryId)
+        trace.cancelled = receipt(event);
+    });
+  });
+}
+
 for (const kind of ['phone', 'app']) {
   test(kind + ' readonly, legacy, missing or malformed mapping refuse touch edits', async () => {
     for (const patch of [
@@ -105,6 +148,7 @@ for (const kind of ['phone', 'app']) {
       const cdp = await loaded.context.newCDPSession(loaded.page);
       try {
         await choose(loaded, 'brush');
+        await observeTouchLifecycle(loaded);
         await visibleCanvas(loaded);
         const a = await scenePoint(loaded, 10, 20),
           b = await scenePoint(loaded, 50, 60);
@@ -117,6 +161,7 @@ for (const kind of ['phone', 'app']) {
           type: 'touchMove',
           touchPoints: [{ id: 1, ...b }],
         });
+        await heldStroke(loaded);
         const after = await loaded.surface.locator(loaded.image).boundingBox();
         assert.equal(before.y, after.y, 'Showing Apply must not move the image under the finger');
         await cdp.send('Input.dispatchTouchEvent', {
@@ -127,6 +172,16 @@ for (const kind of ['phone', 'app']) {
           ],
         });
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        const secondFinger = await loaded.surface.waitForFunction(
+          () => globalThis.touchLifecycleTrace.secondFinger,
+          null,
+          { timeout: 5000 },
+        );
+        const secondReceipt = await secondFinger.jsonValue();
+        assert.equal(secondReceipt.isPrimary, false);
+        assert.notEqual(secondReceipt.pointerId, secondReceipt.primaryId);
+        assert.equal(secondReceipt.hidden, true);
+        assert.equal(secondReceipt.disabled, true);
         assert.equal(await loaded.surface.locator('.touch-confirm').isHidden(), true);
         await cdp.send('Input.dispatchTouchEvent', {
           type: 'touchStart',
@@ -136,8 +191,20 @@ for (const kind of ['phone', 'app']) {
           type: 'touchMove',
           touchPoints: [{ id: 1, ...b }],
         });
+        await heldStroke(loaded);
         await cdp.send('Input.dispatchTouchEvent', { type: 'touchCancel', touchPoints: [] });
+        const cancelled = await loaded.surface.waitForFunction(
+          () => globalThis.touchLifecycleTrace.cancelled,
+          null,
+          { timeout: 5000 },
+        );
+        const cancelReceipt = await cancelled.jsonValue();
+        assert.equal(cancelReceipt.isPrimary, true);
+        assert.equal(cancelReceipt.pointerId, cancelReceipt.primaryId);
+        assert.equal(cancelReceipt.hidden, true);
+        assert.equal(cancelReceipt.disabled, true);
         assert.equal(await loaded.surface.locator('.touch-confirm').isHidden(), true);
+        assert.equal(await loaded.surface.locator('.touch-apply').isDisabled(), true);
         assert.equal(writes(loaded.state).length, 0);
         assert.deepEqual(loaded.errors, []);
       } finally {

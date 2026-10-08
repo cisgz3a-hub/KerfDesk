@@ -46,7 +46,7 @@ export async function stopBeforeDisconnect(
   connection: NonNullable<LiveRefs['connection']>,
 ): Promise<void> {
   if (isGrblFamilyDriver(refs.driver)) {
-    await runGrblDisconnectTransaction(set, refs, safeWrite);
+    await runGrblDisconnectTransaction(set, refs, safeWrite, { keepErroredStreamer: true });
     return;
   }
   // Marlin's quickstop lines when anything may still run (MA-7), else the

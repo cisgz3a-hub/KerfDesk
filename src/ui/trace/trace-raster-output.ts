@@ -2,6 +2,7 @@ import { MAX_RASTER_LINES_PER_MM, MM_PER_INCH, linesPerMmToDpi } from '../../cor
 import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   layerFromSubLayer,
+  applyTransform,
   sceneObjectUsesOperation,
   type Layer,
   type LayerSubLayer,
@@ -113,7 +114,27 @@ export async function buildRasterTraceOutput(
   return {
     ...raster,
     id: traced.id,
+    ...rasterTraceMaskFields(source),
     ...(traced.traceSettings === undefined ? {} : { traceSettings: traced.traceSettings }),
+  };
+}
+
+function rasterTraceMaskFields(
+  source: RasterImage,
+): Pick<RasterImage, 'imageClip' | 'imageMaskId'> {
+  return {
+    ...(source.imageMaskId === undefined ? {} : { imageMaskId: source.imageMaskId }),
+    ...(source.imageClip === undefined
+      ? {}
+      : {
+          imageClip: source.imageClip.map((path) => ({
+            color: path.color,
+            polylines: path.polylines.map((line) => ({
+              ...line,
+              points: line.points.map((point) => applyTransform(point, source.transform)),
+            })),
+          })),
+        }),
   };
 }
 

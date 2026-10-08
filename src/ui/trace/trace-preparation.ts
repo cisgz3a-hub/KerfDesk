@@ -6,6 +6,7 @@ import { checkTraceSignal, traceAbortError } from './trace-cancellation';
 import type { PendingPreparedTrace, TracePreparationRequest } from './prepared-trace';
 import type { TraceResult } from './use-trace-worker-client';
 import type { TracePreviewSettlement } from './use-trace-preview-settlement';
+import { maskTraceSourceResult } from './trace-source-mask';
 
 export type DecodedTraceImage = { readonly img: RawImageData; readonly hasTransparency: boolean };
 export type TracePreparation = PendingPreparedTrace & {
@@ -87,7 +88,7 @@ async function prepare(
   checkTraceSignal(signal);
   tracing(image, 'preparing');
   const boundary = traceBoundaryForWorkingGrid(request.boundary, request.sourceGrid, image.img);
-  return traceImageWithBoundaryMode(
+  const result = await traceImageWithBoundaryMode(
     image.img,
     request.options,
     boundary,
@@ -95,4 +96,6 @@ async function prepare(
     signal,
     (phase) => tracing(image, phase),
   );
+  checkTraceSignal(signal);
+  return maskTraceSourceResult(request.file, result);
 }

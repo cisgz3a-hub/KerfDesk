@@ -2934,6 +2934,29 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
 5. An ordinary Idle Forget has no error dialog. If transport failure leaves motion
    uncertain, the physical-safety warning remains instead of claiming a clean stop.
 
+#### Recovering information without replacing the connection
+
+1. Pause/Resume without a controller reset and clean job completion keep the
+   existing connection and settings observation. Reset-based CNC Pause and lift
+   revalidates information through that connection. An incomplete job alone
+   does not require reconnect.
+2. Abort or reboot automatically refreshes required controller information over
+   that port when cleanup, real response/write ownership and fresh Idle permit
+   it. Responsive Alarm/Sleep waits; actual silence is reported. Old response
+   debt is not discarded on reset delivery or Idle alone. Explicit read-only
+   settings queries retain the supported Alarm-read path and ownership fences.
+3. Retry shows its current waiting reason and checks the settings-read gate
+   again when clicked. Reconnect is offered for current communication or
+   unresolved ownership failures, and rechecks that condition before replacing
+   a connection. Neither action dismisses the physical-safety notice.
+4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
+   artifact. A later accepted Abort, actual Disconnect or controller fault
+   records its own terminal cause. A reset-owned host freeze remains provisional.
+5. A controller reboot during final job settlement records interruption, even
+   after all job lines were acknowledged. Acknowledgement-stall containment
+   freezes further host refill and preserves the existing dwell/busy detection
+   and warning threshold. These are software controls, not physical-stop proof.
+
 ### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373)
 
 #### Success — set up the attachment

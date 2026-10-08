@@ -15,8 +15,12 @@ import {
   discussionsCommand,
   licenceCommand,
   openDataFolderCommand,
+  pricingCommand,
+  privacyCommand,
+  refundsCommand,
   reportBugCommand,
   supportReportCommand,
+  termsCommand,
 } from './support-command-family';
 import { tutorialsCommand } from './help-command-family';
 import { editCommands } from './edit-command-family';
@@ -51,6 +55,10 @@ export function buildAppCommands(ctx: AppCommandContext): ReadonlyArray<AppComma
       supportReportCommand(),
       ...(ctx.openDataFolder === undefined ? [] : [openDataFolderCommand(ctx.openDataFolder)]),
       discussionsCommand(),
+      pricingCommand(),
+      termsCommand(),
+      privacyCommand(),
+      refundsCommand(),
       ...(ctx.licensing === true ? [licenceCommand()] : []),
       checkForUpdatesCommand(),
     ],

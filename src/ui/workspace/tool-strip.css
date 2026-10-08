@@ -94,3 +94,39 @@
     padding-bottom: 5px;
   }
 }
+
+.lf-node-coordinate-panel {
+  width: 236px;
+  padding: 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  background: var(--lf-bg-surface, var(--lf-bg-input));
+  box-shadow: 0 3px 12px #0003;
+  display: grid;
+  gap: 6px;
+  font-size: var(--lf-text-xs);
+}
+.lf-node-coordinate-field {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  align-items: center;
+  gap: 5px;
+}
+.lf-node-coordinate-field input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.lf-node-align-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 5px;
+}
+.lf-node-align-row > span {
+  margin-right: auto;
+}
+.lf-node-align-row button {
+  padding: 3px 5px;
+  font-size: var(--lf-text-xs);
+}

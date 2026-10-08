@@ -1,0 +1,532 @@
+{
+  "format": "kerfdesk.browser-component-pipeline-benchmark",
+  "schemaVersion": 1,
+  "fixtureVersion": 1,
+  "createdAt": "2026-10-07T03:40:01.100Z",
+  "gitHead": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+  "workingTreeDirty": true,
+  "browser": "153.0.8010.53",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36",
+  "node": "v24.15.0",
+  "platform": "win32",
+  "architecture": "x64",
+  "cpu": "13th Gen Intel(R) Core(TM) i9-13900H",
+  "logicalCpuCount": 20,
+  "systemMemoryBytes": 33965383680,
+  "osRelease": "10.0.26200",
+  "warmups": 1,
+  "runs": 3,
+  "moduleHashes": {
+    "/benchmark.mjs": "b365402f6ac33322ed8a8d141056d2b7734b119b932deee98429420f85272285",
+    "/document-import-worker.ts": "0175f65bbb691ed34545d9769e259828553ad6b949bd3bb4301cf033f51f0cf7",
+    "/trace-worker.ts": "535b009349238d896ea602c5fd0f1d94da0d592d859dcb73ae02dc1e63350fff",
+    "/convert-bitmap-worker.ts": "f61ab0035749ed7db478e6c79aa130692ea8205a31fb4358a2a5ea3207822ecb",
+    "/png-import-worker.ts": "f2e6070975bf08c8617623de0670e84d99ce84159d9a9d090ad34bfcd19af684"
+  },
+  "fixtures": {
+    "svgBytes": 3739487,
+    "svgSha256": "00f845086323e7096435aa75c1dfe7018c215458da9f910dc4e09f68a8860757",
+    "pngBytes": 2101476,
+    "pngSha256": "b865fcd733410318112d2cd2ebc5beb31161971f2a105aabb0fe207390a72a0d",
+    "pagedPngBytes": 67118148,
+    "pagedPngSha256": "9e83e688498e9496b7f5d14e9c40dd2de246a909dac64a7958cdc1ce71d2b9d1",
+    "rgbaSha256": "1532db902d9fafd00abf879e9cf79dc7666ee1a00699170a0acb4d91dc2d26e1"
+  },
+  "maskParity": {
+    "verifiedPixels": 4096,
+    "maskedPixels": 2048,
+    "originalSha256": "a26d9a10092b3afa69cee298f955a3f81870a6d6f1a9165f9b72c1a4d3a1fa7c",
+    "originalPreserved": true,
+    "nativeClipPreserved": true,
+    "comparisonMatchesEngravingMask": true
+  },
+  "requestedModules": [
+    "/",
+    "/benchmark.mjs",
+    "/document-import-worker.ts",
+    "/trace-worker.ts",
+    "/convert-bitmap-worker.ts",
+    "/png-import-worker.ts"
+  ],
+  "nativeWorkerModules": [
+    "/document-import-worker.ts",
+    "/trace-worker.ts",
+    "/convert-bitmap-worker.ts",
+    "/png-import-worker.ts"
+  ],
+  "fixedConfiguration": {
+    "device": "Generic GRBL v1.1 reference profile",
+    "bedMm": [600, 600],
+    "speedMmPerMin": 1000,
+    "powerPercent": 50,
+    "imageLinesPerMm": 10,
+    "dither": "threshold",
+    "optimization": "source-order, inside-first off, drawn start",
+    "trace": "Line Art default, original 4096 grid, no boundary, fixed commit device memory 8 GB",
+    "imagePlacement": "Imported 409.6 mm at default 254 DPI, scaled to 128 mm square (31.25%); original bytes unchanged",
+    "svgPaint": "Native fill paint/operation override retained; default scanline fill, 0.1 mm hatch spacing and 5 mm overscan",
+    "canvasPixels": [900, 700]
+  },
+  "scope": "Browser component pipeline: original in-memory File read/import, native decoder/workers, shared trace preparation/commit, SVG presentation, traced vector and raster CAM, native canvas preview paint/readback, deterministic G-code and output parse. Fixture generation, initial module load, output hashing and OS file chooser/disk latency are excluded. Component APIs use a review fixture project; this is not timed full application interaction, controller transport, physical motion/material, competitor speed, or peak memory.",
+  "results": [
+    {
+      "name": "svg50000",
+      "medianMs": 5674.399999976158,
+      "minMs": 4860,
+      "maxMs": 6067.200000047684,
+      "samples": [
+        {
+          "timings": {
+            "importWorker": 1308.6000000238419,
+            "importHydration": 0,
+            "vectorCam": 611.2000000476837,
+            "vectorGcode": 1708.0999999046326,
+            "vectorPreviewData": 215.5,
+            "vectorCanvasPaint": 167.20000004768372,
+            "vectorOutputParse": 810.1000000238419
+          },
+          "totalMs": 4860,
+          "outputHashes": {
+            "geometry": "ba7e386e9571e09e4eae5ce8b4c1b15d2b332b1ebe12a72f30a0052baa83a8c8",
+            "gcode": "328bcda4712d04edabccf04105d6954fe1d7b5e444963ad16a1ea41db82db99b"
+          },
+          "counts": {
+            "objects": 1,
+            "contours": 50000,
+            "groups": 1,
+            "groupKinds": ["fill"],
+            "previewSteps": 675693,
+            "previewLengthMm": 388406.4059744286,
+            "gcodeBytes": 5955318,
+            "gcodeLines": 675704,
+            "preflightIssues": [
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed"
+            ]
+          }
+        },
+        {
+          "timings": {
+            "importWorker": 1345.8999999761581,
+            "importHydration": 0,
+            "vectorCam": 737.4000000953674,
+            "vectorGcode": 2173.399999976158,
+            "vectorPreviewData": 302.2999999523163,
+            "vectorCanvasPaint": 151.80000007152557,
+            "vectorOutputParse": 925.8999999761581
+          },
+          "totalMs": 5674.399999976158,
+          "outputHashes": {
+            "geometry": "ba7e386e9571e09e4eae5ce8b4c1b15d2b332b1ebe12a72f30a0052baa83a8c8",
+            "gcode": "328bcda4712d04edabccf04105d6954fe1d7b5e444963ad16a1ea41db82db99b"
+          },
+          "counts": {
+            "objects": 1,
+            "contours": 50000,
+            "groups": 1,
+            "groupKinds": ["fill"],
+            "previewSteps": 675693,
+            "previewLengthMm": 388406.4059744286,
+            "gcodeBytes": 5955318,
+            "gcodeLines": 675704,
+            "preflightIssues": [
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed"
+            ]
+          }
+        },
+        {
+          "timings": {
+            "importWorker": 1474.1000000238419,
+            "importHydration": 0,
+            "vectorCam": 570.3999999761581,
+            "vectorGcode": 2200.100000023842,
+            "vectorPreviewData": 283.2000000476837,
+            "vectorCanvasPaint": 182.89999997615814,
+            "vectorOutputParse": 1287.5999999046326
+          },
+          "totalMs": 6067.200000047684,
+          "outputHashes": {
+            "geometry": "ba7e386e9571e09e4eae5ce8b4c1b15d2b332b1ebe12a72f30a0052baa83a8c8",
+            "gcode": "328bcda4712d04edabccf04105d6954fe1d7b5e444963ad16a1ea41db82db99b"
+          },
+          "counts": {
+            "objects": 1,
+            "contours": 50000,
+            "groups": 1,
+            "groupKinds": ["fill"],
+            "previewSteps": 675693,
+            "previewLengthMm": 388406.4059744286,
+            "gcodeBytes": 5955318,
+            "gcodeLines": 675704,
+            "preflightIssues": [
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed",
+              "out-of-bed"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "sparse4096",
+      "medianMs": 4334,
+      "minMs": 3951.2000000476837,
+      "maxMs": 5194,
+      "samples": [
+        {
+          "timings": {
+            "imageImport": 1625.6000000238419,
+            "traceSourceRead": 20.600000023841858,
+            "tracePreviewDecodeAndWorker": 1725.5,
+            "traceSvgAndPaint": 9.100000023841858,
+            "traceCommitDecodeAndWorker": 1566,
+            "vectorCam": 3.6999999284744263,
+            "vectorGcode": 1.8000000715255737,
+            "vectorPreviewData": 0.10000002384185791,
+            "vectorCanvasPaint": 6.199999928474426,
+            "vectorOutputParse": 3.399999976158142,
+            "traceRasterWorker": 71.30000007152557,
+            "rasterCam": 127.60000002384186,
+            "rasterGcode": 13.899999976158142,
+            "rasterPreviewData": 4.799999952316284,
+            "rasterCanvasPaint": 9.299999952316284,
+            "rasterOutputParse": 4.200000047683716
+          },
+          "totalMs": 5194,
+          "outputHashes": {
+            "preview": "013b041cb24a906861930b53e6f3076f0d88d84170cbd13f84333d8f0999cc6e",
+            "committed": "61d0d8541203483c9e0bcd32391bd3fb360038ba7613bf54d422907a9d429399",
+            "vectorGcode": "3babc8ae0a415a52ae77eb86c836cfb473534cc722b6d2cc1c9599a83f9188ca",
+            "rasterGcode": "779ce41cc57972269cf1a0c04198c26f81e34ce0b125a4f085ebd1216e4cd709"
+          },
+          "counts": {
+            "naturalGrid": [4096, 4096],
+            "importStorage": "embedded",
+            "importedGrid": [4096, 4096],
+            "previewGrid": [2048, 2048],
+            "commitGrid": [2559, 2559],
+            "traceContours": 10,
+            "rasterGrid": [1032, 1122],
+            "vector": {
+              "groups": 1,
+              "groupKinds": ["cut"],
+              "previewSteps": 21,
+              "previewLengthMm": 3185.5347405444045,
+              "gcodeBytes": 7347,
+              "gcodeLines": 360,
+              "preflightIssues": []
+            },
+            "raster": {
+              "groups": 1,
+              "groupKinds": ["raster"],
+              "previewSteps": 2851,
+              "previewLengthMm": 16682.662614612746,
+              "gcodeBytes": 37815,
+              "gcodeLines": 2879,
+              "preflightIssues": []
+            },
+            "notices": []
+          }
+        },
+        {
+          "timings": {
+            "imageImport": 1363.3999999761581,
+            "traceSourceRead": 28.5,
+            "tracePreviewDecodeAndWorker": 1423.8999999761581,
+            "traceSvgAndPaint": 4.700000047683716,
+            "traceCommitDecodeAndWorker": 1283.8999999761581,
+            "vectorCam": 2.100000023841858,
+            "vectorGcode": 1.9000000953674316,
+            "vectorPreviewData": 0.09999990463256836,
+            "vectorCanvasPaint": 2.100000023841858,
+            "vectorOutputParse": 1,
+            "traceRasterWorker": 65.30000007152557,
+            "rasterCam": 124.20000004768372,
+            "rasterGcode": 13.399999976158142,
+            "rasterPreviewData": 4.799999952316284,
+            "rasterCanvasPaint": 9.600000023841858,
+            "rasterOutputParse": 3.899999976158142
+          },
+          "totalMs": 4334,
+          "outputHashes": {
+            "preview": "013b041cb24a906861930b53e6f3076f0d88d84170cbd13f84333d8f0999cc6e",
+            "committed": "61d0d8541203483c9e0bcd32391bd3fb360038ba7613bf54d422907a9d429399",
+            "vectorGcode": "3babc8ae0a415a52ae77eb86c836cfb473534cc722b6d2cc1c9599a83f9188ca",
+            "rasterGcode": "779ce41cc57972269cf1a0c04198c26f81e34ce0b125a4f085ebd1216e4cd709"
+          },
+          "counts": {
+            "naturalGrid": [4096, 4096],
+            "importStorage": "embedded",
+            "importedGrid": [4096, 4096],
+            "previewGrid": [2048, 2048],
+            "commitGrid": [2559, 2559],
+            "traceContours": 10,
+            "rasterGrid": [1032, 1122],
+            "vector": {
+              "groups": 1,
+              "groupKinds": ["cut"],
+              "previewSteps": 21,
+              "previewLengthMm": 3185.5347405444045,
+              "gcodeBytes": 7347,
+              "gcodeLines": 360,
+              "preflightIssues": []
+            },
+            "raster": {
+              "groups": 1,
+              "groupKinds": ["raster"],
+              "previewSteps": 2851,
+              "previewLengthMm": 16682.662614612746,
+              "gcodeBytes": 37815,
+              "gcodeLines": 2879,
+              "preflightIssues": []
+            },
+            "notices": []
+          }
+        },
+        {
+          "timings": {
+            "imageImport": 1241.4000000953674,
+            "traceSourceRead": 33.39999997615814,
+            "tracePreviewDecodeAndWorker": 1227.3999999761581,
+            "traceSvgAndPaint": 9.100000023841858,
+            "traceCommitDecodeAndWorker": 1244.0999999046326,
+            "vectorCam": 1.100000023841858,
+            "vectorGcode": 1.2000000476837158,
+            "vectorPreviewData": 0.10000002384185791,
+            "vectorCanvasPaint": 2.299999952316284,
+            "vectorOutputParse": 0.7999999523162842,
+            "traceRasterWorker": 63.5,
+            "rasterCam": 99,
+            "rasterGcode": 10.399999976158142,
+            "rasterPreviewData": 4.700000047683716,
+            "rasterCanvasPaint": 8,
+            "rasterOutputParse": 3.799999952316284
+          },
+          "totalMs": 3951.2000000476837,
+          "outputHashes": {
+            "preview": "013b041cb24a906861930b53e6f3076f0d88d84170cbd13f84333d8f0999cc6e",
+            "committed": "61d0d8541203483c9e0bcd32391bd3fb360038ba7613bf54d422907a9d429399",
+            "vectorGcode": "3babc8ae0a415a52ae77eb86c836cfb473534cc722b6d2cc1c9599a83f9188ca",
+            "rasterGcode": "779ce41cc57972269cf1a0c04198c26f81e34ce0b125a4f085ebd1216e4cd709"
+          },
+          "counts": {
+            "naturalGrid": [4096, 4096],
+            "importStorage": "embedded",
+            "importedGrid": [4096, 4096],
+            "previewGrid": [2048, 2048],
+            "commitGrid": [2559, 2559],
+            "traceContours": 10,
+            "rasterGrid": [1032, 1122],
+            "vector": {
+              "groups": 1,
+              "groupKinds": ["cut"],
+              "previewSteps": 21,
+              "previewLengthMm": 3185.5347405444045,
+              "gcodeBytes": 7347,
+              "gcodeLines": 360,
+              "preflightIssues": []
+            },
+            "raster": {
+              "groups": 1,
+              "groupKinds": ["raster"],
+              "previewSteps": 2851,
+              "previewLengthMm": 16682.662614612746,
+              "gcodeBytes": 37815,
+              "gcodeLines": 2879,
+              "preflightIssues": []
+            },
+            "notices": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "sparse4096Paged",
+      "medianMs": 5467.899999976158,
+      "minMs": 4916.299999952316,
+      "maxMs": 5846.100000023842,
+      "samples": [
+        {
+          "timings": {
+            "imageImport": 1845.8999999761581,
+            "sourceLumaHydration": 549.2000000476837,
+            "traceSourceRead": 336.09999990463257,
+            "tracePreviewDecodeAndWorker": 1364.7000000476837,
+            "traceSvgAndPaint": 6.100000023841858,
+            "traceCommitDecodeAndWorker": 1192.6999999284744,
+            "vectorCam": 1.100000023841858,
+            "vectorGcode": 1.100000023841858,
+            "vectorPreviewData": 0.10000002384185791,
+            "vectorCanvasPaint": 2.299999952316284,
+            "vectorOutputParse": 0.7000000476837158,
+            "traceRasterWorker": 63.300000071525574,
+            "rasterCam": 77.79999995231628,
+            "rasterGcode": 10.899999976158142,
+            "rasterPreviewData": 3.700000047683716,
+            "rasterCanvasPaint": 7.5,
+            "rasterOutputParse": 3.6999999284744263
+          },
+          "totalMs": 5467.899999976158,
+          "outputHashes": {
+            "preview": "013b041cb24a906861930b53e6f3076f0d88d84170cbd13f84333d8f0999cc6e",
+            "committed": "61d0d8541203483c9e0bcd32391bd3fb360038ba7613bf54d422907a9d429399",
+            "vectorGcode": "3babc8ae0a415a52ae77eb86c836cfb473534cc722b6d2cc1c9599a83f9188ca",
+            "rasterGcode": "779ce41cc57972269cf1a0c04198c26f81e34ce0b125a4f085ebd1216e4cd709"
+          },
+          "counts": {
+            "naturalGrid": [4096, 4096],
+            "importStorage": "paged-indexeddb",
+            "importedGrid": [4096, 4096],
+            "previewGrid": [2048, 2048],
+            "commitGrid": [2559, 2559],
+            "traceContours": 10,
+            "rasterGrid": [1032, 1122],
+            "vector": {
+              "groups": 1,
+              "groupKinds": ["cut"],
+              "previewSteps": 21,
+              "previewLengthMm": 3185.5347405444045,
+              "gcodeBytes": 7347,
+              "gcodeLines": 360,
+              "preflightIssues": []
+            },
+            "raster": {
+              "groups": 1,
+              "groupKinds": ["raster"],
+              "previewSteps": 2851,
+              "previewLengthMm": 16682.662614612746,
+              "gcodeBytes": 37815,
+              "gcodeLines": 2879,
+              "preflightIssues": []
+            },
+            "notices": []
+          }
+        },
+        {
+          "timings": {
+            "imageImport": 2393.2000000476837,
+            "sourceLumaHydration": 514,
+            "traceSourceRead": 285.5,
+            "tracePreviewDecodeAndWorker": 1293.6999999284744,
+            "traceSvgAndPaint": 5.600000023841858,
+            "traceCommitDecodeAndWorker": 1190.1999999284744,
+            "vectorCam": 1.100000023841858,
+            "vectorGcode": 1.100000023841858,
+            "vectorPreviewData": 0.10000002384185791,
+            "vectorCanvasPaint": 2.0999999046325684,
+            "vectorOutputParse": 0.8000000715255737,
+            "traceRasterWorker": 57.09999990463257,
+            "rasterCam": 74.80000007152557,
+            "rasterGcode": 10.5,
+            "rasterPreviewData": 3.6999999284744263,
+            "rasterCanvasPaint": 7.600000023841858,
+            "rasterOutputParse": 3.899999976158142
+          },
+          "totalMs": 5846.100000023842,
+          "outputHashes": {
+            "preview": "013b041cb24a906861930b53e6f3076f0d88d84170cbd13f84333d8f0999cc6e",
+            "committed": "61d0d8541203483c9e0bcd32391bd3fb360038ba7613bf54d422907a9d429399",
+            "vectorGcode": "3babc8ae0a415a52ae77eb86c836cfb473534cc722b6d2cc1c9599a83f9188ca",
+            "rasterGcode": "779ce41cc57972269cf1a0c04198c26f81e34ce0b125a4f085ebd1216e4cd709"
+          },
+          "counts": {
+            "naturalGrid": [4096, 4096],
+            "importStorage": "paged-indexeddb",
+            "importedGrid": [4096, 4096],
+            "previewGrid": [2048, 2048],
+            "commitGrid": [2559, 2559],
+            "traceContours": 10,
+            "rasterGrid": [1032, 1122],
+            "vector": {
+              "groups": 1,
+              "groupKinds": ["cut"],
+              "previewSteps": 21,
+              "previewLengthMm": 3185.5347405444045,
+              "gcodeBytes": 7347,
+              "gcodeLines": 360,
+              "preflightIssues": []
+            },
+            "raster": {
+              "groups": 1,
+              "groupKinds": ["raster"],
+              "previewSteps": 2851,
+              "previewLengthMm": 16682.662614612746,
+              "gcodeBytes": 37815,
+              "gcodeLines": 2879,
+              "preflightIssues": []
+            },
+            "notices": []
+          }
+        },
+        {
+          "timings": {
+            "imageImport": 1579.3999999761581,
+            "sourceLumaHydration": 502.89999997615814,
+            "traceSourceRead": 293.8000000715256,
+            "tracePreviewDecodeAndWorker": 1222.8999999761581,
+            "traceSvgAndPaint": 12,
+            "traceCommitDecodeAndWorker": 1136.2000000476837,
+            "vectorCam": 0.8999999761581421,
+            "vectorGcode": 1.1999999284744263,
+            "vectorPreviewData": 0.10000002384185791,
+            "vectorCanvasPaint": 2,
+            "vectorOutputParse": 0.7000000476837158,
+            "traceRasterWorker": 59.199999928474426,
+            "rasterCam": 74.89999997615814,
+            "rasterGcode": 11,
+            "rasterPreviewData": 3.700000047683716,
+            "rasterCanvasPaint": 10.200000047683716,
+            "rasterOutputParse": 3.799999952316284
+          },
+          "totalMs": 4916.299999952316,
+          "outputHashes": {
+            "preview": "013b041cb24a906861930b53e6f3076f0d88d84170cbd13f84333d8f0999cc6e",
+            "committed": "61d0d8541203483c9e0bcd32391bd3fb360038ba7613bf54d422907a9d429399",
+            "vectorGcode": "3babc8ae0a415a52ae77eb86c836cfb473534cc722b6d2cc1c9599a83f9188ca",
+            "rasterGcode": "779ce41cc57972269cf1a0c04198c26f81e34ce0b125a4f085ebd1216e4cd709"
+          },
+          "counts": {
+            "naturalGrid": [4096, 4096],
+            "importStorage": "paged-indexeddb",
+            "importedGrid": [4096, 4096],
+            "previewGrid": [2048, 2048],
+            "commitGrid": [2559, 2559],
+            "traceContours": 10,
+            "rasterGrid": [1032, 1122],
+            "vector": {
+              "groups": 1,
+              "groupKinds": ["cut"],
+              "previewSteps": 21,
+              "previewLengthMm": 3185.5347405444045,
+              "gcodeBytes": 7347,
+              "gcodeLines": 360,
+              "preflightIssues": []
+            },
+            "raster": {
+              "groups": 1,
+              "groupKinds": ["raster"],
+              "previewSteps": 2851,
+              "previewLengthMm": 16682.662614612746,
+              "gcodeBytes": 37815,
+              "gcodeLines": 2879,
+              "preflightIssues": []
+            },
+            "notices": []
+          }
+        }
+      ]
+    }
+  ]
+}

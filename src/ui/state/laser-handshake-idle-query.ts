@@ -57,3 +57,36 @@ export async function awaitHandshakeIdle(
   clearTimeout(bound);
   return sawIdle;
 }
+
+export type HandshakeIdleOwner = {
+  readonly idle: LiveRefs['controllerIdleWait'];
+  readonly connection: LiveRefs['connection'];
+  readonly writeEpoch: number;
+  command: LiveRefs['controllerCommand'];
+};
+
+export function ownsHandshakeIdleWait(refs: LiveRefs, owner: HandshakeIdleOwner): boolean {
+  return (
+    refs.connection === owner.connection &&
+    (refs.writeEpoch ?? 0) === owner.writeEpoch &&
+    ((owner.idle !== null && refs.controllerIdleWait === owner.idle) ||
+      (owner.command !== null && refs.controllerCommand === owner.command))
+  );
+}
+
+export function captureHandshakeIdleOwner(refs: LiveRefs): HandshakeIdleOwner {
+  return {
+    idle: refs.controllerIdleWait,
+    command: null,
+    connection: refs.connection,
+    writeEpoch: refs.writeEpoch ?? 0,
+  };
+}
+
+export function handshakeIsCurrent(
+  refs: LiveRefs,
+  connection: NonNullable<LiveRefs['connection']>,
+  writeEpoch: number,
+): boolean {
+  return refs.connection === connection && (refs.writeEpoch ?? 0) === writeEpoch;
+}

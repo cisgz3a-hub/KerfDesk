@@ -45,6 +45,15 @@
   padding: 0;
 }
 
+/* Project workflows share the existing header instead of taking a canvas row. */
+.lf-menu-project-controls {
+  flex-shrink: 0;
+}
+
+.lf-project-sheets-label-narrow {
+  display: none;
+}
+
 .lf-menu-build {
   margin-left: auto;
   color: var(--lf-text-muted);
@@ -56,6 +65,14 @@
     flex-wrap: wrap;
     gap: 2px 10px;
     padding: 4px 8px;
+  }
+
+  .lf-project-sheets-label-wide {
+    display: none;
+  }
+
+  .lf-project-sheets-label-narrow {
+    display: inline;
   }
 
   .lf-menu-build {

@@ -3,6 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JOB_CHECKPOINT_STORAGE_KEY } from '../state/job-checkpoint-storage';
 import { useLaserStore } from '../state/laser-store';
+import {
+  CNC_PAUSE_RESUME_STALLED_MESSAGE,
+  STREAM_STALLED_MESSAGE,
+} from '../state/laser-safety-notice';
 import { SafetyNoticeBanner } from './SafetyNoticeBanner';
 
 const originalWakeController = useLaserStore.getState().wakeController;
@@ -26,6 +30,7 @@ afterEach(() => {
 async function renderBanner(props?: {
   readonly onReconnect?: () => void;
   readonly reconnectDisabled?: boolean;
+  readonly reconnectRecommended?: boolean;
 }): Promise<{ host: HTMLElement; root: Root }> {
   const host = document.createElement('div');
   document.body.appendChild(host);
@@ -158,6 +163,83 @@ describe('SafetyNoticeBanner', () => {
       const alert = host.querySelector('[role="alert"]');
       expect(alert?.textContent).toContain('Controller write failed');
       expect(alert?.textContent).not.toContain('Command may not have sent');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('keeps CNC transition safety guidance without recommending destructive reconnect', async () => {
+    const reconnect = vi.fn();
+    localStorage.setItem(JOB_CHECKPOINT_STORAGE_KEY, 'retained-checkpoint');
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      safetyNotice: {
+        kind: 'cnc-transition-unconfirmed',
+        message: CNC_PAUSE_RESUME_STALLED_MESSAGE,
+      },
+    });
+    const { host, root } = await renderBanner({
+      onReconnect: reconnect,
+      reconnectRecommended: true,
+    });
+    try {
+      expect(host.textContent).toContain('CNC Pause/Resume not confirmed');
+      expect(host.textContent).toContain('retry Resume or request ABORT JOB');
+      expect(host.textContent).toContain('physical E-stop');
+      expect(host.textContent).not.toContain('Reconnect controller…');
+      const acknowledge = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'I made the machine safe',
+      );
+      expect(acknowledge).toBeInstanceOf(HTMLButtonElement);
+      await act(async () => acknowledge?.click());
+      expect(reconnect).not.toHaveBeenCalled();
+      expect(useLaserStore.getState().safetyNotice).toBeNull();
+      expect(localStorage.getItem(JOB_CHECKPOINT_STORAGE_KEY)).toBe('retained-checkpoint');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('does not recommend reconnect from an old stream warning after the link recovers', async () => {
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      safetyNotice: { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE },
+    });
+    const { host, root } = await renderBanner({
+      onReconnect: vi.fn(),
+      reconnectRecommended: false,
+    });
+    try {
+      expect(host.querySelector('[role="alert"]')).not.toBeNull();
+      expect(host.textContent).toContain('Controller stream stalled');
+      expect(host.textContent).not.toContain('Reconnect controller…');
+      expect(host.textContent).toContain('I made the machine safe');
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('offers contextual reconnect for an unresponsive link without acknowledging the incident', async () => {
+    const reconnect = vi.fn();
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      safetyNotice: { kind: 'stream-stalled', message: STREAM_STALLED_MESSAGE },
+    });
+    const { host, root } = await renderBanner({
+      onReconnect: reconnect,
+      reconnectRecommended: true,
+    });
+    try {
+      const reconnectButton = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Reconnect controller…',
+      );
+      expect(reconnectButton?.title).toContain('ends any paused job');
+      await act(async () => reconnectButton?.click());
+      expect(reconnect).toHaveBeenCalledOnce();
+      expect(useLaserStore.getState().safetyNotice?.kind).toBe('stream-stalled');
     } finally {
       await act(async () => root.unmount());
       host.remove();

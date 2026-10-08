@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // Trim Shapes (LightBurn gap LBG-T04): a click deletes the highlighted stretch
 // of outline, as one undo step. Imported and traced artwork is edited in
 // place, and a drawn line stays a drawn line while one piece of it is left.
@@ -51,6 +52,10 @@ function trimShapeMutation(
   const target = findTrimTarget(scene, point, toleranceMm);
   const object = scene.objects.find((entry) => entry.id === target?.contour.objectId);
   if (target === null || object === undefined || !isUnlockedVectorArtwork(object)) return state;
+  if (isBooleanCompoundObject(object)) {
+    notify('Edit compound sources or Expand before trimming the result.');
+    return state;
+  }
   const edit = trimEdit(object, target);
   if (edit === null) return state;
   const history = {

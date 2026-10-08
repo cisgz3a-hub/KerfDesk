@@ -20,7 +20,7 @@ import './trace-preview.css';
 
 type Props = TracePreviewBoundaryProps & {
   readonly state: TracePreviewState;
-  readonly sourceDataUrl?: string;
+  readonly sourceDataUrl?: string | undefined;
   readonly isRasterizing?: boolean;
   readonly onBoundaryClear?: () => void;
 };

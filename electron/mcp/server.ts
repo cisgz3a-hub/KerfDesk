@@ -62,9 +62,10 @@ async function callBackend(
   command: KerfDeskMcpCommand,
   args: Record<string, unknown>,
   signal: AbortSignal,
+  wireRequestId: string | number,
 ): Promise<CallToolResult> {
   try {
-    const response = await requestMcpBackend(backend, command, args, signal);
+    const response = await requestMcpBackend(backend, command, args, signal, wireRequestId);
     if (signal.aborted) throw new KerfDeskMcpError('cancelled');
     return toolSuccess(command, response);
   } catch (error) {
@@ -96,7 +97,8 @@ function registerTool(
       annotations: mcpToolAnnotations(command),
       ...(toolMeta === undefined ? {} : { _meta: toolMeta }),
     },
-    (args, context) => callBackend(backend, command, args, context.mcpReq.signal),
+    (args, context) =>
+      callBackend(backend, command, args, context.mcpReq.signal, context.mcpReq.id),
   );
 }
 

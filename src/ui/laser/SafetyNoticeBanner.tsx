@@ -17,6 +17,7 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
   'disconnect-stop-unconfirmed': 'Controller stop not confirmed',
   'controller-error': 'Controller rejected a command',
   'stream-stalled': 'Controller stream stalled',
+  'cnc-transition-unconfirmed': 'CNC Pause/Resume not confirmed',
   'controller-reboot': 'Controller rebooted mid-job',
   'frame-limit': 'Frame hit a machine limit',
   'home-unfinished': 'Home did not finish',
@@ -24,9 +25,11 @@ const SAFETY_NOTICE_TITLES: Record<LaserSafetyNotice['kind'], string> = {
 };
 
 type Props = {
-  /** Re-opens the serial picker. Calling connect also tears down a stale link. */
+  /** Reconnects the controller. Calling connect also tears down a stale link. */
   readonly onReconnect?: () => void;
   readonly reconnectDisabled?: boolean;
+  /** Current transport recovery context, independent of this retained warning. */
+  readonly reconnectRecommended?: boolean;
 };
 
 export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
@@ -40,9 +43,8 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
   const title = SAFETY_NOTICE_TITLES[notice.kind];
   const resetAvailable = connection.kind === 'connected' && statusState === 'Sleep';
   const reconnectRecommended =
-    connection.kind !== 'connected' ||
-    notice.kind === 'write-failed' ||
-    notice.kind === 'stream-stalled';
+    (props.reconnectRecommended ?? connection.kind !== 'connected') &&
+    !(notice.kind === 'cnc-transition-unconfirmed' && connection.kind === 'connected');
   return (
     <div style={bannerStyle} role="alert">
       <strong style={titleStyle}>{title}</strong>
@@ -58,7 +60,7 @@ export function SafetyNoticeBanner(props: Props = {}): JSX.Element | null {
             onClick={props.onReconnect}
             disabled={props.reconnectDisabled || connection.kind === 'connecting'}
             style={recoverStyle}
-            title="Tear down any stale serial session and open the controller connection picker."
+            title="Close any stale serial session and reconnect the controller. This ends any paused job."
           >
             {connection.kind === 'connecting' ? 'Reconnecting…' : 'Reconnect controller…'}
           </button>

@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import {
   type Bounds,
   type ColoredPath,
@@ -9,6 +10,10 @@ import {
 } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import {
+  pathNodeCoordinateActions,
+  type PathNodeCoordinateActions,
+} from './path-node-coordinate-actions';
 import {
   boundsForPaths,
   deletePathsNodes,
@@ -26,7 +31,7 @@ export type PathNodeRef = {
   readonly handle?: 'incoming' | 'outgoing';
 };
 
-export type PathNodeEditActions = {
+export type PathNodeEditActions = PathNodeCoordinateActions & {
   readonly selectPathNode: (
     ref: PathNodeRef | null,
     options?: { readonly additive?: boolean },
@@ -40,6 +45,7 @@ type Setter = (fn: (state: AppState) => AppState | Partial<AppState>) => void;
 
 export function pathNodeEditActions(set: Setter): PathNodeEditActions {
   return {
+    ...pathNodeCoordinateActions(set, dragObjectNodesToPrimaryTarget),
     selectPathNode: (ref, options = {}) =>
       set((state) => selectPathNode(state, ref, options.additive === true)),
     nudgeSelectedPathNode: (dx, dy) => set((state) => nudgeSelectedPathNode(state, dx, dy)),
@@ -186,7 +192,7 @@ function editObjectNodes(
   dx: number,
   dy: number,
 ): SceneObject {
-  if (object.locked === true) return object;
+  if (object.locked === true || isBooleanCompoundObject(object)) return object;
   if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
     return object;
   }
@@ -202,7 +208,7 @@ function editObjectNodes(
 }
 
 function deleteObjectNodes(object: SceneObject, refs: ReadonlyArray<PathNodeRef>): SceneObject {
-  if (object.locked === true) return object;
+  if (object.locked === true || isBooleanCompoundObject(object)) return object;
   if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
     return object;
   }
@@ -224,7 +230,7 @@ function dragObjectNodesToPrimaryTarget(
   refs: ReadonlyArray<PathNodeRef>,
   scenePoint: Vec2,
 ): SceneObject {
-  if (object.locked === true) return object;
+  if (object.locked === true || isBooleanCompoundObject(object)) return object;
   if (object.kind === 'raster-image' || object.kind === 'relief' || object.kind === 'text') {
     return object;
   }

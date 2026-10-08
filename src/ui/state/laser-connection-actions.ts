@@ -19,10 +19,10 @@ import {
 import { handleLine } from './laser-line-handler';
 import {
   disconnectedControllerQualification,
-  failedControllerQualificationPatch,
   qualifyingController,
 } from './laser-controller-qualification';
 import { controllerHandshakeOwnership, runControllerHandshake } from './laser-controller-handshake';
+import { controllerHandshakeFailurePatch } from './laser-connection-handshake-failure';
 import { recoveryRepository } from './recovery';
 import {
   writeFailedNotice,
@@ -30,17 +30,20 @@ import {
   type LaserSafetyNotice,
 } from './laser-safety-notice';
 import {
+  disconnectSafetyNoticeReader,
   retainedDisconnectSafetyNotice,
+  retainedLiveForgetSafetyNotice,
   retainedUnavailableTransportSafetyNotice,
-  unconfirmedDisconnectStopNotice,
+  safetyNoticeBeforeDisconnect,
   withRetainedDisconnectSafety,
 } from './laser-disconnect-safety';
 import { stopBeforeDisconnect } from './laser-disconnect-stop';
 import { disconnectedStatePatch } from './laser-disconnected-state';
-import { buildPortClosePatch, initialLaserState, pushLog } from './laser-store-helpers';
+import { buildPortClosePatch, initialLaserState } from './laser-store-helpers';
 import {
   containActiveStreamWriteFailure,
   containLostStreamHeartbeat,
+  containStalledStreamAcknowledgements,
   streamWriteOwner,
 } from './laser-stream-heartbeat-containment';
 import { observeStreamHoldTick } from './laser-stream-hold';
@@ -157,7 +160,7 @@ function attachConnectedController(
   set((state) => ({
     ...connectedControllerStatePatch(state),
     serialPortInfo: portInfo,
-    connectedBaudRate: baudRate,
+    connectedBaudRate: portInfo?.transport === 'tcp' ? null : baudRate,
   }));
   startConnectedControllerHandshake(set, get, refs, safeWrite, connection, baudRate);
 }
@@ -178,16 +181,7 @@ function startConnectedControllerHandshake(
   void runControllerHandshake(set, get, refs, safeWrite, baudRate, ownership.adopt)
     .catch((error: unknown) => {
       if (!ownership.isCurrent()) return;
-      const message = error instanceof Error ? error.message : String(error);
-      set((state) =>
-        state.controllerSessionEpoch === ownership.qualificationEpoch
-          ? {
-              ...failedControllerQualificationPatch(state, ownership.qualificationEpoch, message),
-              lastWriteError: message,
-              log: pushLog(state, `[lf2] Controller handshake failed: ${message}`),
-            }
-          : {},
-      );
+      set((state) => controllerHandshakeFailurePatch(state, ownership.qualificationEpoch, error));
     })
     .finally(() => {
       // The status poll belongs to the CONNECTION, not the handshake's write
@@ -219,6 +213,7 @@ function connectingStatePatch(state: LaserState, refs: LiveRefs): Partial<LaserS
     controllerSessionEpoch: nextEpoch,
     statusReport: null,
     statusObservation: null,
+    statusResponseObservation: null,
     detectedSettings: null,
     ...{ controllerSettings: null, reportUnitsUnconfirmed: false },
     controllerSettingsObservation: null,
@@ -320,11 +315,15 @@ async function runOwnedIntentionalDisconnect(
   connection: LiveConnection,
   request: IntentionalDisconnectRequest,
 ): Promise<void> {
-  let retainedSafetyNotice = unconfirmedDisconnectStopNotice(get(), refs.driver);
+  const precedingSafetyNotice = get().safetyNotice;
+  let disconnectFailed = false;
+  let retainedSafetyNotice = safetyNoticeBeforeDisconnect(get(), refs.driver);
+  const currentSafetyNotice = disconnectSafetyNoticeReader(get, refs, () => retainedSafetyNotice);
   try {
     await stopBeforeDisconnect(set, get, refs, safeWrite, connection);
   } catch {
-    retainedSafetyNotice = writeFailedNotice('disconnect');
+    disconnectFailed = true;
+    retainedSafetyNotice = currentSafetyNotice() ?? writeFailedNotice('disconnect');
     set({ safetyNotice: retainedSafetyNotice });
   }
   if (refs.connection === connection) quarantineConnectionRefs(refs);
@@ -333,17 +332,28 @@ async function runOwnedIntentionalDisconnect(
     await closeConnectionOnce(refs, connection, request.forgetRequested);
   } catch (error) {
     closeError = error;
-    retainedSafetyNotice = writeFailedNotice('disconnect');
+    disconnectFailed = true;
+    retainedSafetyNotice = currentSafetyNotice() ?? writeFailedNotice('disconnect');
     set({ safetyNotice: retainedSafetyNotice });
   }
   const ownsFinalState = refs.connection === connection;
   if (ownsFinalState) refs.connection = null;
   const forgetWasRequested = request.forgetRequested || connectionForgetRequested(refs, connection);
   if (forgetWasRequested) {
-    await finalizeForgottenControllerOnce(connection, set, get, refs, retainedSafetyNotice);
+    await finalizeForgottenControllerOnce(
+      connection,
+      set,
+      get,
+      refs,
+      retainedLiveForgetSafetyNotice(
+        currentSafetyNotice(),
+        precedingSafetyNotice,
+        disconnectFailed,
+      ),
+    );
   } else if (ownsFinalState) {
     set((state) =>
-      withRetainedDisconnectSafety(disconnectedStatePatch(state), retainedSafetyNotice),
+      withRetainedDisconnectSafety(disconnectedStatePatch(state), currentSafetyNotice()),
     );
   }
   if (closeError !== null) {
@@ -416,9 +426,12 @@ function startStatusPolling(set: SetFn, get: GetFn, refs: LiveRefs, safeWrite: S
     pollTick++;
     const s = get();
     if (containLostStreamHeartbeat(set, s, refs, safeWrite)) return;
-    // A controller that answers `?` but stops acknowledging sent lines is
-    // named in the live bar and the log rather than declared stalled (ADR-345).
-    observeStreamHoldTick(set, s, refs, Date.now());
+    // Preserve the existing hold telemetry and its non-dwell grace period.
+    // A wait that reaches the warning threshold now freezes refill before reset.
+    if (observeStreamHoldTick(set, s, refs, Date.now())) {
+      containStalledStreamAcknowledgements(set, refs, safeWrite);
+      return;
+    }
     // Start owns this boundary: queue-fence must converge to zero without
     // background writes, and CNC live-status sends its own freshness query.
     // Polling here can otherwise keep pendingTransportWrites continuously

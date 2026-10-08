@@ -13,6 +13,7 @@ export function disconnectedStatePatch(state: LaserState): Partial<LaserState> {
     statusReport: null,
     controllerSessionEpoch: state.controllerSessionEpoch + 1,
     statusObservation: null,
+    statusResponseObservation: null,
     detectedSettings: null,
     detectedControllerKind: null,
     controllerSettings: null,
