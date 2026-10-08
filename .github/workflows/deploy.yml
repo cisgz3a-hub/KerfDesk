@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       payment_flag:
-        description: Explicit licence Worker checkout flag operation (no website deployment)
+        description: Explicit licence Worker checkout operation (no website deployment)
         type: choice
         default: none
         options:
@@ -35,6 +35,7 @@ on:
             sandbox-inspect,
             sandbox-open,
             sandbox-close,
+            sandbox-refresh-code,
           ]
 
 # One serialized production publication lane exists. Queueing every candidate
@@ -316,7 +317,7 @@ jobs:
           retention-days: 30
 
   payment-settings:
-    name: Apply explicitly approved checkout flag
+    name: Apply explicitly approved checkout operation
     if: >-
       github.event_name == 'workflow_dispatch' && inputs.payment_flag != 'none' && inputs.payment_flag != '' &&
       github.repository == 'cisgz3a-hub/KerfDesk' &&
@@ -331,14 +332,21 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 22
-      - name: Verify the bounded flag helper
-        run: node --test scripts/apply-payment-settings.test.mjs
-      - name: Inspect or change only the specified payment flag
+      - name: Verify the bounded checkout helpers
+        run: node --test scripts/apply-payment-settings.test.mjs scripts/refresh-sandbox-script.test.mjs
+      - name: Apply the specified checkout operation
         env:
           KERFDESK_PAYMENT_LAUNCH_CF_TOKEN: ${{ secrets.KERFDESK_PAYMENT_LAUNCH_CF_TOKEN }}
           KERFDESK_PAYMENT_FLAG_EVIDENCE: ${{ runner.temp }}/payment-flag-evidence
           PAYMENT_FLAG_OPERATION: ${{ inputs.payment_flag }}
-        run: node scripts/apply-payment-settings.mjs "$PAYMENT_FLAG_OPERATION"
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$PAYMENT_FLAG_OPERATION" = sandbox-refresh-code ]; then
+            node scripts/refresh-sandbox-script.mjs "$PAYMENT_FLAG_OPERATION"
+          else
+            node scripts/apply-payment-settings.mjs "$PAYMENT_FLAG_OPERATION"
+          fi
       - name: Retain redacted settings receipt
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

@@ -32,9 +32,17 @@ retains their effective v1.0 source/output privately, and aligns the website's
 sales/trial flags and policy links with checked-in Worker settings. Full undated
 review drafts remain separate. No app startup, Frame, Start or output gate changes.
 
-The provider change is limited to PAYMENTS_ENABLED. Preserve the active script,
-all other variables, secret values, signing identity and durable bindings.
+The production provider change is limited to PAYMENTS_ENABLED. Preserve the
+active script, all other variables, secret values, signing identity and durable bindings.
 Closing that flag is the immediate rollback; existing authenticated claims and
 licence checks continue while licensing stays enabled. Verify public health,
 configuration, live checkout price and first-party recovery after deployment.
 Record provider version, source and served-page identities with the final receipt.
+
+On 2026-10-08, the sandbox health route served an older POST-only dispatcher. The sandbox
+repair restores the previously qualified script only after its raw SHA256 matches
+ea76d1d65cccbee7445551da56236dce6cea00a2503f144185093b5b46912907.
+It inherits every binding and secret from the current sandbox version, preserves
+the existing SandboxLicenseAuthority namespace and assets, and keeps checkout
+closed while health is verified. Production script replacement is outside this
+operation. The main-only protected deployment job retains a redacted receipt.
