@@ -46,7 +46,9 @@ import type { LaserSafetyAction } from './laser-safety-notice';
 import { pushLog } from './laser-store-helpers';
 import type { LaserState } from './laser-store';
 import { confirmFreshManualMotionIdle } from './manual-motion-fresh-idle';
-import { appendTranscript, systemTranscriptEntry, type TranscriptSource } from './laser-transcript';
+import { appendTranscript, type TranscriptSource } from './laser-transcript';
+import { publishControllerIncident } from './laser-incident-publish';
+import { clearIncidentHistoryPatch } from './laser-incident-clear';
 import { clearTranscriptBuffer, type TranscriptBufferRefs } from './laser-transcript-buffer';
 import { useStore } from './store';
 import {
@@ -89,6 +91,7 @@ export function consoleActions(
   | 'selectPrimaryWcsForFrame'
   | 'normalizeFrameReportUnits'
   | 'clearTranscript'
+  | 'clearIncidentHistory'
 > {
   return {
     sendConsoleCommand: async (input, options = {}) => {
@@ -142,6 +145,7 @@ export function consoleActions(
     // 200-line ring buffer that Clear used to leave untouched. Anything the
     // stream buffer is holding back is dropped too, or Clear would be undone
     // by the next status report (ADR-333).
+    clearIncidentHistory: () => set((state) => clearIncidentHistoryPatch(refs, state)),
     clearTranscript: () => {
       clearTranscriptBuffer(refs);
       set({ transcript: [], log: [] });
@@ -414,10 +418,12 @@ function block(set: SetFn, get: GetFn, refs: ConsoleActionRefs, reason: string):
   const state = get();
   set({
     lastWriteError: reason,
-    log: pushLog(state, `[lf2] Console command blocked: ${reason}`),
-    transcript: appendTranscript(
-      state.transcript,
-      systemTranscriptEntry(refs.nextTranscriptId++, Date.now(), reason),
+    ...publishControllerIncident(
+      refs,
+      state,
+      reason,
+      'blocked',
+      `[lf2] Console command blocked: ${reason}`,
     ),
   });
   throw new Error(reason);

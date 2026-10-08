@@ -19,13 +19,26 @@ import {
 } from '../../../core/preflight/controller-readiness';
 import { isControllerIdentityWarning } from '../controller-identity-warnings';
 import { SendRouterModeButton } from './SendRouterModeButton';
+import { ShowOmittedFillArtworkButton } from './ShowOmittedFillArtworkButton';
+import { ShowOmittedCncArtworkButton } from './ShowOmittedCncArtworkButton';
+import type { JobReviewCncContourOmissions } from './job-review-cnc-omissions';
+import type { JobReviewFillOmissions } from './job-review-fill-omissions';
 
 export function JobReviewWarnings(props: {
   readonly warnings: ReadonlyArray<string>;
+  readonly openFillOmissions?: JobReviewFillOmissions;
+  readonly openCncContourOmissions?: JobReviewCncContourOmissions;
 }): JSX.Element | null {
   if (props.warnings.length === 0) return null;
   return (
-    <details open={props.warnings.some(opensWarningList)} style={warnDetailsStyle}>
+    <details
+      open={
+        props.openFillOmissions !== undefined ||
+        props.openCncContourOmissions !== undefined ||
+        props.warnings.some(opensWarningList)
+      }
+      style={warnDetailsStyle}
+    >
       <summary
         style={warnSummaryStyle}
         title="Review every warning for this job. Warnings never block the start."
@@ -41,6 +54,12 @@ export function JobReviewWarnings(props: {
           </li>
         ))}
       </ul>
+      {props.openFillOmissions === undefined ? null : (
+        <ShowOmittedFillArtworkButton omissions={props.openFillOmissions} />
+      )}
+      {props.openCncContourOmissions === undefined ? null : (
+        <ShowOmittedCncArtworkButton omissions={props.openCncContourOmissions} />
+      )}
     </details>
   );
 }

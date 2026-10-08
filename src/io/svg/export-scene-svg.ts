@@ -22,6 +22,7 @@ import {
 import { formatSvgPathData } from '../../core/vector-export/svg-path-data';
 import { svgMatrixAttribute, svgNumber, xmlText } from './export-svg-paths';
 import { vectorPathElement, type SvgVectorOptions } from './export-svg-vector';
+import { SVG_ARTWORK_ORIGIN_ATTRIBUTE, svgArtworkOriginValue } from './svg-artwork-origin';
 
 const MIN_PAGE_EXTENT_MM = 0.01;
 
@@ -75,6 +76,10 @@ export function exportSceneSvg(
       'mm"' +
       ' viewBox="' +
       page.viewBox +
+      '" ' +
+      SVG_ARTWORK_ORIGIN_ATTRIBUTE +
+      '="' +
+      svgArtworkOriginValue(page.origin) +
       '" overflow="visible">\n' +
       '<desc>KerfDesk artwork. Text is outlined; machine settings are not included.</desc>\n' +
       elements.map((element) => element.markup).join('\n') +
@@ -89,7 +94,12 @@ export function exportSceneSvg(
 function pageBox(
   bounds: Bounds,
   precisionMm: number | null,
-): { readonly width: string; readonly height: string; readonly viewBox: string } {
+): {
+  readonly width: string;
+  readonly height: string;
+  readonly viewBox: string;
+  readonly origin: Vec2;
+} {
   if (precisionMm === null || !(precisionMm > 0)) {
     const width = svgNumber(Math.max(MIN_PAGE_EXTENT_MM, bounds.maxX - bounds.minX));
     const height = svgNumber(Math.max(MIN_PAGE_EXTENT_MM, bounds.maxY - bounds.minY));
@@ -97,6 +107,7 @@ function pageBox(
       width,
       height,
       viewBox: [svgNumber(bounds.minX), svgNumber(bounds.minY), width, height].join(' '),
+      origin: { x: bounds.minX, y: bounds.minY },
     };
   }
   const grid = decimalGridAtMost(precisionMm);
@@ -108,7 +119,12 @@ function pageBox(
   const text = (index: number): string => formatGridIndex(index, grid);
   const width = text(Math.max(minimum, x.hi - x.lo));
   const height = text(Math.max(minimum, y.hi - y.lo));
-  return { width, height, viewBox: [text(x.lo), text(y.lo), width, height].join(' ') };
+  return {
+    width,
+    height,
+    viewBox: [text(x.lo), text(y.lo), width, height].join(' '),
+    origin: { x: Number(text(x.lo)), y: Number(text(y.lo)) },
+  };
 }
 
 function exportObject(

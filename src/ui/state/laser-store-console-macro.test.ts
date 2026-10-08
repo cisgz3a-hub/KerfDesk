@@ -109,7 +109,19 @@ describe('saved user macro Console dispatch', () => {
     await expect(
       useLaserStore.getState().sendConsoleCommand('G0 X2.5', { provenance: PROVENANCE }),
     ).rejects.toThrow('adapter rejected macro write');
-    expect(useLaserStore.getState().transcript).toEqual([]);
+    const state = useLaserStore.getState();
+    expect(state.transcript).toHaveLength(1);
+    expect(state.transcript[0]).toMatchObject({
+      direction: 'system',
+      source: 'system',
+      kind: 'error',
+      incident: true,
+      raw: '[lf2] Serial write failed: adapter rejected macro write. Machine may not have received the command.',
+    });
+    expect(
+      state.transcript.filter((entry) => entry.direction === 'out' || entry.source === 'macro'),
+    ).toEqual([]);
+    expect(state.incidentHistory).toContainEqual(state.transcript[0]);
     expect(useLaserStore.getState()).toMatchObject({ framedRun: null, streamer: null });
   });
 });

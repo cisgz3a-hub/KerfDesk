@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { compileJob } from '../../core/job';
+import { grblStrategy } from '../../core/output/grbl-strategy';
 import { effectiveOperationForObject } from '../../core/effective-output';
 import {
   captureLayerOperationSettings,
@@ -288,14 +289,34 @@ function outputFor(project: Project, objectId: string) {
   return compileJob(scene, project.device).groups.map((group) => {
     if (group.kind === 'cnc' || group.kind === 'raster')
       throw new Error('Expected laser vector output');
+    expect(group.topologyScope).toMatch(/^vector:\d+:/);
+    const segments = group.segments.map((segment) => {
+      if (segment.nesting?.topologyContour === undefined) return segment;
+      const nesting = segment.nesting;
+      expect(nesting.forest).toBe(group.topologyScope);
+      expect(nesting.topologyContour).toMatch(/^\d+$/);
+      expect(Number.isSafeInteger(nesting.depth) && nesting.depth >= 0).toBe(true);
+      // Reassignment/cloning changes run keys, but must preserve depth and every geometry field.
+      const { forest: _forest, topologyContour: _localId, ...stableNesting } = nesting;
+      return { ...segment, nesting: stableNesting };
+    });
     const {
       layerId: _id,
       color: _color,
       sourceObjectId: _objectId,
       operationSettings: _settings,
+      topologyScope: _scope,
       ...output
     } = group;
-    return output;
+    return {
+      ...output,
+      segments,
+      // Emit the original group; remove only provenance comments, preserving every command.
+      executableCommands: grblStrategy
+        .emit({ groups: [group] }, project.device)
+        .split('\n')
+        .filter((line) => line.length > 0 && !line.startsWith(';')),
+    };
   });
 }
 

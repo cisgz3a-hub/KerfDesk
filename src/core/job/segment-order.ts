@@ -22,7 +22,7 @@ export type SegmentOrderSettings = Pick<
 > &
   Partial<Pick<ProjectOptimizationSettings, 'closedShapeStart'>>;
 
-type EntryPolicy = {
+export type EntryPolicy = {
   readonly allowsReverse: boolean;
   readonly closedShapeStart: ClosedShapeStart;
 };
@@ -152,7 +152,7 @@ function nearestNeighborOrderFrom<T extends CutSegment>(
 // A closed segment offers one entry per candidate start vertex (LBG-C04); the
 // index's vertexIndex tie-break keeps its drawn start ahead on exact ties.
 // Under 'drawn' every segment offers exactly the entries it always did.
-function collectSegmentEntries(
+export function collectSegmentEntries(
   segments: ReadonlyArray<CutSegment>,
   policy: EntryPolicy,
 ): SegmentEntry[] {

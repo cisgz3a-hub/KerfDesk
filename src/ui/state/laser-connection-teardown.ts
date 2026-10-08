@@ -188,7 +188,6 @@ function clearConnectionSessionRefs(refs: LiveRefs, preserveConnection: boolean)
   refs.statusPollSchedule = null;
   refs.settingsCollector = idleCollector();
   refs.settingsCollectorSessionEpoch = null;
-  refs.nextTranscriptId = 1;
   // The next session starts a fresh transcript, so held-back stream lines from
   // the dead one must not surface in it (ADR-333).
   clearTranscriptBuffer(refs);

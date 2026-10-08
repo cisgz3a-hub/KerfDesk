@@ -25,6 +25,20 @@ export function retainedCncCompilationSidecar(
 
   return {
     vcarveOperations,
+    ...(sidecar.omittedOpenContours === undefined
+      ? {}
+      : {
+          omittedOpenContours: sidecar.omittedOpenContours.filter((entry) =>
+            retainedLayerIds.has(entry.layerId),
+          ),
+        }),
+    ...(sidecar.omittedOpenContourSources === undefined
+      ? {}
+      : {
+          omittedOpenContourSources: sidecar.omittedOpenContourSources.filter((entry) =>
+            retainedLayerIds.has(entry.layerId),
+          ),
+        }),
     ...(sidecar.offsetLadderDiagnostics === undefined
       ? {}
       : {

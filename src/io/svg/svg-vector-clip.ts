@@ -39,6 +39,7 @@ export function convexClipOutline(clip: ResolvedSvgClip): ConvexClipOutline | nu
   const subpaths = elementToSubPaths(
     shape.element,
     linearScaleMagnitude(world.a, world.b, world.c, world.d),
+    shape.viewport,
   );
   const ring = supportedClipSubpath(subpaths);
   if (ring === null) return null;

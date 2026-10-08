@@ -94,9 +94,9 @@ describe('parseSvg — happy path', () => {
       expect(points[points.length - 1]).toEqual({ x: 50, y: 0 });
     });
 
-    it('scales each axis independently when width and height disagree', () => {
+    it('scales each axis independently when preserveAspectRatio is none', () => {
       const result = parseSvg(
-        args(`<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 200 200">
+        args(`<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="50mm" viewBox="0 0 200 200" preserveAspectRatio="none">
   <line x1="200" y1="200" x2="0" y2="0" stroke="red"/>
 </svg>`),
       );

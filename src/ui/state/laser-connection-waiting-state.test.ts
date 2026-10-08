@@ -102,6 +102,13 @@ describe('connection handshake waiting for controller Idle', () => {
       await flush();
       expect(useLaserStore.getState().connection.kind).toBe('connected');
       expect(useLaserStore.getState().controllerQualification.kind).toBe('qualifying');
+      expect(
+        (useLaserStore.getState().incidentHistory ?? []).filter(
+          (entry) =>
+            entry.raw.startsWith('[lf2] Controller handshake failed:') ||
+            entry.raw.startsWith('[lf2] Controller information refresh timed out:'),
+        ),
+      ).toEqual([]);
       expect(writes).not.toContain('$$\n');
 
       currentStatus = 'Idle';

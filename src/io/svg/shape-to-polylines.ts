@@ -12,7 +12,8 @@ import { DEFAULT_MACHINE_CURVE_TOLERANCE_MM, type Vec2 } from '../../core/scene'
 import { DEFAULT_FLATNESS_MM } from './flatten-curves';
 import { parsePathD, type SubPath } from './parse-path-d';
 import { closureToleranceUserUnits, endsMeet } from './subpath-closure';
-import { parseSvgLengthUserUnitsOrNull } from './svg-units';
+import { svgGeometryLength } from './svg-geometry-length';
+import { svgViewportAt, type SvgViewportSize } from './svg-viewport';
 
 const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 
@@ -21,23 +22,27 @@ const POINT_NUMBER_RE = /[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g;
 // through here to stay 0.25 mm in scene space instead of 0.25 user units — which
 // on a small-viewBox / large-physical SVG was several mm of faceting (audit C2).
 // The default of 1 keeps every existing caller byte-identical.
-export function elementToSubPaths(el: Element, scale = 1): ReadonlyArray<SubPath> {
+export function elementToSubPaths(
+  el: Element,
+  scale = 1,
+  viewport = svgViewportAt(el),
+): ReadonlyArray<SubPath> {
   const tag = el.tagName.toLowerCase();
   switch (tag) {
     case 'path':
       return pathToSubs(el, scale);
     case 'line':
-      return lineToSubs(el);
+      return lineToSubs(el, viewport);
     case 'polyline':
       return polylineToSubs(el, false, scale);
     case 'polygon':
       return polylineToSubs(el, true, scale);
     case 'rect':
-      return rectToSubs(el, scale);
+      return rectToSubs(el, scale, viewport);
     case 'circle':
-      return circleToSubs(el, scale);
+      return circleToSubs(el, scale, viewport);
     case 'ellipse':
-      return ellipseToSubs(el, scale);
+      return ellipseToSubs(el, scale, viewport);
     default:
       return [];
   }
@@ -49,22 +54,8 @@ function positiveScale(scale: number): number {
   return Number.isFinite(scale) && scale > 0 ? scale : 1;
 }
 
-function numAttr(el: Element, name: string, fallback = 0): number {
-  const raw = el.getAttribute(name);
-  if (raw === null) return fallback;
-  // SVG absolute units resolve to CSS-pixel user units before the accumulated
-  // viewBox/root transform maps them into scene millimetres. Preserve the
-  // historical numeric-prefix fallback for unsupported/malformed units; strict
-  // import refusal is a separate maintainer-owned policy decision.
-  const parsed = parseSvgLengthUserUnitsOrNull(raw) ?? Number.parseFloat(raw);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function optionalNumAttr(el: Element, name: string): number | null {
-  const raw = el.getAttribute(name);
-  if (raw === null) return null;
-  const parsed = parseSvgLengthUserUnitsOrNull(raw) ?? Number.parseFloat(raw);
-  return Number.isFinite(parsed) ? parsed : null;
+function numAttr(el: Element, name: string, viewport: SvgViewportSize, fallback = 0): number {
+  return svgGeometryLength(el, name, viewport) ?? fallback;
 }
 
 function pathToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
@@ -73,11 +64,11 @@ function pathToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   return parsePathD(d, DEFAULT_FLATNESS_MM / positiveScale(scale), scale);
 }
 
-function lineToSubs(el: Element): ReadonlyArray<SubPath> {
-  const x1 = numAttr(el, 'x1');
-  const y1 = numAttr(el, 'y1');
-  const x2 = numAttr(el, 'x2');
-  const y2 = numAttr(el, 'y2');
+function lineToSubs(el: Element, viewport: SvgViewportSize): ReadonlyArray<SubPath> {
+  const x1 = numAttr(el, 'x1', viewport);
+  const y1 = numAttr(el, 'y1', viewport);
+  const x2 = numAttr(el, 'x2', viewport);
+  const y2 = numAttr(el, 'y2', viewport);
   return [
     {
       points: [
@@ -121,17 +112,17 @@ function polylineToSubs(el: Element, closed: boolean, scale: number): ReadonlyAr
   return [{ points, closed: false }];
 }
 
-function rectToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
-  const x = numAttr(el, 'x');
-  const y = numAttr(el, 'y');
-  const w = numAttr(el, 'width');
-  const h = numAttr(el, 'height');
+function rectToSubs(el: Element, scale: number, viewport: SvgViewportSize): ReadonlyArray<SubPath> {
+  const x = numAttr(el, 'x', viewport);
+  const y = numAttr(el, 'y', viewport);
+  const w = numAttr(el, 'width', viewport);
+  const h = numAttr(el, 'height', viewport);
   if (w <= 0 || h <= 0) return [];
   // SVG 2 corner radii: a missing, unreadable or negative radius is auto and
   // takes the other one; both auto give square corners. Each is then clamped
   // to half its side.
-  const rawRx = cornerRadiusAttr(el, 'rx');
-  const rawRy = cornerRadiusAttr(el, 'ry');
+  const rawRx = cornerRadiusAttr(el, 'rx', viewport);
+  const rawRy = cornerRadiusAttr(el, 'ry', viewport);
   const rx = Math.min(w / 2, rawRx ?? rawRy ?? 0);
   const ry = Math.min(h / 2, rawRy ?? rawRx ?? 0);
   if (rx > 0 && ry > 0) return shapePathToSubs(roundedRectPathData(x, y, w, h, rx, ry), scale);
@@ -145,24 +136,32 @@ function rectToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
   return [{ points, closed: true }];
 }
 
-function cornerRadiusAttr(el: Element, name: string): number | null {
-  const radius = optionalNumAttr(el, name);
+function cornerRadiusAttr(el: Element, name: string, viewport: SvgViewportSize): number | null {
+  const radius = svgGeometryLength(el, name, viewport);
   return radius !== null && radius >= 0 ? radius : null;
 }
 
-function circleToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
-  const cx = numAttr(el, 'cx');
-  const cy = numAttr(el, 'cy');
-  const r = numAttr(el, 'r');
+function circleToSubs(
+  el: Element,
+  scale: number,
+  viewport: SvgViewportSize,
+): ReadonlyArray<SubPath> {
+  const cx = numAttr(el, 'cx', viewport);
+  const cy = numAttr(el, 'cy', viewport);
+  const r = numAttr(el, 'r', viewport);
   if (r <= 0) return [];
   return shapePathToSubs(ellipsePathData(cx, cy, r, r), scale);
 }
 
-function ellipseToSubs(el: Element, scale: number): ReadonlyArray<SubPath> {
-  const cx = numAttr(el, 'cx');
-  const cy = numAttr(el, 'cy');
-  const rx = numAttr(el, 'rx');
-  const ry = numAttr(el, 'ry');
+function ellipseToSubs(
+  el: Element,
+  scale: number,
+  viewport: SvgViewportSize,
+): ReadonlyArray<SubPath> {
+  const cx = numAttr(el, 'cx', viewport);
+  const cy = numAttr(el, 'cy', viewport);
+  const rx = numAttr(el, 'rx', viewport);
+  const ry = numAttr(el, 'ry', viewport);
   if (rx <= 0 || ry <= 0) return [];
   return shapePathToSubs(ellipsePathData(cx, cy, rx, ry), scale);
 }

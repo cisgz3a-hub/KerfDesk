@@ -2,6 +2,7 @@ import { classifyResponse } from '../../core/controllers/grbl';
 import { presentAlarm, presentError } from '../../core/controllers/grbl/response-presentation';
 import type { ControllerEvent } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
+import type { ControllerIncidentContext } from './controller-incident-context';
 
 export const TRANSCRIPT_MAX = 500;
 
@@ -23,6 +24,7 @@ export type TranscriptKind =
   | 'realtime'
   | 'gcode'
   | 'blocked'
+  | 'disconnect'
   | 'unknown';
 export type TranscriptSource =
   | 'controller'
@@ -43,6 +45,9 @@ export type SerialTranscriptEntry = {
   readonly kind: TranscriptKind;
   readonly source: TranscriptSource;
   readonly decoded?: string;
+  /** Explicit diagnostic classification independent of the original wire kind. */
+  readonly incident?: true;
+  readonly incidentContext?: ControllerIncidentContext;
 };
 
 export function appendTranscript(

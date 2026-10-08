@@ -2,6 +2,9 @@ import type { ControllerCapabilities } from '../../core/controllers/controller-c
 import type { LaserState } from './laser-store';
 import { QualificationWait } from './laser-controller-qualification-wait';
 import { machineSettingsReadBlockReason } from './machine-settings-read-readiness';
+import { publishControllerIncident } from './laser-incident-publish';
+import type { TranscriptBufferRefs } from './laser-transcript-buffer';
+import type { JobTransportLedgerRefs } from './laser-job-transport-ledger';
 
 export type ControllerQualificationPhase =
   | 'controller-response'
@@ -22,16 +25,18 @@ export type ControllerQualification =
     }
   | { readonly kind: 'failed'; readonly epoch: number; readonly message: string };
 
-export type ControllerQualificationScheduleRefs = {
-  readonly connection?: unknown | null;
-  readonly pendingResetCleanup?: unknown | null;
-  readonly controllerCommand?: unknown | null;
-  readonly settingsCollector?: { readonly kind: string };
-  qualificationTimer?: ReturnType<typeof setTimeout> | null;
-  qualificationDeadline?: number | null;
-  qualificationRevision?: number;
-  runControllerQualification?: (() => Promise<void>) | null;
-};
+export type ControllerQualificationScheduleRefs = TranscriptBufferRefs &
+  JobTransportLedgerRefs & {
+    nextTranscriptId?: number;
+    readonly connection?: unknown | null;
+    readonly pendingResetCleanup?: unknown | null;
+    readonly controllerCommand?: unknown | null;
+    readonly settingsCollector?: { readonly kind: string };
+    qualificationTimer?: ReturnType<typeof setTimeout> | null;
+    qualificationDeadline?: number | null;
+    qualificationRevision?: number;
+    runControllerQualification?: (() => Promise<void>) | null;
+  };
 
 type SetFn = (
   partial: Partial<LaserState> | ((state: LaserState) => Partial<LaserState> | LaserState),
@@ -150,6 +155,7 @@ export function scheduleControllerQualification(
     readinessFailure = reportQualificationReadinessTimeout(
       set,
       get,
+      refs,
       epoch,
       timeout.deadline,
       readinessFailure,
@@ -286,6 +292,7 @@ function restoreQualificationAfterStatus(
 function reportQualificationReadinessTimeout(
   set: SetFn,
   get: GetFn,
+  refs: ControllerQualificationScheduleRefs,
   epoch: number,
   deadline: number | null | undefined,
   readinessFailure: ControllerQualification | null,
@@ -298,9 +305,22 @@ function reportQualificationReadinessTimeout(
     const qualification = get().controllerQualification;
     return qualification.kind === 'failed' && qualification.epoch === epoch ? qualification : null;
   }
-  const patch = failedControllerQualificationPatch(get(), epoch, message);
-  set(patch);
-  return patch.controllerQualification ?? null;
+  let failure: ControllerQualification | null = null;
+  set((state) => {
+    const patch = failedControllerQualificationPatch(state, epoch, message);
+    failure = patch.controllerQualification ?? null;
+    return failure === null
+      ? {}
+      : {
+          ...publishControllerIncident(
+            refs,
+            state,
+            '[lf2] Controller information refresh timed out: ' + message,
+          ),
+          ...patch,
+        };
+  });
+  return failure;
 }
 
 function qualificationScheduleIsCurrent(

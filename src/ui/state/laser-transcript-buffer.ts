@@ -20,6 +20,8 @@
 // resets the transcript clears it.
 
 import type { LaserState } from './laser-store';
+import type { JobTransportLedgerRefs } from './laser-job-transport-ledger';
+import { captureIncidentEntry, retainIncidentEntries } from './laser-incident-history';
 import { TRANSCRIPT_MAX, type SerialTranscriptEntry } from './laser-transcript';
 import { LOG_MAX } from './laser-store-helpers';
 
@@ -34,7 +36,7 @@ export type TranscriptBufferRefs = {
 
 export const TRANSCRIPT_BATCH_MS = 250;
 
-type TranscriptPatch = Pick<LaserState, 'log' | 'transcript'>;
+type TranscriptPatch = Pick<LaserState, 'log' | 'transcript' | 'incidentHistory'>;
 
 /** Hold one entry back from the store. `logLine` is omitted for records that
  * never appear in the operator log (outbound job chunks). Returns true when
@@ -73,15 +75,19 @@ export function hasBufferedTranscript(refs: TranscriptBufferRefs): boolean {
  * single `set()` payload however many acknowledgements it carries.
  */
 export function publishTranscriptPatch(
-  refs: TranscriptBufferRefs,
-  state: Pick<LaserState, 'log' | 'transcript'>,
+  refs: TranscriptBufferRefs & JobTransportLedgerRefs,
+  state: Pick<LaserState, 'log' | 'transcript'> & Partial<LaserState>,
   entry?: SerialTranscriptEntry,
   logLine?: string,
 ): TranscriptPatch {
   const entries = orderedRing(refs.bufferedTranscript ?? [], refs.bufferedTranscriptStart ?? 0);
+  const published = [...entries, ...(entry === undefined ? [] : [entry])].map((item) =>
+    captureIncidentEntry(item, state, refs),
+  );
   const logLines = orderedRing(refs.bufferedLog ?? [], refs.bufferedLogStart ?? 0);
   const patch: TranscriptPatch = {
-    transcript: appendBounded(state.transcript, entries, entry, TRANSCRIPT_MAX),
+    transcript: appendBounded(state.transcript, published, undefined, TRANSCRIPT_MAX),
+    incidentHistory: retainIncidentEntries(state.incidentHistory ?? [], published),
     log: appendBounded(state.log, logLines, logLine, LOG_MAX),
   };
   clearTranscriptBuffer(refs);

@@ -24,16 +24,20 @@ import {
   type SvgClipPresentation,
 } from './svg-clip-presentation';
 import type { SvgIdResolver } from './svg-id-resolver';
-import { svgObjectBoundingBox } from './svg-object-bbox';
-import { numAttr, svgClipPathId, type SvgClipReference } from './svg-presentation';
+import { svgObjectBoundingBox, type SvgObjectBoxSpace } from './svg-object-bbox';
+import { svgClipPathId, type SvgClipReference, type SvgClipTarget } from './svg-presentation';
 import type { SvgStyleCascade } from './svg-stylesheet';
 import { multiplySvgMatrix, translateSvgMatrix } from './svg-transform-attribute';
+import { svgGeometryLength } from './svg-geometry-length';
+import { svgViewportAt, type SvgViewportSize } from './svg-viewport';
 
 export type SvgClipShape = {
   readonly element: Element;
   /** Maps the shape's own coordinates to document millimetres. */
   readonly matrix: SvgMatrix;
   readonly rule: 'nonzero' | 'evenodd';
+  /** Clip geometry uses its definition viewport, including a use's instance context. */
+  readonly viewport?: SvgViewportSize;
   readonly clips: ReadonlyArray<ResolvedSvgClip>;
 };
 
@@ -45,7 +49,7 @@ export type ResolvedSvgClip = {
 export type SvgClipResolver = {
   readonly resolveId: SvgIdResolver;
   readonly presentation: SvgClipPresentation;
-  readonly boundingBox: (element: Element) => Bounds | null;
+  readonly boundingBox: (target: SvgClipTarget) => Bounds | null;
   readonly serial: (element: Element) => number;
 };
 
@@ -64,15 +68,19 @@ export function createSvgClipResolver(
   resolveId: SvgIdResolver,
   cascade: SvgStyleCascade,
 ): SvgClipResolver {
-  const boxes = new Map<Element, Bounds | null>();
+  const boxes = new Map<Element, Map<string, Bounds | null>>();
   const serials = new Map<Element, number>();
   return {
     resolveId,
     presentation: createSvgClipPresentation(cascade),
-    boundingBox: (element) => {
-      if (!boxes.has(element))
-        boxes.set(element, svgObjectBoundingBox(element, resolveId, cascade));
-      return boxes.get(element) ?? null;
+    boundingBox: (target) => {
+      const { element } = target;
+      const key = clipBoxSpaceKey(target);
+      const contexts = boxes.get(element) ?? new Map<string, Bounds | null>();
+      boxes.set(element, contexts);
+      if (!contexts.has(key))
+        contexts.set(key, svgObjectBoundingBox(element, resolveId, cascade, clipBoxSpace(target)));
+      return contexts.get(key) ?? null;
     },
     serial: (element) => {
       if (!serials.has(element)) serials.set(element, serials.size);
@@ -85,8 +93,22 @@ export function resolveSvgClip(
   reference: SvgClipReference,
   resolver: SvgClipResolver,
 ): ResolvedSvgClip {
+  if (reference.kind === 'viewport') {
+    // A detached rectangle uses the same convex proof and region engine as
+    // clipPath artwork. It never becomes a document/import entry.
+    const rectangle = reference.element.ownerDocument.createElementNS(
+      'http://www.w3.org/2000/svg',
+      'rect',
+    );
+    for (const [name, value] of Object.entries(reference.rectangle))
+      rectangle.setAttribute(name, String(value));
+    return {
+      shapes: [{ element: rectangle, matrix: reference.transform, rule: 'nonzero', clips: [] }],
+      clips: [],
+    };
+  }
   const trail = { chain: [], budget: { remaining: MAX_NESTED_CLIPS } };
-  return resolveClip(reference.id, reference.transform, reference.element, resolver, trail);
+  return resolveClip(reference.id, reference.transform, reference, resolver, trail);
 }
 
 /**
@@ -98,19 +120,39 @@ export function svgClipReferenceKey(
   resolver: SvgClipResolver,
 ): string {
   const { a, b, c, d, e, f } = reference.transform;
+  if (reference.kind === 'viewport') {
+    const { x, y, width, height } = reference.rectangle;
+    return `viewport|${a},${b},${c},${d},${e},${f}|${x},${y},${width},${height}`;
+  }
   const key = `${reference.id}|${a},${b},${c},${d},${e},${f}`;
   const clip = resolver.resolveId(reference.id);
   const nested = clip === null ? null : resolver.presentation.property(clip, 'clip-path');
   const measures =
     clip?.getAttribute('clipPathUnits')?.trim() === 'objectBoundingBox' ||
     (nested !== null && nested !== 'none');
-  return measures ? `${key}|${resolver.serial(reference.element)}` : key;
+  return measures
+    ? `${key}|${resolver.serial(reference.element)}|${clipBoxSpaceKey(reference)}`
+    : key;
+}
+
+function clipBoxSpace(target: SvgClipTarget): SvgObjectBoxSpace | undefined {
+  const viewport = target.contentViewport ?? target.viewport;
+  return viewport === undefined
+    ? undefined
+    : { viewport, content: target.contentViewport !== undefined };
+}
+
+function clipBoxSpaceKey(target: SvgClipTarget): string {
+  const space = clipBoxSpace(target);
+  if (space === undefined) return 'placed';
+  const { width, height } = space.viewport;
+  return `${space.content ? 'content' : 'placed'}|${width},${height}`;
 }
 
 function resolveClip(
   id: string,
   userSpace: SvgMatrix,
-  referencing: Element,
+  referencing: SvgClipTarget,
   resolver: SvgClipResolver,
   trail: Trail,
 ): ResolvedSvgClip {
@@ -137,7 +179,11 @@ function resolveClip(
   };
 }
 
-function unitsMatrix(clip: Element, referencing: Element, resolver: SvgClipResolver): SvgMatrix {
+function unitsMatrix(
+  clip: Element,
+  referencing: SvgClipTarget,
+  resolver: SvgClipResolver,
+): SvgMatrix {
   if (clip.getAttribute('clipPathUnits')?.trim() !== 'objectBoundingBox') {
     return { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   }
@@ -166,13 +212,15 @@ function childShapes(
   if (tag === 'text') throw new Error(TEXT_CLIP);
   assertReadableClipContent(child, resolver.presentation);
   const matrix = multiplySvgMatrix(content, clipContentTransform(child));
-  if (tag === 'use') return shapesOfUse(child, matrix, resolver, trail);
+  const viewport = svgViewportAt(child);
+  if (tag === 'use') return shapesOfUse(child, matrix, viewport, resolver, trail);
   return [
     {
       element: child,
       matrix,
+      viewport,
       rule: clipContentRule(child, resolver.presentation),
-      clips: nestedClips(child, matrix, child, resolver, trail),
+      clips: nestedClips(child, matrix, { element: child, viewport }, resolver, trail),
     },
   ];
 }
@@ -180,6 +228,7 @@ function childShapes(
 function shapesOfUse(
   use: Element,
   useSpace: SvgMatrix,
+  viewport: SvgViewportSize,
   resolver: SvgClipResolver,
   trail: Trail,
 ): SvgClipShape[] {
@@ -196,17 +245,24 @@ function shapesOfUse(
   if (tag === 'text') throw new Error(TEXT_CLIP);
   assertReadableClipContent(target, resolver.presentation);
   const matrix = multiplySvgMatrix(
-    multiplySvgMatrix(useSpace, translateSvgMatrix(numAttr(use, 'x'), numAttr(use, 'y'))),
+    multiplySvgMatrix(
+      useSpace,
+      translateSvgMatrix(
+        svgGeometryLength(use, 'x', viewport) ?? 0,
+        svgGeometryLength(use, 'y', viewport) ?? 0,
+      ),
+    ),
     clipContentTransform(target),
   );
   return [
     {
       element: target,
       matrix,
+      viewport,
       rule: clipContentRule(target, resolver.presentation, use),
       clips: [
-        ...nestedClips(use, useSpace, use, resolver, trail),
-        ...nestedClips(target, matrix, target, resolver, trail),
+        ...nestedClips(use, useSpace, { element: use, viewport }, resolver, trail),
+        ...nestedClips(target, matrix, { element: target, viewport }, resolver, trail),
       ],
     },
   ];
@@ -215,7 +271,7 @@ function shapesOfUse(
 function nestedClips(
   owner: Element,
   userSpace: SvgMatrix,
-  referencing: Element,
+  referencing: SvgClipTarget,
   resolver: SvgClipResolver,
   trail: Trail,
 ): ResolvedSvgClip[] {
