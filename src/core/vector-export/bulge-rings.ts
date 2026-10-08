@@ -30,6 +30,12 @@ import type {
 } from '../scene/scene-object';
 import { fittedCurveEdges, splitCircularBulge, type BulgeEdge } from './bulge-arc-fit';
 import { chordCurveEdges } from './bulge-chords';
+import {
+  artworkArcParameterError,
+  artworkArcParameters,
+  artworkArcReconstructionError,
+  retainedArtworkArc,
+} from './artwork-parametric-arc';
 
 export { segmentDistance } from './bulge-chords';
 
@@ -70,7 +76,8 @@ export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): Bulg
   };
   for (const segment of curve.segments) {
     if (segment.kind !== 'line') assertFiniteCurve(current, segment);
-    const bulge = segment.kind === 'elliptical-arc' ? circularBulge(current, segment) : null;
+    const bulge =
+      segment.kind === 'elliptical-arc' ? boundedCircularBulge(current, segment, tolerance) : null;
     if (segment.kind === 'line' || bulge !== null) {
       flushRun();
       addEdges(
@@ -88,6 +95,36 @@ export function curveToBulgeRing(curve: CurveSubpath, toleranceMm: number): Bulg
   return { vertices, closed: curve.closed };
 }
 
+/** The relative-circle shortcut must still satisfy the requested world tolerance. */
+function boundedCircularBulge(
+  from: Vec2,
+  segment: EllipticalArcPathSegment,
+  tolerance: number,
+): number | null {
+  const bulge = circularBulge(from, segment);
+  if (bulge === null) return null;
+  const arc = artworkArcParameters(from, segment);
+  if (arc === null) return bulge;
+  // A nonempty retained traversal can have coincident mapped endpoints.
+  if (bulge === 0) return null;
+  const dx = segment.to.x - from.x;
+  const dy = segment.to.y - from.y;
+  const offset = -(1 - bulge * bulge) / (4 * bulge);
+  const center = {
+    x: (from.x + segment.to.x) / 2 - dy * offset,
+    y: (from.y + segment.to.y) / 2 + dx * offset,
+  };
+  const radius = (Math.hypot(dx, dy) * (1 + bulge * bulge)) / (4 * Math.abs(bulge));
+  const candidate = {
+    center,
+    u: { x: radius, y: 0 },
+    v: { x: 0, y: radius },
+    theta1: Math.atan2(from.y - center.y, from.x - center.x),
+    delta: -4 * Math.atan(bulge),
+  };
+  return artworkArcParameterError(arc, candidate) <= tolerance ? bulge : null;
+}
+
 // The fitted edges, unless chords take fewer vertices (radii outside the
 // fitter's 0.1 to 1000 mm, or very flat curves) or the tolerance is too
 // tight for the fit. Both hold the tolerance and end at the run's end.
@@ -97,8 +134,23 @@ function curvedRunEdges(
   toleranceMm: number,
 ): ReadonlyArray<BulgeEdge> {
   const chords = chordCurveEdges(from, run, toleranceMm);
-  if (toleranceMm < MIN_ARC_FIT_TOLERANCE_MM) return chords;
-  const fitted = fittedCurveEdges(from, run, toleranceMm);
+  // The fitter reconstructs endpoint ellipses. Reserve their independently
+  // bounded mismatch from the retained affine arc inside the same tolerance;
+  // if reconstruction is ill-conditioned, keep the parametric chords.
+  let current = from;
+  let reconstructionError = 0;
+  for (const segment of run) {
+    if (segment.kind === 'elliptical-arc') {
+      reconstructionError = Math.max(
+        reconstructionError,
+        artworkArcReconstructionError(current, segment),
+      );
+    }
+    current = segment.to;
+  }
+  const fitTolerance = toleranceMm - reconstructionError;
+  if (!(fitTolerance >= MIN_ARC_FIT_TOLERANCE_MM)) return chords;
+  const fitted = fittedCurveEdges(from, run, fitTolerance);
   return fitted.length <= chords.length ? fitted : chords;
 }
 
@@ -119,7 +171,7 @@ function assertFiniteCurve(from: Vec2, segment: CubicPathSegment | EllipticalArc
 export function circularBulge(from: Vec2, segment: EllipticalArcPathSegment): number | null {
   const rx = Math.abs(segment.radiusX);
   const ry = Math.abs(segment.radiusY);
-  if (!(rx > 0) || !(ry > 0)) return 0;
+  if (!(rx > 0) || !(ry > 0)) return retainedArtworkArc(segment) === null ? 0 : null;
   if (Math.abs(rx - ry) > CIRCULAR_RELATIVE_EPSILON * Math.max(rx, ry)) return null;
   const chord = Math.hypot(segment.to.x - from.x, segment.to.y - from.y);
   if (chord === 0) return 0;
