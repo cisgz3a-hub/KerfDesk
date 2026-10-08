@@ -5,6 +5,9 @@
 // Stored in localStorage with the same safe-parse / clear-on-corrupt
 // posture as the material library slot.
 
+import { normalizeCncCuttingPreset } from '../../core/cnc/cutting-preset-normalize';
+import { normalizeCncToolAssembly } from '../../core/cnc/cnc-tool-assembly';
+import type { CncCuttingPreset } from '../../core/scene/cnc-cutting-preset';
 import { isValidCncTipAngleDeg } from '../../core/cnc-tip-angle';
 import type { CncLayerSettings, CncMachineConfig, CncTool, CncToolKind } from '../../core/scene';
 import { normalizeCncMachineConfig } from '../../io/project/deserialize-project';
@@ -13,15 +16,7 @@ export const CNC_LIBRARY_STORAGE_KEY = 'laserforge.cnc-library.v1';
 
 // The feeds/speeds a preset captures — the "how fast" half of a layer's
 // CNC settings (cut type / depth / tabs stay per-layer).
-export type CncFeedPreset = {
-  readonly id: string;
-  readonly name: string;
-  readonly feedMmPerMin: number;
-  readonly plungeMmPerMin: number;
-  readonly spindleRpm: number;
-  readonly depthPerPassMm: number;
-  readonly stepoverPercent: number;
-};
+export type CncFeedPreset = CncCuttingPreset;
 
 export type CncMachineProfile = {
   readonly id: string;
@@ -45,10 +40,13 @@ export function feedPresetFromSettings(
   id: string,
   name: string,
   settings: CncLayerSettings,
+  metadata: Pick<CncFeedPreset, 'context' | 'provenance' | 'qualification'> = {},
 ): CncFeedPreset {
   return {
     id,
     name,
+    units: 'mm-min-rpm',
+    ...metadata,
     feedMmPerMin: settings.feedMmPerMin,
     plungeMmPerMin: settings.plungeMmPerMin,
     spindleRpm: settings.spindleRpm,
@@ -131,7 +129,7 @@ function parseTool(raw: unknown): CncTool | null {
   const record = raw as Record<string, unknown>;
   const core = parseToolCore(record);
   if (core === null) return null;
-  return { ...core, ...parseToolMetadata(record) };
+  return { ...core, ...parseToolMetadata(record), ...normalizeCncToolAssembly(record) };
 }
 
 function parseToolCore(record: Record<string, unknown>): CncTool | null {
@@ -191,27 +189,7 @@ function boundedString(value: unknown): string | null {
 }
 
 function parseFeedPreset(raw: unknown): CncFeedPreset | null {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const record = raw as Record<string, unknown>;
-  if (typeof record['id'] !== 'string' || typeof record['name'] !== 'string') return null;
-  if (
-    !isPositive(record['feedMmPerMin']) ||
-    !isPositive(record['plungeMmPerMin']) ||
-    !isPositive(record['spindleRpm']) ||
-    !isPositive(record['depthPerPassMm']) ||
-    !isPositive(record['stepoverPercent'])
-  ) {
-    return null;
-  }
-  return {
-    id: record['id'],
-    name: record['name'],
-    feedMmPerMin: record['feedMmPerMin'],
-    plungeMmPerMin: record['plungeMmPerMin'],
-    spindleRpm: record['spindleRpm'],
-    depthPerPassMm: record['depthPerPassMm'],
-    stepoverPercent: record['stepoverPercent'],
-  };
+  return normalizeCncCuttingPreset(raw);
 }
 
 function parseMachineProfile(raw: unknown): CncMachineProfile | null {

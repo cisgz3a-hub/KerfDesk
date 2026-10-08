@@ -38,7 +38,7 @@ export function startNestingSearch(
     const response = event.data;
     if (response.kind === 'error') error(response.message);
     else if (response.kind === 'complete') close(false);
-    else {
+    else if (response.kind === 'progress') {
       best = response.progress.best;
       onProgress(response.progress);
     }

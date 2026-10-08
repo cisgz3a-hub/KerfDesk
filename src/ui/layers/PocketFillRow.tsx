@@ -34,7 +34,7 @@ export function PocketFillRow(props: {
       <span style={labelStyle}>Fill method</span>
       <select
         aria-label="Pocket fill method"
-        title="How the pocket interior is cleared: verified constant-load adaptive roughing, contour-parallel rings, or raster sweeps. A finishing wall pass runs last."
+        title="How the pocket interior is cleared: verified radial-engagement clearing with explicit entry and wall-cleanup phases, contour-parallel rings, or raster sweeps. A finishing wall pass runs last."
         value={value}
         onChange={(e) => {
           const next = OPTIONS.find((option) => option.value === e.target.value);

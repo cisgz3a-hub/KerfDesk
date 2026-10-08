@@ -1,3 +1,6 @@
+import type { CncToolProgram } from '../../io/cnc/cnc-tool-programs';
+import type { EmittedDesignPlacement } from '../laser/save-output-emission';
+import type { CncProgramFacts } from '../../io/cnc/cnc-program-facts';
 import type { PreflightIssue } from '../../core/preflight';
 import type { CompiledVCarveLayerDepth } from '../laser/cnc-compiled-depth-warnings';
 import type { ResolvedJobPlacement } from '../job-placement';
@@ -15,6 +18,9 @@ export type PreparedGcodeSave =
   | {
       readonly kind: 'ready';
       readonly gcode: string;
+      readonly cncProgramFacts?: CncProgramFacts;
+      readonly cncToolPrograms?: ReadonlyArray<CncToolProgram>;
+      readonly placement?: EmittedDesignPlacement;
       readonly advisories: ReadonlyArray<PreflightIssue>;
       readonly cncVCarveDepths: ReadonlyArray<CompiledVCarveLayerDepth>;
       readonly machineWarnings: ReadonlyArray<string>;
@@ -47,6 +53,13 @@ export async function prepareGcodeSave(
   return {
     kind: 'ready',
     gcode: emission.gcode,
+    ...(emission.placement === undefined ? {} : { placement: emission.placement }),
+    ...(emission.cncProgramFacts === undefined
+      ? {}
+      : { cncProgramFacts: emission.cncProgramFacts }),
+    ...(emission.cncToolPrograms === undefined
+      ? {}
+      : { cncToolPrograms: emission.cncToolPrograms }),
     advisories,
     cncVCarveDepths: emission.cncVCarveDepths,
     machineWarnings: emission.machineWarnings ?? [],

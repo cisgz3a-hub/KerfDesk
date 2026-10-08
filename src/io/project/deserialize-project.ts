@@ -1,3 +1,4 @@
+import { normalizeSceneObject } from './normalize-scene-object';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
 // structured error describing why it cannot be loaded.
 
@@ -33,19 +34,19 @@ import {
   PROJECT_SCHEMA_VERSION,
   isLineStartRegion,
 } from '../../core/scene/project';
-import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 import { normalizeCncTools } from './normalize-cnc-tools';
+import { normalizeCncMachiningSetup } from './project-cnc-setup-validator';
+import { defaultCncMachiningSetup } from '../../core/scene/cnc-machining-setup';
+import { parseProcessRecipeApplications } from './project-process-recipe-validator';
+import { parseProductionNestDefinition } from './project-production-nest-validator';
 import { normalizeLayer } from './normalize-layer';
 import { normalizeTileRegistration } from './normalize-tile-registration';
-import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
-import { withNormalizedTraceSettings } from './project-trace-settings-normalizer';
 import { validateProjectShape } from './project-shape-validator';
 import { recoveredCncDevicePatch } from './project-cnc-sub-profile-recovery';
 import { normalizeProjectJobSetup } from './project-job-setup-normalizer';
 import { projectDeviceControllerCompatibleFields } from './project-device-controller-compatibility';
 import { normalizeControllerPatch } from './project-controller-normalization';
-import { normalizeBooleanCompound } from './normalize-boolean-compound';
 
 export type DeserializeResult =
   | { readonly kind: 'ok'; readonly project: Project; readonly migratedFrom?: number }
@@ -150,7 +151,27 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   } else {
     normalized['parkedCncMachine'] = parked;
   }
+  normalizeCncProductionMetadata(raw, normalized, machine, parked);
   return normalized as unknown as Project;
+}
+
+function normalizeCncProductionMetadata(
+  raw: Record<string, unknown>,
+  normalized: Record<string, unknown>,
+  machine: Record<string, unknown> | undefined,
+  parked: CncMachineConfig | null,
+): void {
+  const setup =
+    normalizeCncMachiningSetup(raw['cncSetup']) ??
+    (machine?.['kind'] === 'cnc' || parked !== null ? defaultCncMachiningSetup() : undefined);
+  if (setup === undefined) delete normalized['cncSetup'];
+  else normalized['cncSetup'] = setup;
+  if (raw['processRecipeApplications'] !== undefined) {
+    const applications = parseProcessRecipeApplications(raw['processRecipeApplications']);
+    if (applications.kind === 'ok') normalized['processRecipeApplications'] = applications.value;
+  }
+  const nest = parseProductionNestDefinition(raw['productionNest']);
+  if (nest.kind === 'ok' && nest.value !== undefined) normalized['productionNest'] = nest.value;
 }
 
 // Optional machine config (CNC support). Absent → undefined. A CNC config
@@ -456,23 +477,4 @@ function overlapMergeTolerance(
 
 function normalizeAirAssistCommand(value: unknown): Project['device']['airAssistCommand'] {
   return value === 'M7' || value === 'M8' ? value : DEFAULT_DEVICE_PROFILE.airAssistCommand;
-}
-
-function normalizeSceneObject(obj: unknown): unknown {
-  if (!isObject(obj)) return obj;
-  const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } = obj;
-  const libraryProvenance =
-    obj['kind'] === 'imported-svg'
-      ? normalizeLibraryAssetProvenance(rawLibraryProvenance)
-      : undefined;
-  const normalized = normalizeBooleanCompound(
-    withNormalizedTraceSettings(
-      libraryProvenance === undefined
-        ? withoutLibraryProvenance
-        : { ...withoutLibraryProvenance, libraryProvenance },
-    ),
-  );
-  if (obj['kind'] !== 'text') return normalized;
-  if (typeof obj['letterSpacing'] === 'number') return normalized;
-  return { ...normalized, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
 }

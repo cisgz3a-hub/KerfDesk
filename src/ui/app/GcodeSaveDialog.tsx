@@ -1,3 +1,5 @@
+import { recordCncPreparation } from '../state/cnc-preparation-evidence-store';
+import { CncSetupDocumentExport } from './CncSetupDocumentExport';
 import { useEffect, useState } from 'react';
 import { Button, Dialog, DialogActions } from '../kit';
 import { currentOutputScope, useStore } from '../state';
@@ -32,6 +34,8 @@ export function GcodeSaveDialog(props: { readonly onClose: () => void }): JSX.El
     let current = true;
     void prebuildGcodeSave(ctx)
       .then((artifact) => {
+        if (current && artifact !== null)
+          recordCncPreparation(artifact.project, ctx.outputScope, 'Export');
         if (current)
           setPreparation(artifact === null ? { kind: 'failed' } : { kind: 'ready', artifact });
       })
@@ -54,6 +58,13 @@ export function GcodeSaveDialog(props: { readonly onClose: () => void }): JSX.El
     <Dialog title="Save G-code" onClose={props.onClose} size="sm">
       <div className="lf-dialog-body">
         <p>{preparationMessage(preparation)}</p>
+        {preparation.kind === 'ready' ? (
+          <CncSetupDocumentExport
+            artifact={preparation.artifact}
+            ctx={ctx}
+            onSaved={props.onClose}
+          />
+        ) : null}
       </div>
       <DialogActions>
         <Button onClick={props.onClose}>Cancel</Button>

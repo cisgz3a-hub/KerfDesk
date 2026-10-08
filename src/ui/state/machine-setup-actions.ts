@@ -1,3 +1,7 @@
+import {
+  defaultCncMachiningSetup,
+  type CncMachiningSetup,
+} from '../../core/scene/cnc-machining-setup';
 import { cncMachineWithOwnFeeds } from '../../core/cnc/cnc-head-feeds';
 import type { DeviceProfile } from '../../core/devices';
 import { deviceSupportsMachineKind } from '../../core/devices/device-profile';
@@ -35,6 +39,7 @@ export type MachineSetupReplacementResult =
     };
 
 export type CncStartupSetupReplacement = {
+  readonly cncSetup?: CncMachiningSetup;
   readonly operationDrafts: ReadonlyArray<CncStartupOperationDraft>;
   readonly materialApplyRequested: boolean;
   readonly customTools: ReadonlyArray<CncTool>;
@@ -42,7 +47,7 @@ export type CncStartupSetupReplacement = {
 
 export type MachineSetupActions = {
   readonly replaceMachineSetup: (
-    ...args: [DeviceProfile, MachineConfig, MachineConfig?]
+    ...args: [DeviceProfile, MachineConfig, MachineConfig?, CncMachiningSetup?]
   ) => MachineSetupReplacementResult;
   readonly replaceCncStartupSetup: (
     profile: DeviceProfile,
@@ -54,8 +59,10 @@ export type MachineSetupActions = {
 
 export function machineSetupActions(set: Setter): MachineSetupActions {
   return {
-    replaceMachineSetup: (profile, machine, retainedMachine) => {
-      set((state) => replacementState(state, profile, machine, retainedMachine));
+    replaceMachineSetup: (profile, machine, retainedMachine, cncSetup) => {
+      set((state) =>
+        replacementState(state, profile, machine, retainedMachine, undefined, cncSetup),
+      );
       return deviceSupportsMachineKind(profile, machine.kind)
         ? { kind: 'applied' }
         : { kind: 'applied-with-capability-warning', requestedKind: machine.kind };
@@ -75,6 +82,7 @@ function replacementState(
   machine: MachineConfig,
   retainedMachine?: MachineConfig,
   startup?: CncStartupSetupReplacement,
+  cncSetup?: CncMachiningSetup,
 ): Partial<AppState> {
   captureSetupHistoryContext(state.project, state);
   const customTools = startup?.customTools ?? state.cncLibrary.customTools;
@@ -94,7 +102,15 @@ function replacementState(
   const switched = modeSwitchState(
     projectWithParkedCnc(
       projectWithStartupChanges(
-        projectWithMachine(state.project, nextProfile, nextMachine, scene),
+        projectWithMachine(
+          {
+            ...state.project,
+            ...retainedSetupPatch(state.project, nextMachine, startup?.cncSetup ?? cncSetup),
+          },
+          nextProfile,
+          nextMachine,
+          scene,
+        ),
         state.cncLiveCaps,
         startup,
       ),
@@ -119,6 +135,17 @@ function replacementState(
     redoStack: [],
     dirty: true,
   };
+}
+
+function retainedSetupPatch(
+  project: Project,
+  machine: MachineConfig,
+  setup: CncMachiningSetup | undefined,
+): Partial<Project> {
+  if (setup !== undefined) return { cncSetup: setup };
+  return project.cncSetup === undefined && machine.kind === 'cnc'
+    ? { cncSetup: defaultCncMachiningSetup() }
+    : {};
 }
 
 function projectWithMachine(

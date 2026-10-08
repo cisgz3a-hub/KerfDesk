@@ -1,3 +1,6 @@
+import { validateCncReliefAuthoringSettings } from './project-cnc-relief-authoring-settings';
+import { normalizeCncPocketRestStock } from '../../core/cnc/cnc-pocket-rest-stock-settings';
+import { normalizeCncTaperedInlay } from '../../core/cnc/tapered-inlay-settings';
 import { DITHER_ALGORITHMS } from '../../core/scene';
 import { validateCncStageRecipes } from './project-cnc-stage-validator';
 import { cutExtrasFieldErrors } from './project-cut-extras-validator';
@@ -24,6 +27,11 @@ import { validateLayerOperationSettings, validateLayerSubLayers } from './projec
 export function validateProjectLayer(layer: unknown, path: string): string | null {
   if (!isObject(layer)) return `missing or invalid \`${path}\``;
   return firstError([
+    validateTaperedInlay(layer['cnc'], path),
+    validatePocketRestStock(layer['cnc'], path),
+    ...(isObject(layer['cnc'])
+      ? [validateCncReliefAuthoringSettings(layer['cnc'], path + '.cnc')]
+      : []),
     validateCncStageRecipes(layer['cnc'], `${path}.cnc`),
     requireString(layer, `${path}.id`),
     requireString(layer, `${path}.name`),
@@ -73,4 +81,18 @@ function validateMaterialBinding(value: unknown, path: string): string | null {
     optionalString(value, `${path}.presetRevision`),
     validateLayerOperationSettings(value['lastResolved'], `${path}.lastResolved`),
   ]);
+}
+
+function validateTaperedInlay(cnc: unknown, path: string): string | null {
+  if (!isObject(cnc) || cnc['taperedInlay'] === undefined) return null;
+  return normalizeCncTaperedInlay(cnc['taperedInlay']) === undefined
+    ? path + '.cnc.taperedInlay must retain valid paired depths and clearances'
+    : null;
+}
+
+function validatePocketRestStock(cnc: unknown, path: string): string | null {
+  if (!isObject(cnc) || cnc['pocketRestStock'] === undefined) return null;
+  return normalizeCncPocketRestStock(cnc['pocketRestStock']) === undefined
+    ? path + '.cnc.pocketRestStock must retain a valid predecessor tool and stock tolerance'
+    : null;
 }

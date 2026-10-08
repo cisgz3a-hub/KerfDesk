@@ -1,6 +1,11 @@
 // CNC library panel (Phase H.7, F-CNC11/13): the bit manager now mounted only
 // inside CNC Startup Setup. App-level data lives in cnc-library-persistence.
 
+import {
+  cncToolAssemblySignature,
+  type CncToolAssemblyMetadata,
+} from '../../core/cnc/cnc-tool-assembly';
+import { CncToolAssemblyEditor } from './CncToolAssemblyEditor';
 import type { CncMachineConfig, CncTool } from '../../core/scene';
 import { DEFAULT_ASSUMED_FLUTE_COUNT } from '../../core/cnc/machine-starters';
 import {
@@ -33,6 +38,7 @@ export function CncToolManager(props: {
   readonly onAddTool?: (tool: Omit<CncTool, 'id'>) => void;
   readonly onDeleteTool?: (toolId: string) => void;
   readonly onChangeFluteCount?: (toolId: string, fluteCount: number) => void;
+  readonly onChangeToolAssembly?: (toolId: string, assembly: CncToolAssemblyMetadata) => void;
 }): JSX.Element {
   const deleteCustomCncTool = useStore((state) => state.deleteCustomCncTool);
   const pushToast = useToastStore((state) => state.pushToast);
@@ -69,6 +75,9 @@ export function CncToolManager(props: {
                   custom={customToolIds.has(tool.id)}
                   draftControlled={props.onDeleteTool !== undefined}
                   onDelete={() => deleteTool(tool.id)}
+                  {...(props.onChangeToolAssembly === undefined
+                    ? {}
+                    : { onChangeToolAssembly: props.onChangeToolAssembly })}
                   {...(props.onChangeFluteCount === undefined
                     ? {}
                     : { onChangeFluteCount: props.onChangeFluteCount })}
@@ -93,10 +102,11 @@ function CncToolManagerRow(props: {
   readonly draftControlled: boolean;
   readonly onDelete: () => void;
   readonly onChangeFluteCount?: (toolId: string, fluteCount: number) => void;
+  readonly onChangeToolAssembly?: (toolId: string, assembly: CncToolAssemblyMetadata) => void;
 }): JSX.Element {
   const label = `${cncToolGeometryLabel(props.tool)} — ${props.tool.name}`;
   return (
-    <li style={listItemStyle}>
+    <li style={{ ...listItemStyle, flexWrap: 'wrap' }}>
       <span style={toolNameStyle} title={label} aria-label={label}>
         {label}
       </span>
@@ -122,6 +132,13 @@ function CncToolManagerRow(props: {
           onChangeFluteCount={props.onChangeFluteCount}
         />
       )}
+      <CncToolAssemblyEditor
+        key={cncToolAssemblySignature(props.tool)}
+        tool={props.tool}
+        {...(props.onChangeToolAssembly === undefined
+          ? {}
+          : { onChange: props.onChangeToolAssembly })}
+      />
       {props.custom ? (
         <button
           type="button"

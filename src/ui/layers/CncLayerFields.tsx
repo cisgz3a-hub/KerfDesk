@@ -57,7 +57,7 @@ export function CncLayerFields(props: {
     : deviceMaxFeed;
   const spindleMaxRpm = isCnc ? machine.params.spindleMaxRpm : 24000;
   const stockThicknessMm = isCnc ? machine.stock.thicknessMm : 0;
-  const isProfile = settings.cutType.startsWith('profile') || settings.cutType === 'inlay-pair';
+  const isProfile = hasProfileTabs(settings);
   const commitSettings = (next: CncLayerSettings): void => {
     if (props.onSettingsChange !== undefined) props.onSettingsChange(next);
     else setLayerParam(layer.id, { cnc: next });
@@ -215,7 +215,8 @@ function CncDepthFields(props: {
   const { layer, settings, onCommit } = props;
   const isVCarve = settings.cutType === 'v-carve';
   const flatDepthEnabled = settings.vCarveFlatDepthEnabled ?? true;
-  const showDepth = !isVCarve || flatDepthEnabled;
+  const isTaperedInlay = settings.cutType === 'inlay-pair' && settings.taperedInlay !== undefined;
+  const showDepth = !isTaperedInlay && (!isVCarve || flatDepthEnabled);
   return (
     <>
       {isVCarve ? (
@@ -230,6 +231,11 @@ function CncDepthFields(props: {
           <span>Flat floor</span>
         </label>
       ) : null}
+      {isTaperedInlay ? (
+        <p className="lf-cnc-settings-hint">
+          Linked pocket and plug depths are set in Inlay fit below.
+        </p>
+      ) : null}
       <div className="lf-cnc-depth-grid">
         {showDepth ? <CutDepthField {...props} /> : null}
         <DepthPerPassField
@@ -238,7 +244,7 @@ function CncDepthFields(props: {
           settings={settings}
           onCommit={onCommit}
         />
-        {!isVCarve && props.stockThicknessMm > 0 ? (
+        {!isVCarve && !isTaperedInlay && props.stockThicknessMm > 0 ? (
           <button
             type="button"
             className="lf-cnc-link-button lf-cnc-depth-grid__stock"
@@ -280,5 +286,12 @@ function CutDepthField(props: {
       title={title}
       onCommit={(depthMm) => props.onCommit({ depthMm })}
     />
+  );
+}
+
+function hasProfileTabs(settings: CncLayerSettings): boolean {
+  return (
+    settings.cutType.startsWith('profile') ||
+    (settings.cutType === 'inlay-pair' && settings.taperedInlay === undefined)
   );
 }

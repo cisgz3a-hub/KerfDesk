@@ -40,11 +40,17 @@ export function useMachineSetupSave(input: {
     const replacement =
       input.state.draftMachine.kind === 'cnc'
         ? replaceCncStartupSetup(profile, input.state.draftMachine, input.state.cncDraft, {
+            cncSetup: input.state.cncSetupDraft,
             operationDrafts: input.operationDrafts,
             customTools: input.customTools,
             materialApplyRequested: input.materialApplyRequested,
           })
-        : replaceMachineSetup(profile, input.state.draftMachine, input.state.cncDraft);
+        : replaceMachineSetup(
+            profile,
+            input.state.draftMachine,
+            input.state.cncDraft,
+            input.state.cncSetupDraft,
+          );
     if (replacement.kind === 'applied-with-capability-warning') {
       pushToast(machineCapabilityWarningMessage(replacement.requestedKind), 'warning');
     }

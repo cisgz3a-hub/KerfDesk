@@ -1,3 +1,4 @@
+import { normalizeCncCuttingPreset } from '../../core/cnc/cutting-preset-normalize';
 // CNC library store slice (Phase H.7): custom bits, feeds/speeds presets,
 // and named machine profiles. App-level state — the use-cnc-library-
 // persistence hook restores it on boot and writes it back on change.
@@ -40,7 +41,12 @@ export type CncLibraryActions = {
   readonly setCncLibrary: (library: CncLibrary) => void;
   readonly addCustomCncTool: (tool: Omit<CncTool, 'id'>) => void;
   readonly deleteCustomCncTool: (toolId: string) => void;
-  readonly saveCncFeedPreset: (name: string, settings: CncLayerSettings) => void;
+  readonly saveCncFeedPreset: (
+    name: string,
+    settings: CncLayerSettings,
+    metadata?: Pick<CncFeedPreset, 'context' | 'provenance' | 'qualification'>,
+  ) => void;
+  readonly importCncFeedPresets: (presets: ReadonlyArray<CncFeedPreset>) => void;
   readonly deleteCncFeedPreset: (presetId: string) => void;
   readonly saveCncMachineProfile: (name: string) => void;
   readonly saveCncMachineProfileFromDraft: (name: string, machine: CncMachineConfig) => void;
@@ -190,15 +196,28 @@ function libraryDeletionWithoutMachineUpdate(
 
 function feedPresetActions(
   set: Setter,
-): Pick<CncLibraryActions, 'saveCncFeedPreset' | 'deleteCncFeedPreset'> {
+): Pick<CncLibraryActions, 'saveCncFeedPreset' | 'deleteCncFeedPreset' | 'importCncFeedPresets'> {
   return {
-    saveCncFeedPreset: (name, settings) =>
+    saveCncFeedPreset: (name, settings, metadata) =>
       set((s) => ({
         cncLibrary: {
           ...s.cncLibrary,
           feedPresets: [
             ...s.cncLibrary.feedPresets,
-            feedPresetFromSettings(crypto.randomUUID(), name, settings),
+            feedPresetFromSettings(crypto.randomUUID(), name, settings, metadata),
+          ],
+        },
+      })),
+    importCncFeedPresets: (presets) =>
+      set((state) => ({
+        cncLibrary: {
+          ...state.cncLibrary,
+          feedPresets: [
+            ...state.cncLibrary.feedPresets,
+            ...presets.slice(0, 256).flatMap((preset) => {
+              const valid = normalizeCncCuttingPreset(preset);
+              return valid === null ? [] : [{ ...valid, id: crypto.randomUUID() }];
+            }),
           ],
         },
       })),
@@ -283,6 +302,7 @@ function machineProfileActions(
 // setLayerParam so undo/dirty ride the existing path).
 export function feedPresetPatch(preset: CncFeedPreset): Partial<CncLayerSettings> {
   return {
+    ...(preset.context === undefined ? {} : { cuttingPreset: preset }),
     feedMmPerMin: preset.feedMmPerMin,
     plungeMmPerMin: preset.plungeMmPerMin,
     spindleRpm: preset.spindleRpm,

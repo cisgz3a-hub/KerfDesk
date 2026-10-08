@@ -1,3 +1,4 @@
+import type { Cnc2dStockEvidence } from './cnc-pocket-stock';
 import {
   assertNever,
   type CncLayerSettings,
@@ -59,6 +60,7 @@ export function passesForCncLayer(
 }
 
 export type CncLayerPassesResult = {
+  readonly restStock?: Cnc2dStockEvidence;
   readonly passes: ReadonlyArray<CncPass>;
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;
@@ -203,6 +205,9 @@ function rawToolpathsForLayer(
   if (restOperation.kind === 'ok') {
     return {
       toolpaths: restOperation.restToolpaths,
+      ...(restOperation.stockEvidence === undefined
+        ? {}
+        : { restStock: restOperation.stockEvidence }),
       offsetFailed: restOperation.offsetFailed,
       passLimited: restOperation.passLimited,
       stepoverUsed: restOperation.stepoverUsed,
@@ -212,6 +217,7 @@ function rawToolpathsForLayer(
 }
 
 type CncLayerToolpathsResult = {
+  readonly restStock?: Cnc2dStockEvidence;
   readonly toolpaths: ReadonlyArray<Polyline>;
   readonly offsetFailed: boolean;
   readonly passLimited: boolean;

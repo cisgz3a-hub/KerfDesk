@@ -74,6 +74,51 @@ export function planRestPocketToolpaths(
   };
 }
 
+/** Explicit residual geometry from actual previous routes; no ideal cutter-reach subtraction. */
+export function planRestPocketResidualToolpaths(
+  contours: ReadonlyArray<Polyline>,
+  residual: ReadonlyArray<Polyline>,
+  finishDiameterMm: number,
+  stepoverPercent: number,
+): RestPocketPlan {
+  if (
+    !positiveFinite(finishDiameterMm) ||
+    !positiveFinite(stepoverPercent) ||
+    stepoverPercent > 100
+  )
+    return {
+      ok: false,
+      reason: 'Stock-aware rest requires a finite finish diameter and stepover at most 100%.',
+    };
+  const original = runClipper(() =>
+    unionD(toPaths(contours), [], FillRule.EvenOdd, PRECISION_DECIMALS),
+  );
+  const rest = runClipper(() =>
+    unionD(toPaths(residual), [], FillRule.EvenOdd, PRECISION_DECIMALS),
+  );
+  if (original === null || rest === null) return clipperFailure();
+  if (rest.length === 0)
+    return {
+      ok: true,
+      toolpaths: [],
+      restRegions: [],
+      completion: 'complete',
+      stepoverUsed: false,
+    };
+  const centers = offset(original, -finishDiameterMm / 2, JoinType.Round);
+  const reach = offset(rest, finishDiameterMm / 2, JoinType.Round);
+  if (centers === null || reach === null) return clipperFailure();
+  const target = runClipper(() => intersectD(centers, reach, FillRule.NonZero, PRECISION_DECIMALS));
+  if (target === null) return clipperFailure();
+  const rings = centerRegionRings(target, finishDiameterMm, stepoverPercent);
+  return {
+    ok: true,
+    toolpaths: rings.toolpaths,
+    restRegions: residual,
+    completion: rings.completion,
+    stepoverUsed: true,
+  };
+}
 type RemainingStock =
   | { readonly ok: true; readonly original: PathsD; readonly rest: PathsD }
   | { readonly ok: false; readonly reason: string };

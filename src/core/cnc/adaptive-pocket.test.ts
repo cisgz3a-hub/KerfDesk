@@ -81,12 +81,9 @@ describe('planAdaptivePocket', () => {
     }
   });
 
-  it('refuses island topology instead of crossing uncleared stock', () => {
+  it('partitions island topology without linking across protected stock', () => {
     const result = planAdaptivePocket([square(0, 0, 30), square(10, 10, 10)], 4, 0.5);
-    expect(result).toMatchObject({
-      ok: false,
-      reason: expect.stringContaining('island-free'),
-    });
+    expect(result).toMatchObject({ ok: true, islandPartitions: 8 });
   });
 
   it('creates one independent sequence per disconnected pocket and is deterministic', () => {

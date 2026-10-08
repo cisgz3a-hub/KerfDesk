@@ -1,0 +1,17 @@
+## ADR-572 - Retained CNC setup and scalar relief authoring
+
+**Status:** Implemented locally under the maintainer's request to build the CNC leader audit plan on 2026-10-08. Software, hosted checks and physical qualification remain separate.
+
+**Decision.** Extend the existing project, recipes and relief field contracts rather than introduce a competing job pipeline. Schema 15 protects retained machining setup, contextual cutting presets, semantic recipe application records and editable relief intent from older readers silently dropping them.
+
+The first setup increment retains one named G54 work setup with stock-top Z, notes and rectangular fixture prisms. Stock, machine, active bit and operation tool/material bindings remain exclusively owned by Machine Setup. Fixtures use emitted program work coordinates; artwork coordinates and camera template slots are not inferred as clamp geometry. Setup identity and notes do not change emitted motion or spatial Frame evidence. Future additional setups or sides require explicit coordinate transforms and independent verification.
+
+Cutting presets capture tool/material/machine context, numerical values, provenance and qualification. Applying a preset is reviewed, manual numerical overrides remain explicit, and preset labels or qualification never imply material validation. Tool flute, shank, stickout and holder descriptions support bounded, conservative advisory checks against fixture prisms. Incomplete coverage is disclosed. Neither missing descriptions nor predicted contact adds a Start refusal.
+
+Editable relief uses ordered scalar components, vector shapes and masks, with bounded resources and revisioned ownership. CAM consumes the existing materialized U16 heightfield. The authoring document records source precision; storage precision does not turn an eight-bit import into sixteen-bit source detail. Revision checks prevent late edits from replacing newer documents. Physical mapping changes either rematerialize matching intent or deliberately detach authoring. The model remains a one-sided height surface, without undercuts or solid CAD claims.
+
+Reusable recipes retain selectors, role matching, dependencies, baselines and application bindings. Preview discloses missing roles. Reapply updates unchanged fields while retaining explicit operation and binding edits. Documentation and preparation status describe exact current output and its inputs, without becoming a second cache authority.
+
+ADR-565 and the existing exact-program review/transport ownership remain in force. Completed Frame for unchanged footprint and placement is the ordinary Start policy gate; every Start still prepares the current executable artifact. Pro tool selection retains the existing entitlement boundary. Frame, Start, Save G-code, output and active jobs acquire no new account, fixture, setup, qualification or licence gates.
+
+**Verification.** Cover schema migration/round trip, malformed and bounded authoring input, undo/redo and stale asynchronous commits, retained manual template edits, canonical setup Save/cancel, fixture-coordinate and holder envelopes, exact exported program identity, and current preparation after geometry/tool/stock edits. Simulated output does not establish controller or physical-machine qualification.

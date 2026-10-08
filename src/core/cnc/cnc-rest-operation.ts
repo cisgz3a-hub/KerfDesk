@@ -6,7 +6,14 @@ import {
   type Polyline,
 } from '../scene';
 import { cncLayoutCutWidths } from './layout-cut-widths';
-import { pocketRasterToolpaths, pocketRingToolpaths, type PocketToolpaths } from './pocket-paths';
+import type { PocketToolpaths } from './pocket-paths';
+import { pocketToolpathsForSettingsWithEvidence } from './cnc-pocket-toolpaths';
+export {
+  pocketToolpathsForSettings,
+  pocketToolpathsForSettingsWithEvidence,
+} from './cnc-pocket-toolpaths';
+import { resolveStockAwareRestPocket } from './cnc-rest-stock-operation';
+import type { Cnc2dStockEvidence } from './cnc-pocket-stock';
 import { planRestPocketToolpaths } from './rest-pocket';
 
 export type CncRestPocketPlanningEvidence = {
@@ -20,6 +27,8 @@ export type CncRestPocketOperation =
   | ({ readonly kind: 'error'; readonly reason: string } & CncRestPocketPlanningEvidence)
   | ({
       readonly kind: 'ok';
+      readonly stockEvidence?: Cnc2dStockEvidence;
+      readonly findings?: ReadonlyArray<string>;
       readonly roughTool: CncTool;
       readonly finishTool: CncTool;
       readonly roughToolpaths: ReadonlyArray<Polyline>;
@@ -42,10 +51,13 @@ export function resolveRestPocketOperation(
   settings: CncLayerSettings,
   config: CncMachineConfig,
 ): CncRestPocketOperation {
-  if (settings.cutType !== 'pocket' || settings.pocketRoughToolId === undefined) {
+  if (settings.cutType !== 'pocket') {
     return { kind: 'not-requested' };
   }
-  if (settings.pocketStrategy === 'adaptive') return { kind: 'not-requested' };
+  if (settings.pocketRestStock !== undefined)
+    return resolveStockAwareRestPocket(contours, settings, config);
+  if (settings.pocketRoughToolId === undefined || settings.pocketStrategy === 'adaptive')
+    return { kind: 'not-requested' };
   if (settings.helixEntry !== undefined) {
     return restPocketError('Rest machining and helical entry cannot be combined yet.');
   }
@@ -78,43 +90,6 @@ export function resolveRestPocketOperation(
     stepoverUsed: rest.stepoverUsed || roughing.stepoverUsed,
     completion: rest.completion,
   };
-}
-
-export function pocketToolpathsForSettings(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  tool: CncTool,
-): ReadonlyArray<Polyline> {
-  return pocketToolpathsForSettingsWithEvidence(polylines, settings, tool).toolpaths;
-}
-
-// The wall rides the cut width at the pocket's full depth and the stepover is
-// a percentage of the cut width over one depth pass. Both are the stored
-// diameter except for a tapered ball nose (ADR-368 Amendment 2).
-export function pocketToolpathsForSettingsWithEvidence(
-  polylines: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  tool: CncTool,
-): PocketToolpaths {
-  const widths = cncLayoutCutWidths(tool, settings.depthMm, settings.depthPerPassMm);
-  if (settings.pocketStrategy === 'raster-x' || settings.pocketStrategy === 'raster-y') {
-    return pocketRasterToolpaths(
-      polylines,
-      widths.wallDiameterMm,
-      settings.stepoverPercent,
-      settings.pocketStrategy === 'raster-x' ? 'x' : 'y',
-      widths.clearingDiameterMm,
-    );
-  }
-  if (settings.pocketStrategy === 'adaptive') {
-    return { toolpaths: [], offsetFailed: false, passLimited: false, stepoverUsed: false };
-  }
-  return pocketRingToolpaths(
-    polylines,
-    widths.wallDiameterMm,
-    settings.stepoverPercent,
-    widths.clearingDiameterMm,
-  );
 }
 
 function restPocketError(

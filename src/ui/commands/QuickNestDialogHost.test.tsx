@@ -72,7 +72,8 @@ describe('nesting draft host', () => {
     await act(async () => Simulate.submit(host!.querySelector('form')!));
     expect(useStore.getState().project).toBe(project);
     const worker = FakeWorker.last;
-    const best = layoutNest(worker.input!.input)!;
+    if (worker.input?.kind !== 'search') throw new Error('Expected a selection nesting request.');
+    const best = layoutNest(worker.input.input)!;
     await act(async () =>
       worker.send({ kind: 'progress', progress: { attempted: 1, total: 24, best } }),
     );

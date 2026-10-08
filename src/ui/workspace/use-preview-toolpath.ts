@@ -1,6 +1,7 @@
 // usePreviewToolpath schedules preview preparation outside render/draw so
 // entering Preview can paint first and cancel stale builds before they start.
 
+import { recordCncPreparation } from '../state/cnc-preparation-evidence-store';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { buildToolpath, EMPTY_JOB, type JobOriginPlacement } from '../../core/job';
 import type { OutputScope, Project } from '../../core/scene';
@@ -195,6 +196,8 @@ function settleBuiltToolpath(args: {
       ? prepareLargeJobOffThread(args.project, args.options)
       : null;
   if (offThread === null) {
+    if (built.previewIssue === undefined)
+      recordCncPreparation(args.project, args.options.outputScope, 'Preview');
     setToolpath(built);
     return;
   }
@@ -203,6 +206,8 @@ function settleBuiltToolpath(args: {
     (prepared) => {
       if (args.isCancelled()) return;
       registerPreviewJobOriginOffset(prepared.toolpath, prepared.jobOriginOffset ?? ZERO_OFFSET);
+      if (prepared.toolpath.previewIssue === undefined)
+        recordCncPreparation(args.project, args.options.outputScope, 'Preview');
       setToolpath(prepared.toolpath);
     },
     (error: unknown) => {

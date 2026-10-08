@@ -52,7 +52,7 @@ export function verifyAdaptivePocket(
       toolDiameterMm / 2,
     );
     contact.addEntry(sequence.entryCenter, sequence.entryRadiusMm);
-    let previous = entryEnd;
+    let previous = clearSeedRings(grid, contact, sequence.seedRings, entryEnd);
     const gauge: ContactGauge = { runMm: Number.POSITIVE_INFINITY };
     for (const ring of sequence.rings) {
       const first = ring.points[0];
@@ -224,4 +224,21 @@ function countOccupied(cells: Uint8Array): number {
   let count = 0;
   for (const cell of cells) count += cell;
   return count;
+}
+
+// Entry slotting is explicit output at plunge feed, distinct from the verified radial-clearing limit.
+function clearSeedRings(
+  grid: Grid,
+  contact: AdaptiveCutterContact,
+  rings: ReadonlyArray<Polyline> = [],
+  initial: Vec2,
+): Vec2 {
+  let previous = initial;
+  for (const ring of rings)
+    for (const point of ring.points) {
+      cutSegmentWithoutMeasurement(grid, previous, point, contact.toolRadiusMm);
+      contact.addMove(previous, point);
+      previous = point;
+    }
+  return previous;
 }

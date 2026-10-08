@@ -4,6 +4,14 @@
 
 export type CncToolKind = 'end-mill' | 'ball-nose' | 'v-bit' | 'engraving' | 'tapered-ball-nose';
 
+// A cylindrical envelope measured from the cutter tip upward in millimetres.
+export type CncToolHolderSegment = {
+  readonly name: string;
+  readonly startMm: number;
+  readonly lengthMm: number;
+  readonly diameterMm: number;
+};
+
 export type CncTool = {
   readonly id: string;
   readonly name: string;
@@ -26,6 +34,10 @@ export type CncTool = {
   readonly family?: string;
   // Physical/catalog metadata. Optional for legacy and hand-entered tools.
   readonly shankDiameterMm?: number;
+  // Optional advisory reach geometry; omission never invalidates legacy cutters.
+  readonly fluteLengthMm?: number;
+  readonly stickoutMm?: number;
+  readonly holderSegments?: ReadonlyArray<CncToolHolderSegment>;
   readonly fluteCount?: number;
   // Stable identity of an app catalog entry copied into the custom library.
   readonly catalogId?: string;

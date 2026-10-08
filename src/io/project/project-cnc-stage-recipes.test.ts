@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createLayer, createProject, DEFAULT_CNC_LAYER_SETTINGS } from '../../core/scene';
+import {
+  createLayer,
+  createProject,
+  DEFAULT_CNC_LAYER_SETTINGS,
+  PROJECT_SCHEMA_VERSION,
+} from '../../core/scene';
 import { deserializeProject } from './deserialize-project';
 import { prepareProjectForPersistence } from './prepare-project-persistence';
 
@@ -26,10 +31,10 @@ function project() {
   };
 }
 describe('CNC stage recipe persistence', () => {
-  it('roundtrips physical values intact under schema 12', () => {
+  it('roundtrips physical values intact under the current schema', () => {
     const prepared = prepareProjectForPersistence(project());
     if (prepared.kind !== 'ok') throw new Error(prepared.reason);
-    expect(JSON.parse(prepared.json).schemaVersion).toBe(14);
+    expect(JSON.parse(prepared.json).schemaVersion).toBe(PROJECT_SCHEMA_VERSION);
     const loaded = deserializeProject(prepared.json);
     if (loaded.kind !== 'ok') throw new Error('Load failed');
     expect(loaded.project.scene.layers[0]?.cnc?.stageRecipes?.['relief-finish']).toEqual(recipe);

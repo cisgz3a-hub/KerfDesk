@@ -1,3 +1,4 @@
+import { cncSideProgramName } from '../../core/cnc/cnc-two-sided-setup';
 import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 // Shared file-action handlers used by both the Toolbar buttons and the
 // window-level keyboard shortcut listener (F-A15). Each function takes the
@@ -267,7 +268,7 @@ async function saveOrdinaryGcode(
     // Preparation is complete, so use the normal Save As dialog. A directory
     // reservation adds a second filename prompt and restricts folder choices.
     target = await ctx.platform.pickFileForSave({
-      suggestedName: suggestedGcodeName(ctx.savedName),
+      suggestedName: cncSideProgramName(suggestedGcodeName(ctx.savedName), ctx.project),
       extensions: ['.gcode', '.nc'],
     });
   } catch (err) {

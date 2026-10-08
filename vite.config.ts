@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
@@ -37,6 +37,10 @@ const BUILD_APP_VERSION = resolveBuildAppVersion(
  */
 function fileSystemAllowList(): ReadonlyArray<string> {
   const roots = [PROJECT_ROOT];
+  // Managed worktrees can share an NTFS junction with a sibling checkout.
+  // Raw dependency assets resolve to that physical directory during dev/test.
+  const dependencies = join(PROJECT_ROOT, 'node_modules');
+  if (existsSync(dependencies)) roots.push(realpathSync(dependencies));
   let dir = dirname(PROJECT_ROOT);
   for (;;) {
     if (existsSync(join(dir, 'node_modules')) && !roots.includes(dir)) roots.push(dir);

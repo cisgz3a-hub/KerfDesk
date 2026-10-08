@@ -1,3 +1,4 @@
+import { cncSideInputScene, cncSideOutputProject } from '../../core/cnc/cnc-two-sided-setup';
 // prepare-output — the single source of truth for turning a Project into the
 // machine Job that everything downstream reasons about: Save, Start, the canvas
 // Preview, and the live Estimate. Before this, the Preview built its toolpath
@@ -40,6 +41,7 @@ import {
   isProgramMaterializationRangeError,
   programMaterializationFailure,
 } from './program-materialization';
+import { prepareReliefAuthoringLinks } from './prepare-relief-authoring-links';
 import { reliefMaterializationFailure } from './relief-materialization-failure';
 import { contourEntryBoundsForDevice, withContourEntryBounds } from '../../core/job/contour-entry';
 import { placeCncParks } from '../../core/job/job-origin';
@@ -91,6 +93,7 @@ export type PreparedOutputInput =
   | {
       readonly ok: true;
       readonly sourceProject: Project;
+      readonly placementProject?: Project;
       readonly project: Project;
       readonly outputScope: OutputScope;
       readonly options: PrepareOutputOptions;
@@ -140,8 +143,16 @@ export function prepareOutputInput(
       },
     };
   }
-  const scopedProject =
-    scoped.scene === project.scene ? project : { ...project, scene: scoped.scene };
+  const reliefLinks = prepareReliefAuthoringLinks(
+    project,
+    cncSideInputScene(project, scoped.scene),
+  );
+  if (reliefLinks.kind === 'relief-materialization-failed')
+    return {
+      ok: false,
+      prepared: { ok: false, preflight: reliefMaterializationFailure(reliefLinks) },
+    };
+  const scopedProject = cncSideOutputProject(project, reliefLinks.scene);
   const outputProject = withExecutionLaserPowerScale(scopedProject, options.laserMaxPowerS);
   // No size refusal remains here (ADR-241/ADR-243): vector scenes of any
   // segment count compile, and rasters of any pixel size stream row-by-row.
@@ -173,6 +184,14 @@ export function prepareOutputInput(
   return {
     ok: true,
     sourceProject: project,
+    ...(project.machine?.kind !== 'cnc' || project.cncSetup?.twoSided === undefined
+      ? {}
+      : {
+          placementProject: cncSideOutputProject(
+            project,
+            cncSideInputScene(project, project.scene),
+          ),
+        }),
     project: outputProject,
     outputScope: options.outputScope ?? DEFAULT_OUTPUT_SCOPE,
     options,
@@ -200,7 +219,7 @@ export function completePreparedOutput(
       ? (input.options.absoluteProgramOffset ?? ZERO_OFFSET)
       : input.options.jobOrigin
         ? resolveJobOriginOffset(
-            input.sourceProject,
+            input.placementProject ?? input.sourceProject,
             compiled,
             input.options.jobOrigin,
             input.outputScope,
