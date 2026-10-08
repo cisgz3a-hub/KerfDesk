@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createDebouncer, type Debouncer } from './debouncer';
 import { validateEnglishDecimalInput } from './english-decimal-input';
+import { useStore } from '../state/store';
 
 const DEFAULT_DEBOUNCE_MS = 300;
 
@@ -43,6 +44,8 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   const { value, commit, parse } = args;
   const format = args.format ?? defaultFormat<T>;
   const debounceMs = args.debounceMs ?? DEFAULT_DEBOUNCE_MS;
+  const documentEpoch = useStore((state) => state.projectDocumentEpoch);
+  const documentOwner = useRef({ draft: documentEpoch, pending: documentEpoch });
 
   const [draft, setDraft] = useState<string>(() => format(value));
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -84,6 +87,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
       // M25 (AUDIT-2026-06-10) is still satisfied — a clamped field shows the
       // enforced value (9999 → 6000) once you leave it, instead of lying.
       commit: (next) => {
+        if (documentOwner.current.pending !== useStore.getState().projectDocumentEpoch) return;
         commitRef.current(next);
       },
     });
@@ -96,6 +100,8 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   // actual edit. Otherwise a sibling's update can leave an untouched display
   // stale merely because parsing it clamps to the new value.
   useEffect(() => {
+    const documentReplaced = documentOwner.current.draft !== documentEpoch;
+    documentOwner.current.draft = documentEpoch;
     // A canonical store update or display-mapping change owns the field now.
     // Drop work parsed against the previous state before acknowledging the new
     // baseline, or its stale timer can overwrite undo/toolbar/document changes.
@@ -103,6 +109,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current?.acknowledge(value);
     setErrorMessage(null);
     if (
+      documentReplaced ||
       !editedRef.current ||
       draftValidationError(value, draftRef.current, validateRef.current) !== null ||
       parseRef.current(draftRef.current) !== value
@@ -114,7 +121,7 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
       // otherwise the valid-looking field remains blocked until another blur.
       setInputValidity(inputRef.current, '');
     }
-  }, [value, args.reconcileKey]);
+  }, [value, args.reconcileKey, documentEpoch]);
 
   // Clean up the pending timer on unmount so we don't commit after the
   // component is gone (avoids ghost writes during route changes).
@@ -125,6 +132,8 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
   }, []);
 
   const handlerContext: DebouncedHandlerContext<T> = {
+    documentEpoch,
+    documentOwner,
     value,
     draft,
     editedRef,
@@ -147,6 +156,8 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
 }
 
 type DebouncedHandlerContext<T> = {
+  readonly documentEpoch: number;
+  readonly documentOwner: { current: { draft: number; pending: number } };
   readonly value: T;
   readonly draft: string;
   readonly editedRef: { current: boolean };
@@ -163,6 +174,8 @@ type DebouncedHandlerContext<T> = {
 
 function createChangeHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onChange'] {
   return (event): void => {
+    if (context.documentEpoch !== useStore.getState().projectDocumentEpoch) return;
+    context.documentOwner.current.pending = context.documentEpoch;
     context.inputRef.current = event.target;
     const nextText = event.target.value;
     context.editedRef.current = true;
@@ -202,6 +215,9 @@ function draftValidationError<T>(
 
 function createBlurHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCommit['onBlur'] {
   return (event): void => {
+    // A document replacement can precede React reconciliation or a late blur.
+    if (!ownsCurrentDocumentDraft(context)) return;
+    context.documentOwner.current.pending = context.documentEpoch;
     if (!context.editedRef.current) {
       // External reconciliation can replace an invalid draft without another
       // input event. Retire its native error without parsing the saved value.
@@ -231,6 +247,13 @@ function createBlurHandler<T>(context: DebouncedHandlerContext<T>): DebouncedCom
     context.setErrorMessage(null);
     setInputValidity(event?.currentTarget, '');
   };
+}
+
+function ownsCurrentDocumentDraft<T>(context: DebouncedHandlerContext<T>): boolean {
+  return (
+    context.documentEpoch === useStore.getState().projectDocumentEpoch &&
+    context.documentOwner.current.draft === context.documentEpoch
+  );
 }
 
 function setInputValidity(

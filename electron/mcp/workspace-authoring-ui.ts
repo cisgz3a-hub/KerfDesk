@@ -39,6 +39,8 @@ export const MCP_AUTHORING_MARKUP = String.raw`<section class="authoring-sheet" 
 export const MCP_AUTHORING_SCRIPT = String.raw`  let submittedForm = null, fontsLoaded = false, authoringTrigger = null;
   const authoringDrafts = new Map();
   function authoringControls(enabled) {
+    const resizeBounds = selectionResizeBounds();
+    if($('authoring-sheet').dataset.authoring==='properties'&&!authoringDrafts.has('resize-form'))loadSelectionSize();
     const stale = form => authoringDrafts.has(form.id) && authoringDrafts.get(form.id) !== workspace?.revision;
     $('authoring-conflict').hidden = !currentAuthoringForms().some(stale);
     $('review-authoring').disabled = !enabled;
@@ -46,14 +48,15 @@ export const MCP_AUTHORING_SCRIPT = String.raw`  let submittedForm = null, fonts
     $('authoring-retry').disabled = busy || !connected || !toolCallsAvailable || !canEdit();
     $('retry').hidden = !pendingEdit || !$('authoring-sheet').hidden;
     $('authoring-access').textContent = !toolCallsAvailable ? 'This host can show your design but cannot apply edits. Use a host that supports interactive MCP tools.' : !canEdit() ? 'Editing is off. Reconnect with editing permission and approve it on the PC. Add text, shapes and properties become available after approval.' : workspace?.mode === 'cnc' ? 'New text and shapes are available in a Laser workspace. Existing artwork can be moved or rotated here.' : 'Changes are saved to the open design on your PC. Undo is available on both screens.';
-    $('authoring-selection').textContent = $('items').querySelectorAll('input:checked').length + ' artwork selected. Choose artwork in Design to change the selection.';
+    const checked = $('items').querySelectorAll('input:checked').length;
+    $('authoring-selection').textContent = checked + ' artwork checked. Edits include every member of a group.' + (checked && !resizeBounds ? ' ' + resizeUnavailableMessage() : ' Resize dimensions describe the complete edit target.');
     const ellipseAvailable=workspace?.capabilities?.touchEditing===true;
     $('add-rectangle-form').querySelector('option[value=ellipse]').disabled=!ellipseAvailable;
     $('shape-availability').hidden=ellipseAvailable;
-    for (const input of $('authoring-sheet').querySelectorAll('input,textarea,select')) input.disabled = !enabled;
+    for (const input of $('authoring-sheet').querySelectorAll('input,textarea,select')) input.disabled = !enabled || (!!input.closest('#resize-form') && !resizeBounds);
     for (const form of $('authoring-sheet').querySelectorAll('form')) {
       const creating = form.id === 'add-text-form' || form.id === 'add-rectangle-form';
-      form.querySelector('button[type=submit]').disabled = !enabled || stale(form) || (creating && workspace?.mode === 'cnc') || (form.id==='add-rectangle-form'&&form.elements.shapeType.value==='ellipse'&&!ellipseAvailable);
+      form.querySelector('button[type=submit]').disabled = !enabled || stale(form) || (creating && workspace?.mode === 'cnc') || (!creating && selectionDirty && selectionRevision!==workspace?.revision) || (form.id==='add-rectangle-form'&&form.elements.shapeType.value==='ellipse'&&!ellipseAvailable) || (form.id==='resize-form'&&!resizeBounds);
     }
   }
   function showAuthoring(name, trigger) {
@@ -101,16 +104,28 @@ export const MCP_AUTHORING_SCRIPT = String.raw`  let submittedForm = null, fonts
     if(!artworkIds.length)throw new Error('Select artwork in Design before moving or rotating it.');
     return artworkIds;
   }
-  function loadSelectionSize() {
+  function resizeUnavailableMessage() {
+    return workspace?.capabilities?.groupTransformBounds === true ? 'Resize is unavailable for this selection. Review groups with hidden, locked or unlisted members on the PC.' : 'Update KerfDesk on the PC and refresh to load complete group dimensions before resizing.';
+  }
+  function selectionResizeBounds() {
+    if(workspace?.capabilities?.groupTransformBounds!==true)return null;
     const ids=[...$('items').querySelectorAll('input:checked')].map(input=>input.value);
-    const bounds=ids.map(id=>workspace?.artwork.find(item=>item.id===id)?.bounds);
-    const valid=bounds.length&&bounds.every(box=>box&&[box.xMm,box.yMm,box.widthMm,box.heightMm].every(Number.isFinite));
-    const form=$('resize-form');
-    for(const name of ['widthMm','heightMm'])form.elements[name].value='';
-    if(!valid)return;
+    const bounds=ids.map(id=>workspace.artwork.find(item=>item.id===id)?.transformBounds);
+    if(!bounds.length||!bounds.every(box=>box&&[box.xMm,box.yMm,box.widthMm,box.heightMm].every(Number.isFinite)))return null;
     const width=Math.max(...bounds.map(box=>box.xMm+box.widthMm))-Math.min(...bounds.map(box=>box.xMm));
     const height=Math.max(...bounds.map(box=>box.yMm+box.heightMm))-Math.min(...bounds.map(box=>box.yMm));
-    if(width>0&&width<=100000&&height>0&&height<=100000){form.elements.widthMm.value=Number(width.toFixed(3));form.elements.heightMm.value=Number(height.toFixed(3));}
+    return width>0.000001&&width<=100000&&height>0.000001&&height<=100000?{width,height}:null;
+  }
+  function resizeSelection() {
+    const ids=formSelection();
+    if(!selectionResizeBounds())throw new Error(resizeUnavailableMessage());
+    return ids;
+  }
+  function loadSelectionSize() {
+    const form=$('resize-form');
+    for(const name of ['widthMm','heightMm'])form.elements[name].value='';
+    const bounds=selectionResizeBounds();
+    if(bounds){form.elements.widthMm.value=String(bounds.width);form.elements.heightMm.value=String(bounds.height);}
   }
   function shapeCommand(form) {
     const shape=form.elements.shapeType.value;
@@ -122,7 +137,7 @@ export const MCP_AUTHORING_SCRIPT = String.raw`  let submittedForm = null, fonts
     'add-text-form':form=>({name:'add_text',args:{text:form.elements.text.value,...(form.elements.fontId.value?{fontId:form.elements.fontId.value}:{}),fontSizeMm:positiveField(form,'fontSizeMm',1000),widthMm:positiveField(form,'widthMm'),xMm:fieldNumber(form,'xMm'),yMm:fieldNumber(form,'yMm')}}),
     'add-rectangle-form':shapeCommand,
     'transform-form':form=>({name:'transform_artwork',args:{artworkIds:formSelection(),transform:{type:'move',dxMm:fieldNumber(form,'dxMm'),dyMm:fieldNumber(form,'dyMm')}}}),
-    'resize-form':form=>({name:'transform_artwork',args:{artworkIds:formSelection(),transform:{type:'resize',widthMm:positiveField(form,'widthMm'),heightMm:positiveField(form,'heightMm')}}}),
+    'resize-form':form=>({name:'transform_artwork',args:{artworkIds:resizeSelection(),transform:{type:'resize',widthMm:positiveField(form,'widthMm'),heightMm:positiveField(form,'heightMm')}}}),
     'rotate-form':form=>({name:'transform_artwork',args:{artworkIds:formSelection(),transform:{type:'rotate',angleDeg:fieldNumber(form,'angleDeg',-3600,3600)}}}),
   };
   for(const [id,build] of Object.entries(authoringCommands))$(id).addEventListener('submit',event=>{

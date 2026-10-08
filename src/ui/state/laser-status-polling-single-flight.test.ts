@@ -54,7 +54,15 @@ describe('background controller status polling', () => {
     vi.useFakeTimers();
     const pendingPoll = deferred();
     const statusWrites: string[] = [];
+    const requests: string[] = [];
     const connection = makeConnection(async (data) => {
+      requests.push(data);
+      const replies: Record<string, readonly string[]> = {
+        '$$\n': ['$30=1000', '$31=0', '$32=1', 'ok'],
+        '$I\n': ['[VER:1.1h.20190830:test]', '[OPT:VM,15,128]', 'ok'],
+        '$G\n': ['[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]', 'ok'],
+      };
+      for (const line of replies[data] ?? []) connection.emitLine(line);
       if (data !== '?') return;
       statusWrites.push(data);
       if (statusWrites.length > 1) await pendingPoll.promise;
@@ -67,9 +75,8 @@ describe('background controller status polling', () => {
     await vi.advanceTimersByTimeAsync(IDLE_POLL_CADENCE_MS);
     expect(statusWrites).toHaveLength(2);
 
-    // A controller silent for the whole listening window fails qualification
-    // (ADR-375), so the report below does not start the settings read, which
-    // would own polling until it finished.
+    // Silence fails qualification. A late Idle resumes the automatic settings
+    // workflow after the unresolved status write settles.
     await vi.advanceTimersByTimeAsync(POLLED_RESPONSE_TIMEOUT_MS);
     expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
     expect(statusWrites).toHaveLength(2);
@@ -80,9 +87,12 @@ describe('background controller status polling', () => {
     await vi.advanceTimersByTimeAsync(IDLE_POLL_CADENCE_MS * 3);
     expect(statusWrites).toHaveLength(2);
 
+    expect(requests).not.toContain('$$\n');
     pendingPoll.resolve();
     await vi.advanceTimersByTimeAsync(0);
     await vi.advanceTimersByTimeAsync(IDLE_POLL_CADENCE_MS);
     expect(statusWrites).toHaveLength(3);
+    expect(requests.filter((request) => request === '$$\n')).toHaveLength(1);
+    expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
   });
 });

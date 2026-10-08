@@ -10,6 +10,8 @@ const runQueues = new WeakMap<
   { readonly plan: CanvasMotionPlan; readonly startedAtMs: number }
 >();
 
+const runDocuments = new WeakMap<CanvasMotionPlan, Map<number, number>>();
+
 export function registerCanvasProgramSource(plan: CanvasMotionPlan, gcode: string): void {
   sources.set(plan, gcode);
 }
@@ -73,4 +75,21 @@ export function canvasProgramMatchesRunQueue(
   if (queued === null) return !['running', 'paused', 'tool-change'].includes(run.lifecycle);
   const bound = runQueues.get(queued);
   return bound?.plan === run.plan && bound.startedAtMs === run.startedAtMs;
+}
+
+/** Session-only document identity captured at the authorized Start handoff. */
+export function registerCanvasProgramRunDocument(
+  plan: CanvasMotionPlan,
+  startedAtMs: number,
+  documentEpoch: number,
+): void {
+  const byStart = runDocuments.get(plan) ?? new Map<number, number>();
+  byStart.set(startedAtMs, documentEpoch);
+  runDocuments.set(plan, byStart);
+}
+
+export function canvasProgramRunDocumentEpoch(
+  run: Pick<LiveCanvasRun, 'plan' | 'startedAtMs'>,
+): number | null {
+  return runDocuments.get(run.plan)?.get(run.startedAtMs) ?? null;
 }

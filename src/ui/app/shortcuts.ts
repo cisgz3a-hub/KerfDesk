@@ -131,16 +131,24 @@ const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
     });
   },
   o: (c) => {
+    const initial = useStore.getState();
+    const requestEpoch = initial.claimProjectOpenRequest();
     void c.confirmDiscard('open another project').then((ok) => {
-      if (!ok) return;
+      if (
+        !ok ||
+        useStore.getState().projectOpenRequestEpoch !== requestEpoch ||
+        useStore.getState().projectDocumentEpoch !== initial.projectDocumentEpoch
+      )
+        return;
       return handleOpenProject({
         platform: c.platform,
         setProject: c.setProject,
         markLoaded: c.markLoaded,
         pushToast: c.pushToast,
-        claimProjectOpenRequest: useStore.getState().claimProjectOpenRequest,
+        claimProjectOpenRequest: () => requestEpoch,
         getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
         getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+        getProject: () => useStore.getState().project,
         currentDevice: () => useStore.getState().project.device,
       });
     });

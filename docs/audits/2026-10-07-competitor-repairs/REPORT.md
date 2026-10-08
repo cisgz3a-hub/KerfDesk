@@ -49,7 +49,7 @@ The broad run exposed a Fill-cache regression: filtering uniform Fill membership
 
 The crossing-Fill working default uses the frontmost positive canvas contributor. Nested positive islands retain their settings; negative holes cannot own restored crossing material. Machine-output artwork priority is separate from canvas stacking. Uniform process settings retain the dense-trace fast path.
 
-SVG clipping follows the documented viewport intersection rule. A native Chrome deviation for a viewport's own clip/overflow interaction is recorded in ADR-570. Unsupported effects retain their existing disclosure. Older KerfDesk SVG exports without versioned artwork-origin metadata reimport using standard SVG viewport placement, which may change their original scene position. CSS geometry and percentage-sized images remain outside the supported percentage contract.
+SVG clipping follows the documented viewport intersection rule. A native Chrome deviation for a viewport's own clip/overflow interaction is recorded in ADR-574. Unsupported effects retain their existing disclosure. Older KerfDesk SVG exports without versioned artwork-origin metadata reimport using standard SVG viewport placement, which may change their original scene position. CSS geometry and percentage-sized images remain outside the supported percentage contract.
 
 Incident history is bounded to the current app window and does not persist across an application restart. Support reports contain bounded build/device/controller/job context rather than artwork or executable content. Recovery distance estimates qualify supported arc geometry, with unknown results for unsupported or ambiguous motion.
 

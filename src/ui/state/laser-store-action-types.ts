@@ -13,6 +13,11 @@ import type { ProbeRequest } from '../../core/controllers/grbl/probe';
 import type { ProbeResult } from './probe-actions';
 import type { WorkZRecoveryConfirmation } from './work-z-recovery-actions';
 import type { JobStartMarkRequest } from './job-start-mark';
+import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
+import type {
+  SurfaceGridRequest,
+  SurfaceGridResult,
+} from '../../core/controllers/grbl/surface-grid-probe';
 
 export type ControllerWakeOutcome = 'idle' | 'alarm';
 
@@ -47,7 +52,11 @@ export type LaserStoreActions = {
   readonly wakeController: () => Promise<ControllerWakeOutcome>;
   readonly configureGrblLaserSetup: () => Promise<void>;
   readonly readMachineSettings: () => Promise<void>;
+  readonly readFirmwareReport: () => Promise<ControllerFirmwareReport>;
+  readonly measureSurfaceGrid: (request: SurfaceGridRequest) => Promise<SurfaceGridResult>;
   readonly retryControllerQualification: () => Promise<void>;
+  readonly getMachineSettingsReadBlockReason: () => string | null;
+  readonly getControllerReconnectRecommended: () => boolean;
   readonly writeGrblSetting: (id: number, value: string) => Promise<void>;
   readonly sendConsoleCommand: (command: string, options?: ConsoleCommandOptions) => Promise<void>;
   /** Owned G54 selection used before preparing Frame so Frame and emitted

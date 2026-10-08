@@ -70,6 +70,7 @@ export async function buildCanvasTextObject(
   return {
     ...object,
     id: original?.id ?? session.id,
+    ...(original?.name === undefined ? {} : { name: original.name }),
     ...(original?.operationIds === undefined ? {} : { operationIds: original.operationIds }),
     ...(original?.operationOverride === undefined
       ? {}
@@ -103,7 +104,6 @@ function useStableTextValues(values: DialogValues): DialogValues {
     weldOverlaps,
     color,
     embeddedFonts,
-    importedFont,
     pathGuide,
   } = values;
   const variableEnabled = values.variableTemplate !== undefined;
@@ -124,8 +124,9 @@ function useStableTextValues(values: DialogValues): DialogValues {
       bendDeg,
       ...(weldOverlaps === undefined ? {} : { weldOverlaps }),
       color,
+      ...(values.textBox === undefined ? {} : { textBox: values.textBox }),
       embeddedFonts,
-      ...(importedFont === undefined ? {} : { importedFont }),
+      ...(values.importedFont === undefined ? {} : { importedFont: values.importedFont }),
       ...(pathGuide === undefined ? {} : { pathGuide }),
       ...(guideObjectId === undefined
         ? {}
@@ -158,7 +159,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
       weldOverlaps,
       color,
       embeddedFonts,
-      importedFont,
+      values.importedFont,
       pathGuide,
       guideObjectId,
       offsetMm,
@@ -167,6 +168,7 @@ function useStableTextValues(values: DialogValues): DialogValues {
       acrossAlign,
       variableEnabled,
       sequenceOffset,
+      values.textBox,
     ],
   );
 }

@@ -46,13 +46,14 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
   page,
 }) => {
   const bridge = await installRtspBridgeRoutes(page);
+  const camera = page.getByRole('dialog', { name: 'Camera preview', exact: true });
   await (await toolbarCommand(page, 'Camera')).click();
 
-  await page.getByText(/^RTSP camera/).click();
-  await page.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await camera.getByText(/^RTSP camera/).click();
+  await camera.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
+  await camera.getByRole('button', { name: 'Connect', exact: true }).click();
 
-  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+  await expect(camera.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   await expect(page.getByAltText('Machine camera stream')).toHaveAttribute(
     'src',
     'http://127.0.0.1:51731/stream.mjpg?camera=e2e',
@@ -68,8 +69,8 @@ test('connects an RTSP camera through the loopback bridge and captures readable 
   await page.getByRole('button', { name: 'Close camera panel' }).click();
   bridge.setProbeAvailable(false);
   await (await toolbarCommand(page, 'Camera')).click();
-  await page.getByText(/^RTSP camera/).click();
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await camera.getByText(/^RTSP camera/).click();
+  await camera.getByRole('button', { name: 'Connect', exact: true }).click();
   await expect(page.getByText('E2E RTSP camera unavailable.', { exact: true })).toBeVisible();
 });
 

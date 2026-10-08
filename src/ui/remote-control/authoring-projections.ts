@@ -4,16 +4,26 @@ import type { RemoteControlOptions } from './types';
 import { RemoteFault } from './fault';
 import { publicIdentifier, workspaceProjection } from './projections';
 import { validTextPatch } from './text-validation';
+import { artworkTransformBounds } from './transform-bounds';
 
 export function historyProjection(state: AppState) {
   return { canUndo: state.undoStack.length > 0, canRedo: state.redoStack.length > 0 };
 }
 
 export function workspaceReadProjection(state: AppState, options: RemoteControlOptions) {
+  const workspace = workspaceProjection(state, options.canShareArtwork?.() === true);
+  const bounds = artworkTransformBounds(state, workspace.artwork);
   return {
-    ...workspaceProjection(state, options.canShareArtwork?.() === true),
+    ...workspace,
+    artwork: workspace.artwork.map((item) => {
+      const transformBounds = bounds.get(item.id);
+      return { ...item, ...(transformBounds === undefined ? {} : { transformBounds }) };
+    }),
     history: historyProjection(state),
-    capabilities: { touchEditing: state.project.machine?.kind !== 'cnc' },
+    capabilities: {
+      touchEditing: state.project.machine?.kind !== 'cnc',
+      groupTransformBounds: true,
+    },
     permissions: {
       canEdit: options.canWrite() && options.canEdit?.() !== false && state.pendingUndo === null,
       artworkSharingEnabled: options.canShareArtwork?.() === true,

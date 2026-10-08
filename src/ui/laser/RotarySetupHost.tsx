@@ -5,10 +5,14 @@ import { useStore } from '../state';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useToastStore } from '../state/toast-store';
 import { RotarySetupDialog } from './RotarySetupDialog';
+import { rotaryArtworkExtent } from './rotary-wrap-preview';
 
 export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.Element {
   const setup = useStore((s) => s.project.device.rotary);
   const machineFamily = useStore((s) => s.project.device.machineFamily);
+  const scene = useStore((s) => s.project.scene);
+  const controller = useStore((s) => s.project.device.controllerKind ?? 'grbl-v1.1');
+  const dialect = useStore((s) => s.project.device.gcodeDialect?.dialectId);
   const dirty = useStore((s) => s.dirty);
   const updateDeviceProfile = useStore((s) => s.updateDeviceProfile);
   const replaceScene = useStore((s) => s.replaceSceneWithGeneratedScene);
@@ -41,6 +45,8 @@ export function RotarySetupHost(props: { readonly onClose: () => void }): JSX.El
       onApply={apply}
       onGenerateCalibration={generate}
       presets={rotaryPresetsFor(machineFamily === undefined ? {} : { machineFamily })}
+      artwork={rotaryArtworkExtent(scene)}
+      outputDescription={`${controller}${dialect === undefined ? '' : ` / ${dialect}`}`}
     />
   );
 }

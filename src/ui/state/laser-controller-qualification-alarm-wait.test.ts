@@ -39,6 +39,7 @@ function harness(): Harness {
       pendingTransportWrites: 0,
       streamer: null,
       statusReport: null,
+      statusSequence: 0,
       statusObservation: null,
     } as unknown as LaserState,
     refs: { connection, runControllerQualification: run } as Harness['refs'],
@@ -53,11 +54,16 @@ function harness(): Harness {
   return h;
 }
 
-function report(h: Harness, state: 'Alarm' | 'Sleep' | 'Idle'): void {
+function report(h: Harness, state: string): void {
+  const sequence = h.state.statusSequence + 1;
   h.state = {
     ...h.state,
     statusReport: { state } as LaserState['statusReport'],
-    statusObservation: { sessionEpoch: 4, positionEpoch: 0, sequence: 1, observedAt: Date.now() },
+    statusSequence: sequence,
+    statusObservation:
+      state === 'Alarm' || state === 'Sleep'
+        ? null
+        : { sessionEpoch: 4, positionEpoch: 0, sequence, observedAt: Date.now() },
   };
 }
 
@@ -151,16 +157,7 @@ describe('qualification while the controller waits for the operator', () => {
       const h = harness();
       scheduleControllerQualification(h.set, h.get, h.refs, 4);
       for (let second = 0; second < 20; second += 1) {
-        h.state = { ...h.state, statusReport: { state: busy } as LaserState['statusReport'] };
-        h.state = {
-          ...h.state,
-          statusObservation: {
-            sessionEpoch: 4,
-            positionEpoch: 0,
-            sequence: 1,
-            observedAt: Date.now(),
-          },
-        };
+        report(h, busy);
         await vi.advanceTimersByTimeAsync(1_000);
       }
       expect(h.state.controllerQualification.kind).toBe('qualifying');

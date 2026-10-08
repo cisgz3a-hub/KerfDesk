@@ -8,11 +8,13 @@ const encoder = new TextEncoder();
 const AMBIGUOUS = new Set([408, 409, 429]);
 
 export function paddleConfiguration(env) {
-  requireValue(
-    env.PAYMENTS_ENABLED === 'true' && env.PAYMENT_PROVIDER === 'paddle',
-    503,
-    'payment_provider_not_configured',
-  );
+  requireValue(env.PAYMENTS_ENABLED === 'true', 503, 'payment_provider_not_configured');
+  return configuredPaddleProvider(env);
+}
+
+// Closing new checkout must not strand paid orders awaiting their notification.
+function configuredPaddleProvider(env) {
+  requireValue(env.PAYMENT_PROVIDER === 'paddle', 503, 'payment_provider_not_configured');
   requireValue(
     ['sandbox', 'live'].includes(env.PADDLE_ENVIRONMENT),
     503,
@@ -169,7 +171,7 @@ function paymentProblem(data, config, operation) {
 }
 
 export function paddleVerifier(env) {
-  const config = paddleConfiguration(env);
+  const config = configuredPaddleProvider(env);
   return async (headers, raw, now) => {
     requireValue(
       await verifyPaddleSignature(

@@ -1,15 +1,22 @@
 import {
-  areaD,
-  EndType,
-  FillRule,
-  inflatePathsD,
-  intersectD,
-  JoinType,
-  type PathsD,
-} from 'clipper2-ts';
+  placedState,
+  obstacleState,
+  collides,
+  inside,
+  rectanglesOverlap,
+  placementBounds,
+  validOutline,
+  finiteNonNegative,
+  type PlacedState,
+} from './nest-outline-geometry';
 import {
   quickNest,
+  allowedNestRotations,
+  nestRotation,
+  nestTurn,
+  orderNestItems,
   type NestItem,
+  type NestOptions,
   type NestPlacement,
   type NestRect,
   type QuickNestResult,
@@ -29,12 +36,11 @@ export type OutlineNestResult =
 export const OUTLINE_NEST_ITEM_LIMIT = 32;
 const OUTLINE_NEST_WORK_LIMIT = 250_000;
 const MAX_CANDIDATES_PER_ITEM = 4_000;
-const AREA_EPSILON = 1e-7;
 
 export function outlineNest(
   bin: NestRect,
   items: ReadonlyArray<OutlineNestItem>,
-  options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
+  options: NestOptions,
 ): OutlineNestResult {
   if (!isOutlineNestWithinWorkBudget(items)) {
     const result = quickNest(bin, items, options);
@@ -44,15 +50,17 @@ export function outlineNest(
   try {
     const seeds = [
       ...(rectangular.ok ? [rectangular.placements] : []),
-      stagingPlacements(bin, items, options.padding, false, 'row'),
-      stagingPlacements(bin, items, options.padding, true, 'row'),
-      stagingPlacements(bin, items, options.padding, false, 'column'),
+      stagingPlacements(bin, items, options, 0, 'row'),
+      stagingPlacements(bin, items, options, 1, 'row'),
+      stagingPlacements(bin, items, options, 0, 'column'),
+      stagingPlacements(bin, items, options, 2, 'row'),
+      stagingPlacements(bin, items, options, 3, 'row'),
     ];
     let best: ReadonlyArray<NestPlacement> | null = null;
     let bestScore: readonly [number, number, number] | null = null;
     for (const seed of seeds) {
       const placements = compactOutlineNest(bin, items, seed, options);
-      if (!validNest(bin, items, placements, options)) continue;
+      if (!validateNest(bin, items, placements, options)) continue;
       const score = placementScore(bin, items, placements, options.padding);
       if (bestScore === null || comparePlacementScore(score, bestScore) < 0) {
         best = placements;
@@ -60,7 +68,9 @@ export function outlineNest(
       }
     }
     return best === null
-      ? { ok: false, unplacedIds: items.map((item) => item.id) }
+      ? rectangular.ok
+        ? { ...rectangular, usedOutline: false }
+        : { ok: false, unplacedIds: items.map((item) => item.id) }
       : { ok: true, placements: best, usedOutline: true };
   } catch {
     return rectangular.ok ? { ...rectangular, usedOutline: false } : rectangular;
@@ -76,7 +86,7 @@ export function compactOutlineNest(
   bin: NestRect,
   items: ReadonlyArray<OutlineNestItem>,
   placements: ReadonlyArray<NestPlacement>,
-  options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
+  options: NestOptions,
 ): ReadonlyArray<NestPlacement> {
   if (!isOutlineNestWithinWorkBudget(items)) return placements;
   try {
@@ -102,7 +112,7 @@ function compactOutlineNestUnsafe(
   bin: NestRect,
   items: ReadonlyArray<OutlineNestItem>,
   placements: ReadonlyArray<NestPlacement>,
-  options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
+  options: NestOptions,
 ): ReadonlyArray<NestPlacement> {
   const byId = new Map(items.map((item) => [item.id, item]));
   const states = placements.flatMap((placement) => {
@@ -151,16 +161,18 @@ function bestCompactedState(
 function stagingPlacements(
   bin: NestRect,
   items: ReadonlyArray<OutlineNestItem>,
-  padding: number,
-  rotate: boolean,
+  options: NestOptions,
+  orientationIndex: number,
   direction: 'row' | 'column',
 ): ReadonlyArray<NestPlacement> {
-  const gap = finiteNonNegative(padding);
+  const gap = finiteNonNegative(options.padding);
   let x = bin.minX + gap / 2;
   let y = bin.minY + gap / 2;
-  return [...items].sort(compareItems).map((item) => {
-    const rotated90 = rotate && item.canRotate && item.width !== item.height;
-    const placement = { id: item.id, x, y, rotated90 };
+  return orderNestItems(items, options.itemOrder).map((item) => {
+    const angles = allowedNestRotations(item);
+    const turn = nestTurn(angles[orientationIndex % angles.length] ?? 0);
+    const { rotated90 } = turn;
+    const placement = { id: item.id, x, y, ...turn };
     const width = rotated90 ? item.height : item.width;
     const height = rotated90 ? item.width : item.height;
     if (direction === 'row') x += width + gap;
@@ -169,14 +181,74 @@ function stagingPlacements(
   });
 }
 
-function validNest(
+/** Validate worker results again before accepting any scene mutation. */
+export function validateNest(
   bin: NestRect,
   items: ReadonlyArray<OutlineNestItem>,
   placements: ReadonlyArray<NestPlacement>,
-  options: { readonly padding: number; readonly obstacles?: ReadonlyArray<NestRect> },
+  options: NestOptions,
 ): boolean {
+  try {
+    return validateNestUnsafe(bin, items, placements, options);
+  } catch {
+    return false;
+  }
+}
+
+function validateNestUnsafe(
+  bin: NestRect,
+  items: ReadonlyArray<OutlineNestItem>,
+  placements: ReadonlyArray<NestPlacement>,
+  options: NestOptions,
+): boolean {
+  if (!validNestDomain(bin, options)) return false;
   if (placements.length !== items.length) return false;
+  if (
+    new Set(items.map((item) => item.id)).size !== items.length ||
+    new Set(placements.map((placement) => placement.id)).size !== items.length ||
+    items.some(
+      (item) =>
+        !Number.isFinite(item.width) ||
+        !Number.isFinite(item.height) ||
+        item.width <= 0 ||
+        item.height <= 0,
+    )
+  )
+    return false;
   const byId = new Map(items.map((item) => [item.id, item]));
+  if (
+    placements.some((placement) => {
+      const item = byId.get(placement.id);
+      return (
+        item === undefined ||
+        ![placement.x, placement.y].every(Number.isFinite) ||
+        !allowedNestRotations(item).includes(nestRotation(placement)) ||
+        placement.rotated90 !== (nestRotation(placement) % 180 !== 0)
+      );
+    })
+  )
+    return false;
+  if (items.every((item) => !validOutline(item.outline))) {
+    const rectangles = placements.flatMap((placement) => {
+      const item = byId.get(placement.id);
+      return item === undefined
+        ? []
+        : [placementBounds(item, placement, finiteNonNegative(options.padding) / 2)];
+    });
+    const obstacles = (options.obstacles ?? []).map((rect) => ({
+      minX: rect.minX - options.padding / 2,
+      minY: rect.minY - options.padding / 2,
+      maxX: rect.maxX + options.padding / 2,
+      maxY: rect.maxY + options.padding / 2,
+    }));
+    return rectangles.every(
+      (rect, index) =>
+        inside(bin, rect) &&
+        ![...rectangles.slice(index + 1), ...obstacles].some((other) =>
+          rectanglesOverlap(rect, other),
+        ),
+    );
+  }
   const states = placements.flatMap((placement) => {
     const item = byId.get(placement.id);
     return item === undefined ? [] : [placedState(item, placement, options.padding)];
@@ -192,6 +264,17 @@ function validNest(
         states.filter((_other, other) => other !== index),
         obstacles,
       ),
+  );
+}
+function validNestDomain(bin: NestRect, options: NestOptions): boolean {
+  if (![bin.minX, bin.minY, bin.maxX, bin.maxY, options.padding].every(Number.isFinite))
+    return false;
+  if (bin.maxX <= bin.minX || bin.maxY <= bin.minY || options.padding < 0) return false;
+  return (options.obstacles ?? []).every(
+    (rect) =>
+      Object.values(rect).every(Number.isFinite) &&
+      rect.maxX >= rect.minX &&
+      rect.maxY >= rect.minY,
   );
 }
 
@@ -216,54 +299,6 @@ function comparePlacementScore(
   right: readonly [number, number, number],
 ): number {
   return left[0] - right[0] || left[1] - right[1] || left[2] - right[2];
-}
-
-function compareItems(left: OutlineNestItem, right: OutlineNestItem): number {
-  return (
-    right.width * right.height - left.width * left.height ||
-    Math.max(right.width, right.height) - Math.max(left.width, left.height) ||
-    left.id.localeCompare(right.id)
-  );
-}
-
-type PlacedState = {
-  readonly item: OutlineNestItem;
-  readonly placement: NestPlacement;
-  readonly paths: PathsD;
-  readonly bounds: NestRect;
-};
-
-function placedState(
-  item: OutlineNestItem,
-  placement: NestPlacement,
-  padding: number,
-): PlacedState {
-  const source = validOutline(item.outline)
-    ? item.outline
-    : rectangleOutline(item.width, item.height);
-  const oriented = source.map((path) =>
-    path.map((point) => {
-      const rotated = placement.rotated90 ? { x: item.height - point.y, y: point.x } : point;
-      return { x: rotated.x + placement.x, y: rotated.y + placement.y };
-    }),
-  ) as PathsD;
-  const spacing = finiteNonNegative(padding) / 2;
-  const paths =
-    spacing === 0
-      ? oriented
-      : inflatePathsD(oriented, spacing, JoinType.Round, EndType.Polygon, 2, 3);
-  const bounds = pathsBounds(paths) ?? placementBounds(item, placement, spacing);
-  return { item, placement, paths, bounds };
-}
-
-function obstacleState(rect: NestRect, padding: number): PlacedState {
-  const item: OutlineNestItem = {
-    id: `obstacle:${rect.minX}:${rect.minY}:${rect.maxX}:${rect.maxY}`,
-    width: rect.maxX - rect.minX,
-    height: rect.maxY - rect.minY,
-    canRotate: false,
-  };
-  return placedState(item, { id: item.id, x: rect.minX, y: rect.minY, rotated90: false }, padding);
 }
 
 function candidatePlacements(
@@ -317,18 +352,6 @@ function contactCoordinates(
   ];
 }
 
-function collides(
-  candidate: PlacedState,
-  others: ReadonlyArray<PlacedState>,
-  obstacles: ReadonlyArray<PlacedState>,
-): boolean {
-  return [...others, ...obstacles].some((other) => {
-    if (!rectanglesOverlap(candidate.bounds, other.bounds)) return false;
-    const intersection = intersectD(candidate.paths, other.paths, FillRule.NonZero, 3);
-    return intersection.some((path) => Math.abs(areaD(path)) > AREA_EPSILON);
-  });
-}
-
 type FootprintScore = readonly [number, number, number, number, number];
 
 function footprintScore(
@@ -353,77 +376,6 @@ function compareScore(left: FootprintScore, right: FootprintScore): number {
     if (Math.abs(delta) > 1e-9) return delta;
   }
   return 0;
-}
-
-function inside(bin: NestRect, bounds: NestRect): boolean {
-  return (
-    bounds.minX >= bin.minX - 1e-7 &&
-    bounds.minY >= bin.minY - 1e-7 &&
-    bounds.maxX <= bin.maxX + 1e-7 &&
-    bounds.maxY <= bin.maxY + 1e-7
-  );
-}
-
-function rectanglesOverlap(left: NestRect, right: NestRect): boolean {
-  return (
-    left.minX < right.maxX - 1e-7 &&
-    left.maxX > right.minX + 1e-7 &&
-    left.minY < right.maxY - 1e-7 &&
-    left.maxY > right.minY + 1e-7
-  );
-}
-
-function pathsBounds(paths: PathsD): NestRect | null {
-  const points = paths.flat();
-  if (points.length === 0) return null;
-  return {
-    minX: Math.min(...points.map((point) => point.x)),
-    minY: Math.min(...points.map((point) => point.y)),
-    maxX: Math.max(...points.map((point) => point.x)),
-    maxY: Math.max(...points.map((point) => point.y)),
-  };
-}
-
-function placementBounds(
-  item: OutlineNestItem,
-  placement: NestPlacement,
-  padding: number,
-): NestRect {
-  const width = placement.rotated90 ? item.height : item.width;
-  const height = placement.rotated90 ? item.width : item.height;
-  return {
-    minX: placement.x - padding,
-    minY: placement.y - padding,
-    maxX: placement.x + width + padding,
-    maxY: placement.y + height + padding,
-  };
-}
-
-function validOutline(outline: NestOutline | undefined): outline is NestOutline {
-  return (
-    outline !== undefined &&
-    outline.length > 0 &&
-    outline.every(
-      (path) => path.length >= 3 && path.every((point) => Number.isFinite(point.x + point.y)),
-    )
-  );
-}
-
-function rectangleOutline(width: number, height: number): NestOutline {
-  const safeWidth = finiteNonNegative(width);
-  const safeHeight = finiteNonNegative(height);
-  return [
-    [
-      { x: 0, y: 0 },
-      { x: safeWidth, y: 0 },
-      { x: safeWidth, y: safeHeight },
-      { x: 0, y: safeHeight },
-    ],
-  ];
-}
-
-function finiteNonNegative(value: number): number {
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function clean(value: number): number {

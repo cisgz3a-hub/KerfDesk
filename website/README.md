@@ -42,6 +42,8 @@ Amendment 1). Desktop downloads go to the KerfDesk download page (`site.download
 serves installers from `dl.kerfdesk.com`); help, bug and security reports go to the support page
 (`site.supportUrl`) or to `site.supportEmail`; write no other email address. Mark a
 tool with `proPill()` (or `pro: true` on a card) only when the owner listed it as Pro.
+The privacy page may link to OpenAI's API data policy for the optional desktop assistant.
+That exact disclosure link is the only additional external destination.
 
 ## Deploying
 

@@ -11,7 +11,8 @@ export function revealReviewedArtwork(
   sources: ReadonlyArray<ReviewArtworkSource>,
   eligibleIds: ReadonlySet<string>,
 ): boolean {
-  const review = useJobReviewStore.getState().state;
+  const request = useJobReviewStore.getState();
+  const review = request.state;
   if (
     review.kind !== 'open' ||
     review.purpose === 'laser-second-pass' ||
@@ -20,6 +21,9 @@ export function revealReviewedArtwork(
   )
     return false;
   const app = useStore.getState();
+  // Identical artwork can belong to a newly switched or duplicated sheet.
+  // Rebuilding the model must not retarget the original review request.
+  if (request.requestDocumentEpoch !== app.projectDocumentEpoch) return false;
   const matching = new Set(matchingReviewArtworkIds(sources, app.project.scene.objects));
   const ids = app.project.scene.objects
     .filter(

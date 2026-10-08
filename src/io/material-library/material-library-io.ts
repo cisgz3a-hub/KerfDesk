@@ -20,9 +20,11 @@ import {
   type ProcessRecipe,
 } from '../../core/material-library/process-recipe';
 import { parseProcessRecipes } from './process-recipe-io';
+import type { MaterialExperiment } from '../../core/material-library/material-experiment';
+import { canonicalMaterialExperiment, parseMaterialExperiments } from './material-experiment-io';
 
 export const MATERIAL_LIBRARY_FORMAT = 'laserforge-material-library';
-export const MATERIAL_LIBRARY_SCHEMA_VERSION = 2;
+export const MATERIAL_LIBRARY_SCHEMA_VERSION = 3;
 
 export { createMaterialLibraryDeviceHint };
 export type { MaterialLibraryDeviceHint };
@@ -56,6 +58,7 @@ export type MaterialLibraryDocument = {
   readonly deviceHint?: MaterialLibraryDeviceHint;
   readonly entries: ReadonlyArray<MaterialPreset>;
   readonly processRecipes?: ReadonlyArray<ProcessRecipe>;
+  readonly experiments?: ReadonlyArray<MaterialExperiment>;
 };
 
 export type DeserializeMaterialLibraryResult =
@@ -137,11 +140,21 @@ export function mergeMaterialLibraries(
       recipes.push(recipe);
     }
   }
+  const experiments = [...(base.experiments ?? [])];
+  const experimentIds = new Set(experiments.map((experiment) => experiment.id));
+  for (const experiment of incoming.experiments ?? []) {
+    if (experimentIds.has(experiment.id)) skippedDuplicateIds.push(experiment.id);
+    else {
+      experimentIds.add(experiment.id);
+      experiments.push(experiment);
+    }
+  }
   return {
     library: canonicalLibrary({
       ...base,
       entries: [...base.entries, ...appended],
       processRecipes: recipes,
+      experiments,
     }),
     skippedDuplicateIds,
   };
@@ -173,6 +186,8 @@ function parseCurrentLibrary(raw: Record<string, unknown>): DeserializeMaterialL
   }
   const recipes = parseProcessRecipes(raw['processRecipes']);
   if (recipes.kind === 'invalid') return recipes;
+  const experiments = parseMaterialExperiments(raw['experiments']);
+  if (experiments.kind === 'invalid') return experiments;
 
   return {
     kind: 'ok',
@@ -186,6 +201,7 @@ function parseCurrentLibrary(raw: Record<string, unknown>): DeserializeMaterialL
         : {}),
       entries: entryResult.entries,
       ...(recipes.value.length === 0 ? {} : { processRecipes: recipes.value }),
+      ...(experiments.value.length === 0 ? {} : { experiments: experiments.value }),
     }),
   };
 }
@@ -317,6 +333,7 @@ function parseThickness(
 
 function canonicalLibrary(document: MaterialLibraryDocument): MaterialLibraryDocument {
   const processRecipes = document.processRecipes ?? [];
+  const experiments = document.experiments ?? [];
   return {
     format: MATERIAL_LIBRARY_FORMAT,
     librarySchemaVersion: MATERIAL_LIBRARY_SCHEMA_VERSION,
@@ -329,6 +346,9 @@ function canonicalLibrary(document: MaterialLibraryDocument): MaterialLibraryDoc
     ...(processRecipes.length === 0
       ? {}
       : { processRecipes: processRecipes.map(canonicalProcessRecipe) }),
+    ...(experiments.length === 0
+      ? {}
+      : { experiments: experiments.map(canonicalMaterialExperiment) }),
   };
 }
 

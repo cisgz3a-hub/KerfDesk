@@ -1,3 +1,4 @@
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 // Delete Duplicates, Close Path and Reverse Direction (LightBurn gap batch 5,
 // LBG-F08, ADR-480). Each is one undo step and says what it did. Close and
 // Reverse edit paths the node tools can edit (imported and traced artwork and
@@ -95,9 +96,10 @@ type EditableObject = Extract<
 
 function isPathEditable(object: SceneObject): object is EditableObject {
   return (
-    object.kind === 'imported-svg' ||
-    object.kind === 'traced-image' ||
-    (object.kind === 'shape' && object.spec.kind === 'polyline')
+    !isBooleanCompoundObject(object) &&
+    (object.kind === 'imported-svg' ||
+      object.kind === 'traced-image' ||
+      (object.kind === 'shape' && object.spec.kind === 'polyline'))
   );
 }
 

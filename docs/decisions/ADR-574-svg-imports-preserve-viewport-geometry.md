@@ -1,4 +1,4 @@
-## ADR-570 - SVG imports preserve viewport geometry
+## ADR-574 - SVG imports preserve viewport geometry
 
 **Date:** 2026-10-07
 

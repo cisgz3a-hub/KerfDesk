@@ -125,11 +125,12 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Menu bar**: the application menus, then an **Undo** / **Redo** pair immediately right of Help (ADR-348). Each is disabled when its own history is empty and runs the same command as the Edit menu and the keyboard shortcut.
 - **Top command toolbar**: Open, Import, Import Image, Save and Preview lead with readable labels when space permits. Selecting an image brings Trace image into the row; Image Studio remains in **More**. Other commands remain in **More** and the application menus, with their existing shortcuts, disabled reasons, tooltips and actions. The row measures available width and moves commands into More instead of scrolling horizontally. Utility controls share the row down to 520 px. The project name includes an unsaved-change indicator.
 - **Numeric transforms**: X, Y, width, height, rotation, and the aspect-ratio lock remain directly available. **Anchor** opens the existing nine-point transform reference selector in a keyboard-accessible popover. Changing its presentation does not change the X/Y reference, resize anchor, or rotation centre.
+- **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
 - **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
-- **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
+- **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Its heading, jog controls and current status remain above the independently scrolling lower settings. The upper controls can also scroll so optional Focus/Z controls and recovery messages remain reachable. When the available panel body is too short for two usable scroll regions, the whole machine panel scrolls instead; Frame and Start remain outside that scroller. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
 - **Placement & output**: the Machine panel groups the existing placement and output settings in a disclosure. Mouse, Space, and Enter open it without activating canvas or job shortcuts.
 - **Job actions dock**: **Frame job** and the primary **Start** action (greyed out until a clean Frame of the exact job completes) sit outside the settings scroller. In Compact layout the dock remains below either expanded Artwork or Machine tab. Collapsing the active panel narrows the entire sidebar to a 48 px restore strip with stacked icon tabs and hides the dock, giving that width back to the canvas; either tab expands its panel. In Spacious layout the dock sits below the expanded Machine panel. It shares the existing readiness, Frame, and Start handlers. A completed Frame for the exact reviewed job remains the sole ordinary Start policy gate; the dock adds no policy checks or machine actions, and the separate Live Motion bar is unaffected by collapse.
@@ -237,7 +238,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
 7. Nested SVG and symbol viewports clip overflowing artwork by default, including embedded images
-   (ADR-570). Explicit or styled `overflow: hidden` and `scroll` clip to the exact viewport;
+   (ADR-574). Explicit or styled `overflow: hidden` and `scroll` clip to the exact viewport;
    `visible` and `auto` allow overflow. A standalone SVG root allows overflow by default and clips
    only when requested. Viewport clips intersect other clips; their own clip paths use the mapped
    content coordinates and measure object bounding boxes before clipping.
@@ -299,7 +300,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
 2. Toast (info): `<filename> has no units — assuming millimeters`.
 
-#### Edge — SVG shape positions or sizes use percentages (ADR-570)
+#### Edge — SVG shape positions or sizes use percentages (ADR-574)
 1. Supported rectangles, lines, circles, ellipses and `<use>` positions retain their layout in the
    nearest SVG or symbol viewport. X coordinates and widths use its width; Y coordinates and
    heights use its height. A circle's percentage radius uses the normalized viewport diagonal.
@@ -1158,7 +1159,7 @@ marks later edits as unapproved without changing the existing Frame/Start policy
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
    (ADR-358). New exports also restore their authored scene coordinate frame through explicit
-   artwork-origin metadata (ADR-570), before ordinary import placement. Older exports, or files
+   artwork-origin metadata (ADR-574), before ordinary import placement. Older exports, or files
    whose metadata an external editor removes, use standard SVG viewport placement and cannot
    automatically recover that frame. Native SVG rendering is unchanged.
    Use the project format to preserve editable text and machining data. Software tests
@@ -2969,6 +2970,29 @@ the lock when the owning window closes, reloads or crashes, so crash recovery is
    libraries, and preferences. It does not send `$RST=*` or factory-reset EEPROM.
 5. An ordinary Idle Forget has no error dialog. If transport failure leaves motion
    uncertain, the physical-safety warning remains instead of claiming a clean stop.
+
+#### Recovering information without replacing the connection
+
+1. Pause/Resume without a controller reset and clean job completion keep the
+   existing connection and settings observation. Reset-based CNC Pause and lift
+   revalidates information through that connection. An incomplete job alone
+   does not require reconnect.
+2. Abort or reboot automatically refreshes required controller information over
+   that port when cleanup, real response/write ownership and fresh Idle permit
+   it. Responsive Alarm/Sleep waits; actual silence is reported. Old response
+   debt is not discarded on reset delivery or Idle alone. Explicit read-only
+   settings queries retain the supported Alarm-read path and ownership fences.
+3. Retry shows its current waiting reason and checks the settings-read gate
+   again when clicked. Reconnect is offered for current communication or
+   unresolved ownership failures, and rechecks that condition before replacing
+   a connection. Neither action dismisses the physical-safety notice.
+4. A CNC Pause/Resume confirmation warning retains the paused job and its saved
+   artifact. A later accepted Abort, actual Disconnect or controller fault
+   records its own terminal cause. A reset-owned host freeze remains provisional.
+5. A controller reboot during final job settlement records interruption, even
+   after all job lines were acknowledged. Acknowledgement-stall containment
+   freezes further host refill and preserves the existing dwell/busy detection
+   and warning threshold. These are software controls, not physical-stop proof.
 
 ### F-B17. Rotary setup, test rotation and the Rotary switch (ADR-127, ADR-315, ADR-373)
 

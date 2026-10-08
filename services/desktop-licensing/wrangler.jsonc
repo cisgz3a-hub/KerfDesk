@@ -14,8 +14,11 @@
   },
   "vars": {
     "LICENSING_ENABLED": "true",
-    "PAYMENTS_ENABLED": "false",
+    "PAYMENTS_ENABLED": "true",
     "PAYMENT_PROVIDER": "paddle",
+    "PADDLE_ENVIRONMENT": "live",
+    "PADDLE_PURCHASE_PRICE_ID": "pri_01m4ajbzk3nx9km7ejhze8hzad",
+    "PADDLE_RENEWAL_PRICE_ID": "pri_01m4ajpg52ch0cq8qh15vveq21",
     "PADDLE_CHECKOUT_URL": "https://kerfdesk.com/buy.html",
     // The key the SIGNING_PRIVATE_JWK secret signs with; public/desktop-licence-keys.json
     // pins its public half. A deploy deletes plain-text variables set only in the

@@ -12,7 +12,11 @@ import { page as license } from './license.mjs';
 import { page as machines } from './machines.mjs';
 import { page as notFound } from './not-found.mjs';
 import { page as phone } from './phone.mjs';
-import { page as pricing } from './pricing.mjs';
+import {
+  pricingInformationPage as pricing,
+  softwareTermsPage,
+  refundPolicyPage,
+} from './payment-information.mjs';
 import { page as privacy } from './privacy.mjs';
 import { page as safety } from './safety.mjs';
 
@@ -24,6 +28,8 @@ export const pages = [
   machines,
   download,
   pricing,
+  softwareTermsPage,
+  refundPolicyPage,
   docs,
   phone,
   safety,

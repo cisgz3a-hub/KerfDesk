@@ -351,11 +351,8 @@ describe('stop-path ack attribution', () => {
     expect(streamer?.inFlight).toHaveLength(1);
   });
 
-  // GRBL stop: the soft reset wipes the firmware's RX buffer, so the
-  // in-flight lines will never be acked and the streamer drops them at stop
-  // time. M5/M9 fail-dark cleanup is deferred until the boot banner (audit
-  // F2) so its oks can neither be swallowed mid-boot nor orphaned by the
-  // banner's ledger reset.
+  // Accepted Stop transport freezes refill while retaining every old reply.
+  // Only the recognized boot discards that ledger before new cleanup ACKs.
   it('GRBL stop defers M5/M9 to the boot banner; their oks settle the ledger', async () => {
     const written: string[] = [];
     const connection = makeConnection(async (data) => {
@@ -367,16 +364,18 @@ describe('stop-path ack attribution', () => {
     await flush();
     expect(useLaserStore.getState().streamer?.inFlight.length).toBeGreaterThan(0);
 
+    const oldInFlight = useLaserStore.getState().streamer!.inFlight;
     await useLaserStore.getState().stopJob();
     const stopped = useLaserStore.getState().streamer;
     expect(stopped?.status).toBe('cancelled');
-    expect(stopped?.inFlight).toEqual([]);
+    expect(stopped?.inFlight).toEqual(oldInFlight);
     // Cleanup is armed, not written: no untracked ack owed yet, nothing to jam.
     expect(written).not.toContain('M5\n');
     expect(written).not.toContain('M9\n');
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
 
-    connection.emitLine('Grbl 1.1f'); // boot banner after the soft reset
+    connection.emitLine('Grbl 1.1f'); // causal RX boundary after the soft reset
+    expect(useLaserStore.getState().streamer?.inFlight).toEqual([]);
     await flush();
     expect(written).toContain('M5\n');
     expect(written).toContain('M9\n');

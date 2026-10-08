@@ -14,6 +14,8 @@ The operator process needs `DESKTOP_STABLE_MANIFEST_PRIVATE_KEY`, `DESKTOP_STABL
 
 The package reader verifies production licensing, trusted release identity, desktop renderer, legal notices, explicit `kerfdeskUnsignedInstaller: true`, `commercial-unsigned` channel, disabled update trust and absence of `app-update.yml`. The installer verifier reads its archive without executing it, checks `NotSigned` Authenticode status and binds its embedded executable, ASAR and notices to the verified package. It runs before publication and again on remote readback.
 
+Windows verification requires the full 7-Zip console with the NSIS handler. It uses `7z.exe` in the standard 64-bit Program Files installation, or the absolute path supplied by `ELECTRON_BUILDER_7ZIP_PATH`. Standalone `7za.exe` supplied by electron-builder cannot read NSIS installers. The verifier checks the tool capability before archive inspection and reports a prerequisite failure if full 7-Zip is absent. A blank NSIS unpacked-size field uses bounded extraction with the same 300 MB limit; a declared size must still match the extracted bytes. Missing, malformed or duplicate size fields are refused. The payload must have the 7z signature required by the pinned NSIS extraction plug-in; ZIP bytes renamed to `app-64.7z` are refused. Portable nested-archive tests do not qualify a Windows installer; the native NSIS regression uses the pinned compiler and real `NotSigned` probe without executing the installer.
+
 The publisher writes only:
 
 - `desktop/commercial-manual/releases/X.Y.Z/KerfDesk-X.Y.Z-windows-x64-setup.exe`

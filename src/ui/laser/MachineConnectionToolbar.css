@@ -1,0 +1,104 @@
+.lf-workspace-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  flex-shrink: 0;
+  background: var(--lf-bg-1);
+  border-bottom: 1px solid var(--lf-border);
+}
+
+.lf-workspace-topbar > .lf-numeric-edits {
+  flex: 1 1 660px;
+  border-bottom: 0;
+}
+
+.lf-machine-toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 5px 12px;
+  font-size: var(--lf-text-sm);
+}
+
+.lf-machine-toolbar .lf-connection-hint {
+  max-width: 420px;
+  font-size: var(--lf-text-xs);
+}
+
+.lf-machine-toolbar .lf-connection-compact-row > [role='note'] {
+  flex-basis: 100%;
+  order: 1;
+}
+
+.lf-machine-toolbar [data-help-id='control:laser.machine-setup.launch'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 5px;
+}
+
+.lf-machine-toolbar [data-help-id='control:laser.machine-setup.launch'] svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 1100px) {
+  .lf-workspace-topbar > .lf-numeric-edits {
+    flex-basis: 100%;
+  }
+
+  .lf-machine-toolbar {
+    flex: 1 1 100%;
+    border-top: 1px solid var(--lf-border);
+  }
+
+  .lf-machine-toolbar .lf-connection-hint {
+    max-width: none;
+  }
+}
+
+@media (max-width: 700px) {
+  /* Leave room to draw when the application header also wraps. Keep the
+     transform and machine controls in two compact, fully reachable rows. */
+  .lf-workspace-topbar > .lf-numeric-edits {
+    min-height: 34px;
+    padding: 1px 8px;
+  }
+
+  .lf-workspace-topbar .lf-transform-anchor-trigger,
+  .lf-workspace-topbar .lf-numeric-edit-field .lf-input {
+    min-height: 32px;
+  }
+
+  .lf-workspace-topbar .lf-numeric-aspect-lock {
+    width: 32px;
+    height: 32px;
+  }
+
+  .lf-machine-toolbar {
+    padding: 0 8px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-status {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .lf-machine-toolbar .lf-connection-card-more {
+    width: 32px;
+    min-width: 32px;
+  }
+}

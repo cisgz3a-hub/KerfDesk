@@ -1,0 +1,318 @@
+{
+  "scope": "Historical bounded mutation audit before the semantic port to current main; not a mutation score of the final PR head.",
+  "originalWorkingTreeHead": "a37082457b76d56b8c9ba92be27db027b5a92cb0",
+  "originalSuiteDetected": 5,
+  "originalSelectedFaults": 7,
+  "strengthenedSelectedFaultsDetected": 10,
+  "selectedFaults": 10,
+  "creditedFailures": "Assertions only; no timeout, configuration or syntax errors credited.",
+  "evidence": [
+    {
+      "id": "m1-scheduler-disabled",
+      "startedAt": "2026-10-07T08:44:27.316Z",
+      "finishedAt": "2026-10-07T08:44:40.831Z",
+      "exitCode": 1,
+      "totalTests": 15,
+      "passedTests": 14,
+      "failedTests": 1,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-store-controller-recovery.test.ts",
+          "title": "controller recovery on the existing connection recovers after Abort even when the reset greeting is missing",
+          "assertion": "AssertionError: expected 1 to be 2 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "id": "m2-old-response-debt-ignored",
+      "startedAt": "2026-10-07T08:44:40.835Z",
+      "finishedAt": "2026-10-07T08:44:54.122Z",
+      "exitCode": 1,
+      "totalTests": 21,
+      "passedTests": 9,
+      "failedTests": 12,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership keeps error-triggered reset debt fenced after a missing greeting, then recovers at a late boot",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership keeps missing-greeting Abort fenced even after all old job ACKs drain",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership keeps an actual non-job owed reply fenced after its late anonymous ACK drains",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership uses a late recognized boot to discard old stream debt before cleanup and settings ACKs",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership preserves the exact reset fence through Alarm at 50 ms and recovers after late boot",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership preserves the exact reset fence through Sleep at 50 ms and recovers after late boot",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership preserves the exact reset fence through Alarm at 600 ms and recovers after late boot",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership preserves the exact reset fence through Sleep at 600 ms and recovers after late boot",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership preserves the exact reset fence through ALARM:2 at 50 ms and recovers after late boot",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership preserves the exact reset fence through ALARM:2 at 600 ms and recovers after late boot",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-response-ownership.test.ts",
+          "title": "causal reset response ownership joins a later Disconnect without a second reset or duplicate cleanup",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-stream-ack-stall.test.ts",
+          "title": "acknowledgement stall containment retains a stalled sender after an unconfirmed accepted reset and recovers only at a late boot",
+          "assertion": "AssertionError: expected 'qualifying' to be 'failed' // Object.is equality"
+        }
+      ]
+    },
+    {
+      "id": "m3-finishing-reboot-not-interrupted",
+      "startedAt": "2026-10-07T08:44:54.13Z",
+      "finishedAt": "2026-10-07T08:45:11.384Z",
+      "exitCode": 1,
+      "totalTests": 3,
+      "passedTests": 1,
+      "failedTests": 2,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-job-settle-reboot.test.ts",
+          "title": "controller reboot before job settlement keeps a rebooted dwell tail interrupted when the new controller later reports Idle",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { streamer: { …(2) }, …(3) }"
+        },
+        {
+          "file": "src/ui/state/laser-job-settle-reboot.test.ts",
+          "title": "controller reboot before job settlement keeps a rebooted awaiting-idle tail interrupted when the new controller later reports Idle",
+          "assertion": "AssertionError: expected { capabilities: { …(18) }, …(99) } to match object { streamer: { …(2) }, …(3) }"
+        }
+      ]
+    },
+    {
+      "id": "m4-reconnect-uses-position-evidence",
+      "startedAt": "2026-10-07T08:45:11.393Z",
+      "finishedAt": "2026-10-07T08:45:13.491Z",
+      "exitCode": 1,
+      "totalTests": 15,
+      "passedTests": 11,
+      "failedTests": 4,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/controller-recovery-status.test.ts",
+          "title": "current controller reconnect recommendation keeps a responsive Alarm or Sleep connection without promoting position authority",
+          "assertion": "AssertionError: expected true to be false // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/controller-recovery-status.test.ts",
+          "title": "current controller reconnect recommendation recognises missing, old-session or stale communication independently of position (null)",
+          "assertion": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/controller-recovery-status.test.ts",
+          "title": "current controller reconnect recommendation recognises missing, old-session or stale communication independently of position ({\"sessionEpoch\":3,\"observedAt\":19500})",
+          "assertion": "AssertionError: expected false to be true // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/controller-recovery-status.test.ts",
+          "title": "current controller reconnect recommendation recognises missing, old-session or stale communication independently of position ({\"sessionEpoch\":4,\"observedAt\":12000})",
+          "assertion": "AssertionError: expected false to be true // Object.is equality"
+        }
+      ]
+    },
+    {
+      "id": "m5-reset-retains-frame-proof",
+      "startedAt": "2026-10-07T08:45:13.498Z",
+      "finishedAt": "2026-10-07T08:45:39.761Z",
+      "exitCode": 0,
+      "totalTests": 38,
+      "passedTests": 38,
+      "failedTests": 0,
+      "allFailuresAreAssertions": false,
+      "failedAssertions": []
+    },
+    {
+      "id": "m5-reset-retains-frame-proof-strengthened",
+      "startedAt": "2026-10-07T08:51:04.455Z",
+      "finishedAt": "2026-10-07T08:51:15.52Z",
+      "exitCode": 1,
+      "totalTests": 9,
+      "passedTests": 8,
+      "failedTests": 1,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/laser/ControllerConnectionControls-reconnect.test.tsx",
+          "title": "ControllerConnectionControls current reconnect ownership revokes a completed exact Frame synchronously when Abort claims a rejected reset",
+          "assertion": "AssertionError: expected { boundsSignature: '0,0,10,10', …(2) } to be null"
+        }
+      ]
+    },
+    {
+      "id": "m6-ack-stall-does-not-freeze",
+      "startedAt": "2026-10-07T08:45:39.766Z",
+      "finishedAt": "2026-10-07T08:45:54.153Z",
+      "exitCode": 1,
+      "totalTests": 6,
+      "passedTests": 5,
+      "failedTests": 1,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-stream-ack-stall.test.ts",
+          "title": "acknowledgement stall containment freezes a non-resettable sender before beam-off acknowledgements can refill it",
+          "assertion": "AssertionError: expected 2 to be 1 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "id": "m7-reconnect-click-guard",
+      "startedAt": "2026-10-07T08:48:30.433Z",
+      "finishedAt": "2026-10-07T08:48:37.597Z",
+      "exitCode": 0,
+      "totalTests": 20,
+      "passedTests": 20,
+      "failedTests": 0,
+      "allFailuresAreAssertions": false,
+      "failedAssertions": []
+    },
+    {
+      "id": "m7-reconnect-click-guard-strengthened",
+      "startedAt": "2026-10-07T08:51:15.612Z",
+      "finishedAt": "2026-10-07T08:51:26.429Z",
+      "exitCode": 1,
+      "totalTests": 9,
+      "passedTests": 7,
+      "failedTests": 2,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/laser/ControllerConnectionControls-reconnect.test.tsx",
+          "title": "ControllerConnectionControls current reconnect ownership rechecks a stale enabled Reconnect controller when the same port finishes recovery before React updates",
+          "assertion": "AssertionError: expected \"spy\" to be called once, but got 2 times"
+        },
+        {
+          "file": "src/ui/laser/ControllerConnectionControls-reconnect.test.tsx",
+          "title": "ControllerConnectionControls current reconnect ownership rechecks a stale enabled Reconnect controller… when the same port finishes recovery before React updates",
+          "assertion": "AssertionError: expected \"spy\" to be called once, but got 2 times"
+        }
+      ]
+    },
+    {
+      "id": "m8-reset-owner-requires-pending-flag",
+      "startedAt": "2026-10-07T08:53:36.034Z",
+      "finishedAt": "2026-10-07T08:53:45.944Z",
+      "exitCode": 1,
+      "totalTests": 10,
+      "passedTests": 4,
+      "failedTests": 6,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending retains cleanup ownership and its real reply debt through Alarm",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending retains cleanup ownership and its real reply debt through Sleep",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending retains cleanup ownership and its real reply debt through ALARM:2",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through Alarm and owns the next Frame Abort",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through Sleep and owns the next Frame Abort",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through ALARM:2 and owns the next Frame Abort",
+          "assertion": "AssertionError: expected null to be { kind: 'recovery', …(2) } // Object.is equality"
+        }
+      ]
+    },
+    {
+      "id": "m9-alarm-sleep-invalidates-write-epoch",
+      "startedAt": "2026-10-07T08:53:45.954Z",
+      "finishedAt": "2026-10-07T08:53:55.953Z",
+      "exitCode": 1,
+      "totalTests": 10,
+      "passedTests": 7,
+      "failedTests": 3,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through Alarm and owns the next Frame Abort",
+          "assertion": "AssertionError: expected 1 to be +0 // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through Sleep and owns the next Frame Abort",
+          "assertion": "AssertionError: expected 1 to be +0 // Object.is equality"
+        },
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps delayed successful cleanup replies owed through ALARM:2 and owns the next Frame Abort",
+          "assertion": "AssertionError: expected 1 to be +0 // Object.is equality"
+        }
+      ]
+    },
+    {
+      "id": "m10-completed-failure-not-released",
+      "startedAt": "2026-10-07T08:53:55.96Z",
+      "finishedAt": "2026-10-07T08:54:06.513Z",
+      "exitCode": 1,
+      "totalTests": 10,
+      "passedTests": 9,
+      "failedTests": 1,
+      "allFailuresAreAssertions": true,
+      "failedAssertions": [
+        {
+          "file": "src/ui/state/laser-reset-cleanup-interruption.test.ts",
+          "title": "post-reset cleanup interrupted while its transport is pending keeps an interrupted cleanup fenced when a second boot arrives before M5 transport settles",
+          "assertion": "AssertionError: expected [] to have a length of 1 but got +0"
+        }
+      ]
+    }
+  ]
+}

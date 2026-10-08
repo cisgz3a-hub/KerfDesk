@@ -27,6 +27,7 @@ import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { loadedMachineCapabilityWarningMessage } from '../machine/machine-capability-messages';
 import { preserveBrowserProProject } from '../state/pending-pro-project';
+import { isAutosaveDiscardPending } from './autosave-file-cleanup';
 
 export const AUTOSAVE_FAILURE_MESSAGE =
   'Autosave could not preserve the newest project. Save the .lf2 file manually; image-heavy projects can exceed browser storage.';
@@ -58,7 +59,11 @@ function createSnapshotForAutosave(): AutosaveSnapshotFn {
     const streamer = ls.streamer;
     const isStreaming =
       streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
-    return { project: snapshotProject(s), dirty: s.dirty, isStreaming };
+    return {
+      project: snapshotProject(s),
+      dirty: s.dirty && !isAutosaveDiscardPending(s.project),
+      isStreaming,
+    };
   };
 }
 

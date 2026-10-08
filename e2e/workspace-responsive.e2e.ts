@@ -1,4 +1,6 @@
 import { test, expect, type Locator, type Page } from './fixtures/kerfdesk-test';
+import type { PlatformAdapter } from '../src/platform/types';
+import type { AppState } from '../src/ui/state';
 
 const viewports = [
   { width: 1920, height: 1080, layout: 'spacious' },
@@ -20,6 +22,7 @@ for (const viewport of viewports) {
     const panels = page.getByRole('region', { name: 'Workspace side panels' });
     await expect(panels).toHaveAttribute('data-layout', viewport.layout);
     await expectWithinViewport(page, panels);
+    await expectWithinViewport(page, page.getByRole('region', { name: 'Machine toolbar' }));
     await expectWithinViewport(page, page.getByRole('region', { name: 'Job actions' }));
     await expectWithinViewport(page, page.getByRole('button', { name: 'Frame job', exact: true }));
     await expectWithinViewport(page, page.getByRole('button', { name: 'Start', exact: true }));
@@ -37,9 +40,12 @@ for (const viewport of viewports) {
     const dockBeforeScroll = await dock.boundingBox();
     const machine = page.getByLabel('Laser controls', { exact: true });
     await expect(machine).toBeVisible();
-    await machine.evaluate((element) => {
+    expect(await machine.getByRole('region', { name: 'Machine connection' }).count()).toBe(0);
+    const jogBeforeScroll = await machine.locator('.lf-jog-panel').boundingBox();
+    await machine.locator('.lf-machine-details').evaluate((element) => {
       element.scrollTop = element.scrollHeight;
     });
+    expect(await machine.locator('.lf-jog-panel').boundingBox()).toEqual(jogBeforeScroll);
     expect(await dock.boundingBox()).toEqual(dockBeforeScroll);
     await expectWithinViewport(page, dock);
     await expectNoPageOverflow(page);
@@ -49,6 +55,89 @@ for (const viewport of viewports) {
       await expectWithinViewport(page, dock);
     }
     expect(errors).toEqual([]);
+  });
+}
+
+test('machine connection remains reachable when its sidebar is collapsed', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 668 });
+  await page.goto('/');
+  await page.getByRole('tab', { name: 'Machine', exact: true }).click();
+  await page.getByRole('button', { name: 'Collapse Laser panel', exact: true }).click();
+  const toolbar = page.getByRole('region', { name: 'Machine toolbar' });
+  await expectWithinViewport(page, toolbar);
+  await expect(toolbar.getByRole('button', { name: 'Connect', exact: true })).toBeVisible();
+  const details = toolbar.getByRole('button', { name: /^Machine details:/ });
+  await details.click();
+  const popup = page.getByRole('dialog', { name: 'Machine details', exact: true });
+  await expectWithinViewport(page, popup);
+  await expect(popup.getByLabel('Machine profile', { exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(details).toBeFocused();
+  await toolbar.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Machine Setup', exact: true })).toBeVisible();
+});
+
+test('expanded FluidNC form stays in machine details without consuming workspace height', async ({
+  page,
+  kerfdesk,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 620 });
+  await page.goto('/');
+  await enableMockFluidNcNetwork(page);
+  const toolbar = page.getByRole('region', { name: 'Machine toolbar' });
+  const dock = page.getByRole('region', { name: 'Job actions' });
+  const toolbarBefore = await toolbar.boundingBox();
+  const dockBefore = await dock.boundingBox();
+  expect(await toolbar.locator('summary').count()).toBe(0);
+  const trigger = toolbar.getByRole('button', { name: /^Machine details:/ });
+  await trigger.click();
+  const popup = page.getByRole('dialog', { name: 'Machine details', exact: true });
+  await popup
+    .locator('summary')
+    .filter({ hasText: /^FluidNC network connection$/ })
+    .click();
+  const address = popup.getByRole('textbox', { name: 'FluidNC machine IP or hostname' });
+  const port = popup.getByRole('spinbutton', { name: 'FluidNC Telnet port' });
+  await address.fill('192.0.2.1');
+  await address.press('Tab');
+  await expect(port).toBeFocused();
+  await port.fill('23456');
+  await port.press('Tab');
+  const connect = popup.getByRole('button', { name: 'Connect FluidNC network', exact: true });
+  await expect(connect).toBeFocused();
+  await expect(connect).toBeEnabled();
+  await expectWithinViewport(page, popup);
+  await expectWithinViewport(page, connect);
+  expect(await toolbar.boundingBox()).toEqual(toolbarBefore);
+  expect(await dock.boundingBox()).toEqual(dockBefore);
+  await expectWithinViewport(page, dock);
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
+});
+
+async function enableMockFluidNcNetwork(page: Page): Promise<void> {
+  await page.getByRole('region', { name: 'Machine toolbar' }).waitFor();
+  await page.evaluate(async () => {
+    const adapterUrl = '/src/platform/web/index.ts';
+    const stateUrl = '/src/ui/state/index.ts';
+    const { webAdapter } = (await import(adapterUrl)) as { webAdapter: PlatformAdapter };
+    const { useStore } = (await import(stateUrl)) as { useStore: { getState: () => AppState } };
+    Object.defineProperty(webAdapter, 'machineNetwork', {
+      configurable: true,
+      value: {
+        serialForTarget: () => {
+          throw new Error('Layout regression must not open a network channel');
+        },
+      },
+    });
+    const device = {
+      ...useStore.getState().project.device,
+      name: 'FluidNC layout fixture',
+      controllerKind: 'fluidnc' as const,
+    };
+    delete device.controllerCommandSet;
+    useStore.getState().replaceDeviceProfile(device);
   });
 }
 

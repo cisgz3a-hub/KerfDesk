@@ -1,13 +1,7 @@
-// Pricing: the Free and Pro editions and the Pro license terms, as the owner
-// settled them on 2026-09-29 (ADR-524 Amendment 1). Every price and term comes
-// from commerce.config.mjs. The prices render while checkout is closed. Purchases
-// start in the desktop app, so the site never links a checkout (ADR-524
-// Amendment 2): until `commerce.trialOpen` the Pro card says purchase opens soon
-// and the trial is promised for when the desktop app is released; after it, the
-// card links the desktop app. Refund terms are not written here: the terms of
-// sale are published before sales open. The hero lead, the terms line and the
-// FAQ follow `salesOpen` and `trialOpen`, but reread all of them in the change
-// that opens sales.
+// Pricing and covered-version licence rights follow the settled offer.
+// Sales use the KerfDesk browser/phone purchase page or Help > Licence on Windows
+// (ADR-562); a standalone provider payment link is never a supported purchase.
+// The flags also render truthful closed-sales and trial-only states.
 
 import { button, callout, faqList, featureGrid, pageHero, section } from '../lib/components.mjs';
 import { formatPrice } from '../lib/commerce.mjs';
@@ -42,18 +36,19 @@ function planFacts(plan, commerce) {
     .join(' ');
 }
 
-// The desktop app runs the trial and sells the license (Help > Licence), so the
-// card links the app once it is out and never a checkout.
-function planAction(plan, commerce) {
+// The first-party page creates and recovers its own order before Paddle opens.
+function planAction(plan, commerce, site) {
   if (!commerce.trialOpen) return html`<p class="plan__soon">Purchase opens soon</p>`;
-  const note = commerce.salesOpen
-    ? html`Buy ${plan.name} inside the app, from Help &gt; Licence.`
-    : 'Purchase opens soon.';
+  if (commerce.salesOpen) {
+    return html`${button(site.appUrl + '/buy.html', 'Buy ' + plan.name)}
+      ${button('/download/', 'Get the desktop app', { variant: 'secondary' })}
+      <p class="plan__fine">Buy in this browser or from Help &gt; Licence in the Windows app.</p>`;
+  }
   return html`${button('/download/', 'Get the desktop app')}
-    <p class="plan__fine">${note}</p>`;
+    <p class="plan__fine">Purchase opens soon.</p>`;
 }
 
-function paidPlan(plan, commerce) {
+function paidPlan(plan, commerce, site) {
   const cadence = plan.billing === 'yearly' ? 'per year' : 'one-time';
   return html`<article class="plan" id="plan-${plan.id}">
     <h2 class="h3">KerfDesk ${plan.name}</h2>
@@ -63,7 +58,7 @@ function paidPlan(plan, commerce) {
     ${plan.where && html`<p>In ${plan.where}.</p>`} ${plan.summary && html`<p>${plan.summary}</p>`}
     ${ticks(plan.includes)}
     <p class="plan__fine">${planFacts(plan, commerce)}</p>
-    ${planAction(plan, commerce)}
+    ${planAction(plan, commerce, site)}
   </article>`;
 }
 
@@ -91,12 +86,13 @@ function termsLine(commerce) {
   and exclude any sales tax or VAT the payment provider adds at checkout.`;
   if (!commerce.salesOpen) {
     return html`<p class="plans__terms">
-      ${tax} Purchase isn’t open yet: no payment provider is live, so there’s no checkout and
-      nothing can be bought today. The terms of sale will be published before sales open.
+      ${tax} Sales and paid checkout remain closed, so nothing can be bought today. Read our
+      <a href="/terms/">software and Supplier Terms</a> and
+      <a href="/refunds/">Refund Policy</a> for a future purchase.
     </p>`;
   }
   return html`<p class="plans__terms">
-    ${tax} Checkout opens on our payment provider’s page. See the
+    ${tax} Paddle shows the applicable tax and total before you pay. Read the
     <a href="${commerce.termsUrl}">terms of sale</a> and
     <a href="${commerce.refundPolicyUrl}">refund policy</a>.
   </p>`;
@@ -146,7 +142,7 @@ function licenseTerms(plan, commerce) {
   });
 }
 
-function faq(commerce, plan) {
+function faq(commerce, plan, site) {
   const devices = plan?.deviceLimit ?? 3;
   return [
     !commerce.trialOpen &&
@@ -155,11 +151,29 @@ function faq(commerce, plan) {
         question: `Can I try ${plan.name} today?`,
         answer: `Not yet. ${plan.name} comes with ${plan.where ?? 'the desktop app'}, which isn’t released yet. When it is, each device gets a free ${plan.trialDays}-day trial with no card needed.`,
       },
-    !commerce.salesOpen && {
+    {
       id: 'buy-now',
       question: 'Can I buy Pro today?',
-      answer:
-        'Not yet. Purchase opens soon. No payment provider is live yet, so there’s no checkout and nothing can be bought today. The terms of sale will be published before sales open.',
+      answer: commerce.salesOpen
+        ? html`<p>
+            Yes. Open the <a href="${site.appUrl}/buy.html">KerfDesk purchase page</a> on a
+            computer, phone or tablet, or choose Help &gt; Licence in the Windows app. After paying,
+            return to the same purchase flow and choose Check payment. Save the licence key and your
+            Paddle receipt, then enter the key in Help &gt; Licence on Windows. Buying on a phone
+            does not activate it or use a licence seat.
+          </p>`
+        : 'Not yet. Sales and paid checkout remain closed, so nothing can be bought today. Our software and Supplier Terms and Refund Policy are published for a future purchase.',
+    },
+    commerce.salesOpen && {
+      id: 'purchase-recovery',
+      question: 'What if checkout closes or my licence does not appear?',
+      answer: html`<p>
+        Return in the same browser or Windows app and choose Check payment. Keep the browser’s site
+        data until you have saved your key. If you paid and cannot recover the purchase, email
+        <a href="mailto:${site.supportEmail}">${site.supportEmail}</a> with your receipt and
+        purchase email. Do not pay again to resolve an uncertain result, and never send a full
+        licence key or card details.
+      </p>`,
     },
     {
       id: 'free-expire',
@@ -205,8 +219,12 @@ function faq(commerce, plan) {
       id: 'refunds',
       question: 'What about refunds?',
       answer: commerce.salesOpen
-        ? html`<p>See the <a href="${commerce.refundPolicyUrl}">refund policy</a>.</p>`
-        : 'The terms of sale will be published before sales open, so you can read them before you buy.',
+        ? html`<p>
+            Request a full refund within 14 calendar days after purchase, including after activating
+            and using Pro. This also covers an optional update year. See the
+            <a href="${commerce.refundPolicyUrl}">Refund Policy</a>.
+          </p>`
+        : 'Read the published Refund Policy for the promise that will apply to a future purchase.',
     },
     {
       id: 'your-copy',
@@ -231,14 +249,15 @@ export const page = {
       'KerfDesk Free runs in the browser and on the desktop, with no time limit.',
       plan &&
         `${plan.name} adds advanced tools${plan.where ? ` to ${plan.where}` : ''} for ${formatPrice(plan.price, commerce.currency)}, paid once.`,
-      !commerce.salesOpen && 'Purchase opens soon.',
+      !commerce.salesOpen && 'Paid checkout is closed.',
     ]
       .filter(Boolean)
       .join(' ');
     return html`${pageHero({ eyebrow: 'Pricing', title: 'Free and Pro', lead })}
     ${section({
       content: html`<div class="plans">
-          ${freePlan(commerce, site)} ${commerce.plans.map((item) => paidPlan(item, commerce))}
+          ${freePlan(commerce, site)}
+          ${commerce.plans.map((item) => paidPlan(item, commerce, site))}
         </div>
         ${proInDesktopNotice(plan, commerce)} ${termsLine(commerce)}`,
     })}
@@ -247,7 +266,7 @@ export const page = {
       narrow: true,
       eyebrow: 'Questions',
       title: 'About pricing and licenses',
-      content: faqList(faq(commerce, plan)),
+      content: faqList(faq(commerce, plan, site)),
     })}`;
   },
 };

@@ -1,7 +1,5 @@
-// The owner's settled Free and Pro offer is shown (ADR-524 Amendment 1), while
-// checkout ships closed and can only open fully configured (ADR-247). Purchases
-// start in the desktop app, so the site never links a checkout, and the trial
-// is promised for when the desktop app is released (ADR-524 Amendment 2).
+// The settled offer and authorised launch use the first-party order/claim flow.
+// Closed-sales and trial-only renders remain covered for operational rollback.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
@@ -17,12 +15,20 @@ const SETTLED_PRICES = ['US$49.50', 'US$20'];
 
 const CHECKOUT_PLAN = { ...PRO, checkoutUrl: 'https://checkout.example.com/buy/pro' };
 
-const TRIAL_STORE = { ...commerce, trialOpen: true };
+const CLOSED_STORE = {
+  ...commerce,
+  trialOpen: false,
+  salesOpen: false,
+  authorizingAdr: null,
+  termsUrl: null,
+  refundPolicyUrl: null,
+};
+const TRIAL_STORE = { ...CLOSED_STORE, trialOpen: true };
 
 const OPEN_STORE = {
   ...TRIAL_STORE,
   salesOpen: true,
-  authorizingAdr: 'ADR-999',
+  authorizingAdr: 'ADR-562',
   termsUrl: '/terms/',
   refundPolicyUrl: '/refunds/',
 };
@@ -72,31 +78,22 @@ describe('commerce configuration', () => {
     ]);
   });
 
-  it('ships with the trial and checkout closed until the desktop app and a payment provider are live', () => {
-    assert.equal(
-      commerce.trialOpen,
-      false,
-      'The trial opens once the licensed Windows app is on the download page and the licence service is on; update this test in that same change.',
-    );
-    assert.equal(
-      commerce.salesOpen,
-      false,
-      'Opening checkout needs a live payment provider, published terms of sale and the commercial ADR ADR-247 requires; update this test in that same change.',
-    );
-    assert.equal(commerce.authorizingAdr, null);
-    assert.equal(commerce.termsUrl, null);
-    assert.equal(commerce.refundPolicyUrl, null);
+  it('ships the owner-authorised trial and first-party purchase flow with policy links', () => {
+    assert.equal(commerce.trialOpen, true);
+    assert.equal(commerce.salesOpen, true);
+    assert.equal(commerce.authorizingAdr, 'ADR-562');
+    assert.equal(commerce.termsUrl, '/terms/');
+    assert.equal(commerce.refundPolicyUrl, '/refunds/');
     for (const plan of commerce.plans) assert.ok(!('checkoutUrl' in plan), plan.id);
     assert.deepEqual(commerceErrors(commerce), []);
   });
 
-  // The licence service fulfils only the Paddle checkouts it creates for the
-  // desktop app (ADR-523): a payment link would take money without a license.
+  // Raw provider links cannot create the licence service's recoverable order.
   it('refuses a checkout URL whether sales are open or closed', () => {
-    for (const store of [commerce, OPEN_STORE]) {
+    for (const store of [CLOSED_STORE, OPEN_STORE]) {
       const errors = commerceErrors({ ...store, plans: [CHECKOUT_PLAN] });
       assert.ok(
-        errors.some((e) => e.includes('purchases start in the desktop app')),
+        errors.some((e) => e.includes('supported KerfDesk purchase flow')),
         errors.join('; '),
       );
     }
@@ -131,7 +128,7 @@ describe('commerce configuration', () => {
   });
 
   it('shows the settled prices and terms but no checkout while closed', () => {
-    const html = renderPricing(commerce);
+    const html = renderPricing(CLOSED_STORE);
     const text = textContent(html);
     for (const price of SETTLED_PRICES) assert.ok(text.includes(price), `pricing lacks ${price}`);
     assert.match(text, /Purchase opens soon/);
@@ -162,14 +159,16 @@ describe('commerce configuration', () => {
     );
     assert.match(text, /only the Pro tools lock, and everything in Free keeps working/);
     assert.match(text, /A license never stops a job from running/);
-    assert.match(text, /terms of sale will be published before sales open/);
+    assert.match(text, /Sales and paid checkout remain closed/);
+    assert.match(html, /href="\/terms\/"/);
+    assert.match(html, /href="\/refunds\/"/);
     assert.doesNotMatch(html, /<form\b/i);
     assert.doesNotMatch(text, /\bBuy Pro\b/);
     assert.doesNotMatch(text, /Get the desktop app/);
     assert.deepEqual(checkoutLinks(html), []);
   });
 
-  it('never renders a checkout link, even if one was pasted in', () => {
+  it('never renders a pasted provider checkout link', () => {
     for (const store of [commerce, OPEN_STORE]) {
       const html = renderPricing({ ...store, plans: [CHECKOUT_PLAN] });
       assert.doesNotMatch(html, /checkout\.example\.com/);
@@ -185,13 +184,22 @@ describe('commerce configuration', () => {
     assert.doesNotMatch(text, /\bBuy Pro\b/);
   });
 
-  it('sends buyers to the desktop app once sales open, never to a checkout', () => {
+  it('opens the first-party purchase flow on mobile or desktop and explains payment recovery', () => {
     const html = renderPricing(OPEN_STORE);
     const text = textContent(html);
     assert.match(text, /US\$49\.50/);
     assert.match(html, /href="\/download\/"/);
-    assert.match(text, /Buy Pro inside the app, from Help &gt; Licence\./);
-    assert.deepEqual(checkoutLinks(html), []);
+    assert.match(text, /Buy Pro/);
+    assert.match(text, /Buy in this browser or from Help &gt; Licence in the Windows app/);
+    assert.ok(checkoutLinks(html).length > 0);
+    assert.ok(checkoutLinks(html).every((url) => url === site.appUrl + '/buy.html'));
+    assert.match(text, /computer, phone or tablet/);
+    assert.match(text, /Check payment/);
+    assert.match(text, /Save the licence key and your Paddle receipt/);
+    assert.match(text, /does not activate it or use a licence seat/);
+    assert.match(text, /Do not pay again/);
+    assert.match(text, /within 14 calendar days after purchase/);
+    assert.doesNotMatch(text, /isn’t released yet|nothing can be bought today/);
     assert.match(html, /href="\/terms\/"/);
     assert.match(html, /href="\/refunds\/"/);
     assert.doesNotMatch(text, /Purchase opens soon/);

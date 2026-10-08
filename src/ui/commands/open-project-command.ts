@@ -23,7 +23,14 @@ export async function openProjectCommand(
   pushToast: PushToast,
   options: OpenProjectOptions = {},
 ): Promise<void> {
+  const initial = useStore.getState();
+  const requestEpoch = initial.claimProjectOpenRequest();
   if (!(await confirmDiscardAsync(platform, 'open another project'))) return;
+  if (
+    useStore.getState().projectOpenRequestEpoch !== requestEpoch ||
+    useStore.getState().projectDocumentEpoch !== initial.projectDocumentEpoch
+  )
+    return;
   if (options.stillAllowed !== undefined && !options.stillAllowed()) return;
   const state = useStore.getState();
   await handleOpenProject(
@@ -32,9 +39,10 @@ export async function openProjectCommand(
       setProject: state.setProject,
       markLoaded: state.markLoaded,
       pushToast,
-      claimProjectOpenRequest: state.claimProjectOpenRequest,
+      claimProjectOpenRequest: () => requestEpoch,
       getProjectOpenRequestEpoch: () => useStore.getState().projectOpenRequestEpoch,
       getProjectDocumentEpoch: () => useStore.getState().projectDocumentEpoch,
+      getProject: () => useStore.getState().project,
       currentDevice: () => useStore.getState().project.device,
       ...(options.stillAllowed === undefined ? {} : { stillAllowed: options.stillAllowed }),
     },

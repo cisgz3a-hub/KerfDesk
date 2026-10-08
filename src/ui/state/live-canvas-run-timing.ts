@@ -103,7 +103,7 @@ export function liveCanvasLifecyclePatch(
 ): Partial<Pick<LaserState, 'liveCanvasRun'>> {
   const run = state.liveCanvasRun ?? null;
   if (run === null) return {};
-  if (isTerminalCanvasLifecycle(run.lifecycle) && !isTerminalCanvasLifecycle(lifecycle)) return {};
+  if (isTerminalCanvasLifecycle(run.lifecycle)) return {};
   const timing = liveCanvasTimingForLifecycle(run.timing, lifecycle, now);
   return {
     liveCanvasRun: {
@@ -116,9 +116,24 @@ export function liveCanvasLifecyclePatch(
 }
 
 /** Marks display completion only after the active driver's settle contract. */
-export function completeLiveCanvasRun(run: LiveCanvasRun | null): LiveCanvasRun | null {
-  if (run === null) return null;
-  return { ...run, timing: completeLiveJobTiming() };
+export function completeLiveCanvasRun(
+  run: LiveCanvasRun | null,
+  now: number = Date.now(),
+): LiveCanvasRun | null {
+  if (run === null || isTerminalCanvasLifecycle(run.lifecycle)) return run;
+  return {
+    ...run,
+    lifecycle: 'finished',
+    controllerState: 'Idle',
+    route: {
+      confirmedRouteMm: run.plan.manifest.totalRouteMm,
+      candidates: [],
+      uncertain: false,
+    },
+    accuracyReason: run.plan.unavailableReason,
+    endedAtMs: endStampFor(run, 'finished', now),
+    timing: completeLiveJobTiming(),
+  };
 }
 
 export function liveCanvasFinishingPatch(
@@ -184,7 +199,7 @@ function liveCanvasTimingForLifecycle(
   }
 }
 
-function isTerminalCanvasLifecycle(lifecycle: LiveCanvasLifecycle): boolean {
+export function isTerminalCanvasLifecycle(lifecycle: LiveCanvasLifecycle): boolean {
   return (
     lifecycle === 'stopped' ||
     lifecycle === 'disconnected' ||

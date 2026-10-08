@@ -1,6 +1,6 @@
 import { FillRule, unionD, type PathsD } from 'clipper2-ts';
 import { err, ok, type Result } from '../result';
-import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene';
+import { IDENTITY_TRANSFORM, type ColoredPath, type ImportedSvg } from '../scene/scene-object';
 import { canonicalizeVectorPaths } from './vector-path-canonical';
 import {
   normalizeVectorObjectBatches,

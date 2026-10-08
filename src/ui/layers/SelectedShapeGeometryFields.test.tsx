@@ -15,6 +15,25 @@ import { SelectedObjectProperties } from './SelectedObjectProperties';
 afterEach(() => resetStore());
 
 describe('SelectedShapeGeometryFields', () => {
+  it('converts arithmetic units into spec dimensions after nonuniform scaling', async () => {
+    const ellipse = createEllipse({
+      id: 'ellipse-units',
+      color: '#ff0000',
+      spec: { widthMm: 20, heightMm: 10 },
+    });
+    const view = await renderShape({ ...ellipse, transform: { ...ellipse.transform, scaleX: 2 } });
+    try {
+      await editNumber(view.host, 'Ellipse width', '1in + 2mm');
+      expect(selectedShape().spec).toMatchObject({ widthMm: 13.7 });
+      expect(selectedShape().transform.scaleX).toBe(2);
+      const before = useStore.getState().project;
+      await editNumber(view.host, 'Ellipse width', '1/0');
+      expect(useStore.getState().project).toBe(before);
+    } finally {
+      await view.dispose();
+    }
+  });
+
   it('updates ellipse dimensions', async () => {
     const ellipse = createEllipse({
       id: 'ellipse-1',

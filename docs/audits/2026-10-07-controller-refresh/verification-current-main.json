@@ -1,0 +1,100 @@
+{
+  "kind": "integrated-current-main-local-verification",
+  "baseHead": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+  "fullSuite": {
+    "success": true,
+    "files": 3578,
+    "tests": 27814,
+    "passed": 27785,
+    "skippedOrPending": 29,
+    "todo": 0,
+    "failed": 0,
+    "runtimeErrorSuites": 0,
+    "unhandledErrors": 0,
+    "startedAt": "2026-10-07T11:15:06.046Z",
+    "finishedAt": "2026-10-07T11:54:13.819Z",
+    "passedFiles": 3560,
+    "skippedFiles": 18
+  },
+  "sourceGuard": {
+    "sourceAndConfigFiles": 7891,
+    "changedDuringRun": 0,
+    "changedAfterRun": 0,
+    "sourceManifestSha256": "3b624adb07670cc506637aa890bd12a155a8f4c4d93e8828638026c8d37bde8b",
+    "scope": "Nonignored tracked and untracked source, Electron and scripts TS/TSX/MJS/CJS, package/lock/root TypeScript/Vite/Vitest/lint configs and the private local Vitest config; documentation excluded."
+  },
+  "checks": [
+    {
+      "name": "TypeScript",
+      "result": "passed"
+    },
+    {
+      "name": "Repository lint",
+      "result": "passed",
+      "note": "Ignored private local evidence directory excluded; no tracked lint configuration change."
+    },
+    {
+      "name": "Repository formatting",
+      "result": "passed",
+      "note": "Full check followed by checks of final changed files."
+    },
+    {
+      "name": "Source file-size limits",
+      "result": "passed"
+    },
+    {
+      "name": "ADR numbering",
+      "result": "passed"
+    },
+    {
+      "name": "Privacy publication",
+      "result": "passed"
+    }
+  ],
+  "rendererBuild": {
+    "builtFrom": {
+      "baseHead": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+      "includesUncommittedRecoveryChanges": true,
+      "exactCommittedHeadBuild": false
+    },
+    "rendererCapability": "browser-free",
+    "localHtmlReferences": 7,
+    "missingReferences": [],
+    "serviceWorkerPresent": true,
+    "manifestPresent": true,
+    "markerFiles": {
+      "Controller information unavailable": ["ui-workbench-B8LZMGly.js"],
+      "CNC Pause/Resume not confirmed": ["ui-workbench-B8LZMGly.js"],
+      "The controller reset was not confirmed.": ["ui-workbench-B8LZMGly.js"]
+    },
+    "artifacts": {
+      "index.html": "adbe3a208b87dc8632cbf60f972c6e90d414b23580a4312b952e0302bb4b8ce6",
+      "assets/index-dr12Ae0B.js": "27006ba6f2015a922379ebe7e60fc7473d41bd790b776aefeb51353daa224821",
+      "sw.js": "b4aff73835aeef5c216d2ca7fa3a6504235f59cb72e69b181859728a1a669962",
+      "manifest.webmanifest": "c7ee806cdcecb23d58a1eacd2ebea279f5f359cb3dac804bc422800f98fa2662"
+    },
+    "passed": true,
+    "postFixtureIntegration": {
+      "changedTestFiles": [
+        "src/ui/app/desktop-close-owner-continuity.test.ts",
+        "src/ui/state/laser-line-handler.response-presentation.test.ts",
+        "src/ui/state/laser-status-polling-single-flight.test.ts"
+      ],
+      "productionAndConfigDifferences": 0
+    }
+  },
+  "boundedFaultAudit": {
+    "report": "mutation-audit-current-main.json",
+    "selectedFaults": 6,
+    "assertionDetected": 5,
+    "survived": 1,
+    "invalidRuns": 0
+  },
+  "limits": [
+    "Local source verification and simulated-controller/mounted-component tests.",
+    "Focused overlapping runs are not added to the full-suite totals.",
+    "No coverage percentage or exhaustive mutation score.",
+    "The renderer was built from the uncommitted recovery source based on the recorded main commit; not an exact clean committed-head build.",
+    "No packaged installer, hosted CI, deployment or physical-machine qualification is claimed."
+  ]
+}

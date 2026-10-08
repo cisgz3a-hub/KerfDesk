@@ -4,12 +4,60 @@
   min-height: 0;
   font-size: var(--lf-text-md);
   line-height: 1.4;
-  scrollbar-width: thin;
 }
 
 .lf-machine-rail > * {
   flex-shrink: 0;
   min-width: 0;
+}
+
+/* Jog stays above the machine tools instead of following their scroll. The
+   upper group can still scroll when focus/Z controls or recovery notices make
+   it taller, leaving room to reach the lower tools in a short window. */
+.lf-machine-primary-controls,
+.lf-machine-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+}
+
+.lf-machine-rail > .lf-machine-primary-controls {
+  flex: 0 1 auto;
+  max-height: 70%;
+}
+
+.lf-machine-rail > .lf-machine-details {
+  flex: 1 1 100px;
+  min-height: min(60px, 25%);
+}
+
+.lf-machine-primary-controls > *,
+.lf-machine-details > * {
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* When the real body is too short for two usable scroll targets, retain one
+   full rail scroller. Heading, jog/focus and lower tools stay reachable while
+   the sibling Frame/Start dock keeps the available window space. */
+@container machine-rail-body (max-height: 192px) {
+  .lf-machine-rail {
+    overflow-y: auto !important;
+  }
+
+  .lf-machine-rail > .lf-machine-primary-controls,
+  .lf-machine-rail > .lf-machine-details {
+    flex: 0 0 auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
 }
 
 .lf-machine-rail .lf-btn {
@@ -55,134 +103,6 @@
   margin-top: 6px;
 }
 
-/* The machine connection card (ADR-420): status, machine, one primary action. */
-.lf-connection-card {
-  display: grid;
-  gap: 8px;
-  padding: 10px 12px;
-  border: 1px solid var(--lf-border);
-  border-radius: 6px;
-  background: var(--lf-bg-0);
-  overflow-wrap: anywhere;
-}
-
-.lf-connection-card[data-state='connected'] {
-  border-left: 3px solid var(--lf-success);
-}
-
-.lf-connection-card[data-state='failed'] {
-  border-left: 3px solid var(--lf-danger);
-}
-
-.lf-connection-card-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.lf-connection-card-status {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: var(--lf-text-sm);
-  font-weight: 600;
-}
-
-.lf-connection-card[data-state='connected'] .lf-connection-card-status {
-  color: var(--lf-success-fg);
-}
-
-.lf-machine-rail .lf-connection-card-more {
-  flex: 0 0 auto;
-  min-width: 28px;
-  min-height: 26px;
-  padding: 0 6px;
-  font-size: 16px;
-  line-height: 1;
-}
-
-.lf-connection-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.lf-connection-card-actions > .lf-btn {
-  flex: 1 1 100%;
-}
-
-.lf-connection-card-actions > p {
-  flex-basis: 100%;
-}
-
-.lf-connection-card-error {
-  margin: 0;
-  color: var(--lf-danger-fg);
-  font-size: 11px;
-  line-height: 1.45;
-}
-
-.lf-connected-profile {
-  display: grid;
-  gap: 2px;
-}
-
-.lf-connected-profile-name {
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.lf-connected-profile-detail,
-.lf-connected-profile-port {
-  color: var(--lf-text-muted);
-  font-size: 11px;
-}
-
-.lf-connection-menu {
-  width: 220px;
-}
-
-.lf-connection-menu-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  min-height: 34px;
-  padding: 7px 9px;
-  color: var(--lf-text);
-  background: transparent;
-  border: 0;
-  border-radius: 4px;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.lf-connection-menu-item:hover:not(:disabled),
-.lf-connection-menu-item:focus-visible {
-  background: var(--lf-tint-accent);
-}
-
-.lf-connection-menu-item:focus-visible {
-  outline: 1px solid var(--lf-accent);
-  outline-offset: -1px;
-}
-
-.lf-connection-menu-item:disabled {
-  color: var(--lf-text-faint);
-  cursor: default;
-}
-
-.lf-connection-menu-check {
-  color: var(--lf-accent);
-  visibility: hidden;
-}
-
-.lf-connection-menu-item[aria-checked='true'] .lf-connection-menu-check {
-  visibility: visible;
-}
-
 .lf-machine-rail [data-help-id='control:laser.machine-setup.launch'] {
   display: flex;
   align-items: center;
@@ -211,5 +131,22 @@
   .lf-machine-rail {
     padding: 10px 12px;
     gap: 10px;
+  }
+
+  .lf-machine-primary-controls,
+  .lf-machine-details {
+    gap: 10px;
+  }
+}
+
+@media (max-height: 600px) {
+  .lf-machine-rail {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .lf-machine-primary-controls,
+  .lf-machine-details {
+    gap: 8px;
   }
 }

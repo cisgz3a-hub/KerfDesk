@@ -53,7 +53,10 @@ export const mcpPermissionsSchema = z.object({
   canEdit: z.boolean(),
   artworkSharingEnabled: z.boolean(),
 });
-export const mcpTouchCapabilitiesSchema = z.object({ touchEditing: z.boolean() });
+export const mcpTouchCapabilitiesSchema = z.object({
+  touchEditing: z.boolean(),
+  groupTransformBounds: z.boolean().optional(),
+});
 const viewportCoordinate = z.number().min(-200_000).max(200_000);
 const viewport = z
   .object({

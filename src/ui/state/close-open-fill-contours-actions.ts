@@ -1,4 +1,5 @@
 import { closeOpenPaths } from '../../core/geometry/path-direction-edits';
+import { isBooleanCompoundObject } from '../../core/scene/boolean-compound';
 import {
   CLOSE_OPEN_FILL_CONTOUR_TOLERANCE_MM,
   isCloseableOpenFillPolyline,
@@ -82,7 +83,7 @@ function closeObjectFillContours(
   groups: ReadonlyArray<OpenFillContourGroup>,
   toleranceMm: number,
 ): SceneObject {
-  if (!('paths' in object)) return object;
+  if (isBooleanCompoundObject(object) || !('paths' in object)) return object;
   const paths = closeFillPaths(object.paths, groups, object.transform, toleranceMm);
   if (paths === object.paths) return object;
   return object.kind === 'shape'

@@ -9,6 +9,8 @@ import { handleInspectCurrentGcode } from '../app/inspect-current-gcode-action';
 import { saveGcodeContext } from '../commands/gcode-command-actions';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { isActiveJobStatus } from '../state/laser-store-helpers';
+import { useCurrentCanvasRun } from '../state/use-current-canvas-run';
 import { useToastStore } from '../state/toast-store';
 import type { CanvasMotionPlan, LiveCanvasLifecycle } from '../state/canvas-motion-plan';
 import { canvasProgramMatchesRunQueue, canvasProgramSource } from '../state/canvas-program-source';
@@ -39,15 +41,21 @@ export function useCurrentGcode(active: boolean): {
   readonly followingRun: boolean;
 } {
   const liveProgram = useCurrentRunProgram();
-  const [dismissedPlan, setDismissedPlan] = useState<CanvasMotionPlan | null>(null);
-  const followingRun = liveProgram !== null && liveProgram.plan !== dismissedPlan;
+  const [dismissedRun, setDismissedRun] = useState<Pick<
+    CurrentRunProgram,
+    'plan' | 'startedAtMs'
+  > | null>(null);
+  const followingRun =
+    liveProgram !== null &&
+    (liveProgram.plan !== dismissedRun?.plan ||
+      liveProgram.startedAtMs !== dismissedRun?.startedAtMs);
   const compilation = useCurrentGcodeCompilation(active, followingRun);
   const compile = compilation.refresh;
   const refresh = useCallback(() => {
     if (followingRun && liveProgram !== null) {
       // Refresh cannot replace immutable running bytes with a new compilation.
-      if (['running', 'paused', 'tool-change'].includes(liveProgram.lifecycle)) return;
-      setDismissedPlan(liveProgram.plan);
+      if (liveProgram.active) return;
+      setDismissedRun({ plan: liveProgram.plan, startedAtMs: liveProgram.startedAtMs });
     }
     compile();
   }, [compile, followingRun, liveProgram]);
@@ -68,19 +76,34 @@ function useCurrentGcodeCompilation(
   readonly refresh: () => void;
 } {
   const project = useStore((store) => store.project);
-  const [state, setState] = useState<CurrentGcode>({ kind: 'idle' });
+  const { state, setState, documentEpoch } = useDocumentOwnedGcodeState();
+  const ownerEpoch = useRef(documentEpoch);
   const compiledFor = useRef<unknown>(null);
+  const compiledDocumentEpoch = useRef<number | null>(null);
   const compilingFor = useRef<unknown>(null);
   const activeController = useRef<AbortController | null>(null);
   const runSequence = useRef(0);
 
   const refresh = useCurrentGcodeRefresh({
     compiledFor,
+    compiledDocumentEpoch,
     compilingFor,
     activeController,
     runSequence,
     setState,
   });
+
+  useEffect(() => {
+    if (ownerEpoch.current === documentEpoch) return;
+    ownerEpoch.current = documentEpoch;
+    runSequence.current += 1;
+    activeController.current?.abort();
+    activeController.current = null;
+    compilingFor.current = null;
+    compiledFor.current = null;
+    compiledDocumentEpoch.current = null;
+    setState({ kind: 'idle' });
+  }, [documentEpoch, setState]);
 
   // A project replacement means the active request no longer describes the
   // canvas. Cancel it immediately; do not auto-recompile on every keystroke.
@@ -95,7 +118,7 @@ function useCurrentGcodeCompilation(
       kind: 'stale',
       reason: 'Design changed while G-code was compiling. Refresh to compile the current canvas.',
     });
-  }, [project]);
+  }, [project, setState]);
 
   useEffect(() => {
     if (!active || suspended) {
@@ -108,10 +131,14 @@ function useCurrentGcodeCompilation(
       }
       return;
     }
-    if (compiledFor.current === useStore.getState().project) return;
+    if (
+      compiledFor.current === useStore.getState().project &&
+      compiledDocumentEpoch.current === documentEpoch
+    )
+      return;
     if (activeController.current !== null) return;
     refresh();
-  }, [active, suspended, refresh]);
+  }, [active, suspended, refresh, documentEpoch]);
 
   useEffect(
     () => () => {
@@ -130,15 +157,21 @@ function useCurrentGcodeCompilation(
 
 type CurrentRunProgram = {
   readonly plan: CanvasMotionPlan;
+  readonly startedAtMs: number;
   readonly text: string;
   readonly lifecycle: LiveCanvasLifecycle;
   readonly context: GcodeInspectionContext;
+  readonly active: boolean;
 };
 
 function useCurrentRunProgram(): CurrentRunProgram | null {
-  const plan = useLaserStore((store) => store.liveCanvasRun?.plan ?? null);
-  const lifecycle = useLaserStore((store) => store.liveCanvasRun?.lifecycle ?? null);
-  const startedAtMs = useLaserStore((store) => store.liveCanvasRun?.startedAtMs ?? 0);
+  const run = useCurrentCanvasRun();
+  const plan = run?.plan ?? null;
+  const lifecycle = run?.lifecycle ?? null;
+  const startedAtMs = run?.startedAtMs ?? 0;
+  const active =
+    useLaserStore((store) => isActiveJobStatus(store.streamer?.status ?? null)) ||
+    (lifecycle !== null && ['running', 'paused', 'tool-change'].includes(lifecycle));
   const queued = useLaserStore((store) => store.streamer?.queued ?? null);
   const context = useMemo(() => (plan === null ? null : runInspectionContext(plan)), [plan]);
   return useMemo(() => {
@@ -146,8 +179,8 @@ function useCurrentRunProgram(): CurrentRunProgram | null {
     const text = canvasProgramSource(plan);
     if (text === null || !canvasProgramMatchesRunQueue({ plan, startedAtMs, lifecycle }, queued))
       return null;
-    return { plan, text, lifecycle, context };
-  }, [plan, lifecycle, queued, startedAtMs, context]);
+    return { plan, startedAtMs, text, lifecycle, context, active };
+  }, [plan, lifecycle, queued, startedAtMs, context, active]);
 }
 
 function currentRunState(run: CurrentRunProgram): Extract<CurrentGcode, { kind: 'ready' }> {
@@ -185,42 +218,61 @@ function runProgramName(lifecycle: LiveCanvasLifecycle): string {
 
 function useCurrentGcodeRefresh(args: {
   readonly compiledFor: { current: unknown };
+  readonly compiledDocumentEpoch: { current: number | null };
   readonly compilingFor: { current: unknown };
   readonly activeController: { current: AbortController | null };
   readonly runSequence: { current: number };
   readonly setState: (state: CurrentGcode) => void;
 }): () => void {
   const platform = usePlatform();
-  const { compiledFor, compilingFor, activeController, runSequence, setState } = args;
+  const {
+    compiledFor,
+    compiledDocumentEpoch,
+    compilingFor,
+    activeController,
+    runSequence,
+    setState,
+  } = args;
   return useCallback(() => {
     activeController.current?.abort();
     const app = useStore.getState();
     const laser = useLaserStore.getState();
     const { pushToast } = useToastStore.getState();
     const snapshot = app.project;
+    const documentEpoch = app.projectDocumentEpoch;
     const controller = new AbortController();
     const runId = runSequence.current + 1;
     runSequence.current = runId;
     activeController.current = controller;
     compilingFor.current = snapshot;
     setState({ kind: 'compiling' });
+    const current = () => {
+      const latest = useStore.getState();
+      return (
+        runSequence.current === runId &&
+        !controller.signal.aborted &&
+        latest.projectDocumentEpoch === documentEpoch &&
+        latest.project === snapshot
+      );
+    };
     void handleInspectCurrentGcode(
       saveGcodeContext({ platform, app, laser, pushToast, openInspector: () => undefined }),
       (programName, text, placement) => {
-        if (runSequence.current !== runId || controller.signal.aborted) return;
+        if (!current()) return;
         compiledFor.current = snapshot;
+        compiledDocumentEpoch.current = documentEpoch;
         const context = projectInspectionContext(snapshot, placement);
         setState({ kind: 'ready', programName, text, context });
       },
       {
         signal: controller.signal,
         onProgress: (progress) => {
-          if (runSequence.current !== runId || controller.signal.aborted) return;
+          if (!current()) return;
           setState({ kind: 'compiling', progress });
         },
       },
     ).then((result) => {
-      if (runSequence.current !== runId || controller.signal.aborted) return;
+      if (!current()) return;
       activeController.current = null;
       compilingFor.current = null;
       if (result.kind === 'empty') setState({ kind: 'empty' });
@@ -230,5 +282,27 @@ function useCurrentGcodeRefresh(args: {
         setState({ kind: 'stale', reason: 'Compilation was cancelled. Refresh to try again.' });
       }
     });
-  }, [activeController, compiledFor, compilingFor, platform, runSequence, setState]);
+  }, [
+    activeController,
+    compiledFor,
+    compiledDocumentEpoch,
+    compilingFor,
+    platform,
+    runSequence,
+    setState,
+  ]);
+}
+
+function useDocumentOwnedGcodeState() {
+  const documentEpoch = useStore((store) => store.projectDocumentEpoch);
+  const [ownedState, setOwnedState] = useState(() => ({
+    documentEpoch,
+    state: { kind: 'idle' } as CurrentGcode,
+  }));
+  const setState = useCallback((state: CurrentGcode) => {
+    setOwnedState({ documentEpoch: useStore.getState().projectDocumentEpoch, state });
+  }, []);
+  const state: CurrentGcode =
+    ownedState.documentEpoch === documentEpoch ? ownedState.state : { kind: 'idle' };
+  return { state, setState, documentEpoch };
 }

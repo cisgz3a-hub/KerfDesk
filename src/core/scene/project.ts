@@ -6,6 +6,10 @@ import type { CncMachineConfig, MachineConfig } from './machine';
 import { EMPTY_SCENE, type Scene } from './scene';
 import type { ProjectVariableData } from './variable-template';
 import type { PrintAndCutDesignTargets } from './print-and-cut';
+import type { ProjectSheetBook } from './project-sheets';
+import type { FixtureTemplate } from '../camera/fixtures/fixture-template';
+import type { ProductionManifest } from './production-manifest';
+import type { RetainedArrayLayout } from './retained-array';
 
 // v9 preserves owned image clips. Older readers would engrave the full source
 // bitmap if allowed to silently ignore its clip geometry.
@@ -14,7 +18,10 @@ import type { PrintAndCutDesignTargets } from './print-and-cut';
 // v11 introduced independent CNC stage recipes (ADR-457); a parallel v11 build
 // introduced path text alignment (ADR-480). v12 preserves both contracts so
 // neither older reader can silently drop motion settings or text placement.
-export const PROJECT_SCHEMA_VERSION = 12 as const;
+// v13 preserves text-frame layout and reviewable manufacturing workflow intent.
+// Older readers must not silently rebuild wrapped/fitted text without its frame.
+// v14 retains editable Boolean sources and independent design-tree ordering.
+export const PROJECT_SCHEMA_VERSION = 14 as const;
 
 export type EmbeddedFont = {
   readonly key: string;
@@ -149,6 +156,10 @@ export type Project = {
   readonly printAndCutTargets?: PrintAndCutDesignTargets;
   readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
   readonly notes: string;
+  readonly sheetBook?: ProjectSheetBook;
+  readonly fixtureTemplates?: ReadonlyArray<FixtureTemplate>;
+  readonly productionManifest?: ProductionManifest;
+  readonly arrayLayouts?: readonly RetainedArrayLayout[];
   // Absent on laser projects saved before CNC support — treated as laser.
   readonly machine?: MachineConfig;
   // The CNC setup (stock, bits, params, tiling) kept while the project is in

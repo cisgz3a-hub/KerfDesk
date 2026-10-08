@@ -126,6 +126,7 @@ async function recoverUncertainProbe(
   if (softReset === null) return;
   const resetEpoch = refs.writeEpoch ?? 0;
   const resetBoundary = waitForControllerResetBoundary(refs, resetEpoch);
+  const owner: ProbeRecoveryWaitOwner = { reset: refs.controllerResetWait, idle: null };
   clearCncLiveCaps();
   set((state) => invalidateControllerSessionEvidence(state));
   try {
@@ -135,22 +136,49 @@ async function recoverUncertainProbe(
       // A very fast reboot banner advances the epoch before write() resolves;
       // that observed boundary is stronger evidence than transport resolution.
       if ((refs.writeEpoch ?? 0) === resetEpoch) {
-        cancelControllerLifecycleRefs(refs, 'Probe reset write failed.');
+        if (ownsProbeRecoveryWait(get(), refs, connection, transactionId, owner)) {
+          cancelControllerLifecycleRefs(refs, 'Probe reset write failed.');
+        }
         await resetBoundary.catch(() => undefined);
         throw error;
       }
     }
     await resetBoundary;
+    assertCurrentProbe(get(), refs, connection, transactionId);
     markRecoveryResetSent(set, refs, transactionId);
     // Only reports observed after the controller's reboot banner qualify.
-    await waitForFreshIdle(refs, { kind: 'probe', requiredReports: RECOVERY_IDLE_REPORTS });
+    const idle = waitForFreshIdle(refs, { kind: 'probe', requiredReports: RECOVERY_IDLE_REPORTS });
+    owner.idle = refs.controllerIdleWait;
+    await idle;
     assertCurrentProbe(get(), refs, connection, transactionId);
     markRecoveryComplete(set, transactionId);
   } catch (error) {
-    cancelControllerLifecycleRefs(refs, 'Probe recovery did not settle.');
+    if (ownsProbeRecoveryWait(get(), refs, connection, transactionId, owner)) {
+      cancelControllerLifecycleRefs(refs, 'Probe recovery did not settle.');
+    }
     const message = error instanceof Error ? error.message : String(error);
     markRecoveryLocked(set, transactionId, failureMessage, message);
   }
+}
+
+type ProbeRecoveryWaitOwner = {
+  readonly reset: RecoveryRefs['controllerResetWait'];
+  idle: RecoveryRefs['controllerIdleWait'];
+};
+
+function ownsProbeRecoveryWait(
+  state: LaserState,
+  refs: RecoveryRefs,
+  connection: SerialConnection,
+  transactionId: number,
+  owner: ProbeRecoveryWaitOwner,
+): boolean {
+  return (
+    refs.connection === connection &&
+    isCurrentProbe(state, transactionId) &&
+    ((owner.reset != null && refs.controllerResetWait === owner.reset) ||
+      (owner.idle !== null && refs.controllerIdleWait === owner.idle))
+  );
 }
 
 function markRecoveryResetSent(set: SetFn, refs: RecoveryRefs, transactionId: number): void {

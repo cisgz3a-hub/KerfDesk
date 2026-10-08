@@ -10,7 +10,7 @@ import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
 import { LaserWindow } from './LaserWindow';
-import { MachineSetupDialogHost } from './device-setup';
+import { MachineConnectionToolbar } from './MachineConnectionToolbar';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -45,80 +45,6 @@ afterEach(() => {
 });
 
 describe('LaserWindow autofocus busy controls', () => {
-  it('shows a toast when controller settings auto-detection completes', async () => {
-    vi.useFakeTimers();
-    useToastStore.setState({ toasts: [] });
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(
-          <PlatformProvider adapter={mockPlatform}>
-            <>
-              <LaserWindow />
-              <MachineSetupDialogHost />
-            </>
-          </PlatformProvider>,
-        );
-      });
-
-      await act(async () => {
-        useLaserStore.setState({
-          detectedSettings: { maxPowerS: 255 },
-          controllerSettings: { maxPowerS: 255 },
-          grblSettingsRows: [],
-          lastSettingsReadAt: 123,
-        });
-      });
-
-      expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
-        variant: 'info',
-        message: expect.stringMatching(/machine settings detected/i),
-      });
-      expect(useToastStore.getState().toasts.at(-1)?.message).toContain('Machine Setup');
-    } finally {
-      await unmountRoot(root);
-      host.remove();
-      useToastStore.setState({ toasts: [] });
-      vi.clearAllTimers();
-      vi.useRealTimers();
-    }
-  });
-
-  it('opens Machine Setup from a compact rail entry', async () => {
-    const host = document.createElement('div');
-    document.body.appendChild(host);
-    let root: Root | null = null;
-    try {
-      await act(async () => {
-        root = createRoot(host);
-        root.render(
-          <PlatformProvider adapter={mockPlatform}>
-            <>
-              <LaserWindow />
-              <MachineSetupDialogHost />
-            </>
-          </PlatformProvider>,
-        );
-      });
-
-      expect(host.textContent).not.toContain('Use Neotronics 4040 Max');
-      expect(button(host, 'Machine Setup')).toBeInstanceOf(HTMLButtonElement);
-
-      await act(async () => {
-        button(host, 'Machine Setup').click();
-      });
-
-      expect(host.textContent).toContain('Step 1 of 3');
-      expect(host.querySelectorAll('input[name="machine-capability"]')).toHaveLength(3);
-    } finally {
-      await unmountRoot(root);
-      host.remove();
-    }
-  });
-
   it('disables motion and origin controls but keeps Disconnect available during autofocus', async () => {
     useStore.setState({
       project: createProject({
@@ -140,7 +66,10 @@ describe('LaserWindow autofocus busy controls', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={mockPlatform}>
-            <LaserWindow />
+            <>
+              <MachineConnectionToolbar />
+              <LaserWindow />
+            </>
           </PlatformProvider>,
         );
       });
@@ -177,7 +106,10 @@ describe('LaserWindow autofocus busy controls', () => {
         root = createRoot(host);
         root.render(
           <PlatformProvider adapter={mockPlatform}>
-            <LaserWindow />
+            <>
+              <MachineConnectionToolbar />
+              <LaserWindow />
+            </>
           </PlatformProvider>,
         );
       });
@@ -415,8 +347,9 @@ describe('LaserWindow jog gating during a job (H6)', () => {
 });
 
 function button(host: HTMLElement, label: string): HTMLButtonElement {
-  const match = [...host.querySelectorAll('button')].find((candidate) =>
-    candidate.textContent?.includes(label),
+  const match = [...host.querySelectorAll('button')].find(
+    (candidate) =>
+      candidate.textContent?.includes(label) || candidate.getAttribute('aria-label') === label,
   );
   if (!(match instanceof HTMLButtonElement)) throw new Error(`Button not rendered: ${label}`);
   return match;

@@ -4,6 +4,7 @@
 import type { StreamerStatus } from '../../core/controllers/grbl';
 import type { JobInterruption } from '../../core/recovery';
 import { currentJobStopRequest } from '../state/job-stop-request';
+import { isProvisionalResetFreeze } from '../state/laser-reset-terminal-state';
 import { isUnarchivedRun } from '../state/laser-unarchived-run';
 import { useLaserStore, type LaserState } from '../state/laser-store';
 import type { RecoveryRepository, RunId } from '../state/recovery';
@@ -65,7 +66,7 @@ export function disappearedStreamInterruption(
 ): JobInterruption {
   return (
     checkpointInterruption(
-      previousStatus,
+      state.connection.kind === 'connected' ? previousStatus : 'disconnected',
       state.safetyNotice,
       currentJobStopRequest(state),
       currentRunPlannerBacklog(state),
@@ -77,6 +78,27 @@ export function disappearedStreamInterruption(
           ? 'The job stream ended before clean physical completion.'
           : 'The controller connection ended before clean physical completion.',
     }
+  );
+}
+
+export function observedStreamInterruption(
+  status: StreamerStatus,
+  state: LaserState,
+): JobInterruption | null {
+  if (isProvisionalResetFreeze(state, status)) {
+    // Reset freezes host refill before the accepted Stop or closed port can
+    // publish its terminal event. Real fault notices keep their own cause.
+    return null;
+  }
+  return checkpointInterruption(
+    status,
+    state.safetyNotice,
+    currentJobStopRequest(state),
+    currentRunPlannerBacklog(state),
+    runStopMayHaveLostPosition(state),
+    state.streamer === null
+      ? undefined
+      : Math.min(state.streamer.total, state.streamer.completed + state.streamer.inFlight.length),
   );
 }
 

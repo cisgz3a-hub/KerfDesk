@@ -1,4 +1,4 @@
-// ConnectionBar — the machine connection card at the top of the machine rail
+// ConnectionBar — the compact machine toolbar or standalone connection card
 // (ADR-420): one status line, the machine it talks to, one primary action and
 // a small menu for the rest.
 //
@@ -18,6 +18,8 @@ import { assertNever } from '../../core/scene';
 import { AnchoredPopover, movePopoverFocus } from '../common/AnchoredPopover';
 import type { ControllerQualification } from '../state/laser-controller-qualification';
 import type { ConnectionState } from '../state/laser-store';
+import { CompactConnectionControls } from './CompactConnectionControls';
+import './ConnectionBar.css';
 
 type Props = {
   readonly connection: ConnectionState;
@@ -27,6 +29,8 @@ type Props = {
   readonly onForget: () => void;
   readonly disabled: boolean;
   readonly qualification?: ControllerQualification;
+  readonly qualificationReadBlockReason?: string | null;
+  readonly reconnectRecommended?: boolean;
   readonly onRetryQualification?: () => void;
   readonly onReconnectQualification?: () => void;
   /** Show the port picker even when a remembered port is attached. */
@@ -35,6 +39,11 @@ type Props = {
   readonly onAutoConnectChange?: (enabled: boolean) => void;
   /** The desktop app on macOS and Linux forgets its chosen ports when it closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
+  readonly layout?: 'card' | 'compact';
+  /** The toolbar label; the full machine profile stays in the details popover. */
+  readonly machineName?: string;
+  /** Additional machine details, such as the fitted laser module. */
+  readonly details?: ReactNode;
   /** The machine line: its name, work area and controller. */
   readonly machine?: ReactNode;
   /** The Machine Setup entry, beside the primary action. */
@@ -43,31 +52,51 @@ type Props = {
 
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
+  const compact = props.layout === 'compact';
   return (
     <section
-      className="lf-connection-card"
+      className={compact ? 'lf-connection-compact' : 'lf-connection-card'}
       aria-label="Machine connection"
       data-state={connection.kind}
     >
-      <div className="lf-connection-card-head">
-        <StatusDot connection={connection} />
-        <span className="lf-connection-card-status" role="status" aria-live="polite">
-          {connectionStatusLabel(connection)}
-        </span>
-        <ConnectionMenu {...props} />
-      </div>
-      {props.machine}
-      <div className="lf-connection-card-actions">
-        <PrimaryAction {...props} />
-        {props.setup}
-      </div>
+      {compact ? (
+        <CompactConnectionControls
+          machineName={props.machineName ?? 'Unnamed machine'}
+          status={connectionStatusLabel(connection)}
+          statusDot={<StatusDot connection={connection} />}
+          machine={props.machine}
+          details={props.details}
+        >
+          <PrimaryAction {...props} />
+          {props.setup}
+          <ConnectionMenu {...props} />
+        </CompactConnectionControls>
+      ) : (
+        <>
+          <div className="lf-connection-card-head">
+            <StatusDot connection={connection} />
+            <span className="lf-connection-card-status" role="status" aria-live="polite">
+              {connectionStatusLabel(connection)}
+            </span>
+            <ConnectionMenu {...props} />
+          </div>
+          {props.machine}
+          <div className="lf-connection-card-actions">
+            <PrimaryAction {...props} />
+            {props.setup}
+          </div>
+        </>
+      )}
       {connection.kind === 'failed' && (
         <p role="alert" className="lf-connection-card-error">
           {connectionFailureText(connection.error, props.machineNoun)}
         </p>
       )}
       <QualificationNotice
+        connection={connection}
         qualification={props.qualification}
+        readBlockReason={props.qualificationReadBlockReason}
+        reconnectRecommended={props.reconnectRecommended === true}
         onRetry={props.onRetryQualification}
         onReconnect={props.onReconnectQualification}
         disabled={props.disabled}
@@ -248,50 +277,83 @@ export function connectionFailureText(error: string, machineNoun: string): strin
   return error;
 }
 
-function QualificationNotice(props: {
+type QualificationNoticeProps = {
+  readonly connection: ConnectionState;
   readonly qualification: ControllerQualification | undefined;
+  readonly readBlockReason: string | null | undefined;
+  readonly reconnectRecommended: boolean;
   readonly onRetry: (() => void) | undefined;
   readonly onReconnect: (() => void) | undefined;
   readonly disabled: boolean;
-}): JSX.Element | null {
+};
+
+function QualificationNotice(props: QualificationNoticeProps): JSX.Element | null {
   const qualification = props.qualification;
+  if (props.connection.kind !== 'connected') return null;
   if (qualification === undefined || qualification.kind === 'disconnected') return null;
   if (qualification.kind === 'qualified') return null;
   if (qualification.kind === 'qualifying') {
     return (
       <div role="status" style={qualificationStyle}>
-        {qualificationMessage(qualification.phase)}
+        {qualification.phase !== 'settings-read' && props.readBlockReason != null
+          ? 'Waiting to read controller settings…'
+          : qualificationMessage(qualification.phase)}
+        {qualification.phase !== 'settings-read' && props.readBlockReason != null ? (
+          <p style={qualificationMessageStyle}>{props.readBlockReason}</p>
+        ) : null}
       </div>
     );
   }
   return (
     <div role="alert" className="lf-banner lf-banner--warning" style={qualificationErrorStyle}>
-      <strong style={qualificationTitleStyle}>Controller qualification failed</strong>
+      <strong style={qualificationTitleStyle}>
+        {props.reconnectRecommended
+          ? 'Controller connection needs recovery'
+          : 'Controller information unavailable'}
+      </strong>
       <p style={qualificationMessageStyle}>{qualification.message}</p>
-      <div style={qualificationActionsStyle}>
-        {props.onRetry !== undefined && (
-          <button
-            type="button"
-            className="lf-btn"
-            onClick={props.onRetry}
-            disabled={props.disabled}
-            title="Retry the owned controller settings read for this connection."
-          >
-            Retry reading controller settings
-          </button>
-        )}
-        {props.onReconnect !== undefined && (
-          <button
-            type="button"
-            className="lf-btn"
-            onClick={props.onReconnect}
-            disabled={props.disabled}
-            title="Close this controller connection and reconnect for fresh qualification."
-          >
-            Reconnect controller
-          </button>
-        )}
-      </div>
+      {props.readBlockReason != null ? (
+        <p role="status" style={qualificationMessageStyle}>
+          Waiting to retry: {props.readBlockReason}
+        </p>
+      ) : null}
+      <QualificationActions {...props} />
+    </div>
+  );
+}
+
+function QualificationActions(
+  props: Pick<
+    QualificationNoticeProps,
+    'onRetry' | 'onReconnect' | 'disabled' | 'readBlockReason' | 'reconnectRecommended'
+  >,
+): JSX.Element {
+  return (
+    <div style={qualificationActionsStyle}>
+      {props.onRetry !== undefined && (
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={props.onRetry}
+          disabled={props.disabled || props.readBlockReason !== null}
+          title={
+            props.readBlockReason ?? 'Read controller settings again using the current connection.'
+          }
+        >
+          Retry reading controller settings
+        </button>
+      )}
+      {props.reconnectRecommended && props.onReconnect !== undefined && (
+        <button
+          type="button"
+          className="lf-btn"
+          onClick={props.onReconnect}
+          disabled={props.disabled}
+          title="Close this controller connection and reconnect. This ends any paused job."
+        >
+          Reconnect controller
+        </button>
+      )}
     </div>
   );
 }
@@ -303,7 +365,7 @@ function qualificationMessage(
     case 'controller-response':
       return 'Waiting for controller response…';
     case 'reset-cleanup':
-      return 'Controller reset detected. Waiting for fresh Idle before reading settings…';
+      return 'Controller reset detected. Waiting to read controller settings…';
     case 'settings-read':
       return 'Reading controller settings…';
     default:
@@ -347,8 +409,8 @@ const qualificationStyle: React.CSSProperties = {
   color: 'var(--lf-text-muted)',
   fontSize: 11,
 };
-// A failed qualification is recoverable in place, so it wears the shared
-// warning banner rather than raw red text with bare inline buttons.
+// Missing controller information is recoverable through the open connection.
+// A transport problem supplies its own contextual reconnect recommendation.
 const qualificationErrorStyle: React.CSSProperties = {
   display: 'grid',
   gap: 6,

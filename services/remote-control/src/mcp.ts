@@ -1,5 +1,6 @@
-import { createMcpHandler } from '@modelcontextprotocol/server';
+import { createMcpHandler, isJsonContentType } from '@modelcontextprotocol/server';
 import type { OAuthResourceContext } from '@cloudflare/workers-oauth-provider';
+import { KerfDeskMcpError } from '../../../electron/mcp/backend.js';
 import { createKerfDeskMcpServer } from '../../../electron/mcp/server.js';
 import { mcpOutputSchemas } from '../../../electron/mcp/output-schemas.js';
 import { mcpCommandScope, type KerfDeskMcpCommand } from '../../../electron/mcp/input-schemas.js';
@@ -9,12 +10,11 @@ import {
   oauthGrantSchema,
   oauthScopes,
   type OAuthGrantProps,
-  type McpReservation,
   type RemoteScope,
 } from './protocol.js';
 import { bodyJson, json } from './security.js';
 import { device, relayRequest } from './relay.js';
-import { prepareMcpExchange } from './mcp-wire.js';
+import { prepareMcpExchange, releaseMcpReservations, type McpReservations } from './mcp-wire.js';
 import { mcpAuthChallenge, remoteToolMetadata } from './mcp-auth.js';
 import { abortRequest, clientLimited, rateLimited } from './limits.js';
 
@@ -60,7 +60,7 @@ async function scopeChallenge(request: Request, scopes: RemoteScope) {
   if (
     request.method === 'POST' &&
     (!scopes.includes('edit') || !scopes.includes('control')) &&
-    request.headers.get('Content-Type')?.split(';')[0].trim() === 'application/json'
+    isJsonContentType(request.headers.get('Content-Type'))
   ) {
     const message = await bodyJson(request.clone());
     const messages = Array.isArray(message) ? message : [message];
@@ -117,15 +117,10 @@ async function streamExchange(
   ctx: ExecutionContext,
   props: OAuthGrantProps,
   scopes: RemoteScope,
-  reservation?: McpReservation,
+  reservations: McpReservations = new Map(),
 ): Promise<Response> {
   const exchange = new AbortController();
-  const release = () =>
-    reservation
-      ? device(env, props.deviceId)
-          .endMcpRequest(props, reservation)
-          .catch(() => undefined)
-      : Promise.resolve();
+  const release = () => releaseMcpReservations(env, props, reservations);
   let ready: () => void = () => undefined;
   const streaming = new Promise<void>((resolve) => {
     ready = resolve;
@@ -134,8 +129,11 @@ async function streamExchange(
     () =>
       createKerfDeskMcpServer(
         {
-          async request(name, args, signal) {
+          async request(name, args, signal, wireRequestId) {
             await streaming;
+            const reservation =
+              wireRequestId === undefined ? undefined : reservations.get(wireRequestId);
+            if (!reservation) throw new KerfDeskMcpError('unavailable');
             return relayRequest(
               env,
               props,
@@ -201,7 +199,14 @@ export const protectedHandler = {
     );
     return (
       prepared.response ??
-      streamExchange(request, env, ctx, permitted.props, permitted.scopes, prepared.reservation)
+      streamExchange(
+        prepared.request ?? request,
+        env,
+        ctx,
+        permitted.props,
+        permitted.scopes,
+        prepared.reservations,
+      )
     );
   },
 } satisfies ExportedHandler<Env>;

@@ -2,6 +2,7 @@
 // as compilation. One physical contour is counted once even when several Fill
 // operations or suboperations omit it.
 import { effectiveOperationForObject } from '../effective-output';
+import { isBooleanCompoundObject } from '../scene/boolean-compound';
 import {
   applyTransform,
   outputOperationLayers,
@@ -25,8 +26,8 @@ export type OpenFillContourGroup = {
   readonly pathIndex: number;
   readonly polylines: ReadonlyArray<Polyline>;
   readonly contourIndexes: ReadonlyArray<number>;
-  /** Counts may still describe canonical geometry when its compatibility pair
-   * or parametric shape cannot be repaired without guessing. */
+  /** Counts may describe derived compound paths, or canonical geometry whose
+   * compatibility pair or parametric shape cannot be repaired without guessing. */
   readonly repairable: boolean;
 };
 
@@ -142,6 +143,7 @@ function openFillContoursForObject(
         polylines,
         contourIndexes,
         repairable:
+          !isBooleanCompoundObject(object) &&
           (path.curves === undefined || path.curves.length === path.polylines.length) &&
           shapeHasRepairableRepresentation(object),
       },

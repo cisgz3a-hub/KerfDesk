@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import { machineKindOf, type Project } from '../../core/scene';
 import { useStore } from '../state';
@@ -12,7 +12,7 @@ import './artwork-run-order.css';
 
 export function ArtworkRunOrderPanel(): JSX.Element {
   const controller = useRunOrderController();
-  if (controller.rows.length === 0) {
+  if (controller.rows.length === 0 && controller.numbering.kind === 'idle') {
     return (
       <section className="lf-run-order-empty" aria-label="Run order getting started">
         <span className="lf-run-order-empty-number" aria-hidden="true">
@@ -28,6 +28,7 @@ export function ArtworkRunOrderPanel(): JSX.Element {
 
 function useRunOrderController() {
   const project = useStore((state) => state.project);
+  const documentEpoch = useStore((state) => state.projectDocumentEpoch);
   const selectedObjectId = useStore((state) => state.selectedObjectId);
   const selectObjects = useStore((state) => state.selectObjects);
   const moveArtworkToPosition = useStore((state) => state.moveArtworkToPosition);
@@ -44,7 +45,7 @@ function useRunOrderController() {
   const machineKind = machineKindOf(project.machine);
 
   useSelectionFocus({ rows, selectedObjectId, activeRow, focus, numbering, setFocus, setReveal });
-  useRunOrderCleanup();
+  useRunOrderCleanup(documentEpoch);
 
   const focusRowAndReveal = (row: ArtworkRunOrderRowModel): void => {
     selectObjects(row.objectIds);
@@ -200,14 +201,20 @@ function useSelectionFocus(args: {
   ]);
 }
 
-function useRunOrderCleanup(): void {
+function useRunOrderCleanup(documentEpoch: number): void {
+  const ownerEpoch = useRef(documentEpoch);
+  useEffect(() => {
+    if (ownerEpoch.current === documentEpoch) return;
+    ownerEpoch.current = documentEpoch;
+  }, [documentEpoch]);
   useEffect(
     () => () => {
+      const app = useStore.getState();
+      if (app.projectDocumentEpoch !== ownerEpoch.current) return;
       if (useUiStore.getState().artworkNumbering.kind === 'active') {
-        useStore.getState().cancelInteraction();
-        useUiStore.getState().finishArtworkNumbering();
+        app.cancelInteraction();
       }
-      useUiStore.getState().setArtworkRunFocus(null);
+      useUiStore.getState().resetArtworkRunOrder();
     },
     [],
   );

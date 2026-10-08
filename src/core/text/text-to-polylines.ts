@@ -1,3 +1,4 @@
+import type { TextBoxSettings } from '../scene/text-box';
 // textToPolylines — render a TextObject's content into ColoredPath
 // polylines. Outline fonts use opentype.js once their ArrayBuffer is in
 // hand; bundled CNC fonts route to their native open-stroke renderer.
@@ -47,6 +48,8 @@ import {
   translateTextOutline,
   type TextOutlineGeometry,
 } from './text-outline-path';
+import { layoutTextBox, type TextBoxLayout } from './text-box-layout';
+import { finishTextBoxRender } from './text-box-render';
 import { cncStrokeTextToPolylines } from './cnc-stroke-font';
 import { missingCharacters, textForLayout } from './glyph-coverage';
 
@@ -86,6 +89,7 @@ type TextRenderSharedInput = {
   // adds spacing × fontSize to each glyph's advance.
   readonly letterSpacing?: number;
   readonly color: string;
+  readonly textBox?: TextBoxSettings;
 };
 
 export type TextRenderInput = TextRenderSharedInput &
@@ -95,6 +99,7 @@ export type TextRenderInput = TextRenderSharedInput &
   );
 
 export type TextRenderResult = {
+  readonly textBoxLayout?: TextBoxLayout;
   readonly paths: ReadonlyArray<ColoredPath>;
   readonly bounds: Bounds;
   /**
@@ -119,21 +124,33 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
   if (input.geometry === 'single-line') return cncStrokeTextToPolylines(input);
   const ot = await loadOpentype();
   const font = ot.parse(input.fontBuffer);
-  const text = textForLayout(input.content);
+  const layout =
+    input.textBox === undefined
+      ? undefined
+      : layoutTextBox(
+          { ...input, content: textForLayout(input.content), textBox: input.textBox },
+          (line, size) => measureLineWidth(font, line, size, input.letterSpacing ?? 0),
+          (font.ascender - font.descender) / font.unitsPerEm,
+        );
+  const actual =
+    layout === undefined ? input : { ...input, content: layout.content, sizeMm: layout.sizeMm };
+  const text = textForLayout(actual.content);
   const lines = text.split('\n');
-  const lineSpacingMm = input.sizeMm * input.lineHeight;
-  const letterSpacing = input.letterSpacing ?? 0;
+  const lineSpacingMm = actual.sizeMm * actual.lineHeight;
+  const letterSpacing = actual.letterSpacing ?? 0;
   // Per-line widths drive alignment, so they measure the glyphs as drawn.
-  const lineWidths = lines.map((line) => measureLineWidth(font, line, input.sizeMm, letterSpacing));
+  const lineWidths = lines.map((line) =>
+    measureLineWidth(font, line, actual.sizeMm, letterSpacing),
+  );
   const maxWidth = lineWidths.reduce((m, w) => (w > m ? w : m), 0);
   const raw: Polyline[] = [];
   const rawCurves: CurveSubpath[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i] ?? '';
     const lineWidth = lineWidths[i] ?? 0;
-    const xOffset = alignOffset(input.alignment, lineWidth, maxWidth);
+    const xOffset = alignOffset(actual.alignment, lineWidth, maxWidth);
     const yBaseline = i * lineSpacingMm;
-    const geometry = lineGeometry(font, line, input.sizeMm, xOffset, yBaseline, letterSpacing);
+    const geometry = lineGeometry(font, line, actual.sizeMm, xOffset, yBaseline, letterSpacing);
     raw.push(...geometry.polylines);
     rawCurves.push(...geometry.curves);
   }
@@ -143,14 +160,17 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
   // starting at top-left; text needs to behave the same.
   const { polylines, curves, bounds, offset } = normalizeToOrigin(raw, rawCurves);
   // Where a zero-width line would sit is the point every line aligns to.
-  const anchorX = alignOffset(input.alignment, 0, maxWidth);
+  const anchorX = alignOffset(actual.alignment, 0, maxWidth);
   const missing = missingCharacters(text, outlineGlyphCoverage(font));
-  return {
-    paths: [{ color: input.color, polylines, curves }],
+  const rendered: TextRenderResult = {
+    paths: [{ color: actual.color, polylines, curves }],
     bounds,
     ...(offset === null ? {} : { anchor: { x: anchorX + offset.x, y: offset.y } }),
     ...(missing.length === 0 ? {} : { missingCharacters: missing }),
   };
+  return layout === undefined || input.textBox === undefined
+    ? rendered
+    : finishTextBoxRender(rendered, layout, input.textBox, input.alignment);
 }
 
 /** The characters of `content` an outline font has no glyph for, as its render reports them. */
