@@ -18,6 +18,7 @@ import {
   provisionalResetCanvasPatch,
 } from './laser-reset-terminal-state';
 import { frameProofReset } from './laser-session-reset';
+import { publishControllerIncident } from './laser-incident-publish';
 import {
   canonicalRecoveryForReset,
   hasCoordinatedControllerReset,
@@ -157,11 +158,25 @@ export function acceptOwnedResetWrite(owner: ResetOwnership, keepErroredStreamer
 
 /** A rejected or timed-out reset is a real transport fault; it cannot publish
  * an accepted stopped outcome. Preserve an earlier factual notice. */
-export function failOwnedResetWrite(owner: ResetOwnership, action: LaserSafetyAction): void {
+export function failOwnedResetWrite(
+  owner: ResetOwnership,
+  action: LaserSafetyAction,
+  error?: unknown,
+): void {
   if (owner.refs.connection !== owner.connection || owner.boundaryObserved) return;
   owner.set((state) =>
     ownsResetOperation(state, owner.operation)
       ? {
+          ...ownedResetFailureIncident(
+            owner,
+            state,
+            '[lf2] Controller reset write failed: ' +
+              (error instanceof Error
+                ? error.message
+                : error === undefined
+                  ? writeFailedNotice(action).message
+                  : String(error)),
+          ),
           ...liveCanvasLifecyclePatch(state, 'errored'),
           ...(state.safetyNotice === null ||
           state.safetyNotice.kind === 'cnc-transition-unconfirmed'
@@ -178,9 +193,33 @@ export function failOwnedResetInformation(owner: ResetOwnership, message: string
   if (owner.refs.connection !== owner.connection) return;
   owner.set((state) =>
     ownsResetOperation(state, owner.operation)
-      ? failedControllerQualificationPatch(state, state.controllerSessionEpoch, message)
+      ? {
+          ...ownedResetFailureIncident(
+            owner,
+            state,
+            '[lf2] Controller reset information failed: ' + message,
+          ),
+          ...failedControllerQualificationPatch(state, state.controllerSessionEpoch, message),
+        }
       : {},
   );
+}
+
+const recordedResetFailures = new WeakMap<ResetOwnership, Set<string>>();
+
+/** A deadline failure can precede the transport promise settling. Retain that
+ * owned occurrence once, without allowing late or replaced reset callbacks to
+ * publish into a later session. The caller checks connection/operation ownership. */
+function ownedResetFailureIncident(
+  owner: ResetOwnership,
+  state: LaserState,
+  message: string,
+): Partial<LaserState> {
+  const recorded = recordedResetFailures.get(owner) ?? new Set<string>();
+  if (recorded.has(message)) return {};
+  recorded.add(message);
+  recordedResetFailures.set(owner, recorded);
+  return publishControllerIncident(owner.refs, state, message);
 }
 
 export async function writeResetWithinDeadline(

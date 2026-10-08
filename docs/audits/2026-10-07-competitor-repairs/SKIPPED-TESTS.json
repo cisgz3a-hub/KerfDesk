@@ -1,0 +1,147 @@
+[
+  {
+    "file": "src/core/cnc/vcarve-source-boundary-coverage-performance.test.ts",
+    "name": "reports matched dense coverage timing",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_arch-house-edge-audit.test.ts",
+    "name": "renders Arch House Edge Detection crops + gap/wobble metrics",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_tracer-upgrade-audit.test.ts",
+    "name": "renders every tracer over the diagnostic battery with metrics",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_contour-hole-debug.test.ts",
+    "name": "stage timing over all arch-house loops",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_contour-hole-debug.test.ts",
+    "name": "sharpen ON vs OFF: corners and timing",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_contour-hole-debug.test.ts",
+    "name": "stage-by-stage on the dying loops",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_cnc-audit-geometry.test.ts",
+    "name": "1.1 — default climb profile-outside walks the exterior clockwise",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_cnc-audit-geometry.test.ts",
+    "name": "1.10 — 85% stepover pocket reaches the core",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_cnc-audit-geometry.test.ts",
+    "name": "1.11 — relief finishing reaches the far-Y edge",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_cnc-audit-geometry.test.ts",
+    "name": "1.12 — inlay male insert enters on a lead",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_letter-b-smoothness.test.ts",
+    "name": "measures B-bowl smoothness against the real glyph outline",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+    "name": "measures real-logo curved-letter faceting via merged app options",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_letter-a-counter.test.ts",
+    "name": "reproduces + measures A counter closure",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_arch-a-scale.test.ts",
+    "name": "sweeps scale + sensitivity for the ARCH A counter",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+    "name": "measures small anti-aliased E/B faceting via merged app options",
+    "state": "skipped"
+  },
+  {
+    "file": "electron/desktop-project-file-check.test.ts",
+    "name": "checkDesktopProjectPath > refuses a project-named link to a file of another type",
+    "state": "skipped"
+  },
+  {
+    "file": "electron/desktop-project-file-check.test.ts",
+    "name": "checkDesktopProjectPath > follows a link to another project file and reads the target",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_centerline-wobble-probe.test.ts",
+    "name": "measures centerline wobble on ideal curved strokes",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_edge-zoom.test.ts",
+    "name": "renders zoomed edge-trace crops of the arch-house logo",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_edge-zoom.test.ts",
+    "name": "renders zoomed CENTERLINE crops of the arch-house logo",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_edge-zoom.test.ts",
+    "name": "renders the ARCH letters crop under knob variants (gap sweep)",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_edge-zoom.test.ts",
+    "name": "renders raw Canny masks for the LANGEBAAN crop under preprocessing variants",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_reference-iou.test.ts",
+    "name": "measures our-vs-reference IoU on identical bitmaps",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_reference-export.test.ts",
+    "name": "exports preprocessed fixture bitmaps for the reference tracer",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/_trace-audit-render.test.ts",
+    "name": "renders trace presets for visual audit",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/colour-layers-real-art.test.ts",
+    "name": "colour layers on real art (smoke) > owl.png traces with N = auto, 2, 3, 4",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/colour-layers-real-art.test.ts",
+    "name": "colour layers on real art (smoke) > hummingbird.png traces with N = auto, 2, 3, 4",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/trace-parity-distance-field.test.ts",
+    "name": "distance field on the oracle corpus masks > matches the frozen reference on every mask the tracer builds",
+    "state": "skipped"
+  },
+  {
+    "file": "src/__fixtures__/perceptual/trace-parity-thinning.test.ts",
+    "name": "medial thinning on the oracle corpus masks > matches the frozen reference on every mask the tracer thins",
+    "state": "skipped"
+  }
+]

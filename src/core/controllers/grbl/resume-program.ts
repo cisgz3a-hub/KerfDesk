@@ -16,6 +16,8 @@ import { createNativeLaserBeam, type NativeLaserBeam } from './native-laser-resu
 import { nativeLaserResume, scanNativeBeamLine } from './native-laser-resume';
 import { canTrackHeadStopBlock } from './resume-head-stop-block';
 
+export { resumeTravelMm } from './resume-travel';
+
 export type { LaserResumeTransformVersion };
 /** The transform new resumes use; archived resume steps record their own. */
 export const LASER_RESUME_TRANSFORM_VERSION: LaserResumeTransformVersion = 4;
@@ -110,35 +112,6 @@ export function resumeEntryPointMm(
   const state = initialModalState();
   if (scanToResumeLine(lines, fromLine, state, null, true) !== null) return null;
   return state.wcs === 'G54' ? pointMm(state) : null;
-}
-
-/**
- * How far the program moves in XY, in mm, from the head's point at `fromLine`
- * to its point at `toLine`: the straight distance between successive commanded
- * points, so an arc counts its chord. After a lost link the head stopped at
- * the end of the last line sent only if the controller kept running; this is
- * how far back along the path the stretch after the last confirmed line
- * reaches (ADR-341 Amendment 8). Null when the program cannot be followed.
- */
-export function resumeTravelMm(gcode: string, fromLine: number, toLine: number): number | null {
-  const lines = gcode.split('\n');
-  if (!validLineSpan(fromLine, toLine, lines.length)) return null;
-  const state = initialModalState();
-  if (scanToResumeLine(lines, fromLine, state, null, true) !== null) return null;
-  let travel = 0;
-  let from = pointMm(state);
-  for (let i = fromLine - 1; i < toLine - 1; i += 1) {
-    if (applyLine(state, lines[i] ?? '', true) !== null) return null;
-    const to = pointMm(state);
-    if (from !== null && to !== null) travel += Math.hypot(to.x - from.x, to.y - from.y);
-    from = to;
-  }
-  return state.wcs === 'G54' ? travel : null;
-}
-
-function validLineSpan(fromLine: number, toLine: number, lineCount: number): boolean {
-  if (!Number.isInteger(fromLine) || !Number.isInteger(toLine)) return false;
-  return fromLine >= 1 && toLine >= fromLine && toLine <= lineCount + 1;
 }
 
 function pointMm(state: LaserResumeModalState): { readonly x: number; readonly y: number } | null {

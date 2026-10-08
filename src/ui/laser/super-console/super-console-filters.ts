@@ -11,7 +11,11 @@ export const SUPER_CONSOLE_GROUPS: ReadonlyArray<{
   readonly label: string;
   readonly hint: string;
 }> = [
-  { id: 'errors', label: 'Errors', hint: 'error:N, ALARM:N, and locally blocked commands.' },
+  {
+    id: 'errors',
+    label: 'Errors',
+    hint: 'Controller errors, alarms, blocked commands, and retained connection incidents.',
+  },
   {
     id: 'commands',
     label: 'Commands',
@@ -23,7 +27,13 @@ export const SUPER_CONSOLE_GROUPS: ReadonlyArray<{
 ];
 
 export function groupForEntry(entry: SerialTranscriptEntry): SuperConsoleGroup {
-  if (entry.kind === 'error' || entry.kind === 'alarm' || entry.kind === 'blocked') {
+  if (
+    entry.incident === true ||
+    entry.kind === 'disconnect' ||
+    entry.kind === 'error' ||
+    entry.kind === 'alarm' ||
+    entry.kind === 'blocked'
+  ) {
     return 'errors';
   }
   if (entry.source === 'job') return 'stream';

@@ -34,6 +34,7 @@ import {
   originTileValue,
 } from './job-review-format';
 import { buildEffectiveOperationReview } from './job-review-effective-operations';
+import { buildReviewedOmissions, type JobReviewOmissions } from './job-review-omissions';
 import { memoizedFillHeatRisk } from './fill-heat-risk-memo';
 import { buildOutputQualityReviewFacts, type JobReviewFact } from './job-review-live-rows';
 import { detectArchiveCapacityWarnings } from './archive-capacity-warnings';
@@ -70,7 +71,7 @@ export type JobReviewAcknowledgement =
   | { readonly kind: 'laser-unverified'; readonly prompt: string }
   | { readonly kind: 'cnc'; readonly prompt: string };
 
-export type JobReviewModel = {
+export type JobReviewModel = JobReviewOmissions & {
   readonly machineKind: MachineKind;
   readonly stats: ReadonlyArray<JobReviewStatTile>;
   readonly warnings: ReadonlyArray<string>;
@@ -102,6 +103,7 @@ export function buildJobReviewModel(args: JobReviewModelArgs): JobReviewModel {
   const outputScope = args.outputScope ?? DEFAULT_OUTPUT_SCOPE;
   return {
     machineKind,
+    ...buildReviewedOmissions(args.prepared, outputScope),
     stats: buildStatTiles(
       args.prepared,
       machineKind,

@@ -49,6 +49,27 @@ sends is its licence check. The fix has to stay inside that.
    location is chosen, so the browser still sees the menu click as the gesture
    that opened the picker.
 
+### Amendment 1 (2026-10-07): retained controller incident evidence
+
+The report also includes this window's bounded retained controller incidents under a separate
+heading, newest last, independently of the existing last 100 console lines. Each entry keeps its
+original ID, timestamp, direction, source, wire kind, raw and decoded text. Its **event-time
+context** is separately labelled from the current Machine section: build, selected/detected
+controller and command set, session/connection/baud/USB facts, qualification, bounded firmware
+lines, last observed status/positions, and bounded run identity/progress/ACK/transport counts.
+Connecting incidents' baud and USB facts describe the owned open attempt. Store writes and
+current-epoch job refill writes are counted separately. The allowlist includes no project,
+artwork, complete executable program, account information or private port path.
+
+Capture uses immutable bounded copies before teardown; reconnect and asynchronous log reads
+cannot rewrite earlier event facts. Entries without captured context say so rather than borrowing
+current machine facts. Delimiters in raw/decoded/context text are escaped for the report. Licence
+keys are redacted before cell escaping, then the complete report is redacted again, preserving
+keys adjacent to escaped tabs/newlines. Saving is read-only: it does not clear history, acknowledge
+SafetyNotice or issue machine commands. The picker remains first and cancellation gathers nothing.
+The history is window-local, retained through Disconnect/Forget/reconnect, capped at 500, and
+explicitly clearable under ADR-229. No persistence across reload or automatic upload is added.
+
 ### Consequences
 
 - The support page tells customers to attach the report, which covers most of

@@ -1,8 +1,6 @@
-// CncOpenPathNote — per-layer advisory under the cut type: fires when nothing
-// on the layer is a closed shape AND the chosen cut type needs one. That is
-// exactly the case where the layer compiles to no toolpath at all, the emitted
-// file carries only its provenance header, and the operator meets an empty 3D
-// view with no explanation. Catching it here means it is caught before compile.
+// CncOpenPathNote — per-layer advisory under a closed-only cut type. Count
+// open contours even when closed artwork on the same operation still cuts.
+// An all-open vector operation without assigned relief retains the no-toolpath explanation.
 //
 // Which cut types those are is measured against the compiler, not assumed —
 // core/cnc/closed-contour-cut-types.ts and its test. V-carve, Pocket and Drill
@@ -20,8 +18,12 @@ import { useEffect, useState } from 'react';
 // Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
 // (scripts/index-export-baseline.json pins it at 67) and may only shrink.
 import { cutTypeNeedsClosedContours } from '../../core/cnc/closed-contour-cut-types';
-import { hasVCarvableContour } from '../../core/cnc/vcarve-carvable-contours';
-import { cutTypeLabel, type CncLayerSettings, type Layer } from '../../core/scene';
+import {
+  cutTypeLabel,
+  sceneObjectUsesOperation,
+  type CncLayerSettings,
+  type Layer,
+} from '../../core/scene';
 import { useStore } from '../state';
 import { cncNoteContours } from './cnc-note-contours';
 
@@ -36,12 +38,15 @@ export function CncOpenPathNote(props: {
   const device = useStore((s) => s.project.device);
   const machine = useStore((s) => s.project.machine);
   const [isAllOpen, setIsAllOpen] = useState(false);
+  const [openCount, setOpenCount] = useState(0);
   const [geometryIssue, setGeometryIssue] = useState<string | null>(null);
-  const needsClosed = machine?.kind === 'cnc' && cutTypeNeedsClosedContours(settings.cutType);
+  const needsClosed =
+    machine?.kind === 'cnc' && layer.output && cutTypeNeedsClosedContours(settings.cutType);
 
   useEffect(() => {
     if (!needsClosed) {
       setIsAllOpen(false);
+      setOpenCount(0);
       setGeometryIssue(null);
       return undefined;
     }
@@ -49,9 +54,15 @@ export function CncOpenPathNote(props: {
       const result = cncNoteContours(objects, layer, device);
       const polylines = result.polylines;
       setGeometryIssue(result.geometryIssue);
-      // An empty layer is a different (and obvious) state; only artwork that
-      // exists but cannot be cut is worth interrupting the operator for.
-      setIsAllOpen(polylines.length > 0 && !hasVCarvableContour(polylines));
+      const count = polylines.filter((polyline) => !polyline.closed).length;
+      setOpenCount(count);
+      // A closed but degenerate outline is not an open contour.
+      const hasRelief = objects.some(
+        (object) => object.kind === 'relief' && sceneObjectUsesOperation(object, layer),
+      );
+      // Relief output is independent of the vector cut type. Do not infer the
+      // entire operation's lack of motion from its vector contours alone.
+      setIsAllOpen(count > 0 && count === polylines.length && !hasRelief);
     }, NOTE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [needsClosed, objects, layer, device]);
@@ -62,10 +73,19 @@ export function CncOpenPathNote(props: {
         {geometryIssue}
       </p>
     );
-  if (!isAllOpen) return null;
+  if (openCount === 0) return null;
+  if (!isAllOpen)
+    return (
+      <p role="note" style={noteStyle}>
+        {openCount} open contour{openCount === 1 ? ' is' : 's are'} omitted from this layer. For
+        vector artwork, {cutTypeLabel(settings.cutType)} works on closed outlines only. Use “Engrave
+        (trace path)” or “On path” for open strokes, or close the shapes.
+      </p>
+    );
   return (
     <p role="note" style={noteStyle}>
-      Every shape on this layer is an open path. {cutTypeLabel(settings.cutType)} works on closed
+      Every shape on this layer is an open path. {openCount} open contour
+      {openCount === 1 ? ' is' : 's are'} omitted. {cutTypeLabel(settings.cutType)} works on closed
       outlines only, so this layer contributes no toolpath. Single-line fonts and traced centerlines
       are open by nature — cut them with “Engrave (trace path)” or “On path”, or close the shapes.
     </p>

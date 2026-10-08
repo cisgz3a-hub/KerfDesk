@@ -51,7 +51,17 @@ export function applyLineTabs(
       segments: polylines.map((polyline, index) => cutSegment(polyline, segments[index])),
       tabSpans: [],
     };
-  const eligible = automaticTabEligibility(polylines, settings);
+  const needsLegacyDepth =
+    settings.tabSkipInnerShapes &&
+    segments.some((segment) => segment.closed && segment.nesting?.topologyContour === undefined);
+  const legacyEligible = needsLegacyDepth
+    ? automaticTabEligibility(polylines, settings)
+    : polylines.map((polyline) => polyline.closed);
+  const eligible = segments.map((segment, index) =>
+    settings.tabSkipInnerShapes && segment.nesting?.topologyContour !== undefined
+      ? segment.closed && segment.nesting.depth % 2 === 0
+      : legacyEligible[index] === true,
+  );
   const layout = automaticTabLayoutFor(settings);
   const burns: CutSegment[] = [];
   const tabSpans: CutSegment[] = [];

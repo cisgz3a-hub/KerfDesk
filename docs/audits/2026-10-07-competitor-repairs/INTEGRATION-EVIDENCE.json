@@ -1,0 +1,226 @@
+{
+  "date": "2026-10-09",
+  "sourceCheckpoint": "134aeda2e19de083964fa6b6fcc076ff141f1a89",
+  "integrationBase": "2cd5600ac519fadd7095a4367bbd57db1efef70d",
+  "originalQualificationCheckpoint": "da10ce94de5e81f180ee09452729359cb8139f3b",
+  "unitQualification": {
+    "selectedFiles": 198,
+    "uniquePassedTests": 2211,
+    "skippedTests": 0,
+    "combinedRun": {
+      "head": "89bb2ea942e87db5fa309da50a8ab0019c7bdd52",
+      "passed": 2210,
+      "failed": 1,
+      "unhandledErrors": 0
+    },
+    "correctedFixtureRerun": {
+      "file": "src/ui/state/controller-incident-stop-deadline.test.ts",
+      "passed": 1,
+      "failed": 0
+    },
+    "productionHashComparison": {
+      "reference": "89bb2ea942e87db5fa309da50a8ab0019c7bdd52",
+      "current": "134aeda2e19de083964fa6b6fcc076ff141f1a89",
+      "changedSrcFilesChecked": 95,
+      "differences": 0
+    }
+  },
+  "sourceTypes": {
+    "head": "134aeda2e19de083964fa6b6fcc076ff141f1a89",
+    "startedAt": "2026-10-08T16:41:58.3261666Z",
+    "endedAt": "2026-10-08T16:45:44.7376385Z",
+    "seconds": 226.435,
+    "exitCode": 0,
+    "args": ["--max-old-space-size=4096", "node_modules/typescript/bin/tsc", "--noEmit"]
+  },
+  "staticQualification": {
+    "baseline": "b28b104bc783dd9e27305d21c7b09677bafe0fc3",
+    "fullLintBaseline": {
+      "errors": 2,
+      "warnings": 0
+    },
+    "correctedFilesLint": {
+      "files": 5,
+      "exitCode": 0,
+      "maxWarnings": 0
+    },
+    "finalFixtureLint": {
+      "files": 1,
+      "exitCode": 0,
+      "maxWarnings": 0
+    },
+    "fullFormatExitCode": 0,
+    "correctedFilesFormatted": true,
+    "otherChecks": [
+      {
+        "name": "e2e-types",
+        "exitCode": 0
+      },
+      {
+        "name": "electron-types",
+        "exitCode": 0
+      },
+      {
+        "name": "electron-lint",
+        "exitCode": 0
+      },
+      {
+        "name": "file-size",
+        "exitCode": 0
+      },
+      {
+        "name": "soft-size",
+        "exitCode": 0
+      },
+      {
+        "name": "adr-numbers",
+        "exitCode": 0
+      },
+      {
+        "name": "index-exports",
+        "exitCode": 0
+      },
+      {
+        "name": "privacy",
+        "exitCode": 0
+      }
+    ]
+  },
+  "browserQualification": {
+    "state": "running-at-report-checkpoint",
+    "selectedCases": 22,
+    "sourceCheckpoint": "134aeda2e19de083964fa6b6fcc076ff141f1a89",
+    "executionReceipt": "output/competitor-repairs/pr-integration-20261009/browser-execution.json",
+    "results": "output/competitor-repairs/pr-integration-20261009/browser-results.json",
+    "timingBudgetsChanged": false,
+    "controllers": "simulated",
+    "note": "Completion is recorded in the execution receipt and the ready PR status."
+  },
+  "rendererBuilds": {
+    "buildHead": "134aeda2e19de083964fa6b6fcc076ff141f1a89",
+    "editions": [
+      {
+        "edition": "browser-free",
+        "capability": "browser-free",
+        "identity": {
+          "sha": "134aeda2",
+          "version": "0.1.3147",
+          "emitterRevision": "operation-topology-fill-ownership-contour-packets-20261007-v17"
+        },
+        "identityFiles": {
+          "sha": [
+            "assets/main-DzI3DU1T.js",
+            "assets/output-preparation-worker-Btcbzqiu.js",
+            "assets/ui-workbench-DMGag0R3.js"
+          ],
+          "version": [
+            "assets/main-DzI3DU1T.js",
+            "assets/output-preparation-worker-Btcbzqiu.js",
+            "assets/ui-workbench-DMGag0R3.js"
+          ],
+          "emitterRevision": [
+            "assets/io--q5tPnwL.js",
+            "assets/output-preparation-worker-Btcbzqiu.js"
+          ]
+        },
+        "indexSha256": "205bc1990282e4aab1c9c1f88393ae59bff4b654275d3c06e5d21929d0e15451"
+      },
+      {
+        "edition": "desktop",
+        "capability": "desktop",
+        "identity": {
+          "sha": "134aeda2",
+          "version": "0.1.3147",
+          "emitterRevision": "operation-topology-fill-ownership-contour-packets-20261007-v17"
+        },
+        "identityFiles": {
+          "sha": [
+            "assets/main-Bc1_6Iaa.js",
+            "assets/output-preparation-worker-C_tEJ7SQ.js",
+            "assets/ui-workbench-jwngqJrf.js"
+          ],
+          "version": [
+            "assets/main-Bc1_6Iaa.js",
+            "assets/output-preparation-worker-C_tEJ7SQ.js",
+            "assets/ui-workbench-jwngqJrf.js"
+          ],
+          "emitterRevision": [
+            "assets/io-CANjErPr.js",
+            "assets/output-preparation-worker-C_tEJ7SQ.js"
+          ]
+        },
+        "indexSha256": "81db893416f157aefc3fe7dbeea7e7a3864752e6312c96206fe7b2054761f756"
+      }
+    ]
+  },
+  "tracerData": [
+    {
+      "edition": "browser-free",
+      "tables": [
+        {
+          "path": "assets/core-BHt-KcWo.js",
+          "names": ["Line Art"]
+        }
+      ]
+    },
+    {
+      "edition": "desktop",
+      "tables": [
+        {
+          "path": "assets/core-Ct6ddN1T.js",
+          "names": [
+            "Line Art",
+            "Photo shading",
+            "Centerline",
+            "Line + fill",
+            "Edge Detection",
+            "Smooth",
+            "Sharp",
+            "Colour layers"
+          ]
+        }
+      ]
+    }
+  ],
+  "rawReceipts": [
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/integrated-tests.json",
+      "sha256": "92053660bcfbb1f172dea711e8a6b56720c0e2ed9f93ac3e2d7299155d7479ec"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/deadline-retry-tests.json",
+      "sha256": "f0d0afb7e7c5e562986703aea73eb2b368430c4e5bf11c95b03429eedf59e443"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/source-types-retry.json",
+      "sha256": "21e29b1bbc444d32f27b85ee09f6597b2a35b14b66dd239285c9ad7cddb1be4c"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/build-progress.json",
+      "sha256": "4db0f9604d430a12c65646949362c0d1f31938ffdcf36076a98e8492a1658e19"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/build-verification.json",
+      "sha256": "365eb74c3e80ef97ec3c7a5fb942ff019a528132230e935a64f503d185cad85a"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/build-preset-verification.json",
+      "sha256": "81617e7ba37977a5a029c1bb9bd4050d4a7a8b617d0ab143155d84c31ac5d6e0"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/qualified-source-snapshot.json",
+      "sha256": "5218a913b67308f9e52117d390aeda9293bd43eff829e5a695c97e09eee4a3f4"
+    },
+    {
+      "path": "output/competitor-repairs/pr-integration-20261009/test-manifest.json",
+      "sha256": "8baef02b9f718b8a6fa5d525e0cc4d852a055b8ff86fe272c910b4160dfd2ebf"
+    }
+  ],
+  "boundaries": [
+    "No merge or deployment",
+    "No release or provider-state change",
+    "No Windows or macOS installer qualification",
+    "No hardware or material qualification",
+    "Original October 7 results remain historical"
+  ]
+}

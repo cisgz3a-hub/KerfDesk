@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { pointInPolygon } from '../../core/geometry';
-import { compileJob } from '../../core/job';
+import { compileJob, optimizePaths } from '../../core/job';
+import { grblStrategy } from '../../core/output/grbl-strategy';
 import {
   createLayer,
   createProject,
@@ -8,6 +9,7 @@ import {
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
+  type Project,
   type RasterImage,
   type SceneObject,
   type TracedImage,
@@ -104,6 +106,7 @@ describe('Break Apart on a traced image', () => {
     expect(compiledMoves(after.scene, after.device)).toEqual(
       compiledMoves(before.scene, before.device),
     );
+    expect(emittedCommands(after)).toEqual(emittedCommands(before));
   });
 
   it('keeps operation bindings, output settings and z-order, and one undo restores the trace', () => {
@@ -303,9 +306,35 @@ function evenOddCovers(loops: ReadonlyArray<Polyline>, point: Vec2): boolean {
 
 function compiledMoves(...args: Parameters<typeof compileJob>): ReadonlyArray<string> {
   return compileJob(...args)
-    .groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []))
-    .map((segment) => JSON.stringify(segment))
+    .groups.flatMap((group) => {
+      if (group.kind !== 'cut') throw new Error('Expected Line output');
+      expect(group.topologyScope).toMatch(/^vector:\d+:/);
+      const ids = group.segments.map((segment) => segment.nesting?.topologyContour);
+      expect(new Set(ids).size).toBe(group.segments.length);
+      return group.segments.map((segment) => {
+        const nesting = segment.nesting!;
+        expect(nesting.topologyContour).toMatch(/^\d+$/);
+        expect(nesting.forest).toBe(group.topologyScope);
+        expect(Number.isSafeInteger(nesting.depth) && nesting.depth >= 0).toBe(true);
+        // Break Apart renumbers local parents; retain the full geometry and shared forest/depth.
+        const { topologyContour: _localId, ...stableNesting } = nesting;
+        return JSON.stringify({ ...segment, nesting: stableNesting });
+      });
+    })
     .sort();
+}
+
+function emittedCommands(project: Project): ReadonlyArray<string> {
+  const job = optimizePaths(
+    compileJob(project.scene, project.device),
+    project.optimization,
+    project.device.scanningOffsets,
+    project.device.origin,
+  );
+  return grblStrategy
+    .emit(job, project.device)
+    .split('\n')
+    .filter((line) => line.length > 0 && !line.startsWith(';'));
 }
 
 // Two rings (outer circle + reversed inner circle) and a speck, in a

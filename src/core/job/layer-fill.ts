@@ -49,10 +49,11 @@ export function islandFillGroupsForLayer(
   device: DeviceProfile,
   powerSource: SceneObject | { readonly powerScale: number },
   sourceObjectId?: string,
+  suppliedContours?: ReadonlyArray<Polyline>,
 ): Group[] {
   const common = commonVectorGroupFields(layer, device, powerSource, sourceObjectId);
   const fillRule = fillRuleForLayer(objects, layer);
-  const contours = collectFillContoursForLayer(objects, layer, device);
+  const contours = suppliedContours ?? collectFillContoursForLayer(objects, layer, device);
   const islandMotionPolicy = islandFillMotionPolicyForDevice(device);
   const sensitiveIslandFill = islandMotionPolicy === 'sensitive';
   const scanDirection = resolveIslandFillScanDirection(device, layer, sensitiveIslandFill);
@@ -97,17 +98,24 @@ export function collectFillSegmentsForLayer(
   objects: ReadonlyArray<SceneObject>,
   layer: Layer,
   device: DeviceProfile,
+  suppliedContours?: ReadonlyArray<Polyline>,
 ): LayerFillSegments {
   const offsetFill =
     layer.fillStyle === 'offset'
       ? offsetFillContours({
-          polylines: collectFillContoursForLayer(objects, layer, device),
+          polylines: suppliedContours ?? collectFillContoursForLayer(objects, layer, device),
           spacingMm: layer.hatchSpacingMm,
         })
       : null;
   const polylines =
     offsetFill === null
-      ? memoizedLayerFillHatching(objects, layer, device)
+      ? suppliedContours === undefined
+        ? memoizedLayerFillHatching(objects, layer, device)
+        : memoizedFillHatchingWithMetadata(
+            suppliedContours,
+            layer,
+            fillRuleForLayer(objects, layer),
+          )
       : offsetFill.contours.map((polyline) => ({ ...polyline, reverse: false }));
   return {
     segments: polylines.map((polyline) => ({

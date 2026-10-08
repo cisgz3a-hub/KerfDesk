@@ -1,0 +1,722 @@
+{
+  "baseline": "76b5ff53e3be7df6c160a8b26820e61188595f08",
+  "evidenceHead": "da10ce94de5e81f180ee09452729359cb8139f3b",
+  "branch": "codex/fix-competitor-findings-20261007",
+  "generatedAt": "2026-10-07T15:40:59.998Z",
+  "tests": {
+    "passed": 28313,
+    "failed": 0,
+    "skipped": 29,
+    "unknown": 0,
+    "total": 28342,
+    "files": 3598,
+    "expectedFiles": 3598,
+    "success": true,
+    "unsuccessfulModules": [],
+    "finalRunErrors": [],
+    "evidence": [
+      {
+        "path": "integration-stage3-files.jsonl",
+        "sha256": "e1a943a98c52ddea0ca163b83f57602453c820cec6ba16da8b0d9b8733c5ddcc",
+        "completedModules": 3598,
+        "originallyFailedModules": 0
+      }
+    ],
+    "resultSha256": "06d6cef29da798d5d340751654fb91dbb512af1105bf4a3e878114a6d7766531"
+  },
+  "checks": {
+    "checks": [
+      {
+        "args": [
+          "--max-old-space-size=4096",
+          "node_modules/vitest/vitest.mjs",
+          "run",
+          "--config",
+          "output/competitor-repairs/vitest.integration-stage3.config.ts",
+          "--reporter=dot",
+          "--reporter=json",
+          "--reporter=./output/competitor-repairs/durable-stage3-reporter.mjs",
+          "--outputFile=output/competitor-repairs/integration-stage3-tests.json"
+        ],
+        "exitCode": 0,
+        "seconds": 1468.764,
+        "name": "tests",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-tests.txt"
+      },
+      {
+        "args": ["--max-old-space-size=4096", "node_modules/typescript/bin/tsc", "--noEmit"],
+        "exitCode": 0,
+        "seconds": 61.635,
+        "name": "source-types",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-source-types.txt"
+      },
+      {
+        "args": [
+          "--max-old-space-size=4096",
+          "node_modules/typescript/bin/tsc",
+          "--noEmit",
+          "-p",
+          "e2e/tsconfig.json"
+        ],
+        "exitCode": 0,
+        "seconds": 17.192,
+        "name": "e2e-types",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-e2e-types.txt"
+      },
+      {
+        "args": [
+          "--max-old-space-size=5120",
+          "node_modules/eslint/bin/eslint.js",
+          ".",
+          "--ignore-pattern",
+          "output/**"
+        ],
+        "exitCode": 0,
+        "seconds": 203.797,
+        "name": "lint",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-lint.txt"
+      },
+      {
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-format-retry.txt",
+        "seconds": 99.866,
+        "exitCode": 0,
+        "originalEvidence": "integration-stage3-format-stderr.txt",
+        "name": "format",
+        "head": "da10ce94de5e81f180ee09452729359cb8139f3b",
+        "stderr": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-format-retry-stderr.txt",
+        "args": [
+          "node_modules/prettier/bin/prettier.cjs",
+          "--check",
+          ".",
+          "--ignore-path",
+          ".prettierignore.competitor-repairs"
+        ]
+      },
+      {
+        "args": ["scripts/check-file-size-policy.mjs"],
+        "exitCode": 0,
+        "seconds": 6.085,
+        "name": "file-size",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-file-size.txt"
+      },
+      {
+        "args": ["scripts/check-soft-line-limit.mjs"],
+        "exitCode": 0,
+        "seconds": 4.053,
+        "name": "soft-size",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-soft-size.txt"
+      },
+      {
+        "args": ["scripts/check-adr-numbers.mjs"],
+        "exitCode": 0,
+        "seconds": 1.052,
+        "name": "adr-numbers",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-adr-numbers.txt"
+      },
+      {
+        "args": ["scripts/check-index-exports.mjs"],
+        "exitCode": 0,
+        "seconds": 1.025,
+        "name": "index-exports",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\integration-stage3-index-exports.txt"
+      }
+    ],
+    "retryEvidence": "integration-format-retry-progress.json",
+    "originalEvidence": "integration-stage3-progress.json",
+    "updatedAt": "2026-10-07T15:17:52.7910083Z",
+    "head": "da10ce94de5e81f180ee09452729359cb8139f3b",
+    "status": "passed",
+    "startedAt": "2026-10-07T14:41:54.8390620Z"
+  },
+  "checksEvidence": "integration-final-qualified-checks.json",
+  "pipeline": {
+    "stages": [
+      {
+        "originalEvidence": "integration-stage3-progress.json",
+        "exitCode": 0,
+        "evidence": "integration-final-qualified-checks.json",
+        "name": "integration"
+      },
+      {
+        "originalPassed": 20,
+        "exitCode": 0,
+        "originalEvidence": "browser-final-events.jsonl",
+        "name": "browser",
+        "evidence": "browser-qualified.json",
+        "retrySeconds": 178.671,
+        "retriedPassed": 2,
+        "retryEvidence": "browser-final-retry-events.jsonl"
+      },
+      {
+        "exitCode": 0,
+        "seconds": 215.162,
+        "name": "builds"
+      }
+    ],
+    "originalEvidence": "final-pipeline-qualified-progress.json",
+    "updatedAt": "2026-10-07T15:38:35.3956366Z",
+    "currentStage": "",
+    "head": "da10ce94de5e81f180ee09452729359cb8139f3b",
+    "status": "passed",
+    "startedAt": "2026-10-07T15:31:59.7645457Z"
+  },
+  "pipelineEvidence": "final-pipeline-completed-progress.json",
+  "browser": {
+    "passed": 22,
+    "failed": 0,
+    "skipped": 0,
+    "total": 22,
+    "success": true,
+    "evidence": [
+      {
+        "path": "browser-prior-passed.json",
+        "sha256": "3d2da7c77268eeb049cd8f0b9cc80b1a470ec397df082c05d02d03043d6c95ab",
+        "provenance": "Observed Playwright passed lines in tool output chunks 98020b and 1ca53b before interruption; saved screenshots and round-trip artifacts retained under browser-results",
+        "tests": 7
+      },
+      {
+        "path": "browser-final-events.jsonl",
+        "sha256": "2126ead49f6e72d65c6e7baa3d07ec282dc6ec78a0dfb08de482e144f4ae57e6",
+        "tests": 22,
+        "originallyUnsuccessful": 2
+      },
+      {
+        "path": "browser-final-retry-events.jsonl",
+        "sha256": "dbdd00539b08629e1ee6cd018918e2fd8c8409038b41b615da0ff8929123fd25",
+        "tests": 2,
+        "originallyUnsuccessful": 0
+      }
+    ],
+    "resultSha256": "790f592ac6866c16675f8b60ca07b13d6d0e6c3d716a92fbcfeca93d2b7a52a8"
+  },
+  "builds": [
+    {
+      "edition": "browser-free",
+      "capability": "browser-free",
+      "indexSha256": "b5a13048c2b508886ac860ce70eabb9a03174a75bca5a25b3da0bb3e9028a476",
+      "fileCount": 460,
+      "bytes": 23059924
+    },
+    {
+      "edition": "desktop",
+      "capability": "desktop",
+      "indexSha256": "cf04e4bd9e8dbeaf0df2bb42d5690587c8eb405669b5ba5c0901c30fd5ab02b9",
+      "fileCount": 467,
+      "bytes": 24876377
+    }
+  ],
+  "buildChecks": {
+    "updatedAt": "2026-10-07T15:38:35.0026283Z",
+    "head": "da10ce94de5e81f180ee09452729359cb8139f3b",
+    "checks": [
+      {
+        "args": ["scripts/generate-privacy-page.mjs"],
+        "exitCode": 0,
+        "seconds": 1.051,
+        "name": "privacy",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\build-privacy.txt"
+      },
+      {
+        "args": ["scripts/generate-third-party-notices.mjs"],
+        "exitCode": 0,
+        "seconds": 3.043,
+        "name": "notices",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\build-notices.txt"
+      },
+      {
+        "args": [
+          "--max-old-space-size=4096",
+          "node_modules/vite/bin/vite.js",
+          "build",
+          "--config",
+          "output/competitor-repairs/vite.browser.config.ts",
+          "--outDir",
+          "output/competitor-repairs/build-browser-free"
+        ],
+        "exitCode": 0,
+        "seconds": 85.75,
+        "name": "browser-free",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\build-browser-free.txt"
+      },
+      {
+        "args": [
+          "--max-old-space-size=4096",
+          "node_modules/vite/bin/vite.js",
+          "build",
+          "--config",
+          "output/competitor-repairs/vite.browser.config.ts",
+          "--mode",
+          "desktop",
+          "--outDir",
+          "output/competitor-repairs/build-desktop"
+        ],
+        "exitCode": 0,
+        "seconds": 124.297,
+        "name": "desktop",
+        "log": "D:\\LaserForge\\competitor-fixes-20261007\\output\\competitor-repairs\\build-desktop.txt"
+      }
+    ]
+  },
+  "buildVerification": {
+    "buildHead": "da10ce94de5e81f180ee09452729359cb8139f3b",
+    "editions": [
+      {
+        "edition": "browser-free",
+        "capability": "browser-free",
+        "identity": {
+          "sha": "da10ce94",
+          "version": "0.1.3042",
+          "emitterRevision": "operation-topology-fill-ownership-contour-packets-20261007-v17"
+        },
+        "identityFiles": {
+          "sha": [
+            "assets/main-nFc7dxHE.js",
+            "assets/output-preparation-worker-9THDeMN7.js",
+            "assets/ui-workbench-dNzzYoaW.js"
+          ],
+          "version": [
+            "assets/main-nFc7dxHE.js",
+            "assets/output-preparation-worker-9THDeMN7.js",
+            "assets/ui-workbench-dNzzYoaW.js"
+          ],
+          "emitterRevision": [
+            "assets/io-3N4uq5zN.js",
+            "assets/output-preparation-worker-9THDeMN7.js"
+          ]
+        },
+        "indexSha256": "b5a13048c2b508886ac860ce70eabb9a03174a75bca5a25b3da0bb3e9028a476"
+      },
+      {
+        "edition": "desktop",
+        "capability": "desktop",
+        "identity": {
+          "sha": "da10ce94",
+          "version": "0.1.3042",
+          "emitterRevision": "operation-topology-fill-ownership-contour-packets-20261007-v17"
+        },
+        "identityFiles": {
+          "sha": [
+            "assets/main-Bhf9BoXl.js",
+            "assets/output-preparation-worker-CfTeRtuE.js",
+            "assets/ui-workbench-B5mDpjBU.js"
+          ],
+          "version": [
+            "assets/main-Bhf9BoXl.js",
+            "assets/output-preparation-worker-CfTeRtuE.js",
+            "assets/ui-workbench-B5mDpjBU.js"
+          ],
+          "emitterRevision": [
+            "assets/io-Dnk6j4b5.js",
+            "assets/output-preparation-worker-CfTeRtuE.js"
+          ]
+        },
+        "indexSha256": "cf04e4bd9e8dbeaf0df2bb42d5690587c8eb405669b5ba5c0901c30fd5ab02b9"
+      }
+    ]
+  },
+  "buildPresetVerification": [
+    {
+      "edition": "browser-free",
+      "tables": [
+        {
+          "path": "assets/core-C3Z7nsJ3.js",
+          "names": ["Line Art"]
+        }
+      ]
+    },
+    {
+      "edition": "desktop",
+      "tables": [
+        {
+          "path": "assets/core-BGwjXhKn.js",
+          "names": [
+            "Line Art",
+            "Photo shading",
+            "Centerline",
+            "Line + fill",
+            "Edge Detection",
+            "Smooth",
+            "Sharp",
+            "Colour layers"
+          ]
+        }
+      ]
+    }
+  ],
+  "production": [
+    {
+      "path": "src/core/cnc/cnc-compilation-sidecar.ts",
+      "sha256": "58c933d599a0682d1690c3789087f35ac5b9b6c0597b1652811e43e130f3e32f"
+    },
+    {
+      "path": "src/core/cnc/cnc-open-contour-omissions.ts",
+      "sha256": "c6e18995d9e2372ccd8197383e879a794de1cb3720f60c1ab2f5ba0f8f4d831b"
+    },
+    {
+      "path": "src/core/cnc/compile-cnc-job.ts",
+      "sha256": "1c67fcec3bd3cee9c800aa28d574e73f03bcdd36622d8f13041e41119322acf7"
+    },
+    {
+      "path": "src/core/controllers/grbl/resume-program.ts",
+      "sha256": "f1e309bf3955a773b9f1b5a0b01ea2393abad70ce59682d8d8834aca6dd9eba4"
+    },
+    {
+      "path": "src/core/controllers/grbl/resume-travel-arc.ts",
+      "sha256": "3ef2bb7f5da16e385ebda0369b9e1f99997571e8c0afd2b775d59e406239947b"
+    },
+    {
+      "path": "src/core/controllers/grbl/resume-travel.ts",
+      "sha256": "37092f1b2072f9a7c9ffdf09eebe2aade12aeca27f8e74ab9afac9852cba0a39"
+    },
+    {
+      "path": "src/core/geometry/path-direction-edits.ts",
+      "sha256": "dc6c16b2ce6e011e1efa0c7be3a1f9639c7d5233290a960cc63aa714296ce935"
+    },
+    {
+      "path": "src/core/geometry/polygon-difference.ts",
+      "sha256": "a75a20482854fa96fd37d305b0e2cef232a0323b86b1f6c2f5e991d2d4d5691a"
+    },
+    {
+      "path": "src/core/geometry/polygon-intersection.ts",
+      "sha256": "0b7477eda23b0998de3bee74cfbc9abd1f54d2b4c6474681c50323b8cbe254ec"
+    },
+    {
+      "path": "src/core/job/cnc-compilation-sidecar-types.ts",
+      "sha256": "bacc479fe16901f3ed7dfe2eb5a238998d3ae4f9c46d180ca1ed80656c48d8dd"
+    },
+    {
+      "path": "src/core/job/collect-line-segments.ts",
+      "sha256": "737bb7e15477599594d86833973f4d2c53986cdfc3574a0e007aaea4a5f26f84"
+    },
+    {
+      "path": "src/core/job/compile-job.ts",
+      "sha256": "99816ec2e0a22388768291c6b9d3b9a0090d091c9c66ee19a652d2ee51d6d818"
+    },
+    {
+      "path": "src/core/job/compile-line-topology.ts",
+      "sha256": "9da18fc5c58e0456b06b24e5fb72cc966cec0926d843ff4b4a152c1105a62a9b"
+    },
+    {
+      "path": "src/core/job/compile-vector-operation.ts",
+      "sha256": "1256f5cab43998c0657e44d64bce2391cf9fb7eaae85034c1ff4e120e1ea5dca"
+    },
+    {
+      "path": "src/core/job/fill-material-components.ts",
+      "sha256": "452149cd150baffcc522f2eeca11844e24fc32574395ce158c6940b24ad8190c"
+    },
+    {
+      "path": "src/core/job/fill-material-ownership.ts",
+      "sha256": "f409a822bb5864ff245b2f6520d1f87bec928c4d03c284863c0fe742ed1110ec"
+    },
+    {
+      "path": "src/core/job/fill-ownership-cells.ts",
+      "sha256": "66c7e8161ac8f3e3fc96d198a495807e18687e9bc438bf55dd53b62ecbd3f015"
+    },
+    {
+      "path": "src/core/job/job.ts",
+      "sha256": "c0ac577645144f8de92100b211229a78b0bb82558853f8d170fa0881898ae0f4"
+    },
+    {
+      "path": "src/core/job/layer-fill.ts",
+      "sha256": "3d74117b75b58b6598444d2141787929c41e2cc6d920e71d29ad1a146f482a9e"
+    },
+    {
+      "path": "src/core/job/layer-kerf.ts",
+      "sha256": "6442bafdde188ac4e56a941e329faf7fa4bf66591e53ed0a2d0b40fcd0215d25"
+    },
+    {
+      "path": "src/core/job/line-tabs.ts",
+      "sha256": "4095ff344b992e3864b472aa166c9a68bb13cbfc3ee351e284c0dc6b0499e066"
+    },
+    {
+      "path": "src/core/job/open-fill-contours.ts",
+      "sha256": "1ba36c8050ef036ebe38fc706e9953ca4176f2c6e3cd9a1d47e4161c79d9999a"
+    },
+    {
+      "path": "src/core/job/optimize-paths.ts",
+      "sha256": "d6f2eb134f154ba4b3cafd34367c5f5309b2665aeb58b34586fb0929522d6509"
+    },
+    {
+      "path": "src/core/job/proper-contour-containment.ts",
+      "sha256": "425dfa0e3ac184b39fc396a9a7abd4fb30fc0e9ff1a69dc64b7a2d2277543172"
+    },
+    {
+      "path": "src/core/job/segment-order.ts",
+      "sha256": "bc808a4f3edcd247a20116a2e14f99eb43b9e9afc79394446522eca3cb6a3598"
+    },
+    {
+      "path": "src/core/job/stable-fill-artwork-subset.ts",
+      "sha256": "65b2bc80919cdb2162d39967b6f355ea1b3a0de3487cdc4acbfeee2bd4e4967a"
+    },
+    {
+      "path": "src/core/job/topology-cut-cleanup.ts",
+      "sha256": "8b4a2916f38cd34f7ec7fa35aefa31a855f7101ffd9f7d86dbd533831daa64d7"
+    },
+    {
+      "path": "src/core/job/topology-cut-packets.ts",
+      "sha256": "a2f7ab4ab8a140883821e1e5d51484a03b9fd6532792b462872e33a3964d479f"
+    },
+    {
+      "path": "src/core/job/vector-process-buckets.ts",
+      "sha256": "51e186402dbf2d231e2f72d92f9ad725e9bba8f43a2444d608ac3467fb2bd07a"
+    },
+    {
+      "path": "src/core/preflight/cnc-open-contour-issues.ts",
+      "sha256": "a7ff0387aafc30a8ca9a1724c6e0d4260a5088f8b1c984f481050f1ac09be28d"
+    },
+    {
+      "path": "src/core/preflight/cnc-preflight.ts",
+      "sha256": "2993a3eb296c85a3b778dc83347ce0979d442475d53224bf16a01beea3efb73d"
+    },
+    {
+      "path": "src/core/preflight/open-fill-contour-issues.ts",
+      "sha256": "b9768973a8222d56506ebe9c3ce877fbbe9aee61e4802519961f8ba6d5e99fa8"
+    },
+    {
+      "path": "src/core/preflight/preflight.ts",
+      "sha256": "f667f29d5ccf79a4f41071e3e58c3fd9200409ab6725c9d436939cb215d99b80"
+    },
+    {
+      "path": "src/core/recovery/cnc-retained-compilation-sidecar.ts",
+      "sha256": "6727726b318709d730470900e4e2c274205196221409397fe55619e93e5a1e9d"
+    },
+    {
+      "path": "src/io/gcode/gcode-metadata.ts",
+      "sha256": "29b096327ad53e3fd32163251ed278f5c269464266f2e038fccde9d4f5084b29"
+    },
+    {
+      "path": "src/io/svg/export-scene-svg.ts",
+      "sha256": "49811ae47b97c9703fb20651641ed89f8b5ec0597f6cc749fa2e82912a9dcb4c"
+    },
+    {
+      "path": "src/io/svg/parse-svg.ts",
+      "sha256": "8a95ee28c5a9f18078ce2efd8492601b16f13febb9a2d66ca23b0312e5008ab9"
+    },
+    {
+      "path": "src/io/svg/shape-to-polylines.ts",
+      "sha256": "cab35b2ade8659db61eeac79ff71856a23e1fe9d1e19ffd9c8f0a49d68b44fa7"
+    },
+    {
+      "path": "src/io/svg/svg-artwork-origin.ts",
+      "sha256": "f99e2e66827d05da4e2f99b40965e657b4b05126b7625a6e1ab9bd207058c840"
+    },
+    {
+      "path": "src/io/svg/svg-clip-region.ts",
+      "sha256": "fef4eb014593a44e5d154adf2aa6a7889b014d508a4b03f0070aaf0ec626aed6"
+    },
+    {
+      "path": "src/io/svg/svg-clip-resolve.ts",
+      "sha256": "1deb8f290f43f6e1da31acd9c88c0fe99b181143a94f1bb8eaff348c7d9b8152"
+    },
+    {
+      "path": "src/io/svg/svg-geometry-length.ts",
+      "sha256": "fde3295c4e6e0bdab3ac3704fba091f0d64220921871d226ea56025115d1e0f7"
+    },
+    {
+      "path": "src/io/svg/svg-image-element.ts",
+      "sha256": "0792d55cb68e7a9dbe48f2de269be472d30733cce0a75e4c479c985795117824"
+    },
+    {
+      "path": "src/io/svg/svg-object-bbox.ts",
+      "sha256": "39148df47232a224df75a9ea8e653345a536dd79140e8fdfa4f99891cd1af76b"
+    },
+    {
+      "path": "src/io/svg/svg-overflow.ts",
+      "sha256": "10da184d564e71acafe3bc3801742ad1834f61934a3845a46aed6c5ef288d1a6"
+    },
+    {
+      "path": "src/io/svg/svg-presentation.ts",
+      "sha256": "b50e6f28329f73a1e0214fadceecce6aa0d38554d26813453ee9e28e6bc77ff8"
+    },
+    {
+      "path": "src/io/svg/svg-root-viewport.ts",
+      "sha256": "c9a7e1e000681aef3838f5009a35059c40226d22ea5b16303847e0a5a238e716"
+    },
+    {
+      "path": "src/io/svg/svg-vector-clip.ts",
+      "sha256": "9c2472c1eca932303f0b25f0d6f037a1c6042ef870ed406738ca14a85be4b0c8"
+    },
+    {
+      "path": "src/io/svg/svg-viewport-state.ts",
+      "sha256": "b016970fd215b1b6aae6251b33fa0c71c74e7c05445b3f5e3e646a288ca76c56"
+    },
+    {
+      "path": "src/io/svg/svg-viewport.ts",
+      "sha256": "99fe20f0623f64a0afa9f538073f8f38b96212daeceeb514e9123d733370b6b7"
+    },
+    {
+      "path": "src/ui/commands/command-families.ts",
+      "sha256": "aa4ec6b2d8865fc9ed023a4511e80b70f6671466265b05b8515e7cabeff10e8e"
+    },
+    {
+      "path": "src/ui/common/fill-diagnostics.ts",
+      "sha256": "77b8a04be9e5f1d5ff5e4374ae59433862b4dde69c11f8208e6d217fab7f8de8"
+    },
+    {
+      "path": "src/ui/laser/compile-diagnostic-warnings.ts",
+      "sha256": "e2275a4c59e8d4d866fbe8e82d6b9580f84df7f296c91f3736716cfa642fcfa4"
+    },
+    {
+      "path": "src/ui/laser/job-review/JobReviewDialog.tsx",
+      "sha256": "e0f3f6588dacf444b236759503ddeda2b8e26484d3d34c75c7193892ee7b0ca7"
+    },
+    {
+      "path": "src/ui/laser/job-review/JobReviewWarnings.tsx",
+      "sha256": "5e39320c63526e36755a298d5c9bda360a5ad49d4cd937b19348c4dbb38baba4"
+    },
+    {
+      "path": "src/ui/laser/job-review/ShowOmittedCncArtworkButton.tsx",
+      "sha256": "d6a9e3f04a4120ff7337bc7e96b61aaa9bd95ebe2cff84bfddc5126842ca7225"
+    },
+    {
+      "path": "src/ui/laser/job-review/ShowOmittedFillArtworkButton.tsx",
+      "sha256": "2e4dbb99abb17e5329c3006b2ebf79361dee9dd6dff8719da82ccf71f192a516"
+    },
+    {
+      "path": "src/ui/laser/job-review/job-review-cnc-omissions.ts",
+      "sha256": "822e815deda92a09d32adfda19a493b1ec6676094b34ca31516c913a1af11a7a"
+    },
+    {
+      "path": "src/ui/laser/job-review/job-review-fill-omissions.ts",
+      "sha256": "552cd783fd964fecaeee01ae87f30eae0fb3b33cf9a6f7991c77a3485d705322"
+    },
+    {
+      "path": "src/ui/laser/job-review/job-review-model.ts",
+      "sha256": "a55e6831a27108b40f21060ecb4b6d9e1106becd556ce3afdeb8bae143d63c18"
+    },
+    {
+      "path": "src/ui/laser/job-review/job-review-omissions.ts",
+      "sha256": "1e42b6514c298af20bebf1fa2b149ed4a040f477a3494ea4bdf53d9f2fde25db"
+    },
+    {
+      "path": "src/ui/laser/job-review/reveal-reviewed-artwork.ts",
+      "sha256": "c8f37f2f09ad9499aa029c8ee2d872228e0e1b5599e7b2f8b4029ec734232b5c"
+    },
+    {
+      "path": "src/ui/laser/job-review/review-artwork-sources.ts",
+      "sha256": "4ab34f27971a0303875c6230ec4ac0acfa54492ef1a76bddebc2658ce7452870"
+    },
+    {
+      "path": "src/ui/laser/super-console/SuperConsoleDialog.tsx",
+      "sha256": "8cecbf80ca151e7f776f1a15ca8ae3c42ab8d2aba048ab6105373dd9cc41cef4"
+    },
+    {
+      "path": "src/ui/laser/super-console/super-console-filters.ts",
+      "sha256": "8d865ef4e2a8ffc1fbf5ce0a208f19c73a3f2c573bf0196ffb6ec886bda1b72b"
+    },
+    {
+      "path": "src/ui/layers/CncOpenPathNote.tsx",
+      "sha256": "e1a842af7b8a70da6da74d3a6989cccb1144f1f2a7b3b4e886f5668ddfbc3108"
+    },
+    {
+      "path": "src/ui/state/close-open-fill-contours-actions.ts",
+      "sha256": "89e9a15c8c9ff8a62ca2193cbd6c263e27897ee6395086abdfc7357421bb6213"
+    },
+    {
+      "path": "src/ui/state/controller-incident-context.ts",
+      "sha256": "77f0003332de5cfd1090505941ed34bd4d18672fb9d7f386e4bf3e76dd8d76c6"
+    },
+    {
+      "path": "src/ui/state/laser-connect-action.ts",
+      "sha256": "77d34d078165cad38e13170b627638def1129ed0e71a4634d58e8b3fad2133ab"
+    },
+    {
+      "path": "src/ui/state/laser-connection-actions.ts",
+      "sha256": "b3fa82eb5825b6c12d0091fe2faee36f36ba55cde98fae4ad4402e96901ca5a1"
+    },
+    {
+      "path": "src/ui/state/laser-connection-teardown.ts",
+      "sha256": "23a7f8889dcfd3550af76bb3069007b98f57c5f4b6a0fbf10eb0df92034bad14"
+    },
+    {
+      "path": "src/ui/state/laser-console-actions.ts",
+      "sha256": "27eef14e9534db40d78ab937dd2462b8a5649bfedc200e7ad263d1386372fc27"
+    },
+    {
+      "path": "src/ui/state/laser-controller-silence.ts",
+      "sha256": "304a34e7629aa70f0a05b4cb7e472656109e292de95b52c6c140024ce77d8217"
+    },
+    {
+      "path": "src/ui/state/laser-disconnect-stop.ts",
+      "sha256": "81b7db6ce4ca13b4ea028ab0fdb0d6fd0e46d4ee54561b1a175561356e21a055"
+    },
+    {
+      "path": "src/ui/state/laser-forget-finalization.ts",
+      "sha256": "0ea5c67425b9767b55d7b8a1ed2e03a2d28fd8d252c45de709c7f17193dbf511"
+    },
+    {
+      "path": "src/ui/state/laser-incident-clear.ts",
+      "sha256": "8ee363b19589be4f357ff1d7379795d1fbe528bf92d0de03a2e66d476f8a7b65"
+    },
+    {
+      "path": "src/ui/state/laser-incident-history.ts",
+      "sha256": "e6cfda51c3c8a754f09d04ad085ce9768de7bc531f6778eb2fef0ed4ef06d1b8"
+    },
+    {
+      "path": "src/ui/state/laser-incident-publish.ts",
+      "sha256": "9d6e701262c203268ade4cd14fd5b2d30fd4e7bd08d718e0a59c5655e54d5462"
+    },
+    {
+      "path": "src/ui/state/laser-line-handler.test-support.ts",
+      "sha256": "dab562b14c854d8adc405e9365df0741022eba2f0de1f13b3353bae3df51206d"
+    },
+    {
+      "path": "src/ui/state/laser-safe-write.ts",
+      "sha256": "10b3996239f34bd14e25ab6dcc56104395b322605ac52254a73af4c6f6568d1e"
+    },
+    {
+      "path": "src/ui/state/laser-serial-line-errors.ts",
+      "sha256": "db47ae83b84ae1af7fd6ca92f22020f1471a93e1ebfce40280ef71783a4cd5fe"
+    },
+    {
+      "path": "src/ui/state/laser-store-action-types.ts",
+      "sha256": "70f3f3a3d5afbbed6560906a18de2e63b6ac0346af40eeeff95c0974b15d98e0"
+    },
+    {
+      "path": "src/ui/state/laser-store-helpers.ts",
+      "sha256": "0815c0cb9385d7a828bc5f22c8cc517c528d6455c3eb771218dfbb69377ecb42"
+    },
+    {
+      "path": "src/ui/state/laser-store.ts",
+      "sha256": "fd348a417626b9828a82dc010e8bf3f8077d29e5b32d9acc6a1451246c038c63"
+    },
+    {
+      "path": "src/ui/state/laser-stream-heartbeat-containment.ts",
+      "sha256": "028f3181ef73085542b5d7509051d98ada64f6785229412d4d0f23dc25f6f542"
+    },
+    {
+      "path": "src/ui/state/laser-system-notice.ts",
+      "sha256": "061bcaa5224519f415127196894ad9ae7e92e0bbaa1724869ccbe261749947cb"
+    },
+    {
+      "path": "src/ui/state/laser-transcript-buffer.ts",
+      "sha256": "ea7419fc7b6efe2d22e545a25a18359aad8e8f603ec412c0a359f954f2d891ed"
+    },
+    {
+      "path": "src/ui/state/laser-transcript.ts",
+      "sha256": "57747d988ddbed9e9e890bd1b09f49703d86a09ea17928baef13aa82b3df72d9"
+    },
+    {
+      "path": "src/ui/support/save-support-report.ts",
+      "sha256": "ad7005c39fbe81e8b05977bb2acefa978a081ec662b77026dd8772d9de5fd8cf"
+    },
+    {
+      "path": "src/ui/support/support-report-incidents.ts",
+      "sha256": "9c17204850a36ff94fa22d0a782a257bd4e8e2085c7010a9eea3852bcce1538c"
+    },
+    {
+      "path": "src/ui/support/support-report-redaction.ts",
+      "sha256": "8c29ef0032f4f740ecb5960d18913af98397846839b530c057146a62466f9f39"
+    },
+    {
+      "path": "src/ui/support/support-report.ts",
+      "sha256": "9598161c43341302f9900560f00d27ef166363d9263dad05e43ea5e8e55129af"
+    }
+  ],
+  "status": "?? .prettierignore.competitor-repairs\n?? docs/audits/2026-10-07-competitor-repairs/\n?? output/",
+  "limits": [
+    "Local tests and renderer builds only",
+    "Browser uses fake file/controller platform",
+    "No push, merge, deployment, provider, installer, hardware or material qualification"
+  ]
+}

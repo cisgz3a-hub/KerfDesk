@@ -34,6 +34,14 @@ covers an interrupted one.
    sent after the last one the controller confirmed and the XY travel they cover
    (`resumeTravelMm`), and says that confirmed lines may still have been queued, so the
    operator knows how far back along the path a power loss could have stopped the head.
+   Distance inspection follows linear XY moves and the swept length of incremental-center
+   G17 arcs, including modal arcs, signed-radius arcs and I/J full circles, in millimetres.
+   Rounded I/J words allow at most 0.005 mm of start/end radius mismatch for this diagnostic;
+   larger discrepancies stay unknown. That allowance is independent of firmware validity.
+   It reports unknown for unsupported or ambiguous arc geometry, invalid words or nonfinite
+   arithmetic instead of substituting an endpoint chord. Absolute arc centers, non-XY arc
+   planes and arc-local P parameters are untracked. This is a single diagnostic walk;
+   the archived executable transforms and the shared restart-point scan stay unchanged.
 3. **A laser run without an archive keeps a short record.** When a fresh laser Start is
    accepted but its archive cannot be staged (over budget, or storage failed), Start hands the
    repository the run's start intent (ADR-337: fingerprint, length, output scope, placement)

@@ -300,7 +300,7 @@ describe('runPreflight — F-A10 check 6: empty output', () => {
 });
 
 describe('runPreflight offset fill validation', () => {
-  it('blocks offset fill on open vector contours instead of silently producing empty output', () => {
+  it('reports omitted open offset Fill contours rather than silently producing empty output', () => {
     const layer = {
       ...createLayer({ id: 'L1', color: '#ff0000', mode: 'fill' }),
       fillStyle: 'offset' as const,
@@ -313,11 +313,11 @@ describe('runPreflight offset fill validation', () => {
     expect(result.issues).toContainEqual({
       code: 'offset-fill-open-contour',
       message:
-        'Layer L1 uses Offset Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+        'Fill output omits 1 open contour in 1 artwork. Close the shapes, or use Line to engrave their outlines. Scanline, Island and Offset Fill all require closed contours.',
     });
   });
 
-  it('blocks Follow Shape object overrides on open vector contours', () => {
+  it('reports open contours under Follow Shape object overrides', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });
     const project: Project = {
       ...projectWith(layer),
@@ -339,11 +339,11 @@ describe('runPreflight offset fill validation', () => {
     expect(result.issues).toContainEqual({
       code: 'offset-fill-open-contour',
       message:
-        'Layer L1 uses Follow Shape but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+        'Fill output omits 1 open contour in 1 artwork. Close the shapes, or use Line to engrave their outlines. Scanline, Island and Offset Fill all require closed contours.',
     });
   });
 
-  it('blocks Island Fill object overrides on open vector contours', () => {
+  it('reports open contours under Island Fill object overrides', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });
     const project: Project = {
       ...projectWith(layer),
@@ -365,7 +365,7 @@ describe('runPreflight offset fill validation', () => {
     expect(result.issues).toContainEqual({
       code: 'offset-fill-open-contour',
       message:
-        'Layer L1 uses Island Fill but has open vector contours assigned. Close the shapes or use Scanline Fill.',
+        'Fill output omits 1 open contour in 1 artwork. Close the shapes, or use Line to engrave their outlines. Scanline, Island and Offset Fill all require closed contours.',
     });
   });
 });

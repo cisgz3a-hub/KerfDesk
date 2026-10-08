@@ -54,6 +54,8 @@ kerf-compensated circle reached an arc-capable GRBL machine as dozens of short G
 
 ### Limits
 
+The first two limits below are superseded by [Amendment 2](ADR-486-amendment-2-topology-before-process-settings.md): topology now precedes settings/power buckets and crossing contours require complete-boundary containment. They remain here as the original decision record.
+
 - Containment is decided among the objects compiled together. An object with its own settings
   override or power scale compiles apart from the rest of the layer, so a hole drawn that way is
   still decided alone.

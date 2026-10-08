@@ -50,7 +50,12 @@ import { perforationPatternFor } from './operation-cut-extras';
 export const KERF_ARC_SOURCE_TOLERANCE_MM = 0.005;
 
 /** A closed contour in machine coordinates and the tabs placed on it by hand. */
-export type KerfSource = { readonly polyline: Polyline; readonly points: ReadonlyArray<Vec2> };
+export type KerfSource = {
+  readonly polyline: Polyline;
+  readonly points: ReadonlyArray<Vec2>;
+  readonly nesting?: CutSegment['nesting'];
+};
+export type KerfContextDepth = { readonly total: number; readonly outside: number };
 
 export type PendingKerfGroup = {
   /** Index in the layer's other segments that this path's contours precede. */
@@ -120,11 +125,18 @@ export function withLayerKerf(
   collected: LineSegmentsWithTabs & { readonly kerf: ReadonlyArray<PendingKerfGroup> },
   layer: Layer,
   device: DeviceProfile,
+  contextDepths?: ReadonlyMap<Polyline, KerfContextDepth>,
 ): LayerKerfResult {
   const pending = collected.kerf;
   if (pending.length === 0) return { ...collected, failed: false, closedUp: 0 };
   const rings = pending.map((group) => group.sources.map((source) => source.polyline));
-  const depths = ringDepths(rings);
+  const depths =
+    contextDepths === undefined
+      ? ringDepths(rings)
+      : rings.map((group) => ({
+          total: group.map((ring) => contextDepths.get(ring)?.total ?? 0),
+          outside: group.map((ring) => contextDepths.get(ring)?.outside ?? 0),
+        }));
   const fit = kerfContoursTakeArcs(layer, device)
     ? laserArcFitForMachineChords(device, KERF_ARC_SOURCE_TOLERANCE_MM)
     : (segment: CutSegment) => segment;

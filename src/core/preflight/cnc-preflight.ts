@@ -39,6 +39,7 @@ import {
   type CncLayerSettings,
 } from '../scene';
 import { findCncMotionBoundsPreflightIssues } from './cnc-motion-bounds-preflight';
+import { cncOpenContourIssues } from './cnc-open-contour-issues';
 import { findInvalidCncToolGeometry } from './cnc-tool-geometry';
 import { findNoGoZoneCollisions } from './no-go-zones';
 import type { PreflightIssue, PreflightResult } from './preflight';
@@ -91,6 +92,7 @@ function appendSourceGeometryIssues(
   options: CncPreflightOptions,
   issues: PreflightIssue[],
 ): void {
+  issues.push(...cncOpenContourIssues(options.compiledJob));
   if (options.sourceGeometryChecks === 'compiled-evidence-only') {
     appendVCarveEntryIssues(project, config, options.compiledJob, issues);
     return;

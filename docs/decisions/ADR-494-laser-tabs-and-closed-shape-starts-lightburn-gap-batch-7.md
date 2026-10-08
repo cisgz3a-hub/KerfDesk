@@ -118,6 +118,8 @@ F. **Scope.** Line cut groups and Offset Fill rings, the groups the planner alre
 
 ### Consequences
 
+[ADR-486 Amendment 2](ADR-486-amendment-2-topology-before-process-settings.md) adds whole-run automatic tab parity and parent main-pass/tab-pass ordering for new inside-first Jobs; source-order and historical Jobs retain this decision's original process-group route.
+
 - Output changes only for projects that choose a closed-shape start other than Where drawn, and for
   operations that choose spacing, set a tab power or have tabs placed by hand. No snapshot changes.
 - The seam hides only where a shape has a corner; round shapes start at their nearest point.

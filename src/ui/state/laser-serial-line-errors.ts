@@ -85,7 +85,12 @@ function recordSerialLineError(
   // After any job acknowledgements still held back, so the Console keeps wire
   // order (ADR-333).
   set((state) =>
-    publishTranscriptPatch(refs, state, systemTranscriptEntry(id, now, line, 'message'), line),
+    publishTranscriptPatch(
+      refs,
+      state,
+      { ...systemTranscriptEntry(id, now, line, 'message'), incident: true },
+      line,
+    ),
   );
 }
 

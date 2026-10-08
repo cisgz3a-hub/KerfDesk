@@ -7,6 +7,7 @@
 // store (ConfirmSave precedent) so the file keeps one responsibility.
 
 import { create } from 'zustand';
+import { useStore } from '../../state/store';
 import type { JobReviewModel } from './job-review-model';
 
 export type JobReviewSignal = 'confirm' | 'cancel' | 'rebuild';
@@ -26,6 +27,8 @@ type JobReviewStore = {
   readonly state: JobReviewState;
   /** Identity of one open review; stale async work may never close its successor. */
   readonly requestOwner: symbol | null;
+  /** Transient document owner for advisory navigation; never part of saved output. */
+  readonly requestDocumentEpoch: number | null;
   /** One-shot resolver armed by the gate's `nextSignal`; null while unarmed. */
   readonly waiter: ((signal: JobReviewSignal) => void) | null;
   /** Highest-priority signal raised while unarmed, consumed by `nextSignal`. */
@@ -68,6 +71,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
   return {
     state: { kind: 'idle' },
     requestOwner: null,
+    requestDocumentEpoch: null,
     waiter: null,
     pendingSignal: null,
     open: (model, purpose = 'start') => {
@@ -79,6 +83,7 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       set({
         state: { kind: 'open', model, purpose, isPreparing: false, blocker: null },
         requestOwner: Symbol('job-review'),
+        requestDocumentEpoch: useStore.getState().projectDocumentEpoch,
         waiter: null,
         pendingSignal: null,
       });
@@ -110,7 +115,13 @@ export const useJobReviewStore = create<JobReviewStore>((set, get) => {
       set({ state: { ...state, isPreparing: false, blocker } });
     },
     close: () =>
-      set({ state: { kind: 'idle' }, requestOwner: null, waiter: null, pendingSignal: null }),
+      set({
+        state: { kind: 'idle' },
+        requestOwner: null,
+        requestDocumentEpoch: null,
+        waiter: null,
+        pendingSignal: null,
+      }),
     confirm: () => {
       const { state } = get();
       if (state.kind !== 'open' || state.isPreparing || state.blocker !== null) return;

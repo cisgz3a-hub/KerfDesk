@@ -87,6 +87,7 @@ describe('svgViewportTransform', () => {
     expect(svgViewportTransform(svg, { width: 200, height: 100 })).toEqual({
       matrix: { a: 5, b: 0, c: 0, d: 5, e: 45, f: 10 },
       viewport: { width: 10, height: 10 },
+      rectangle: { x: 20, y: 10, width: 100, height: 50 },
     });
   });
 
@@ -95,6 +96,7 @@ describe('svgViewportTransform', () => {
     expect(svgViewportTransform(plain, { width: 200, height: 100 })).toEqual({
       matrix: { a: 1, b: 0, c: 0, d: 1, e: 3, f: 4 },
       viewport: { width: 20, height: 100 },
+      rectangle: { x: 3, y: 4, width: 20, height: 100 },
     });
     expect(
       svgViewportTransform(plain, { width: 200, height: 100 }, { width: 0, height: null }),
