@@ -26,6 +26,7 @@ test('edits a drawn rectangle as canonical geometry and undoes the edit', async 
   expect(rectangle?.spec).toMatchObject({ cornerRadiusMm: 6 });
   expect(JSON.stringify(rectangle?.paths)).toContain('cubic');
 
+  await page.getByLabel('KerfDesk workspace', { exact: true }).focus();
   await page.keyboard.press('Control+z');
   await expect(cornerRadius).toHaveValue('0');
 });

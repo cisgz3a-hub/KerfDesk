@@ -11,7 +11,8 @@ import { parseProcessRecipes } from './process-recipe-io';
 
 export const MAX_EXPERIMENT_PHOTO_CHARS = 1_600_000;
 const text = z.string().max(10_000);
-const id = z.string().min(1).max(200);
+export const MAX_MATERIAL_EXPERIMENT_ID_CHARS = 200;
+const id = z.string().min(1).max(MAX_MATERIAL_EXPERIMENT_ID_CHARS);
 const number = z.number().finite();
 const point = z.object({ x: number.min(0).max(1), y: number.min(0).max(1) });
 const bounds = z

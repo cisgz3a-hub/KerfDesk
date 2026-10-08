@@ -11,8 +11,8 @@
 import { callout, featureGrid, pageHero, section, statusPill, table } from '../lib/components.mjs';
 import { html } from '../lib/html.mjs';
 import { remotePrivacy } from '../lib/remote-privacy.mjs';
-import { aiPrivacy } from '../lib/ai-privacy.mjs';
 import { publicSellerContact } from '../lib/legal-publication.mjs';
+import { aiPrivacy } from '../lib/ai-privacy.mjs';
 
 const AT_A_GLANCE = [
   {

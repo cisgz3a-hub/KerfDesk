@@ -78,10 +78,10 @@ test('app privacy notice preserves source disclosures and scopes static-page cla
     const url = new URL(href, 'https://kerfdesk.com');
     if (url.origin !== 'https://kerfdesk.com') {
       assert.ok(
-        new Set([
+        [
           'https://www.paddle.com/legal/privacy',
           'https://developers.openai.com/api/docs/guides/your-data',
-        ]).has(url.href),
+        ].includes(url.href),
         'Unexpected external notice link',
       );
       continue;

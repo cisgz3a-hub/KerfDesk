@@ -1,16 +1,19 @@
-.lf-project-sheets-bar {
+.lf-dialog.lf-project-sheets-dialog {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.lf-project-sheets-controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   flex: 0 0 auto;
   gap: 8px;
   box-sizing: border-box;
   min-width: 0;
   padding: 4px 8px;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
 }
 
-.lf-project-sheets-bar > label {
+.lf-project-sheets-controls > label {
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
@@ -19,12 +22,12 @@
   white-space: nowrap;
 }
 
-.lf-project-sheets-bar select {
+.lf-project-sheets-controls select {
   min-width: 0;
   max-width: min(160px, 40vw);
 }
 
-.lf-project-sheets-bar > button {
+.lf-project-sheets-controls > button {
   flex: 0 0 auto;
   white-space: nowrap;
 }

@@ -9,7 +9,11 @@ import type {
 } from '../../core/material-library/process-recipe';
 import { createLayer } from '../../core/scene';
 import type { MaterialLibraryDocument, MaterialPreset } from '../../io/material-library';
-import { parseMaterialExperiments } from '../../io/material-library/material-experiment-io';
+import {
+  MAX_MATERIAL_EXPERIMENT_ID_CHARS,
+  parseMaterialExperiments,
+} from '../../io/material-library/material-experiment-io';
+import { deserializeMaterialLibraryValue } from '../../io/material-library/material-library-io';
 import type { MaterialLibraryState } from './material-library-actions';
 
 type Set = (fn: (state: MaterialLibraryState) => Partial<MaterialLibraryState>) => unknown;
@@ -95,9 +99,21 @@ function saveCell(
     )
       return {};
     const id = uniqueRecipeId(library, `${experimentId}-${cellId}`);
+    const next = libraryWithCapturedCell(library, experiment, cell, id, name);
+    const validated = deserializeMaterialLibraryValue(next);
+    if (validated.kind !== 'ok') {
+      result = {
+        kind: 'invalid',
+        reason:
+          validated.kind === 'invalid'
+            ? validated.reason
+            : 'This material library cannot be saved by this version.',
+      };
+      return {};
+    }
     result = { kind: 'ok', value: id };
     return {
-      materialLibrary: libraryWithCapturedCell(library, experiment, cell, id, name),
+      materialLibrary: next,
       materialLibraryDirty: true,
     };
   });
@@ -173,7 +189,11 @@ function uniqueRecipeId(library: MaterialLibraryDocument, base: string): string 
   const ids = new Set(
     [...library.entries, ...(library.processRecipes ?? [])].map((recipe) => recipe.id),
   );
-  let suffix = 1;
-  while (ids.has(`${base}-${suffix}`)) suffix += 1;
-  return `${base}-${suffix}`;
+  // Leave room for each numeric suffix, including collisions crossing 9 to 10.
+  // Ordinary UUID-derived identities retain their previous spelling.
+  for (let suffix = 1; ; suffix += 1) {
+    const ending = '-' + suffix;
+    const candidate = base.slice(0, MAX_MATERIAL_EXPERIMENT_ID_CHARS - ending.length) + ending;
+    if (!ids.has(candidate)) return candidate;
+  }
 }

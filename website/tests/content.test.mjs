@@ -101,7 +101,7 @@ describe('website copy', () => {
 
   // Keep source-repository routes out of customer pages (ADR-524 Amendment 1).
   // Product downloads/support use first-party destinations; policies may link
-  // only to exact Paddle legal/support pages and the OpenAI API data policy. Scan every generated text file.
+  // only to the providers' exact legal/support pages. Scan every generated text file.
   it('keeps repository routes out of customer pages and permits exact provider policy/support links', () => {
     const paddlePolicies = [
       'https://www.paddle.com/legal/buyer-terms',

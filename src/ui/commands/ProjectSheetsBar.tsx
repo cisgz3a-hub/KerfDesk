@@ -6,32 +6,44 @@ import { RetainedArraysButton } from './RetainedArraysButton';
 import './ProjectSheetsBar.css';
 
 export function ProjectSheetsBar(): JSX.Element {
-  const book = useStore((state) => state.project.sheetBook);
-  const switchSheet = useStore((state) => state.switchProjectSheet);
   const [open, setOpen] = useState(false);
   return (
-    <div aria-label="Project sheets" className="lf-project-sheets-bar">
-      <label>
-        Sheet{' '}
-        <select
-          aria-label="Active project sheet"
-          title="Open another sheet's artwork and setup; only the active sheet is output, and switching resets the current review."
-          value={book?.activeId ?? 'current'}
-          onChange={(event) => switchSheet(event.currentTarget.value)}
-        >
-          <option value={book?.activeId ?? 'current'}>{book?.activeName ?? 'Sheet 1'}</option>
-          {book?.inactive.map((sheet) => (
-            <option key={sheet.id} value={sheet.id}>
-              {sheet.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Button onClick={() => setOpen(true)}>Manage sheets…</Button>
-      <ProductionManifestButton />
-      <RetainedArraysButton />
+    <>
+      <Button
+        aria-label="Project sheets…"
+        title="Manage project sheets, production runs and saved arrays"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
+        <span className="lf-project-sheets-label-wide">Project sheets…</span>
+        <span className="lf-project-sheets-label-narrow">Sheets…</span>
+      </Button>
       {open ? <ProjectSheetsDialog onClose={() => setOpen(false)} /> : null}
-    </div>
+    </>
+  );
+}
+
+function ActiveProjectSheet(): JSX.Element {
+  const book = useStore((state) => state.project.sheetBook);
+  const switchSheet = useStore((state) => state.switchProjectSheet);
+  return (
+    <label>
+      Active sheet{' '}
+      <select
+        aria-label="Active project sheet"
+        title="Open another sheet's artwork and setup; only the active sheet is output, and switching resets the current review."
+        value={book?.activeId ?? 'current'}
+        onChange={(event) => switchSheet(event.currentTarget.value)}
+      >
+        <option value={book?.activeId ?? 'current'}>{book?.activeName ?? 'Sheet 1'}</option>
+        {book?.inactive.map((sheet) => (
+          <option key={sheet.id} value={sheet.id}>
+            {sheet.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -51,18 +63,18 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
     if (id !== null) setName('');
   };
   return (
-    <Dialog title="Project sheets" onClose={props.onClose} size="md">
-      <p>
-        Each sheet retains its artwork, machine setup, placement, selected-output scope and variable
-        data. Switches reset current review and Frame ownership. Save the project to keep all sheets
-        together.
-      </p>
-      <p>
-        Duplicate active sheet keeps the current artwork, including fixed text and barcodes. When a
-        production row is open, Duplicate editable design restores the run's saved editable design
-        and variable settings for a new batch. Both copies start without a production run; run
-        results stay on the original sheet.
-      </p>
+    <Dialog
+      title="Project sheets"
+      onClose={props.onClose}
+      size="md"
+      panelClassName="lf-project-sheets-dialog"
+    >
+      <div className="lf-project-sheets-controls">
+        <ActiveProjectSheet />
+        <ProductionManifestButton />
+        <RetainedArraysButton />
+      </div>
+      <ProjectSheetHelp />
       <label>
         New sheet name
         <input
@@ -138,6 +150,24 @@ function SheetCreationButtons(props: {
           Duplicate editable design
         </Button>
       ) : null}
+    </>
+  );
+}
+
+function ProjectSheetHelp(): JSX.Element {
+  return (
+    <>
+      <p>
+        Each sheet retains its artwork, machine setup, placement, selected-output scope and variable
+        data. Switches reset current review and Frame ownership. Save the project to keep all sheets
+        together.
+      </p>
+      <p>
+        Duplicate active sheet keeps the current artwork, including fixed text and barcodes. When a
+        production row is open, Duplicate editable design restores the run's saved editable design
+        and variable settings for a new batch. Both copies start without a production run; run
+        results stay on the original sheet.
+      </p>
     </>
   );
 }
