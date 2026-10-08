@@ -7,6 +7,7 @@ import type * as ThreeNamespace from 'three';
 import type { InterleavedBufferAttribute } from 'three';
 import type { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import type { ToolpathBuildArgs } from './scene-toolpath';
+import { installXYPlaneDepth } from './line-plane-depth';
 
 const CORE_PX = 4;
 const CASING_PX = 8;
@@ -51,6 +52,7 @@ export function createCurrentMove(
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1,
     });
+    if (!planar) installXYPlaneDepth(args.three, material, 'fat');
     material.toneMapped = false;
     material.resolution.set(args.viewWidth, args.viewHeight);
     const line = new args.LineSegments2(geometry, material);

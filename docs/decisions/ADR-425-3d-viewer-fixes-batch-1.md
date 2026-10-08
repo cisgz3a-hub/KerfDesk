@@ -111,7 +111,14 @@ Flat toolpath strokes share one transparent draw queue without writing depth aga
 faint future paths, travel, completed cuts, then the active playback casing and core. Their screen-space
 widths and depth slopes therefore cannot hide an active retrace or crossing, even at grazing angles.
 All still depth-test against scene geometry, with a small work-plane bias. Nonplanar paths retain
-their existing depth writes and occlusion. Foreground aids remain above planar strokes: hover and
+their existing depth writes and occlusion. In a mixed-Z program, exact constant-Z strokes compare
+their XY plane at the raster sample, independently of ribbon width, direction and shortened playback
+endpoints. Completed, active, faint future and native travel strokes use that same depth definition.
+A later parking move or an unrelated earlier depth change therefore cannot obscure a coplanar retrace.
+Different-Z planes still occlude according to geometric depth; sloping strokes retain their original
+fragment depth. The per-draw plane transform and actual framebuffer viewport also cover pixel ratio
+and the cropped picking target. Native travel needs two one-byte eligibility flags per move, shared
+by its visible, ghost and ID geometry; it adds no position copy. Foreground aids remain above planar strokes: hover and
 measurement highlights, Studio origin arrows and dot, then the red live-position marker. These
 opaque-colour overlays use the same ordered queue without blending or depth writes; the simulated
 head and direction arrows retain physical depth testing. Every segment

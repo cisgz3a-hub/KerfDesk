@@ -7,6 +7,7 @@ import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { editLineMaterial, withShownMoves } from './line-shader-edits';
+import { addXYPlaneFlags, installXYPlaneDepth, XY_PLANE_ATTRIBUTE } from './line-plane-depth';
 import { addTrail, setTrail, type TrailUniforms } from './line-trail';
 import {
   COLOR_STRIDE,
@@ -197,31 +198,12 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
     detail = solid.detail;
   }
   if (travelBucket.count > 0) {
-    const travel = lineSegmentsObject(
-      args.three,
-      travelBucket.positions,
-      args.theme.travel,
-      TRAVEL_OPACITY,
-      0,
-    );
-    travel.visible = args.travelVisible;
-    const travelGroup = new args.three.Group();
-    travelGroup.visible = args.travelVisible;
-    travel.visible = true;
-    travelGhost = lineSegmentsObject(
-      args.three,
-      travelBucket.positions,
-      args.theme.travel,
-      0.1,
-      -1,
-    );
-    travelGhost.material.depthWrite = false;
-    travelGhost.visible = false;
-    travelGroup.add(travel, travelGhost);
-    travelObject = travelGroup;
-    objects.push(travelGroup);
-    travelTarget = { geometry: travel.geometry, total: travelBucket.count };
-    travelLine = travel;
+    const travel = buildTravel(args, travelBucket.positions);
+    travelGhost = travel.ghost;
+    travelObject = travel.group;
+    travelLine = travel.line;
+    objects.push(travel.group);
+    travelTarget = { geometry: travel.line.geometry, total: travelBucket.count };
   }
   return {
     objects,
@@ -248,6 +230,22 @@ export function buildToolpathObjects(args: ToolpathBuildArgs): {
   };
 }
 
+function buildTravel(args: ToolpathBuildArgs, positions: Float32Array) {
+  const line = lineSegmentsObject(args.three, positions, args.theme.travel, TRAVEL_OPACITY, 0);
+  const ghost = lineSegmentsObject(
+    args.three,
+    positions,
+    args.theme.travel,
+    0.1,
+    -1,
+    line.geometry.getAttribute(XY_PLANE_ATTRIBUTE),
+  );
+  ghost.visible = false;
+  const group = new args.three.Group();
+  group.visible = args.travelVisible;
+  group.add(line, ghost);
+  return { line, ghost, group };
+}
 // The done moves as fat lines, and their faint copy for the moves to come,
 // both drawn from one GPU copy of the program (ADR-485).
 function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolean) {
@@ -273,6 +271,7 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolea
     polygonOffsetUnits: -1,
   });
   const trail = addTrail(args.three, material);
+  if (!planar) installXYPlaneDepth(args.three, material, 'fat');
   const lines = new args.LineSegments2(geometry, material);
   lines.renderOrder = 1;
   const ghostMaterial = fatLineMaterial(args, {
@@ -284,6 +283,7 @@ function buildSolid(args: ToolpathBuildArgs, colors: Uint16Array, planar: boolea
     depthFunc: args.three.LessDepth,
   });
   editLineMaterial(ghostMaterial, 'kerfdesk-shown-moves', withShownMoves);
+  if (!planar) installXYPlaneDepth(args.three, ghostMaterial, 'fat');
   const ghost = new args.LineSegments2(
     shareProgramGeometry(args.LineSegmentsGeometry, geometry),
     ghostMaterial,
@@ -349,6 +349,7 @@ function lineSegmentsObject(
   color: number,
   opacity: number,
   renderOrder: number,
+  sharedFlags?: ThreeNamespace.BufferAttribute | ThreeNamespace.InterleavedBufferAttribute,
 ): ThreeNamespace.LineSegments<ThreeNamespace.BufferGeometry, ThreeNamespace.LineBasicMaterial> {
   const geometry = new three.BufferGeometry();
   geometry.setAttribute('position', new three.BufferAttribute(positions, 3));
@@ -360,6 +361,9 @@ function lineSegmentsObject(
     depthWrite: false,
     depthFunc: three.LessDepth,
   });
+  if (sharedFlags) geometry.setAttribute(XY_PLANE_ATTRIBUTE, sharedFlags);
+  else addXYPlaneFlags(three, geometry);
+  installXYPlaneDepth(three, material, 'native');
   const lines = new three.LineSegments(geometry, material);
   lines.renderOrder = renderOrder;
   return lines;

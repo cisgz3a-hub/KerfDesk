@@ -59,6 +59,113 @@ test('coplanar picks name the visible cut while genuine nearer travel retains de
   expect(errors).toEqual([]);
 });
 
+test('unrelated off-plane moves preserve the visible coplanar cut and its pick', async ({
+  page,
+}, info) => {
+  const errors = await openProbe(page);
+  const results: Results = [];
+  for (const look of ['classic', 'studio'] as const)
+    for (const perspective of [false, true])
+      for (const angle of ['top', 'iso', 'grazing'] as const)
+        for (const pixelRatio of [1, 2] as const)
+          for (const prefix of [CUT_TRAVEL, CUT_TRAVEL.replace('\nG1 Y10', '')])
+            for (const tail of ['\nG0 Y30\nG0 Z1', '\nG0 Y30\nG0 Z1\nM3 S500\nG1 X10\nM5']) {
+              const options = {
+                text: prefix + tail,
+                pixelRatio,
+                sample: { x: 50, y: 0, z: 0 },
+                look,
+                perspective,
+                travel: true,
+                angle,
+                alignToPixelCentre: true,
+              };
+              const frame = await capture(page, info, options, results, 'mixed-z-coplanar-cut');
+              const withoutTravel = await capture(
+                page,
+                info,
+                { ...options, travel: false },
+                results,
+                'mixed-z-coplanar-cut-travel-off',
+              );
+              const intendedCut = look === 'classic' ? [151, 209, 255, 255] : [79, 163, 255, 255];
+              expect(frame.planar, 'the unrelated Z1 move must make the model genuinely 3D').toBe(
+                false,
+              );
+              expect(withoutTravel.planar).toBe(false);
+              expect(frame.drawingBuffer).toEqual({
+                width: 800 * pixelRatio,
+                height: 600 * pixelRatio,
+              });
+              expect(withoutTravel.drawingBuffer).toEqual(frame.drawingBuffer);
+              expect(
+                withoutTravel.pixel,
+                'the aligned Travel-off control contains the cut',
+              ).toEqual(intendedCut);
+              expect(frame.pixel, 'remote off-plane moves must not expose coplanar travel').toEqual(
+                intendedCut,
+              );
+              expect(frame.pixel).toEqual(withoutTravel.pixel);
+              expect(frame.pick?.segmentIndex, 'mixed-Z picks must name the visible cut').toBe(0);
+              expect(withoutTravel.pick?.segmentIndex).toBe(0);
+              expect(frame.pick?.point.x).toBeCloseTo(50, 7);
+              expect(withoutTravel.pick?.point.x).toBeCloseTo(50, 7);
+            }
+  await saveResults(info, results);
+  expect(errors).toEqual([]);
+});
+
+test('varying-Z travel retains genuine nearer and farther pick depth', async ({ page }, info) => {
+  const errors = await openProbe(page);
+  const results: Results = [];
+  for (const look of ['classic', 'studio'] as const)
+    for (const perspective of [false, true])
+      for (const angle of ['top', 'iso', 'grazing'] as const)
+        for (const z of [-1, 1]) {
+          const dx = angle === 'top' ? 0 : angle === 'iso' ? 1 : 2;
+          const dy = angle === 'top' ? 0 : angle === 'iso' ? -1 : -4;
+          const startZ = z - 0.5;
+          const endZ = z + 0.5;
+          const text =
+            'G21 G90\nM3 S500\nG1 X100 F600\nM5\n' +
+            'G1 X' +
+            (100 + dx * startZ) +
+            ' Y' +
+            dy * startZ +
+            ' Z' +
+            startZ +
+            '\n' +
+            'G1 X' +
+            dx * endZ +
+            ' Y' +
+            dy * endZ +
+            ' Z' +
+            endZ;
+          const frame = await capture(
+            page,
+            info,
+            {
+              text,
+              sample: z > 0 ? { x: 50 + dx * z, y: dy * z, z } : { x: 50, y: 0, z: 0 },
+              look,
+              perspective,
+              travel: true,
+              // These ramp and cut paths share the original camera's projection
+              // plane. Translating that camera breaks their exact overlap.
+              angle,
+            },
+            results,
+            'varying-z-depth-control',
+          );
+          expect(frame.planar).toBe(false);
+          expect(frame.pick?.segmentIndex, 'the ramp keeps its physical depth priority').toBe(
+            z > 0 ? 2 : 0,
+          );
+        }
+  await saveResults(info, results);
+  expect(errors).toEqual([]);
+});
+
 test('clipping excludes hidden endpoint snaps and measurement points but keeps visible boundary endpoints', async ({
   page,
 }, info) => {
@@ -224,8 +331,12 @@ async function capture(
   const path = info.outputPath(`${results.length}-${name}.png`);
   await writeFile(path, Buffer.from(frame.data.split(',')[1] ?? '', 'base64'));
   await info.attach(name, { path, contentType: 'image/png' });
-  const { pixel, pointer, pick, measuredPoint } = frame;
-  results.push({ name, options, frame: { pixel, pointer, pick, measuredPoint } });
+  const { pixel, pointer, pick, measuredPoint, planar, drawingBuffer } = frame;
+  results.push({
+    name,
+    options,
+    frame: { pixel, pointer, pick, measuredPoint, planar, drawingBuffer },
+  });
   return frame;
 }
 

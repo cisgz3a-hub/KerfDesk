@@ -4,6 +4,7 @@
 import type * as ThreeNamespace from 'three';
 import { TRAVEL_OPACITY, type RevealTargets, type TravelLine } from './scene-toolpath';
 import { planarTravelOpacity } from './planar-path-density';
+import { installXYPlaneDepth } from './line-plane-depth';
 import { STUDIO_TRAVEL_COLOR, type Viewer3dLook } from './viewer3d-look';
 import type { Viewer3dTheme } from './viewer3d-theme';
 
@@ -48,6 +49,7 @@ export function applyTravelLook(
       depthFunc: three.LessDepth,
     });
   }
+  installXYPlaneDepth(three, line.material, 'native');
   previous.dispose();
 }
 

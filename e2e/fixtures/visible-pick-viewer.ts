@@ -23,6 +23,7 @@ export interface VisiblePickOptions {
   travel: boolean;
   angle?: 'top' | 'iso' | 'grazing';
   alignToPixelCentre?: boolean;
+  pixelRatio?: 1 | 2;
   planes?: readonly Viewer3dClipPlane[];
   hiddenSegments?: readonly number[];
 }
@@ -39,6 +40,7 @@ export async function visiblePickFrame(options: VisiblePickOptions) {
           options.hiddenSegments?.includes(index) ? 0 : 1,
         );
   const renderer = new three.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(options.pixelRatio ?? 1);
   renderer.setSize(800, 600);
   renderer.localClippingEnabled = true;
   const theme = resolveViewer3dTheme();
@@ -83,6 +85,8 @@ export async function visiblePickFrame(options: VisiblePickOptions) {
       pixel,
       pointer,
       pick,
+      planar: build.reveal.planarDensity !== null,
+      drawingBuffer: { width: renderer.domElement.width, height: renderer.domElement.height },
       measuredPoint: pick === null ? null : measuredPoint(pick),
     };
   } finally {
@@ -105,7 +109,8 @@ function frameCamera(options: VisiblePickOptions) {
   camera.lookAt(50, 0, 0);
   camera.updateProjectionMatrix();
   camera.updateMatrixWorld();
-  if (options.alignToPixelCentre) centreCameraOnPixel(camera, options.sample);
+  if (options.alignToPixelCentre)
+    centreCameraOnPixel(camera, options.sample, options.pixelRatio ?? 1);
   return camera;
 }
 
@@ -115,6 +120,7 @@ function frameCamera(options: VisiblePickOptions) {
 function centreCameraOnPixel(
   camera: three.PerspectiveCamera | three.OrthographicCamera,
   sample: Point3,
+  pixelRatio: number,
 ): void {
   const point = new three.Vector3(sample.x, sample.y, sample.z);
   const projected = point.clone().project(camera);
@@ -129,10 +135,10 @@ function centreCameraOnPixel(
       : (camera.top - camera.bottom) / (600 * camera.zoom);
   const shift = new three.Vector3()
     .setFromMatrixColumn(camera.matrixWorld, 0)
-    .multiplyScalar(-(Math.round(x) + 0.5 - x) * mmPerPixel)
+    .multiplyScalar(-((Math.round(x * pixelRatio) + 0.5) / pixelRatio - x) * mmPerPixel)
     .addScaledVector(
       new three.Vector3().setFromMatrixColumn(camera.matrixWorld, 1),
-      (Math.round(y) + 0.5 - y) * mmPerPixel,
+      ((Math.round(y * pixelRatio) + 0.5) / pixelRatio - y) * mmPerPixel,
     );
   camera.position.add(shift);
   camera.lookAt(new three.Vector3(50, 0, 0).add(shift));
@@ -145,11 +151,12 @@ function readPixel(
   centred: boolean,
 ): number[] {
   const coordinate = centred ? Math.floor : Math.round;
+  const pixelRatio = renderer.getPixelRatio();
   const gl = renderer.getContext();
   const pixel = new Uint8Array(4);
   gl.readPixels(
-    coordinate(pointer.xPx),
-    599 - coordinate(pointer.yPx),
+    coordinate(pointer.xPx * pixelRatio),
+    renderer.domElement.height - 1 - coordinate(pointer.yPx * pixelRatio),
     1,
     1,
     gl.RGBA,

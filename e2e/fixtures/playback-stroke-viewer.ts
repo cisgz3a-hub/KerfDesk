@@ -46,6 +46,10 @@ interface FrameOptions {
   hideToolpath?: boolean;
   hideCompleted?: boolean;
   completedWidth?: number;
+  cameraFar?: number;
+  cameraUp?: Point;
+  pixelRatio?: number;
+  viewport?: { width: number; height: number };
   cameraPose?: Point;
   cameraTarget?: Point;
 }
@@ -58,9 +62,10 @@ export function playbackStrokeFrame(options: FrameOptions): {
 } {
   const parsed = buildGcodeRenderModel(options.text);
   if (parsed.kind !== 'ok') throw new Error(parsed.reason);
-  const width = 800;
-  const height = 400;
+  const width = options.viewport?.width ?? 800;
+  const height = options.viewport?.height ?? 400;
   const renderer = new three.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(options.pixelRatio ?? 1);
   renderer.setSize(width, height);
   const theme = resolveViewer3dTheme();
   renderer.setClearColor(theme.background);
@@ -93,14 +98,16 @@ export function playbackStrokeFrame(options: FrameOptions): {
   if (options.completedWidth !== undefined && built.fatMaterials[0] !== undefined)
     built.fatMaterials[0].linewidth = options.completedWidth;
   const camera = frameCamera(options, width, height);
-  const region = sampleRegion(options, camera, width, height);
+  const rasterWidth = renderer.domElement.width;
+  const rasterHeight = renderer.domElement.height;
+  const region = sampleRegion(options, camera, rasterWidth, rasterHeight);
   const regions = (options.samples ?? [options.sample]).map((sample) =>
-    sampleRegion({ ...options, sample }, camera, width, height),
+    sampleRegion({ ...options, sample }, camera, rasterWidth, rasterHeight),
   );
   try {
     if (options.samples !== undefined)
       for (const r of regions)
-        if (r.x < 0 || r.y < 0 || r.x + r.width > width || r.y + r.height > height)
+        if (r.x < 0 || r.y < 0 || r.x + r.width > rasterWidth || r.y + r.height > rasterHeight)
           throw new Error('Centreline sample outside the rendered viewport');
     renderer.render(scene, camera);
     // Read in the render's task: WebGL clears its drawing buffer at composite.
@@ -193,8 +200,8 @@ function addOverlays(
 
 function frameCamera(options: FrameOptions, width: number, height: number): three.Camera {
   const camera = options.perspective
-    ? new three.PerspectiveCamera(40, width / height, 0.1, 1_000)
-    : new three.OrthographicCamera(-80, 80, 40, -40, 0.1, 1_000);
+    ? new three.PerspectiveCamera(40, width / height, 0.1, options.cameraFar ?? 1_000)
+    : new three.OrthographicCamera(-80, 80, 40, -40, 0.1, options.cameraFar ?? 1_000);
   const poses = {
     top: [50, 35, 110],
     iso: [160, -75, 110],
@@ -204,6 +211,7 @@ function frameCamera(options: FrameOptions, width: number, height: number): thre
   const pose = poses[options.view ?? 'top'];
   const position = options.cameraPose ?? { x: pose[0], y: pose[1], z: pose[2] };
   const target = options.cameraTarget ?? { x: 50, y: 35, z: 0 };
+  if (options.cameraUp) camera.up.set(options.cameraUp.x, options.cameraUp.y, options.cameraUp.z);
   camera.position.set(position.x, position.y, position.z);
   camera.lookAt(target.x, target.y, target.z);
   camera.updateMatrixWorld();
