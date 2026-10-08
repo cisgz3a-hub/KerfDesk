@@ -12,15 +12,10 @@
 //   6. Generated G-code is non-empty (at least one G1 line).
 //
 import {
-  assertNever,
-  isClosedEnough,
   outputOperationLayers,
-  pathUsesOperation,
   sceneObjectUsesOperation,
   type Layer,
   type Project,
-  type Scene,
-  type SceneObject,
 } from '../scene';
 import {
   findLaserOnTravelIssues,
@@ -41,7 +36,7 @@ import {
 import { findNoGoZoneCollisions } from './no-go-zones';
 import { findRelativeMotionEnvelopeIssues } from './relative-motion-envelope';
 import { operationScanOffsetIssues } from './scan-offset-policy';
-import { effectiveOperationForObject, operationOverrideForObject } from '../effective-output';
+import { openFillContourIssues } from './open-fill-contour-issues';
 
 export type PreflightCode =
   | 'no-output-layer'
@@ -78,6 +73,8 @@ export type PreflightCode =
   | 'cnc-adaptive-clearing-invalid'
   | 'cnc-inlay-invalid'
   | 'cnc-layer-empty'
+  // Advisory-only: exact open contours omitted by closed-only CNC operations.
+  | 'cnc-open-contours-omitted'
   | 'plunged-travel'
   | 'spindle-start-before-clearance'
   | 'relief-needs-cnc'
@@ -145,7 +142,7 @@ export function runPreflight(
 
   issues.push(...findLayerModeMismatchIssues(project.scene.objects, outputLayers));
 
-  appendOffsetFillOpenContourIssues(project.scene, outputLayers, issues);
+  issues.push(...openFillContourIssues(project.scene));
 
   // A8: split the (up to ~96 MB raster) body ONCE and thread the lines through
   // every G-code scanner below, instead of each re-splitting the whole string.
@@ -269,87 +266,6 @@ function appendLayerIssues(layer: Layer, maxFeed: number, issues: PreflightIssue
 
 function layerSpeedOutOfRange(speed: number, maxFeed: number): boolean {
   return !Number.isFinite(speed) || speed <= 0 || speed > maxFeed;
-}
-
-function appendOffsetFillOpenContourIssues(
-  scene: Scene,
-  outputLayers: ReadonlyArray<Layer>,
-  issues: PreflightIssue[],
-): void {
-  for (const layer of outputLayers) {
-    const layerFillLabel = openContourFillLabel(layer);
-    if (layerFillLabel !== null) {
-      appendOpenContourIssueForLayer(scene.objects, layer, layerFillLabel, issues);
-      continue;
-    }
-    const overrideFillLabel = openContourOverrideFillLabel(scene.objects, layer);
-    if (overrideFillLabel !== null) {
-      appendOffsetFillOpenContourIssue(layer, overrideFillLabel, issues);
-    }
-  }
-}
-
-function openContourFillLabel(layer: Layer): string | null {
-  if (layer.mode !== 'fill') return null;
-  if (layer.fillStyle === 'offset') return 'Offset Fill';
-  if (layer.fillStyle === 'island') return 'Island Fill';
-  return null;
-}
-
-function appendOpenContourIssueForLayer(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-  label: string,
-  issues: PreflightIssue[],
-): void {
-  if (!objects.some((obj) => objectHasOpenContourOnLayer(obj, layer))) return;
-  appendOffsetFillOpenContourIssue(layer, label, issues);
-}
-
-function appendOffsetFillOpenContourIssue(
-  layer: Layer,
-  label: string,
-  issues: PreflightIssue[],
-): void {
-  issues.push({
-    code: 'offset-fill-open-contour',
-    message: `Layer ${layer.id} uses ${label} but has open vector contours assigned. Close the shapes or use Scanline Fill.`,
-  });
-}
-
-function openContourOverrideFillLabel(
-  objects: ReadonlyArray<SceneObject>,
-  layer: Layer,
-): string | null {
-  for (const obj of objects) {
-    const override = operationOverrideForObject(layer, obj);
-    if (override === undefined) continue;
-    const effectiveLayer = effectiveOperationForObject(layer, obj);
-    if (effectiveLayer.mode !== 'fill') continue;
-    if (!objectHasOpenContourOnLayer(obj, effectiveLayer)) continue;
-    if (effectiveLayer.fillStyle === 'offset') return 'Follow Shape';
-    if (effectiveLayer.fillStyle === 'island') return 'Island Fill';
-  }
-  return null;
-}
-
-function objectHasOpenContourOnLayer(obj: SceneObject, layer: Layer): boolean {
-  switch (obj.kind) {
-    case 'imported-svg':
-    case 'text':
-    case 'traced-image':
-    case 'shape':
-      return obj.paths.some(
-        (path) =>
-          pathUsesOperation(obj, path, layer) &&
-          path.polylines.some((polyline) => !isClosedEnough(polyline)),
-      );
-    case 'raster-image':
-    case 'relief':
-      return false;
-    default:
-      return assertNever(obj, 'SceneObject');
-  }
 }
 
 function appendBoundsIssues(

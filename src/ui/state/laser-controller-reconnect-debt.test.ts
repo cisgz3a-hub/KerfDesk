@@ -23,6 +23,22 @@ describe('explicit Reconnect after bounded cleanup reply debt', () => {
     expect(useLaserStore.getState().controllerQualification.kind).toBe('failed');
     expect(useLaserStore.getState().getControllerReconnectRecommended()).toBe(true);
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(2);
+    const retained = (useLaserStore.getState().incidentHistory ?? []).filter((entry) =>
+      entry.raw.startsWith('[lf2] Controller information refresh timed out:'),
+    );
+    expect(retained).toHaveLength(1);
+    expect(retained[0]).toMatchObject({
+      incident: true,
+      incidentContext: { run: { pendingUntrackedAcks: 2 } },
+    });
+    const recordedContext = retained[0]?.incidentContext;
+    expect(recordedContext).toBeDefined();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(
+      (useLaserStore.getState().incidentHistory ?? []).filter((entry) =>
+        entry.raw.startsWith('[lf2] Controller information refresh timed out:'),
+      ),
+    ).toEqual(retained);
 
     const reconnect = connect();
     await flush();
@@ -43,5 +59,10 @@ describe('explicit Reconnect after bounded cleanup reply debt', () => {
     expect(useLaserStore.getState().pendingUntrackedAcks).toBe(0);
     expect(useLaserStore.getState().controllerQualification.kind).toBe('qualified');
     expect(old.writes.filter((line) => line.includes('G1 X'))).toEqual(jobWrites);
+    expect(useLaserStore.getState().incidentHistory).toEqual(expect.arrayContaining(retained));
+    expect(
+      useLaserStore.getState().incidentHistory?.find((entry) => entry.id === retained[0]?.id)
+        ?.incidentContext,
+    ).toBe(recordedContext);
   });
 });

@@ -373,3 +373,8 @@ took 5.63 to 5.99 s after against 5.76 to 6.02 s before.
 What still separates the branch from main on noise is the repair's input: the live heap as the
 repair starts is 191 MB against main's 110 MB (the samples at 0.02 px and the finished contours).
 That is a follow-up the tracer work owns (ADR-530, Known gaps).
+
+
+## Compiled operation topology follow-up (2026-10-07)
+
+[ADR-486 Amendment 2](ADR-486-amendment-2-topology-before-process-settings.md) retains this source forest within its valid path, then records actual surviving whole-run containment after kerf. New optional plain topologyScope/topologyContour fields carry parent ordering through tabs and perforation. Existing nesting alone does not opt historical saved Jobs into that planner; exact replay continues to emit their stored Job.

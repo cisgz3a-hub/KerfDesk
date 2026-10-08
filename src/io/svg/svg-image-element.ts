@@ -170,6 +170,7 @@ function nativeClipPath(shape: SvgClipShape, inverse: SvgMatrix): ColoredPath {
   const subpaths = elementToSubPaths(
     shape.element,
     linearScaleMagnitude(world.a, world.b, world.c, world.d),
+    shape.viewport,
   );
   const polylines = subpaths.map((subpath) => {
     const points = subpath.points.map((point) => applySvgMatrix(local, point));

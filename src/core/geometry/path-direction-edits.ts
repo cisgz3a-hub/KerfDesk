@@ -7,7 +7,6 @@
 import {
   applyTransform,
   curveEndpointJoin,
-  isClosedEnough,
   type ColoredPath,
   type CurveSubpath,
   type Polyline,
@@ -22,6 +21,13 @@ export type ClosePathsResult = {
   /** The widest gap a closing line had to bridge, in world millimetres. */
   readonly longestGapMm: number;
 };
+
+/** A caller may target canonical contours even when a legacy compatibility flag says closed. */
+export type ClosePathPredicate = (
+  polyline: Polyline,
+  subpathIndex: number,
+  path: ColoredPath,
+) => boolean;
 
 export type ReversePathsResult = {
   readonly paths: ReadonlyArray<ColoredPath>;
@@ -41,13 +47,14 @@ export function isCloseablePolyline(polyline: Polyline): boolean {
 export function closeOpenPaths(
   paths: ReadonlyArray<ColoredPath>,
   transform: Transform,
+  shouldClose: ClosePathPredicate = isCloseablePolyline,
 ): ClosePathsResult {
   let closed = 0;
   let longestGapMm = 0;
   const next = paths.map((path) => {
     if (!curvesPairWithPolylines(path)) return path;
     const indexes = path.polylines.flatMap((polyline, index) =>
-      isCloseablePolyline(polyline) ? [index] : [],
+      shouldClose(polyline, index, path) ? [index] : [],
     );
     if (indexes.length === 0) return path;
     for (const index of indexes) {
@@ -122,7 +129,12 @@ function reverseCurveKeepingStart(curve: CurveSubpath): CurveSubpath {
 // A path whose ends already meet is stored as Z would have closed it: its last
 // point moves onto the first instead of a second closing point being added.
 function closePolyline(polyline: Polyline): Polyline {
-  const drawn = isClosedEnough(polyline) ? polyline.points.slice(0, -1) : polyline.points;
+  const first = polyline.points[0];
+  const last = polyline.points.at(-1);
+  // An older Fill repair set only the closed flag. That does not make its
+  // genuine last endpoint a repeated seam point.
+  const repeatsStart = first !== undefined && last !== undefined && endsMeet(first, last);
+  const drawn = repeatsStart ? polyline.points.slice(0, -1) : polyline.points;
   return { closed: true, points: [...drawn, ...polyline.points.slice(0, 1)] };
 }
 

@@ -156,8 +156,9 @@ describe('SVG composition parsing', () => {
         '"/></g></svg>',
     );
     const point = applyTransform({ x: 5, y: 6 }, entry.transform);
-    expect(point.x).toBeCloseTo(2);
-    expect(point.y).toBeCloseTo(3.8);
+    // The nonzero root viewBox origin adds 1 mm and 0.5 mm to placement.
+    expect(point.x).toBeCloseTo(3);
+    expect(point.y).toBeCloseTo(4.3);
     expect(entry.transform.scaleX).toBeCloseTo(0.2);
     expect(entry.transform.scaleY).toBeCloseTo(0.3);
   });

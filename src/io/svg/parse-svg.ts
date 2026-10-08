@@ -5,7 +5,7 @@
 // 2. Parse the cleaned markup with the native DOMParser into a Document.
 // 3. Walk every geometry-bearing element (shape-to-polylines.ts) in document
 //    order — deterministic for snapshot tests. Nested <svg> and <symbol>
-//    viewports map their content (not clipped to the viewport), a <switch>
+//    viewports map and clip their content as overflow specifies, a <switch>
 //    renders one child, and <use> expansion skips circular references and has
 //    a budget (ADR-268 Amendment 1).
 // 4. Attribute each element to stroke color, falling back to visible fill
@@ -39,9 +39,9 @@ import {
   type SvgImportBudget,
 } from './svg-import-budget';
 import { resolveUnitScale } from './svg-units';
+import { rootSvgViewportMapping } from './svg-root-viewport';
 import {
   INITIAL_PRESENTATION_STATE,
-  numAttr,
   presentationStateFor,
   type PresentationState,
 } from './svg-presentation';
@@ -58,7 +58,9 @@ import { svgImageElement } from './svg-image-element';
 import { createSvgStyleCascade, type SvgStyleCascade } from './svg-stylesheet';
 import { svgRenderedChildren } from './svg-conditional-processing';
 import { hasSvgMarkers } from './svg-markers';
-import { rootViewportSize, svgViewportTransform, viewportLength } from './svg-viewport';
+import { rootViewportSize, viewportLength } from './svg-viewport';
+import { svgGeometryLength } from './svg-geometry-length';
+import { nestedSvgViewportState, rootSvgViewportState } from './svg-viewport-state';
 import {
   createSvgUseBudget,
   spendSvgUseElement,
@@ -105,16 +107,21 @@ type WalkContext = {
 function walkGeometry(
   svgEl: Element,
   context: WalkContext,
-  unitScale: { readonly scaleX: number; readonly scaleY: number },
+  viewport: ReturnType<typeof rootSvgViewportMapping>,
 ): void {
   // The unit scale seeds the transform stack root so every element's
   // geometry lands in mm (H9), composing with element/group transforms.
-  const transform = { a: unitScale.scaleX, b: 0, c: 0, d: unitScale.scaleY, e: 0, f: 0 };
-  const rootState = presentationStateFor(
+  const { matrix: transform } = viewport;
+  if (transform === null) return;
+  const presented = presentationStateFor(
     svgEl,
     { ...INITIAL_PRESENTATION_STATE, transform, viewport: rootViewportSize(svgEl) },
     context.cascadeStyles,
   );
+  const rootState = rootSvgViewportState(svgEl, presented, {
+    bounds: viewport.bounds,
+    matrix: transform,
+  });
   // The root is an ancestor of everything, so a <use> of it is circular.
   context.active.add(svgEl);
   for (const child of Array.from(svgEl.children)) {
@@ -148,7 +155,7 @@ function walkElement(
   if (tag === 'text') context.counts.text += 1;
   if (tag === 'text' || NEVER_RENDERED.has(tag)) return;
   appendElement(el, state, context, depth);
-  const content = tag === 'svg' ? viewportState(el, state, AUTO_SIZE) : state;
+  const content = tag === 'svg' ? nestedSvgViewportState(el, state, AUTO_SIZE) : state;
   if (content !== null) walkChildren(el, content, context, depth);
 }
 
@@ -185,23 +192,6 @@ function walkChildren(
 type UseSize = { readonly width: number | null; readonly height: number | null };
 const AUTO_SIZE: UseSize = { width: null, height: null };
 
-// A nested <svg>, or the <svg> a <use> makes of a <symbol>, maps its content
-// into its viewport; null when a zero size disables rendering. Content that
-// overflows the viewport is not clipped to it.
-function viewportState(
-  el: Element,
-  state: PresentationState,
-  size: UseSize,
-): PresentationState | null {
-  const viewport = svgViewportTransform(el, state.viewport, size);
-  if (viewport === null) return null;
-  return {
-    ...state,
-    transform: multiplySvgMatrix(state.transform, viewport.matrix),
-    viewport: viewport.viewport,
-  };
-}
-
 function appendImage(el: Element, state: PresentationState, context: WalkContext): void {
   const { entries, identity } = context.fragment;
   const image = svgImageElement(el, state, context.clipResolver, {
@@ -226,7 +216,10 @@ function appendUseGeometry(
     ...state,
     transform: multiplySvgMatrix(
       state.transform,
-      translateSvgMatrix(numAttr(el, 'x'), numAttr(el, 'y')),
+      translateSvgMatrix(
+        svgGeometryLength(el, 'x', state.viewport) ?? 0,
+        svgGeometryLength(el, 'y', state.viewport) ?? 0,
+      ),
     ),
   };
   context.active.add(el);
@@ -270,7 +263,7 @@ function appendElementGeometry(el: Element, state: PresentationState, context: W
   // Flatten curves/arcs to a scene-mm tolerance, not user-units, by dividing
   // the mm chord tolerance by this transform's distance stretch (audit C2).
   const t = state.transform;
-  const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d));
+  const subs = elementToSubPaths(el, linearScaleMagnitude(t.a, t.b, t.c, t.d), state.viewport);
   if (subs.length === 0) return;
   const stroke = visibleStroke(state, context);
   const fill = visibleFill(el, state, context);
@@ -346,7 +339,8 @@ function walkReferencedDefinition(
 ): void {
   spendSvgUseElement(context.useBudget);
   const state = presentationStateFor(el, parent, context.cascadeStyles);
-  const content = el.tagName.toLowerCase() === 'defs' ? state : viewportState(el, state, size);
+  const content =
+    el.tagName.toLowerCase() === 'defs' ? state : nestedSvgViewportState(el, state, size);
   if (content !== null) walkChildren(el, content, context, depth);
 }
 
@@ -375,7 +369,8 @@ export function parseSvgDocument(
   }
 
   const unitScale = resolveUnitScale(svgEl);
-  const bounds = unitScale.bounds;
+  const rootViewport = rootSvgViewportMapping(svgEl, unitScale);
+  const bounds = rootViewport.bounds;
   assertSvgImportPoints([
     { x: bounds.minX, y: bounds.minY },
     { x: bounds.maxX, y: bounds.maxY },
@@ -402,7 +397,7 @@ export function parseSvgDocument(
       active: new Set(),
       useBudget: createSvgUseBudget(svgEl),
     },
-    unitScale,
+    rootViewport,
   );
 
   const paths: ColoredPath[] = [...byColor.values()].map((bucket) => ({

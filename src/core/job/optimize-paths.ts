@@ -60,6 +60,7 @@ import {
 } from './segment-order';
 import { removeCutOverlaps } from './remove-cut-overlaps';
 import { isBurningLineGroup, lineStartCursorForJob } from './line-start-region';
+import { orderTopologyScopes } from './topology-cut-packets';
 
 type PathOptimizationSettings = Pick<
   ProjectOptimizationSettings,
@@ -87,10 +88,20 @@ export function optimizePaths(
 ): Job {
   const prioritized = prioritizeLayerGroups(job.groups, settings.layerPriority);
   const lineStartCursor = lineStartCursorForJob(job, settings.lineStartRegion, origin);
+  const topology =
+    settings.travelPolicy !== 'source-order' && settings.insideFirst
+      ? orderTopologyScopes(prioritized, settings, lineStartCursor)
+      : { groups: prioritized, orderedCuts: new Set<CutGroup>() };
   const ordered =
     settings.travelPolicy === 'source-order'
       ? prioritized.map((group) => startClosedShapesInSourceOrder(group, settings, lineStartCursor))
-      : optimizeGroups(prioritized, settings, scanningOffsets, lineStartCursor);
+      : optimizeGroups(
+          topology.groups,
+          settings,
+          scanningOffsets,
+          lineStartCursor,
+          topology.orderedCuts,
+        );
   return {
     ...job,
     // Keep containment/ordering decisions on the original contours. Splitting
@@ -98,7 +109,7 @@ export function optimizePaths(
     groups:
       settings.removeOverlappingLines === true
         ? ordered.map((group) =>
-            group.kind === 'cut'
+            group.kind === 'cut' && !topology.orderedCuts.has(group)
               ? removeCutOverlaps(group, settings.overlapMergeToleranceMm ?? 0)
               : group,
           )
@@ -151,11 +162,16 @@ function optimizeGroups(
   settings: PathOptimizationSettings,
   scanningOffsets: ReadonlyArray<ScanOffsetPoint>,
   lineStartCursor: Vec2 | null,
+  orderedCuts: ReadonlySet<CutGroup>,
 ): Group[] {
   const out: Group[] = [];
   let i = 0;
   while (i < groups.length) {
-    const group = optimizeGroupAny(groups[i] as Group, settings, lineStartCursor);
+    const source = groups[i] as Group;
+    const group =
+      source.kind === 'cut' && orderedCuts.has(source)
+        ? source
+        : optimizeGroupAny(source, settings, lineStartCursor);
     if (!isIslandFillGroup(group)) {
       out.push(group);
       i += 1;

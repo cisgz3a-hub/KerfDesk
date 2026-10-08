@@ -95,12 +95,14 @@ describe('support report text', () => {
       '== Machine ==',
       '== Machine settings ($$), read 2026-09-29T07:11:00.000Z ==',
       '== Machine console, newest last ==',
+      '== Retained controller incidents, newest last ==',
       '== Problems in this window, newest last ==',
       '== Desktop log, newest last ==',
     ]);
     expect(text).toContain('Version: 0.9.1 (commit abc1234, built 2026-09-28T12:00:00Z)');
     expect(text).toContain('App: desktop app');
     expect(text).toContain('$32=1');
+    expect(text).toContain('== Retained controller incidents, newest last ==\nNone.');
     expect(text).toContain('2026-09-29T07:11:55.000Z error: TypeError: layer is undefined');
     expect(text).toContain('INFO  [app] KerfDesk 0.9.1 started.');
     expect(text.endsWith('\n')).toBe(true);

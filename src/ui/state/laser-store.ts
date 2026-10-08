@@ -72,7 +72,10 @@ import type {
 } from './laser-controller-observation';
 import type { LaserSafetyAction, LaserSafetyNotice } from './laser-safety-notice';
 import { createSafeWrite, type SafeWrite } from './laser-safe-write';
-import { bindLiveJobTransportLedger } from './laser-job-transport-ledger';
+import {
+  bindLiveJobTransportLedger,
+  type JobTransportLedgerRefs,
+} from './laser-job-transport-ledger';
 import { setupActions } from './laser-setup-actions';
 import { controllerFireActions } from './laser-fire-actions';
 import { jobStartMarkActions } from './laser-job-start-mark-actions';
@@ -89,6 +92,7 @@ import {
   pushLog,
 } from './laser-store-helpers';
 import type { StallProbe } from './laser-stream-stall';
+import type { ControllerIncidentState } from './laser-incident-history';
 import type { ControllerFirmwareReport } from '../../core/controllers/controller-firmware-report';
 import { firmwareReportActions } from './controller-firmware-report-action';
 import { surfaceProbeActions } from './laser-surface-probe-actions';
@@ -111,6 +115,7 @@ export type WorkOriginSource = 'none' | 'g92' | 'g54-persistent' | 'unknown';
 export type { ConnectControllerOptions } from './laser-store-action-types';
 
 export type LaserState = LaserStoreActions &
+  ControllerIncidentState &
   ControllerBuildInfoState &
   CncPauseLiftStoreState &
   WorkOriginState &
@@ -358,6 +363,7 @@ export type LiveRefs = ControllerLifecycleRefs & {
   /** Last Marlin busy keepalive; restarts the ack watchdog (MA-9). */
   controllerBusyAt?: number | null;
 } & TranscriptBufferRefs &
+  JobTransportLedgerRefs &
   ResetCleanupRefs &
   ResetAlarmRefs &
   ConnectAttemptOwnershipRefs &

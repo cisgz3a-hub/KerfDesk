@@ -56,6 +56,8 @@ function diagnosticWarning(diagnostic: CompileDiagnostic): string {
       return offsetFillFailedWarning(diagnostic.layerName);
     case 'offset-fill-pass-limit':
       return offsetFillPassLimitWarning(diagnostic.layerName, diagnostic.passLimit);
+    case 'fill-ownership-failed':
+      return `Fill could not be prepared for ${diagnostic.count} artwork objects in operation "${diagnostic.layerName}". This run's Fill output is missing. Check the preview before running. Other prepared output remains available.`;
     case 'kerf-offset-failed':
       return kerfOffsetFailedWarning(diagnostic.layerName);
     case 'kerf-offset-closed-up':

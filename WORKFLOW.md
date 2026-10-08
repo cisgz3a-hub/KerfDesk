@@ -128,7 +128,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Machine connection toolbar**: the machine name and connection status sit beside the numeric transforms, with Connect/Disconnect, the Machine Setup icon and the connection-options menu. The machine-name dropdown shows the full profile, bed size, controller, connected port, fitted Laser module selector and supported FluidNC network connection form. Tab moves between its fields; Escape closes it and returns focus to the machine name. Field input stays inside the dropdown while the existing Abort shortcut remains available. Connection failures and qualification/recovery notices remain visible outside the dropdown. On narrow windows the machine controls wrap onto a second top row, and remain available when either sidebar is collapsed. Detected-settings notifications also remain active with the sidebar closed.
 - **Artwork / Operations panel**: docked right with **Settings**, **Run order**, and **Materials** views in Laser mode; CNC keeps Settings and Run order. Settings is the default. Run order shares the same docked rail at the same width while the canvas remains on the left; it is not a modal or a third sidebar, and switching views never resizes the rail (ADR-348). Materials owns reusable preset and saved-library management without displacing the active job workflow. A header chevron collapses the rail to a narrow named strip; the same strip expands it.
 - **Laser artwork settings (ADR-430)**: the selected artwork's name heads the Settings view, with the Operation | Artwork switch under it. The Operation view leads with the operation's colour and name, then one scope line only when an edit reaches other artwork (with **Make unique**). **Line**, **Fill** and **Image** are three buttons; Power, Speed and Passes share one row; Fill adds Line spacing and Angle, and Image adds Dither, Line interval and (Grayscale) Min power. Scan both ways and Air assist are one-line switches whose explanations are tooltips. **More cut settings** opens Cut Settings for everything else and names what it holds. Include in output, Show on canvas and **Add operation** close the view.
-- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only.
+- **CNC artwork settings (ADR-481)**: the same header, scope line and footer lead and close the CNC Operation view. **Cut type** comes first (its explanation is the tooltip), then **Bit** with a **Manage bits** link to the Machine Setup bit library, the second bit the cut type uses (Pocket roughing, Floor clearing or Relief finishing) and **Material**. Cut depth and Depth per pass share one row with **Set to stock thickness** under it; Feed, Plunge and Spindle speed share the next, with the machine maximum under Spindle speed opening Machine Setup. **Traced edges** appears only for imported or traced outlines. Collapsed sections follow only for the cut types they serve, each naming its state (Holding tabs "4 per shape", Clearing strategy "Offset · 40 %", Entry & travel "Climb · Plunge"). An adaptive pocket's Entry & travel names its own helix ("Climb · Adaptive helix"), and names the Ramp entry angle only as the entry of reliefs on the same operation ("Relief ramp 5°", ADR-481 Amendment 1). Stock, tiling, spin-up, coolant, safe Z and park are edited in Machine Setup only. Closed-only operations also show the exact count of omitted open contours, including mixed closed/open artwork; all-open vector operations without assigned relief retain the no-toolpath explanation (ADR-481 Amendment 2).
 - **Operation cards**: the list comes before the artwork inspector, with the selected operation's process fields before secondary artwork properties. Each card keeps its visibility toggle on the face. Its **•••** disclosure contains order, output, artwork selection, settings clipboard, and delete controls.
 - **Machine controls panel**: in Spacious layout it is docked at the far right with the same collapse/expand pattern. Its heading, jog controls and current status remain above the independently scrolling lower settings. The upper controls can also scroll so optional Focus/Z controls and recovery messages remain reachable. When the available panel body is too short for two usable scroll regions, the whole machine panel scrolls instead; Frame and Start remain outside that scroller. Both panels can be resized or hidden independently. It may be collapsed during a job because active run controls live independently in the Live Motion bar.
 - **Toasts**: share the canvas's available space (lower left of the workspace, above the live controls) or a reserved row inside the open modal — never the rails, where they hid Start/Job and the layer list. Only the newest three render. The toast body does not take pointer input, so a click or drag through it reaches the canvas; the × control dismisses it early. Success confirmations dismiss after 4 s; advisories and failures after 8 s.
@@ -237,6 +237,11 @@ startup crash is shown at once. It introduces no startup interaction or modal.
    opacity is skipped with a warning instead (ADR-358 Amendment 3).
 6. Image clips follow the same rules: a missing `clipPathUnits` is `userSpaceOnUse` and a missing
    `clip-rule` is `nonzero`. KerfDesk's own exported image clips keep their curves.
+7. Nested SVG and symbol viewports clip overflowing artwork by default, including embedded images
+   (ADR-574). Explicit or styled `overflow: hidden` and `scroll` clip to the exact viewport;
+   `visible` and `auto` allow overflow. A standalone SVG root allows overflow by default and clips
+   only when requested. Viewport clips intersect other clips; their own clip paths use the mapped
+   content coordinates and measure object bounding boxes before clipping.
 
 #### Edge — SVG path arcs
 1. A path's `A` arcs import as cubic curves of at most a quarter turn each. Each curve's midpoint
@@ -294,6 +299,20 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 #### Edge — SVG uses unit-less coordinates
 1. SVG without explicit units (no `mm`, `cm`, `in`, `px`): treated as mm per laser-community convention.
 2. Toast (info): `<filename> has no units — assuming millimeters`.
+
+#### Edge — SVG shape positions or sizes use percentages (ADR-574)
+1. Supported rectangles, lines, circles, ellipses and `<use>` positions retain their layout in the
+   nearest SVG or symbol viewport. X coordinates and widths use its width; Y coordinates and
+   heights use its height. A circle's percentage radius uses the normalized viewport diagonal.
+   ViewBox dimensions remain the reference under meet, slice and none; a viewport without a
+   viewBox uses its absolute user-coordinate size before the 96-DPI conversion.
+2. Percentage clip shapes use the viewport where the clip is defined. Object-box scaling follows
+   that length resolution; ordinary fractional clip coordinates still scale directly with the
+   artwork's box. Differently sized copies measure their own geometry before clipping.
+3. Numeric and absolute geometry lengths keep their existing units. Geometry defined only in CSS
+   remains outside the supported primitive attributes, and CSS-only clip geometry reports its
+   error. Images still need absolute positions and sizes; unusable percentage image geometry is
+   skipped with the existing warning.
 
 #### Edge — SVG `<text>` elements
 1. Phase A ignores `<text>` elements (text → paths conversion is Phase D).
@@ -1139,7 +1158,11 @@ marks later edits as unapproved without changing the existing Frame/Start policy
 3. Cancellation writes nothing. Missing image pixels, unsupported 3D relief or invalid geometry
    report an error without claiming a successful partial export. A write error reports its reason.
 4. Re-import preserves the supported vector/image composition, physical size and image clips
-   (ADR-358). Use the project format to preserve editable text and machining data. Software tests
+   (ADR-358). New exports also restore their authored scene coordinate frame through explicit
+   artwork-origin metadata (ADR-574), before ordinary import placement. Older exports, or files
+   whose metadata an external editor removes, use standard SVG viewport placement and cannot
+   automatically recover that frame. Native SVG rendering is unchanged.
+   Use the project format to preserve editable text and machining data. Software tests
    do not replace rendered verification in KerfDesk and an independent vector editor.
 5. Explicit **Re-import source** replaces the complete originally imported SVG composition in one
    Undo step. Unambiguous unchanged components retain settings; changed or ambiguous components
@@ -2348,8 +2371,19 @@ authorization, Frame proof, controller command, or safety boundary.
    instead of rows.
 
 #### Edge - long sessions
-1. The transcript store keeps the newest 500 entries; the Super console shows all of them,
-   not the docked panel's 150-entry slice.
+1. The rolling transcript keeps the newest 500 entries; the Super console shows all of them,
+   plus a separate history of the newest 500 controller incidents. Rows appearing in both are
+   shown once with their original time. Errors, search and Copy visible include retained incidents
+   after routine traffic evicts them or Disconnect, Forget and reconnect reset live controller state.
+2. UART/silence diagnostics keep their original message kind and appear under Errors; ordinary
+   Ready messages remain Replies. Transport and run facts are captured when the incident happens,
+   so reconnect does not rewrite earlier evidence. This history lasts only in the current window.
+3. The docked console's Clear removes rolling traffic/logs only. **Clear incident history** in the
+   Super console removes retained incidents and any remaining copies of their IDs in rolling
+   traffic. Neither action acknowledges a safety notice, changes Frame or settles machine ACKs.
+4. Help > Save Support Report includes retained incidents under their own heading with separately
+   labelled event-time context, alongside current machine facts and the existing last 100 console
+   lines. The file is local, licence keys are redacted, and the customer reads and sends it.
 #### Success - settings pane (v2)
 1. The dialog's right pane embeds the read-only Machine Settings table (F-B14).
 2. When the dialog opens, it reuses a settings snapshot already read in the current controller
@@ -2600,7 +2634,9 @@ authorization, Frame proof, controller command, or safety boundary.
   shows before anything burns. The Review then reads as set from the head stop instead of
   warning that the origin moved (ADR-341 Amendment 6). It also says how far back along the path
   the lines sent after the last confirmed one reach, the stretch a laser that lost power may
-  not have burned (ADR-341 Amendment 8).
+  not have burned (ADR-341 Amendment 8). That XY distance includes arc travel along the curve,
+  rather than its endpoint chord. Unsupported or ambiguous geometry leaves the distance
+  unknown; it does not establish which queued commands physically ran.
 - Once the controller has the origin the job ran with, or one set from where the head stopped,
   **Go to job origin** and **Go to restart point** jog the head, beam off, to work X0 Y0 and to
   where the chosen restart line re-enters the job (ADR-341 Amendment 8).
@@ -3572,15 +3608,18 @@ or traced image) with at least one closed polyline.
    order using their own mode, power, speed, passes, fill, image, kerf, tab, and air settings. This
    supports fill-then-line workflows without duplicating artwork or opening a nested Sub-layers box.
 
-**Error**:
-- *No closed polylines on this color* — the layer's mode is Fill, but
-  every matching polyline is open (e.g., a single line, not a region).
-  The compile step silently emits nothing for that layer (no error
-  toast; the empty result is itself the diagnostic). Switch back to
-  Line mode to engrave the outline instead.
-- *Offset Fill on open contours* - Start / Save G-code preflight blocks with
-  a specific Offset Fill message. Close the shapes or switch the layer back to
-  Scanline Fill.
+**Warnings**:
+- *Open Fill contours omitted* — Scanline, Island and Offset Fill require closed regions.
+  Start and Save G-code report the omitted contour and artwork counts. These warnings are
+  advisory when other artwork produces executable output. Close the shapes, or use Line
+  to engrave their outlines; changing to Scanline does not fill an open region.
+- Selected open Fill artwork is highlighted using its canonical geometry and effective enabled
+  operations, including object overrides and suboperations. **Close Open Fill Contours** closes
+  eligible near gaps in physical millimetres; ambiguous curve/polyline pairs stay unresolved.
+- In ordinary Job Review, **Show omitted artwork** cancels the pending run, selects unchanged
+  matching artwork from the reviewed output scope, fits the selection and reveals the Artwork
+  rail. Changed objects, archived recovery and painted second passes do not invent source
+  correspondence. Merely opening review changes no selection or project.
 - *Additional operation disabled* - the operation stays saved on the project but does not compile
   into Preview, Frame, Save G-code, or Start output.
 
@@ -6037,6 +6076,16 @@ as the pane's design record.
 1. With no output-enabled CNC content it shows a hint; a job whose cut
    type cannot produce toolpaths (e.g. pocketing open line art) empties
    the pane the same way — honest feedback, not an error.
+2. Pocket, V-carve and Drill omit open contours even when other closed shapes on
+   the operation still cut. Artwork settings and Job Review show the omitted
+   count. An assigned relief can still contribute motion when all vector
+   contours are open, so the note describes only those omitted contours rather
+   than calling the entire operation empty. For a fresh prepared job,
+   **Show omitted artwork** cancels review,
+   selects the unchanged eligible omitted sources, fits them and opens Artwork.
+   This advice leaves the successful toolpath and ordinary Start confirmation
+   unchanged. Archived review keeps recorded counts without mapping them to
+   today's canvas; derived recovery retains counts only for surviving CNC layers.
 
 #### Edge — laser mode
 1. The pane never renders in laser mode.

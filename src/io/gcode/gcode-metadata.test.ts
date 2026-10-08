@@ -41,7 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe('cnc-finish-ladder-thin-stock-tabs-mesh-footprint-20260929-v16');
+    expect(EMITTER_REVISION).toBe('operation-topology-fill-ownership-contour-packets-20261007-v17');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -141,7 +141,7 @@ function shapeRegion(shape: SvgClipShape): PathsD {
   const { matrix } = shape;
   const scale = linearScaleMagnitude(matrix.a, matrix.b, matrix.c, matrix.d);
   // A clip child contributes its fill area: every subpath implicitly closes.
-  const rings = elementToSubPaths(shape.element, scale)
+  const rings = elementToSubPaths(shape.element, scale, shape.viewport)
     .map((subpath) => machineDocumentPoints(subpath, matrix))
     .filter((ring) => ring.length >= 3);
   let region =

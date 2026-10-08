@@ -11,7 +11,8 @@ import { elementToSubPaths } from './shape-to-polylines';
 import { applySvgMatrix, transformSvgCurveSubpath, type SvgMatrix } from './svg-curve-transform';
 import { svgRenderedChildren } from './svg-conditional-processing';
 import type { SvgIdResolver } from './svg-id-resolver';
-import { numAttr, svgPresentationStyles } from './svg-presentation';
+import { svgPresentationStyles } from './svg-presentation';
+import { svgGeometryLength } from './svg-geometry-length';
 import type { SvgStyleCascade } from './svg-stylesheet';
 import {
   multiplySvgMatrix,
@@ -50,18 +51,28 @@ type Box = { minX: number; minY: number; maxX: number; maxY: number };
 /** A user space: its matrix, and the viewport its percentages resolve against. */
 type Space = { readonly matrix: SvgMatrix; readonly viewport: SvgViewportSize };
 type UseSize = { readonly width: number | null; readonly height: number | null };
+export type SvgObjectBoxSpace = {
+  readonly viewport: SvgViewportSize;
+  /** Measure viewport content without applying its own viewBox placement again. */
+  readonly content: boolean;
+};
 
 export function svgObjectBoundingBox(
   element: Element,
   resolveId: SvgIdResolver,
   cascade: SvgStyleCascade,
+  boxSpace?: SvgObjectBoxSpace,
 ): Bounds | null {
   const box: Box = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   const active = new Set<Element>();
   for (let at = element.parentElement; at !== null; at = at.parentElement) active.add(at);
   const budget = createSvgUseBudget(element.ownerDocument.documentElement);
-  const space = { matrix: IDENTITY, viewport: svgViewportAt(element) };
-  contentBounds(element, space, { resolveId, cascade, active, budget }, box, 0);
+  const space = { matrix: IDENTITY, viewport: boxSpace?.viewport ?? svgViewportAt(element) };
+  const context = { resolveId, cascade, active, budget };
+  // A viewport-owned clip already carries the viewBox matrix, so measure its
+  // child geometry in content coordinates, never its placement or clipped area.
+  if (boxSpace?.content === true) childrenBounds(element, space, context, box, 0);
+  else contentBounds(element, space, context, box, 0);
   return Number.isFinite(box.minX) && Number.isFinite(box.minY) ? box : null;
 }
 
@@ -76,7 +87,7 @@ function contentBounds(
   if (depth > MAX_DEPTH) return;
   if (context.budget.nesting > 0) spendSvgUseElement(context.budget);
   const tag = element.tagName.toLowerCase();
-  if (SHAPES.has(tag)) shapeBounds(element, space.matrix, box);
+  if (SHAPES.has(tag)) shapeBounds(element, space, box);
   else if (tag === 'image') imageBounds(element, space.matrix, box);
   else if (tag === 'use') boundsOfUse(element, space, context, box, depth);
   else if (tag === 'svg' && element !== element.ownerDocument.documentElement) {
@@ -134,7 +145,10 @@ function boundsOfUse(use: Element, space: Space, context: Context, box: Box, dep
     ...space,
     matrix: multiplySvgMatrix(
       space.matrix,
-      translateSvgMatrix(numAttr(use, 'x'), numAttr(use, 'y')),
+      translateSvgMatrix(
+        svgGeometryLength(use, 'x', space.viewport) ?? 0,
+        svgGeometryLength(use, 'y', space.viewport) ?? 0,
+      ),
     ),
   };
   const size = {
@@ -168,9 +182,9 @@ function instanceBounds(
   }
 }
 
-function shapeBounds(element: Element, matrix: SvgMatrix, box: Box): void {
+function shapeBounds(element: Element, { matrix, viewport }: Space, box: Box): void {
   const scale = linearScaleMagnitude(matrix.a, matrix.b, matrix.c, matrix.d);
-  for (const subpath of elementToSubPaths(element, scale)) {
+  for (const subpath of elementToSubPaths(element, scale, viewport)) {
     if (subpath.curve === undefined) {
       for (const point of subpath.points) include(box, applySvgMatrix(matrix, point));
       continue;

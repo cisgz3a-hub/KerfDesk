@@ -150,6 +150,17 @@ describe('lensLegend', () => {
     expect(feed.kind === 'ramp' ? feed.to : '').toContain('800 mm/min');
   });
 
+  it('keeps one-depth engraving distinct from travel without a misleading depth ramp', () => {
+    const { model, time } = built('G21 G90\nM4 S500\nG0 X10\nG1 X20 F600\nG0 Y10');
+    const colorOf = lensColorFn(model, time, 'depth', THEME);
+    expect(rgbCss(colorOf(firstOfKind(model, SEG_KIND.cut)))).toBe('rgb(79, 163, 255)');
+    expect(rgbCss(colorOf(firstOfKind(model, SEG_KIND.travel)))).toBe('rgb(204, 68, 68)');
+    expect(lensLegend(model, time, 'depth', THEME)).toEqual({
+      kind: 'note',
+      note: 'Single cutting depth: 0.00 mm',
+    });
+  });
+
   it('counts both planner outcomes', () => {
     const { model, time } = built();
     const legend = lensLegend(model, time, 'planner', THEME);
@@ -272,9 +283,12 @@ describe('defaultLensFor', () => {
     expect(defaultLensFor(built(RASTER.join('\n')).model, 'cnc')).toBe('depth');
   });
 
-  it('keeps depth for a flat program cut at one power', () => {
+  it('opens constant-power laser engraving on move kind, preserving CNC and unknown defaults', () => {
     const flat = ['G21 G90', 'M3 S500', 'G0 X0 Y0', 'G1 X10 F600', 'G1 Y10', 'M5'];
-    expect(defaultLensFor(built(flat.join('\n')).model, 'laser')).toBe('depth');
+    const { model } = built(flat.join('\n'));
+    expect(defaultLensFor(model, 'laser')).toBe('kind');
+    expect(defaultLensFor(model, 'cnc')).toBe('depth');
+    expect(defaultLensFor(model)).toBe('depth');
   });
 });
 

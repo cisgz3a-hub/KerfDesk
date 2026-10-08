@@ -25,13 +25,13 @@ import {
 } from './laser-job-transport-ledger';
 import {
   activeJobCommandBlockMessage,
-  pushLog,
   serialWriteErrorMessage,
   setupBlockingJobCommandBlockMessage,
 } from './laser-store-helpers';
 import { isProbeAlarmedToolChangeHold } from './tool-change-probe-alarm';
 import { framePushWritePatch } from './laser-frame-modal-restore';
 import { toolOffAirPatch } from './laser-tool-off-air';
+import { publishControllerIncident } from './laser-incident-publish';
 
 export type SafeWriteRefs = UntrackedAckLedgerRefs &
   TranscriptBufferRefs &
@@ -81,7 +81,12 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     if (blockedMessage !== null) {
       set({
         lastWriteError: blockedMessage,
-        log: pushLog(get(), `[lf2] Serial write blocked: ${blockedMessage}`),
+        ...publishControllerIncident(
+          refs,
+          get(),
+          `[lf2] Serial write blocked: ${blockedMessage}`,
+          'blocked',
+        ),
       });
       throw new Error(blockedMessage);
     }
@@ -90,7 +95,8 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
       const message = 'No active serial connection.';
       set({
         lastWriteError: message,
-        log: pushLog(
+        ...publishControllerIncident(
+          refs,
           get(),
           `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
         ),
@@ -101,7 +107,7 @@ export function createSafeWrite(set: SetFn, get: GetFn, refs: SafeWriteRefs): Sa
     const writeSource =
       source ?? transcriptSourceForWrite(line, action, refs.driver.realtime.statusQuery);
     if (source === 'job' && action === undefined) return writeJobRefill(set, refs, conn, line);
-    refuseUnencodableLine(set, get, line);
+    refuseUnencodableLine(set, get, refs, line);
     const wakeOwner = wakeOwnerForWrite(get, action);
     const binding = reserveWrite(set, get, refs, line, action, writeSource);
     const { writeEpoch, ownedMotionOperationId } = binding;
@@ -192,12 +198,17 @@ function setupPayloadBlockMessage(
 // the refusal, owe nothing, and raise no E-stop notice. The quarantine in
 // recordWriteFailure stays for failures that really are ambiguous (audit
 // transport-1).
-function refuseUnencodableLine(set: SetFn, get: GetFn, line: string): void {
+function refuseUnencodableLine(set: SetFn, get: GetFn, refs: SafeWriteRefs, line: string): void {
   const refusal = wireEncodingError(line);
   if (refusal === null) return;
   set({
     lastWriteError: refusal.message,
-    log: pushLog(get(), `[lf2] Serial write refused before sending: ${refusal.message}`),
+    ...publishControllerIncident(
+      refs,
+      get(),
+      `[lf2] Serial write refused before sending: ${refusal.message}`,
+      'blocked',
+    ),
   });
   throw refusal;
 }
@@ -288,7 +299,8 @@ function recordWriteFailure(
       state.motionOperation?.mpgInterruptionId !== undefined
         ? `${message}. ${JOG_MPG_INTERRUPTION_MESSAGE}`
         : message,
-    log: pushLog(
+    ...publishControllerIncident(
+      refs,
       state,
       `[lf2] Serial write failed: ${message}. Machine may not have received the command.`,
     ),

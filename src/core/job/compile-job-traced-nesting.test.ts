@@ -111,16 +111,18 @@ describe('inside-first ordering of a traced path (ADR-531)', () => {
           : { ...layer, perforationEnabled: true, perforationCutMm: 3, perforationSkipMm: 1 };
       const compiled = compileJob({ objects: [trace(nested)], layers: [settings] }, device);
       const job = optimizePaths(compiled, { ...DEFAULT_PROJECT_OPTIMIZATION, insideFirst: true });
-      for (const group of job.groups) {
-        if (group.kind !== 'cut') continue;
-        expect(group.segments.every((segment) => !segment.closed)).toBe(true);
-        expect(group.segments[0]?.nesting?.depth).toBe(1);
-        const firstOuter = group.segments.findIndex((segment) => segment.nesting?.depth === 0);
-        expect(firstOuter).toBeGreaterThan(0);
-        expect(
-          group.segments.slice(firstOuter).every((segment) => segment.nesting?.depth === 0),
-        ).toBe(true);
-      }
+      const ordered = job.groups.flatMap((group) => (group.kind === 'cut' ? group.segments : []));
+      // Parent packets may separate main/bridge settings, but ALL inner output
+      // must precede outer output, including the nonzero-power bridge spans.
+      expect(ordered.every((segment) => !segment.closed)).toBe(true);
+      expect(ordered[0]?.nesting?.depth).toBe(1);
+      const firstOuter = ordered.findIndex((segment) => segment.nesting?.depth === 0);
+      expect(firstOuter).toBeGreaterThan(0);
+      expect(ordered.slice(0, firstOuter).every((segment) => segment.nesting?.depth === 1)).toBe(
+        true,
+      );
+      expect(ordered.slice(firstOuter).every((segment) => segment.nesting?.depth === 0)).toBe(true);
+      expect(new Set(ordered.map((segment) => segment.nesting?.topologyContour)).size).toBe(2);
     },
   );
 
@@ -132,6 +134,12 @@ describe('inside-first ordering of a traced path (ADR-531)', () => {
     };
     const compiled = compileJob({ objects: [trace(moved)], layers: [layer] }, device);
     const segments = (compiled.groups[0] as CutGroup).segments;
-    expect(segments.every((segment) => segment.nesting === undefined)).toBe(true);
+    // Invalid carried nesting is ignored. New compiled topology still records
+    // the two actual, disjoint zero-depth parents; stale depth 1 cannot leak.
+    expect(segments.every((segment) => segment.nesting?.depth === 0)).toBe(true);
+    expect(segments.every((segment) => typeof segment.nesting?.topologyContour === 'string')).toBe(
+      true,
+    );
+    expect(firstCut(moved)).toBe(outline.points.length);
   });
 });
