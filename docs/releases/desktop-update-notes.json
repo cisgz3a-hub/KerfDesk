@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "e3820ed51a8d3e9ae8eab16f47097c4011dbd703",
+  "sinceSourceSha": "2cd5600ac519fadd7095a4367bbd57db1efef70d",
   "highlights": [
-    "Connect and set up your machine from the compact top bar. Jog controls stay above the other machine tools, with scrolling that keeps them reachable in smaller windows.",
-    "Save material-test settings, result notes and photos together, turn selected test cells into reusable recipes, and compare recipe settings before applying them.",
-    "Preview shape combinations before applying them, keep their source paths editable, and organise artwork with named groups and drag-and-drop.",
-    "Organise projects into sheets, regenerate saved arrays, and keep batch data, serials and reviewed variants fixed when reopening a production run.",
-    "After Abort, responsive controllers recover on the same connection. Delayed startup replies get clearer messages, and later resets retain the first stop or fault result.",
-    "Your selected machine and hardware settings return next session. New starts a fresh job, and opened CNC job settings no longer replace your saved machine choice."
+    "Create and revise reliefs with editable components, vector masks, sculpting and rail profiles. CNC preview uses the revised surface.",
+    "Save CNC setups and cutting presets, preview machining-template changes, plan quantities across sheets and export setup documents.",
+    "Edit constrained sketches and parametric parts, prepare two-sided CNC work, and review tapered inlays, predicted remaining stock and tool-reach warnings.",
+    "Dense laser G-code previews use finer cutting lines and less prominent travel lines. Laser job previews start with travel hidden, and active playback strokes remain visible over flat cuts.",
+    "SVG imports follow declared sizes, percentages and clipping; new KerfDesk artwork exports retain scene placement. Cut planning preserves holes and islands across different artwork settings.",
+    "Find omitted open contours in Job Review and select affected artwork for repair. Controller incidents remain available during the session and in support reports."
   ]
 }
