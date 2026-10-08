@@ -63,3 +63,42 @@
     max-width: none;
   }
 }
+
+@media (max-width: 700px) {
+  /* Leave room to draw when the application header also wraps. Keep the
+     transform and machine controls in two compact, fully reachable rows. */
+  .lf-workspace-topbar > .lf-numeric-edits {
+    min-height: 34px;
+    padding: 1px 8px;
+  }
+
+  .lf-workspace-topbar .lf-transform-anchor-trigger,
+  .lf-workspace-topbar .lf-numeric-edit-field .lf-input {
+    min-height: 32px;
+  }
+
+  .lf-workspace-topbar .lf-numeric-aspect-lock {
+    width: 32px;
+    height: 32px;
+  }
+
+  .lf-machine-toolbar {
+    padding: 0 8px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-status {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .lf-machine-toolbar .lf-connection-card-more {
+    width: 32px;
+    min-width: 32px;
+  }
+}

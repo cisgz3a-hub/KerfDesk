@@ -6,25 +6,26 @@ test('RTSP bridge failure requires explicit reconnect even when the image never 
   page,
 }) => {
   const bridge = await installControlledRtspBridge(page);
+  const camera = page.getByRole('dialog', { name: 'Camera preview', exact: true });
   await page.goto('/');
   await (await toolbarCommand(page, 'Camera')).click();
-  await page.getByText(/^RTSP camera/).click();
-  await page.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
-  await page.getByRole('button', { name: 'Connect', exact: true }).click();
+  await camera.getByText(/^RTSP camera/).click();
+  await camera.getByRole('textbox', { name: 'RTSP camera URL' }).fill('rtsp://192.168.10.1:8554/');
+  await camera.getByRole('button', { name: 'Connect', exact: true }).click();
 
-  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
-  await expect(page.getByAltText('Machine camera stream')).toBeVisible();
+  await expect(camera.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+  await expect(camera.getByAltText('Machine camera stream')).toBeVisible();
   await expect.poll(bridge.statusHits).toBeGreaterThan(0);
 
   bridge.failStream();
 
-  await expect(page.getByRole('button', { name: 'Reconnect', exact: true })).toBeVisible();
-  await expect(page.getByText(/RTSP preview stopped/)).toBeVisible();
+  await expect(camera.getByRole('button', { name: 'Reconnect', exact: true })).toBeVisible();
+  await expect(camera.getByText(/RTSP preview stopped/)).toBeVisible();
   expect(bridge.probeHits()).toBe(1);
 
   bridge.restoreStream();
-  await page.getByRole('button', { name: 'Reconnect', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+  await camera.getByRole('button', { name: 'Reconnect', exact: true }).click();
+  await expect(camera.getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
   expect(bridge.probeHits()).toBe(2);
 });
 
