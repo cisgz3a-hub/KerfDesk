@@ -87,14 +87,30 @@ export function sandboxUploadMetadata(settings, activeVersion, entrypoint, opera
   };
 }
 
-export async function readSandboxModule(response, format = {}) {
+export async function readSandboxModule(response, format = {}, expectedRawDescriptor) {
   const mimeType = (response.headers.get('content-type') ?? '')
     .split(';', 1)[0]
     .trim()
     .toLowerCase();
   const safeName = (name) =>
-    typeof name === 'string' && /^[A-Za-z0-9_.-]{1,128}$/u.test(name) ? name : null;
-  format.contentType = /^[a-z0-9.+-]{1,64}\/[a-z0-9.+-]{1,64}$/u.test(mimeType) ? mimeType : null;
+    ['worker.js', 'sandbox-worker.js', 'worker.js.map', 'sandbox-worker.js.map'].includes(name)
+      ? name
+      : null;
+  const safeMime = (type) =>
+    [
+      'multipart/form-data',
+      'application/javascript',
+      'application/javascript+module',
+      'text/javascript+module',
+      'text/javascript',
+      'application/source-map',
+      'application/json',
+      'text/html',
+      'application/octet-stream',
+    ].includes(type)
+      ? type
+      : null;
+  format.contentType = safeMime(mimeType);
   format.entrypoint = safeName(response.headers.get('cf-entrypoint'));
   assert.ok(response.ok, 'Sandbox module unavailable.');
   if (mimeType !== 'multipart/form-data') {
@@ -107,11 +123,23 @@ export async function readSandboxModule(response, format = {}) {
     format.raw = { size: bytes.length, sha256: hash(bytes) };
     assert.ok(bytes.length, 'Sandbox module empty.');
     assert.equal(format.raw.sha256, GOOD_CODE_SHA256, 'Sandbox module is not the attested code.');
-    // The pin identifies this self-contained ESM bundle; normalize its raw response filename.
-    return {
+    const descriptor = expectedRawDescriptor ?? {
       entrypoint: 'sandbox-worker.js',
       filename: 'sandbox-worker.js',
       mimeType: 'application/javascript+module',
+    };
+    if (expectedRawDescriptor) {
+      const header = response.headers.get('cf-entrypoint');
+      assert.ok(
+        header === null || header === descriptor.entrypoint,
+        'Sandbox raw entrypoint changed.',
+      );
+    }
+    // Only raw readback adopts the already-attested upload identity; multipart stays strict.
+    return {
+      entrypoint: descriptor.entrypoint,
+      filename: descriptor.filename,
+      mimeType: descriptor.mimeType,
       bytes,
     };
   }
@@ -129,7 +157,7 @@ export async function readSandboxModule(response, format = {}) {
       return {
         field: safeName(field),
         filename: isFile ? safeName(file.name) : null,
-        mimeType: isFile ? file.type : null,
+        mimeType: isFile ? safeMime(file.type) : null,
         isFile,
         size: bytes.length,
         sha256: hash(bytes),
@@ -241,12 +269,13 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     operationVersion = active;
   };
   const readSettings = () => api('/settings', {}, 'sandbox-settings-get');
-  const readModule = async (version, label) => {
+  const readModule = async (version, label, expectedRawDescriptor) => {
     const format = {};
     try {
       return await readSandboxModule(
         await request('/content/v2?version=' + version, {}, label),
         format,
+        expectedRawDescriptor,
       );
     } catch (error) {
       moduleFormatFailure = { version, stage: label, ...format };
@@ -312,7 +341,11 @@ export async function refreshSandboxScript({ operation, token, output }, fetcher
     const active = await activeVersion();
     if (mutationAttempted) await verifyOperationVersion(active);
     await verifySettings();
-    const restored = await readModule(active, 'sandbox-restored-content-get');
+    const restored = await readModule(active, 'sandbox-restored-content-get', {
+      entrypoint: module.entrypoint,
+      filename: module.filename,
+      mimeType: module.mimeType,
+    });
     setStage('sandbox-restored-content-verification');
     assert.equal(restored.entrypoint, module.entrypoint, 'Sandbox entrypoint changed.');
     assert.equal(restored.filename, module.filename, 'Sandbox module filename changed.');
