@@ -24,7 +24,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   if (!current || extra.length) throw new Error('Expected current and optional previous project.');
   // This CLI belongs to the authenticated historical upgrade lane. Accept only
   // its known schema contracts, including an unchanged 12-to-12 historical pair
-  // and reviewed 12/13-to-14 migrations; the exported API remains current-strict by default.
+  // and reviewed 12/13/14-to-15 migrations; the exported API remains current-strict by default.
   const options = { schemaMode: 'known-upgrade' };
   validateUpgradeProject(
     await readFile(current),

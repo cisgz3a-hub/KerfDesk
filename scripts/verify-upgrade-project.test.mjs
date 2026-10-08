@@ -61,7 +61,7 @@ test('installed project qualification matches the canonical writer schema before
 });
 
 test('current project qualification refuses historical, future and malformed schema versions', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 15, '14', null, undefined]) {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 16, '14', '15', null, undefined]) {
     assert.throws(
       () => validateUpgradeProject(encoded({ ...fixture, schemaVersion })),
       /Expected current project schema/,
@@ -125,7 +125,7 @@ test('the known upgrade contract accepts historical retention and current migrat
 });
 
 test('known upgrade qualification keeps schema, scene and machine evidence strict', () => {
-  for (const schemaVersion of [11, 15, '12', '13', '14', null, undefined]) {
+  for (const schemaVersion of [11, 16, '12', '13', '14', '15', null, undefined]) {
     assert.throws(
       () =>
         validateUpgradeProject(
@@ -149,4 +149,31 @@ test('known upgrade qualification keeps schema, scene and machine evidence stric
     () => validateUpgradeProject(encoded(machine), historicalFixture, knownUpgrade),
     /Saved machine/,
   );
+});
+
+test('known upgrade preserves schema 13/14 saves and verifies their migration to the current writer', () => {
+  for (const schemaVersion of [13, 14]) {
+    const previous = { ...historicalFixture, schemaVersion };
+    assert.deepEqual(validateUpgradeProject(encoded(previous), previous, knownUpgrade), previous);
+    assert.deepEqual(validateUpgradeProject(encoded(fixture), previous, knownUpgrade), fixture);
+    assert.throws(
+      () => validateUpgradeProject(encoded(previous)),
+      /Expected current project schema/,
+    );
+    assert.throws(
+      () => validateUpgradeProject(encoded(previous), fixture, knownUpgrade),
+      /schema downgrade/,
+    );
+    const changed = structuredClone(fixture);
+    changed.scene.layers[0].mode = 'fill';
+    assert.throws(
+      () => validateUpgradeProject(encoded(changed), previous, knownUpgrade),
+      /artwork\/operations changed/,
+    );
+    const machine = { ...fixture, machine: { kind: 'cnc' } };
+    assert.throws(
+      () => validateUpgradeProject(encoded(machine), previous, knownUpgrade),
+      /Saved machine/,
+    );
+  }
 });

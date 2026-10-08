@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "recordedAtUtc": "2026-10-08T17:46:23.985Z",
+  "recordedAtUtc": "2026-10-08T17:55:04.477Z",
   "scope": "Completed CNC, retained relief and bounded parametric build; PR preparation after main integration.",
   "implementationBase": "88433fec3d0e44e0b4793e086af34d6c4760bdfb",
   "mainIntegrated": "a397bb70764259a081ef286ea420ff178314a543",
@@ -126,8 +126,9 @@
     "exclude": "Old interface screenshot churn, screenshots, PIDs, raw trace/report archives, generated benchmark outputs and binaries remain local.",
     "proprietaryLicenseVerified": true,
     "mergeOrReleaseAuthorized": false,
-    "stagedFiles": 367,
-    "implementationCommit": "08afe91ca8213f31e7bc38bf2d5e94cc4d1edfe9"
+    "stagedFiles": 371,
+    "implementationCommit": "08afe91ca8213f31e7bc38bf2d5e94cc4d1edfe9",
+    "additionalQualificationFiles": 4
   },
   "qualificationLimits": {
     "physicalHardware": "Not operated or qualified.",
@@ -206,7 +207,34 @@
       "files": 47,
       "failedFiles": 0,
       "success": true
-    }
+    },
+    "typechecks": {
+      "main": "passed",
+      "e2e": "passed",
+      "electron": "passed"
+    },
+    "hostedCIFix": {
+      "initialHead": "58d000a0f741947975614cb004135efb2dc84172",
+      "failure": "Installed-project qualification still declared schema 14 while the canonical writer declares schema 15.",
+      "repair": "Current native qualification requires schema 15. Explicit known-upgrade qualification retains schemas 12, 13 and 14 alongside 15. Existing artwork/operation, workspace, job-setup and machine comparisons plus downgrade refusal remain strict.",
+      "regression": "Explicit schema 13/14 retention and migration to the current writer reject operation or machine drift. Schema 16 and malformed/string versions are refused.",
+      "tests": {
+        "passed": 22,
+        "failed": 0,
+        "skipped": 0,
+        "files": 2
+      },
+      "scopedLint": "passed",
+      "formatting": "passed",
+      "installedAppLaunched": false
+    },
+    "pendingAtLatestPush": [
+      "Renderer builds",
+      "34 standard Chrome workflows",
+      "Five production browser workflows",
+      "Fresh benchmark source stamp",
+      "Exact-head hosted CI"
+    ]
   },
   "preCompetitorMergeVerification": {
     "sourceFiles": 8116,
