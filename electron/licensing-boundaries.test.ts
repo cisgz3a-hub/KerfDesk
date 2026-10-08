@@ -211,6 +211,19 @@ describe('licensing custom protocol capability boundary', () => {
     );
     expect(h.activate).toHaveBeenCalledTimes(1);
   });
+  it.each([undefined, null, 1, [], ['purchase'], ['renewal'], { toString: 'purchase' }])(
+    'refuses a non-string checkout operation before commerce: %j',
+    async (operation) => {
+      const h = routes();
+      const checkout = vi.spyOn(h.runtime, 'checkout');
+      const response = await h.handle(
+        request('checkout', {}, { operation, licenseKey: 'test-key' }),
+      );
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({ error: 'invalid_request' });
+      expect(checkout).not.toHaveBeenCalled();
+    },
+  );
   it('routes the recovery actions and no longer offers a launch gate', async () => {
     const h = routes();
     const reset = vi.spyOn(h.runtime, 'resetStore');

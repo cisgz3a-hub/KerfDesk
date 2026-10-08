@@ -23,6 +23,10 @@ type RenewalIdentity = {
 
 const CHECKOUT_PAGE = 'https://kerfdesk.com/buy.html?_ptxn=';
 
+export function isLicenceCheckoutOperation(value: unknown): value is 'purchase' | 'renewal' {
+  return value === 'purchase' || value === 'renewal';
+}
+
 /** A Paddle transaction ID, lower case only, exactly as the licence service accepts it. */
 export function isTransactionId(value: string): boolean {
   return /^txn_[a-z0-9]{26}$/.test(value);
@@ -40,7 +44,7 @@ export function validLicencePayment(value: unknown, sandbox = false): value is L
     !record(value) ||
     typeof value.requestId !== 'string' ||
     !/^[A-Za-z0-9_-]{43}$/.test(value.requestId) ||
-    !['purchase', 'renewal'].includes(String(value.operation)) ||
+    !isLicenceCheckoutOperation(value.operation) ||
     (value.operation === 'renewal' &&
       !validRenewal(value.renewal) &&
       (typeof value.licenseKey !== 'string' ||
@@ -93,6 +97,7 @@ export async function prepareLicenceCheckout(
   openBrowser = true,
   renewal?: RenewalIdentity,
 ): Promise<void> {
+  if (!isLicenceCheckoutOperation(operation)) throw new Error('Checkout operation is invalid.');
   const payment = deps.saved.payment ?? newPayment(operation, licenseKey, renewal);
   // A retry always resumes the same operation and idempotency key.
   await deps.store.write({ ...deps.saved, payment });
