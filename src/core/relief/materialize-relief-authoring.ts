@@ -1,15 +1,18 @@
 import type { ReliefHeightfield } from '../scene/relief/relief-heightfield';
+import type { Vec2 } from '../scene/scene-object';
 import type {
   ReliefAuthoringDocument,
   ReliefComponent,
   ReliefCombineMode,
   ReliefLevel,
+  ReliefVectorMask,
 } from '../scene/relief/relief-authoring';
 import { createReliefHeightfield } from './relief-heightfield-factory';
 import { createComponentSampler } from './relief-authoring-sampling';
 import { reliefAuthoringError } from './relief-authoring-validation';
 import { inverseReliefPoint, reliefBoundaryContains } from './relief-vector-boundary';
 import { applyReliefSculptStrokes } from './relief-sculpt';
+import { reliefVectorFootprintCovered } from './relief-vector-footprint';
 
 export type ReliefAuthoringMaterializationResult =
   | {
@@ -157,6 +160,13 @@ export function combineReliefHeight(
   }
 }
 
+type ComponentSampleLocation = {
+  readonly p: Vec2;
+  readonly local: Vec2;
+  readonly footprint: ReadonlyArray<Vec2>;
+  readonly localFootprint: ReadonlyArray<Vec2>;
+};
+
 function componentGrid(
   doc: ReliefAuthoringDocument,
   component: ReliefComponent,
@@ -170,18 +180,9 @@ function componentGrid(
   for (let y = 0; y < doc.height; y += 1) {
     if (cancelled()) throw new Error('Relief authoring cancelled.');
     for (let x = 0; x < doc.width; x += 1) {
-      const p = {
-        x: ((x + 0.5) * doc.physicalWidthMm) / doc.width,
-        y: ((y + 0.5) * doc.physicalHeightMm) / doc.height,
-      };
-      const local = inverseReliefPoint(p, component.transform);
-      if (
-        (doc.clip !== undefined && !reliefBoundaryContains(doc.clip, p)) ||
-        (level.mask !== undefined && !reliefBoundaryContains(level.mask, p)) ||
-        (component.mask !== undefined && !reliefBoundaryContains(component.mask, local))
-      )
-        continue;
-      const value = sample(local),
+      const location = componentSampleLocation(doc, component, x, y);
+      if (!componentSampleCovered(doc, component, level, location)) continue;
+      const value = sample(location.local),
         i = y * doc.width + x;
       if (!value.included) continue;
       const height = component.baseHeightMm + value.heightMm * component.heightScale;
@@ -192,6 +193,51 @@ function componentGrid(
     }
   }
   return { heights, coverage };
+}
+
+function componentSampleLocation(
+  doc: ReliefAuthoringDocument,
+  component: ReliefComponent,
+  x: number,
+  y: number,
+): ComponentSampleLocation {
+  const p = {
+    x: ((x + 0.5) / doc.width) * doc.physicalWidthMm,
+    y: ((y + 0.5) / doc.height) * doc.physicalHeightMm,
+  };
+  const footprint = doc.outsideMask === 'excluded' ? reliefCellFootprint(doc, x, y) : [];
+  return {
+    p,
+    local: inverseReliefPoint(p, component.transform),
+    footprint,
+    localFootprint: footprint.map((corner) => inverseReliefPoint(corner, component.transform)),
+  };
+}
+
+function componentSampleCovered(
+  doc: ReliefAuthoringDocument,
+  component: ReliefComponent,
+  level: ReliefLevel,
+  location: ComponentSampleLocation,
+): boolean {
+  const { p, local, footprint, localFootprint } = location;
+  if (!maskSampleCovered(doc.clip, doc.outsideMask, p, footprint)) return false;
+  if (!maskSampleCovered(level.mask, doc.outsideMask, p, footprint)) return false;
+  if (!maskSampleCovered(component.mask, doc.outsideMask, local, localFootprint)) return false;
+  if (doc.outsideMask !== 'excluded' || component.source.kind !== 'vector-shape-v1') return true;
+  return reliefVectorFootprintCovered(component.source.boundary, localFootprint);
+}
+
+function maskSampleCovered(
+  mask: ReliefVectorMask | undefined,
+  outsideMask: ReliefAuthoringDocument['outsideMask'],
+  point: Vec2,
+  footprint: ReadonlyArray<Vec2>,
+): boolean {
+  if (mask === undefined) return true;
+  return outsideMask === 'excluded'
+    ? reliefVectorFootprintCovered(mask, footprint)
+    : reliefBoundaryContains(mask, point);
 }
 
 function encodeComposite(
@@ -206,15 +252,18 @@ function encodeComposite(
     for (let x = 0; x < doc.width; x += 1) {
       const i = y * doc.width + x;
       const p = {
-        x: ((x + 0.5) * doc.physicalWidthMm) / doc.width,
-        y: ((y + 0.5) * doc.physicalHeightMm) / doc.height,
+        x: ((x + 0.5) / doc.width) * doc.physicalWidthMm,
+        y: ((y + 0.5) / doc.height) * doc.physicalHeightMm,
       };
-      const inside = documentSampleIncluded(doc, covered[i] ?? 0, p);
-      const height = inside
-        ? (heights[i] ?? 0)
-        : doc.outsideMask === 'stock-top'
-          ? doc.maxDepthMm
-          : 0;
+      const inside = documentSampleIncluded(
+        doc,
+        covered[i] ?? 0,
+        p,
+        doc.outsideMask === 'excluded' && doc.clip !== undefined
+          ? reliefCellFootprint(doc, x, y)
+          : [],
+      );
+      const height = encodedCompositeHeight(doc, heights[i] ?? 0, inside);
       if (inside && (height < 0 || height > doc.maxDepthMm)) clipped += 1;
       const code = Math.round(Math.min(1, Math.max(0, height / doc.maxDepthMm)) * 65535);
       bytes[i * 2] = code & 255;
@@ -222,6 +271,15 @@ function encodeComposite(
       mask[i] = inside ? 255 : 0;
     }
   return { bytes, mask, clipped };
+}
+
+function encodedCompositeHeight(
+  doc: ReliefAuthoringDocument,
+  height: number,
+  inside: boolean,
+): number {
+  if (inside) return height;
+  return doc.outsideMask === 'stock-top' ? doc.maxDepthMm : 0;
 }
 
 export function unchangedImportedReliefField(
@@ -278,9 +336,26 @@ function documentSampleIncluded(
   doc: ReliefAuthoringDocument,
   coverage: number,
   point: { x: number; y: number },
+  footprint: ReadonlyArray<{ x: number; y: number }>,
 ): boolean {
   return (
-    (doc.clip === undefined || reliefBoundaryContains(doc.clip, point)) &&
+    (doc.clip === undefined ||
+      (doc.outsideMask === 'excluded'
+        ? reliefVectorFootprintCovered(doc.clip, footprint)
+        : reliefBoundaryContains(doc.clip, point))) &&
     (doc.outsideMask !== 'excluded' || coverage !== 0)
   );
+}
+
+function reliefCellFootprint(doc: ReliefAuthoringDocument, x: number, y: number) {
+  const x0 = (x / doc.width) * doc.physicalWidthMm,
+    x1 = ((x + 1) / doc.width) * doc.physicalWidthMm,
+    y0 = (y / doc.height) * doc.physicalHeightMm,
+    y1 = ((y + 1) / doc.height) * doc.physicalHeightMm;
+  return [
+    { x: x0, y: y0 },
+    { x: x1, y: y0 },
+    { x: x1, y: y1 },
+    { x: x0, y: y1 },
+  ];
 }

@@ -1,6 +1,10 @@
+import { frameSpatialPlacementBinding } from './frame-spatial-placement-anchor';
+import { createLastScopeProjectionCache } from './frame-spatial-projection-cache';
+import { frameSpatialOutputScene } from './frame-spatial-output-scene';
 import { defaultCncMachiningSetup } from '../../core/scene/cnc-machining-setup';
 import {
   LASER_MACHINE_CONFIG,
+  type OutputScope,
   DEFAULT_CNC_LAYER_SETTINGS,
   machineKindOf,
   type CncLayerSettings,
@@ -12,14 +16,13 @@ import {
 import type { ObjectOperationSettingsOverride } from '../../core/scene/scene-object';
 import type { CncStageRecipe } from '../../core/scene/cnc-stage-recipe';
 import type { CncTwoSidedSetup } from '../../core/scene/cnc-two-sided-setup';
-import type { Scene } from '../../core/scene/scene';
-import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
 import type { DeviceProfile } from '../../core/devices';
+import type { JobPlacementSettings } from '../../core/job';
 import { currentOutputScope, useStore } from '../state';
 import { canvasPlanRetentionKey } from '../state/canvas-motion-plan';
 import { currentPrintCutOutputRegistration } from './print-cut-output';
 
-const spatialProjects = new WeakMap<Project, Project>();
+const spatialProjects = createLastScopeProjectionCache<Project, Project>();
 
 /** Authored coordinates and output bindings, separate from the exact execution
  * key. Newly prepared motion bounds still qualify every Start: feed-dependent
@@ -27,20 +30,53 @@ const spatialProjects = new WeakMap<Project, Project>();
 export function currentFrameSpatialSignature(
   app: ReturnType<typeof useStore.getState> = useStore.getState(),
 ): string {
+  const scope = currentOutputScope(app);
+  const placement = frameSpatialPlacementBinding(app.project, scope, app.jobPlacement);
+  const registration = currentPrintCutOutputRegistration(app.project);
   return canvasPlanRetentionKey(
-    spatialProject(app.project),
-    currentOutputScope(app),
+    spatialProject(
+      app.project,
+      scope,
+      app.jobPlacement,
+      placement?.kind === 'unresolved',
+      placement?.kind === 'known' || placement?.kind === 'selected-output',
+    ),
+    scope,
     app.jobPlacement,
-    currentPrintCutOutputRegistration(app.project),
+    placement?.kind === 'known'
+      ? { printCut: registration ?? null, placementAnchor: placement.anchor }
+      : registration,
   );
 }
 
-function spatialProject(project: Project): Project {
-  const cached = spatialProjects.get(project);
+function spatialProject(
+  project: Project,
+  scope: OutputScope,
+  placement: JobPlacementSettings,
+  retainAllCoordinates: boolean,
+  placementAnchorBound: boolean,
+): Project {
+  const relative = placement.startFrom !== 'absolute';
+  const scopeKey = scope.cutSelectedGraphics
+    ? JSON.stringify({
+        ids: scope.selectedObjectIds,
+        selectionOrigin: scope.useSelectionOrigin,
+        relative,
+        retainAllCoordinates,
+        placementAnchorBound,
+      })
+    : '';
+  const cached = spatialProjects.get(project, scopeKey);
   if (cached !== undefined) return cached;
   const isCnc = machineKindOf(project.machine) === 'cnc';
   const { cncSetup: setup, ...base } = project;
-  const scene = spatialCncSideScene(project);
+  const scene = frameSpatialOutputScene(
+    project,
+    scope,
+    placement,
+    retainAllCoordinates,
+    !placementAnchorBound,
+  );
   const projected = {
     ...base,
     ...(isCnc && setup?.twoSided !== undefined
@@ -59,7 +95,7 @@ function spatialProject(project: Project): Project {
       objects: scene.objects.map(spatialObject),
     },
   };
-  spatialProjects.set(project, projected);
+  spatialProjects.set(project, scopeKey, projected);
   return projected;
 }
 
@@ -75,54 +111,6 @@ function spatialCncSideSetup(side: CncTwoSidedSetup): CncTwoSidedSetup {
     sideBStockOriginMm: sideB ? side.sideBStockOriginMm : { x: 0, y: 0 },
     registration: [],
   };
-}
-
-/** Match the side membership filter without materializing or compiling geometry.
- * Projection targets and live authoring links still supply active coordinates. */
-function spatialCncSideScene(project: Project): Scene {
-  const scene = project.scene;
-  const side = project.machine?.kind === 'cnc' ? project.cncSetup?.twoSided : undefined;
-  if (side === undefined) return scene;
-  const ids = new Set(side.activeSide === 'A' ? side.sideAObjectIds : side.sideBObjectIds);
-  retainSpatialReliefProjections(scene, ids);
-  for (const object of scene.outputDependencies ?? []) ids.add(object.id);
-  retainSpatialReliefLinks(
-    new Map(
-      [...scene.objects, ...(scene.outputDependencies ?? [])].map((object) => [object.id, object]),
-    ),
-    ids,
-  );
-  return {
-    ...scene,
-    objects: scene.objects.filter((object) => ids.has(object.id)),
-    ...(scene.artworkOrder === undefined
-      ? {}
-      : { artworkOrder: scene.artworkOrder.filter((id) => ids.has(id)) }),
-  };
-}
-
-function retainSpatialReliefProjections(scene: Scene, ids: Set<string>): void {
-  for (const layer of scene.layers) {
-    const projection = layer.output ? layer.cnc?.reliefProjection : undefined;
-    if (projection !== undefined) ids.add(projection.reliefObjectId);
-  }
-}
-
-function retainSpatialReliefLinks(
-  objects: ReadonlyMap<string, SceneObject>,
-  ids: Set<string>,
-): void {
-  const pending = [...ids];
-  for (const id of pending) {
-    const object = objects.get(id);
-    if (object?.kind !== 'relief' || object.reliefSource.kind !== 'heightfield-v1') continue;
-    if (!('reliefAuthoring' in object) || object.reliefAuthoring === undefined) continue;
-    for (const linkedId of reliefAuthoringLinkIds(object.reliefAuthoring)) {
-      if (ids.has(linkedId)) continue;
-      ids.add(linkedId);
-      pending.push(linkedId);
-    }
-  }
 }
 
 /** Warning/timing metadata, process scales and idle button configuration do
