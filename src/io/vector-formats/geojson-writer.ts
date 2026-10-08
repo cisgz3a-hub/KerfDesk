@@ -32,7 +32,8 @@
 // contour's line ends where it starts). A bbox member (section 5) gives the
 // written extent.
 
-import { flattenCurveSubpath, type CurveSubpath, type Vec2 } from '../../core/scene';
+import type { CurveSubpath, Vec2 } from '../../core/scene';
+import { flattenArtworkCurve } from '../../core/vector-export/affine-curves';
 import { formatGridIndex } from '../../core/vector-export/decimal-grid';
 import {
   preparePage,
@@ -196,7 +197,7 @@ function lineString(curve: CurveSubpath, page: PreparedPage, tolerance: number):
 }
 
 function flattened(curve: CurveSubpath, tolerance: number): Vec2[] {
-  const result = flattenCurveSubpath(curve, { toleranceMm: tolerance });
+  const result = flattenArtworkCurve(curve, { toleranceMm: tolerance });
   if (result.kind !== 'ok') {
     throw new Error(
       'A contour needs more than ' +

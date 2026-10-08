@@ -16,7 +16,19 @@
 //
 // Pure-core compliant: no clock, no random, no I/O, no DOM.
 
-import type { CurveSubpath, PathSegment, Vec2 } from '../scene/scene-object';
+import type {
+  CurveSubpath,
+  EllipticalArcPathSegment,
+  PathSegment,
+  Vec2,
+} from '../scene/scene-object';
+import { MAX_FLATTENED_CURVE_SEGMENTS } from '../scene/curve-path';
+import {
+  artworkArcEncodingRoundoff,
+  artworkSvgEncodingError,
+  flattenArtworkArc,
+  retainedArtworkArc,
+} from './artwork-parametric-arc';
 import { formatGridIndex, gridIndex, snapToGrid, type DecimalGrid } from './decimal-grid';
 
 type GridPoint = { readonly x: number; readonly y: number };
@@ -39,7 +51,7 @@ export function formatSvgPathData(
   for (const curve of curves) {
     if (curve.segments.length === 0) continue;
     if (grid === null || hasArc(curve)) {
-      writeAbsolute(writer, curve);
+      writeAbsolute(writer, curve, grid);
       cursor = null;
     } else {
       cursor = writeRelative(writer, curve, grid, cursor);
@@ -71,8 +83,9 @@ function quantizeCurve(curve: CurveSubpath, grid: DecimalGrid): CurveSubpath {
   };
 }
 
-function writeAbsolute(writer: PathWriter, curve: CurveSubpath): void {
+function writeAbsolute(writer: PathWriter, curve: CurveSubpath, grid: DecimalGrid | null): void {
   writer.command('M', [curve.start.x, curve.start.y].map(exactNumber));
+  let from = curve.start;
   for (const segment of curve.segments) {
     if (segment.kind === 'line') writer.command('L', pointText(segment.to));
     else if (segment.kind === 'cubic') {
@@ -82,17 +95,51 @@ function writeAbsolute(writer: PathWriter, curve: CurveSubpath): void {
         ...pointText(segment.to),
       ]);
     } else {
-      writer.command('A', [
-        exactNumber(segment.radiusX),
-        exactNumber(segment.radiusY),
-        exactNumber(segment.rotationDeg),
-        segment.largeArc ? '1' : '0',
-        segment.sweep ? '1' : '0',
-        ...pointText(segment.to),
-      ]);
+      writeArc(writer, from, segment, grid);
     }
+    from = segment.to;
   }
   if (curve.closed) writer.close();
+}
+
+function writeArc(
+  writer: PathWriter,
+  from: Vec2,
+  segment: EllipticalArcPathSegment,
+  grid: DecimalGrid | null,
+): void {
+  const retained = retainedArtworkArc(segment);
+  // Arc-containing paths are already absolute/full precision. Keep fallback
+  // chords unsnapped, using the existing half-grid-diagonal displacement bound
+  // entirely for approximation rather than adding a second rounding error.
+  const tolerance =
+    grid === null ? artworkArcEncodingRoundoff(from, segment) : (grid.step * Math.SQRT2) / 2;
+  if (retained !== null && !(artworkSvgEncodingError(from, segment) <= tolerance)) {
+    if (grid === null) {
+      throw new Error(
+        'SVG cannot represent this mapped arc at full precision. Export it in its source coordinate frame.',
+      );
+    }
+    const points = flattenArtworkArc(
+      from,
+      segment.to,
+      retained,
+      tolerance,
+      MAX_FLATTENED_CURVE_SEGMENTS,
+    );
+    if (points === null)
+      throw new Error('An affine arc needs too many SVG vertices at this precision.');
+    for (const point of points) writer.command('L', pointText(point));
+    return;
+  }
+  writer.command('A', [
+    exactNumber(segment.radiusX),
+    exactNumber(segment.radiusY),
+    exactNumber(segment.rotationDeg),
+    segment.largeArc ? '1' : '0',
+    segment.sweep ? '1' : '0',
+    ...pointText(segment.to),
+  ]);
 }
 
 function writeRelative(

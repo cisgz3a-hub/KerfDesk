@@ -15,7 +15,6 @@
 // uses the grid page itself.
 
 import {
-  curveSubpathBounds,
   pathUsesOperation,
   polylineToCurveSubpath,
   type ColoredPath,
@@ -27,7 +26,11 @@ import {
 import { effectiveOperationForObject } from '../../core/scene/effective-operation';
 import { err, ok, type Result } from '../../core/result';
 import type { TracedLayer } from '../../core/trace/batch-trace-svg';
-import { transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
+import { curvesBounds, transformCurveSubpathExact } from '../../core/vector-export/affine-curves';
+import {
+  artworkArcCubics,
+  artworkArcParameters,
+} from '../../core/vector-export/artwork-parametric-arc';
 import {
   DEFAULT_EXPORT_PRECISION_MM,
   decimalGridAtMost,
@@ -36,7 +39,6 @@ import {
   outwardGridIndices,
   type DecimalGrid,
 } from '../../core/vector-export/decimal-grid';
-import { arcToCubics } from '../svg/flatten-curves';
 import { filledCurvesKept } from './collapsed-ring-subtrees';
 import { svgObjectMatrix } from '../svg/export-svg-paths';
 import { paintedPathBounds } from './painted-path-bounds';
@@ -121,7 +123,8 @@ export function artworkExtent(items: ReadonlyArray<VectorPaintItem>): VectorPage
   for (const item of items) {
     for (const curve of item.curves) {
       if (curve.segments.length === 0) continue;
-      const b = curveSubpathBounds(curve);
+      const b = curvesBounds([curve]);
+      if (b === null) return null;
       minX = Math.min(minX, b.minX);
       minY = Math.min(minY, b.minY);
       maxX = Math.max(maxX, b.maxX);
@@ -151,32 +154,21 @@ export function gridCommands(curve: CurveSubpath, page: PreparedPage): GridComma
         c2: page.toGrid(segment.control2),
         p: page.toGrid(segment.to),
       });
-    } else if (from.x === segment.to.x && from.y === segment.to.y) {
-      // Zero-length arc: omitted.
-    } else if (!(segment.radiusX !== 0 && segment.radiusY !== 0)) {
-      commands.push({ op: 'line', p: page.toGrid(segment.to) });
     } else {
-      const cubics = arcToCubics(
-        from,
-        segment.to,
-        Math.abs(segment.radiusX),
-        Math.abs(segment.radiusY),
-        {
-          rx: Math.abs(segment.radiusX),
-          ry: Math.abs(segment.radiusY),
-          xAxisRotationDeg: segment.rotationDeg,
-          largeArc: segment.largeArc,
-          sweep: segment.sweep,
-        },
-      );
-      for (const [index, cubic] of cubics.entries()) {
-        commands.push({
-          op: 'cubic',
-          c1: page.toGrid(cubic.p1),
-          c2: page.toGrid(cubic.p2),
-          // The last piece ends exactly on the segment's endpoint.
-          p: page.toGrid(index === cubics.length - 1 ? segment.to : cubic.p3),
-        });
+      const arc = artworkArcParameters(from, segment);
+      if (arc === null) {
+        if (from.x !== segment.to.x || from.y !== segment.to.y) {
+          commands.push({ op: 'line', p: page.toGrid(segment.to) });
+        }
+      } else {
+        for (const cubic of artworkArcCubics(from, segment.to, arc)) {
+          commands.push({
+            op: 'cubic',
+            c1: page.toGrid(cubic.control1),
+            c2: page.toGrid(cubic.control2),
+            p: page.toGrid(cubic.to),
+          });
+        }
       }
     }
     from = segment.to;
