@@ -291,15 +291,14 @@ function resolveJobOriginOffset(
   // to the BOX, not to whichever layer is output for that run, so the artwork
   // lands inside the burned box instead of at the bed corner. No-op when no jig
   // is present (returns null -> existing placement logic below).
+  if (outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin) {
+    const bounds = selectedOutputPlacementBounds(project);
+    return bounds === null
+      ? ZERO_OFFSET
+      : jobOriginOffsetFromBounds(bounds, jobOrigin, project.device);
+  }
   const boxBounds = registrationBoxBounds(project);
   if (boxBounds !== null) return jobOriginOffsetFromBounds(boxBounds, jobOrigin, project.device);
-
-  if (outputScope.cutSelectedGraphics && !outputScope.useSelectionOrigin) {
-    const fullBounds = fullSceneOutputBounds(project);
-    return fullBounds === null
-      ? ZERO_OFFSET
-      : jobOriginOffsetFromBounds(fullBounds, jobOrigin, project.device);
-  }
   return jobOriginOffset(compiled, jobOrigin, project.device);
 }
 
@@ -316,6 +315,10 @@ export function registrationBoxBounds(project: Project): JobBounds | null {
   return compiled.kind === 'compiled' ? computeJobBounds(compiled.job, project.device) : null;
 }
 
+/** Actual anchor source for selected output using the whole-scene origin. */
+export function selectedOutputPlacementBounds(project: Project): JobBounds | null {
+  return registrationBoxBounds(project) ?? fullSceneOutputBounds(project);
+}
 function fullSceneOutputBounds(project: Project): JobBounds | null {
   const machine = project.machine;
   if (machine === undefined || machine.kind !== 'cnc') {

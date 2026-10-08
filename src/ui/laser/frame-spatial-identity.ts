@@ -1,3 +1,4 @@
+import { frameSpatialPlacementBinding } from './frame-spatial-placement-anchor';
 import { createLastScopeProjectionCache } from './frame-spatial-projection-cache';
 import { frameSpatialOutputScene } from './frame-spatial-output-scene';
 import { defaultCncMachiningSetup } from '../../core/scene/cnc-machining-setup';
@@ -30,11 +31,21 @@ export function currentFrameSpatialSignature(
   app: ReturnType<typeof useStore.getState> = useStore.getState(),
 ): string {
   const scope = currentOutputScope(app);
+  const placement = frameSpatialPlacementBinding(app.project, scope, app.jobPlacement);
+  const registration = currentPrintCutOutputRegistration(app.project);
   return canvasPlanRetentionKey(
-    spatialProject(app.project, scope, app.jobPlacement),
+    spatialProject(
+      app.project,
+      scope,
+      app.jobPlacement,
+      placement?.kind === 'unresolved',
+      placement?.kind === 'known',
+    ),
     scope,
     app.jobPlacement,
-    currentPrintCutOutputRegistration(app.project),
+    placement?.kind === 'known'
+      ? { printCut: registration ?? null, placementAnchor: placement.anchor }
+      : registration,
   );
 }
 
@@ -42,6 +53,8 @@ function spatialProject(
   project: Project,
   scope: OutputScope,
   placement: JobPlacementSettings,
+  retainAllCoordinates: boolean,
+  placementAnchorBound: boolean,
 ): Project {
   const relative = placement.startFrom !== 'absolute';
   const scopeKey = scope.cutSelectedGraphics
@@ -49,13 +62,21 @@ function spatialProject(
         ids: scope.selectedObjectIds,
         selectionOrigin: scope.useSelectionOrigin,
         relative,
+        retainAllCoordinates,
+        placementAnchorBound,
       })
     : '';
   const cached = spatialProjects.get(project, scopeKey);
   if (cached !== undefined) return cached;
   const isCnc = machineKindOf(project.machine) === 'cnc';
   const { cncSetup: setup, ...base } = project;
-  const scene = frameSpatialOutputScene(project, scope, placement);
+  const scene = frameSpatialOutputScene(
+    project,
+    scope,
+    placement,
+    retainAllCoordinates,
+    !placementAnchorBound,
+  );
   const projected = {
     ...base,
     ...(isCnc && setup?.twoSided !== undefined

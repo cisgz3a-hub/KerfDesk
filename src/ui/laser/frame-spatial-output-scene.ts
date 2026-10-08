@@ -1,5 +1,3 @@
-import { registrationBoxBounds } from '../../io/gcode/prepare-output';
-import { cncSideInputScene, cncSideOutputProject } from '../../core/cnc/cnc-two-sided-setup';
 import {
   findRegistrationBoxes,
   sceneObjectUsesOperation,
@@ -16,16 +14,18 @@ export function frameSpatialOutputScene(
   project: Project,
   outputScope: OutputScope,
   placement: JobPlacementSettings,
+  retainAllCoordinates = false,
+  retainPlacementFixtures = true,
 ): Scene {
   const scene = project.scene;
-  const scope = selectedSpatialScope(project, outputScope, placement);
+  const scope = outputScope.cutSelectedGraphics && !retainAllCoordinates ? outputScope : undefined;
   const sideIds = activeSideIds(project);
   if (sideIds === undefined && scope === undefined) return scene;
   const ids = spatialArtworkIds(scene, sideIds, scope);
   retainSpatialReliefProjections(scene, ids);
   for (const object of scene.outputDependencies ?? []) ids.add(object.id);
   retainSpatialImageMasks(scene, ids);
-  retainSpatialRegistrationBoxes(scene, ids, sideIds, placement);
+  if (retainPlacementFixtures) retainSpatialRegistrationBoxes(scene, ids, sideIds, placement);
   retainSpatialReliefLinks(
     new Map(
       [...scene.objects, ...(scene.outputDependencies ?? [])].map((object) => [object.id, object]),
@@ -39,26 +39,6 @@ export function frameSpatialOutputScene(
       ? {}
       : { artworkOrder: scene.artworkOrder.filter((id) => ids.has(id)) }),
   };
-}
-
-function selectedSpatialScope(
-  project: Project,
-  scope: OutputScope,
-  placement: JobPlacementSettings,
-): OutputScope | undefined {
-  if (!scope.cutSelectedGraphics) return undefined;
-  if (placement.startFrom === 'absolute' || scope.useSelectionOrigin) return scope;
-  return hasRegistrationAnchor(project) ? scope : undefined;
-}
-
-function hasRegistrationAnchor(project: Project): boolean {
-  // Match the compiler's registration-anchor precedence. An inactive fixture or
-  // a CNC profile collapsed by its tool cannot supply that anchor.
-  const scene = cncSideInputScene(project, project.scene);
-  return (
-    findRegistrationBoxes(scene).length > 0 &&
-    registrationBoxBounds(cncSideOutputProject(project, scene)) !== null
-  );
 }
 
 function activeSideIds(project: Project): ReadonlySet<string> | undefined {
