@@ -9,6 +9,7 @@ type SelectedWriteStatus = {
   selectedPending: boolean;
   selectedSucceeded: boolean;
   pendingComparisons: number;
+  destinationComparisons: ReadonlyMap<number, SaveDestinationComparison>;
 };
 
 type SelectedProjectWrite = {
@@ -92,6 +93,7 @@ class ProjectSaveWriteCoordinatorState {
       selectedPending: true,
       selectedSucceeded: false,
       pendingComparisons: 0,
+      destinationComparisons: new Map(),
     };
     const selectedSettled = selected.then(
       () => {
@@ -135,6 +137,14 @@ class ProjectSaveWriteCoordinatorState {
       if (!pair) return;
       pendingPair = undefined;
       try {
+        pair.left.status.destinationComparisons = new Map([
+          ...pair.left.status.destinationComparisons,
+          [pair.right.id, result],
+        ]);
+        pair.right.status.destinationComparisons = new Map([
+          ...pair.right.status.destinationComparisons,
+          [pair.left.id, result],
+        ]);
         if (result !== 'different') this.mergeGroups(pair.left, pair.right, result === 'unknown');
       } finally {
         pair.left.status.pendingComparisons -= 1;
@@ -223,6 +233,12 @@ function settledPromise(promise: Promise<unknown>): Promise<void> {
   );
 }
 
+type ReplayResult = {
+  readonly operation: SelectedProjectWrite;
+  readonly index: number;
+};
+type FailedReplay = ReplayResult & { readonly error: unknown };
+
 async function repairCapturedWrites(group: DestinationWriteGroup): Promise<void> {
   // Let successful selected-write owners publish before a repair failure asks
   // that exact handoff to become dirty again.
@@ -232,20 +248,59 @@ async function repairCapturedWrites(group: DestinationWriteGroup): Promise<void>
   const writes = group.hasUnknownDestinations
     ? [...group.members].sort(compareWriteOrder).slice(1)
     : [latest];
+  const failures: FailedReplay[] = [];
+  const restored: ReplayResult[] = [];
+  const notifiedOwners = new Set<number>();
   // The earliest chosen write already ran. Replay the later snapshots in
   // request order: aliases finish newest, distinct files keep their own bytes.
-  for (const operation of writes) {
+  for (const [index, operation] of writes.entries()) {
     if (!isCurrentGroup(group)) return;
     try {
       await operation.target.write(operation.contents);
+      restored.push({ operation, index });
     } catch (error) {
-      if (isCurrentGroup(group) && operation === latest && latest.status.selectedSucceeded) {
-        await reportRestoreFailure(latest, error);
-      }
+      failures.push({ operation, index, error });
+      reportAffectedSaveOwners(group, failures, restored, writes.slice(index + 1), notifiedOwners);
+    }
+  }
+  reportAffectedSaveOwners(group, failures, restored, [], notifiedOwners);
+}
+
+function reportAffectedSaveOwners(
+  group: DestinationWriteGroup,
+  failures: ReadonlyArray<FailedReplay>,
+  restored: ReadonlyArray<ReplayResult>,
+  pending: ReadonlyArray<SelectedProjectWrite>,
+  notifiedOwners: Set<number>,
+): void {
+  // A failed later selection does not replace a successful handoff. A throwing
+  // write may already have changed an unknown alias, so notify each potentially
+  // affected successful owner. Its saved-epoch/document guards decide ownership.
+  for (const owner of group.members) {
+    if (!isCurrentGroup(group)) return;
+    if (!owner.status.selectedSucceeded || notifiedOwners.has(owner.id) || pending.includes(owner))
+      continue;
+    const failure = [...failures]
+      .reverse()
+      .find(
+        (failed) =>
+          owner.status.destinationComparisons.get(failed.operation.id) !== 'different' &&
+          !restored.some(
+            (successful) =>
+              successful.index > failed.index &&
+              (successful.operation === owner ||
+                (owner.status.destinationComparisons.get(successful.operation.id) === 'same' &&
+                  Object.is(successful.operation.contents, owner.contents))),
+          ),
+      );
+    // Owners whose own replay is ahead wait for its result. Already-final owners
+    // are notified promptly, independently of other replays or feedback handlers.
+    if (failure) {
+      notifiedOwners.add(owner.id);
+      void reportRestoreFailure(owner, failure.error);
     }
   }
 }
-
 function compareWriteOrder(left: SelectedProjectWrite, right: SelectedProjectWrite): number {
   return left.requestEpoch - right.requestEpoch || left.id - right.id;
 }
@@ -263,9 +318,9 @@ function latestWrite(operations: ReadonlySet<SelectedProjectWrite>): SelectedPro
   );
 }
 
-async function reportRestoreFailure(latest: SelectedProjectWrite, error: unknown): Promise<void> {
+async function reportRestoreFailure(owner: SelectedProjectWrite, error: unknown): Promise<void> {
   try {
-    await latest.onRestoreFailure?.(error);
+    await owner.onRestoreFailure?.(error);
   } catch {
     // Feedback failure must not reject another Save or poison future repairs.
   }
