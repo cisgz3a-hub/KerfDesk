@@ -1,13 +1,10 @@
-import { mkdirSync } from 'node:fs';
-import { applicationHeader, toolbarCommand } from './fixtures/workspace-ui';
+import { applicationHeader, machineJogAction, toolbarCommand } from './fixtures/workspace-ui';
 import { test, expect } from './fixtures/kerfdesk-test';
-
-const evidence = 'docs/audits/2026-09-21-interface';
 
 test('routine controls stay visible while setup, history, and Learn remain reachable', async ({
   page,
   kerfdesk,
-}) => {
+}, testInfo) => {
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -18,15 +15,20 @@ test('routine controls stay visible while setup, history, and Learn remain reach
   await page.getByRole('tab', { name: 'Machine', exact: true }).click();
   await expect(page.getByLabel('Laser controls', { exact: true })).toBeVisible();
   const rail = page.getByLabel('Laser controls', { exact: true });
-  const setup = rail.locator('summary').filter({ hasText: /^Homing & focus$/ });
-  await expect(rail.getByRole('button', { name: 'Set up homing', exact: true })).toBeHidden();
-  await setup.focus();
+  const homing = machineJogAction(page, 'Set up homing');
+  await expect(homing).toBeVisible();
+  await expect(homing).toBeEnabled();
+  await expect(machineJogAction(page, 'Set up auto-focus')).toBeVisible();
+  await homing.focus();
   await page.keyboard.press('Enter');
-  await expect(rail.getByRole('button', { name: 'Set up homing', exact: true })).toBeVisible();
-  await expect(rail.getByRole('button', { name: 'Set up auto-focus', exact: true })).toBeVisible();
-  await setup.click();
+  const setup = page.getByRole('dialog', { name: 'Machine Setup', exact: true });
+  await expect(setup.getByRole('checkbox', { name: 'Homing enabled', exact: true })).toBeVisible();
+  await setup.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
+  await expect(setup).not.toBeVisible();
+  await expect(homing).toBeFocused();
   const history = rail.locator('summary').filter({ hasText: /^History & recovery$/ });
-  await history.click();
+  await history.focus();
+  await page.keyboard.press('Enter');
   await rail
     .locator('summary')
     .filter({ hasText: /^Execution archive/ })
@@ -40,15 +42,14 @@ test('routine controls stay visible while setup, history, and Learn remain reach
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(learn).toBeFocused();
-  mkdirSync(evidence, { recursive: true });
-  await page.screenshot({ path: `${evidence}/machine-after.png` });
+  await page.screenshot({ path: testInfo.outputPath('machine-after.png') });
   await page.setViewportSize({ width: 640, height: 450 });
   const start = page.getByRole('button', { name: 'Start', exact: true });
   await expect(start).toBeVisible();
   const bounds = await start.boundingBox();
   expect((bounds?.y ?? 450) + (bounds?.height ?? 1)).toBeLessThanOrEqual(450);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(641);
-  await page.screenshot({ path: `${evidence}/machine-compact.png` });
+  await page.screenshot({ path: testInfo.outputPath('machine-compact.png') });
   expect((await kerfdesk.events()).filter((event) => event.kind === 'serial-write')).toEqual([]);
   expect(errors).toEqual([]);
 });
@@ -56,7 +57,7 @@ test('routine controls stay visible while setup, history, and Learn remain reach
 test('Done clears a simulated completed run while keeping the project and job controls', async ({
   page,
   kerfdesk,
-}) => {
+}, testInfo) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1366, height: 768 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
@@ -73,8 +74,7 @@ test('Done clears a simulated completed run while keeping the project and job co
     return JSON.stringify(useStore.getState().project);
   });
   await expect(page.getByRole('region', { name: 'Completed job', exact: true })).toBeVisible();
-  mkdirSync(evidence, { recursive: true });
-  await page.screenshot({ path: `${evidence}/completed-simulated-laptop.png` });
+  await page.screenshot({ path: testInfo.outputPath('completed-simulated-laptop.png') });
   await page.setViewportSize({ width: 640, height: 450 });
   const done = page.getByRole('button', { name: 'Done', exact: true });
   const start = page.getByRole('button', { name: 'Start', exact: true });
@@ -88,7 +88,7 @@ test('Done clears a simulated completed run while keeping the project and job co
   const startBounds = await start.boundingBox();
   expect((doneBounds?.y ?? 450) + (doneBounds?.height ?? 1)).toBeLessThanOrEqual(450);
   expect((startBounds?.y ?? 450) + (startBounds?.height ?? 1)).toBeLessThanOrEqual(450);
-  await page.screenshot({ path: `${evidence}/completed-simulated-compact.png` });
+  await page.screenshot({ path: testInfo.outputPath('completed-simulated-compact.png') });
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThanOrEqual(451);
   const eventsBefore = await kerfdesk.events();
   await done.click();

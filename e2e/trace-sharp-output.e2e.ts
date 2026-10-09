@@ -6,6 +6,7 @@ import type { Project } from '../src/core/scene';
 import { expect, test } from './fixtures/kerfdesk-test';
 import {
   connectMachineAndDismissFirstSetup,
+  machineJogAction,
   selectWorkspacePanel,
   toolbarCommand,
 } from './fixtures/workspace-ui';
@@ -146,12 +147,9 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
   // Home establishes machine position without erasing a retained G54/G92.
   // This used to refuse Absolute placement before starting the compiler.
   await kerfdesk.emitSerialLine('<Idle|MPos:0,0,0|WCO:200.398,170.323,0|FS:0,0>');
-  await page
-    .locator('summary')
-    .filter({ hasText: /^Homing & focus$/ })
-    .click();
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled({
+  const home = machineJogAction(page, 'Home');
+  await home.click();
+  await expect(home).toBeEnabled({
     timeout: 15_000,
   });
   record('homed-with-retained-offset');

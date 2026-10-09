@@ -7,7 +7,7 @@
 // keys while it is mounted: PageUp/PageDown for Z focus, and LightBurn's XY
 // keys (ADR-493), which send the same step vector as the matching arrow.
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import {
   jogAxisSignsForOrigin,
   machineBoundsForDevice,
@@ -36,7 +36,12 @@ import { useZeroZAction } from './use-zero-z-action';
 
 const FOCUS_FEED_MM_PER_MIN = 600;
 
-export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Element {
+type Props = {
+  readonly disabled: boolean;
+  readonly machineActions?: ReactNode;
+};
+
+export function JogPad({ disabled, machineActions }: Props): JSX.Element {
   const [focusStep, setFocusStep] = useState<number>(1);
   const step = useJogControlPreferences((state) => state.stepMm);
   const setStep = useJogControlPreferences((state) => state.setStepMm);
@@ -94,7 +99,11 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
         onStep={setStep}
         onFeed={setSelectedFeed}
       />
-      <div className="lf-jog-controls" style={jogRowStyle}>
+      <JogControlsLayout
+        showManualAir={showManualAir}
+        machineKind={machineKind}
+        machineActions={machineActions}
+      >
         <JogArrows
           disabled={disabled}
           stepMm={step}
@@ -105,9 +114,7 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
           onJog={sendVector}
           onCancel={cancelContinuousJog}
         />
-        {showManualAir ? <JogPadAirAssist /> : null}
-        <MomentaryFireControl />
-      </div>
+      </JogControlsLayout>
       <FocusJogControls
         device={device}
         machineKind={machineKind}
@@ -119,6 +126,45 @@ export function JogPad({ disabled }: { readonly disabled: boolean }): JSX.Elemen
       />
     </div>
   );
+}
+
+function JogControlsLayout(props: {
+  readonly showManualAir: boolean;
+  readonly machineKind: 'laser' | 'cnc';
+  readonly machineActions: ReactNode;
+  readonly children: ReactNode;
+}): JSX.Element {
+  const integrated = props.machineActions !== undefined;
+  return (
+    <div
+      className={`lf-jog-controls${integrated ? ' lf-jog-controls--machine-actions' : ''}`}
+      style={
+        integrated
+          ? {
+              ...jogRowStyle,
+              gridTemplateAreas: machineActionAreas(props.showManualAir, props.machineKind),
+              rowGap: 4,
+            }
+          : jogRowStyle
+      }
+    >
+      {props.children}
+      {props.showManualAir ? <JogPadAirAssist compact={integrated} /> : null}
+      {props.machineActions}
+      <MomentaryFireControl />
+    </div>
+  );
+}
+
+function machineActionAreas(showManualAir: boolean, machineKind: 'laser' | 'cnc'): string {
+  return [
+    ...(showManualAir ? ['"arrows air"'] : []),
+    '"arrows home"',
+    ...(machineKind === 'laser' ? ['"arrows autofocus"'] : []),
+    '"arrows origin"',
+    '"fire fire"',
+    '"warning warning"',
+  ].join(' ');
 }
 
 // The head position only aims a continuous jog. A disabled pad (a job, Frame or
