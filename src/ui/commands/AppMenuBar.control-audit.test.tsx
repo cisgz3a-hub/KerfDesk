@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useArtworkCreationStore } from '../layers/artwork-creation-store';
 import { useTutorialStore } from '../tutorials/tutorial-store';
 import { AppMenuBar } from './AppMenuBar';
 import { buildAppCommands } from './command-registry';
@@ -8,6 +9,7 @@ import { baseCtx } from './command-registry-test-helpers';
 import type { AppCommandContext, CommandId } from './command-types';
 
 type Outcome = {
+  readonly creation?: 'sketch' | 'part' | 'relief';
   readonly callback?: keyof AppCommandContext;
   readonly args?: ReadonlyArray<string | number>;
   readonly guard?: string;
@@ -59,6 +61,9 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'edit.delete-duplicates': { callback: 'deleteDuplicates' },
   'edit.clear-selection': { callback: 'clearSelection' },
   'edit.settings': { callback: 'openSettings' },
+  'tools.constrained-sketch': { creation: 'sketch' },
+  'tools.parametric-part': { creation: 'part' },
+  'tools.editable-relief': { creation: 'relief' },
   'tools.measure': { callback: 'measureTool' },
   'tools.add-text': { callback: 'addText' },
   'tools.registration-jig': { callback: 'toggleRegistrationPanel' },
@@ -197,6 +202,7 @@ beforeEach(() => {
   document.body.appendChild(host);
   root = createRoot(host);
   useTutorialStore.setState({ isOpen: false, tutorialId: null });
+  useArtworkCreationStore.getState().close();
 });
 
 afterEach(async () => {
@@ -216,6 +222,7 @@ function availableContext(id: CommandId): AppCommandContext {
   return baseCtx({
     ...eligibility,
     connected: id !== 'laser.connect',
+    machineKind: id === 'tools.editable-relief' ? 'cnc' : 'laser',
     licensing: true,
     printAndCutFeatureEnabled: true,
     printAndCutProfileSupported: true,
@@ -284,6 +291,7 @@ describe('every registered application menu action', () => {
         expect(button.disabled).toBe(false);
         expect(host.querySelector('details[open]')).toBeNull();
       }
+      assertCreationKind(outcome);
       if (outcome.callback !== undefined) {
         expect(context[outcome.callback]).toHaveBeenCalledExactlyOnceWith(...(outcome.args ?? []));
       }
@@ -306,3 +314,7 @@ describe('every registered application menu action', () => {
     },
   );
 });
+
+function assertCreationKind(outcome: Outcome): void {
+  expect(useArtworkCreationStore.getState().kind).toBe(outcome.creation ?? null);
+}

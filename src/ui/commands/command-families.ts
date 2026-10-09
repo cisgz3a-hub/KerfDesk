@@ -14,6 +14,7 @@ import { windowPanelCommands } from './window-panel-commands';
 import { rotarySetupCommand } from './rotary-command-family';
 import { labsCommand } from './labs-command-family';
 import { printAndCutCommand } from './print-cut-command-family';
+import { artworkCreationCommands } from './artwork-creation-commands';
 import { useAiDialogStore } from '../ai/ai-dialog-store';
 
 export { fileCommands } from './file-command-family';
@@ -21,6 +22,7 @@ export { connectionHelpCommand, helpCommand, safetyHelpCommand } from './help-co
 
 export function toolsCommands(ctx: AppCommandContext): ReadonlyArray<AppCommand> {
   return [
+    ...artworkCreationCommands(ctx.machineKind),
     measureCommand(ctx),
     canvasTextCommand(ctx),
     registrationJigCommand(ctx),

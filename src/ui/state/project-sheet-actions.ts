@@ -60,15 +60,8 @@ export function projectSheetActions(set: Set, get: () => AppState): ProjectSheet
     },
     renameProjectSheet: (id, name) =>
       set((state) => {
-        const book = state.project.sheetBook;
-        if (book === undefined || name.trim() === '' || name.length > 200) return {};
-        const sheetBook = {
-          ...book,
-          activeName: book.activeId === id ? name.trim() : book.activeName,
-          inactive: book.inactive.map((sheet) =>
-            sheet.id === id ? { ...sheet, name: name.trim() } : sheet,
-          ),
-        };
+        const sheetBook = renamedSheetBook(state.project.sheetBook, id, name);
+        if (sheetBook === null) return {};
         return {
           project: { ...state.project, sheetBook },
           undoStack: pushUndo(state.project, state.undoStack, 'Rename sheet'),
@@ -157,5 +150,33 @@ function blankSheet(project: Project): Project {
       : { parkedCncMachine: project.parkedCncMachine }),
     ...(project.embeddedFonts === undefined ? {} : { embeddedFonts: project.embeddedFonts }),
     ...(project.variables === undefined ? {} : { variables: project.variables }),
+  };
+}
+
+function renamedSheetBook(
+  existing: ProjectSheetBook | undefined,
+  id: string,
+  name: string,
+): ProjectSheetBook | null {
+  const trimmed = name.trim();
+  if (trimmed === '' || name.length > 200) return null;
+  let book = existing;
+  let targetId = id;
+  if (book === undefined) {
+    if (id !== 'current' || trimmed === 'Sheet 1') return null;
+    book = { activeId: crypto.randomUUID(), activeName: 'Sheet 1', inactive: [] };
+    targetId = book.activeId;
+  }
+  const currentName =
+    targetId === book.activeId
+      ? book.activeName
+      : book.inactive.find((sheet) => sheet.id === targetId)?.name;
+  if (currentName === undefined || currentName === trimmed) return null;
+  return {
+    ...book,
+    activeName: book.activeId === targetId ? trimmed : book.activeName,
+    inactive: book.inactive.map((sheet) =>
+      sheet.id === targetId ? { ...sheet, name: trimmed } : sheet,
+    ),
   };
 }

@@ -89,3 +89,123 @@ describe('reachable sketch review', () => {
     expect(useStore.getState().undoStack).toEqual([initial]);
   });
 });
+
+describe('sketch creation workflows', () => {
+  it('creates and retains a user-sized circle rather than forcing the bracket template', async () => {
+    await act(async () => root.render(<ConstrainedSketchControls />));
+    await click('Create constrained sketch…');
+    await field('Starting geometry', 'circle');
+    const diameter = host.querySelector<HTMLInputElement>(
+      'input[aria-label="diameter value or expression"]',
+    );
+    if (diameter === null) throw new Error('Missing diameter');
+    await act(async () => {
+      diameter.value = '24';
+      Simulate.change(diameter);
+    });
+    await click('Review solved geometry');
+    expect(host.textContent).toContain('24.000 × 24.000 mm');
+    await click('Apply reviewed sketch');
+    const object = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    expect(object.paths).toHaveLength(1);
+    expect(object.constrainedSketch?.circles).toHaveLength(1);
+    expect(object.bounds.maxX - object.bounds.minX).toBeCloseTo(24, 5);
+  });
+  it('creates custom geometry and invalidates the reviewed Apply when geometry changes', async () => {
+    await act(async () => root.render(<ConstrainedSketchControls />));
+    await click('Create constrained sketch…');
+    await field('Starting geometry', 'custom');
+    await click('Add geometry');
+    await click('Review solved geometry');
+    expect(host.textContent).toContain('20.000 × 10.000 mm');
+    expect(host.querySelector('svg[aria-label="Solved sketch outline"]')).not.toBeNull();
+    await field('Geometry type', 'circle');
+    await click('Add geometry');
+    expect(
+      Array.from(host.querySelectorAll('button')).some(
+        (button) => button.textContent === 'Apply reviewed sketch',
+      ),
+    ).toBe(false);
+    await click('Review solved geometry');
+    await click('Apply reviewed sketch');
+    const object = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    expect(object.constrainedSketch?.profiles).toHaveLength(1);
+    expect(object.constrainedSketch?.circles).toHaveLength(1);
+    expect(object.paths).toHaveLength(2);
+  });
+  it('ignores a hidden rectangle height when adding a circle', async () => {
+    await act(async () => root.render(<ConstrainedSketchControls />));
+    await click('Create constrained sketch…');
+    await field('Starting geometry', 'custom');
+    await field('Height (mm)', '');
+    await field('Geometry type', 'circle');
+    await click('Add geometry');
+    await click('Review solved geometry');
+    expect(host.textContent).toContain('20.000 × 20.000 mm');
+    await click('Apply reviewed sketch');
+    const object = useStore.getState().project.scene.objects[0] as ImportedSvg;
+    expect(object.constrainedSketch?.circles).toHaveLength(1);
+  });
+  it('adds unique parameter names after deleting a dimension', async () => {
+    await act(async () => root.render(<ConstrainedSketchControls />));
+    await click('Create constrained sketch…');
+    await click('Add dimension');
+    await click('Add dimension');
+    await click('Remove dimension_1');
+    await click('Add dimension');
+    await click('Review solved geometry');
+    expect(host.querySelector('svg[aria-label="Solved sketch outline"]')).not.toBeNull();
+    await click('Apply reviewed sketch');
+    const params =
+      (useStore.getState().project.scene.objects[0] as ImportedSvg).constrainedSketch?.parameters ??
+      [];
+    expect(new Set(params.map((p) => p.name)).size).toBe(params.length);
+  });
+});
+
+describe('sketch editor ownership', () => {
+  it('closes an old draft when its document is replaced with matching artwork IDs', async () => {
+    await act(async () => root.render(<ConstrainedSketchControls />));
+    await click('Create constrained sketch…');
+    await click('Review solved geometry');
+    await click('Apply reviewed sketch');
+    const original = useStore.getState().project;
+    const object = original.scene.objects[0] as ImportedSvg;
+    if (object.constrainedSketch === undefined) throw new Error('Missing retained sketch');
+    await act(async () => {
+      useStore.setState({ selectedObjectId: object.id });
+      root.render(<ConstrainedSketchControls mode="edit" />);
+    });
+    await click('Edit constrained sketch…');
+    const replacement = {
+      ...original,
+      scene: {
+        ...original.scene,
+        objects: [
+          {
+            ...object,
+            constrainedSketch: {
+              ...object.constrainedSketch,
+              parameters: object.constrainedSketch.parameters.map((parameter) =>
+                parameter.name === 'width' ? { ...parameter, value: 91 } : parameter,
+              ),
+            },
+          },
+        ],
+      },
+    };
+    await act(async () => {
+      useStore.getState().setProject(replacement);
+    });
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(useStore.getState().project).toBe(replacement);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+    await act(async () => {
+      useStore.setState({ selectedObjectId: object.id });
+    });
+    await click('Edit constrained sketch…');
+    expect(
+      host.querySelector<HTMLInputElement>('input[aria-label="width value or expression"]')?.value,
+    ).toBe('91');
+  });
+});

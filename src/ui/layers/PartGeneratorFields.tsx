@@ -33,27 +33,32 @@ export function PartGeneratorFields(props: {
           onChange={(event) => props.onChange({ ...definition, name: event.currentTarget.value })}
         />
       </label>
-      {dimensionFields(definition).map((field) => (
-        <label key={field.key} style={{ display: 'block' }}>
-          {field.label}{' '}
-          <input
-            title={field.label}
-            type="number"
-            min={field.count ? 1 : 0.001}
-            max={field.count ? 32 : 100000}
-            step={field.count ? 1 : 'any'}
-            value={Number.isFinite(field.value) ? field.value : ''}
-            onChange={(event) =>
-              props.onChange({
-                ...definition,
-                [field.key]:
-                  event.currentTarget.value === '' ? NaN : Number(event.currentTarget.value),
-              })
-            }
-          />
-        </label>
-      ))}
-      <p>
+      <div className="lf-authoring-dimensions">
+        {dimensionFields(definition).map((field) => (
+          <label key={field.key}>
+            {field.label}{' '}
+            <input
+              title={field.label}
+              type="number"
+              min={field.count ? 1 : 0.001}
+              max={field.count ? 32 : 100000}
+              step={field.count ? 1 : 'any'}
+              value={Number.isFinite(field.value) ? field.value : ''}
+              onChange={(event) =>
+                props.onChange({
+                  ...definition,
+                  [field.key]:
+                    event.currentTarget.value === '' ? NaN : Number(event.currentTarget.value),
+                })
+              }
+            />
+          </label>
+        ))}
+      </div>
+      {definition.kind === 'hole-grid' || definition.kind === 'fixture' ? (
+        <p className="lf-authoring-hint">A single row or column centres its holes on that axis.</p>
+      ) : null}
+      <p className="lf-authoring-hint">
         Hole grids contain at most 512 holes. Holes must fit inside the boundary without touching or
         overlapping.
       </p>

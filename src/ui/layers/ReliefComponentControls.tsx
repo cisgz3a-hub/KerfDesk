@@ -157,37 +157,42 @@ export function ReliefComponentControls(props: {
             : 'Scalar rail source and positioned profiles retained.'}
         </p>
       )}
-      {(['x', 'y', 'scaleX', 'scaleY', 'rotationDeg'] as const).map((key) => (
-        <NumberControl
-          key={key}
-          label={`Component ${key}`}
-          value={c.transform[key]}
-          commit={(value) => props.onPatch({ transform: { ...c.transform, [key]: value } })}
-        />
-      ))}
-      <label>
-        Linked clip{' '}
-        <select
-          title="Clip this component to a live linked closed-vector boundary"
-          value={c.mask?.linkedObjectId ?? ''}
-          aria-label="Relief component linked clip"
-          onChange={(e) => {
-            const object = props.vectors.find((v) => v.id === e.target.value);
-            props.onClip(
-              object === undefined
-                ? null
-                : vectorMaskForRelief(object, props.reliefTransform, c.transform),
-            );
-          }}
-        >
-          <option value="">No linked clip</option>
-          {props.vectors.map((v) => (
-            <option key={v.id} value={v.id}>
-              {v.name ?? v.id}
-            </option>
-          ))}
-        </select>
-      </label>
+      <details className="lf-relief-advanced">
+        <summary title="Adjust this component's position, scale, rotation and linked clipping shape">
+          Component placement and clip
+        </summary>
+        {(['x', 'y', 'scaleX', 'scaleY', 'rotationDeg'] as const).map((key) => (
+          <NumberControl
+            key={key}
+            label={`Component ${key}`}
+            value={c.transform[key]}
+            commit={(value) => props.onPatch({ transform: { ...c.transform, [key]: value } })}
+          />
+        ))}
+        <label>
+          Linked clip{' '}
+          <select
+            title="Clip this component to a live linked closed-vector boundary"
+            value={c.mask?.linkedObjectId ?? ''}
+            aria-label="Relief component linked clip"
+            onChange={(e) => {
+              const object = props.vectors.find((v) => v.id === e.target.value);
+              props.onClip(
+                object === undefined
+                  ? null
+                  : vectorMaskForRelief(object, props.reliefTransform, c.transform),
+              );
+            }}
+          >
+            <option value="">No linked clip</option>
+            {props.vectors.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name ?? v.id}
+              </option>
+            ))}
+          </select>
+        </label>
+      </details>
     </fieldset>
   );
 }
@@ -198,7 +203,7 @@ export function NumberControl(props: {
   readonly commit: (value: number) => void;
 }): JSX.Element {
   return (
-    <label style={{ display: 'block', margin: '6px 0' }}>
+    <label className="lf-relief-number-control">
       {props.label}{' '}
       <input
         title={props.label}
@@ -207,11 +212,22 @@ export function NumberControl(props: {
         step="any"
         defaultValue={props.value}
         aria-label={props.label}
-        onBlur={(e) => {
-          const value = Number(e.target.value);
-          if (Number.isFinite(value) && value !== props.value) props.commit(value);
+        onBlur={(event) => {
+          const raw = event.currentTarget.value.trim();
+          const value = Number(raw);
+          event.currentTarget.value = String(props.value);
+          if (raw !== '' && Number.isFinite(value) && value !== props.value) props.commit(value);
         }}
-        style={{ width: 90 }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+          if (event.key === 'Escape') {
+            event.currentTarget.value = String(props.value);
+            event.stopPropagation();
+          }
+        }}
       />
     </label>
   );
