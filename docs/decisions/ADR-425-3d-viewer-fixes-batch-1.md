@@ -110,16 +110,19 @@ pixel and the XY plane's projected angle, returning to its normal opacity as zoo
 Flat toolpath strokes share one transparent draw queue without writing depth against each other:
 faint future paths, travel, completed cuts, then the active playback casing and core. Their screen-space
 widths and depth slopes therefore cannot hide an active retrace or crossing, even at grazing angles.
-All still depth-test against scene geometry, with a small work-plane bias. Nonplanar paths retain
-their existing depth writes and occlusion. In a mixed-Z program, exact constant-Z strokes compare
-their XY plane at the raster sample, independently of ribbon width, direction and shortened playback
-endpoints. Completed, active, faint future and native travel strokes use that same depth definition.
-A later parking move or an unrelated earlier depth change therefore cannot obscure a coplanar retrace.
-Different-Z planes still occlude according to geometric depth; sloping strokes retain their original
-fragment depth. The per-draw plane transform and actual framebuffer viewport also cover pixel ratio
-and the cropped picking target. Native travel needs two one-byte eligibility flags per move, shared
-by its visible, ghost and ID geometry; it adds no position copy. Foreground aids remain above planar strokes: hover and
-measurement highlights, Studio origin arrows and dot, then the red live-position marker. These
+All still depth-test against scene geometry, with a small work-plane bias. Nonplanar completed cutting
+strokes and the active core remain opaque and write depth against scene geometry; the active casing
+writes none. Each nonvertical stored source stroke compares its physical least-slope XY plane at the
+raster sample, independently of ribbon width, direction and shortened playback endpoints. Completed,
+active, faint future and native travel strokes share that definition; vertical and edge-on strokes
+retain raster depth. Reversed endpoints and active prefixes keep the full stored source plane through
+byte-identical packed normal, high/low offset and canonical-origin descriptors, with invariant shader outputs. The shader evaluates the
+plane using a split camera-relative origin, the draw's normal matrix and inverse projection. The actual
+framebuffer viewport accounts for pixel ratio and the cropped picking target. Rendered qualification
+requires separate evidence for the camera and backend cases exercised. Descriptors occupy 36 bytes per
+fat source row or 72 bytes per native pair, shared by visible, ghost and ID geometry. Original position
+arrays and source mapping stay unchanged. Foreground aids remain above planar
+strokes: hover and measurement highlights, Studio origin arrows and dot, then the red live-position marker. These
 opaque-colour overlays use the same ordered queue without blending or depth writes; the simulated
 head and direction arrows retain physical depth testing. Every segment
 and its source mapping remains available to playback and picking. Geometry, emitted output and controller
