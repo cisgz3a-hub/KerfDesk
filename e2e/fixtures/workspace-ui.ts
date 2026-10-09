@@ -25,7 +25,7 @@ export function machineJogAction(
   name: 'Home' | 'Set up homing' | 'Auto-focus' | 'Set up auto-focus' | 'Set origin here',
 ): Locator {
   return page
-    .getByRole('region', { name: 'Jog and machine status', exact: true })
+    .getByRole('region', { name: 'Jog and positioning', exact: true })
     .getByRole('button', { name, exact: true });
 }
 

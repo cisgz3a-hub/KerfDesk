@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { JogAxisSigns, MachineBounds } from '../../core/devices';
 import type { Vec2 } from '../../core/scene';
 import {
@@ -25,6 +26,7 @@ const DIRECTIONS: ReadonlyArray<{
 ];
 
 export function JogArrowGrid(props: {
+  readonly centerAction?: ReactNode;
   readonly disabled: boolean;
   readonly stepMm: number;
   readonly feed: number;
@@ -39,13 +41,17 @@ export function JogArrowGrid(props: {
   readonly onCancel: () => void;
 }): JSX.Element {
   return (
-    <div style={gridStyle}>
+    <div className="lf-jog-arrow-grid" style={gridStyle}>
       {DIRECTIONS.slice(0, 4).map((item) => (
         <JogArrowButton key={item.glyph} {...item} {...props} />
       ))}
-      <span style={centerStyle} aria-hidden="true">
-        ·
-      </span>
+      <div
+        className="lf-jog-center"
+        style={centerStyle}
+        aria-hidden={props.centerAction === undefined ? true : undefined}
+      >
+        {props.centerAction ?? '·'}
+      </div>
       {DIRECTIONS.slice(4).map((item) => (
         <JogArrowButton key={item.glyph} {...item} {...props} />
       ))}

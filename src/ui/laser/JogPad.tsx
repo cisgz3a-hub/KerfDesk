@@ -38,10 +38,11 @@ const FOCUS_FEED_MM_PER_MIN = 600;
 
 type Props = {
   readonly disabled: boolean;
+  readonly machineHome?: ReactNode;
   readonly machineActions?: ReactNode;
 };
 
-export function JogPad({ disabled, machineActions }: Props): JSX.Element {
+export function JogPad({ disabled, machineHome, machineActions }: Props): JSX.Element {
   const [focusStep, setFocusStep] = useState<number>(1);
   const step = useJogControlPreferences((state) => state.stepMm);
   const setStep = useJogControlPreferences((state) => state.setStepMm);
@@ -88,23 +89,14 @@ export function JogPad({ disabled, machineActions }: Props): JSX.Element {
 
   return (
     <div className="lf-jog-panel" style={containerStyle}>
-      <div className="lf-machine-section-heading">
-        <span>Position the head</span>
-      </div>
-      <JogSettingsRow
-        disabled={disabled}
-        step={step}
-        feed={feed}
-        maxFeed={maxFeed}
-        onStep={setStep}
-        onFeed={setSelectedFeed}
-      />
+      <div className="lf-machine-section-heading">Position the head</div>
       <JogControlsLayout
         showManualAir={showManualAir}
         machineKind={machineKind}
         machineActions={machineActions}
       >
         <JogArrows
+          centerAction={machineHome}
           disabled={disabled}
           stepMm={step}
           feed={feed}
@@ -115,6 +107,14 @@ export function JogPad({ disabled, machineActions }: Props): JSX.Element {
           onCancel={cancelContinuousJog}
         />
       </JogControlsLayout>
+      <JogSettingsRow
+        disabled={disabled}
+        step={step}
+        feed={feed}
+        maxFeed={maxFeed}
+        onStep={setStep}
+        onFeed={setSelectedFeed}
+      />
       <FocusJogControls
         device={device}
         machineKind={machineKind}
@@ -159,7 +159,6 @@ function JogControlsLayout(props: {
 function machineActionAreas(showManualAir: boolean, machineKind: 'laser' | 'cnc'): string {
   return [
     ...(showManualAir ? ['"arrows air"'] : []),
-    '"arrows home"',
     ...(machineKind === 'laser' ? ['"arrows autofocus"'] : []),
     '"arrows origin"',
     '"fire fire"',
