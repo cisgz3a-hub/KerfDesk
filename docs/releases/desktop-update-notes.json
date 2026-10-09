@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "2cd5600ac519fadd7095a4367bbd57db1efef70d",
+  "sinceSourceSha": "e34ad795e1e6d8dad256d106e41e9b3a8f335331",
   "highlights": [
-    "Create and revise reliefs with editable components, vector masks, sculpting and rail profiles. CNC preview uses the revised surface.",
-    "Save CNC setups and cutting presets, preview machining-template changes, plan quantities across sheets and export setup documents.",
-    "Edit constrained sketches and parametric parts, prepare two-sided CNC work, and review tapered inlays, predicted remaining stock and tool-reach warnings.",
-    "Dense laser G-code previews use finer cutting lines and less prominent travel lines. Laser job previews start with travel hidden, and active playback strokes remain visible over flat cuts.",
-    "SVG imports follow declared sizes, percentages and clipping; new KerfDesk artwork exports retain scene placement. Cut planning preserves holes and islands across different artwork settings.",
-    "Find omitted open contours in Job Review and select affected artwork for repair. Controller incidents remain available during the session and in support reports."
+    "Repeated Save and Save As requests to the same file through different paths preserve the newest captured document.",
+    "CNC relief masks respect whole cell footprints, varying-width rail profiles stay aligned and tapered inlays preserve overlapping text joins. Sketches retain diagonals and withhold results that cannot reopen.",
+    "Selected CNC output ignores unused projection dependencies and retains valid Frame evidence after unrelated edits.",
+    "Artwork exports preserve thin and flattened curves under scaling, rotation and mirroring, within the requested precision of supported vector formats.",
+    "Licence checkout rejects malformed requests before saving payment intent. Desktop Phone connections bound complete reply frames and report oversize responses cleanly.",
+    "First Connect opens Machine Setup for an unconfigured machine. Desktop upgrade checks verify saved CNC setups and optimisation settings against the installed writer. Build tools include available security patches."
   ]
 }
