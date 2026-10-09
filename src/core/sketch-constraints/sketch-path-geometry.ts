@@ -5,9 +5,15 @@ import { sketchRequired } from './sketch-indexed';
 export function sketchUnprofiledLines(sketch: ConstrainedSketch2d): ConstrainedSketch2d['lines'] {
   return sketch.lines.filter(
     (line) =>
-      !sketch.profiles.some(
-        (profile) =>
-          profile.pointIds.includes(line.first) && profile.pointIds.includes(line.second),
+      !sketch.profiles.some((profile) =>
+        profile.pointIds.some((first, index) => {
+          const second =
+            profile.pointIds[index + 1] ?? (profile.closed ? profile.pointIds[0] : undefined);
+          return (
+            (first === line.first && second === line.second) ||
+            (first === line.second && second === line.first)
+          );
+        }),
       ),
   );
 }

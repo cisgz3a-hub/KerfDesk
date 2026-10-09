@@ -1,4 +1,23 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
+
+export async function connectMachineThroughToolbar(page: Page): Promise<void> {
+  await page
+    .getByRole('region', { name: 'Machine toolbar', exact: true })
+    .getByRole('button', { name: 'Connect', exact: true })
+    .click();
+}
+
+/** Transport workflows cancel the first setup offer through the ordinary UI. */
+export async function connectMachineAndDismissFirstSetup(page: Page): Promise<void> {
+  await connectMachineThroughToolbar(page);
+  const setup = page.getByRole('dialog', { name: 'Machine Setup', exact: true });
+  // Explicit Connect opens this synchronously for an unconfigured profile.
+  // An already configured profile can connect without an offer to dismiss.
+  if (await setup.isVisible()) {
+    await setup.getByRole('button', { name: 'Cancel without saving', exact: true }).click();
+    await expect(setup).not.toBeVisible();
+  }
+}
 
 /** Occasional setup actions now live behind a named disclosure in the Machine panel. */
 export async function expandMachineUtilities(page: Page): Promise<void> {

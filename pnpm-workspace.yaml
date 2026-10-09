@@ -106,7 +106,14 @@ overrides:
   # GHSA-qw65-cvwx-89v3, GHSA-58mr-gqgx-xq4g and GHSA-hrr3-gc8f-f4qj: keep AJV's 3.x API
   # while rejecting malformed authorities in the release build toolchain.
   fast-uri@>=3.0.0 <3.1.8: 3.1.8
-  sharp@<0.35.4: 0.35.4
+  # October 2026 toolchain advisories: preserve existing APIs and avoid new
+  # runtime dependencies. Source maps arrive through Vite/coverage, template
+  # compilation through ESLint boundaries, and librsvg through Wrangler.
+  # GHSA-68fv-2mgg-jv7q, GHSA-8r5x-fm3f-whwj, GHSA-p8wg-vrv2-v86f,
+  # GHSA-xw65-4hp5-5hc7 and GHSA-wq5f-xc86-pv6w.
+  source-map-js@<1.2.2: 1.2.2
+  handlebars@<4.7.10: 4.7.10
+  sharp@<0.35.5: 0.35.5
   undici@>=6.0.0 <6.28.1: 6.28.1
   undici@>=7.0.0 <7.29.1: 7.29.1
   postcss@<8.5.28: 8.5.28

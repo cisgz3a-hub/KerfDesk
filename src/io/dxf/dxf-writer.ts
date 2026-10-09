@@ -19,7 +19,8 @@
 // fitted with lines and circular-arc bulges within the stated tolerance
 // (ADR-452; see core/vector-export/bulge-rings).
 
-import { curveSubpathBounds, type CurveSubpath } from '../../core/scene';
+import type { CurveSubpath } from '../../core/scene';
+import { curvesBounds } from '../../core/vector-export/affine-curves';
 import {
   curveToBulgeRing,
   DEFAULT_DXF_CURVE_TOLERANCE_MM,
@@ -120,7 +121,8 @@ function drawingExtent(
   let maxY = -Infinity;
   for (const layer of layers) {
     for (const curve of layer.curves) {
-      const b = curveSubpathBounds(curve);
+      const b = curvesBounds([curve]);
+      if (b === null) return null;
       minX = Math.min(minX, b.minX);
       minY = Math.min(minY, b.minY);
       maxX = Math.max(maxX, b.maxX);

@@ -10,6 +10,7 @@ import { useLaserStore } from '../state/laser-store';
 import type { ConnectControllerOptions } from '../state/laser-store';
 import { loadAutoConnectPreference, saveAutoConnectPreference } from '../state/serial-port-memory';
 import { ConnectionBar } from './ConnectionBar';
+import { connectMachine } from './connect-machine';
 import { ConnectedMachineProfile } from './ConnectedMachineProfile';
 import { LaserModuleRow } from './LaserModuleRow';
 import { DeviceSetupControls } from './device-setup';
@@ -47,7 +48,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   const connectOptions = (): ConnectControllerOptions =>
     connectOptionsForDevice(useStore.getState().project.device);
   const connect = (): void => {
-    void connectController(platform, connectOptions());
+    void connectMachine(platform).catch(controllerActionFailureHandler('Connect'));
   };
   const reconnect = (): void => {
     if (!useLaserStore.getState().getControllerReconnectRecommended()) return;
@@ -62,7 +63,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
   // A connected machine is closed first, so the chosen port replaces it.
   const choosePort = async (): Promise<void> => {
     if (useLaserStore.getState().connection.kind === 'connected') await disconnectController();
-    await connectController(platform, { ...connectOptions(), portSelection: 'choose' });
+    await connectMachine(platform, { portSelection: 'choose' });
   };
   const autoConnect = useAutoConnectPreference();
   return (

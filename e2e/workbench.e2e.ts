@@ -4,7 +4,11 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
-import { expandMachineUtilities, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  expandMachineUtilities,
+  toolbarCommand,
+} from './fixtures/workspace-ui';
 import { confirmJobReview } from './fixtures/recovery-flow';
 import { acknowledgedStartControlLinesSince } from './fixtures/recovery-start-boundary';
 
@@ -737,7 +741,7 @@ async function installFileSystemMocks(
 
 async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
   await page.getByRole('tab', { name: 'Machine' }).click();
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
   await expandMachineUtilities(page);

@@ -19,7 +19,9 @@
 // (a symmetric bow-tie or figure-eight) has NOT collapsed: it crosses itself,
 // is kept, and is never used as a container here.
 
-import { flattenCurveSubpath, type CurveSubpath, type Vec2 } from '../../core/scene';
+import type { CurveSubpath, Vec2 } from '../../core/scene';
+import { flattenArtworkCurve } from '../../core/vector-export/affine-curves';
+import { retainedArtworkArc } from '../../core/vector-export/artwork-parametric-arc';
 
 /** Maximum containment tolerance (mm); finer grids need finer source outlines. */
 const CONTAINMENT_TOLERANCE_MM = 0.01;
@@ -96,7 +98,7 @@ export function contoursKeptAfterCollapse(
 }
 
 function unsnappedPolyline(curve: CurveSubpath, toleranceMm: number, collapsed: boolean): Vec2[] {
-  const result = flattenCurveSubpath(curve, { toleranceMm });
+  const result = flattenArtworkCurve(curve, { toleranceMm });
   if (result.kind !== 'ok') {
     throw new Error(
       'Cannot resolve contour containment within ' +
@@ -125,7 +127,7 @@ function sourceMayEncloseArea(curve: CurveSubpath): boolean {
       segment.kind === 'elliptical-arc' &&
       segment.radiusX !== 0 &&
       segment.radiusY !== 0 &&
-      (from.x !== segment.to.x || from.y !== segment.to.y)
+      (retainedArtworkArc(segment) !== null || from.x !== segment.to.x || from.y !== segment.to.y)
     ) {
       return true;
     }

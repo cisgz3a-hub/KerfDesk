@@ -32,7 +32,11 @@ import {
   type CapsuleProbe,
   type FixtureEvents,
 } from './fixtures/recovery-flow';
-import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  selectWorkspacePanel,
+  toolbarCommand,
+} from './fixtures/workspace-ui';
 import { recoveryExecutionLinesSince } from './fixtures/recovery-execution-lines';
 
 const RECONNECTED_HEAD = { x: 777.7, y: 666.6 };
@@ -438,7 +442,7 @@ test('after a lost link the Review opens by itself, homes, and puts the saved or
   // over the Machine panel, so homing and the restore happen inside it.
   await kerfdesk.emitSerialLine('<Idle|MPos:20.000,20.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
   await kerfdesk.setAutoAcknowledge(true);
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   const review = page.getByRole('dialog', { name: 'Review interrupted laser job' });
   await expect(review).toContainText('The controller has no work origin set now');
   const writesBeforeHome = serialWrites(await kerfdesk.events()).length;
