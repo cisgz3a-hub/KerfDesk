@@ -92,21 +92,22 @@ describe('cropped ID eye-depth encoding', () => {
       expect(shader.vertexShader).toContain(
         'vec3 pickSourceAxis = kerfdeskPickFullSourceAxis( instanceStart, instanceEnd );',
       );
-      expect(shader.vertexShader.indexOf('start *= 0.5;')).toBeLessThan(
-        shader.vertexShader.indexOf('vec3 delta = end - start;'),
+      expect(shader.vertexShader).toContain('uvec3 firstBits = floatBitsToUint( first )');
+      expect(shader.vertexShader.indexOf('start = uvec3( kerfdeskPickHalf')).toBeLessThan(
+        shader.vertexShader.indexOf('uvec3 delta = uvec3( kerfdeskPickSubtract'),
       );
       for (const component of ['x', 'y', 'z']) {
         expect(shader.vertexShader).toContain(
           `kerfdeskPickNeedsHalf( start.${component}, end.${component} )`,
         );
       }
-      expect(shader.vertexShader).toContain('delta *= 16777216.0;');
-      expect(shader.vertexShader.indexOf('delta *= 16777216.0;')).toBeLessThan(
-        shader.vertexShader.indexOf('float scale = uintBitsToFloat('),
-      );
-      expect(shader.vertexShader).toContain(
-        'uintBitsToFloat( floatBitsToUint( maximum ) & 0x7f800000u )',
-      );
+      for (const helper of ['RoundShift', 'ShiftJam', 'RoundPack', 'Normalise']) {
+        expect(shader.vertexShader).toContain(`uint kerfdeskPick${helper}(`);
+      }
+      expect(shader.vertexShader).toContain('return uintBitsToFloat( uvec3(');
+      expect(shader.vertexShader).not.toContain('vec3 delta = end - start;');
+      expect(shader.vertexShader).not.toContain('start *= 0.5;');
+      expect(shader.vertexShader).not.toContain('delta / scale');
       expect(shader.vertexShader).not.toContain('log2(');
       expect(shader.vertexShader).not.toContain('exp2(');
     } else {
@@ -150,7 +151,7 @@ describe('cropped ID eye-depth encoding', () => {
     ).toBeLessThan(shader.fragmentShader.indexOf('float pickDepth ='));
     expect(shader.fragmentShader).toContain('else if ( kerfdeskPickPerspective > 0.5 )');
     expect(material.customProgramCacheKey()).toContain(
-      '-linear-pick-eye-depth-source-axis-f32-visible-far-v3-' + kind,
+      '-linear-pick-eye-depth-source-axis-bitwise-visible-far-v4-' + kind,
     );
     material.dispose();
   });

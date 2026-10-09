@@ -139,5 +139,5 @@ export function installPickDepth(
     perspective.value = 'isPerspectiveCamera' in view ? 1 : 0;
   };
   material.customProgramCacheKey = () =>
-    cacheKey + '-linear-pick-eye-depth-source-axis-f32-visible-far-v3-' + kind;
+    cacheKey + '-linear-pick-eye-depth-source-axis-bitwise-visible-far-v4-' + kind;
 }

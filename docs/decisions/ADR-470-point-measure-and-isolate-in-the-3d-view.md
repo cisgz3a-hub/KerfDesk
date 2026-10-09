@@ -136,8 +136,15 @@ IDs retain a 24-byte descriptor per pair, allocated once on the first pick. Neit
 positions or scans them on the CPU per frame; native first-pick preparation is linear in rapid count,
 and its latency is not bounded here. Both writers canonicalise stored endpoints, prevent
 opposed-component subtraction overflow by halving when that same component is large, round
-the subtraction to Float32, lift subnormal major deltas and divide by a power of two. This
-packing can still round endpoint differences or underflow a subdominant direction component.
+the subtraction to Float32, lift subnormal major deltas and divide by a power of two. The
+native CPU writer retains that packing order. Fat IDs reproduce it with unsigned integer
+IEEE-754 operations: endpoint ordering, round-to-nearest-even halving and subtraction, then
+exponent-based normalisation including nonzero subnormal output bits. This packing has no
+intermediate float arithmetic that could flush retained subnormal words. It adds no fat
+attribute or position copy. Exact raw packing still needs separate backend verification;
+subsequent attribute decoding and floating-point plane arithmetic are not qualified by that
+raw-bit check. This packing can still round endpoint differences or underflow a subdominant
+direction component.
 Rounding subtraction before normalisation can also double-round a tiny component to zero
 where normalising the double difference would retain the smallest Float32 subnormal; this
 shared shader/native policy does not promise the previous CPU-only packing at that limit.

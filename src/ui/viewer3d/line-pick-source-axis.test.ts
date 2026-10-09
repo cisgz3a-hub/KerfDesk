@@ -146,6 +146,61 @@ describe('full stored source axes for the lazy ID pass', () => {
     expect(Math.fround(exactMinor / 2 ** 126)).toBe(2 ** -149); // c7 CPU-only order.
   });
 
+  it.each([
+    {
+      name: 'smallest major',
+      start: [0, 0, 0],
+      end: [1, 3, 0x80000002],
+      expected: [0x3f000000, 0x3fc00000, 0xbf800000],
+    },
+    {
+      name: 'largest subnormal major',
+      start: [0, 0, 0],
+      end: [0x007fffff, 0, 0],
+      expected: [0x3ffffffe, 0, 0],
+    },
+    {
+      name: 'huge common X and tiny Y',
+      start: [0x7f7fffff, 0x80000001, 0],
+      end: [0x7f7fffff, 1, 0],
+      expected: [0, 0x3f800000, 0],
+    },
+    {
+      name: 'nonzero subnormal output',
+      start: [0, 0, 0],
+      end: [0x7e800000, 0x34000000, 0],
+      expected: [0x3f800000, 1, 0],
+    },
+    {
+      name: 'negative subnormal output',
+      start: [0, 0, 0],
+      end: [0x7e800000, 0xb4000000, 0],
+      expected: [0x3f800000, 0x80000001, 0],
+    },
+    {
+      name: 'double rounded minor',
+      start: [0, 0xa6800000, 0],
+      end: [0x7e800000, 0x33800000, 0],
+      expected: [0x3f800000, 0, 0],
+    },
+    {
+      name: 'opposed maximum',
+      start: [0xff7fffff, 0, 0x7f7fffff],
+      end: [0x7f7fffff, 0, 0xff7fffff],
+      expected: [0x3fffffff, 0, 0xbfffffff],
+    },
+    {
+      name: 'zero signs in lexicographic order',
+      start: [0x80000000, 0xbf800000, 0],
+      end: [0, 0x3f800000, 0],
+      expected: [0, 0x3f800000, 0],
+    },
+  ])('preserves the independent fixed words for $name and reversal', ({ start, end, expected }) => {
+    const first = new Float32Array(new Uint32Array(start).buffer);
+    const last = new Float32Array(new Uint32Array(end).buffer);
+    expect(bits(axis(first as unknown as Point, last as unknown as Point))).toEqual(expected);
+    expect(bits(axis(last as unknown as Point, first as unknown as Point))).toEqual(expected);
+  });
   it('clears invalid/point inputs without signed-zero direction bits', () => {
     for (const start of [
       [NaN, 0, 0],

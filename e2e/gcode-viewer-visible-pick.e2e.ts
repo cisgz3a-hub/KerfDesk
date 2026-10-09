@@ -241,9 +241,8 @@ test('native picks exclude the visible far boundary and preserve internal equal-
           'native-visible-camera-range',
         );
         expect(frame.pick?.segmentIndex ?? null).toBe(control.expected);
-        // Classic native travel uses alpha .35 over the dark clear colour.
-        // The frozen isolated-native read is [90,44,47], rather than opaque red.
-        expect(frame.pixel).toEqual(control.visible ? [90, 44, 47, 255] : [28, 31, 36, 255]);
+        if (control.visible) expectNativeBlend(frame.pixel, 1);
+        else expect(frame.pixel).toEqual([28, 31, 36, 255]);
       }
       const farCut = await capture(
         page,
@@ -275,7 +274,7 @@ test('native picks exclude the visible far boundary and preserve internal equal-
       );
       expect(ties.planar).toBe(!mixed);
       // Two .35-alpha native bodies accumulate over the same clear pixel.
-      expect(ties.pixel).toEqual([130, 52, 54, 255]);
+      expectNativeBlend(ties.pixel, 2);
       expect(ties.pick?.segmentIndex).toBe(1);
     }
   }
@@ -338,6 +337,26 @@ test('clipping excludes hidden endpoint snaps and measurement points but keeps v
   await saveResults(info, results);
   expect(errors).toEqual([]);
 });
+
+// The visible material blends sRGB [204,68,68] with alpha .35. An 8-bit
+// dithered framebuffer can quantise each exact channel to its floor or ceil.
+// Keep these source-derived bounds; do not assume one backend's rounding.
+function expectNativeBlend(pixel: readonly number[], passes: 1 | 2): void {
+  const ink = [204, 68, 68] as const;
+  const low: [number, number, number] = [28, 31, 36];
+  const high: [number, number, number] = [...low];
+  for (let pass = 0; pass < passes; pass += 1) {
+    for (const channel of [0, 1, 2] as const) {
+      low[channel] = Math.floor(ink[channel] * 0.35 + low[channel] * 0.65);
+      high[channel] = Math.ceil(ink[channel] * 0.35 + high[channel] * 0.65);
+    }
+  }
+  for (const channel of [0, 1, 2] as const) {
+    expect(pixel[channel]).toBeGreaterThanOrEqual(low[channel]);
+    expect(pixel[channel]).toBeLessThanOrEqual(high[channel]);
+  }
+  expect(pixel[3]).toBe(255);
+}
 
 type Results = { name: string; options: VisiblePickOptions; frame: Omit<Frame, 'data'> }[];
 
