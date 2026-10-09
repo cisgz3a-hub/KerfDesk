@@ -1,7 +1,7 @@
 // DeviceSetupControls - one context-aware rail entry for machine configuration.
 // The button opens Machine Setup in every state and gains primary emphasis only
-// when the connected profile still needs guided setup. This is the single
-// explicit setup launch, removing the former pair of near-synonym workflows.
+// when the connected profile still needs guided setup. Explicit first Connect
+// opens this same global workflow; other connections keep the passive nudge.
 
 import { useEffect, useState } from 'react';
 import { machineKindOf } from '../../../core/scene';

@@ -1,4 +1,6 @@
 import {
+  connectMachineAndDismissFirstSetup,
+  connectMachineThroughToolbar,
   expandMachineUtilities,
   selectWorkspacePanel,
   toolbarCommand,
@@ -222,7 +224,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
 }) => {
   await enableLab(page, 'Print and Cut');
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
   await expandMachineUtilities(page);
@@ -440,12 +442,14 @@ test('keeps detected firmware, catalog profile, and streaming transport coherent
   kerfdesk,
 }) => {
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineThroughToolbar(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await kerfdesk.emitSerialLine("Grbl 1.1h ['$' for help]");
 
-  await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
   const setup = page.getByRole('dialog', { name: 'Machine Setup' });
+  if (!(await setup.isVisible()))
+    await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
+  await expect(setup).toBeVisible();
   await setup.getByText('Connection options', { exact: true }).click();
   await expect(setup.getByLabel('Controller firmware')).toHaveValue('grbl-v1.1');
 

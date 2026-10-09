@@ -6,7 +6,7 @@ import { machineKindOf } from '../../core/scene';
 import { resetWorkspaceLayout, toggleWorkspaceSidePanels } from '../app/workspace-panel-actions';
 import { usePlatform } from '../app/platform-context';
 import { editImageAction } from './edit-image-action';
-import { connectOptionsForDevice, hasFileOnlyTransport } from './connect-options';
+import { hasFileOnlyTransport } from './connect-options';
 import { railPanelCommandContext } from './command-context-helpers';
 import { useCommandStoreState } from './use-command-store-state';
 import { useStore } from '../state';
@@ -47,6 +47,7 @@ import {
   selectionUnitCount,
 } from './selection-command-state';
 import { controllerActionFailureHandler } from '../laser/report-controller-action-failure';
+import { connectMachine } from '../laser/connect-machine';
 import { useEdition } from '../licensing/edition';
 import { labelProCommands } from './edition-command-gate';
 
@@ -299,7 +300,7 @@ function laserCommandContext(
 ): Pick<AppCommandContext, 'connectLaser' | 'disconnectLaser' | 'homeLaser'> {
   return {
     connectLaser: () =>
-      void laser.connect(platform, connectOptionsForDevice(useStore.getState().project.device)),
+      void connectMachine(platform).catch(controllerActionFailureHandler('Connect')),
     disconnectLaser: () =>
       void laser.disconnect().catch(controllerActionFailureHandler('Disconnect')),
     homeLaser: () => void laser.home().catch(controllerActionFailureHandler('Home')),

@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
-import { selectWorkspacePanel } from './fixtures/workspace-ui';
+import { connectMachineAndDismissFirstSetup, selectWorkspacePanel } from './fixtures/workspace-ui';
 import type { SerialTranscriptEntry } from '../src/ui/state/laser-transcript';
 
 test('controller incidents survive acknowledgements and reconnect in the console and saved report', async ({
@@ -11,7 +11,7 @@ test('controller incidents survive acknowledgements and reconnect in the console
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto('/');
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
   await kerfdesk.emitSerialLine('ALARM:2');
@@ -42,7 +42,7 @@ test('controller incidents survive acknowledgements and reconnect in the console
   await expect
     .poll(async () => (await incidents(page)).some((entry) => entry.kind === 'disconnect'))
     .toBe(true);
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   expect(
     (await incidents(page)).filter((entry) => original.some((prior) => prior.id === entry.id)),
