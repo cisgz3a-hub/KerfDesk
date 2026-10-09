@@ -6,7 +6,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { selectControllerDriver } from '../../../core/controllers';
 import { usePlatform } from '../../app/platform-context';
-import { connectOptionsForDevice } from '../../commands/connect-options';
 import { waitForControllerQueueSettled } from '../../state/controller-queue-settle';
 import { useLaserStore, type ConnectControllerOptions } from '../../state/laser-store';
 import { useToastStore } from '../../state/toast-store';
@@ -19,6 +18,7 @@ import {
 } from './device-setup-baud-scan';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
+import { connectionForMachineSetup, type MachineSetupConnection } from './machine-setup-connection';
 import { liveConnectionAttempt, type DeviceSetupAutomatic } from './use-controller-auto-fill';
 
 const ANSWER_WAIT_MS = 4_000;
@@ -36,6 +36,7 @@ export type BaudScanStatus =
 export function useFindMachine(
   state: DeviceSetupStepProps['state'],
   automatic?: DeviceSetupAutomatic,
+  setupConnection?: MachineSetupConnection,
 ) {
   const platform = usePlatform();
   const laser = useFindLaserState();
@@ -57,24 +58,21 @@ export function useFindMachine(
     connected &&
     laser.detectedControllerKind !== null &&
     laser.detectedControllerKind !== controllerKind;
-  // The options the rail and menu Connect build from a profile, so the draft's
-  // Background streaming choice travels as they send it, an explicit opt-out
-  // included (2026-09-25 audit, SER-2). Setup keeps its controller and baud
-  // fallbacks.
-  const options = (extra: Partial<ConnectControllerOptions> = {}): ConnectControllerOptions => ({
-    ...connectOptionsForDevice(state.draft),
-    controllerKind,
-    baudRate,
-    ...extra,
-  });
+  const connection = connectionForMachineSetup(platform, state.draft, baudRate, setupConnection);
   const showError = (error: unknown): void =>
     pushToast(error instanceof Error ? error.message : String(error), 'error');
   const openConnection = (extra?: Partial<ConnectControllerOptions>): Promise<void> =>
-    laser.connect(platform, options(extra));
+    connection.connect(laser.connect, extra);
   // A failed attempt shows as the connection's own failure; the scan reads it.
   const connectAt = (baud: number): Promise<void> =>
     openConnection({ baudRate: baud }).catch(() => undefined);
-  const scan = useBaudScan(connectAt, laser.disconnect, baudRate, automatic);
+  const scan = useBaudScan(
+    connectAt,
+    laser.disconnect,
+    baudRate,
+    automatic,
+    setupConnection === undefined,
+  );
   const actions = findConnectionActions({
     openConnection,
     disconnect: laser.disconnect,
@@ -86,7 +84,7 @@ export function useFindMachine(
     driverMismatch,
     laser.detectedControllerKind,
     controllerKind,
-    automatic,
+    setupConnection === undefined ? automatic : undefined,
     actions.reconnectForFind,
   );
   return {
@@ -104,7 +102,9 @@ export function useFindMachine(
     reconnect: () => void actions.reconnect().catch(showError),
     disconnect: actions.disconnect,
     scan,
-    supportsSerial: platform.serial.isSupported(),
+    networkTarget: connection.networkTarget,
+    connectionBlocked: connection.blockedReason,
+    supportsSerial: connection.supportsSerial,
   };
 }
 
@@ -214,11 +214,13 @@ function useBaudScan(
   disconnect: () => Promise<void>,
   currentBaud: number,
   automatic: DeviceSetupAutomatic | undefined,
+  enabled: boolean,
 ) {
   const [status, setStatus] = useState<BaudScanStatus>({ kind: 'idle' });
   const [ownership] = useState(createBaudScanOwnership);
   useEffect(() => () => ownership.retire(), [ownership]);
   const start = (): void => {
+    if (!enabled) return;
     const retired = ownership.claim();
     // A scan from the connection Find opened keeps Find's claim on each speed.
     const connection = scanConnectionOwnership(

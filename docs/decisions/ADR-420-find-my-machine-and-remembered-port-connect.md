@@ -157,9 +157,19 @@ logical profile history, not a physical USB serial identity. An already-open
 setup draft is retained rather than replaced by another Connect action.
 Opening first-time setup from the FluidNC details form dismisses that popover;
 closing setup returns keyboard focus to its stable machine-name trigger.
+The compact toolbar uses that same focus fallback when the original Connect
+button is still disabled by a pending connection as setup closes.
 
-Automatic connection, replug, recovery Reconnect and setup's Find continue using
-their existing transport paths. They do not launch or reset a setup dialog. No
+A first FluidNC network connection carries its explicit TCP target into that
+setup request. Try again and other explicit reconnect actions retain that target
+and renderer streaming. USB port selection, baud scanning and automatic firmware
+reconnect are omitted from this network context; a non-FluidNC or vendor command
+contract cannot use it. Closing setup or opening a different setup request drops
+the context. No network connection is retried without an explicit user action.
+
+Automatic connection, replug and recovery Reconnect continue using their existing
+transport paths. Setup opened normally retains its existing USB Find workflow.
+These actions do not launch or reset a setup dialog. No
 controller setting is written by opening setup or connecting, and the existing
 draft Save, explicit firmware-write consent and Frame/Start contracts remain.
 

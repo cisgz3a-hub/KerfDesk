@@ -27,6 +27,11 @@ export function CompactConnectionControls(props: Props): JSX.Element {
     <>
       <div
         className="lf-connection-compact-row"
+        onFocusCapture={(event) => {
+          if (event.target instanceof HTMLElement && !triggerRef.current?.contains(event.target)) {
+            event.target.dataset['dialogFocusFallback'] = triggerId;
+          }
+        }}
         onClickCapture={(event) => {
           if (event.target instanceof Node && !triggerRef.current?.contains(event.target)) close();
         }}
@@ -78,18 +83,24 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           </div>
           {props.machine ?? <strong>{props.machineName}</strong>}
           {props.details}
-          <button
-            type="button"
-            className="lf-btn lf-btn--ghost lf-connection-machine-popover-close"
-            aria-label="Close machine details"
-            title="Close machine details"
-            onClick={closeAndFocus}
-          >
-            <Icon name="close" size={14} />
-          </button>
+          <MachineDetailsCloseButton onClose={closeAndFocus} />
         </AnchoredPopover>
       ) : null}
     </>
+  );
+}
+
+function MachineDetailsCloseButton({ onClose }: { readonly onClose: () => void }): JSX.Element {
+  return (
+    <button
+      type="button"
+      className="lf-btn lf-btn--ghost lf-connection-machine-popover-close"
+      aria-label="Close machine details"
+      title="Close machine details"
+      onClick={onClose}
+    >
+      <Icon name="close" size={14} />
+    </button>
   );
 }
 

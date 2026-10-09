@@ -8,6 +8,7 @@ import {
 } from '../state/device-setup-configured-persistence';
 import { useLaserStore, type ConnectControllerOptions } from '../state/laser-store';
 import { deviceProfileSignature } from './device-setup/device-setup-nudge';
+import type { MachineSetupConnection } from './device-setup/machine-setup-connection';
 import {
   openMachineSetup,
   useMachineSetupDialogStore,
@@ -18,6 +19,7 @@ import {
 export function connectMachine(
   platform: PlatformAdapter,
   options: ConnectControllerOptions = {},
+  setupConnection?: MachineSetupConnection,
 ): Promise<void> {
   const { project } = useStore.getState();
   const laser = useLaserStore.getState();
@@ -28,7 +30,7 @@ export function connectMachine(
     !configured.has(deviceProfileSignature(project.device, machineKindOf(project.machine))) &&
     useMachineSetupDialogStore.getState().state.kind === 'idle'
   ) {
-    openMachineSetup();
+    openMachineSetup(undefined, setupConnection);
   }
   // Do not defer connection to an effect or await setup: requestPort needs the
   // original user gesture. Only the existing setup Save records completion.
