@@ -87,6 +87,7 @@ for (const scenario of cases) {
                 return {
                   data: frame.data,
                   regions: frame.regions,
+                  completedWidths: frame.completedWidths,
                   pixels: await fixture.strokeRegionsColours(frame.data, frame.regions),
                 };
               },
@@ -107,6 +108,10 @@ for (const scenario of cases) {
                 ...(control === 'wide-completed' ? { completedWidth: 2.5 } : {}),
               },
             );
+            if (control === 'wide-completed') {
+              expect(result.completedWidths.length).toBeGreaterThan(0);
+              expect(result.completedWidths.every((width) => width === 2.5)).toBe(true);
+            }
             const name =
               scenario.name +
               '-' +

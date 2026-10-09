@@ -64,6 +64,7 @@ export function playbackStrokeFrame(options: FrameOptions): {
   data: string;
   region: Region;
   regions: Region[];
+  completedWidths: number[];
 } {
   const parsed = buildGcodeRenderModel(options.text);
   if (parsed.kind !== 'ok') throw new Error(parsed.reason);
@@ -120,8 +121,15 @@ export function playbackStrokeFrame(options: FrameOptions): {
     if (built.reveal.solid !== null) built.reveal.solid.geometry.instanceCount = 0;
     if (built.reveal.solidGhost !== null) built.reveal.solidGhost.visible = false;
   }
-  if (options.completedWidth !== undefined && built.fatMaterials[0] !== undefined)
-    built.fatMaterials[0].linewidth = options.completedWidth;
+  if (options.completedWidth !== undefined)
+    for (const object of built.objects)
+      if (object instanceof LineSegments2 && object.renderOrder === 1)
+        object.material.linewidth = options.completedWidth;
+  const completedWidths = built.objects.flatMap((object) =>
+    object instanceof LineSegments2 && object.renderOrder === 1 && object.visible
+      ? [object.material.linewidth]
+      : [],
+  );
   const camera = frameCamera(options, width, height);
   const rasterWidth = renderer.domElement.width;
   const rasterHeight = renderer.domElement.height;
@@ -136,7 +144,7 @@ export function playbackStrokeFrame(options: FrameOptions): {
           throw new Error('Centreline sample outside the rendered viewport');
     renderer.render(scene, camera);
     // Read in the render's task: WebGL clears its drawing buffer at composite.
-    return { data: renderer.domElement.toDataURL('image/png'), region, regions };
+    return { data: renderer.domElement.toDataURL('image/png'), region, regions, completedWidths };
   } finally {
     disposeChildren(scene);
     renderer.dispose();

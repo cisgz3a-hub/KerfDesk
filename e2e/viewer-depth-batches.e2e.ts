@@ -14,6 +14,7 @@ type Input = Pick<
   | 'cameraTarget'
   | 'cameraPose'
   | 'clipMinX'
+  | 'completedWidth'
 > & { name: string; expected?: 'hidden' };
 
 const cases: Input[] = [
@@ -81,6 +82,7 @@ cases.push({
     z: 5 + index * 0.05,
   })),
 });
+cases.push({ ...retrace, name: 'wide-sloping-retrace', completedWidth: 6 });
 for (const sign of [-1, 1]) {
   cases.push({
     name: 'active-ramp-over-flat-' + sign,
@@ -137,6 +139,7 @@ test('fast mixed-depth strokes match the precise source-order renderer at slopin
             return {
               data: frame.data,
               regions: frame.regions,
+              completedWidths: frame.completedWidths,
               pixels: await fixture.strokeRegionsColours(frame.data, frame.regions),
             };
           }, options);
@@ -147,12 +150,25 @@ test('fast mixed-depth strokes match the precise source-order renderer at slopin
             Buffer.from(rendered.data.slice(rendered.data.indexOf(',') + 1), 'base64'),
           );
           await info.attach(name, { path, contentType: 'image/png' });
-          pair.push({ name, regions: rendered.regions, pixels: rendered.pixels });
+          pair.push({
+            name,
+            regions: rendered.regions,
+            pixels: rendered.pixels,
+            completedWidths: rendered.completedWidths,
+          });
         }
         results.push(pair);
         await writeFile(info.outputPath('pixel-samples.json'), JSON.stringify(results, null, 2));
         const [fast, reference] = pair;
         if (fast === undefined || reference === undefined) throw new Error('Missing matched frame');
+        if (input.completedWidth !== undefined)
+          for (const rendered of pair) {
+            expect(rendered.completedWidths.length, rendered.name).toBeGreaterThan(0);
+            expect(
+              rendered.completedWidths.every((width) => width === input.completedWidth),
+              rendered.name,
+            ).toBe(true);
+          }
         expect(fast.regions).toEqual(reference.regions);
         expect(fast.pixels.total, fast.name).toBeGreaterThan(30);
         for (const rendered of pair) {
