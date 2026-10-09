@@ -59,15 +59,18 @@ test('coplanar picks name the visible cut while genuine nearer travel retains de
   expect(errors).toEqual([]);
 });
 
-test('unrelated off-plane moves preserve the visible coplanar cut and its pick', async ({
-  page,
-}, info) => {
-  const errors = await openProbe(page);
-  const results: Results = [];
-  for (const look of ['classic', 'studio'] as const)
-    for (const perspective of [false, true])
-      for (const angle of ['top', 'iso', 'grazing'] as const)
-        for (const pixelRatio of [1, 2] as const)
+// Each frame creates a fresh renderer. Retain the full matrix while grouping
+// each look, projection and pixel ratio under the ordinary per-test timeout.
+for (const look of ['classic', 'studio'] as const) {
+  for (const perspective of [false, true]) {
+    for (const pixelRatio of [1, 2] as const) {
+      const projection = perspective ? 'perspective' : 'orthographic';
+      test(`unrelated off-plane moves preserve the visible coplanar cut and its pick: ${look}, ${projection}, DPR ${pixelRatio}`, async ({
+        page,
+      }, info) => {
+        const errors = await openProbe(page);
+        const results: Results = [];
+        for (const angle of ['top', 'iso', 'grazing'] as const)
           for (const prefix of [CUT_TRAVEL, CUT_TRAVEL.replace('\nG1 Y10', '')])
             for (const tail of ['\nG0 Y30\nG0 Z1', '\nG0 Y30\nG0 Z1\nM3 S500\nG1 X10\nM5']) {
               const options = {
@@ -111,9 +114,12 @@ test('unrelated off-plane moves preserve the visible coplanar cut and its pick',
               expect(frame.pick?.point.x).toBeCloseTo(50, 7);
               expect(withoutTravel.pick?.point.x).toBeCloseTo(50, 7);
             }
-  await saveResults(info, results);
-  expect(errors).toEqual([]);
-});
+        await saveResults(info, results);
+        expect(errors).toEqual([]);
+      });
+    }
+  }
+}
 
 test('varying-Z travel retains genuine nearer and farther pick depth', async ({ page }, info) => {
   const errors = await openProbe(page);
