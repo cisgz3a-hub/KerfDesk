@@ -11,6 +11,12 @@
   min-width: 0;
 }
 
+/* The primary controls and lower machine tools own separate scrollers so
+   opening Console or History does not move the jog pad out of view. */
+.lf-rail.lf-machine-rail {
+  overflow: hidden;
+}
+
 /* Jog stays above the machine tools instead of following their scroll. The
    upper group can still scroll when focus/Z controls or recovery notices make
    it taller, leaving room to reach the lower tools in a short window. */
@@ -46,8 +52,8 @@
    full rail scroller. Heading, jog/focus and lower tools stay reachable while
    the sibling Frame/Start dock keeps the available window space. */
 @container machine-rail-body (max-height: 192px) {
-  .lf-machine-rail {
-    overflow-y: auto !important;
+  .lf-rail.lf-machine-rail {
+    overflow-y: auto;
   }
 
   .lf-machine-rail > .lf-machine-primary-controls,

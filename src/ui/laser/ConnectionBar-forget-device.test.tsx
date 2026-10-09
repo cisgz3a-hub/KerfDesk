@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 describe('ConnectionBar device permission actions', () => {
-  it('keeps Disconnect on the card and Forget Controller in its menu', async () => {
+  it('keeps Disconnect on the toolbar and Forget Controller in its menu', async () => {
     const onDisconnect = vi.fn();
     const onForget = vi.fn();
     const host = await renderBar({
