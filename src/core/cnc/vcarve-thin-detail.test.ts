@@ -3,7 +3,10 @@ import * as polygonDifference from '../geometry/polygon-difference';
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import { err } from '../result';
 import type { Polyline } from '../scene';
-import { THIN_DETAIL_RESOLUTION_MM, vcarveThinDetailRings } from './vcarve-thin-detail';
+import {
+  THIN_DETAIL_RESOLUTION_MM,
+  vcarveThinDetailRings,
+} from './vcarve-thin-detail.test-support';
 
 const DELTA_MM = 0.5;
 

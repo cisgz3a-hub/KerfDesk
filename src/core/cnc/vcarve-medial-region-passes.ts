@@ -12,7 +12,7 @@ import {
   vcarveEmittedDepthAtPoint,
   type DetailDepthLaw,
 } from './vcarve-detail-depth';
-import type { VCarveOptions } from './vcarve-ladder';
+import type { VCarveOptions } from './vcarve-plan';
 import { vcarveEmittedProfileCovers, vcarveRoutePrecisionMet } from './vcarve-emitted-profile';
 import type { VCarveMedialRegionGeometryPlan } from './vcarve-medial-region-plan';
 import { vcarveConservativeZ, vcarveEmissionConstraints } from './vcarve-cutting-constraints';

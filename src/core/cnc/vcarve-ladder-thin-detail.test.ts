@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fc from 'fast-check';
 import type { CncTool, Polyline } from '../scene';
-import { vcarveLadderPasses, vcarvePasses } from './vcarve-ladder';
+import { vcarveLadderPasses, vcarvePasses } from './vcarve-ladder.test-support';
 
 // ADR-282: strokes narrower than 2·δ used to vanish from the carve entirely —
 // the first coarse inset already consumed them, so a thin script stroke

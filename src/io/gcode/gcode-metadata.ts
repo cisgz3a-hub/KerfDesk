@@ -128,7 +128,8 @@ export type GcodeMetadata = {
 // Line parents across process groups, retaining passes before their low-power tabs.
 // CNC audit: authored relief footprints, ruled rail sections, sketch diagonals
 // and tapered-inlay nonzero joins now produce the corrected geometry.
-export const EMITTER_REVISION = 'cnc-relief-footprints-inlay-nonzero-sketch-topology-20261009-v18';
+// ADR-576 plans V-carve only with modelled conical cutters.
+export const EMITTER_REVISION = 'vcarve-conical-cutters-20261010-v19';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

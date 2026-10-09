@@ -40,15 +40,15 @@ describe('vcarveClearanceToolpaths', () => {
     }
   });
 
-  it('preserves legacy clearance output for a non-V-bit selection', () => {
+  it('plans no clearance stage for a non-V-bit selection (ADR-576)', () => {
     expect(
       vcarveClearanceToolpaths([SQUARE], {
         vBit: CLEAR_TOOL,
         clearTool: CLEAR_TOOL,
         maxDepthMm: 2,
         stepoverPercent: 40,
-      }).length,
-    ).toBeGreaterThan(0);
+      }),
+    ).toEqual([]);
   });
 
   it('moves the flat-core boundary outward by the engraving tip radius', () => {

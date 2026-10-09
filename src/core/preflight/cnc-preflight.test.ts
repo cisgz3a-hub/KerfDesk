@@ -270,7 +270,7 @@ describe('runCncPreflight', () => {
       ...base,
       scene: { ...base.scene, objects: [squareObject('O1', '#ff0000', 20)] },
     };
-    const result = runCncPreflight(project, config, GOOD_GCODE);
+    const result = runCncPreflight(project, { ...config, toolId: 'vb-60' }, GOOD_GCODE);
     expect(result.issues).toContainEqual(
       expect.objectContaining({
         code: 'cnc-vcarve-entry-fallback',

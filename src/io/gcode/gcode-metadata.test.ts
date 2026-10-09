@@ -41,9 +41,7 @@ function laserAssumptions(
 
 describe('gcodeMetadataHeader', () => {
   it('tracks the latest safety-relevant emitter revision', () => {
-    expect(EMITTER_REVISION).toBe(
-      'cnc-relief-footprints-inlay-nonzero-sketch-topology-20261009-v18',
-    );
+    expect(EMITTER_REVISION).toBe('vcarve-conical-cutters-20261010-v19');
   });
 
   it('emits provenance as GRBL comment lines and ends with a newline', () => {

@@ -22,7 +22,7 @@ const COLOR = '#000000';
 
 const VCARVE_LAYER: Layer = {
   ...createLayer({ id: 'L1', color: COLOR }),
-  cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve' },
+  cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'v-carve', toolId: 'vb-60' },
 };
 
 function artwork(strokeWidthMm: number): SceneObject {

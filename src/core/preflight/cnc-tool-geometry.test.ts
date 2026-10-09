@@ -116,7 +116,7 @@ describe('invalid CNC tool geometry preflight', () => {
     expect(preflight([{ ...layer, output: false }], [object])).toEqual({ ok: true, issues: [] });
   });
 
-  it('does not let an unused or too-narrow single-stage V-carve block output', () => {
+  it('does not let an unused V-carve block output', () => {
     const validColor = '#00ff00';
     const validLayer = createLayer({ id: 'valid', color: validColor });
     const unusedVCarve = vcarveLayer('unused-v-carve');
@@ -126,9 +126,14 @@ describe('invalid CNC tool geometry preflight', () => {
       ok: true,
       issues: [],
     });
-    expect(preflight([unusedVCarve], [rectangle('too-narrow-v-carve', VCARVE_COLOR, 0.1)])).toEqual(
-      { ok: true, issues: [] },
-    );
+  });
+
+  // ADR-285: the medial planner carves a hairline region as well as a wide one,
+  // so an angleless V-bit changes output however narrow the artwork is.
+  it('refuses an angleless V-bit on artwork narrower than the former ring pitch', () => {
+    expect(
+      preflight([vcarveLayer('narrow-v-carve')], [rectangle('narrow', VCARVE_COLOR, 0.1)]),
+    ).toMatchObject({ ok: false, issues: [{ code: 'cnc-tool-geometry-invalid' }] });
   });
 
   it('does not mistake invalid pass depth or diameter for proof that no pass can emit', () => {

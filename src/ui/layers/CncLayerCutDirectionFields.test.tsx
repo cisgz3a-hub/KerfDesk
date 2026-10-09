@@ -19,9 +19,12 @@ const DIRECTED_CUT_TYPES: ReadonlyArray<CncCutType> = [
   'profile-inside',
   'pocket',
 ];
-const INERT_CUT_TYPES: ReadonlyArray<CncCutType> = ['profile-on-path', 'engrave', 'v-carve'];
+const INERT_CUT_TYPES: ReadonlyArray<CncCutType> = ['profile-on-path', 'engrave'];
 
-async function renderRows(cutType: CncCutType): Promise<{
+async function renderRows(
+  cutType: CncCutType,
+  extra: Partial<typeof DEFAULT_CNC_LAYER_SETTINGS> = {},
+): Promise<{
   readonly host: HTMLDivElement;
   readonly root: Root;
   readonly onCommitSettings: ReturnType<typeof vi.fn>;
@@ -34,7 +37,7 @@ async function renderRows(cutType: CncCutType): Promise<{
     root.render(
       <MotionPolishRows
         layer={LAYER}
-        settings={{ ...DEFAULT_CNC_LAYER_SETTINGS, cutType }}
+        settings={{ ...DEFAULT_CNC_LAYER_SETTINGS, cutType, ...extra }}
         onCommit={vi.fn()}
         onCommitSettings={onCommitSettings}
       />,
@@ -74,27 +77,44 @@ describe('CNC cut-direction editor contract', () => {
     }
   });
 
-  it('writes V-carve entry to its dedicated opt-in field', async () => {
-    vi.useFakeTimers();
+  it('hides the unapplied V-carve entry field until a saved request needs clearing', async () => {
     const view = await renderRows('v-carve');
+    try {
+      expect(
+        view.host.querySelector(`select[aria-label="Cut direction for ${LAYER.color}"]`),
+      ).toBeNull();
+      expect(
+        view.host.querySelector(`input[aria-label="Ramp entry angle for ${LAYER.color}"]`),
+      ).toBeNull();
+    } finally {
+      await act(async () => view.root.unmount());
+      view.host.remove();
+    }
+  });
+
+  it('clears a saved V-carve entry request from its dedicated field', async () => {
+    vi.useFakeTimers();
+    const view = await renderRows('v-carve', { vCarveRampEntryDeg: 3, rampEntryDeg: 4 });
     try {
       const input = view.host.querySelector<HTMLInputElement>(
         `input[aria-label="Ramp entry angle for ${LAYER.color}"]`,
       );
       if (input === null) throw new Error('ramp input missing');
+      expect(input.value).toBe('3');
+      expect(input.title).toContain('It is not applied');
+      expect(view.host.textContent).toContain('° not applied');
       const valueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
       if (valueSetter === undefined) throw new Error('input value setter missing');
       await act(async () => {
-        valueSetter.call(input, '3');
+        valueSetter.call(input, '0');
         input.dispatchEvent(new Event('input', { bubbles: true }));
       });
       await act(async () => {
         await vi.advanceTimersByTimeAsync(350);
       });
-      expect(view.onCommitSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ cutType: 'v-carve', vCarveRampEntryDeg: 3 }),
-      );
-      expect(view.onCommitSettings.mock.calls.at(-1)?.[0]).not.toHaveProperty('rampEntryDeg');
+      const committed = view.onCommitSettings.mock.calls.at(-1)?.[0];
+      expect(committed).toMatchObject({ cutType: 'v-carve', rampEntryDeg: 4 });
+      expect(committed).not.toHaveProperty('vCarveRampEntryDeg');
     } finally {
       await act(async () => view.root.unmount());
       view.host.remove();

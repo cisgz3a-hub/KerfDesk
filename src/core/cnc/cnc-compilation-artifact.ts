@@ -9,7 +9,7 @@ import {
 } from '../scene';
 import { collectLayerContours, layerPolylinesFromContours } from './collect-cnc-contours';
 import type { CollectedCncContour } from './cnc-manual-tab-mapping';
-import type { VCarveLadder } from './vcarve-ladder';
+import type { VCarveLadder } from './vcarve-plan';
 import { vcarveMedialOptionsForLayer } from './vcarve-medial-options';
 import {
   finalizeVCarveMedialWork,

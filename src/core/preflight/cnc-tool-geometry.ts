@@ -1,17 +1,14 @@
 import { collectLayerPolylines } from '../cnc/collect-cnc-contours';
 import { vcarveClearanceToolpaths, vcarveHasFlatFloor } from '../cnc/vcarve-clearance';
-import { vcarveResolutionMm } from '../cnc/vcarve-ladder';
 import { zPassCount } from '../cnc/depth-passes';
-import { MIN_CNC_TIP_ANGLE_DEG, isValidCncTipAngleDeg } from '../cnc-tip-angle';
+import { isValidCncTipAngleDeg } from '../cnc-tip-angle';
 import type { DeviceProfile } from '../devices';
-import { insetContoursChecked } from '../geometry/offset-ladder';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
   sceneObjectUsesOperation,
   type CncLayerSettings,
   type CncMachineConfig,
-  type CncTool,
   type Layer,
   type Polyline,
   type Scene,
@@ -43,7 +40,7 @@ export function findInvalidCncToolGeometry(
     if (invalidClearTool !== null) issues.push(invalidClearTool);
     const tool = layerCncTool(config, settings);
     if (tool.kind !== 'v-bit' || isValidCncTipAngleDeg(tool.tipAngleDeg)) continue;
-    if (!invalidAngleCanChangeOutput(contours, settings, tool, config)) continue;
+    if (!invalidAngleCanChangeOutput(settings)) continue;
     issues.push({
       code: 'cnc-tool-geometry-invalid',
       message:
@@ -160,39 +157,8 @@ function contributingContours(
   );
 }
 
-function invalidAngleCanChangeOutput(
-  contours: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  vBit: CncTool,
-  config: CncMachineConfig,
-): boolean {
-  if (!(settings.depthMm > 0)) return false;
-  const firstInsetMm = vcarveResolutionMm(settings.vResolutionMm, vBit.diameterMm);
-  if (
-    Number.isFinite(firstInsetMm) &&
-    firstInsetMm > 0 &&
-    insetContoursChecked(contours, firstInsetMm).contours.length > 0
-  ) {
-    return true;
-  }
-  return twoStageClearanceCouldEmit(contours, settings, config);
-}
-
-function twoStageClearanceCouldEmit(
-  contours: ReadonlyArray<Polyline>,
-  settings: CncLayerSettings,
-  config: CncMachineConfig,
-): boolean {
-  if (!(settings.vCarveFlatDepthEnabled ?? true)) return false;
-  if (zPassCount(settings.depthMm, settings.depthPerPassMm) === 0) return false;
-  const clearTool = config.tools.find((candidate) => candidate.id === settings.vClearToolId);
-  if (clearTool === undefined || !(clearTool.diameterMm > 0)) return false;
-  // At the minimum allowed angle the flat-floor clamp inset is smallest. If
-  // even that case cannot produce a clearing pocket, no allowed angle can.
-  // A contour-parallel pocket emits iff its first tool-radius inset exists,
-  // so two single offsets prove existence without building the full ladder.
-  const clampInsetMm = settings.depthMm * Math.tan((MIN_CNC_TIP_ANGLE_DEG * Math.PI) / 360);
-  const floor = insetContoursChecked(contours, clampInsetMm);
-  if (floor.contours.length === 0) return false;
-  return insetContoursChecked(floor.contours, clearTool.diameterMm / 2).contours.length > 0;
+// The medial planner (ADR-285) carves every closed contributing region, however
+// narrow, so any positive requested depth needs the bit's real angle.
+function invalidAngleCanChangeOutput(settings: CncLayerSettings): boolean {
+  return settings.depthMm > 0;
 }

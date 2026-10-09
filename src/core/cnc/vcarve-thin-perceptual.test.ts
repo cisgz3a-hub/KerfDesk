@@ -17,7 +17,7 @@ import {
 } from '../scene';
 import { cncGrblStrategy } from '../output';
 import { compileCncJob } from './compile-cnc-job';
-import { THIN_DETAIL_RESOLUTION_MM } from './vcarve-thin-detail';
+import { THIN_DETAIL_RESOLUTION_MM } from './vcarve-thin-detail.test-support';
 
 // Perceptual verification (ADR-025 pattern) for ADR-282: V-carve artwork
 // THINNER than the ring pitch through the REAL pipeline (compileCncJob →

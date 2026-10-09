@@ -1,5 +1,5 @@
 import type { Polyline } from '../scene';
-import type { VCarveLadder, VCarveOptions } from './vcarve-ladder';
+import type { VCarveLadder, VCarveOptions } from './vcarve-plan';
 import {
   finalizeVCarveMedialWork,
   prepareVCarveMedialWork,

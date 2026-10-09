@@ -34,7 +34,7 @@ import { applyRampEntry, enforceCutDirection } from './motion-polish';
 import { hasFinitePoints, profileToolpathPolylines } from './profile-paths';
 import { specializedPassesForLayer } from './compile-cnc-special-passes';
 import { manualTabCentersForToolpaths, type CollectedCncContour } from './cnc-manual-tab-mapping';
-import type { VCarveLadder } from './vcarve-ladder';
+import type { VCarveLadder } from './vcarve-plan';
 import { cncSettingsForStage, cncStageRecipe } from './cnc-stage-settings';
 import { preserveProfileFinishStages } from './profile-finishing-stage';
 import { pocketPassLinks } from './pocket-stay-down-links';

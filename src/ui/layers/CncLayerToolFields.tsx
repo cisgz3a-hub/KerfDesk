@@ -102,25 +102,30 @@ export function MotionPolishRows(props: {
           </select>
         </Row>
       ) : null}
-      <Row label="Ramp entry">
-        <ClearableNumberField
-          min={0}
-          max={isVCarve ? Number.MAX_VALUE : 45}
-          step={0.5}
-          value={(isVCarve ? props.settings.vCarveRampEntryDeg : props.settings.rampEntryDeg) ?? 0}
-          onCommit={(deg) => commitRampEntry(props.settings, deg, props.onCommitSettings)}
-          ariaLabel={`Ramp entry angle for ${props.layer.color}`}
-          title={
-            isVCarve
-              ? "Requested maximum entry angle. The certified medial depth profile may supersede it; Job Review reports that explicitly. Use only the cutter manufacturer's approved angle. 0 = profile-controlled entry."
-              : props.settings.cutType === 'pocket' && props.settings.pocketStrategy === 'adaptive'
-                ? 'Adaptive pockets use their own entry. This setting applies only to any relief roughing in this operation.'
-                : 'Requested maximum entry angle along the path. Paths that cannot ramp retain a disclosed plunge. 0 = plunge (default).'
-          }
-          style={rampInputStyle}
-        />
-        <span style={rampUnitStyle}>{isVCarve ? '° requested' : '° ramp'}</span>
-      </Row>
+      {isVCarve && props.settings.vCarveRampEntryDeg === undefined ? null : (
+        <Row label="Ramp entry">
+          <ClearableNumberField
+            min={0}
+            max={isVCarve ? Number.MAX_VALUE : 45}
+            step={0.5}
+            value={
+              (isVCarve ? props.settings.vCarveRampEntryDeg : props.settings.rampEntryDeg) ?? 0
+            }
+            onCommit={(deg) => commitRampEntry(props.settings, deg, props.onCommitSettings)}
+            ariaLabel={`Ramp entry angle for ${props.layer.color}`}
+            title={
+              isVCarve
+                ? 'Saved entry angle from an earlier V-carve planner. It is not applied: V-carve enters along its certified variable-depth profile. Set 0 to clear it.'
+                : props.settings.cutType === 'pocket' &&
+                    props.settings.pocketStrategy === 'adaptive'
+                  ? 'Adaptive pockets use their own entry. This setting applies only to any relief roughing in this operation.'
+                  : 'Requested maximum entry angle along the path. Paths that cannot ramp retain a disclosed plunge. 0 = plunge (default).'
+            }
+            style={rampInputStyle}
+          />
+          <span style={rampUnitStyle}>{isVCarve ? '° not applied' : '° ramp'}</span>
+        </Row>
+      )}
     </>
   );
 }

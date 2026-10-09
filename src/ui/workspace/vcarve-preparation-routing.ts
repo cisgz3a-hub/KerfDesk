@@ -21,8 +21,8 @@
 // because that predicate is shared with computeDesignSceneSource (the 3D carve
 // pane, ADR-261), which treats any issue as "render nothing". Reporting V-carve
 // as over-budget there would blank the pane rather than move its work. That
-// pane calls prepareOutput on the main thread with no worker fallback, so it
-// remains a synchronous V-carve compile site this module does not fix.
+// pane builds in its own worker (design-scene-worker.ts) and never moves a
+// costly compile onto the UI thread when that worker is unavailable.
 
 import { DEFAULT_CNC_LAYER_SETTINGS, type Project } from '../../core/scene';
 

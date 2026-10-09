@@ -340,9 +340,9 @@ function VCarveDetailField(props: {
 
 // H.3: a live warning when THIS operation's bit lacks a supported conical
 // envelope. It stays beside the bit choice rather than inside a section.
-// Wrong-kind selection remains advisory-only and keeps its legacy fallback
-// geometry; an actual V-bit with an invalid angle is the separate exact
-// compile-integrity refusal. Read the layer tool so overrides are represented.
+// A wrong-kind selection plans no V-carve motion and stays a warning (ADR-576);
+// an actual V-bit with an invalid angle is the separate exact compile-integrity
+// refusal. Read the layer tool so overrides are represented.
 export function VCarveToolWarning(props: {
   readonly settings: CncLayerSettings;
 }): JSX.Element | null {
@@ -354,8 +354,8 @@ export function VCarveToolWarning(props: {
   if (props.settings.cutType !== 'v-carve' || activeToolIsCompatible) return null;
   return (
     <div style={vbitWarningStyle} role="alert">
-      V-carve needs a V-bit or modeled angled engraving bit. Choose one under Bit above. Unsupported
-      selections may use legacy 60° fallback geometry where compatible.
+      V-carve needs a V-bit or modeled angled engraving bit. Choose one under Bit above. With this
+      bit the layer produces no V-carve toolpath.
     </div>
   );
 }
