@@ -45,6 +45,13 @@ describe('laser start program assertions', () => {
       expect(() => assertGcodeFitsController(`G21\n${oversized}`, {})).toThrow(/G-code line 2/);
     });
 
+    it('refuses a later line the serial wire cannot carry before any byte is sent', () => {
+      const program = `G21\n${'G1 X1\n'.repeat(500)}G1 X10 ; Ø5 mm\nM5`;
+      expect(() => assertGcodeFitsController(program, {})).toThrow(
+        /^G-code line 502: Not sent: the command contains "Ø".*Job not started\.$/,
+      );
+    });
+
     it('applies FluidNC executable payload limits independently of a larger RX window', () => {
       const accepted = `G1 X${'1'.repeat(123)}`;
       const rejected = `G1 X${'1'.repeat(124)}`;
