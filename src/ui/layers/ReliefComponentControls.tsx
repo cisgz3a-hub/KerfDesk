@@ -158,7 +158,9 @@ export function ReliefComponentControls(props: {
         </p>
       )}
       <details className="lf-relief-advanced">
-        <summary>Component placement and clip</summary>
+        <summary title="Adjust this component's position, scale, rotation and linked clipping shape">
+          Component placement and clip
+        </summary>
         {(['x', 'y', 'scaleX', 'scaleY', 'rotationDeg'] as const).map((key) => (
           <NumberControl
             key={key}

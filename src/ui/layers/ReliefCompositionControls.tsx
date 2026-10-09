@@ -79,7 +79,9 @@ export function ReliefCompositionControls(props: Props): JSX.Element {
         ) : null}
       </fieldset>
       <details className="lf-relief-advanced">
-        <summary>Composition settings and levels</summary>
+        <summary title="Adjust relief dimensions, depth and component levels">
+          Composition settings and levels
+        </summary>
         <ReliefCompositionSettings {...props} />
       </details>
     </>

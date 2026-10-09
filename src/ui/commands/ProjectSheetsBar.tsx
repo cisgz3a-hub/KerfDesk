@@ -120,7 +120,9 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
         create={create}
       />
       <details className="lf-project-sheet-production">
-        <summary>Production runs and saved arrays</summary>
+        <summary title="Show production runs and saved placement arrays for this sheet">
+          Production runs and saved arrays
+        </summary>
         <div className="lf-project-sheet-actions">
           <ProductionManifestButton />
           <RetainedArraysButton />

@@ -135,6 +135,23 @@
   }
 }
 
+/* Short compact windows keep a full sheet row without taking the canvas space
+   needed for drawing. Match the existing small-button target size. */
+@media (max-width: 700px) and (max-height: 500px) {
+  .lf-project-sheets-bar {
+    padding-block: 2px;
+  }
+  .lf-project-sheets-bar button {
+    min-height: 24px;
+    padding-block: 1px;
+    font-size: 12px;
+  }
+  .lf-project-sheets-bar .lf-project-sheet-add {
+    font-size: 18px;
+    line-height: 1;
+  }
+}
+
 .lf-project-sheets-dialog .lf-dialog-actions {
   bottom: calc(-1 * var(--lf-space-6));
   z-index: 2;

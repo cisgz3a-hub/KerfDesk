@@ -231,7 +231,9 @@ export function ReliefAuthoringDialog(props: {
           ) : null}
           {message ? <p role="status">{message}</p> : null}
           <details className="lf-relief-advanced">
-            <summary>Reusable components</summary>
+            <summary title="Show reusable component assets for this relief">
+              Reusable components
+            </summary>
             <ReliefLocalAssetControls
               document={document}
               component={selected}
@@ -326,7 +328,9 @@ export function ReliefAuthoringDialog(props: {
             prepare={prepare}
           />
           <details className="lf-relief-advanced">
-            <summary>Rail and profile surfaces</summary>
+            <summary title="Create relief surfaces from rails and cross-section profiles">
+              Rail and profile surfaces
+            </summary>
             <ReliefRailCreationControls
               document={document}
               vectors={vectors}
@@ -359,7 +363,9 @@ export function ReliefAuthoringDialog(props: {
         </div>
       </div>
       <details className="lf-relief-advanced">
-        <summary>Relief resolution and surface model</summary>
+        <summary title="Show relief sampling resolution and supported surface geometry">
+          Relief resolution and surface model
+        </summary>
         <p className="lf-relief-note">
           Authoring {document.width} × {document.height} cells;{' '}
           {(document.physicalWidthMm / document.width).toPrecision(4)} ×{' '}

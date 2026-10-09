@@ -78,12 +78,20 @@ test.describe('workspace shell acceptance', () => {
     expect(compactBox?.width ?? 0).toBeGreaterThan(300);
     expect(compactBox?.height ?? 0).toBeGreaterThan(200);
 
-    const sheets = page.getByRole('button', { name: 'Project sheets…', exact: true });
+    const sheetBar = page.getByRole('navigation', { name: 'Project sheets', exact: true });
+    await expectInsideViewport(page, sheetBar);
+    await expect(
+      sheetBar
+        .getByRole('tablist', { name: 'Project sheets', exact: true })
+        .getByRole('tab', { name: 'Sheet 1', exact: true }),
+    ).toHaveAttribute('aria-selected', 'true');
+    const sheets = sheetBar.getByRole('button', { name: 'Manage project sheets', exact: true });
     await expectInsideViewport(page, sheets);
     await sheets.focus();
     await page.keyboard.press('Enter');
     const sheetDialog = page.getByRole('dialog', { name: 'Project sheets', exact: true });
-    await expect(sheetDialog.getByRole('combobox', { name: 'Active project sheet' })).toBeVisible();
+    await expect(sheetDialog.getByRole('textbox', { name: 'Active sheet name' })).toBeVisible();
+    await sheetDialog.getByText('Production runs and saved arrays', { exact: true }).click();
     await expect(sheetDialog.getByRole('button', { name: 'Production run…' })).toBeVisible();
     await expect(sheetDialog.getByRole('button', { name: 'Saved arrays…' })).toBeVisible();
     await sheetDialog.getByRole('button', { name: 'Production run…' }).click();
