@@ -19,7 +19,9 @@ export function reliefCompositionWork(document: Record<string, unknown>): number
   const components = Array.isArray(document['components']) ? document['components'] : [];
   const levels = Array.isArray(document['levels']) ? document['levels'] : [];
   if (components.length > 64 || levels.length > 64) return Infinity;
-  const wholeCell = document['outsideMask'] === 'excluded';
+  const wholeCell =
+    document['algorithmRevision'] === 'retained-relief-v2' &&
+    document['outsideMask'] === 'excluded';
   const clip = reliefMaskWork(document['clip'], wholeCell);
   const cost = components.reduce<number>((sum, component) => {
     if (!record(component)) return sum + 1;

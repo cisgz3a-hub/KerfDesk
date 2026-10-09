@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { findFirstSendableLineOver, hasSendableGcodeLine } from './sendable-line-scan';
+import {
+  findFirstSendableLineOver,
+  findFirstUnencodableSendableLine,
+  hasSendableGcodeLine,
+  unencodableLineMessage,
+} from './sendable-line-scan';
 import { isSendableGcodeLine } from './streamer';
 
 // The definition the scans must keep: splitLines in streamer.ts.
@@ -75,5 +80,23 @@ describe('allocation-light sendable-line scans', () => {
     expect(hasSendableGcodeLine('G0 X1')).toBe(true);
     expect(findFirstSendableLineOver('G0 X1', 5)).toEqual({ lineNumber: 1, bytes: 6 });
     expect(findFirstSendableLineOver('G0 X1', 6)).toBeNull();
+  });
+
+  it('finds the first sendable line carrying a byte the wire cannot send as text', () => {
+    const gcode = [
+      'G21',
+      '; full-line comments never stream: Ø 45°',
+      'G1 X1',
+      'G1 X2\u00a0',
+      'G1 X10 ; Ø5 mm',
+      'G1 X20 (45° corner)',
+    ].join('\n');
+    const found = findFirstUnencodableSendableLine(gcode);
+    expect(found?.lineNumber).toBe(4);
+    expect(found?.error.codePoint).toBe(0xd8);
+    expect(found === null ? '' : unencodableLineMessage(found)).toMatch(
+      /^G-code line 4: Not sent: the command contains "Ø"/,
+    );
+    expect(findFirstUnencodableSendableLine('G21\nG1 X1 Y2 ; plain\n')).toBeNull();
   });
 });

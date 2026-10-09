@@ -1,0 +1,158 @@
+{
+  "sector": 18,
+  "categories": [
+    {
+      "id": "18.1",
+      "summary": "Quiet first-run: a static splash (index.html) fades to an empty workspace with a drop hint; no welcome modal/tour/what's-new (WORKFLOW F-A1), default 400x400 device auto-loaded. Manual Device Setup wizard (ADR-092): pure reducer, draft-commit, readiness checklist, passive non-nagging nudge. Beginner mode (ADR-111) is CNC-only, default Basic; laser layer cards always expose every field. CNC material picker adds safe-default feed guidance.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "index.html:8-64 (full-black startup splash + banner splash.jpg, static in HTML so it paints on first parse, hides once app mounts)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "WORKFLOW.md:13-24 (F-A1 first run: empty workspace, 'No welcome modal, no onboarding tour, no what's-new dialog', default 400x400 device auto-loaded)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:3318 ADR-092 (manual connect-time Device Setup wizard, draft-commit, guarded firmware sync); device-setup readiness bed+$30 block vs identity/origin/homing informational (full-sweep S12 evidence device-setup-readiness.ts:46-65,148-168)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CncAdvancedToggle.tsx:10-14 (returns null outside CNC — laser has no Basic/Advanced disclosure); DECISIONS.md:5017-5048 ADR-111 (#4 persisted showCncAdvanced default Basic=false; #1 material picker auto-fills feed/plunge/depth; #3b limit advisories)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/device-setup/device-setup-nudge.ts (passive nudge, never auto-opens per ADR-092, localStorage-keyed fail-soft; DECISIONS.md:3394-3396)"
+        }
+      ],
+      "notVerified": "No live-app first-run observed this audit (static reading only); splash visual quality and empty-first-paint not rendered. The wizard's hardware behaviour (reading $$ on connect, firmware writes, origin-corner G-code flip) is ADR-092-recorded as hardware-unverified (HW-CLAIMED). Known audit findings persist in-tree: beginner mode CNC-only (S12-F7); CNC beginner-safety default divergences vs Easel/Carbide (S8-F2/F3/F4: no work-zero advisory at Start, through-cut default with tabs off and no warning) were flagged but not re-checked here."
+    },
+    {
+      "id": "18.2",
+      "summary": "End-user docs are two markdown guides (docs/safety.md, docs/connection-troubleshooting.md) plus a comprehensive README (Place Board, Registration Jig, trace modes, box gen). Deep developer docs: PROJECT/WORKFLOW/DECISIONS/CONTRIBUTING/RESEARCH_LOG. In-app help is only 3 native-alert entries (About, Can't connect?, Safety) with test-enforced tooltip coverage. The two guides are referenced by 'docs/...' paths not shipped in the web bundle, so they are unreachable from the deployed app.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "docs/safety.md + docs/connection-troubleshooting.md (the two end-user guides); README.md:1-211 (how-to for Place Board/Registration Jig/trace/box + project-doc index table); PROJECT.md/WORKFLOW.md/DECISIONS.md/CONTRIBUTING.md/RESEARCH_LOG.md (developer docs)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/command-families.ts:382-410 + command-types.ts:94-96 (Help family is exactly help.about/help.connection/help.safety — no online-documentation command); no window.open/kerfdesk.com/github external-docs opener anywhere in commands/help/state (S12-F8)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/help/connection-help.ts:40 ('Full guide: docs/connection-troubleshooting.md') + safety-notice.ts (docs/safety.md) rendered via jobAwareAlert (cannot hyperlink); public/ glob = 404.html,_headers,_redirects,favicon.svg,download.html,eula.txt,third-party-notices.txt,splash.jpg (NO docs/) → paths resolve to nothing on kerfdesk.com (S12-F1, confirmed still present)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/help/help-topics.test.ts (builds the real command registry for BOTH machine kinds; fails if any command lacks a help topic, if a topic is stale, or if a tooltip is not a meaningful sentence — anti-drift tooltip coverage)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/common/shortcut-list.ts (in-app Shortcuts reference drifted: missing shipped Ctrl+C/X/V clipboard, Ctrl+G group, Ctrl+Shift+B convert-to-bitmap bindings; no sync test unlike help-topics — S12-F3)"
+        }
+      ],
+      "notVerified": "Whether kerfdesk.com hosts any documentation outside the app bundle (which would mitigate the dead docs/ references) — cannot be verified from the tree. Rendered appearance / live behaviour of the help alerts not observed this audit. The full contents/quality of docs/safety.md and docs/connection-troubleshooting.md were not exhaustively re-read for accuracy."
+    },
+    {
+      "id": "18.3",
+      "summary": "No structured learning ecosystem: no in-app tutorials, guided tour, videos, or walkthrough (F-A1 explicitly ships none). The README markets a 'Help build it' section that routes users to GitHub issues for feedback/bugs/profiles; the project self-describes as young and early. No forum/Discord/community platform referenced in the tree. Learning material is the README how-tos plus the two docs guides.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "README.md:151-165 ('Help build it' — testers/feedback via GitHub issues, share device profiles, contribute code; 'young and under active development')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "WORKFLOW.md:16 (F-A1: 'no onboarding tour'); grep of src for tutorial|youtube|video guide|walkthrough|getting-started tour = no in-app tutorial/video assets"
+        },
+        {
+          "tag": "CODE",
+          "cite": "README.md:1-107 (long-form how-to narrative for the flagship flows — the de-facto getting-started material, README-only, not in-app)"
+        }
+      ],
+      "notVerified": "Actual external community size, any hosted tutorial/video content, and any kerfdesk.com learning pages are off-repo and cannot be verified from the tree (documentary/absence-based). No competitor comparison performed (market agent's scope)."
+    },
+    {
+      "id": "18.4",
+      "summary": "Assets are a bundled, offline Design Library (ADR-105 G11): ~76 provenance-tagged entries (21 first-party templates + 8 CC0 SVGs + 47 Lucide icons) across 8 categories (Laser/CNC Templates, Test & Calibration, Jigs, Boxes, Signs, Decorative, Icons), filterable by machine mode/operation/source, imported as editable vectors through the SVG pipeline. Plus a parametric Box Generator and material libraries (.lfml.json). No marketplace, no downloadable/community content, no cloud project sharing.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/library/design-library.ts:59-170 (8 LIBRARY_CATEGORIES; DESIGN_LIBRARY = OWNED_TEMPLATE_ENTRIES + CC0_LIBRARY_ENTRIES + 47 LUCIDE_LIBRARY_ENTRIES; provenance-tagged, insert via SVG pipeline)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/library/design-library-owned-svg.ts (21 owned template entries) + design-library-cc0.ts (8 CC0 entries); DECISIONS.md:4473 ADR-105 (bundled design library)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "README.md:110-120 + BoxGeneratorDialog (parametric finger-jointed box templates); README.md:143 material libraries (.lfml.json) with recipe wizard; src/io/project serialize (.lf2 project save = repeat mechanism)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/library/DesignLibraryDialog.test.tsx (asserts 'Laser Templates'/'CNC Templates' categories present)"
+        }
+      ],
+      "notVerified": "Library not exercised in the live app this audit (code-derived counts). Full-sweep finding S8-F4 (design library opens only from a small unlabelled 'Lib' text button with no command id / menu entry / shortcut — undiscoverable) was flagged but not re-verified here. Perceptual quality of the bundled template/artwork SVGs not rendered."
+    },
+    {
+      "id": "18.5",
+      "summary": "No extensibility surface: no plugin system, no scripting/macro language, no public/automation API. The console offers raw GRBL command entry plus a fixed, driver-defined set of quick-command buttons (not user-savable macros). The only 'extension' points are file formats: .lf2 projects, .lfml.json material libraries (import/export), .lbdev device-profile import, and SVG/DXF/STL in, SVG/G-code out. No user-defined macros or headless/CLI interface.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "grep of src for plugin|scripting|user-script|extension api = no plugin/scripting/API implementation; package.json has no plugin/scripting infrastructure"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/ConsolePanel.tsx:72-73,133-147 (QuickCommandRow renders driver.consoleQuickCommands — a fixed per-driver list, not user-defined) plus free-text command input; not a macro/scripting engine"
+        },
+        {
+          "tag": "CODE",
+          "cite": "README.md:137-147 (interop is file-format based: .lf2, .lfml.json material libraries, .lbdev import, SVG/DXF/STL import, SVG/G-code export) — the de-facto extension mechanism"
+        }
+      ],
+      "notVerified": "Nothing to verify — absence of any plugin/scripting/API is confirmed by code search. No competitor comparison performed (market agent's scope)."
+    },
+    {
+      "id": "18.6",
+      "summary": "English-only. No internationalization framework or dependency (no i18n/intl/translation library in package.json), no language switcher, no string catalog; all UI strings are inline English literals. The only 'locale' usage is Number.toLocaleString for numeric formatting, not translation. No RTL support.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "package.json:44-85 (dependencies/devDependencies contain no i18n/intl/translation/lingui/formatjs/polyglot package)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep of src for i18n|useTranslation|Intl.\\w+|translation framework = none; 'locale' matches are toLocaleString number formatting only (e.g. CheckpointResumeBanner.tsx, MachineSettingsPanel.tsx, FeedsCalculatorRow.tsx)"
+        }
+      ],
+      "notVerified": "Nothing to verify — no localization exists; confirmed absent by dependency and source search."
+    },
+    {
+      "id": "18.7",
+      "summary": "Free and MIT-licensed (ADR-120, superseding the earlier proprietary ADR-018): LICENSE is standard MIT (c) Johann Stolk, package.json declares license MIT, version 0.1.0. Public source repo, zero-install web PWA plus a free Windows desktop build, no account/sign-up/telemetry. Dependency licensing gated MIT-compatible-only in CI. EULA reduced to a License & Safety Notice. Auto-updates: PWA service worker (job-aware banner) and desktop electron-updater.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "LICENSE:1-31 (standard MIT, Copyright 2026 Johann Stolk; note first-party MIT vs third-party upstream licenses); package.json:2-6 (name laserforge, version 0.1.0, private, license MIT)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:5668-5717 ADR-120 (License MIT, repo public, dependency policy MIT-compatible only / GPL rejected, EULA reduced to distribution notice; supersedes ADR-018 proprietary)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "public/eula.txt:1-25 (KerfDesk License & Safety Notice — MIT grant + machine-safety warning + no-warranty); README.md:3-15,205 (free, no install/account/telemetry, MIT, CI 'pnpm license-check' MIT-only); scripts/check-licenses.mjs gated in release:check"
+        },
+        {
+          "tag": "TEST",
+          "cite": "electron/auto-update.ts + electron/auto-update.test.ts (desktop electron-updater against self-hosted generic feed, runs only when isPackaged); DECISIONS.md:3545 ADR-060 + src/ui/app/PwaUpdatePrompt.tsx/.test.tsx (offline-first PWA, job-aware update banner, dismissal keyed to __APP_VERSION__)"
+        }
+      ],
+      "notVerified": "Production update-feed hosting and real update cadence (self-hosted generic electron-updater feed) not verified live. Real Windows desktop install/packaged-update behaviour is CLAIMED, not machine-verified (HW/packaged pass outstanding per the repo ledger). Actual release cadence over time is not observable from a single pinned snapshot."
+    }
+  ]
+}

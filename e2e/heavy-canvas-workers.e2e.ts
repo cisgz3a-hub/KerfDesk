@@ -25,7 +25,7 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   await showGcodeCanvas(page);
 
   await expect(page.getByLabel('G-code canvas view')).toBeVisible();
-  await expect(page.locator('[aria-label$=" workspace"]')).toHaveCount(0);
+  await expect(page.locator('canvas[aria-label$=" workspace"]')).toHaveCount(0);
   await expect(page.getByTestId('canvas-motion-layer')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({
     timeout: 60_000,
@@ -38,7 +38,7 @@ test('G-code canvas ownership cancels hidden idle planning without a delayed UI 
   // stale idle reply used to commit and draw under this covering view here.
   await page.waitForTimeout(750);
 
-  await expect(page.locator('[aria-label$=" workspace"]')).toHaveCount(0);
+  await expect(page.locator('canvas[aria-label$=" workspace"]')).toHaveCount(0);
   await expect(page.getByTestId('canvas-motion-layer')).toHaveCount(0);
   const initialOpen = await stopResponsivenessProbe(page);
   const plannerCapacity = await page.evaluate(async () => {

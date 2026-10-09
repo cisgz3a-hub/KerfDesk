@@ -1,0 +1,198 @@
+{
+  "sector": 4,
+  "categories": [
+    {
+      "id": "4.1",
+      "summary": "11 dither modes: threshold, 8 error-diffusion kernels (Floyd-Steinberg serpentine, Jarvis, Stucki, Atkinson, Burkes, Sierra 3/2/lite), ordered Bayer 4x4, grayscale — all UI-selectable per layer. No halftone/newsprint angle screens (LightBurn gap, prior audit S9-F11). 43 structural dither tests passed this session; zero perceptual coverage of dither output.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/dither.ts:59-120,215-329 — mode dispatch + all kernels, pure and deterministic"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsImageFields.tsx:196-208 — 11 modes exposed in the Cuts panel Dither select"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/raster/dither.test.ts — 43/43 passed this session via `pnpm vitest run src/core/raster src/core/job/compile-job-raster.test.ts`; proves per-mode structure only (black→sMax, white→0, FS output strictly binary, determinism, input not mutated) — NOT that any dithered result looks like the source"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:1287-1295 (S9-F11) — no Halftone/Newsprint screens; still true at pinned tree (dither.ts has no angle-screen mode)"
+        }
+      ],
+      "notVerified": "No perceptual evidence exists anywhere for the dither lane: grep of src/__fixtures__/perceptual/ for dither|emitRaster|RasterImage|grayscale returns no files (re-confirmed this session), matching prior finding S9-F4 (full-sweep-audit.md:1217). ADR-025/ADR-128 perceptual harness covers trace only. Preview registration is 'maintainer-eyeball only' per ADR-028 (DECISIONS.md:1145). Per design §5.3 no rating above 6 is supportable."
+    },
+    {
+      "id": "4.2",
+      "summary": "Grayscale mode maps luma linearly to S in [sMin,sMax]; sMin from layer Min Power % (UI appears when grayscale selected), sMax from layer/per-object power × device maxPowerS. Emitted as M4 dynamic-power runs with modal S and run-length compression. Hardware burn still pending (F.2.f); no perceptual or burn proof of the tone ramp.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/dither.ts:137-148 — linear luma→S interpolation, white stays 0 even with sMin"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job-raster.ts:45-48 — sMax/sMin from effective (object-override-aware) power percent × device.maxPowerS"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsImageFields.tsx:38-48 — Min Power field shown for grayscale"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/compile-job-raster.test.ts:67 'maps grayscale image layers between minPower and power while keeping white off' — passed this session; proves the numeric mapping, not what a burn looks like"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/emit-raster.ts:88-96,250-263 — M5 then M4 S0 arm; S emitted only on change (modal)"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "PROJECT.md:100 — 'F.2.f hardware burn pending … not yet burned on Falcon'; every grayscale-engrave fidelity claim is unburned"
+        }
+      ],
+      "notVerified": "No perceptual, rendered, or hardware evidence that the linear S ramp produces a usable tone ramp; dither.ts:16-19 itself notes most diode lasers do not respond linearly to S and no gamma/power LUT compensates. Per design §5.3 no rating above 6 is supportable."
+    },
+    {
+      "id": "4.3",
+      "summary": "Per-image brightness/contrast/gamma plus invert, edited in an Adjust Image dialog with source/processed canvas preview and presets (built-in Custom/Basic/Black-Paint-on-White plus named user presets persisted locally). Layer-level Negative toggle. Closed-vector image mask whites pixels outside the shape, with a crop-to-mask command and a save-processed-bitmap export. Compile order: adjust → invert → resample → mask → dither.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/luma-adjust.ts:9-42 — brightness/contrast/gamma (gamma clamped 0.1–5) + maybeInvertLuma"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job-raster.ts:42-44,64-75 — adjustments/invert applied before resample, mask before dither"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/raster/AdjustImageDialog.tsx:1-60 + AdjustImageDialog.presets.tsx:9-23 — dialog, preview canvases, built-in + user presets"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/image-mask.ts:22-43 — even-odd closed-contour mask; src/ui/raster/crop-image.ts:22-46 + src/ui/commands/image-command-actions.ts:53-88 — apply/remove mask and crop commands"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/raster/luma-adjust.test.ts (3) and image-mask.test.ts (2) passed this session — prove neutral-passthrough, apply-order, gamma clamp, mask whiting and closed-geometry detection; not visual quality"
+        }
+      ],
+      "notVerified": "Adjustment-curve quality was never compared perceptually against a reference (no rendered before/after diff in the repo); the dialog's live preview was not exercised this session (no dev-server interaction per ground rules)."
+    },
+    {
+      "id": "4.4",
+      "summary": "Dual Line Interval (mm) and DPI fields in the Cuts panel convert to an internal lines/mm value, hard-clamped to 5–25 lines/mm (127–635 DPI, 0.04–0.2 mm interval) with a 20/mm warn constant. A pre-compile budget refuses jobs over 4M target pixels or ~64 MB working memory. Prior audit S9-F10: LightBurn has neither the interval ceiling/floor nor the size refusal.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/raster-units.ts:4-28 — MIN 5 / MAX 25 lines-per-mm clamp and mm/DPI conversions"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/raster-budget.ts:12-21 — MAX_RASTER_PIXELS 4,000,000, 64 MB working-byte cap, WARN at 20 lines/mm"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsImageFields.tsx:92-133 — paired Line Interval + DPI inputs with min/max bounds"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/raster/raster-units.test.ts (2) and raster-budget.test.ts (5) passed this session — prove the clamps and refusal thresholds numerically"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:1277-1285 (S9-F10) — hard ceiling vs LightBurn; unchanged at pinned tree"
+        }
+      ],
+      "notVerified": "Live typing/rounding behavior of the paired fields was not exercised in the running app; whether the 20/mm warn constant actually surfaces as a UI warning was not traced."
+    },
+    {
+      "id": "4.5",
+      "summary": "Position, scale, mirror (including negative-scale-as-mirror equivalence and cancellation) and device-origin orientation are correctly baked into the burn grid. Rotation of an image-mode object is refused at preflight — 'clear rotation before engraving' — while LightBurn engraves rotated images (prior audit S9-F2, confirmed still present). The Transform model has no skew at all.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/preflight.ts:321-327 — rotationDeg !== 0 on an image-mode raster blocks the job"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job-raster.ts:109-140 — mirror/origin orientation baked into luma; src/core/job/raster-bounds.ts:16-34 — machine-space AABB from all four transformed corners"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/scene-object.ts:20-28 — Transform = x/y/scale/rotation/mirror only; no skew"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/compile-job-raster.test.ts:151-247 — origin flips, column-mirror, negative-scale-as-mirror, mirror cancellation, transformed-corner bounds all passed this session"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:1197-1205 (S9-F2 MAJOR) — rotated raster cannot engrave; verified unchanged in current tree"
+        }
+      ],
+      "notVerified": "Whether the canvas UI permits rotating a raster via handles (and what feedback the user gets before preflight) was not live-verified; only the compile/preflight behavior was code-verified."
+    },
+    {
+      "id": "4.6",
+      "summary": "Per-layer Bidirectional toggle; ADR-052 per-device, speed-interpolated scan-offset compensation applied to reverse rows (shared fill+raster geometry, with a calibration-pattern generator, empty table = byte-identical output). Overscan is a fixed 5 mm compile constant — not per-layer, unlike fill's fillOverscanMm and unlike LightBurn (prior findings S3-F7/S5-F8). No scan-angle for image mode; rows are always X-axis sweeps.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job-raster.ts:92 (bidirectional: layer.imageBidirectional) and :90 (overscanMm: DEFAULT_OVERSCAN_MM); src/core/job/compile-job-defaults.ts:6 — fixed 5 mm, comment defers configurability to device profiles"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/scan-offset.ts:1-30 + DECISIONS.md:2804 (ADR-052) — speed-interpolated reverse-row compensation; src/core/job/scan-offset-calibration-pattern.ts — calibration generator"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/raster/emit-raster-scan-offset.test.ts (3) and emit-raster.test.ts overscan/row-alternation cases (29) passed this session — prove offset geometry and overscan span structurally"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/compile-job-raster.test.ts:90 'keeps scan-offset compensation profile-scoped instead of baking it into raster groups' — passed this session"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsImageFields.tsx:70-75 — Bidirectional checkbox; grep: no scanAngle/angle field exists for image mode (hatchAngleDeg is fill-only, src/core/job/fill-hatching.ts:49)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:466-474,763-771 — fixed image overscan vs LightBurn's per-layer setting; unchanged at pinned tree"
+        }
+      ],
+      "notVerified": "Scan-offset compensation effectiveness is hardware-dependent and unburned (no machine this audit); zipper cancellation is proven only as geometry, never on material."
+    },
+    {
+      "id": "4.7",
+      "summary": "Per-layer Pass-through skips resampling and uses source pixels 1:1; Negative (invert) toggle; Convert to Bitmap turns vectors into a RasterImage (Fill All / Outlines / Use Cut Settings render types, DPI control, 50%-gray ink, ADR-029/030); Save Processed Bitmap exports the adjusted image as PNG. Pass-through still runs the layer's dither over the pixels — it is not a full processing bypass.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job-raster.ts:50-63 — passThrough keeps source pixel grid and skips resampleLumaNearest; :72-75 — dither still applied afterward with layer.ditherAlgorithm"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsImageFields.tsx:76-81 — Pass-through checkbox ('skip KerfDesk image processing'); :64-69 — Negative checkbox"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/raster/ConvertToBitmapDialog.tsx:1-40 + src/core/raster/rasterize-vector.ts + PROJECT.md:102 — vector→bitmap with render types and DPI; ink luma 127 regression-pinned (DECISIONS.md:1200)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/save-processed-bitmap.ts:1-25 — export processed raster as PNG"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/raster/rasterize-vector.test.ts (16) passed this session — structural fill/outline rasterization proofs"
+        }
+      ],
+      "notVerified": "Pass-through semantics vs LightBurn were not verified: LightBurn's Pass-Through skips all processing including dithering for pre-dithered sources, while KerfDesk still dithers pass-through pixels (compile-job-raster.ts:72-75) — the UI tooltip overstates the bypass; no ADR records this divergence, and no LightBurn side-by-side or perceptual check exists for any special mode."
+    }
+  ]
+}

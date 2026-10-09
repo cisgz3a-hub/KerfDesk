@@ -1,14 +1,12 @@
-import type { ColoredPath } from '../../core/scene/scene-object';
 import type { PreparedPartGenerator } from '../state/prepare-part-generator';
-
+import { VectorGeometryPreview } from './VectorGeometryPreview';
 export function PartGeneratorReview(props: {
   readonly prepared: PreparedPartGenerator;
   readonly stale: boolean;
 }): JSX.Element {
-  const { prepared } = props;
-  const { object, previousObject } = prepared;
-  const width = Math.max(object.bounds.maxX, previousObject?.bounds.maxX ?? 0);
-  const height = Math.max(object.bounds.maxY, previousObject?.bounds.maxY ?? 0);
+  const { prepared } = props,
+    { object, previousObject } = prepared;
+  const bounds = reviewBounds(prepared);
   return (
     <section aria-label="Generated part review">
       {props.stale ? (
@@ -20,23 +18,18 @@ export function PartGeneratorReview(props: {
           those manual geometry edits. Bake the part to keep the current paths as ordinary artwork.
         </p>
       ) : null}
-      <svg
-        role="img"
-        aria-label="Current and proposed part geometry"
-        viewBox={[-2, -2, width + 4, height + 4].join(' ')}
-        style={{ width: '100%', height: 280, border: '1px solid var(--lf-border)' }}
-      >
-        <g stroke="var(--lf-danger)" strokeDasharray="1 1" opacity={0.45}>
-          <PartPaths paths={previousObject?.paths ?? []} />
-        </g>
-        <g stroke="var(--lf-accent)">
-          <PartPaths paths={object.paths} />
-        </g>
-      </svg>
+      <VectorGeometryPreview
+        paths={object.paths}
+        bounds={bounds}
+        label="Current and proposed part geometry"
+        {...(previousObject === undefined ? {} : { previousPaths: previousObject.paths })}
+      />
       <p>
         Proposed: {object.partGenerator.definition.widthMm} ×{' '}
-        {object.partGenerator.definition.heightMm} mm, {object.paths.length - 1} holes. Blue shows
-        proposed dimensions; dashed red shows current geometry.
+        {object.partGenerator.definition.heightMm} mm, {object.paths.length - 1} holes.{' '}
+        {previousObject === undefined
+          ? ''
+          : 'Solid lines show proposed geometry; dashed lines show current geometry.'}
       </p>
       {previousObject === undefined ? (
         <p>A new named operation will be created with this part.</p>
@@ -63,24 +56,13 @@ export function PartGeneratorReview(props: {
     </section>
   );
 }
-function PartPaths(props: { readonly paths: readonly ColoredPath[] }): JSX.Element {
-  return (
-    <>
-      {props.paths.flatMap((path, pathIndex) =>
-        path.polylines.map((polyline, lineIndex) => {
-          const points = polyline.points;
-          const first = points[0];
-          const closed = polyline.closed && first !== undefined ? [...points, first] : points;
-          return (
-            <polyline
-              key={pathIndex + ':' + lineIndex}
-              points={closed.map((point) => point.x + ',' + point.y).join(' ')}
-              fill="none"
-              strokeWidth={0.4}
-            />
-          );
-        }),
-      )}
-    </>
-  );
+
+function reviewBounds({ object, previousObject }: PreparedPartGenerator) {
+  const previous = previousObject?.bounds ?? object.bounds;
+  return {
+    minX: Math.min(object.bounds.minX, previous.minX),
+    minY: Math.min(object.bounds.minY, previous.minY),
+    maxX: Math.max(object.bounds.maxX, previous.maxX),
+    maxY: Math.max(object.bounds.maxY, previous.maxY),
+  };
 }

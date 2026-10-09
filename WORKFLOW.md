@@ -1351,10 +1351,20 @@ the completed physical Frame is the spatial source of truth.
    after validation is complete, using that click's file access permission.
 
 #### Error — save failure
-- Error toast: `Could not save project: <reason>`. Project remains dirty, user can retry.
+- Error toast: `Could not save project: <reason>`. Unpersisted changes remain unsaved and the user can retry. A failed selection does not replace the previous successful file handoff.
 - If a late older request wrote the same physical file and restoring the newest captured bytes fails,
-  the exact newest Save owner is marked unsaved and the error toast says to save again. A replacement
-  document or still-newer Save cannot be dirtied by that callback.
+  the exact last successful file handoff is marked unsaved and the error toast says to save again.
+  A later failed Save does not replace that owner. A failed replay that may have changed an alias
+  marks an affected handoff unsaved promptly once its final restoration fails. Notifications check
+  each saved owner independently; unrelated later replays and older feedback handlers cannot delay
+  them. A newer Save that is still pending cannot silence a completed restoration failure, even
+  when it cancels the affected owner's remaining restoration. An affected owner whose own replay is
+  still queued becomes temporarily unsaved immediately, keeping recovery and close protection active
+  even if another file's replay stalls. Only that owner's successful own replay can clear this
+  temporary state, and only while the captured project, document, saved owner and latest uncertainty
+  still match. Newer edits stay unsaved. A final failed or cancelled restoration requires Save again;
+  a different carrier's later replay does not automatically clear it.
+  A replacement document or a genuinely newer successful handoff cannot be dirtied by that callback.
 
 #### Edge — save in web context
 - Requires the File System Access API (Chromium-only, per PROJECT.md "Delivery targets"). There is **no browser-download fallback and no IndexedDB fallback** — an unsupported browser fails clearly rather than creating a second persistence path outside the project/file contract (`web-adapter.ts`).

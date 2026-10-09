@@ -303,15 +303,11 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 }
 
 const panelStyle: React.CSSProperties = {
-  // Jog controls stay fixed while lower tools scroll independently. If the
-  // entire group cannot fit a very short body, the outer rail can scroll to
-  // reach it without covering the separate Frame/Start dock.
-  // Surface chrome and spacing come from .lf-machine-rail; layout only here.
+  // This outer rail stays within the workspace body above its Frame/Start dock.
+  // Surface chrome, spacing and scrolling come from .lf-machine-rail.
   width: '100%',
   height: '100%',
   boxSizing: 'border-box',
-  overflowY: 'auto',
-  overflowX: 'hidden',
   fontFamily: 'system-ui, sans-serif',
   display: 'flex',
   flexDirection: 'column',

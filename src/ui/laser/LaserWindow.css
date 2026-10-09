@@ -14,6 +14,11 @@
 
 /* Ordinary positioning controls have no separate scroller. Opening Console or
    other lower tools leaves the entire jog cluster in place. */
+.lf-rail.lf-machine-rail {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .lf-machine-primary-controls,
 .lf-machine-details {
   display: flex;
@@ -45,10 +50,6 @@
    full rail scroller. Heading, jog/focus and lower tools stay reachable while
    the sibling Frame/Start dock keeps the available window space. */
 @container machine-rail-body (max-height: 192px) {
-  .lf-machine-rail {
-    overflow-y: auto !important;
-  }
-
   .lf-machine-rail > .lf-machine-primary-controls,
   .lf-machine-rail > .lf-machine-details {
     flex: 0 0 auto;

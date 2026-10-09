@@ -1,7 +1,8 @@
 import type { ConstrainedSketch2d, SketchConstraint } from './constrained-sketch';
 import { sketchLength, resolveSketchParameters } from './sketch-parameters';
 import { sketchAt, sketchRequired } from './sketch-indexed';
-import type { SketchEvaluator, SketchResidual } from './sketch-jacobian';
+import type { SketchEvaluator, SketchResidual, SketchDerivative } from './sketch-jacobian';
+import { sketchConstraintJacobian } from './sketch-constraint-jacobian';
 type Pair = readonly [number, number];
 type EquationContext = {
   readonly point: (id: string, values: readonly number[]) => Pair;
@@ -11,10 +12,13 @@ type EquationContext = {
     value: Extract<SketchConstraint, { readonly value: unknown }>['value'],
   ) => number;
 };
-export function sketchEquations(
-  sketch: ConstrainedSketch2d,
-):
-  | { readonly kind: 'ok'; readonly initial: readonly number[]; readonly evaluate: SketchEvaluator }
+export function sketchEquations(sketch: ConstrainedSketch2d):
+  | {
+      readonly kind: 'ok';
+      readonly initial: readonly number[];
+      readonly evaluate: SketchEvaluator;
+      readonly derivative: SketchDerivative;
+    }
   | { readonly kind: 'error'; readonly reason: string } {
   const parameters = resolveSketchParameters(sketch.parameters);
   if (parameters.kind === 'error') return parameters;
@@ -53,6 +57,7 @@ export function sketchEquations(
         ...sketch.points.flatMap((point) => [point.x, point.y]),
         ...sketch.circles.map((circle) => circle.radiusMm),
       ],
+      derivative: (values) => sketchConstraintJacobian(sketch, values),
       evaluate: (values) =>
         sketch.constraints.flatMap((constraint) => constraintResidual(constraint, values, context)),
     };

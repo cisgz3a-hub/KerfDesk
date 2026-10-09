@@ -10,7 +10,7 @@ import { IDENTITY_TRANSFORM } from '../scene/scene-object';
 export function createReliefAuthoringDocument(field: ReliefHeightfield): ReliefAuthoringDocument {
   return {
     schemaVersion: 1,
-    algorithmRevision: 'retained-relief-v1',
+    algorithmRevision: 'retained-relief-v2',
     revision: field.revision,
     width: field.width,
     height: field.height,
@@ -86,7 +86,7 @@ export function createBlankReliefAuthoringDocument(input: {
   return {
     ...input,
     schemaVersion: 1,
-    algorithmRevision: 'retained-relief-v1',
+    algorithmRevision: 'retained-relief-v2',
     revision: 0,
     baselineHeightMm: 0,
     outsideMask: 'relief-floor',

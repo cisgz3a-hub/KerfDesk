@@ -1,3 +1,4 @@
+import type { Project } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import type { AppState } from './store';
 import { saveTargetsShareDestination } from './project-save-write-coordinator';
@@ -7,6 +8,12 @@ import { saveTargetsShareDestination } from './project-save-write-coordinator';
 export type MarkLoadedOptions = {
   readonly dirty?: boolean;
   readonly saveTarget?: SaveTarget;
+};
+
+export type ProjectSaveRestoration = {
+  readonly expectedProject: Project;
+  readonly completed: Promise<boolean>;
+  readonly onRestored?: () => void;
 };
 
 type Setter = (
@@ -43,35 +50,7 @@ export function saveTrackingActions(
       });
       return savedCurrentProject;
     },
-    markProjectSaveUncertain: async (
-      expectedProjectDocumentEpoch,
-      expectedProjectSavedRequestEpoch,
-      target,
-    ) => {
-      const before = get();
-      const savedTarget = before.lastSaveTarget;
-      if (
-        before.projectDocumentEpoch !== expectedProjectDocumentEpoch ||
-        before.projectSavedRequestEpoch !== expectedProjectSavedRequestEpoch ||
-        savedTarget === null ||
-        !(await saveTargetsShareDestination(savedTarget, target))
-      ) {
-        return false;
-      }
-      let markedUncertain = false;
-      set((state) => {
-        if (
-          state.projectDocumentEpoch !== expectedProjectDocumentEpoch ||
-          state.projectSavedRequestEpoch !== expectedProjectSavedRequestEpoch ||
-          state.lastSaveTarget !== savedTarget
-        ) {
-          return {};
-        }
-        markedUncertain = true;
-        return { dirty: true };
-      });
-      return markedUncertain;
-    },
+    markProjectSaveUncertain: createProjectSaveUncertaintyAction(set, get),
     markLoaded: (filename, options) =>
       set({
         dirty: options?.dirty ?? false,
@@ -80,5 +59,70 @@ export function saveTrackingActions(
         lastSaveTarget: options?.saveTarget ?? null,
         projectSavedRequestEpoch: null,
       }),
+  };
+}
+
+function ownsSavedProject(
+  state: AppState,
+  documentEpoch: number,
+  savedRequestEpoch: number,
+  target: SaveTarget,
+): boolean {
+  return (
+    state.projectDocumentEpoch === documentEpoch &&
+    state.projectSavedRequestEpoch === savedRequestEpoch &&
+    state.lastSaveTarget === target
+  );
+}
+
+function createProjectSaveUncertaintyAction(
+  set: Setter,
+  get: Getter,
+): AppState['markProjectSaveUncertain'] {
+  let nextUncertainty = 0;
+  let latestUncertainty = 0;
+  return async (documentEpoch, savedRequestEpoch, target, restoration) => {
+    const before = get();
+    const savedTarget = before.lastSaveTarget;
+    const token = ++nextUncertainty;
+    if (
+      savedTarget === null ||
+      !ownsSavedProject(before, documentEpoch, savedRequestEpoch, savedTarget) ||
+      !(await saveTargetsShareDestination(savedTarget, target))
+    )
+      return false;
+    let markedUncertain = false;
+    set((state) => {
+      if (
+        token < latestUncertainty ||
+        !ownsSavedProject(state, documentEpoch, savedRequestEpoch, savedTarget)
+      )
+        return {};
+      latestUncertainty = token;
+      markedUncertain = true;
+      return { dirty: true };
+    });
+    if (markedUncertain && restoration !== undefined) {
+      void restoration.completed
+        .then((restored) => {
+          if (!restored) return;
+          let markedRestored = false;
+          set((state) => {
+            if (
+              latestUncertainty !== token ||
+              state.project !== restoration.expectedProject ||
+              !ownsSavedProject(state, documentEpoch, savedRequestEpoch, savedTarget)
+            )
+              return {};
+            markedRestored = true;
+            return { dirty: false };
+          });
+          if (markedRestored) restoration.onRestored?.();
+        })
+        .catch(() => {
+          // Failed or abandoned restoration keeps recovery armed.
+        });
+    }
+    return markedUncertain;
   };
 }

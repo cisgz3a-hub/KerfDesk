@@ -1,6 +1,6 @@
-// ConnectionBar — the compact machine toolbar or standalone connection card
-// (ADR-420): one status line, the machine it talks to, one primary action and
-// a small menu for the rest.
+// ConnectionBar — the compact machine connection toolbar (ADR-420 Amendment 2):
+// one status line, the machine it talks to, one primary action and a small
+// menu for the rest.
 //
 //   disconnected → "Not connected", primary "Connect"
 //   connecting   → "Connecting…" (disabled)
@@ -39,7 +39,6 @@ type Props = {
   readonly onAutoConnectChange?: (enabled: boolean) => void;
   /** The desktop app on macOS and Linux forgets its chosen ports when it closes (ADR-366). */
   readonly portChoiceEndsOnRestart?: boolean;
-  readonly layout?: 'card' | 'compact';
   /** The toolbar label; the full machine profile stays in the details popover. */
   readonly machineName?: string;
   /** Additional machine details, such as the fitted laser module. */
@@ -52,41 +51,23 @@ type Props = {
 
 export function ConnectionBar(props: Props): JSX.Element {
   const { connection } = props;
-  const compact = props.layout === 'compact';
   return (
     <section
-      className={compact ? 'lf-connection-compact' : 'lf-connection-card'}
+      className="lf-connection-compact"
       aria-label="Machine connection"
       data-state={connection.kind}
     >
-      {compact ? (
-        <CompactConnectionControls
-          machineName={props.machineName ?? 'Unnamed machine'}
-          status={connectionStatusLabel(connection)}
-          statusDot={<StatusDot connection={connection} />}
-          machine={props.machine}
-          details={props.details}
-        >
-          <PrimaryAction {...props} />
-          {props.setup}
-          <ConnectionMenu {...props} />
-        </CompactConnectionControls>
-      ) : (
-        <>
-          <div className="lf-connection-card-head">
-            <StatusDot connection={connection} />
-            <span className="lf-connection-card-status" role="status" aria-live="polite">
-              {connectionStatusLabel(connection)}
-            </span>
-            <ConnectionMenu {...props} />
-          </div>
-          {props.machine}
-          <div className="lf-connection-card-actions">
-            <PrimaryAction {...props} />
-            {props.setup}
-          </div>
-        </>
-      )}
+      <CompactConnectionControls
+        machineName={props.machineName ?? 'Unnamed machine'}
+        status={connectionStatusLabel(connection)}
+        statusDot={<StatusDot connection={connection} />}
+        machine={props.machine}
+        details={props.details}
+      >
+        <PrimaryAction {...props} />
+        {props.setup}
+        <ConnectionMenu {...props} />
+      </CompactConnectionControls>
       {connection.kind === 'failed' && (
         <p role="alert" className="lf-connection-card-error">
           {connectionFailureText(connection.error, props.machineNoun)}

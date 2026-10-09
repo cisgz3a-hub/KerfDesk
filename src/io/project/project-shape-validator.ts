@@ -24,8 +24,11 @@ import { validateOptionalArtworkOrder } from './project-artwork-order-validator'
 import { validateProjectScanOffsetProfile } from './project-scan-offset-validator';
 import { validateTracedImageMetadata } from './project-trace-shape-validator';
 import * as reliefField from './project-relief-heightfield-validator';
-import { validateReliefAuthoringObject } from './project-relief-authoring-validator';
-import { validateSingleReliefSource } from './project-relief-source-authority';
+import {
+  validateReliefAuthoringObject,
+  type ReliefAuthoringResolutions,
+} from './project-relief-authoring-validator';
+import { validateReliefSource } from './project-relief-source-authority';
 import { validateProjectJobSetup } from './project-job-setup-validator';
 import { validateOperationIds } from './project-operation-id-validator';
 import {
@@ -67,7 +70,10 @@ const ORIGINS = ['front-left', 'front-right', 'rear-left', 'rear-right', 'center
 const MAX_RASTER_SOURCE_PIXELS = 256_000_000;
 
 // which the G-code bounds-check regex can't read — defeating the bounds
-export function validateProjectShape(raw: Record<string, unknown>): string | null {
+export function validateProjectShape(
+  raw: Record<string, unknown>,
+  resolvedDocuments?: ReliefAuthoringResolutions,
+): string | null {
   const archiveError = visitWorkflowArchives(raw);
   if (archiveError !== null) return archiveError;
   const device = raw['device'];
@@ -96,7 +102,7 @@ export function validateProjectShape(raw: Record<string, unknown>): string | nul
     validateProcessRecipeApplications(raw['processRecipeApplications']),
     validateProductionNestDefinition(raw['productionNest']),
     validateRetainedArrays(raw['arrayLayouts'], validateProjectShape),
-    validateScene(scene),
+    validateScene(scene, resolvedDocuments),
   ]);
 }
 
@@ -158,14 +164,19 @@ function validateWorkspace(workspace: Record<string, unknown>): string | null {
   ]);
 }
 
-function validateScene(scene: Record<string, unknown>): string | null {
+function validateScene(
+  scene: Record<string, unknown>,
+  resolvedDocuments?: ReliefAuthoringResolutions,
+): string | null {
   const layers = scene['layers'];
   const objects = scene['objects'];
   if (!Array.isArray(objects) || !Array.isArray(layers)) return null;
   return (
     validateSceneBudgets(scene) ??
     validateArray(layers, 'scene.layers', validateProjectLayer) ??
-    validateArray(objects, 'scene.objects', validateSceneObject) ??
+    validateArray(objects, 'scene.objects', (object, path) =>
+      validateSceneObject(object, path, resolvedDocuments),
+    ) ??
     validateOptionalArtworkOrder(scene, 'scene.artworkOrder') ??
     validateDesignTreeOrder(scene['designTreeOrder']) ??
     optionalSceneGroups(scene, 'scene.groups') ??
@@ -173,7 +184,11 @@ function validateScene(scene: Record<string, unknown>): string | null {
   );
 }
 
-function validateSceneObject(obj: unknown, path: string): string | null {
+function validateSceneObject(
+  obj: unknown,
+  path: string,
+  resolvedDocuments?: ReliefAuthoringResolutions,
+): string | null {
   if (!isObject(obj)) return `missing or invalid \`${path}\``;
   const sharedError = validateSharedObjectMetadata(obj, path);
   if (sharedError !== null) return sharedError;
@@ -185,7 +200,7 @@ function validateSceneObject(obj: unknown, path: string): string | null {
   }
   if (kind === 'raster-image') return validateRasterObject(obj, path);
   if (kind === 'shape') return validateShapeObject(obj, path);
-  if (kind === 'relief') return validateReliefObject(obj, path);
+  if (kind === 'relief') return validateReliefObject(obj, path, resolvedDocuments);
   return `missing or invalid \`${path}.kind\``;
 }
 function validateImportedVector(obj: Record<string, unknown>, path: string): string | null {
@@ -227,12 +242,16 @@ function validateSvgImport(value: unknown, path: string): string | null {
 }
 // H.4 (ADR-098): the embedded mesh is the carving source — a malformed or
 // non-finite mesh or canonical field/mask data must never reach the heightmap sampler.
-function validateReliefObject(obj: Record<string, unknown>, path: string): string | null {
+function validateReliefObject(
+  obj: Record<string, unknown>,
+  path: string,
+  resolvedDocuments?: ReliefAuthoringResolutions,
+): string | null {
   const fieldError = firstError([
     requireString(obj, `${path}.id`),
     requireString(obj, `${path}.source`),
     validateReliefSource(obj, path),
-    validateReliefAuthoringObject(obj, path),
+    validateReliefAuthoringObject(obj, path, { resolvedDocuments }),
     requirePositiveNumber(obj, `${path}.targetWidthMm`),
     requirePositiveNumber(obj, `${path}.reliefDepthMm`),
     requireString(obj, `${path}.color`),
@@ -244,35 +263,6 @@ function validateReliefObject(obj: Record<string, unknown>, path: string): strin
   ]);
   if (fieldError !== null) return fieldError;
   return reliefField.validateReliefHeightfieldBounds(obj, path);
-}
-
-function validateReliefSource(obj: Record<string, unknown>, path: string): string | null {
-  const source = obj['reliefSource'];
-  if (!isObject(source)) return `missing or invalid \`${path}.reliefSource\``;
-  const authorityError = validateSingleReliefSource(obj, source, path);
-  if (authorityError !== null) return authorityError;
-  if (source['kind'] === 'legacy-mesh') {
-    return firstError([
-      validateMeshPositions(source['meshPositions'], `${path}.reliefSource.meshPositions`),
-      requireLiteral(source, `${path}.reliefSource.emptyCells`, ['floor', 'top']),
-    ]);
-  }
-  return reliefField.validateReliefHeightfield(source, `${path}.reliefSource`);
-}
-
-function validateMeshPositions(value: unknown, path: string): string | null {
-  if (!Array.isArray(value) || value.length === 0) {
-    return `missing or invalid \`${path}\``;
-  }
-  if (value.length % 9 !== 0) {
-    return `\`${path}\` length must be a multiple of 9 (three xyz vertices per triangle)`;
-  }
-  for (const n of value) {
-    if (typeof n !== 'number' || !Number.isFinite(n)) {
-      return `non-finite number in \`${path}\``;
-    }
-  }
-  return null;
 }
 
 function validateVectorObject(obj: Record<string, unknown>, path: string): string | null {

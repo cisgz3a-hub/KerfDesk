@@ -10,7 +10,7 @@ const all = (values: readonly boolean[]): boolean => values.every(Boolean);
 const point = (v: unknown): v is { x: number; y: number } =>
   record(v) && finite(v['x']) && finite(v['y']);
 
-export function reliefRailProfileError(raw: unknown): string | null {
+export function reliefRailProfileError(raw: unknown, legacy = false): string | null {
   if (!record(raw) || raw['kind'] !== 'rail-profile-v1') return 'Unsupported rail/profile source.';
   const steps = raw['samplingSteps'],
     width = raw['widthMm'],
@@ -26,7 +26,7 @@ export function reliefRailProfileError(raw: unknown): string | null {
   const profile = sectionsError(sections as unknown[]);
   if (profile !== null) return profile;
   try {
-    railProfileTriangles(raw as unknown as ReliefRailProfileSource);
+    railProfileTriangles(raw as unknown as ReliefRailProfileSource, legacy);
     return null;
   } catch (error) {
     return error instanceof Error ? error.message : 'Rail surface is not single-valued.';

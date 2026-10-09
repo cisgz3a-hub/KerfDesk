@@ -12,6 +12,18 @@ export type CommandHelpTopic = {
 };
 
 export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
+  'tools.constrained-sketch': {
+    family: 'tools',
+    tooltip: 'Create an editable 2D sketch with named dimensions and geometric relations.',
+  },
+  'tools.parametric-part': {
+    family: 'tools',
+    tooltip: 'Create a dimensioned panel, bracket, hole grid or fixture.',
+  },
+  'tools.editable-relief': {
+    family: 'tools',
+    tooltip: 'Create and sculpt an editable heightfield in CNC mode.',
+  },
   'tools.ai-assistant': {
     family: 'tools',
     tooltip:

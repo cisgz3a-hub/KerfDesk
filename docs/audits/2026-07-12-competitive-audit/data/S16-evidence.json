@@ -1,0 +1,180 @@
+{
+  "sector": 16,
+  "categories": [
+    {
+      "id": "16.1",
+      "summary": "Six ControllerKinds; GRBL v1.1 is deepest — pure $$ parser harvesting $30/$31/$32/$110-$132, native $J jog, alarm+error(1-38) tables, G38.2 probe, allowlisted verify-by-reread setting writes, override bytes now capability-gated (CTL-01). grblHAL = 4-line delta (alarms 10-13; errors 39+ surface as raw text, comment now honest). FluidNC = readonly-dump delta, but console still accepts numeric $-writes (A.3.9 open).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/device-profile.ts:18-24 — ControllerKind union: grbl-v1.1, grblhal, fluidnc, marlin, smoothieware, ruida"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/parse-settings.ts:1-159 — pure $$ state-machine parser (bed $130/$131, power $30/$31, laser $32, feed $110/$111, accel, junction, Z $132)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grblhal/driver.ts:1-16 — grblHAL is {...grblDriver, kind, label}; comment now states errors stop at vanilla 38 and 39+ surface as raw text (A.3.6 comment corrected)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/error-codes.ts:15-135 — error table ends at code 38; alarm-codes.ts covers grblHAL 10-13"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/fluidnc/driver.ts:10-19 — settings:'readonly-dump', firmwareSetupPanel:'none', but NO prepareConsoleCommand override, so numeric $N=value writes are still accepted (A.3.9 OPEN)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/controller-capabilities.ts:67-71 + grbl/driver.ts:55 (overrides:true) — new overrides capability; override bytes 0x90-0x9D now gated (CTL-01, fixes A.3.1)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/detect-controller.ts:14-24 — banner matchers ordered FluidNC before grblHAL before generic GRBL"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/controllers/grbl-family-drivers.test.ts:14-32,41-68 — pins which driver fields may diverge, incl. overrides:false for non-GRBL"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "src/core/devices/profile-catalog.ts:215-217 — Falcon A1 Pro grblHAL evidence text 'Hardware-verified'; per repo ledger this is CLAIMED, not re-verified this session"
+        }
+      ],
+      "notVerified": "No real-hardware behavior of grblHAL or FluidNC. The FluidNC 'simulator' is the GRBL sim with a FluidNC banner; whether a real FluidNC $$ dump includes $30/$32 (which the power-scale gate depends on) is unproven. The grblHAL hardware-verified claim was taken from catalog evidence text, not re-verified. Lint/tests not run."
+    },
+    {
+      "id": "16.2",
+      "summary": "Marlin (ADR-095): queued M114 status polled only while idle, stream-side pause, M400 settle (CTL-02 fix, was hardcoded G4 P0.01), inline/fan dialects; Smoothieware (ADR-096): fractional S 0-1.0 rescale, comma-status fallback parser (CTL-05 fix). Shared relative-jog module (A.3.11 fix); override bytes suppressed. Both simulator-verified only, no hardware. Open A.3.3: streamingMode not coupled to kind, so wizard detection can mint a char-counted Marlin profile ADR-095 calls unsafe.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/marlin/driver.ts:49,65 — overrides:false, settleDwell:M400; response.ts synthesized Idle M114"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-post-job-settle.ts:44-52 — settle now uses refs.driver.commands.settleDwell (CTL-02, fixes A.3.2)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/smoothieware/comma-status-report.ts:17-43 + response.ts:26-29 — classic comma-grammar status fallback (CTL-05, fixes A.3.5)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/relative-jog-commands.ts consumed by marlin/commands.ts:4,28 and smoothieware/commands.ts:5,29 (fixes A.3.11 copy-paste)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/gcode-dialects.ts:11 — MarlinGcodeDialectId 'marlin-inline'|'marlin-fan'"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/state/laser-lifecycle-marlin.simulator.test.ts, laser-lifecycle-smoothie.simulator.test.ts, marlin/marlin-driver.test.ts, smoothieware/smoothieware-driver.test.ts (asserts settle=M400, overrides:false)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/device-setup/device-setup-flow.ts:97-101,132-138 — detection overlays controllerKind only, never streamingMode; start-job-flow.ts:65 passes project.device.streamingMode verbatim; profile-application.ts:23-24 couples kind but not streamingMode (A.3.3 OPEN)"
+        }
+      ],
+      "notVerified": "All real-hardware Marlin/Smoothieware behavior — both are simulator-verified only per ADR-095/096 catalog evidence 'NOT hardware-verified'. Whether stock/stable Smoothie emits comma vs pipe status is unconfirmed (the fix is a tolerant parser, not a board check). A real Marlin's reaction to a stray override byte is unconfirmed. A.3.3 streamingMode-mismatch is a designed-open path, not exercised on hardware."
+    },
+    {
+      "id": "16.3",
+      "summary": "Ruida is the only DSP/proprietary controller — no Trocen or others. Experimental .rd vector export, file-only transport (Connect disabled), clean-room swizzle encoder that refuses rasters, EXPERIMENTAL toast on every save. Verification is circular (round-trips through the repo's own decoder); no real hardware or LightBurn reference .rd exists. Fixes since audit: false 'golden hex fixtures' header corrected, real byte-regression golden + emit-rd tests added, Min==Max power divergence now recorded in ADR-097. No UDP socket in the tree.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/ruida/rd-encoder.ts:1-11 — header now says determinism is pinned by the double-encode test + STATUS HONESTY note (false 'golden hex fixtures' claim removed, part of A.3.4)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/ruida/driver.ts:31,47 — overrides:false, settleDwell:''; transport file-only via controller-capabilities.ts:33-38"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/controllers/ruida/rd-encoder-golden.test.ts:1-30 — byte-level regression golden (CTL-04 pt3); src/io/rd/emit-rd.test.ts (65 lines, fixes A.3.10 'zero tests'); ruida.test.ts round-trip"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md ADR-097 Limitation (lines ~3730-3741, CTL-04 pt2) — Min==Max layer power (rd-encoder.ts:68-69) now recorded as a deliberate LightBurn divergence (was unrecorded in A.3.4)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/ruida/ruida-udp-session.ts — pure state machine only; no dgram/socket anywhere, so unvalidated bytes cannot reach a live laser (ADR-097)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/profile-catalog.ts:202-208 — generic Ruida entry evidence status 'experimental', 'NO file has been accepted by a real Ruida controller yet'"
+        }
+      ],
+      "notVerified": "No real Ruida controller has accepted the output (labeled experimental everywhere). No LightBurn/MeerK40t reference .rd exists in the tree to diff against — the golden test proves byte-stability across code changes, not protocol correctness. What a real Ruida DSP does with Min==Max power is unverified. UDP transport is deliberately not built."
+    },
+    {
+      "id": "16.4",
+      "summary": "12 shipped catalog entries: Default starter, Falcon A1 Pro grblHAL (HW-claimed), Falcon-compatible, Neotronics 4040, xTool D1 Pro, Sculpfun S30, Ortur LM3, and generic grblHAL/FluidNC/Marlin/Smoothie/Ruida — each with typed evidence badges; Start gate cross-checks $30/$32 vs profile (stronger than LightBurn). Fixed since audit: File->New keeps the device (A.4.1 critical), laser bounds now cross-checked vs live $130/$131 travel (A.4.6). Still open: no RESEARCH_LOG provenance (A.4.10), guessed .lbdev schema (A.4.5), no app-level saved-machines list (A.4.2).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/profile-catalog.ts:211-248 — GRBL_MACHINE_PROFILE_CATALOG array of 12 entries; :50-56 typed ProfileEvidence with status (public-spec-starter/hardware-verified/simulator-tested/experimental)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/store.ts:403-415 — newProject now passes createProject(s.project.device), carrying bed/origin/zones/scan-offsets/camera (fixes A.4.1 CRITICAL File->New reset)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/laser-machine-limit-warnings.ts:1-46 + machine-job-warnings.ts laser branch — new detectLaserMachineLimitWarnings compares profile bed vs reported $130/$131 and fastest emitted feed vs $110/$111 (fixes A.4.6, DEV-06/R4)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/profile-catalog.ts:261 duplicateProfileAsCustom is exported but referenced only by index.ts:49 and its own test; grep for savedMachines/saved-machines slice = NONE (A.4.2 OPEN, no app-level laser machine list)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/lightburn/lbdev-import.ts — alias-fishing regex parser against a guessed schema; lbdev-import.test.ts uses a synthetic fixture only; no real .lbdev sample in tree (A.4.5 OPEN)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "RESEARCH_LOG.md — grep for xtool/sculpfun/ortur/falcon/neotronics and bed dims returns zero machine provenance entries (A.4.10 OPEN)"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "src/core/devices/profile-catalog.ts:215-217 (Falcon A1 Pro grblHAL) 'Hardware-verified' — CLAIMED per repo ledger, not re-verified"
+        }
+      ],
+      "notVerified": "Vendor-published bed dimensions for xTool D1 Pro / Sculpfun S30 / Ortur LM3 / Falcon / Neotronics (no network access). The real LightBurn .lbdev file format (no genuine sample). Whether .lfmachine.json still drops baudRate/cameraAlignment (A.4.8) — the io module was not re-read this session. Falcon hardware-verified claim taken from evidence text."
+    },
+    {
+      "id": "16.5",
+      "summary": "ADR-092 Device Setup wizard: a 7-step draft-commit reducer (connect->identify->confirm->safety->probe->firmware->review) with assertNever exhaustiveness, prefilled from the $$ dump (the beats-LightBurn 'your laser told us its settings' angle), guarded firmware writes ($30/$31/$32 allowlist + verify-by-reread), committing only on Finish; broad unit and component test coverage. Banner auto-detection is advisory-only and correctly ordered. Open: detection overlays controllerKind but not streamingMode (A.3.3); connected profile-apply can keep old machine numbers under a new name (A.4.3).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md ADR-092:3318-3423 — manual-trigger, multi-step, draft-and-commit wizard; reuses $$ detection pipeline + guarded writeGrblSetting (allowlist COMMON_WRITE_IDS, re-reads $$ to verify)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/device-setup/device-setup-flow.ts:82-127 — pure initDeviceSetup + deviceSetupReducer with assertNever; commits via replaceDeviceProfile on Finish"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/detect-controller.ts:14-34 — advisory banner detection registry; never silently switches drivers (ADR-094 decision 4)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/laser/device-setup/: DeviceSetupWizard.test.tsx, device-setup-flow.test.ts, device-setup-readiness.test.ts, device-setup-firmware-diff.test.ts, device-setup-nudge.test.ts, DeviceSetupProbeStep.test.tsx"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/device-setup/device-setup-flow.ts:97-101 — detection overlays controllerKind onto the draft but leaves streamingMode untouched (A.3.3 unsafe-profile path OPEN)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/profile-application.ts:12-31 — profileWithControllerFacts spreads machineReportedProfilePatch(current) when controllerRead; on the banner-interacted path old machine numbers can ride into a newly-picked profile (A.4.3 PARTIAL, mechanism present)"
+        }
+      ],
+      "notVerified": "Hardware-gated per ADR-092: that the wizard reads $$ correctly on a real GRBL connect, that writing $30/$32 to a real controller verifies via re-read, and that the chosen origin corner flips Y correctly in emitted G-code. Wizard runtime UI was not exercised (no dev-server interaction per collaboration rule 4)."
+    }
+  ]
+}

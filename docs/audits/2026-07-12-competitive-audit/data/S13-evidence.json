@@ -1,0 +1,121 @@
+{
+  "sector": 13,
+  "categories": [
+    {
+      "id": "13.1",
+      "summary": "Rotary data model exists (RotarySetup: roller/chuck, mmPerRotation, objectDiameterMm, reverseAxis), persisted in .lf2 + machine profiles. But there is NO rotary UI anywhere — no setup dialog, wizard, config fields, or test/spin button; it is settable only by hand-editing a project or machine-profile file. ADR-127 explicitly deferred the dialog and command wiring.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/rotary.ts:14-35 — RotarySetup type (roller/chuck, mmPerRotation, objectDiameterMm, reverseAxis) + DEFAULT_ROTARY_SETUP (enabled:false)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/project/project-device-profile-validator.ts:66 (optionalRotarySetup) and src/io/machine-profile/machine-profile-io.ts:156-260 — rotary validated and round-tripped through .lf2 project and machine-profile files"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui — grep of the entire src/ui tree for /[Rr]otary|RotarySetup/ returns NO files; src/ui/laser/DeviceProfileFields.tsx has no rotary field. No setup dialog, wizard, or command surface exists."
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md ADR-127:6179-6182 — 'The Rotary Setup dialog and command wiring are a deliberate follow-up so this lands as a small, reviewable, UI-free slice.'"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/devices/rotary.test.ts and src/io/machine-profile/machine-profile-rotary.test.ts — unit coverage of the setup math and profile round-trip only (not a wizard/test flow)"
+        }
+      ],
+      "notVerified": "No rotary setup wizard or test-spin routine exists, so none could be exercised; the feature is unreachable from the UI (file-edit only), so usability could not be assessed. Prior internal audits (2026-07-10 consolidated v2 / full-sweep) did not cover rotary — it landed after their pinned commit (full-sweep-audit line 22: rotary/emitter 'not covered by any stream')."
+    },
+    {
+      "id": "13.2",
+      "summary": "Rotary Y-scaling math is implemented and routed through one source of truth (machineSpaceJob), applied at emit for G-code + Ruida .rd, plus framing, time-estimate and preflight bounds. Chuck scales by mmPerRotation/(pi*d); roller 1:1; reverseAxis mirrors; Y is rebased to 0. Disabled output is byte-identical. Jobs taller than one revolution and raster jobs are refused. Never run on a physical rotary (CLAIMED).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/rotary-transform.ts:17-63 (scale + rebase, reverse-mirror) and src/core/job/rotary-job.ts:28-45 (machineSpaceJob = single source of truth; identity when inactive)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/rotary.ts:42-52 — rotaryYScale = mmPerRotation/(pi*d) for chuck, 1 for roller; rotaryYLimitMm = one-revolution wrap extent"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/gcode/emit-gcode-rotary.test.ts:55-126 — chuck scale-and-rebase, roller 1:1, wrap-taller refused (out-of-bed), raster refused (rotary-raster-unsupported), disabled == absent byte-identical"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/rd/emit-rd.ts:11,34-37 — Ruida .rd export applies the same machineSpaceJob rotary scaling as G-code (review R3)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/preflight.ts:76-78,341,378-379 — boundsHeightOverrideMm swaps bed height for the one-revolution wrap limit; Y span [0,override]"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "DECISIONS.md ADR-127:6187-6190 — Y-scale factor, reverse-mirror sign and wrap limit 'have never run on a physical rotary. A wrong calibration silently distorts the burn and no automated test can catch it. Ships CLAIMED until a maintainer rotary bench pass.'"
+        }
+      ],
+      "notVerified": "[HW] cell — circumference/scale mapping, reverse-mirror sign, and wrap limit are structurally unit-tested only; never validated on hardware, and a wrong calibration silently distorts the burn (HW-CLAIMED). No perceptual/preview proof of the wrapped result: by design the on-canvas preview stays surface-true and does NOT apply rotary scaling (rotary-job.ts:8-9), so there is no rotary-specific preview showing the mapped output."
+    },
+    {
+      "id": "13.3",
+      "summary": "Autofocus is real: runAutofocus sends a user-configured command (Creality Falcon $HZ1 preset or generic GRBL G38.2 probe preset), watching ok/error/alarm/status with a 15s timeout; an AutofocusEditor UI with presets ships. The Focus Test command exists but is permanently DISABLED (stub alert — needs a hardware-verified Z-motion generator). No laser material-thickness/focus-offset field; thickness is CNC-stock and material-library matching only.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/autofocus-action.ts:40-140 — runAutofocus protocol: preflight (connected/idle/single-line), send + status nudge, resolve on non-idle->idle, reject on error/alarm/15s timeout"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/AutofocusEditor.tsx:16-73 — command textarea + one-click presets: Falcon A1 Pro '$HZ1' and generic GRBL probe 'G38.2 Z-30 ... G92 Z0'"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/command-families.ts:308-317 and src/ui/commands/CommandShell.tsx:80-83 — Focus Test is a disabled() command whose invoke only shows 'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run.'"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/commands/command-registry.test.ts:221-245 — Focus Test stays disabled and never runs, even when a profile advertises focusTestAvailable:true"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/material-library/material-matching.ts:93,193 — thicknessMm is used only for material-library candidate matching; no laser Z-focus-from-thickness path"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "DECISIONS.md ADR-018:421-422 — autofocus 'working' on a Creality Falcon A1 Pro is stated as a prior hardware pass; per the standing ledger all KerfDesk hardware passes are CLAIMED, unverified in this audit"
+        }
+      ],
+      "notVerified": "Autofocus was not run on hardware in this audit (ledger = CLAIMED) and the live UI was not exercised (side-effect-free constraint). The Focus Test generator does not exist — the command is permanently a disabled stub. There is no autofocus<->material-thickness integration and no laser-side focus-offset-from-thickness field."
+    },
+    {
+      "id": "13.4",
+      "summary": "Automated air assist is present and real: a device-level airAssistCommand (M7/M8/none), a per-layer airAssist flag, per-object override, a defaults-sync action, and emitted M7/M8/M9 coolant transitions that wrap cut groups in the G-code; it is safety-locked while a job runs. Curved/tilted/conical-surface (rotary-cone) compensation is absent — no code found. No other specialty modes were located.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:345-355 — groupCoolantMode returns off/M7/M8 per group and coolantTransition emits M7/M8 on and M9 off around groups (automated per-layer air assist)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/air-assist-default-actions.ts:38-122 — per-layer + per-object air-assist defaults sync (DEFAULT_MANUAL_AIR_COMMAND 'M7', enables air on all output laser layers/overrides)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/output/grbl-strategy-air-assist.test.ts and src/ui/state/laser-store-air-assist-safety.test.ts + src/io/project/project-air-assist.test.ts — emission and safety/round-trip coverage"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core — grep for /tilt|curved|conical|surface compensation/ finds only camera-mount tilt (align-markers/calibrate tests) and CNC stock thickness; NO laser curved/tilted-surface or rotary-cone compensation exists"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:401-402 — cut settings (incl. air assist) locked while a job is active, corroborating the safety-lock behavior"
+        }
+      ],
+      "notVerified": "Air-assist actual airflow is hardware-dependent; only the emitted M7/M8/M9 command sequence is verified (CODE/TEST), not that a solenoid fires. The absence of curved/tilted/conical-surface compensation is a negative result from an exhaustive grep — no such path was found, but absence cannot be proven exhaustively."
+    }
+  ]
+}

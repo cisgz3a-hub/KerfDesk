@@ -1,0 +1,454 @@
+{
+  "sector": 4,
+  "categories": [
+    {
+      "id": "4.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Roster-leading breadth: 10 documented modes (Threshold, Ordered, Atkinson, Dither, Stucki, Jarvis, Newsprint, Halftone with cell size/angle, Grayscale, Sketch); community treats LightBurn as the photo-engraving reference and its dither set as the superset.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/"
+            },
+            { "tag": "COMM", "cite": "https://craftgineer.com/blog/lightburn-vs-lasergrbl" },
+            {
+              "tag": "COMM",
+              "cite": "https://omtech.com/blogs/software/lightburn-photo-engraving-settings"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only (no laser): product page lists only CNC control/CAM targets; Phase-0 coverage note confirms no laser functionality, so no laser raster/dither pipeline.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Official docs document a generic '1bit BW dithering' tool without enumerating algorithms; community/third-party writeups list Floyd-Steinberg (default), Jarvis, Stucki, Atkinson, Sierra variants, Burkes, Random. Community: genuinely good for free, trails LightBurn on complex photos.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/dithering-tool/"
+            },
+            { "tag": "COMM", "cite": "https://craftgineer.com/blog/lightburn-vs-lasergrbl" },
+            {
+              "tag": "COMM",
+              "cite": "https://twotrees3d.com/blogs/twotrees-blog/lasergrbl-vs-lightburn-which-laser-software-is-right-for-you"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio bitmap modes: Grayscale (default), Bayer, Floyd, Stucki, Atkinson, Jarvis, Sierra, with per-mode guidance (Jarvis recommended for infrared, Grayscale for blue diode). No halftone/newsprint family. Quality beyond docs not established.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2432" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/553" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Not a laser raster product: Easel Pro's 'Raster Toolpaths' is a CNC pocket-clearing fill strategy (bit moves in parallel lines, X/Y direction only), not image dithering; community confirms Easel is not meant for laser work.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012726174-Easel-Pro-Feature-Raster-Toolpaths"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/laser-engraving-cutting-with-easel/34013"
+            },
+            { "tag": "COMM", "cite": "https://optlasers.com/x-carve-laser-instruction" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Grayscale mode 'varies power output as a percentage between Min and Max Power' per layer. Community consensus: excellent for depth/3D effects; on diode lasers users often prefer dithering for tonal photos — a material limit, not a software one.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/grayscale-vs-dithering-choices/43897"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/greyscale-vs-dithering-with-a-diode-laser/106876"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no laser power-modulated engraving (product page lists only CNC targets).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Line To Line tool engraves 'realistic shades of grey' via PWM (laser must support power modulation); S-MIN maps white pixels, S-MAX black; M3/M4 choice documented. Community: close to LightBurn for basic photos; gap widens where fine-tuning matters.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/line-to-line-tool/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/target-image-size-and-laser-options/"
+            },
+            { "tag": "COMM", "cite": "https://craftgineer.com/blog/lightburn-vs-lasergrbl" },
+            {
+              "tag": "COMM",
+              "cite": "https://twotrees3d.com/blogs/twotrees-blog/lasergrbl-vs-lightburn-which-laser-software-is-right-for-you"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Grayscale is the default xTool Studio bitmap mode ('the darker the pixel, the deeper the carving' — per-pixel power modulation). No documented user control of the power mapping curve or S-min/max equivalent; quality signal beyond docs not established.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2432" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No laser pipeline; CNC depth comes from Z, not power modulation. Community: Easel is not meant to drive laser heads.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/laser-engraving-cutting-with-easel/34013"
+            },
+            { "tag": "COMM", "cite": "https://optlasers.com/x-carve-laser-instruction" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Adjust Image tool (contrast, brightness, gamma with live preview) plus vector-shape image masking/cropping (Apply Mask to Image; masks stay editable with node/boolean tools, removable non-destructively).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/Tools/AdjustImage.html" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/ApplyMaskToImage/"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no laser image pipeline to adjust.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Import dialog documents brightness/contrast, B&W threshold, three grayscale conversion formulas (SimpleAverage/WeightAverage/OpticalCorrect) plus custom RGB weights, bicubic/nearest resize, and rotate/crop/flip tools. Color invert was a requested gap (GitHub #130); current status unverified.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/import-parameters/"
+            },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/130" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio documents brightness, contrast, saturation, sharpness, and temperature sliders, bitmap color invert (incl. grayscale/color handling), and stylistic bitmap filters. No gamma control documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2528" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/961" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Raster images are only consumed via Image Trace to vectors; no raster-engrave image-adjustment pipeline exists.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/laser-engraving-cutting-with-easel/34013"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Per-layer Line Interval with linked DPI display controls 'spacing between scanned rows'; separate Cells-per-Inch density for Halftone. Docs and vendor/community guides give material-specific interval guidance.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://omtech.com/blogs/software/lightburn-photo-engraving-settings"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://www.orturlaser.com/blogs/academy/what-is-the-best-lightburn-setting-for-photo-laser-engraving"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; stepover for milling is a different concept (S7), no laser line-interval control.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Row density set via 'Quality' in lines/mm; official dithering page advises 'use a high quality resolution' for best results. Third-party guides document lines-per-mm behavior; no DPI-unit display documented.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/dithering-tool/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://ortur.net/blogs/ortur-blog-center/how-to-set-the-engraving-and-cutting-parameters-of-lasergrbl"
+            },
+            { "tag": "COMM", "cite": "https://all3dp.com/2/lasergrbl-tutorial/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio 'Lines per cm' documented with visual 10–300 lines/cm examples; applies to Bitmap and Vector Engrave on all models except F1/F1 Ultra bitmap engrave (fixed resolution there). Metric-only unit; no DPI display documented.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2428" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No laser raster pipeline; the analogous CNC control is bit stepover, out of this sector.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012726174-Easel-Pro-Feature-Raster-Toolpaths"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Images are first-class canvas objects: documented editable vector masking/crop; scan angle is layer-controlled independent of object orientation. Arbitrary rotate/scale/flip of image objects is inferred from the documented object model, not a fetched doc page — flagged INF.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/ApplyMaskToImage/"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/ (scan angle documented as a layer setting, implying object transforms are free; free rotation itself not fetch-verified)"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no raster engrave operation to transform.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Rotate/crop/flip tools documented in the import dialog plus numeric size/offset — but transforms are fixed at G-code conversion; no on-canvas object model afterwards. Arbitrary-angle rotation not documented; users resort to editing images externally.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/target-image-size-and-laser-options/"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio has full canvas object editing (move/rotate/scale/flip) that applies to bitmap objects per the Object Editing doc; skew/warp not documented.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/3406" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No raster engrave operation; imported rasters exist only as trace sources.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Deepest documented set: Scan Angle (any angle, 0/90/180 semantics), per-pass Angle Increment, bidirectional toggle, Overscanning, Dot Width Correction, Fill Grouping. Community caveat: non-90-degree angles are emulated with cut moves (style option); DSP advised to 90-degree multiples.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/scan-angle-questions/38854"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/significantly-different-results-depending-on-scan-angle/84558"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no laser scan-line options.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Conversion direction selectable horizontal/vertical/diagonal (diagonal halves effective axis speed) per community guides; a uni-directional option was a user request (#97). Overscan control not documented anywhere found — treat overscan/bi-di toggle as unknown.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://ortur.net/blogs/ortur-blog-center/how-to-set-the-engraving-and-cutting-parameters-of-lasergrbl"
+            },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/97" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio documents uni/bi-directional 'Engraving Mode' (bi-di faster, edges less clean). Engraving angle + cross-hatch documented but gated: XCS V2.3+, currently F1 Ultra vector engraving only. Overscan is machine-managed, not user-exposed.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2429" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1905" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Raster X/Y direction choice exists only for CNC pocket clearing, not laser scanning.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012726174-Easel-Pro-Feature-Raster-Toolpaths"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "4.7",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Both special modes documented per layer: Pass-Through for images 'pre-processed for laser engraving' (skips resampling/dither) and Negative Image inversion for dark materials.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no laser image modes.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "unknown",
+          "quality": "No documented pass-through or negative mode on lasergrbl.com; color-invert at import was an open user request (GitHub #130) and Facebook posts discuss unwanted inversion, not a feature. Whether later builds added either is unverified.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/130" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/ (no pass-through/negative documented)"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Negative covered: bitmap color invert documented for dark/transparent materials (B&W, grayscale, color handling specified). No documented pre-dithered pass-through mode — inferred absent from the bitmap-mode doc set.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2528" },
+            {
+              "tag": "INF",
+              "cite": "https://support.xtool.com/article/2432 (bitmap mode list contains no pass-through option)"
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No raster engrave pipeline at all, so no special modes.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/laser-engraving-cutting-with-easel/34013"
+            },
+            { "tag": "COMM", "cite": "https://optlasers.com/x-carve-laser-instruction" }
+          ]
+        }
+      ]
+    }
+  ]
+}

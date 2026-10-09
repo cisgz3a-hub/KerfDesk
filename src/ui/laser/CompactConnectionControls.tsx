@@ -17,6 +17,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
   const triggerId = `${popoverId}-trigger`;
+  const statusId = `${popoverId}-status`;
   useRetainedDetailsFocus(open, popoverId);
   const close = useCallback(() => setOpen(false), []);
   const closeAndFocus = (): void => {
@@ -41,7 +42,8 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           id={triggerId}
           type="button"
           className="lf-btn lf-connection-machine-trigger"
-          aria-label={`Machine details: ${props.machineName}, ${props.status}`}
+          aria-label={`Machine details: ${props.machineName}`}
+          aria-describedby={statusId}
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? popoverId : undefined}
@@ -54,15 +56,11 @@ export function CompactConnectionControls(props: Props): JSX.Element {
             setOpen(true);
           }}
         >
-          {props.statusDot}
-          <span className="lf-connection-machine-summary">
-            <strong className="lf-connection-machine-name">{props.machineName}</strong>
-            <span className="lf-connection-machine-status" role="status" aria-live="polite">
-              {props.status}
-            </span>
-          </span>
-          <Icon name="chevron-down" size={13} />
+          <MachineSummary {...props} statusId={statusId} />
         </button>
+        <span className="lf-connection-status-live" role="status" aria-live="polite">
+          {props.status}
+        </span>
         {props.children}
       </div>
       {open ? (
@@ -86,6 +84,23 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           <MachineDetailsCloseButton onClose={closeAndFocus} />
         </AnchoredPopover>
       ) : null}
+    </>
+  );
+}
+
+function MachineSummary(
+  props: Pick<Props, 'machineName' | 'status' | 'statusDot'> & { readonly statusId: string },
+): JSX.Element {
+  return (
+    <>
+      {props.statusDot}
+      <span className="lf-connection-machine-summary">
+        <strong className="lf-connection-machine-name">{props.machineName}</strong>
+        <span id={props.statusId} className="lf-connection-machine-status">
+          {props.status}
+        </span>
+      </span>
+      <Icon name="chevron-down" size={13} />
     </>
   );
 }
