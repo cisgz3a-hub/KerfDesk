@@ -1,0 +1,137 @@
+.lf-relief-authoring-dialog,
+.lf-relief-create-dialog {
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.lf-relief-authoring-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) minmax(260px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.lf-relief-sculpt-pane,
+.lf-relief-components-pane {
+  min-width: 0;
+}
+.lf-relief-sculpt-pane canvas {
+  display: block;
+  box-sizing: border-box;
+  background: #202020;
+}
+.lf-relief-note {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--lf-text-muted);
+  margin: 6px 0 10px;
+}
+.lf-relief-authoring-dialog fieldset,
+.lf-relief-create-dialog fieldset {
+  min-width: 0;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+}
+.lf-relief-authoring-dialog legend,
+.lf-relief-create-dialog legend {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 4px;
+}
+.lf-relief-authoring-dialog label,
+.lf-relief-create-dialog label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(80px, 140px);
+  align-items: center;
+  gap: 8px;
+  margin: 7px 0;
+  font-size: 12px;
+}
+.lf-relief-authoring-dialog label:has(input[type='checkbox']) {
+  display: flex;
+}
+.lf-relief-authoring-dialog select,
+.lf-relief-create-dialog select,
+.lf-relief-authoring-dialog input:not([type='checkbox']),
+.lf-relief-create-dialog input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 6px 7px;
+  border: 1px solid var(--lf-border);
+  border-radius: 4px;
+  background: var(--lf-bg-input);
+  color: var(--lf-text);
+  font: inherit;
+}
+.lf-relief-authoring-dialog button:not(.lf-btn) {
+  padding: 6px 9px;
+  margin: 3px 4px 3px 0;
+  border: 1px solid var(--lf-border);
+  border-radius: 4px;
+  background: var(--lf-bg-2);
+  color: var(--lf-text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.lf-relief-authoring-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.lf-relief-authoring-dialog button:hover:not(:disabled) {
+  border-color: var(--lf-border-strong);
+}
+.lf-relief-component-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 6px;
+}
+.lf-relief-advanced {
+  margin: 10px 0;
+}
+.lf-relief-advanced summary {
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px 0;
+}
+.lf-relief-advanced[open] > summary {
+  margin-bottom: 6px;
+}
+.lf-relief-dimensions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.lf-relief-create-dialog .lf-relief-dimensions label {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+}
+@media (max-width: 760px) {
+  .lf-relief-authoring-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .lf-relief-sculpt-pane canvas {
+    max-width: 100% !important;
+  }
+}
+@media (max-width: 480px) {
+  .lf-relief-dimensions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .lf-relief-create-dialog .lf-relief-dimensions label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 100px;
+  }
+}
+
+.lf-relief-authoring-dialog .lf-dialog-actions,
+.lf-relief-create-dialog .lf-dialog-actions {
+  bottom: calc(-1 * var(--lf-space-6));
+  z-index: 2;
+}

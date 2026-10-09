@@ -28,7 +28,7 @@ function SketchConstraintRow(
 ): JSX.Element {
   const { sketch, constraint: c, index, onChange } = props;
   return (
-    <div>
+    <div className="lf-sketch-constraint-row">
       <span>
         {c.id}: {sketchConstraintLabel(c)}
       </span>

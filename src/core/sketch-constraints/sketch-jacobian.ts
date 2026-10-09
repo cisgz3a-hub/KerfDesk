@@ -1,11 +1,14 @@
 import { sketchAt } from './sketch-indexed';
 export type SketchResidual = { readonly id: string; readonly value: number };
 export type SketchEvaluator = (values: readonly number[]) => readonly SketchResidual[];
+export type SketchDerivative = (values: readonly number[]) => readonly (readonly number[])[];
 export function sketchJacobian(
   values: readonly number[],
   residual: readonly number[],
   evaluate: SketchEvaluator,
+  derivative?: SketchDerivative,
 ): number[][] {
+  if (derivative !== undefined) return derivative(values).map((row) => [...row]);
   const result = residual.map(() => Array<number>(values.length).fill(0));
   for (let column = 0; column < values.length; column += 1) {
     const step = Math.max(1e-6, Math.abs(sketchAt(values, column)) * 1e-7),

@@ -1,10 +1,10 @@
+import { VectorGeometryPreview } from './VectorGeometryPreview';
 import type { SketchSolveResult } from '../../core/sketch-constraints/constrained-sketch';
 import type { ConstrainedSketchReview } from '../state/constrained-sketch-actions';
 export function SketchSolveReview(props: {
   readonly result: SketchSolveResult | null;
   readonly review: ConstrainedSketchReview | null;
   readonly stale: boolean;
-  readonly onApply: () => void;
 }): JSX.Element {
   const { result, review } = props;
   return (
@@ -26,17 +26,11 @@ export function SketchSolveReview(props: {
       {props.stale ? (
         <p role="alert">The project changed. Review the current sketch again.</p>
       ) : null}
-      {review === null ? null : (
-        <SketchGeometryPreview review={review} stale={props.stale} onApply={props.onApply} />
-      )}
+      {review === null ? null : <SketchGeometryPreview review={review} />}
     </>
   );
 }
-function SketchGeometryPreview(props: {
-  readonly review: ConstrainedSketchReview;
-  readonly stale: boolean;
-  readonly onApply: () => void;
-}): JSX.Element {
+function SketchGeometryPreview(props: { readonly review: ConstrainedSketchReview }): JSX.Element {
   const { review } = props,
     bounds = review.object.bounds;
   return (
@@ -51,43 +45,11 @@ function SketchGeometryPreview(props: {
           Undo restores them.
         </p>
       ) : null}
-      <svg
-        role="img"
-        aria-label="Solved sketch outline"
-        viewBox={[
-          bounds.minX - 2,
-          bounds.minY - 2,
-          bounds.maxX - bounds.minX + 4,
-          bounds.maxY - bounds.minY + 4,
-        ].join(' ')}
-        width="100%"
-        height="160"
-      >
-        {review.object.paths.flatMap((path, pathIndex) =>
-          path.polylines.map((line, lineIndex) => {
-            const first = line.points[0];
-            const points =
-              line.closed && first !== undefined ? [...line.points, first] : line.points;
-            return (
-              <polyline
-                key={pathIndex + '-' + lineIndex}
-                points={points.map((point) => point.x + ',' + point.y).join(' ')}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="0.3"
-              />
-            );
-          }),
-        )}
-      </svg>
-      <button
-        title="Apply the current reviewed constraint solution as visible geometry"
-        type="button"
-        disabled={props.stale}
-        onClick={props.onApply}
-      >
-        Apply reviewed sketch
-      </button>
+      <VectorGeometryPreview
+        paths={review.object.paths}
+        bounds={bounds}
+        label="Solved sketch outline"
+      />
     </section>
   );
 }

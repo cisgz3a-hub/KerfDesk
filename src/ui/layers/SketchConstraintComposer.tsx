@@ -18,7 +18,7 @@ export function SketchConstraintComposer({ sketch, onChange }: SketchEditorProps
   const pair = constraintNeedsPair(kind),
     dimension = constraintNeedsDimension(kind);
   return (
-    <div>
+    <div className="lf-sketch-constraint-composer">
       <label>
         Constraint type
         <select
@@ -57,7 +57,11 @@ export function SketchConstraintComposer({ sketch, onChange }: SketchEditorProps
       <button
         title="Add the selected geometric constraint to the retained sketch"
         type="button"
-        disabled={firstId === '' || (pair && secondId === '') || sketch.constraints.length >= 128}
+        disabled={
+          firstId === '' ||
+          (pair && (secondId === '' || firstId === secondId)) ||
+          sketch.constraints.length >= 128
+        }
         onClick={() =>
           onChange({
             ...sketch,

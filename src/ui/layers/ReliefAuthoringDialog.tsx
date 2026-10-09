@@ -16,7 +16,8 @@ import {
   importReliefComponentAsset,
   type ReliefComponentAsset,
 } from '../../io/project/relief-component-asset';
-import { Dialog } from '../kit';
+import { Dialog, DialogActions, Button } from '../kit';
+import './relief-authoring.css';
 import { useStore } from '../state';
 import { useReliefAuthoringComposition } from './use-relief-authoring-composition';
 import {
@@ -43,10 +44,20 @@ export function ReliefAuthoringDialog(props: {
   const objects = useStore((s) => s.project.scene.objects);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
+  const canUndo = useStore((s) => s.undoStack.length > 0);
+  const canRedo = useStore((s) => s.redoStack.length > 0);
   const vectors = objects.filter((o) => 'paths' in o && o.id !== relief.id);
+  const closedVectors = vectors.filter(
+    (object) =>
+      'paths' in object &&
+      object.paths.some((path) => path.polylines.length > 0) &&
+      object.paths.every((path) =>
+        path.polylines.every((line) => line.closed && line.points.length >= 3),
+      ),
+  );
   const [selectedId, setSelectedId] = useState(document.components[0]?.id ?? '');
   const selected = document.components.find((c) => c.id === selectedId) ?? document.components[0];
-  const [vectorId, setVectorId] = useState(vectors[0]?.id ?? '');
+  const [vectorId, setVectorId] = useState(closedVectors[0]?.id ?? '');
   const [profile, setProfile] = useState<'plane' | 'dome' | 'slope'>('plane');
   const [mode, setMode] = useState<ReliefSculptStroke['mode']>('add');
   const [diameter, setDiameter] = useState(5);
@@ -84,7 +95,7 @@ export function ReliefAuthoringDialog(props: {
     void prepare(reviseReliefDocument(document, { components }));
   }
   function addShape(): void {
-    const vector = vectors.find((o) => o.id === vectorId);
+    const vector = closedVectors.find((o) => o.id === vectorId) ?? closedVectors[0];
     if (vector === undefined) {
       setMessage('Choose closed vector artwork for the shape.');
       return;
@@ -157,26 +168,19 @@ export function ReliefAuthoringDialog(props: {
       ariaLabel="Relief authoring"
       title="Edit relief components"
       size="xl"
+      panelClassName="lf-relief-authoring-dialog"
       onClose={props.onClose}
     >
-      <p>
-        One-sided scalar surface. Stock top is Z = 0; heights below use the relief floor as their
-        base. Undercuts and solid CAD are unsupported.
+      <p className="lf-relief-note">
+        Sculpt the selected component or add shapes from closed vectors. Each completed edit is
+        saved to the project and can be undone.
       </p>
-      <p>
-        Authoring {document.width} × {document.height} cells;{' '}
-        {(document.physicalWidthMm / document.width).toPrecision(4)} ×{' '}
-        {(document.physicalHeightMm / document.height).toPrecision(4)} mm/cell. The 256 × 256
-        display is a preview; CAM keeps the canonical U16 field and its own stated sampling.
-      </p>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'minmax(220px, 1fr) minmax(240px, 1fr)',
-          gap: 16,
-        }}
-      >
-        <div>
+      <div className="lf-relief-authoring-layout">
+        <div className="lf-relief-sculpt-pane">
+          <p className="lf-relief-note">
+            {document.physicalWidthMm} × {document.physicalHeightMm} mm · {document.maxDepthMm} mm
+            deep
+          </p>
           <ReliefSculptCanvas
             field={preview?.field ?? relief.reliefSource}
             disabled={disabled || selected === undefined}
@@ -184,7 +188,7 @@ export function ReliefAuthoringDialog(props: {
             onStroke={applyStroke}
           />
           <ReliefBrushControls
-            disabled={disabled}
+            disabled={disabled || selected === undefined}
             mode={mode}
             setMode={setMode}
             diameter={diameter}
@@ -193,14 +197,14 @@ export function ReliefAuthoringDialog(props: {
             setStrength={setStrength}
             flattenHeight={flattenHeight}
             setFlattenHeight={setFlattenHeight}
-            vectors={vectors}
+            vectors={closedVectors}
             regionId={brushRegionId}
             setRegionId={setBrushRegionId}
           />
           <button
             title="Undo the last retained relief edit, including a complete sculpt stroke"
             type="button"
-            disabled={busy}
+            disabled={busy || preview !== null || !canUndo}
             onClick={undo}
           >
             Undo last edit
@@ -208,7 +212,7 @@ export function ReliefAuthoringDialog(props: {
           <button
             title="Redo the last undone relief edit"
             type="button"
-            disabled={busy}
+            disabled={busy || preview !== null || !canRedo}
             onClick={redo}
           >
             Redo
@@ -226,86 +230,93 @@ export function ReliefAuthoringDialog(props: {
             </>
           ) : null}
           {message ? <p role="status">{message}</p> : null}
-          <ReliefLocalAssetControls
-            document={document}
-            component={selected}
-            disabled={disabled}
-            onPreview={(value) => {
-              setAsset(value);
-              setPreview(null);
-            }}
-            onError={setMessage}
-          />
-          {asset !== null ? (
-            <fieldset disabled={busy}>
-              <legend>Import component preview</legend>
-              <p>
-                {asset.component.name}: original authoring area {asset.physicalWidthMm} ×{' '}
-                {asset.physicalHeightMm} mm. Units stay in millimetres.
-              </p>
-              <NumberControl
-                label="Imported component base (mm)"
-                value={asset.component.baseHeightMm}
-                commit={(baseHeightMm) => {
-                  setAsset({ ...asset, component: { ...asset.component, baseHeightMm } });
-                  setPreview(null);
-                }}
-              />
-              <NumberControl
-                label="Imported component XY scale"
-                value={asset.component.transform.scaleX}
-                commit={(scale) => {
-                  setAsset({
-                    ...asset,
-                    component: {
-                      ...asset.component,
-                      transform: { ...asset.component.transform, scaleX: scale, scaleY: scale },
-                    },
-                  });
-                  setPreview(null);
-                }}
-              />
-              <button
-                title="Compose the opened component into a preview before adding it"
-                type="button"
-                onClick={() => {
-                  void prepare(
-                    importReliefComponentAsset(document, asset, crypto.randomUUID()),
-                    true,
-                  );
-                }}
-              >
-                Preview component
-              </button>
-              <button
-                title="Add the current previewed component to this relief"
-                type="button"
-                disabled={preview === null}
-                onClick={applyPreview}
-              >
-                Add previewed component
-              </button>
-              <button
-                title="Discard the opened component and its preview"
-                type="button"
-                onClick={() => {
-                  setAsset(null);
-                  setPreview(null);
-                }}
-              >
-                Discard preview
-              </button>
-            </fieldset>
-          ) : null}
+          <details className="lf-relief-advanced">
+            <summary>Reusable components</summary>
+            <ReliefLocalAssetControls
+              document={document}
+              component={selected}
+              disabled={disabled}
+              onPreview={(value) => {
+                setAsset(value);
+                setPreview(null);
+              }}
+              onError={setMessage}
+            />
+            {asset !== null ? (
+              <fieldset disabled={busy}>
+                <legend>Import component preview</legend>
+                <p>
+                  {asset.component.name}: original authoring area {asset.physicalWidthMm} ×{' '}
+                  {asset.physicalHeightMm} mm. Units stay in millimetres.
+                </p>
+                <NumberControl
+                  label="Imported component base (mm)"
+                  value={asset.component.baseHeightMm}
+                  commit={(baseHeightMm) => {
+                    setAsset({ ...asset, component: { ...asset.component, baseHeightMm } });
+                    setPreview(null);
+                  }}
+                />
+                <NumberControl
+                  label="Imported component XY scale"
+                  value={asset.component.transform.scaleX}
+                  commit={(scale) => {
+                    setAsset({
+                      ...asset,
+                      component: {
+                        ...asset.component,
+                        transform: { ...asset.component.transform, scaleX: scale, scaleY: scale },
+                      },
+                    });
+                    setPreview(null);
+                  }}
+                />
+                <button
+                  title="Compose the opened component into a preview before adding it"
+                  type="button"
+                  onClick={() => {
+                    void prepare(
+                      importReliefComponentAsset(document, asset, crypto.randomUUID()),
+                      true,
+                    );
+                  }}
+                >
+                  Preview component
+                </button>
+                <button
+                  title="Add the current previewed component to this relief"
+                  type="button"
+                  disabled={preview === null}
+                  onClick={applyPreview}
+                >
+                  Add previewed component
+                </button>
+                <button
+                  title="Discard the opened component and its preview"
+                  type="button"
+                  onClick={() => {
+                    setAsset(null);
+                    setPreview(null);
+                  }}
+                >
+                  Discard preview
+                </button>
+              </fieldset>
+            ) : null}
+          </details>
         </div>
-        <div>
+        <div className="lf-relief-components-pane">
           <ReliefCompositionControls
             document={document}
             selected={selected}
             field={relief.reliefSource}
             disabled={disabled}
-            vectors={vectors}
-            vectorId={vectorId}
+            vectors={closedVectors}
+            vectorId={
+              closedVectors.some((item) => item.id === vectorId)
+                ? vectorId
+                : (closedVectors[0]?.id ?? '')
+            }
             profile={profile}
             setVectorId={setVectorId}
             setProfile={setProfile}
@@ -314,19 +325,23 @@ export function ReliefAuthoringDialog(props: {
             addShape={addShape}
             prepare={prepare}
           />
-          <ReliefRailCreationControls
-            document={document}
-            vectors={vectors}
-            reliefTransform={relief.transform}
-            disabled={disabled}
-            prepare={prepare}
-            setSelectedId={setSelectedId}
-          />
-          {selected !== undefined ? (
-            <ReliefComponentControls
-              component={selected}
+          <details className="lf-relief-advanced">
+            <summary>Rail and profile surfaces</summary>
+            <ReliefRailCreationControls
               document={document}
               vectors={vectors}
+              reliefTransform={relief.transform}
+              disabled={disabled}
+              prepare={prepare}
+              setSelectedId={setSelectedId}
+            />
+          </details>
+          {selected !== undefined ? (
+            <ReliefComponentControls
+              key={`component-controls:${selected.id}`}
+              component={selected}
+              document={document}
+              vectors={closedVectors}
               reliefTransform={relief.transform}
               disabled={disabled}
               onPatch={updateComponent}
@@ -335,6 +350,7 @@ export function ReliefAuthoringDialog(props: {
           ) : null}
           {selected === undefined ? null : (
             <ReliefRailSourceControls
+              key={`rail-source-controls:${selected.id}`}
               component={selected}
               disabled={disabled}
               onPatch={updateComponent}
@@ -342,9 +358,24 @@ export function ReliefAuthoringDialog(props: {
           )}
         </div>
       </div>
-      <button title="Close the relief component editor" type="button" onClick={props.onClose}>
-        Close
-      </button>
+      <details className="lf-relief-advanced">
+        <summary>Relief resolution and surface model</summary>
+        <p className="lf-relief-note">
+          Authoring {document.width} × {document.height} cells;{' '}
+          {(document.physicalWidthMm / document.width).toPrecision(4)} ×{' '}
+          {(document.physicalHeightMm / document.height).toPrecision(4)} mm/cell. The sculpt display
+          is a preview; CAM uses the canonical U16 field and its own sampling.
+        </p>
+        <p className="lf-relief-note">
+          Stock top is Z = 0. Component heights are measured above the relief floor. The surface has
+          one height per XY point; undercuts and solid CAD are unsupported.
+        </p>
+      </details>
+      <DialogActions>
+        <Button title="Close the relief component editor" onClick={props.onClose}>
+          Close
+        </Button>
+      </DialogActions>
     </Dialog>
   );
 }
