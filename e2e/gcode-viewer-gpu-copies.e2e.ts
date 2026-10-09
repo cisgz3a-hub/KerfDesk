@@ -1,3 +1,4 @@
+import { buildGcodeRenderModel, SEG_KIND } from '../src/core/gcode-view';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
 // A 20,000-move serpentine at one depth: enough moves that a second GPU copy
@@ -17,8 +18,23 @@ function serpentine(): string {
   return lines.join('\n');
 }
 
-// A few kilobytes for the rapids' own pick copy and the hover outline.
+// ADR-470 adds one packed XYZ source axis per fat row and per native vertex.
+const FAT_SOURCE_AXIS_BYTES = 3 * Float32Array.BYTES_PER_ELEMENT;
+const NATIVE_SOURCE_AXIS_BYTES = 2 * FAT_SOURCE_AXIS_BYTES;
+// Bound the hover outline, native pick IDs and newly visible playback geometry.
+// This stays smaller than another positions or colour buffer for this program.
 const SMALL_BYTES = 64 * 1024;
+
+function expectedPickAxisBytes(text: string): number {
+  const parsed = buildGcodeRenderModel(text);
+  if (parsed.kind !== 'ok') throw new Error(parsed.reason);
+  const { model } = parsed;
+  let nativePairs = 0;
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    if (model.segKind[index] === SEG_KIND.travel) nativePairs += 1;
+  }
+  return model.segmentCount * FAT_SOURCE_AXIS_BYTES + nativePairs * NATIVE_SOURCE_AXIS_BYTES;
+}
 
 // Counts the bytes held in WebGL buffers, so the test sees what the view
 // keeps on the GPU rather than what it meant to.
@@ -64,9 +80,11 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   page.on('console', (message) => {
     if (message.type() === 'error') problems.push(message.text());
   });
+  const text = serpentine();
+  const pickAxisBytes = expectedPickAxisBytes(text);
   await trackGpuBuffers(page);
   await page.goto('/');
-  await kerfdesk.setOpenFiles([{ name: 'gpu-serpentine.nc', text: serpentine() }]);
+  await kerfdesk.setOpenFiles([{ name: 'gpu-serpentine.nc', text }]);
   await page.getByText('File', { exact: true }).click();
   await page.getByRole('menuitem').filter({ hasText: 'Open G-code...' }).click();
   const dialog = page.getByRole('dialog', { name: 'G-code Inspector: gpu-serpentine.nc' });
@@ -81,7 +99,8 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   // Twenty thousand moves at 24 bytes of positions each, at least.
   expect(opened).toBeGreaterThan(ROWS * STEPS_PER_ROW * 24);
 
-  // Pointing at a move builds the pick pass over the drawn lines' buffers.
+  // Pointing at a move shares the drawn positions and allocates only source axes
+  // once, plus small fixed geometry. A duplicate program buffer exceeds the bound.
   const view = dialog.getByLabel('3D G-code toolpath', { exact: true });
   const box = await view.boundingBox();
   if (box === null) throw new Error('view has no size');
@@ -90,7 +109,8 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   await page.mouse.move(box.x + box.width / 2 + 9, box.y + box.height / 2 + 5);
   await settle();
   const picked = await gpuBytes();
-  expect(picked - opened).toBeLessThan(SMALL_BYTES);
+  expect(picked - opened).toBeGreaterThanOrEqual(pickAxisBytes);
+  expect(picked - opened - pickAxisBytes).toBeLessThan(SMALL_BYTES);
 
   // A lens repaints the colours in place: no new buffer, nothing left behind.
   await page.mouse.move(2, 2);
@@ -106,6 +126,8 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   if (track === null) throw new Error('timeline has no size');
   await page.mouse.click(track.x + track.width * 0.5, track.y + track.height / 2);
   await settle();
-  expect((await gpuBytes()) - opened).toBeLessThan(SMALL_BYTES);
+  // The source axes were paid for by the first pick; playback cannot allocate
+  // them again or make another program-sized copy for the faint lines.
+  expect((await gpuBytes()) - picked).toBeLessThan(SMALL_BYTES);
   expect(problems).toEqual([]);
 });
