@@ -27,9 +27,13 @@ function useFluidNcNetworkConnect() {
     }
     setMessage('Opening the entered FluidNC channel…');
     try {
+      const targetHost = host.trim();
+      const targetPort = Number(port);
+      const serial = network.serialForTarget(targetHost, targetPort);
       await connectMachine(
-        { ...platform, serial: network.serialForTarget(host.trim(), Number(port)) },
+        { ...platform, serial },
         { hostedStreaming: false, portSelection: 'choose' },
+        { kind: 'fluidnc-network', serial, host: targetHost, port: targetPort },
       );
       const result = useLaserStore.getState().connection;
       setMessage(
@@ -63,7 +67,8 @@ export function FluidNcNetworkConnect(): JSX.Element | null {
       <p>
         Enter the machine IP or hostname and its enabled Telnet/Port value. This uses the same
         FluidNC driver and Frame workflow. Disconnect the current controller first. Targets last
-        only in this panel; there is no automatic scan, reconnect or command replay.
+        only in this panel or the setup it opens; there is no automatic scan, reconnect or command
+        replay.
       </p>
       <p>Telnet is unencrypted. Use this channel on a trusted network.</p>
       <label>

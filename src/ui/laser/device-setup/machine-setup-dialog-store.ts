@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import type { DeviceSetupStep } from './device-setup-flow';
+import type { MachineSetupConnection } from './machine-setup-connection';
 
 export type DeviceSetupHighlight = 'autofocus' | 'air-assist';
 
@@ -34,12 +35,13 @@ export type MachineSetupDialogState =
       readonly kind: 'open';
       readonly target: MachineSetupTarget;
       readonly requestId: number;
+      readonly connection?: MachineSetupConnection;
     };
 
 type MachineSetupDialogStore = {
   readonly state: MachineSetupDialogState;
   readonly configuredRevision: number;
-  readonly open: (target: MachineSetupTarget) => void;
+  readonly open: (target: MachineSetupTarget, connection?: MachineSetupConnection) => void;
   readonly close: () => void;
   readonly configurationRecorded: () => void;
 };
@@ -49,10 +51,10 @@ const DEFAULT_TARGET: MachineSetupTarget = { kind: 'step', step: 'capability' };
 export const useMachineSetupDialogStore = create<MachineSetupDialogStore>((set, get) => ({
   state: { kind: 'idle' },
   configuredRevision: 0,
-  open: (target) => {
+  open: (target, connection) => {
     const current = get().state;
     const requestId = current.kind === 'open' ? current.requestId + 1 : 1;
-    set({ state: { kind: 'open', target, requestId } });
+    set({ state: { kind: 'open', target, requestId, ...(connection ? { connection } : {}) } });
   },
   close: () => set({ state: { kind: 'idle' } }),
   configurationRecorded: () =>
@@ -60,8 +62,11 @@ export const useMachineSetupDialogStore = create<MachineSetupDialogStore>((set, 
 }));
 
 /** Open the one global Machine Setup workflow at an exact section or CNC field. */
-export function openMachineSetup(target: MachineSetupTarget = DEFAULT_TARGET): void {
-  useMachineSetupDialogStore.getState().open(target);
+export function openMachineSetup(
+  target: MachineSetupTarget = DEFAULT_TARGET,
+  connection?: MachineSetupConnection,
+): void {
+  useMachineSetupDialogStore.getState().open(target, connection);
 }
 
 export function closeMachineSetup(): void {

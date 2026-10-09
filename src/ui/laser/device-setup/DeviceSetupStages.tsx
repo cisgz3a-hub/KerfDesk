@@ -4,6 +4,7 @@ import type { DeviceSetupStepProps } from './device-setup-flow';
 import { machineSetupValidationIssues } from './device-setup-flow';
 import { deviceSetupStage } from './device-setup-steps';
 import type { DeviceSetupHighlight } from './machine-setup-dialog-store';
+import type { MachineSetupConnection } from './machine-setup-connection';
 import { DeviceSetupMachineCapability } from './DeviceSetupMachineCapability';
 import { DeviceSetupIdentifyStep } from './DeviceSetupIdentifyStep';
 import { DeviceSetupConnectStep } from './DeviceSetupConnectStep';
@@ -19,6 +20,7 @@ export type DeviceSetupStagesProps = DeviceSetupStepProps & {
   readonly layers: ReadonlyArray<Layer>;
   readonly cncSetup: CncStartupWizardDraft;
   readonly automatic?: DeviceSetupAutomatic | undefined;
+  readonly connection?: MachineSetupConnection | undefined;
 };
 
 export function DeviceSetupStages(props: DeviceSetupStagesProps): JSX.Element {
@@ -37,6 +39,7 @@ function MachineStage(props: DeviceSetupStagesProps): JSX.Element {
         state={props.state}
         dispatch={props.dispatch}
         automatic={props.automatic}
+        connection={props.connection}
         openOptions={props.state.step === 'connect'}
       />
       <DeviceSetupMachineCapability {...props} />

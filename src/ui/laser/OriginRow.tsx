@@ -56,11 +56,14 @@ function SetOriginButton(props: {
   readonly busy: boolean;
   readonly needsAttention: boolean;
   readonly onSet: () => void;
-}): JSX.Element {
+  readonly jog?: boolean;
+  readonly show?: boolean;
+}): JSX.Element | null {
+  if (props.show === false) return null;
   return (
     <button
       type="button"
-      className={props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}
+      className={`${props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}${props.jog ? ' lf-jog-origin' : ''}`}
       onClick={props.onSet}
       disabled={props.busy}
       title={
@@ -119,10 +122,13 @@ function resetOriginTitle(persistentOrUnknown: boolean, hasCustom: boolean): str
 //   - "Reset origin" sends G92.1. Only enabled when wcoCache shows a
 //     non-trivial offset; disabled otherwise (nothing to clear).
 //   - "Release motors" sends $SLP for hand-positioning (ADR-053 P4).
-export function OriginRow(props: {
+type Props = {
   readonly disabled: boolean;
   readonly streaming: boolean;
-}): JSX.Element | null {
+  readonly layout?: 'all' | 'set-only' | 'utilities';
+};
+
+export function OriginRow(props: Props): JSX.Element | null {
   const wcs = useLaserStore((s) => s.capabilities.wcs);
   const canSleep = useLaserStore((s) => s.capabilities.sleep);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
@@ -173,6 +179,21 @@ export function OriginRow(props: {
     setJobPlacement,
     pushToast,
   });
+  const setOriginButton = (
+    <SetOriginButton
+      busy={busy}
+      needsAttention={needsSetOriginAttention({
+        homingEnabled,
+        hasCustom: hasCustomXy,
+        busy,
+        startFrom,
+      })}
+      onSet={onSet}
+      jog={props.layout === 'set-only'}
+      show={props.layout !== 'utilities'}
+    />
+  );
+  if (props.layout === 'set-only') return setOriginButton;
   return (
     <div style={originSectionStyle}>
       <div
@@ -181,16 +202,7 @@ export function OriginRow(props: {
         <span style={sectionCaptionStyle}>Origin</span>
       </div>
       <div style={actionGridStyle}>
-        <SetOriginButton
-          busy={busy}
-          needsAttention={needsSetOriginAttention({
-            homingEnabled,
-            hasCustom: hasCustomXy,
-            busy,
-            startFrom,
-          })}
-          onSet={onSet}
-        />
+        {setOriginButton}
         <button
           type="button"
           className="lf-btn"
@@ -226,14 +238,20 @@ type OriginHandlerDeps = {
   readonly pushToast: (message: string, variant: 'success') => void;
 };
 
-// A fresh origin makes only Absolute unusable (it refuses while a custom origin
-// is active), so that is the one mode Set origin upgrades to User Origin. An
-// explicit User, Verified, or Current Position choice is the operator's and is
+// Set origin upgrades Absolute Coordinates to User Origin. An explicit
+// User, Verified, or Current Position choice is the operator's and is
 // never rewritten under them (ADR-193; ADR-327). The mode is read when the
 // controller acknowledges, not when the button rendered: Set origin waits up to
 // a few seconds for the work-offset frame and the dropdown may change meanwhile.
-function placementAfterSetOrigin(setJobPlacement: OriginHandlerDeps['setJobPlacement']): void {
-  const startFrom: JobStartMode = useStore.getState().jobPlacement.startFrom;
+// The controller origin is global, but its placement update belongs only to
+// the document in which the operator clicked, even if New/Open ran meanwhile.
+function placementAfterSetOrigin(
+  setJobPlacement: OriginHandlerDeps['setJobPlacement'],
+  documentEpoch: number,
+): void {
+  const state = useStore.getState();
+  if (state.projectDocumentEpoch !== documentEpoch) return;
+  const startFrom: JobStartMode = state.jobPlacement.startFrom;
   if (startFrom === 'absolute') setJobPlacement({ startFrom: 'user-origin' });
 }
 
@@ -248,10 +266,11 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
 } {
   return {
     onSet: () => {
+      const documentEpoch = useStore.getState().projectDocumentEpoch;
       void deps
         .setOrigin()
         .then(() => {
-          placementAfterSetOrigin(deps.setJobPlacement);
+          placementAfterSetOrigin(deps.setJobPlacement, documentEpoch);
           deps.pushToast('Origin set to current head position (G92).', 'success');
         })
         .catch(reportOriginActionFailure);
@@ -342,10 +361,11 @@ function AdvancedOriginControls(props: {
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const onSetPersistent = (): void => {
+    const documentEpoch = useStore.getState().projectDocumentEpoch;
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        placementAfterSetOrigin(setJobPlacement);
+        placementAfterSetOrigin(setJobPlacement, documentEpoch);
         pushToast('Persistent G54 XY origin set; temporary offsets cleared.', 'success');
       })
       .catch(reportOriginActionFailure);

@@ -44,6 +44,7 @@ export function MachineSetupDialogHost(): JSX.Element | null {
       initialStep={machineSetupInitialStep(dialog.target)}
       highlight={machineSetupHighlight(dialog.target)}
       target={dialog.target}
+      connection={dialog.connection}
       onClose={closeDraft}
       onConfigured={markConfigured}
     />

@@ -114,9 +114,21 @@ describe('explicit first machine connection', () => {
   });
 
   it('retains an already open setup draft and its target on another Connect', async () => {
-    openMachineSetup({ kind: 'cnc', field: 'stock' });
+    openMachineSetup(
+      { kind: 'cnc', field: 'stock' },
+      { kind: 'fluidnc-network', serial: platform.serial, host: '192.0.2.5', port: 23 },
+    );
     const originalDraft = useMachineSetupDialogStore.getState().state;
-    await connectMachine(platform);
+    await connectMachine(
+      platform,
+      {},
+      {
+        kind: 'fluidnc-network',
+        serial: platform.serial,
+        host: '192.0.2.6',
+        port: 24,
+      },
+    );
     expect(useMachineSetupDialogStore.getState().state).toBe(originalDraft);
     expect(connect).toHaveBeenCalledOnce();
   });

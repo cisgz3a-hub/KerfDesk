@@ -3,9 +3,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
 import { FALCON_A1_PRO_INFRARED_2W_MODULE } from '../../core/devices/laser-modules';
-import type { PlatformAdapter } from '../../platform/types';
+import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
+import { DEVICE_SETUP_CONFIGURED_STORAGE_KEY } from '../state/device-setup-configured-persistence';
 import { useLaserStore } from '../state/laser-store';
 import { resetStore } from '../state/test-helpers';
 import { useToastStore } from '../state/toast-store';
@@ -13,6 +14,7 @@ import { useUiStore } from '../state/ui-store';
 import { LaserWindow } from './LaserWindow';
 import { MachineConnectionToolbar } from './MachineConnectionToolbar';
 import { MachineSetupDialogHost } from './device-setup';
+import { closeMachineSetup } from './device-setup/machine-setup-dialog-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -58,6 +60,66 @@ afterEach(() => {
 });
 
 describe('machine toolbar', () => {
+  it('restores focus to the machine trigger when first setup closes while Connect is disabled', async () => {
+    const savedSetup = localStorage.getItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY);
+    localStorage.removeItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY);
+    let failOpen!: (error: Error) => void;
+    const pendingOpen = new Promise<SerialConnection>((_resolve, reject) => {
+      failOpen = reject;
+    });
+    const waitingPlatform: PlatformAdapter = {
+      ...platform,
+      serial: {
+        isSupported: () => true,
+        requestPort: async () => ({ open: () => pendingOpen }),
+      },
+    };
+    try {
+      await act(async () => {
+        root.render(
+          <PlatformProvider adapter={waitingPlatform}>
+            <MachineConnectionToolbar />
+            <MachineSetupDialogHost />
+          </PlatformProvider>,
+        );
+      });
+      const connect = [...host.querySelectorAll('button')].find(
+        (button) => button.textContent === 'Connect',
+      );
+      const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="dialog"]');
+      if (connect === undefined || trigger === null) throw new Error('Connection controls missing');
+      await act(async () => {
+        connect.focus();
+        connect.click();
+      });
+      expect(useLaserStore.getState().connection.kind).toBe('connecting');
+      expect(connect.disabled).toBe(true);
+      const dialog = document.querySelector('[role="dialog"][aria-modal="true"]');
+      expect(dialog?.contains(document.activeElement)).toBe(true);
+      await act(async () => {
+        document.activeElement?.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+        );
+      });
+      expect(document.querySelector('[role="dialog"][aria-modal="true"]')).toBeNull();
+      expect(document.activeElement).toBe(trigger);
+      await act(async () => {
+        failOpen(new Error('Selected port could not open'));
+        await pendingOpen.catch(() => undefined);
+      });
+      expect(connect.disabled).toBe(false);
+      expect(document.activeElement).toBe(trigger);
+    } finally {
+      await act(async () => {
+        failOpen(new Error('Selected port could not open'));
+        await pendingOpen.catch(() => undefined);
+        closeMachineSetup();
+      });
+      if (savedSetup === null) localStorage.removeItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY);
+      else localStorage.setItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY, savedSetup);
+    }
+  });
+
   it('opens Machine Setup from the compact top bar', async () => {
     await act(async () => {
       root.render(

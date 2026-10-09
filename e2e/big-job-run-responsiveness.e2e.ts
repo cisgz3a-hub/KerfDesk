@@ -6,7 +6,7 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { connectMachineAndDismissFirstSetup } from './fixtures/workspace-ui';
+import { connectMachineAndDismissFirstSetup, machineJogAction } from './fixtures/workspace-ui';
 
 const pacedSerialSource = readFileSync(
   fileURLToPath(new URL('./fixtures/paced-grbl-serial.js', import.meta.url)),
@@ -67,9 +67,9 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+  const home = machineJogAction(page, 'Home');
+  await home.click();
+  await expect(home).toBeEnabled();
 
   const frameCdp = PROFILE_FRAME ? await page.context().newCDPSession(page) : null;
   if (frameCdp !== null) {
@@ -672,13 +672,6 @@ async function streamProbe(page: Page): Promise<{
 async function dismissNotifications(page: Page): Promise<void> {
   const notifications = page.getByRole('button', { name: /^Dismiss notification:/ });
   while ((await notifications.count()) > 0) await notifications.first().click();
-}
-
-async function expandMachineUtilities(page: Page): Promise<void> {
-  const summary = page.locator('.lf-machine-rail summary').filter({
-    hasText: /^Homing & (focus|maintenance)$/,
-  });
-  if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();
 }
 
 async function selectWorkspacePanel(page: Page, name: 'Artwork' | 'Machine'): Promise<void> {
