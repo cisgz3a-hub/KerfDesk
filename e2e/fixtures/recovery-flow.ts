@@ -5,7 +5,7 @@
 
 import {
   connectMachineAndDismissFirstSetup,
-  expandMachineUtilities,
+  machineJogAction,
   selectWorkspacePanel,
 } from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
@@ -292,11 +292,11 @@ export async function connectAndHome(
     await review.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(review).not.toBeVisible();
   }
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  const home = machineJogAction(page, 'Home');
+  await home.click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine(IDLE);
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+  await expect(home).toBeEnabled();
 }
 
 export function serialWrites(events: FixtureEvents): string {

@@ -56,11 +56,14 @@ function SetOriginButton(props: {
   readonly busy: boolean;
   readonly needsAttention: boolean;
   readonly onSet: () => void;
-}): JSX.Element {
+  readonly jog?: boolean;
+  readonly show?: boolean;
+}): JSX.Element | null {
+  if (props.show === false) return null;
   return (
     <button
       type="button"
-      className={props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}
+      className={`${props.needsAttention ? 'lf-btn lf-btn--attention' : 'lf-btn'}${props.jog ? ' lf-jog-origin' : ''}`}
       onClick={props.onSet}
       disabled={props.busy}
       title={
@@ -119,10 +122,13 @@ function resetOriginTitle(persistentOrUnknown: boolean, hasCustom: boolean): str
 //   - "Reset origin" sends G92.1. Only enabled when wcoCache shows a
 //     non-trivial offset; disabled otherwise (nothing to clear).
 //   - "Release motors" sends $SLP for hand-positioning (ADR-053 P4).
-export function OriginRow(props: {
+type Props = {
   readonly disabled: boolean;
   readonly streaming: boolean;
-}): JSX.Element | null {
+  readonly layout?: 'all' | 'set-only' | 'utilities';
+};
+
+export function OriginRow(props: Props): JSX.Element | null {
   const wcs = useLaserStore((s) => s.capabilities.wcs);
   const canSleep = useLaserStore((s) => s.capabilities.sleep);
   const homingEnabled = useStore((s) => s.project.device.homing.enabled);
@@ -173,6 +179,21 @@ export function OriginRow(props: {
     setJobPlacement,
     pushToast,
   });
+  const setOriginButton = (
+    <SetOriginButton
+      busy={busy}
+      needsAttention={needsSetOriginAttention({
+        homingEnabled,
+        hasCustom: hasCustomXy,
+        busy,
+        startFrom,
+      })}
+      onSet={onSet}
+      jog={props.layout === 'set-only'}
+      show={props.layout !== 'utilities'}
+    />
+  );
+  if (props.layout === 'set-only') return setOriginButton;
   return (
     <div style={originSectionStyle}>
       <div
@@ -181,16 +202,7 @@ export function OriginRow(props: {
         <span style={sectionCaptionStyle}>Origin</span>
       </div>
       <div style={actionGridStyle}>
-        <SetOriginButton
-          busy={busy}
-          needsAttention={needsSetOriginAttention({
-            homingEnabled,
-            hasCustom: hasCustomXy,
-            busy,
-            startFrom,
-          })}
-          onSet={onSet}
-        />
+        {setOriginButton}
         <button
           type="button"
           className="lf-btn"

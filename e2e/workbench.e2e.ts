@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { grayscaleTracePngBase64, writeQualifiedPngFixture } from './fixtures/png-fixture';
 import {
   connectMachineAndDismissFirstSetup,
-  expandMachineUtilities,
+  expandMachineMaintenance,
+  machineJogAction,
   toolbarCommand,
 } from './fixtures/workspace-ui';
 import { confirmJobReview } from './fixtures/recovery-flow';
@@ -192,7 +193,16 @@ baseTest(
     await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
     await dialog.getByRole('button', { name: 'Save CNC machine setup', exact: true }).click();
 
-    await expect(page.getByLabel('Router controls')).toBeVisible();
+    const router = page.getByLabel('Router controls', { exact: true });
+    await expect(router).toBeVisible();
+    await expandMachineMaintenance(page);
+    await router
+      .locator('summary')
+      .filter({ hasText: /^Surface spoilboard$/ })
+      .click();
+    await expect(
+      router.getByRole('button', { name: 'Save surfacing G-code…', exact: true }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Machine Setup', exact: true }).click();
     const reopened = page.getByRole('dialog', { name: 'CNC Machine Setup' });
     await reopened.getByRole('button', { name: 'Go to step 2: Essentials', exact: true }).click();
@@ -209,9 +219,7 @@ baseTest('unconfigured auto-focus opens its setup section directly', async ({ pa
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
   await page.getByRole('tab', { name: 'Machine' }).click();
-  await expandMachineUtilities(page);
-
-  await page.getByRole('button', { name: 'Set up auto-focus', exact: true }).click();
+  await machineJogAction(page, 'Set up auto-focus').click();
 
   const dialog = page.getByRole('dialog', { name: 'Machine Setup' });
   await expect(dialog).toContainText('Step 2 of 3');
@@ -744,11 +752,11 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  const home = machineJogAction(page, 'Home');
+  await home.click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+  await expect(home).toBeEnabled();
 }
 
 interface CanvasPixels {
