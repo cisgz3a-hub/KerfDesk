@@ -4,7 +4,7 @@
   "highlights": [
     "Repeated Save and Save As requests to the same file through different paths preserve the newest captured document.",
     "CNC relief masks respect whole cell footprints, varying-width rail profiles stay aligned and tapered inlays preserve overlapping text joins. Sketches retain diagonals and withhold results that cannot reopen.",
-    "Selected CNC output ignores unused projection dependencies and retains valid Frame evidence after unrelated edits.",
+    "Selected CNC output ignores unused projection dependencies and retains Frame after unrelated edits. G-code preview preserves active retraces and 3D depth, corrects timing and picking, and restores its background after graphics recovery.",
     "Artwork exports preserve thin and flattened curves under scaling, rotation and mirroring, within the requested precision of supported vector formats.",
     "Licence checkout rejects malformed requests before saving payment intent. Desktop Phone connections bound complete reply frames and report oversize responses cleanly.",
     "First Connect opens Machine Setup for an unconfigured machine. Desktop upgrade checks verify saved CNC setups and optimisation settings against the installed writer. Build tools include available security patches."
