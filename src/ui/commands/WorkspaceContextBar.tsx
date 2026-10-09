@@ -155,7 +155,10 @@ function closeOnOutsidePointerDown(
 
 function closeOnEscape(close: () => void): () => void {
   const closeOnEscapeKey = (event: KeyboardEvent): void => {
-    if (event.key === 'Escape') close();
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    close();
   };
   document.addEventListener('keydown', closeOnEscapeKey, true);
   return () => document.removeEventListener('keydown', closeOnEscapeKey, true);
