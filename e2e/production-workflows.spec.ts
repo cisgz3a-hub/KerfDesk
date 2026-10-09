@@ -1,7 +1,7 @@
 import {
   connectMachineAndDismissFirstSetup,
   connectMachineThroughToolbar,
-  expandMachineUtilities,
+  machineJogAction,
   selectWorkspacePanel,
   toolbarCommand,
 } from './fixtures/workspace-ui';
@@ -227,8 +227,8 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expect(page.getByText(/^Info: Machine settings detected:/)).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  const home = machineJogAction(page, 'Home');
+  await home.click();
   await expect
     .poll(async () =>
       (await kerfdesk.events())
@@ -238,7 +238,7 @@ test('uses one print-and-cut transform for export and invalidates it on trust lo
     )
     .toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+  await expect(home).toBeEnabled();
   await runMenuCommand(page, 'Tools', 'Print and Cut...');
 
   const targetOne = page.getByRole('group', { name: 'Target 1' });

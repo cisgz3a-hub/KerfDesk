@@ -132,6 +132,13 @@ scroller replaces the two regions so the controls remain reachable. The existing
 dock stays outside those scrollers. Connection actions, jog cancellation, ordinary workspace
 shortcuts, qualification, output and the ADR-565 Frame/Start contract are unchanged.
 
+The maintainer's 2026-10-09 refinement places a smaller Manual Air toggle above Home,
+laser Auto-focus and Set origin in a compact column beside the jog arrows. Existing
+action handlers, setup links and busy states are shared with standalone controls.
+Origin utilities and CNC maintenance remain in the lower tools; air setup notices
+span the jog area's full width and the optional hold-to-Fire control remains reachable.
+CNC omits laser Auto-focus and retains Home and Set origin when manual air is hidden.
+
 #### Amendment 3 - Explicit first Connect opens Machine Setup (2026-10-09)
 
 The maintainer requested that pressing Connect open Machine Setup for a machine

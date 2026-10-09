@@ -23,6 +23,9 @@ import { StatusDisplay } from './StatusDisplay';
 import { JogPad } from './JogPad';
 import { MoveToPositionSection } from './MoveToPositionSection';
 import { JobControls } from './JobControls';
+import { JobSetupControls } from './JobSetupControls';
+import { OriginRow } from './OriginRow';
+import { jobControlsBusy } from './job-controls-busy';
 import { MachineHoursSection } from './MachineHoursSection';
 import { ProbePanel } from './ProbePanel';
 import { runStartJobFlow } from './start-job-flow';
@@ -31,11 +34,16 @@ import './LaserWindow.css';
 
 export { forgetControllerAndClearStartBlockers } from './controller-connection-actions';
 
-export function LaserWindow({
-  dockedJobActions = false,
-}: {
+// Homing lives on Confirm, so its setup deep-link needs no section highlight.
+const openHomingSetup = (): void => openMachineSetup({ kind: 'step', step: 'confirm' });
+const openAutofocusSetup = (): void =>
+  openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' });
+
+type Props = {
   readonly dockedJobActions?: boolean;
-} = {}): JSX.Element {
+};
+
+export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Element {
   const machinePanel = useMachineRailVisibility();
   const connection = useLaserStore((s) => s.connection);
   const alarmCode = useLaserStore((s) => s.alarmCode);
@@ -44,6 +52,10 @@ export function LaserWindow({
   const autofocusBusy = useLaserStore((s) => s.autofocusBusy);
   const motionOperation = useLaserStore((s) => s.motionOperation);
   const controllerOperation = useLaserStore((s) => s.controllerOperation);
+  const setupBusy = useLaserStore((s) =>
+    jobControlsBusy(s.streamer?.status, s.motionOperation, s.controllerOperation),
+  );
+  const setupDisabled = connection.kind !== 'connected' || autofocusBusy;
   // By value: the report object is replaced on every 250 ms poll, and this
   // rail derives only Idle / Sleep / Alarm from it. Selecting the object
   // re-rendered the whole machine rail on each poll of a running job.
@@ -62,9 +74,6 @@ export function LaserWindow({
     machineOperationBusy,
     jogBlocked,
   );
-  // Homing lives on the Confirm settings step, which is not collapsed, so the
-  // deep-link needs no section highlight.
-  const openHomingSetup = (): void => openMachineSetup({ kind: 'step', step: 'confirm' });
   if (!machinePanel.isExpanded) {
     return <CollapsedMachineRail machineKind={machineKind} onExpand={machinePanel.toggle} />;
   }
@@ -92,19 +101,22 @@ export function LaserWindow({
           />
         )}
         {controllerDisplay.sleep && <SleepBanner onWake={control.runWake} />}
-        <JogPad disabled={jogPadDisabled} />
+        <MachineJogControls
+          disabled={jogPadDisabled}
+          setupDisabled={setupDisabled}
+          setupBusy={setupBusy}
+        />
         <StatusDisplay />
       </section>
       <section className="lf-machine-details" aria-label="Machine tools">
         <MoveToPositionSection disabled={jogPadDisabled} />
         <ProbePanel />
         <JobControls
-          setupExtras={<CncUtilitiesPanel />}
+          setupExtras={machineKind === 'cnc' ? <CncUtilitiesPanel /> : undefined}
           dockedJobActions={dockedJobActions}
-          disabled={connection.kind !== 'connected' || autofocusBusy}
-          onConfigureAutofocus={() =>
-            openMachineSetup({ kind: 'step', step: 'options', highlight: 'autofocus' })
-          }
+          machineActionsInJogPad
+          disabled={setupDisabled}
+          onConfigureAutofocus={openAutofocusSetup}
           onConfigureHoming={openHomingSetup}
           onStartJob={() => void runStartJobFlow()}
         />
@@ -112,6 +124,30 @@ export function LaserWindow({
         <MachineConsoleSection />
       </section>
     </aside>
+  );
+}
+
+function MachineJogControls(props: {
+  readonly disabled: boolean;
+  readonly setupDisabled: boolean;
+  readonly setupBusy: boolean;
+}): JSX.Element {
+  return (
+    <JogPad
+      disabled={props.disabled}
+      machineActions={
+        <>
+          <JobSetupControls
+            disabled={props.setupDisabled}
+            streaming={props.setupBusy}
+            onConfigureAutofocus={openAutofocusSetup}
+            onConfigureHoming={openHomingSetup}
+            jog
+          />
+          <OriginRow disabled={props.setupDisabled} streaming={props.setupBusy} layout="set-only" />
+        </>
+      }
+    />
   );
 }
 

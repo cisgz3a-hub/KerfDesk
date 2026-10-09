@@ -23,7 +23,9 @@ import { controllerActionFailureHandler } from './report-controller-action-failu
 //     the listed defaults and then turns manual air on, in one click.
 type AirAssistReadiness = 'ready' | 'no-output' | 'defaults';
 
-export function JogPadAirAssist(): JSX.Element {
+export function JogPadAirAssist({
+  compact = false,
+}: { readonly compact?: boolean } = {}): JSX.Element {
   const [noticeOpen, setNoticeOpen] = useState(false);
   const project = useStore((s) => s.project);
   const syncProjectAirAssistDefaults = useStore((s) => s.syncProjectAirAssistDefaults);
@@ -55,6 +57,7 @@ export function JogPadAirAssist(): JSX.Element {
         enabled={airAssistOn}
         readiness={readiness}
         onToggle={handleToggle}
+        compact={compact}
       />
       {noticeOpen && readiness === 'no-output' ? (
         <AirOutputUnsetNotice
@@ -87,6 +90,7 @@ function AirAssistControl(props: {
   readonly enabled: boolean;
   readonly readiness: AirAssistReadiness;
   readonly onToggle: (enabled: boolean) => void;
+  readonly compact: boolean;
 }): JSX.Element {
   // The store's own refusal for this click, if any. A 'no-output' or
   // 'defaults' button stays clickable: its click opens the setup notice.
@@ -103,12 +107,19 @@ function AirAssistControl(props: {
       disabled={disabled}
       aria-label={label}
       aria-pressed={props.enabled}
-      className="lf-manual-air"
+      className={`lf-manual-air${props.compact ? ' lf-manual-air--compact' : ''}`}
       title={title}
-      style={airAssistButtonStyle(props.enabled, props.readiness)}
+      style={{
+        ...airAssistButtonStyle(props.enabled, props.readiness),
+        ...(props.compact ? compactAirAssistStyle : {}),
+      }}
     >
-      <span style={airAssistTitleStyle}>Manual Air</span>
-      <span style={airAssistStateStyle}>{props.enabled ? 'ON' : 'OFF'}</span>
+      <span style={props.compact ? { ...airAssistTitleStyle, fontSize: 11 } : airAssistTitleStyle}>
+        Manual Air
+      </span>
+      <span style={props.compact ? compactAirAssistStateStyle : airAssistStateStyle}>
+        {props.enabled ? 'ON' : 'OFF'}
+      </span>
       <span style={airAssistCommandStyle}>{controlCaption(props.readiness, props.command)}</span>
     </button>
   );
@@ -271,10 +282,22 @@ const airAssistTitleStyle: React.CSSProperties = {
   fontWeight: 600,
   lineHeight: 1.15,
 };
+const compactAirAssistStyle: React.CSSProperties = {
+  minHeight: 40,
+  padding: '4px 5px',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  columnGap: 4,
+  rowGap: 2,
+};
 const airAssistStateStyle: React.CSSProperties = {
   fontSize: 14,
   fontWeight: 600,
   lineHeight: 1,
+};
+const compactAirAssistStateStyle: React.CSSProperties = {
+  ...airAssistStateStyle,
+  fontSize: 12,
 };
 const airAssistCommandStyle: React.CSSProperties = {
   fontSize: 11,
