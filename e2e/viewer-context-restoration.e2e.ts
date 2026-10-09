@@ -155,7 +155,8 @@ async function productionContextReceipt(options: {
     if (parsed.kind !== 'ok') throw new Error(parsed.reason);
     current.setSegments(parsed.model);
     current.setStage(CLASSIC_STAGE);
-    current.setView('top');
+    // Front view keeps these fixed corner samples outside the XY grid.
+    current.setView('front');
     current.fitView();
     current.setPlayhead({ segmentIndex: 1, point: { x: 50, y: 0, z: 0.5 } });
     await settle();
