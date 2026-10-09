@@ -120,6 +120,14 @@ genuine multi-depth paths retain their depth writes and nearer-move priority. Th
 and legend mask still exclude hidden moves. This also covers zero-area horizontal and vertical
 paths classified as flat by ADR-425.
 
+The nonplanar ID pass encodes the resolved physical plane's eye distance linearly across the
+original camera near/far interval. It evaluates that distance before perspective NDC rounding,
+so a genuinely nearer move 0.01 mm ahead does not collapse onto the cut's depth on software
+WebGL. Fat and native IDs share this encoding and retain the original projected geometry,
+physical-plane clipping, local clipping and coplanar cut priority. Raster fallback converts
+perspective depth to the same encoding; it cannot recover precision already lost in raster
+depth. The visible toolpath, camera and its clipping range are unchanged.
+
 A new pick computes its closest point on the original move's retained interval under the current
 section and Z planes. Only original endpoints that remain in that interval and in the viewport
 can supply a fresh measurement snap; inclusive boundary endpoints still snap, and a clipping

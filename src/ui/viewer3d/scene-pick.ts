@@ -9,7 +9,7 @@ import type * as ThreeNamespace from 'three';
 import type { WebGLRenderer } from 'three';
 import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { editLineMaterial, withShownMoves } from './line-shader-edits';
-import { installXYPlaneDepth } from './line-plane-depth';
+import { installPickDepth } from './line-pick-depth';
 import { addDepthPlanes } from './line-depth-plane-geometry';
 import {
   encodePickIds,
@@ -171,7 +171,7 @@ function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPas
     toneMapped: false,
     clipping: true,
   });
-  installXYPlaneDepth(three, material, 'native');
+  installPickDepth(three, material, 'native');
   const savedClear = new three.Color();
   return {
     addProgram: (solid, planar) => {
@@ -258,7 +258,7 @@ function createProgramPickMaterial(modules: ThreeModules) {
   editLineMaterial(material, 'kerfdesk-pick-moves', (shader) =>
     withInstancePickIds(withShownMoves(shader)),
   );
-  installXYPlaneDepth(modules.three, material, 'fat');
+  installPickDepth(modules.three, material, 'fat');
   return material;
 }
 

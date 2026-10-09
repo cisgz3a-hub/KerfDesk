@@ -337,6 +337,8 @@ async function capture(
     options,
     frame: { pixel, pointer, pick, measuredPoint, planar, drawingBuffer },
   });
+  // Preserve the complete raw readout even when the next assertion fails.
+  await writeFile(info.outputPath('pick-results.json'), JSON.stringify(results, null, 2));
   return frame;
 }
 

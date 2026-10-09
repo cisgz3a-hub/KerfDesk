@@ -18,6 +18,15 @@ import { applyTravelLook } from '../../src/ui/viewer3d/scene-travel-look';
 import { srgbToLinear, type Viewer3dLook } from '../../src/ui/viewer3d/viewer3d-look';
 import { resolveViewer3dTheme } from '../../src/ui/viewer3d/viewer3d-theme';
 import { clipObjects } from '../../src/ui/viewer3d/scene-isolate';
+import {
+  DEPTH_PLANE_ATTRIBUTE,
+  DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  DEPTH_PLANE_ORIGIN_ATTRIBUTE,
+} from '../../src/ui/viewer3d/line-depth-plane-geometry';
+import { installGhostTail } from '../../src/ui/viewer3d/line-ghost-tail';
+import { installXYPlaneDepth } from '../../src/ui/viewer3d/line-plane-depth';
+import { editLineMaterial, withShownMoves } from '../../src/ui/viewer3d/line-shader-edits';
+import { SHOWN_ATTRIBUTE } from '../../src/ui/viewer3d/program-lines';
 
 interface Point {
   x: number;
@@ -47,7 +56,10 @@ interface FrameOptions {
   hideToolpath?: boolean;
   hideCompleted?: boolean;
   completedWidth?: number;
-  /** Compare the fast branch with the exact source-ordered meshes from the same factory. */
+  /**
+   * Compare production with an unculled source-order ghost reference.
+   * Both share the physical depth formula; this checks completed-ghost culling.
+   */
   sourceOrder?: boolean;
   retainCurrentGhost?: boolean;
   clipMinX?: number;
@@ -103,19 +115,67 @@ export function playbackStrokeFrame(options: FrameOptions): {
   if (options.clipMinX !== undefined)
     clipObjects(group, [new three.Plane(new three.Vector3(1, 0, 0), -options.clipMinX)]);
   if (options.sourceOrder !== undefined) {
-    if (built.reveal.solid?.depthBatches == null)
-      throw new Error('Source-order comparison requires a mixed-depth batch');
-    const strokes = built.objects.slice(1, 7);
-    if (strokes.length !== 6 || strokes.some((object) => !('isLineSegments2' in object)))
-      throw new Error('Expected original completed/ghost meshes followed by their depth batches');
+    const { solid, ghostTail } = built.reveal;
+    const strokes = built.objects.filter(
+      (object): object is LineSegments2 => object instanceof LineSegments2,
+    );
+    const [completed, ghost] = strokes;
     if (
-      strokes[0]?.visible ||
-      strokes.filter((object) => object.renderOrder === 1 && object.visible).length !== 2
+      solid === null ||
+      solid.depthBatches?.split !== false ||
+      ghostTail === null ||
+      strokes.length !== 2 ||
+      completed === undefined ||
+      ghost === undefined ||
+      completed.geometry !== solid.geometry ||
+      ghost !== built.reveal.solidGhost ||
+      completed.renderOrder !== 1 ||
+      ghost.renderOrder !== -1
     )
-      throw new Error('Comparison input did not admit the fast depth branch');
-    if (options.sourceOrder) built.reveal.active.useHardwareDepth(false);
-    if (options.sourceOrder)
-      for (const [index, stroke] of strokes.entries()) stroke.visible = index < 2;
+      throw new Error('Source-order comparison requires the two original nonplanar stroke meshes');
+    for (const name of [
+      'instanceStart',
+      'instanceEnd',
+      SHOWN_ATTRIBUTE,
+      DEPTH_PLANE_ATTRIBUTE,
+      DEPTH_PLANE_OFFSET_ATTRIBUTE,
+      DEPTH_PLANE_ORIGIN_ATTRIBUTE,
+    ]) {
+      const attribute = completed.geometry.getAttribute(name);
+      if (attribute === undefined || ghost.geometry.getAttribute(name) !== attribute)
+        throw new Error('Source-order comparison requires shared source attributes: ' + name);
+    }
+    const positions = completed.geometry.getAttribute('instanceStart');
+    const shown = completed.geometry.getAttribute(SHOWN_ATTRIBUTE);
+    if (
+      !(positions instanceof three.InterleavedBufferAttribute) ||
+      !(positions.data.array instanceof Float32Array) ||
+      positions.data.array.buffer !== parsed.model.positions.buffer ||
+      positions.data.array.byteOffset !== parsed.model.positions.byteOffset ||
+      positions.count !== solid.total ||
+      !(shown instanceof three.InterleavedBufferAttribute) ||
+      shown.data.array !== solid.colors ||
+      ghost.geometry.instanceCount !== solid.total
+    )
+      throw new Error('Source-order comparison requires the unchanged full program buffers');
+    if (options.sourceOrder) {
+      const production = ghost.material;
+      // Three's clone copies material properties/uniforms, not custom callbacks.
+      // Build a separate shown/tail/depth pipeline with no covered-ghost cull.
+      const reference = production.clone();
+      if (
+        reference.onBeforeCompile === production.onBeforeCompile ||
+        reference.onBeforeRender === production.onBeforeRender
+      ) {
+        reference.dispose();
+        throw new Error('Unculled ghost reference unexpectedly inherited production callbacks');
+      }
+      editLineMaterial(reference, 'kerfdesk-source-order-reference-shown', withShownMoves);
+      installGhostTail(three, reference, ghost.geometry, ghostTail);
+      installXYPlaneDepth(three, reference, 'fat');
+      ghost.material = reference;
+      production.dispose();
+    }
   }
   if (options.hideCompleted) {
     if (built.reveal.solid !== null) built.reveal.solid.geometry.instanceCount = 0;

@@ -110,7 +110,7 @@ for (const sign of [-1, 1]) {
   });
 }
 
-test('fast mixed-depth strokes match the precise source-order renderer at sloping retraces and crossings', async ({
+test('source-order strokes match an unculled ghost reference at sloping retraces and crossings', async ({
   page,
 }, info) => {
   test.setTimeout(120_000);
