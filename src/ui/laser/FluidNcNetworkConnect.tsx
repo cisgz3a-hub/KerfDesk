@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { usePlatform } from '../app/platform-context';
-import { connectOptionsForDevice } from '../commands/connect-options';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { connectMachine } from './connect-machine';
 
 /** Explicit target, same live-controller session/driver as USB, no network discovery. */
 function useFluidNcNetworkConnect() {
@@ -27,9 +27,9 @@ function useFluidNcNetworkConnect() {
     }
     setMessage('Opening the entered FluidNC channel…');
     try {
-      await laser.connect(
+      await connectMachine(
         { ...platform, serial: network.serialForTarget(host.trim(), Number(port)) },
-        { ...connectOptionsForDevice(current), hostedStreaming: false, portSelection: 'choose' },
+        { hostedStreaming: false, portSelection: 'choose' },
       );
       const result = useLaserStore.getState().connection;
       setMessage(

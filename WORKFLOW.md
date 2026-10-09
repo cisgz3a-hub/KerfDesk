@@ -3093,6 +3093,12 @@ Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026
 The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
+Pressing **Connect** for a profile that has not completed setup opens the Machine
+stage immediately and starts the normal connection in the same click. The saved
+record is per machine profile and Laser/CNC head. Only **Save machine setup**
+completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
+Configured profiles connect directly. Automatic connections and recovery Reconnect
+keep their existing behavior and do not open setup (ADR-420 Amendment 3).
 The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
 profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
 **Check essentials** remains available to edit values first. Neither selecting the shortcut nor

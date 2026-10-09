@@ -4,7 +4,11 @@ import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Project } from '../src/core/scene';
 import { expect, test } from './fixtures/kerfdesk-test';
-import { selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  selectWorkspacePanel,
+  toolbarCommand,
+} from './fixtures/workspace-ui';
 
 // A local reproduction can use the exact original PNG without committing it.
 const imagePath =
@@ -137,7 +141,7 @@ test('dense Sharp artwork traces, previews and completes one simulated Frame aft
 
   // The fixture supplies a simulated serial controller; no hardware is used.
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible({ timeout: 15_000 });
   // Home establishes machine position without erasing a retained G54/G92.
   // This used to refuse Absolute placement before starting the compiler.

@@ -6,6 +6,7 @@
 import { expect, test, type CDPSession, type Page } from '@playwright/test';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { connectMachineAndDismissFirstSetup } from './fixtures/workspace-ui';
 
 const pacedSerialSource = readFileSync(
   fileURLToPath(new URL('./fixtures/paced-grbl-serial.js', import.meta.url)),
@@ -64,7 +65,7 @@ test('big job streaming keeps the workspace responsive', async ({ page }, testIn
   await dismissNotifications(page);
 
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expandMachineUtilities(page);
   await page.getByRole('button', { name: 'Home', exact: true }).click();

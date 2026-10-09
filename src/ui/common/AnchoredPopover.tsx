@@ -10,6 +10,8 @@ type PopoverProps = {
   readonly className?: string;
   readonly children: ReactNode;
   readonly initialFocus?: string;
+  /** Stable opener for a modal whose control disappears with this popover. */
+  readonly focusFallbackId?: string;
   /** Forms keep native Tab navigation inside, then dismiss when focus leaves. */
   readonly closeOnTab?: boolean;
   /** Keep controls inside their owning modal's focus boundary when needed. */
@@ -74,6 +76,11 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
       className={`lf-anchored-popover ${props.className ?? ''}`}
       style={position}
       onKeyDownCapture={props.onKeyDownCapture}
+      onFocusCapture={(event) => {
+        if (props.focusFallbackId !== undefined && event.target instanceof HTMLElement) {
+          event.target.dataset['dialogFocusFallback'] = props.focusFallbackId;
+        }
+      }}
       onBlur={(event) => {
         if (props.closeOnTab !== false) return;
         const next = event.relatedTarget;
