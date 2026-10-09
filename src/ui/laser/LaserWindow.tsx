@@ -85,7 +85,7 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
       style={panelStyle}
     >
       <MachineRailHeading machineKind={machineKind} onCollapse={machinePanel.toggle} />
-      <section className="lf-machine-primary-controls" aria-label="Jog and machine status">
+      <section className="lf-machine-primary-controls" aria-label="Jog and positioning">
         {controllerDisplay.showAlarmBanner && (
           <AlarmBanner
             code={alarmCode}
@@ -106,9 +106,9 @@ export function LaserWindow({ dockedJobActions = false }: Props = {}): JSX.Eleme
           setupDisabled={setupDisabled}
           setupBusy={setupBusy}
         />
-        <StatusDisplay />
       </section>
       <section className="lf-machine-details" aria-label="Machine tools">
+        <StatusDisplay />
         <MoveToPositionSection disabled={jogPadDisabled} />
         <ProbePanel />
         <JobControls
@@ -135,6 +135,16 @@ function MachineJogControls(props: {
   return (
     <JogPad
       disabled={props.disabled}
+      machineHome={
+        <JobSetupControls
+          disabled={props.setupDisabled}
+          streaming={props.setupBusy}
+          onConfigureAutofocus={openAutofocusSetup}
+          onConfigureHoming={openHomingSetup}
+          actions="home"
+          jog
+        />
+      }
       machineActions={
         <>
           <JobSetupControls
@@ -142,6 +152,7 @@ function MachineJogControls(props: {
             streaming={props.setupBusy}
             onConfigureAutofocus={openAutofocusSetup}
             onConfigureHoming={openHomingSetup}
+            actions="autofocus"
             jog
           />
           <OriginRow disabled={props.setupDisabled} streaming={props.setupBusy} layout="set-only" />
@@ -292,14 +303,14 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 }
 
 const panelStyle: React.CSSProperties = {
-  // The primary controls and lower machine tools own separate scrollers so
-  // opening Console or History does not move the jog pad out of view. This
-  // outer rail stays within the workspace body above its Frame/Start dock.
+  // Jog controls stay fixed while lower tools scroll independently. If the
+  // entire group cannot fit a very short body, the outer rail can scroll to
+  // reach it without covering the separate Frame/Start dock.
   // Surface chrome and spacing come from .lf-machine-rail; layout only here.
   width: '100%',
   height: '100%',
   boxSizing: 'border-box',
-  overflowY: 'hidden',
+  overflowY: 'auto',
   overflowX: 'hidden',
   fontFamily: 'system-ui, sans-serif',
   display: 'flex',
