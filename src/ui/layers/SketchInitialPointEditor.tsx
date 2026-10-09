@@ -3,7 +3,7 @@ export function SketchInitialPointEditor({ sketch, onChange }: SketchEditorProps
   return (
     <>
       {sketch.points.map((point, index) => (
-        <div key={point.id}>
+        <div key={point.id} className="lf-sketch-point-row">
           {point.id}
           {(['x', 'y'] as const).map((axis) => (
             <label key={axis}>
@@ -18,13 +18,19 @@ export function SketchInitialPointEditor({ sketch, onChange }: SketchEditorProps
                 }
                 type="number"
                 aria-label={point.id + ' ' + axis}
-                value={point[axis]}
+                value={Number.isFinite(point[axis]) ? point[axis] : ''}
                 onChange={(event) =>
                   onChange({
                     ...sketch,
                     points: sketch.points.map((candidate, i) =>
                       index === i
-                        ? { ...candidate, [axis]: Number(event.currentTarget.value) }
+                        ? {
+                            ...candidate,
+                            [axis]:
+                              event.currentTarget.value.trim() === ''
+                                ? NaN
+                                : Number(event.currentTarget.value),
+                          }
                         : candidate,
                     ),
                   })

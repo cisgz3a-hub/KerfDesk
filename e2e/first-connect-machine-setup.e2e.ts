@@ -46,9 +46,9 @@ test('first explicit Connect opens Machine setup, connects, and saved catalog se
   await profile.check();
   await expect(profile).toBeChecked();
   await saveSetup(setup);
-  await expect(toolbar.getByRole('button', { name: /^Machine details:/ })).toHaveAccessibleName(
-    /Creality Falcon A1 Pro.*Connected/,
-  );
+  const details = toolbar.getByRole('button', { name: /^Machine details:/ });
+  await expect(details).toHaveAccessibleName(/Creality Falcon A1 Pro/);
+  await expect(details).toHaveAccessibleDescription('Connected');
   const saved = await configuredSignatures(page);
   expect(saved).toHaveLength(1);
   expect(saved[0]).toContain('358x268');

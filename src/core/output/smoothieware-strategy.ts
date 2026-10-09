@@ -29,12 +29,26 @@ export const smoothiewareStrategy = {
   },
 };
 
-function rescaleSWords(body: string, maxPowerS: number): string {
-  return body.replace(S_WORD_RE, (_match, sText: string) => {
+/** Rescale S words in G-code only; `;` and `( )` comments keep their bytes. */
+export function rescaleSWords(body: string, maxPowerS: number): string {
+  const rescale = (_match: string, sText: string): string => {
     const virtual = Number.parseFloat(sText);
     if (!Number.isFinite(virtual) || virtual <= 0) return 'S0';
     return `S${formatPower((virtual / SMOOTHIE_VIRTUAL_MAX_POWER) * maxPowerS)}`;
-  });
+  };
+  return body
+    .split('\n')
+    .map((line) => {
+      const commentStart = line.indexOf(';');
+      const code = commentStart < 0 ? line : line.slice(0, commentStart);
+      const comment = commentStart < 0 ? '' : line.slice(commentStart);
+      const rescaled = code
+        .split(/(\([^)]*\))/)
+        .map((part) => (part.startsWith('(') ? part : part.replace(S_WORD_RE, rescale)))
+        .join('');
+      return `${rescaled}${comment}`;
+    })
+    .join('\n');
 }
 
 function formatPower(value: number): string {

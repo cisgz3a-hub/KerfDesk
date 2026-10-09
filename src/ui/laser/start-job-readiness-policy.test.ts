@@ -125,6 +125,18 @@ describe('preparedProgramIntegrityIssue line buffer', () => {
     ]);
   });
 
+  it('refuses Frame for a line carrying a byte the serial wire cannot send as text', () => {
+    const issue = preparedProgramIntegrityIssue(
+      'G21\nG1 X1\nG1 X2 (45° corner)\n',
+      1024,
+      NO_PREFLIGHT,
+      'grbl-v1.1',
+    );
+    expect(issue).toHaveLength(1);
+    expect(issue?.[0]).toMatch(/^G-code line 3: Not sent: the command contains "°"/);
+    expect(issue?.[0]).toMatch(/Job not framed or started\.$/);
+  });
+
   it('keeps the line for a controller whose parser holds it or is not described', () => {
     for (const kind of ['grblhal', 'fluidnc', 'marlin', undefined] as const) {
       expect(preparedProgramIntegrityIssue(program, 1024, NO_PREFLIGHT, kind)).toBeNull();

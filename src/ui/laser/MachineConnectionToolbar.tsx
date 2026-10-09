@@ -15,7 +15,6 @@ export function MachineConnectionToolbar(): JSX.Element {
     <section className="lf-machine-toolbar" aria-label="Machine toolbar">
       <DetectedSettingsToast />
       <ControllerConnectionControls
-        layout="compact"
         machineKind={machineKind}
         autofocusBusy={autofocusBusy}
         motionOperation={motionOperation}

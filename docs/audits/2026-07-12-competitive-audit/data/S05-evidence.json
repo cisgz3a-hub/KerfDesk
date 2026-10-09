@@ -1,0 +1,194 @@
+{
+  "sector": 5,
+  "categories": [
+    {
+      "id": "5.1",
+      "summary": "Layers keyed by lowercase hex color, one per unique stroke color, auto-created on import/draw/trace with mode-aware ensurers; unlimited count. Manual add via color picker; per-row Assign moves selection (recolors paths). Show hides canvas only; Output gates compile — LightBurn semantics. No LightBurn-style fixed palette strip; color choice is a free picker.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:53-63,120-144 (Layer keyed by #rrggbb color, normalizeLayerColor)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/scene-mutations.ts:92-163 (ensureLayersForColors / ensureLayersForMode / ensureRasterImageLayer auto-create per color, mode-aware)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/AddLayerControls.tsx:8-37 (free color-picker + Add; no fixed palette strip — grep 'palette' in src/ui matches only tool strip/trace/theme)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/scene.ts:42-52 (assignObjectToLayer recolors object paths); src/ui/layers/AssignSelectionButton.tsx:4-19"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/visibility.ts (visible = canvas only) vs src/core/job/compile-job.ts:51 (output gates compile) — LightBurn Show/Output split"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/scene/layer.test.ts; src/ui/layers/CutsLayersPanel.test.tsx (jsdom)"
+        }
+      ],
+      "notVerified": "Assignment ergonomics not exercised in a running app (jsdom tests only). LightBurn palette-strip comparison is from docs/training knowledge, not a live LightBurn install."
+    },
+    {
+      "id": "5.2",
+      "summary": "Deep typed per-layer laser model: mode, min/max power, speed (edit-time clamp to device.maxFeed), passes, air assist, kerf, tabs (size/count/skip-inner), hatch angle/spacing/LPI, fill overscan, 3 fill styles, cross-hatch, bidirectional, 11 dithers, negative, pass-through, dot-width; parallel CNC block; per-device persisted defaults. Absent vs LightBurn (no scope ADR): Z offset/Z-step per pass, perforation, dot mode, cut-through delays, ramp, fill grouping; image overscan hard-coded 5 mm.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:20-63 (full LayerOperationSettings union, readonly typed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/machine.ts:80-131 (CncLayerSettings: cutType, tool, depth/pass, feeds, plunge, spindle, stepover, pocket strategy, rampEntryDeg, tabs, materialKey)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/LayerRowFields.tsx:226-236 (speed parse clamps 1..device.maxFeed at edit time)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/layer-default-settings.ts:17-30 (per-device-profile persisted layer defaults, laserforge.layer-defaults.v1.<device>)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job-defaults.ts:1-6 + src/core/job/compile-job-raster.ts:90 (image overscan fixed DEFAULT_OVERSCAN_MM=5, no per-layer field); grep zOffset|perforation|dotMode|cutThrough in src/core/scene + src/ui/layers: no laser-side hits"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/layers/cut-settings-output-parity.test.ts:19-117 (fill/image/air/kerf patches route through prepared output, preview, G-code, estimate)"
+        }
+      ],
+      "notVerified": "Whether any of the absent LightBurn staples (Z-step, perforation, dot mode, cut-through, ramp) landed elsewhere under different names — greps found none. Actual burn effect of parameters never verified perceptually or on hardware."
+    },
+    {
+      "id": "5.3",
+      "summary": "Sub-layers: N extra full operation-settings blocks per color layer, each with enabled flag, emitted after the primary via outputOperationLayers — enables fill+line stacking on one color. UI has quick mode/power fields plus a full dialog. Known defects (2026-07-10 audit, still present): dialog reuses CutSettingsDialog wholesale so a dead 'Visible' checkbox is silently discarded; no ADR records this LightBurn divergence.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:46-51,193-215 (LayerSubLayer, layerFromSubLayer, outputOperationLayers)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:50-58 (compile walks outputOperationLayers per layer — sub-ops emitted after primary, output-gated)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/LayerSubLayers.tsx:100-190 (mode/power quick fields, full dialog; :183-190 subLayerPatchFromDialog discards 'visible', remaps output→enabled — dead checkbox persists)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep DECISIONS.md 'sub-layer|sublayer' — no ADR (full-sweep S3-F6 still open at pinned commit)"
+        }
+      ],
+      "notVerified": "Sub-layer dialog behavior not exercised in a browser; the dead 'Visible' checkbox conclusion is from static reading of the apply path. Actual multi-op burn output never verified on hardware."
+    },
+    {
+      "id": "5.4",
+      "summary": "SceneObject.operationOverride forks any layer setting per object; compiler buckets overridden objects into synthetic effective layers so preview/G-code/estimate agree; UI is 'Selected Artwork Settings'. Per-shape powerScale separately matches LightBurn Shape Properties. R1-R6 re-audit folded overrides into the feed advisory. Still no ADR records the override model (unrecorded LightBurn divergence, S3-F3), and overrides stay invisible in the layer list unless selected.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/scene-object.ts:78 (operationOverride?: ObjectOperationOverride)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:66-119 (compileVectorGroupsForLayer / vectorObjectBucketsForLayer / layerWithObjectOverride — synthetic per-override buckets)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/SelectedObjectOperationSettings.tsx:35,64,358 ('Selected Artwork Settings' editor over override); src/ui/layers/LayerRow.tsx:156 (layer card retargets to 'Use Selected Artwork Settings above' when selection exists)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep DECISIONS.md 'operationOverride|Selected Artwork|per-object' — no ADR at pinned commit (only powerScale is ADR-annotated, DECISIONS.md:2285)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-11-reaudit-fixes-handoff.md:32-35 (R4 fix 9195a90c folds object overrides into emitted-feed advisory)"
+        }
+      ],
+      "notVerified": "Override UI flows not exercised live. Interaction of overrides with material presets and cut order was not traced end-to-end this session."
+    },
+    {
+      "id": "5.5",
+      "summary": "Native deterministic .lfml.json library (ADR-045): strict validation, merge; ADR-093 multi-library auto-saved localStorage collection with legacy migration, create/edit wizard, Saved Libraries browser (Open/New/Rename/Duplicate/Delete/Export/Import). Apply copies recipe to layer, undoable; device-mismatch is now warn+confirm (2026-07-10 block-vs-ADR-045 finding FIXED); only 'unsupported' matches hard-block. Starter presets for exactly one machine (7 entries). No .clb import, manufacturer/community libraries, or linked presets.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:2325 (ADR-045 native format 'laserforge-material-library'), DECISIONS.md:3427-3505 (ADR-093 wizard, Saved Libraries, auto-save; .clb/manufacturer/linked presets out of scope)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/material-library-persistence.ts:28,143-145 (laserforge.material-libraries.v1 keyed collection + one-time legacy migration)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/material-library-preset-options.ts:42-53 + src/ui/layers/MaterialLibraryRecipeControls.tsx:30-41 + src/ui/state/material-library-actions.ts:104-110 (device mismatch = warn + confirm, assignable; 'unsupported' = hard block) — S3-F1 fixed vs 2026-07-10 audit"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/material-library-actions.ts:57-83 (Apply copies recipe via scene mutation, undoable, never linked)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/material-library/starter-catalog.ts:19-24 + neotronics-4040-presets.ts (starter catalog: 1 machine, 7 presets); src/ui/layers/CncMaterialRow.tsx:59-73 (CNC chipload material picker feeds calculator)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/material-library/material-library-io.test.ts:85; src/ui/layers/MaterialLibraryPanel.management.test.tsx:117; src/ui/layers/material-library-preset-options.test.ts"
+        }
+      ],
+      "notVerified": "Wizard internals (src/ui/material-library/wizard) read only at directory level this session. No LightBurn .clb fixture comparison exists. Library UX not exercised in a running app."
+    },
+    {
+      "id": "5.6",
+      "summary": "The visible layer-list order IS the execution order: compileJob walks scene.layers in array order through the single shared compile path, so reordering provably reorders the burn (pinned by output-parity test). Reordering UI is single-step up/down arrow buttons only — no drag-and-drop, no move-to-top/bottom (2026-07-10 S3-F9 still open). No per-layer priority number.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:48-59 (for layer of scene.layers, output-gated — list order = compile order)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/scene.ts:73-82 (moveLayer pure adjacent swap); src/ui/layers/LayerOrderControls.tsx:26-45 (only ^ / v single-step buttons at pinned commit)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/layers/cut-settings-output-parity.test.ts:18-50 (one dialog patch asserted identical across prepared output, preview toolpath, G-code, estimate — ADR-040 single compile path)"
+        }
+      ],
+      "notVerified": "Within-layer path ordering/optimization is S6 territory and was not assessed here. Reorder undo behavior not exercised live."
+    },
+    {
+      "id": "5.7",
+      "summary": "320px card-stack Cuts/Layers rail: per-card swatch, mode, Show/Output/Air toggles, power/speed/passes rows; double-click opens full editor with Make Default / Make Default for All / Reset to Default persisted per device; honest debounced clamp-snap commit; editor locked during active jobs. Since the 2026-07-10 audit the Layers section now defaults open on selection (partial S3-F2 fix); Material Library still collapses, layer card still redirects to override fields, clamps stay silent, Delete removes layer plus artwork against stale WORKFLOW F-A7.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutsLayersPanel.tsx:48-68,123-127 (LAYERS_SECTION_DEFAULT_OPEN=true with LightBurn-citing comment — layer rows no longer hidden on selection; Material Library still CollapsedPanel default-closed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsDefaultActions.tsx:17-31 (Make Default / for All / Reset); src/ui/layers/layer-default-settings.ts:17-30 (per-device persistence)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/use-debounced-commit.ts:54-118 (300ms debounce, snap display to committed value, blank-blur restore citing LightBurn); src/ui/layers/use-cut-settings-launcher.ts:12-27 (blocked while streaming/jogging/autofocus, auto-close on job start)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/LayerRowFields.tsx:204,230 (silent clamp, no status feedback — S3-F5 open); src/ui/layers/LayerRow.tsx:156 (card redirects to 'Selected Artwork Settings' on selection); src/ui/layers/DeleteLayerButton.tsx:4-14 (deleteLayerAndObjects vs WORKFLOW F-A7 doc — S3-F4 open)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/layers/LayerRow.double-click.test.tsx:71-93; src/ui/layers/CutsLayersPanel.cut-settings.test.tsx:176; src/ui/layers/CutsLayersPanel.numeric-safety.test.tsx"
+        }
+      ],
+      "notVerified": "No browser/live exercise of the panel — collapse/expand, debounce feel, and dialog flows are asserted only via jsdom tests and static reading. WORKFLOW F-A7 doc drift (S3-F4) was not re-diffed line-by-line this session; delete-semantics mismatch was re-confirmed in code."
+    }
+  ]
+}

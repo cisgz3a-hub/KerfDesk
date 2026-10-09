@@ -1,4 +1,5 @@
 import { selectControllerDriver } from '../../core/controllers';
+import { Icon } from '../kit';
 import { useStore } from '../state';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
 import { useToastStore } from '../state/toast-store';
@@ -12,6 +13,7 @@ type Props = {
   readonly onConfigureHoming: () => void;
   readonly compact?: boolean;
   readonly jog?: boolean;
+  readonly actions?: 'all' | 'home' | 'autofocus';
 };
 
 /** Shared Home and autofocus actions for the jog column and standalone job controls. */
@@ -25,16 +27,18 @@ export function JobSetupControls(props: Props): JSX.Element {
   const busy = props.disabled || props.streaming;
   return (
     <>
-      <HomeButton
-        onHome={() => void home().catch(controllerActionFailureHandler('Home'))}
-        onConfigureHoming={props.onConfigureHoming}
-        busy={busy}
-        streaming={props.streaming}
-        homingEnabled={homingEnabled}
-        command={homeCommand}
-        jog={props.jog}
-      />
-      {machineKind !== 'cnc' && (
+      {props.actions !== 'autofocus' && (
+        <HomeButton
+          onHome={() => void home().catch(controllerActionFailureHandler('Home'))}
+          onConfigureHoming={props.onConfigureHoming}
+          busy={busy}
+          streaming={props.streaming}
+          homingEnabled={homingEnabled}
+          command={homeCommand}
+          jog={props.jog}
+        />
+      )}
+      {props.actions !== 'home' && machineKind !== 'cnc' && (
         <AutofocusButton
           needsSetup={autofocusCommand.trim() === ''}
           busy={busy}
@@ -78,7 +82,7 @@ function HomeButton(props: {
         disabled={props.streaming}
         title="Homing is off for this machine. Open Machine Setup to configure Home."
       >
-        Set up homing
+        <HomeLabel jog={props.jog} label="Set up homing" />
       </button>
     );
   }
@@ -94,8 +98,21 @@ function HomeButton(props: {
           : `Run ${props.command.split(/\r?\n/).join(' then ')} to establish the machine reference. Set the workpiece origin separately.`
       }
     >
-      Home
+      <HomeLabel jog={props.jog} label="Home" />
     </button>
+  );
+}
+
+function HomeLabel(props: {
+  readonly jog: boolean | undefined;
+  readonly label: string;
+}): JSX.Element {
+  if (!props.jog) return <>{props.label}</>;
+  return (
+    <>
+      <Icon name="home" size={18} />
+      <span className="lf-jog-home-label">{props.label}</span>
+    </>
   );
 }
 

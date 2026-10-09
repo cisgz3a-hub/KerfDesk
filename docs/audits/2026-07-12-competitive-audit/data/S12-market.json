@@ -1,0 +1,332 @@
+{
+  "sector": 12,
+  "categories": [
+    {
+      "id": "12.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Two-stage: permanent lens-distortion calibration (presets for official cameras) then camera-to-workspace alignment via engraved targets; must re-run alignment if the camera moves. Thorough, guided, but finicky—alignment-score quality matters.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/Cameras/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CalibrateCameraAlignment/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/camera-alignment-accuracy/118996"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "No camera. CNC-only router software; positions by manual zeroing to a workpiece corner/center. Docs site carries only hidden shared-with-LightBurn camera-calibration pages, not an exposed MillMage feature.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Explainers/MillMageForLightBurnUsers/"
+            },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No camera support of any kind, so no calibration. Long-standing user feature requests (GitHub #2385, #74) remain unimplemented; the app targets basic GRBL sending.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/2385" },
+            {
+              "tag": "COMM",
+              "cite": "https://acmerlaser.com/blogs/news/the-difference-between-lightburn-and-lasergrbl"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Camera-first UX with per-machine guided calibrations: manual camera calibration (M1), distant-view/close-view calibration (P2/P3), and Aimed-Measure calibration. Calibration is a core onboarding step, not an add-on.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/137" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/834" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/221" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No camera. XY work-zero is set by manually jogging to the material's front-left corner; only a Z-probe accessory (for Z zero) exists—nothing to calibrate optically.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/5360405175187-Using-the-Z-Probe"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Live camera overlay places designs on real material; accuracy is hardware-bound (mount stability, camera MP)—fine for general placement, sub-mm needs care. Fine-tune via Width/Height/X-Y-Shift. 2.1 adds multi/IP-camera support.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/Cameras/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/camera-precision-capabilities-in-lightburn/90875"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "No camera overlay. Output is positioned relative to a chosen workpiece corner/center set during Project Setup with manual X/Y zeroing—no on-screen live view of the work material.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Explainers/MillMageForLightBurnUsers/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No camera overlay—the single most-cited missing feature versus LightBurn; users must frame by watching the head move. Third-party cameras (e.g. Mintion) provide monitoring only, not positioning overlay.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/2385" },
+            {
+              "tag": "COMM",
+              "cite": "https://diode-laser-wiki.com/documentation/extras/using-a-camera-with-a-diode-laser/"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Signature strength—camera-first WYSIWYG placement. Single wide camera ~1.5mm (M1, ≤3mm material); P2 dual-camera close-view reaches ~0.3mm via Aimed Measure. Accuracy degrades with material un-flatness/height.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/925" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/773" },
+            { "tag": "COMM", "cite": "https://laserengraverexpert.com/xtool-p2-vs-p2s/" },
+            { "tag": "COMM", "cite": "https://www.tomshardware.com/reviews/xtool-p2" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No camera and no live view of the work material; placement is entirely by manual work-zero jogging plus homing. No camera-overlay positioning surface at all.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Camera capture-to-vector is built into the Cameras workflow: trace artwork or objects placed in the laser directly from a camera image into editable vectors. Standard, documented feature.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Cameras/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "No camera, so no capture-to-vector. It inherits LightBurn's design tools (bitmap trace exists) but only from imported image files, never from a live camera.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Explainers/MillMageForLightBurnUsers/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No camera. It has a file-based raster→vector vectorization tool, but nothing is captured from a camera; camera support is entirely absent.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/2385" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Camera-equipped machines capture the baseplate image; users trace/outline real objects to vectors (Trace: auto-trace/centerline). Camera-less machines fall back to a phone-photo snapshot import.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/771" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1022" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No camera. Image trace is available only from uploaded image files via the import workflow, not from any live camera capture.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Full Print-and-Cut: two Target Positions (Tools→Print and Cut→Set First/Second Target Location) measure offset, rotation and scale to align a cut to printed media; requires Absolute Coords; accuracy grows with target separation.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/PrintAndCut/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://github.com/LightBurnSoftware/Documentation/blob/master/PrintAndCut.md"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "No print-and-cut / registration-mark alignment. Registration to a workpiece is done by probing or manual origin-setting, not by aligning to printed marks.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Guides/Probing/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Explainers/MillMageForLightBurnUsers/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No print-and-cut or registration-mark workflow; the app lacks LightBurn's advanced alignment features. Inferred absent from the feature set and comparison write-ups.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://acmerlaser.com/blogs/news/the-difference-between-lightburn-and-lasergrbl"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (feature not present in documented usage index)"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "'Print & blade cut' registers printed patterns for blade-module machines (e.g. M1); the camera also positions a laser cut onto pre-printed material. Capability is machine/module dependent.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/771" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/925" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No print-and-cut / registration-mark workflow. Machine control is limited to manual work-zero plus homing; nothing aligns a cut to printed artwork.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us (no print-and-cut article in support catalog)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "12.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Print-and-Cut doubles as a jig/fixture workflow—align a project to existing target marks on a fixture for repeat placement—and the camera overlay enables eyeball repeat placement. No dedicated fixture library.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/PrintAndCut/"
+            },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Cameras/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "CNC-native analog: a Probing Wizard (XYZ probe block on a workpiece corner) sets origin plus a work offset for repeatable fixture/jig placement. Probe/manual-based—no camera or board-outline auto-capture.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Guides/Probing/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No fixture/board-capture or jig workflow; repeatability relies on manual origin/zero setting only. No camera and no repeat-placement tooling.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" },
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (no fixture/jig feature in usage index)"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Camera captures the full baseplate; Batch Fill / Smart Fill replicate a design across multiple identical pieces placed on the bed for repeat/batch production—a camera-driven fixture-style placement workflow.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/771" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2542" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/613" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No jig/board-capture feature. Repeatable placement depends on homing plus manually re-setting the same work zero; there is no fixture or board-capture tool.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

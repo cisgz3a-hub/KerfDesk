@@ -1,0 +1,139 @@
+{
+  "sector": 15,
+  "categories": [
+    {
+      "id": "15.1",
+      "summary": "Production array is 'Array on board' (ADR-125 A2): tiles copies of the ONE selected design across the placed board (registration box), either fit-as-many-as-fit or explicit rows x cols with a spacing gap, block-centered, as one undoable edit. Per-axis cap 100 / total 500; re-array disabled after (double-burn guard). Design-time offers only in-place Duplicate (Cmd+D); no grid/circular/radial/offset array (arrange = align+distribute only).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/tile-into-region.ts:24,29,31-73 (grid/fill offsets, centered; MAX_TILE_PER_AXIS=100, MAX_TILE_TOTAL=500)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/board-tile-actions.ts:32-73 (tileSelectionIntoBoard: move original to slot 0 + append copies; whole-grid select re-array guard)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/board-capture/BoardArrayForm.tsx:10-98 (fit-as-many-as-fit vs rows x cols + mm spacing UI); src/ui/state/scene-mutations.ts:201-238 (Duplicate = in-place clone, LightBurn parity)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/arrange-command-family.ts:4-26,93-156 (arrange family = align + distribute only; no array command)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/scene/tile-into-region.test.ts (13) + src/ui/state/board-tile-actions.test.ts (7 incl. grid, fill, circle inscribed-square, re-array no-op) — re-run green 2026-07-13"
+        }
+      ],
+      "notVerified": "ADR-125 states the array was NOT perceptually rendered at authoring; green tests assert geometry (counts, centering, guards), not that the tiled sheet looks right on the maintainer's canvas. No live-app placement run this audit. Array is production-time board-only; no design-time step-and-repeat grid exists to compare against LightBurn's Array tool."
+    },
+    {
+      "id": "15.2",
+      "summary": "Auto-fit is 'Fit to board' (ADR-125 D1): fitObjectToRegion generalizes fit-to-bed to scale-to-fit-and-center the ONE selected design into the board region, rotation-safe (uses the rotated footprint AABB so a rotated design cannot overflow the physical board), grow flag scales small designs up. Fill-the-board = uniform grid of copies of one design (auto-count). Single-design only; multi-select is a no-op.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/fit-to-region.ts:28-69 (marginFraction + grow; rotated-footprint scale; rotation-safe centering)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/board-fit-region.ts:10-19 (fit region = box bounds for rect, centered inscribed square d/sqrt2 for circle)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:6072-6083 (ADR-125 D1 fitObjectToRegion / fitSelectionToBoard; multi-select no-op), :6117 (rotation-safe fit amendment)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/scene/fit-to-region.test.ts (9) + src/core/scene/board-fit-region.test.ts (3) — re-run green 2026-07-13"
+        }
+      ],
+      "notVerified": "Same ADR-125 caveat: auto-fit/fill not perceptually rendered at authoring; the maintainer eyeball is the stated fidelity gate. 'Fill the board' maximizes stock use for identical copies only — no cross-part stock-usage optimization. Not run in the live app this audit."
+    },
+    {
+      "id": "15.3",
+      "summary": "True (irregular-shape) nesting is ABSENT and explicitly deferred. The only replication is rectangular-cell grid tiling of a single design; there is no bin-pack / no-fit-polygon / multi-part nesting code anywhere in the tree. DECISIONS.md lists nesting in the deferred set (H.-phase list) and ADR-125 records 'nesting different parts (bin-pack)' as not covered.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:6106-6108 (ADR-125 'Not covered ... deferred: nesting different parts (bin-pack)')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:4421 ('adaptive clearing; nesting; rotary...' listed as deferred/anticipated, not shipped)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep of src for nest|bin-?pack|packRect|no-fit-polygon = no nesting implementation (only S2-F12 'nested groups' and even-odd 'nested inside' references)"
+        }
+      ],
+      "notVerified": "Nothing to verify — feature confirmed absent by code+ADR. (MEMORY notes an ADR-122 'nesting' item existed only on an unpushed gap-closure branch; on merged main ADR-122 is potrace-backend removal, not nesting — DECISIONS.md:5896-5897.)"
+    },
+    {
+      "id": "15.4",
+      "summary": "Stock shapes = rectangle + circle only. Captured board is a BoardShape union {rect | circle} (ADR-126): rect from four-corner or one-corner+typed size; circle from centre + typed/measured diameter (fit/array use its inscribed square). CNC stock is rectangular (CncStock) with optional job-tiling (CncTiling, Phase H.10/F-CNC19) that splits an oversized job into a bed-sized overlapping tile grid with registration holes for re-indexing. No arbitrary custom-outline stock, no offcut/remnant support.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/board-capture.ts:28-32 (BoardShape = rect | circle; comment: rounded-rect/polygon would need a new ADR-gated arm)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/machine.ts:138-152 (CncTiling {tileWidth/Height, overlap, registrationHoles}; CncStock rectangular)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/cnc/tile-plan.ts:1-67 (planTiles indexed row/col grid, overlap step, registration holes); src/ui/app/save-tiled-gcode.ts:1-67 (one G-code file per tile, per-tile preflight)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:6122-6154 (ADR-126 board-shape union + circle boards, inscribed-square amendment)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/scene/board-fit-region.test.ts (3, incl. circle inscribed square) + board-tile circle-board test green 2026-07-13"
+        }
+      ],
+      "notVerified": "CNC tiling's physical re-indexing (dowel/registration-hole accuracy when the operator slides and re-zeros stock between tiles) is a hardware behavior — CLAIMED, never machine-verified. No custom-polygon or offcut stock exists to test. Live-app board capture/placement not run this audit."
+    },
+    {
+      "id": "15.5",
+      "summary": "Batch / variable content is ABSENT. No variable-text, mail-merge, serial-number, CSV/data-merge, or barcode/QR generation anywhere in the tree; text objects are static (AddTextDialog). 'batch-trace' is multi-file bitmap tracing, unrelated to variable content. Replication produces identical copies only (board array), never per-copy varying text or codes.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "grep of src for variable.?text|serial number|mail.?merge|csv merge|barcode|qr = no variable-content feature"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/trace/batch-trace.ts (batch = multi-file image trace, not variable content); src/ui/state/board-tile-actions.ts:53-56 (tiled copies are exact clones — no per-copy text substitution)"
+        }
+      ],
+      "notVerified": "Nothing to verify — confirmed absent. (MEMORY: a 'variable text' feature appeared in Codex PR #58 but was flagged out-of-scope and is not on the pinned/merged tree.)"
+    },
+    {
+      "id": "15.6",
+      "summary": "Repeat-job ergonomics: a Design Library (first-party manufacturing 'templates' + vetted artwork, filterable by machine mode/operation/source; owned templates import as editable vectors), a parametric Box Generator, and full project save/load via .lf2 (scene + machine + layer settings). No 'recent files' list, no saved-job/cut-settings preset for one-click re-run, no quick re-run-last-job command.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/library/design-library.ts:55-167 (OWNED_TEMPLATE_ENTRIES + categories 'Laser Templates'/'CNC Templates'); src/ui/library/DesignLibraryDialog.tsx:1,111,186,297 (templates vs artwork, editable-vector import)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/box/BoxGeneratorDialog.tsx + box-draft.ts (parametric box templates); src/io/project/serialize-project.ts (.lf2 project save = the repeat mechanism)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep of src for recent.?file|openRecent|recent.?project = no matches (no recent-files list); no saved-job preset or re-run-last command found"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/library/DesignLibraryDialog.test.tsx (asserts 'Laser Templates'/'CNC Templates') — present in tree"
+        }
+      ],
+      "notVerified": "Design Library and Box Generator not exercised in the live app this audit (code-derived). Whether .lf2 re-open preserves every cut setting for a true 'repeat job' round-trip is covered by io/project tests but was not re-run for this sector. No recent-files/saved-job feature exists to evaluate."
+    }
+  ]
+}

@@ -1,0 +1,222 @@
+{
+  "sector": 2,
+  "categories": [
+    {
+      "id": "2.1",
+      "summary": "Two vector formats: SVG (sanitized, full path commands, curve flattening) and DXF (clean-room ASCII parser: LINE/CIRCLE/ARC/LWPOLYLINE/classic POLYLINE/ELLIPSE/SPLINE, recursive INSERT/MINSERT to depth 8, $INSUNITS units, ACI layer colors; TEXT/HATCH skipped with counts). STL imports as CNC relief, drag-drop only. No AI, PDF, EPS, CDR, PLT, or binary DXF.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/command-families.ts:34-42 (Import SVG Ctrl+I / Import DXF / Import Image are the only import commands)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/dxf/parse-dxf.ts:1-52 (clean-room ASCII DXF pipeline, ADR-098 §2; $INSUNITS map incl. in/ft/cm/m/mil/micron/yd/dm)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/dxf/dxf-expand.ts:52,95,138-150 (entity dispatch LINE/CIRCLE/ARC/LWPOLYLINE/POLYLINE/ELLIPSE/SPLINE; recursive INSERT, MAX_INSERT_DEPTH=8)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/stl/parse-stl.ts + parse-stl-ascii.ts + parse-stl-binary.ts (STL relief import); src/ui/app/use-import-drag-drop.ts:65,88-92 (STL reachable via drop only; no File-menu STL command in command-families.ts)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "vitest run src/io (this session 2026-07-12): 50 files / 365 tests green, incl. parse-dxf.test.ts, dxf-spline.test.ts, dxf-curve-sampling.test.ts, parse-svg.test.ts, parse-stl.test.ts"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep of src for '.ai|.pdf|.eps|.cdr|.plt' import handling: no matches (formats absent); PROJECT.md lists AI/PDF out of scope per full-sweep S1-F10 evidence"
+        }
+      ],
+      "notVerified": "Behavior on a real-world Illustrator/AutoCAD/Inkscape corpus was not exercised this session (repo tests use synthetic fixtures). Binary DXF handling not tested; parser header states ASCII DXF only."
+    },
+    {
+      "id": "2.2",
+      "summary": "PNG and JPG/JPEG only, via picker and drag-drop (MIME- or extension-filtered). Embedded density is honored: PNG pHYs and JPEG JFIF DPI, clamped to 10-10000 DPI with corrupt values rejected, else the 254 DPI default (ADR-048, LightBurn parity). No BMP, GIF, TIFF, or WebP. SVG-embedded bitmaps are dropped (see 2.4).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/platform-image-files.ts:3 (IMAGE_FILE_EXTENSIONS = ['.png','.jpg','.jpeg'])"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/use-import-drag-drop.ts:118-124 (drop filter: image/png, image/jpeg MIME or .png/.jpg/.jpeg extension)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/common/image-density.ts:1-28 (PNG pHYs + JPEG JFIF density parsing; MIN_VALID_DPI=10, MAX_VALID_DPI=10000; corrupt density treated as absent)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:2508 ADR-048 (metadata-less bitmap imports default to 254 DPI, LightBurn parity)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/common/image-density.test.ts (density parser unit tests; part of repo suite)"
+        }
+      ],
+      "notVerified": "Whether a renamed BMP/GIF/WebP file passes the extension filter and then decodes via the browser Image element was not tested; the decode path (importImageFile) was not exercised against non-PNG/JPEG bytes this session."
+    },
+    {
+      "id": "2.3",
+      "summary": "No .lbrn/.lbrn2, .crv, or .easel readers; .lbrn absence has no recorded scope decision (audit S1-F10 still true). LightBurn interop is device profiles only: .lbdev import built against a guessed schema, GRBL-gated. G-code import is a CNC-only visualizer ('Open G-code (Preview)'): modal GRBL-dialect parser incl. G2/G3 arcs, G20/G21, G90/G91 — simulation only, never editable geometry.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "grep -i 'lbrn|.crv|.easel' over src at commit 3e453074: zero project-import matches (only Easel behavioral-parity comments in core/cnc)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/lightburn/lbdev-import.ts:97 (isGrbl gate — Marlin/Smoothie .lbdev refused as profiles); docs/audits/2026-07-10-consolidated-audit-v2.md A.4.5 (guessed schema, synthetic fixture only)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/gcode/parse-gcode-program.ts:1-24 (GRBL-dialect modal parser: G0/G1, G2/G3 I/J and R-form incl. helical, G90/G91, G20/G21, 500k-line cap; feeds CNC simulator, ADR-098 §2)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/command-families.ts:51-58 ('Open G-code (Preview)...' — CNC-only, hidden in laser mode by the ADR-101 machine gate)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/gcode/gcode-reimport-parity.test.ts:1-5 (KerfDesk's own .nc export re-imports to the same material-removal footprint as the native compile; passed in this session's src/io run)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md S1-F10 (no ADR for .lbrn absence); DECISIONS.md ADR headings through ADR-134 contain no .lbrn/interop scope entry"
+        }
+      ],
+      "notVerified": ".lbdev import fidelity against files actually produced by LightBurn's Export Devices — no genuine sample exists in the repo (consolidated-audit A.4.5); whether the GRBL-only .lbdev gate (A.4.12) was relaxed post-audit was checked (still present at lbdev-import.ts:97)."
+    },
+    {
+      "id": "2.4",
+      "summary": "Strong mechanics: SVG unit resolution (ADR-046), DXF $INSUNITS, corrupt-DPI rejection; 0.25 mm adaptive curve flattening with transform-scale compensation (audit C2 fix); DOMPurify sanitization, resource budgets, malicious-corpus tests; DXF unreadable-geometry skip + 1e6 mm cap (S1-F8 fixed); non-finite-coordinate preflight scanner (S1-F1 fixed). Defects: SVG text and embedded images silently dropped with stale 'Phase D/E' toasts.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/svg-units.ts:1-23 (ADR-046: viewBox+physical length per axis; viewBox-only = 1uu=1mm; no viewBox = 96 DPI px, LightBurn default)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/flatten-curves.ts:12 (DEFAULT_FLATNESS_MM = 0.25, De Casteljau + W3C arc-to-cubic); src/io/svg/transform-scale.ts:1-14 (chord tolerance divided by transform scale magnitude — audit C2 fix, flattening stays 0.25 mm in scene space)"
+        },
+        {
+          "tag": "PERC",
+          "cite": "src/io/svg/import-perceptual.test.ts:33-53 (imported circle vs analytic disc, IoU >= 0.95, sagitta/facet-depth guards; re-run green in this session's vitest src/io run)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/svg/malicious-corpus.test.ts + src/io/project/project-security-validation.test.ts (hostile-input corpora; passed this session)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/dxf/dxf-entities.ts:190-215 (DXF_GEOMETRY_CODES + hasUnreadableGeometry: non-numeric or >1e6 mm geometry rejects the entity and reports it — full-sweep S1-F8 fixed); src/io/dxf/dxf-expand.ts:104-107 (skip + note, 'matches LightBurn')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/preflight.ts:410 + src/core/invariants/non-finite-coords.ts:21-23 (scanner distinguishes malformed-present from absent coordinate words — full-sweep S1-F1 fixed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/parse-svg.ts:448-451 (text elements ignored 'wait for Phase D'; image elements ignored 'Phase E adds raster tracing' — both stale, Phase D/E shipped; full-sweep S1-F3/S12-F4 still present)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/sanitize.ts (DOMPurify profile + href allowlist) and src/io/svg/svg-import-budget.ts (256 colors / 50k polylines / 250k points / 1e6 mm caps) per full-sweep report section 1"
+        }
+      ],
+      "notVerified": "Perceptual fidelity vs LightBurn on real-world files (only the synthetic circle fixture is instrumented). Whether interactive post-import scaling by the user re-flattens curves (full-sweep S5-F2 residual) — the C2 fix covers the SVG's own unit scale and element transforms at parse time; the later-user-scaling case was not re-checked this session."
+    },
+    {
+      "id": "2.5",
+      "summary": "Universal window-level drag-drop (SVG/DXF/PNG/JPG/STL) with overlay, batch stagger, ignored-file toasts, and size-before-read oversize confirm. But menu import stays split into three format-specific commands and Ctrl+I opens an SVG-only picker (S1-F4 unfixed). No clipboard-paste import, no Open Recent (S1-F9), extension-only filtering (no MIME sniff), synchronous main-thread SVG parse.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/command-families.ts:34-42 (three format-specific import commands; Ctrl+I bound to Import SVG only — full-sweep S1-F4 still true at 3e453074)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/use-import-drag-drop.ts:58-92 (single drop entry dispatches SVG/DXF/image/STL; unrecognized and mixed-drop leftovers named in toasts)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/file-actions.ts:76-81 (oversize confirm gates on file.size BEFORE reading when the adapter supplies it — full-sweep S1-F7 fixed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep 'Open Recent|recentProjects|recent-files' over src: no matches (S1-F9 still true); grep ClipboardEvent/'paste' handlers: Ctrl+V is internal scene clipboard only (src/ui/state/scene-clipboard-actions.ts), no OS-clipboard import"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/parse-svg.ts:414-438 region runs synchronously on the main thread (full-sweep S1-F6: no parse spinner possible); import toasts carry sanitization counts and DXF skipped-entity summaries (src/ui/app/import-toasts.ts)"
+        }
+      ],
+      "notVerified": "No live-app run this session (rule 4): drag-drop overlay, toast copy, and picker behavior verified from code and the 2026-07-10 audits, not by driving the running UI."
+    },
+    {
+      "id": "2.6",
+      "summary": "G-code (.gcode/.nc) export with preflight, $30/$32 readiness confirm, and provenance header; Ruida binary .rd via driver-capability routing (ADR-097; verified only against the repo's own decoder); CNC tiled multi-file export, now readiness-gated (Codex M-04 fixed); .lf2 project save; device-profile .lfmachine.json and material-library .lfml.json export/import; batch trace-to-SVG file export. No general scene SVG/DXF/image export.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/file-actions.ts:120-179 (handleSaveGcode: tiled dispatch, placement resolve, preflight, confirmControllerReadiness, .gcode/.nc save picker; provenance header comment at 137-139)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/gcode/gcode-metadata.ts:1-32 (build/commit/emitter provenance header, EMITTER_REVISION, per-machine $30/$32 assumption lines)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/save-tiled-gcode.ts:56-58 (controller-readiness gate run once for the tile set — consolidated-audit M-04/P1-c fixed)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/app/file-actions.rd-routing.test.ts:77-78 (file-only/Ruida profile routes Save to binary .rd Blob) + src/ui/app/save-rd-action.test.ts (byte-exact Blob vs emitRdFile); .rd emit shares prepareOutput with G-code (consolidated-audit A.3 'what's great', src/io/rd/emit-rd.ts:1-46)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/MachineSetupImportExport.tsx:84-86 (Export active profile / Import KerfDesk profile / Import LightBurn .lbdev buttons); src/ui/app/material-library-file-actions.ts:46,77 (.lfml.json import/export via serialize/deserializeMaterialLibrary)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/multi-file-trace-action.ts:38-41 + command-families.ts:92-98 (Multi-File Trace: batch image trace exported as SVG files)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep for scene SVG/DXF/PNG export commands: none in command-families.ts; the only artwork-out path is trace export (absence claim)"
+        }
+      ],
+      "notVerified": ".rd byte-stream correctness against a real Ruida controller or a LightBurn-exported golden file — verification remains circular through the repo's own decoder with no golden hex fixture (consolidated-audit A.3.4); no hardware or hands-on export run this session."
+    },
+    {
+      "id": "2.7",
+      "summary": "Re-importing a same-filename SVG/DXF replaces the placed object in place, keeping object id, transform, and per-color layer settings, and toasts a kept/new/removed color diff. Replacement is unconditional — no 'import as copy' choice (S1-F5; an un-ADR'd divergence from LightBurn's add-a-copy). Raster images always add fresh. No linked-file watching or update-from-source beyond manual re-import.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/scene-mutations.ts:82-90 (findReimportTarget matches imported-svg by source filename) and :454-486 (applyReimport keeps id+transform, ensures layers, emits kept/added/removed diff outcome)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/object-insert-actions.ts:55-69 (importSvgObject: replace-in-place is the unconditional default when a target exists)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/file-actions.ts:87-94 (re-import diff toast on the picker path); src/ui/app/import-toasts.ts describeReimportOutcome"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md S1-F5 (always-replace not recorded as a deliberate LightBurn divergence; DECISIONS.md through ADR-134 has no entry for it — re-checked this session)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "findReimportTarget returns null for non-imported-svg kinds (scene-mutations.ts:83), so raster image re-imports always add a new object; grep for file-watch/linked-source machinery: none"
+        }
+      ],
+      "notVerified": "The kept/new/removed diff behavior was verified from code and tests, not by a live re-import in the running app; DXF re-import shares the pipeline (parse-dxf produces the same imported-svg variant) but was not separately exercised end-to-end this session."
+    }
+  ]
+}

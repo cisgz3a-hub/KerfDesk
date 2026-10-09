@@ -47,7 +47,7 @@ export function reliefAuthoringError(value: unknown): string | null {
     if (error !== null) return error;
   }
   for (const component of components) {
-    const error = componentError(component, levelIds, componentIds);
+    const error = componentError(component, levelIds, componentIds, value['algorithmRevision']);
     if (error !== null) return error;
   }
   return firstError([
@@ -58,7 +58,9 @@ export function reliefAuthoringError(value: unknown): string | null {
 function headerError(v: RecordValue): string | null {
   const shape = firstError([
     requirement(
-      v['schemaVersion'] === 1 && v['algorithmRevision'] === 'retained-relief-v1',
+      v['schemaVersion'] === 1 &&
+        (v['algorithmRevision'] === 'retained-relief-v1' ||
+          v['algorithmRevision'] === 'retained-relief-v2'),
       'Unsupported retained relief document.',
     ),
     requirement(
@@ -134,7 +136,12 @@ function levelError(v: unknown, ids: Set<string>): string | null {
   ids.add(v['id'] as string);
   return optionalMaskError(v['mask']);
 }
-function componentError(v: unknown, levels: Set<string>, ids: Set<string>): string | null {
+function componentError(
+  v: unknown,
+  levels: Set<string>,
+  ids: Set<string>,
+  algorithmRevision: unknown,
+): string | null {
   if (!record(v)) return 'Invalid relief component.';
   const meta = all([
     text(v['id']),
@@ -155,13 +162,14 @@ function componentError(v: unknown, levels: Set<string>, ids: Set<string>): stri
   return firstError([
     requirement(parameters, 'Invalid component mode, height or physical transform.'),
     optionalMaskError(v['mask']),
-    sourceError(v['source']),
+    sourceError(v['source'], algorithmRevision),
   ]);
 }
-function sourceError(v: unknown): string | null {
+function sourceError(v: unknown, algorithmRevision: unknown): string | null {
   if (!record(v)) return 'Missing relief component source.';
   if (v['kind'] === 'retained-field-v1') return retainedFieldSizeError(v['field']);
-  if (v['kind'] === 'rail-profile-v1') return reliefRailProfileError(v);
+  if (v['kind'] === 'rail-profile-v1')
+    return reliefRailProfileError(v, algorithmRevision === 'retained-relief-v1');
   const height = v['heightMm'];
   const valid = all([
     v['kind'] === 'vector-shape-v1',

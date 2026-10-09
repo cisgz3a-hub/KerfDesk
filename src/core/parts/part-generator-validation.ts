@@ -26,7 +26,7 @@ function bracketProblem(
     !dimension(definition.holeOffsetMm) ||
     definition.holeOffsetMm <= definition.holeDiameterMm / 2 ||
     definition.holeOffsetMm >=
-      Math.min(definition.widthMm, definition.heightMm) - definition.legWidthMm / 2
+      Math.min(definition.widthMm, definition.heightMm) - definition.holeDiameterMm / 2
   )
     return 'Bracket holes must fit in each leg with a positive edge clearance.';
   return null;
@@ -41,16 +41,18 @@ function integerCount(value: number): boolean {
 function edgeOffsetProblem(
   definition: Exclude<PartGeneratorDefinition, { readonly kind: 'bracket' }>,
 ): string | null {
+  const offsetX = definition.kind === 'panel' || definition.columns > 1;
+  const offsetY = definition.kind === 'panel' || definition.rows > 1;
   if (
     !dimension(definition.edgeOffsetMm) ||
-    definition.edgeOffsetMm <= definition.holeDiameterMm / 2
+    ((offsetX || offsetY) && definition.edgeOffsetMm <= definition.holeDiameterMm / 2)
   )
     return 'The hole offset must leave each hole inside the part boundary.';
   if (
-    definition.widthMm <= 2 * definition.edgeOffsetMm ||
-    definition.heightMm <= 2 * definition.edgeOffsetMm
+    (offsetX && definition.widthMm <= 2 * definition.edgeOffsetMm) ||
+    (offsetY && definition.heightMm <= 2 * definition.edgeOffsetMm)
   )
-    return 'Width and height must exceed twice the hole offset.';
+    return 'Dimensions along multi-hole axes must exceed twice the hole offset.';
   return null;
 }
 

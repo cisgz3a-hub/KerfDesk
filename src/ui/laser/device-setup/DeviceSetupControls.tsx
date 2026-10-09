@@ -16,9 +16,7 @@ import { useLaserStore } from '../../state/laser-store';
 import { shouldPromptDeviceSetup } from './device-setup-nudge';
 import { openMachineSetup, useMachineSetupDialogStore } from './machine-setup-dialog-store';
 
-export function DeviceSetupControls({
-  compact = false,
-}: { readonly compact?: boolean } = {}): JSX.Element {
+export function DeviceSetupControls(): JSX.Element {
   const [configured, setConfigured] = useState<ReadonlySet<string>>(() => {
     const storage = browserLocalStorage();
     return storage === null ? new Set() : loadConfiguredSignatures(storage);
@@ -38,9 +36,9 @@ export function DeviceSetupControls({
         variant={needsSetup ? 'primary' : 'default'}
         onClick={() => openMachineSetup()}
         {...helpProps('control:laser.machine-setup.launch')}
-        aria-label={compact ? 'Machine Setup' : undefined}
+        aria-label="Machine Setup"
       >
-        {compact ? <Icon name="sliders" size={16} /> : 'Machine Setup'}
+        <Icon name="sliders" size={16} />
       </Button>
       {needsSetup && (
         <p style={mutedNoteStyle} role="note">

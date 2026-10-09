@@ -27,7 +27,7 @@ export function FocusJogControls(props: {
   const disabled = props.disabled || !ready;
   return (
     <div style={panelStyle}>
-      <div style={headerStyle}>
+      <div className="lf-focus-jog-header" style={headerStyle}>
         <strong>{isCncMachine ? 'Z axis' : 'Focus / Z'}</strong>
         <select
           value={props.focusStep}

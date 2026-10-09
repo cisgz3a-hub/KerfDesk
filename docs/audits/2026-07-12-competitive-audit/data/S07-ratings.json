@@ -1,0 +1,607 @@
+{
+  "sector": 7,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/07-cnc-toolpath.md",
+  "ratings": [
+    {
+      "cat": "7.1",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "TEST",
+      "note": "Inside/outside/on-path clipper2 offsets, inner-first ordering, opt-in climb/conventional; no leads, no user start point; tests green"
+    },
+    {
+      "cat": "7.1",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser-only; vendor ships MillMage as its separate CNC product"
+    },
+    {
+      "cat": "7.1",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Along/Inside/Outside, climb/conventional, four entry methods incl. helical, trochoidal, Stock to Leave; 0.x, no quality consensus yet"
+    },
+    {
+      "cat": "7.1",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser-only sender/engraver, no milling toolpaths"
+    },
+    {
+      "cat": "7.1",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - xTool Studio drives laser/blade machines only; no CNC milling support found"
+    },
+    {
+      "cat": "7.1",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "On/outside/inside with auto radius offset; no climb/conventional or strategy control; community calls it simplified"
+    },
+    {
+      "cat": "7.1",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "No Offset/Inside/Outside plus tabs free; ramp Pro-only; climb/conventional undocumented; community: bare-bones vs VCarve"
+    },
+    {
+      "cat": "7.1",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Reference-grade: climb/conventional, lead-in/out, ramps, tabs, separate last pass, start-point control; community consensus leader"
+    },
+    {
+      "cat": "7.2",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "Contour-parallel rings (wall ring last) plus ADR-105 raster serpentine; islands handled; no rest machining, adaptive, or wall allowance"
+    },
+    {
+      "cat": "7.2",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser Fill is hatch-filling, not material-removal pocketing"
+    },
+    {
+      "cat": "7.2",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Pocket plus Rest Pocket rest machining; stepover/depth from tool library; climb per operation"
+    },
+    {
+      "cat": "7.2",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no pocketing, laser-only"
+    },
+    {
+      "cat": "7.2",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC milling support"
+    },
+    {
+      "cat": "7.2",
+      "product": "Easel",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Single 'clear out a pocket' fill; no documented stepover, strategy, or multi-tool controls; deliberately simplified"
+    },
+    {
+      "cat": "7.2",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Pocket with depth-per-pass free; Rest Machining Pro-only; fewer strategy controls than VCarve per community"
+    },
+    {
+      "cat": "7.2",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Offset/raster strategies with separate clearance and finishing tools; multi-tool pocketing a community-cited advantage"
+    },
+    {
+      "cat": "7.3",
+      "product": "KerfDesk",
+      "score": 4,
+      "star": false,
+      "tag": "CODE",
+      "note": "Peck cycle at bbox center of closed shapes only; no point drilling, dwell, retract config, or plain-vs-peck choice"
+    },
+    {
+      "cat": "7.3",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no drilling operations, laser software"
+    },
+    {
+      "cat": "7.3",
+      "product": "MillMage",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Plunge/Peck/Spot/Countersink with Depth Per Peck, Dwell Time, retract type/distance/rate - widest documented set in roster"
+    },
+    {
+      "cat": "7.3",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no drilling, laser-only"
+    },
+    {
+      "cat": "7.3",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC milling support"
+    },
+    {
+      "cat": "7.3",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Bit-diameter holes with chip-clearing plunge/retract cycles; hole size locked to bit diameter"
+    },
+    {
+      "cat": "7.3",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Drill toolpath with full-depth, peck, and peck-with-full-retract styles"
+    },
+    {
+      "cat": "7.3",
+      "product": "VCarve",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Peck drilling with tool-database pass depth, full or relative retract options, dwell time at peck bottom"
+    },
+    {
+      "cat": "7.4",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "TEST",
+      "note": "True medial-axis ladder with cone-height flat-depth cap and two-stage clearing; analytic perceptual test through real pipeline; quality never compared"
+    },
+    {
+      "cat": "7.4",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no V-bit carving; laser engraving is a different mechanism"
+    },
+    {
+      "cat": "7.4",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "Absent at pinned 0.8.02: V-Carving is unreleased Pro (0.9.00 Early Access only); Chamfer gives edge chamfers only"
+    },
+    {
+      "cat": "7.4",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no V-carving, laser-only"
+    },
+    {
+      "cat": "7.4",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC milling support"
+    },
+    {
+      "cat": "7.4",
+      "product": "Easel",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "V-Carve Projects Pro-only ($24/mo); guided project type, not a parametric toolpath with flat-depth control"
+    },
+    {
+      "cat": "7.4",
+      "product": "Carbide Create",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "V-carve plus Advanced V-carve (max-depth with flat-bottom clearing) in free tier - only no-cost V-carving in roster"
+    },
+    {
+      "cat": "7.4",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Namesake strength: flat-depth clearing plus Prism, Photo V-Carve, Inlay; community rates it industry-leading"
+    },
+    {
+      "cat": "7.5",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "TEST",
+      "note": "Auto tabs with exact tab-top pass and slug tabs; opt-in ramp with level re-cut; no drag tabs or arc leads; tabs-off default un-ADR'd"
+    },
+    {
+      "cat": "7.5",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser tabs belong to S6.5; no CNC holding tabs/ramps"
+    },
+    {
+      "cat": "7.5",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Manual tabs plus Tab Wizard, three tab types incl. ramp, four ramp entry methods; dedicated lead arcs undocumented"
+    },
+    {
+      "cat": "7.5",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC tabs/ramps, laser-only"
+    },
+    {
+      "cat": "7.5",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC milling support"
+    },
+    {
+      "cat": "7.5",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Automatic and draggable tabs (up to 32/shape, adjustable); ramping Pro-only; no lead-in/out"
+    },
+    {
+      "cat": "7.5",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Tabs free since CCv7; Ramping Pro-only; lead-in/out not documented"
+    },
+    {
+      "cat": "7.5",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Most complete: 2D/3D tabs, ramp distance/angle, lead-in/out incl. Ramp on Lead In; community-cited edge"
+    },
+    {
+      "cat": "7.6",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "Exact-floor pass ladder, contour-major vs depth-major, preflight overdepth block re-proven on emitted G-code; no stock-to-leave for 2D ops"
+    },
+    {
+      "cat": "7.6",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC depth management; laser Z-step is sector S6.7"
+    },
+    {
+      "cat": "7.6",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Start/Final Depth, Depth Per Pass with auto count, Stock to Leave allowance, separate ramp Z feed"
+    },
+    {
+      "cat": "7.6",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser multi-pass loop only, no CNC stepdown management"
+    },
+    {
+      "cat": "7.6",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC milling support"
+    },
+    {
+      "cat": "7.6",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Cut depth and depth-per-pass per shape; Two-Stage Carves for rough+detail; no numeric finishing allowance"
+    },
+    {
+      "cat": "7.6",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Depth-per-pass and max depth per toolpath; Rest Machining Pro; no explicit stock-to-leave documented"
+    },
+    {
+      "cat": "7.6",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Tool-database pass depth, editable pass count, machining allowance, separate final pass - community-named differentiator"
+    },
+    {
+      "cat": "7.7",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "18 starter bits plus custom; chipload calculator (5 materials x 4 bands) in three UX tiers; multi-bit tool-change hold; no per-tool feeds/flutes"
+    },
+    {
+      "cat": "7.7",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - Material Library stores laser presets, not milling tool geometry or feeds"
+    },
+    {
+      "cat": "7.7",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Tool Library with geometry, diameter/flutes, feed/plunge/ramp, RPM, chipload, per-tool DOC and stepover; no material guidance"
+    },
+    {
+      "cat": "7.7",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no tool library, laser-only"
+    },
+    {
+      "cat": "7.7",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - EasySet library is laser presets; no CNC tool library"
+    },
+    {
+      "cat": "7.7",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Bit selection with recommended per-material cut settings; guidance-oriented, not a parametric tool database"
+    },
+    {
+      "cat": "7.7",
+      "product": "Carbide Create",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Tool database with per machine/material/cutter feeds; conservative defaults; large third-party library ecosystem"
+    },
+    {
+      "cat": "7.7",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Deepest in roster: per-machine configuration management, material-specific settings, chipload-based feeds"
+    },
+    {
+      "cat": "7.8",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "ASCII+binary STL to heightmap, waterline roughing plus scallop-driven finishing, 3D pane; drag-drop only (S8-F5); no image-to-heightmap"
+    },
+    {
+      "cat": "7.8",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no 3D relief or STL machining"
+    },
+    {
+      "cat": "7.8",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "Absent at pinned 0.8.02: Relief Carving is unreleased Pro; no STL/heightmap import documented"
+    },
+    {
+      "cat": "7.8",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no 3D machining, laser-only"
+    },
+    {
+      "cat": "7.8",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no CNC milling support"
+    },
+    {
+      "cat": "7.8",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Pro-only STL import with browser-based roughing and detail toolpaths; depth limits per official 3D FAQs"
+    },
+    {
+      "cat": "7.8",
+      "product": "Carbide Create",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Pro-only: 3D components from vectors, image-as-heightmap, STL, textures; 3D Rough and Finish toolpaths"
+    },
+    {
+      "cat": "7.8",
+      "product": "VCarve",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "3D Rough/Finish with imported models and clipart; from-scratch modelling reserved for higher-tier Aspire"
+    }
+  ],
+  "wins": [
+    {
+      "cat": "7.4",
+      "vs": "MillMage",
+      "delta": 7,
+      "claim": "KerfDesk ships true medial-axis V-carving with a flat-depth cap and two-stage clearing for free while MillMage 0.8.02 has none (unreleased Pro feature)."
+    },
+    {
+      "cat": "7.8",
+      "vs": "MillMage",
+      "delta": 6,
+      "claim": "KerfDesk ships a full STL-to-heightmap rough+finish relief pipeline with a 3D pane; MillMage 0.8.02 has no relief or STL machining."
+    },
+    {
+      "cat": "7.4",
+      "vs": "Easel",
+      "delta": 3,
+      "claim": "KerfDesk's parametric V-carve toolpath is free; Easel's V-Carve Projects are a $24/mo Pro guided project type without flat-depth control."
+    },
+    {
+      "cat": "7.2",
+      "vs": "Easel",
+      "delta": 2,
+      "claim": "Two pocket strategies (contour-parallel rings plus raster serpentine) with island handling and stepover control versus Easel's single simplified pocket fill."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "7.3",
+      "vs": "MillMage",
+      "delta": -6,
+      "claim": "One hard-coded peck-at-bbox-center behavior versus MillMage's Plunge/Peck/Spot/Countersink drill editor with dwell and retract control."
+    },
+    {
+      "cat": "7.1",
+      "vs": "VCarve",
+      "delta": -4,
+      "claim": "No lead-in/out, no user start-point control, no separate last pass, and plunge/ramp-only entry versus VCarve's reference-grade profile form."
+    },
+    {
+      "cat": "7.2",
+      "vs": "VCarve",
+      "delta": -4,
+      "claim": "No rest machining or multi-tool clearance for 2D pockets, no adaptive strategy, and no wall finish allowance."
+    },
+    {
+      "cat": "7.5",
+      "vs": "VCarve",
+      "delta": -4,
+      "claim": "Auto tabs only with no manual/drag placement and no arc leads; the tabs-off full-depth default divergence from Easel cites a nonexistent ADR (section 5.6 severity bump)."
+    },
+    {
+      "cat": "7.6",
+      "vs": "VCarve",
+      "delta": -4,
+      "claim": "No stock-to-leave, machining allowance, or separate finish pass exists for any 2D operation."
+    },
+    {
+      "cat": "7.7",
+      "vs": "VCarve",
+      "delta": -4,
+      "claim": "Tools store no per-tool feeds/flutes and the chipload chart is provisional and never cut-validated, versus per-machine material-specific tool databases."
+    },
+    {
+      "cat": "7.4",
+      "vs": "VCarve",
+      "delta": -3,
+      "claim": "No Photo V-Carve, Prism, or Inlay toolpaths, and carved-letter quality has never been compared side by side."
+    },
+    {
+      "cat": "7.8",
+      "vs": "VCarve",
+      "delta": -3,
+      "claim": "No image-as-heightmap route, no 3D components or textures, and STL import is reachable only via drag-and-drop (S8-F5)."
+    }
+  ],
+  "notVerified": [
+    "Sector-wide: no KerfDesk CNC toolpath has ever been cut on a machine - every CNC hardware pass is CLAIMED per the standing ledger; accuracy, chip evacuation, tab strength, floor precision, and climb/conventional behavior are design-intent claims",
+    "7.1: no rendered or machine verification that offset contours land the cut edge on the drawn path; correctness rests on clipper2 wrapper tests",
+    "7.2: pocket floor coverage (no uncut slivers between rings/sweeps) asserted structurally only, never rendered or cut (also flagged by 2026-07-10 full-sweep audit)",
+    "7.3: bbox-center drilling of non-circular closed shapes never compared against any reference CAM",
+    "7.4: perceptual test is analytic (removal grid vs formula), not a rendered visual or a real cut; carve quality never compared vs VCarve/Carbide Create; sharp corners verified only on a square fixture",
+    "7.5: the claimed 'CNC-defaults ADR' recording the tabs-off default divergence does not exist in DECISIONS.md (grep-refuted) - un-ADR'd doc drift; physical tab strength never cut",
+    "7.6: floor precision at -depth is a machine claim; stock-to-leave absence concluded from CncLayerSettings source, not a UI walk",
+    "7.7: chipload numbers are provisional and never cut-validated; full tool-change flow verified only via streamer unit tests, never on a machine or live app",
+    "7.8: no perceptual/visual verification of carved relief output (terraces, scallops) - relief tests analytic; live 3D-pane behavior on large meshes not exercised",
+    "Competitor caveats: all competitor cells are documentary [OFF]/[COMM], none hands-on; MillMage is 0.x with no community quality consensus so its 8s rest on documented breadth; XCS N/R rests on [OFF] plus a phase-0 [INF] coverage note",
+    "All four win bullets and every KerfDesk-ties-or-leads cell (7.4, 7.8, 7.2 vs Easel; 7.1/7.2/7.5/7.6 ties vs Carbide Create; 7.5 tie vs Easel) pending adversarial verification per design 5.5"
+  ]
+}

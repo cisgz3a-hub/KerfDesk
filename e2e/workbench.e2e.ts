@@ -62,6 +62,15 @@ baseTest(
     await expect(tools).toBeFocused();
     await tools.press('ArrowDown');
     await expect(page.getByRole('group', { name: 'Create & measure' })).toBeVisible();
+    const sketch = page.getByRole('menuitem', { name: 'Constrained sketch…', exact: true });
+    await expect(sketch).toBeFocused();
+    await sketch.press('ArrowDown');
+    const part = page.getByRole('menuitem', { name: 'Parametric part…', exact: true });
+    await expect(part).toBeFocused();
+    await expect(
+      page.getByRole('menuitem', { name: 'Editable relief…', exact: true }),
+    ).toBeDisabled();
+    await part.press('ArrowDown');
     await expect(page.getByRole('menuitemcheckbox', { name: 'Measure' })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(tools).toBeFocused();

@@ -1,0 +1,423 @@
+{
+  "sector": 2,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/02-import-interop.md",
+  "ratings": [
+    {
+      "cat": "2.1",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "SVG + deep clean-room DXF (splines, INSERT depth 8, $INSUNITS) + STL drag-drop; no AI/PDF/EPS/CDR/PLT or binary DXF"
+    },
+    {
+      "cat": "2.1",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Broadest of roster: .ai/.svg/.dxf/.pdf/.plt-.hpgl; no EPS/CDR; fonts must be installed locally"
+    },
+    {
+      "cat": "2.1",
+      "product": "MillMage",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Identical format list to LightBurn (shared engine): .ai/.svg/.dxf/.pdf/.plt"
+    },
+    {
+      "cat": "2.1",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "SVG only, officially 'early state of development', Inkscape-tuned; DXF a long-open request (#408)"
+    },
+    {
+      "cat": "2.1",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "xTool Studio imports SVG and DXF only; PDF/AI must be converted before import"
+    },
+    {
+      "cat": "2.1",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "SVG + DXF (capped below 5 MB) + STL + custom fonts; no AI/PDF/EPS"
+    },
+    {
+      "cat": "2.2",
+      "product": "KerfDesk",
+      "score": 4,
+      "star": false,
+      "tag": "CODE",
+      "note": "PNG/JPG only, but honors pHYs/JFIF DPI with clamping and 254 DPI LightBurn-parity default (ADR-048)"
+    },
+    {
+      "cat": "2.2",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "PNG, JPG, BMP, GIF, TIFF; no WebP documented"
+    },
+    {
+      "cat": "2.2",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Same five formats as LightBurn: PNG/JPG/BMP/GIF/TIFF; no WebP"
+    },
+    {
+      "cat": "2.2",
+      "product": "LaserGRBL",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "BMP/JPG/PNG/GIF; raster-to-G-code is the product's core design"
+    },
+    {
+      "cat": "2.2",
+      "product": "XCS",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Widest of roster: JPG/JPEG/GIF/PNG/BMP/WEBP; only product with documented WebP"
+    },
+    {
+      "cat": "2.2",
+      "product": "Easel",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Narrowest: JPG/PNG only, and only via Image Trace or Pro raster toolpaths"
+    },
+    {
+      "cat": "2.3",
+      "product": "KerfDesk",
+      "score": 3,
+      "star": false,
+      "tag": "CODE",
+      "note": "No .lbrn/.crv/.easel (absence un-ADR'd, S1-F10); .lbdev guessed-schema GRBL-gated; G-code = CNC-only preview visualizer"
+    },
+    {
+      "cat": "2.3",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Native .lbrn/.lbrn2, opens MillMage .mage, G-code import extracts geometry (no speed/power)"
+    },
+    {
+      "cat": "2.3",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Opens .mage, .lbrn and .lbrn2 directly; G-code import undocumented"
+    },
+    {
+      "cat": "2.3",
+      "product": "LaserGRBL",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "G-code load/preview/stream is the core function; no foreign project formats"
+    },
+    {
+      "cat": "2.3",
+      "product": "XCS",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "Opens only .xcs projects; exhaustive import list has no G-code or foreign project formats"
+    },
+    {
+      "cat": "2.3",
+      "product": "Easel",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "G-code import with visualization, but files must pass a post-processor to match the Easel spec"
+    },
+    {
+      "cat": "2.4",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "PERC",
+      "note": "Strong units/flattening/sanitization/budgets + perceptual circle test (IoU>=0.95); SVG text and embedded images silently dropped"
+    },
+    {
+      "cat": "2.4",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "COMM",
+      "note": "Documented DPI/spline controls; recurring community DXF 25.4x mis-scale, spline artifacts, paste DPI drift"
+    },
+    {
+      "cat": "2.4",
+      "product": "MillMage",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Docs mirror LightBurn's engine but no fidelity consensus; quality unknown - research debt"
+    },
+    {
+      "cat": "2.4",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Weak by own docs: SVG 'as is', no text/fill, Inkscape-tuned, 'expect some problems' elsewhere"
+    },
+    {
+      "cat": "2.4",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Per-import DPI, auto DXF unit detection, parse-quality options documented; quality unproven ([OFF] proves existence only)"
+    },
+    {
+      "cat": "2.4",
+      "product": "Easel",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Documented hard limits: DXF under 5 MB, SVG text unsupported, strict G-code spec"
+    },
+    {
+      "cat": "2.5",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Universal drag-drop with overlay/batch/toasts/oversize-confirm; but 3-way split menu, SVG-only Ctrl+I, no paste, no recents"
+    },
+    {
+      "cat": "2.5",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Universal dialog, drag-drop, clipboard paste, Recent Projects/Templates - fullest import UX of roster"
+    },
+    {
+      "cat": "2.5",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Drag-drop plus Recent Projects/Templates documented; clipboard paste not explicitly documented"
+    },
+    {
+      "cat": "2.5",
+      "product": "LaserGRBL",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Drag-drop/clipboard/recent-files behavior undocumented anywhere found - unknown"
+    },
+    {
+      "cat": "2.5",
+      "product": "XCS",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Picker with per-import parse options documented; drag-drop and clipboard paste unevidenced"
+    },
+    {
+      "cat": "2.5",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Import tab groups SVG/DXF/Image-Trace/G-code entry points; cloud dashboard; no drag-drop/paste documented"
+    },
+    {
+      "cat": "2.6",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Strong machine-out: G-code + Ruida .rd + gated tiled export + .lf2/profile/material JSON; zero artwork export"
+    },
+    {
+      "cat": "2.6",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Broadest: .ai/.svg/.dxf vectors plus .png/.jpg/.bmp image export plus .lbrn projects"
+    },
+    {
+      "cat": "2.6",
+      "product": "MillMage",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": ".ai/.svg/.dxf export with two DXF dialects; .mage; per-controller G-code/machine file"
+    },
+    {
+      "cat": "2.6",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "COMM",
+      "note": "G-code save exists; no vector export - DXF export an unfulfilled user request"
+    },
+    {
+      "cat": "2.6",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "PNG/JPG at 50-1000 DPI plus SVG export plus legacy .xcs; no G-code or DXF export documented"
+    },
+    {
+      "cat": "2.6",
+      "product": "Easel",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "G-code export tier-gated (Free 1/week, Starter 20/week); no SVG/DXF design export"
+    },
+    {
+      "cat": "2.7",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Same-filename re-import replaces in place keeping id/transform/layers + diff toast; unconditional (S1-F5), vectors only, no watching"
+    },
+    {
+      "cat": "2.7",
+      "product": "LightBurn",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "No replace-on-reimport or linked-file feature in file-management docs; nearest is one-way Cuttle integration"
+    },
+    {
+      "cat": "2.7",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "No re-import or update-from-file feature documented"
+    },
+    {
+      "cat": "2.7",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "No project or linked-file concept; every load is a one-shot conversion"
+    },
+    {
+      "cat": "2.7",
+      "product": "XCS",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "No re-import workflow found, but absence not exhaustively confirmed (scattered per-machine docs) - unknown"
+    },
+    {
+      "cat": "2.7",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "Cloud auto-save only; no external linked-file or replace-on-reimport workflow documented"
+    }
+  ],
+  "wins": [
+    {
+      "cat": "2.1",
+      "vs": "LaserGRBL",
+      "delta": 3,
+      "claim": "Full DXF import (splines, blocks, units) plus SVG and STL against LaserGRBL's single officially-'early' Inkscape-tuned SVG importer."
+    },
+    {
+      "cat": "2.3",
+      "vs": "XCS",
+      "delta": 3,
+      "claim": "KerfDesk at least visualizes G-code (CNC preview, G2/G3, reimport-parity-tested); xTool Studio's documented import list opens nothing foreign."
+    },
+    {
+      "cat": "2.4",
+      "vs": "LaserGRBL",
+      "delta": 3,
+      "claim": "Unit/DPI resolution, sanitization, malformed-file skip-and-report, and a perceptual import test versus SVG handled 'as is' with no text or fill."
+    },
+    {
+      "cat": "2.6",
+      "vs": "Easel",
+      "delta": 2,
+      "claim": "Unmetered G-code/.rd/tiled export against Easel's tier-gated one-export-per-week free tier."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "2.1",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "No AI, PDF, EPS, CDR, or PLT import and no binary DXF versus the LightBurn/MillMage five-format engine."
+    },
+    {
+      "cat": "2.2",
+      "vs": "XCS",
+      "delta": -6,
+      "claim": "PNG/JPG only; no BMP, GIF, TIFF, or WebP while every competitor imports at least four raster formats."
+    },
+    {
+      "cat": "2.3",
+      "vs": "LightBurn",
+      "delta": -6,
+      "claim": "No .lbrn/.lbrn2 reader for the LightBurn-switcher persona, and the absence is un-ADR'd (severity bump per design 5.6)."
+    },
+    {
+      "cat": "2.4",
+      "vs": "LightBurn",
+      "delta": -1,
+      "claim": "SVG text and embedded images silently dropped with stale 'Phase D/E' toasts - an un-ADR'd divergence; LightBurn imports text with local fonts."
+    },
+    {
+      "cat": "2.5",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "No clipboard-paste import, no Open Recent, and a three-way split import menu with an SVG-only Ctrl+I."
+    },
+    {
+      "cat": "2.6",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "No artwork export at all (scene SVG/DXF/image out) - designs enter KerfDesk but never leave as vectors."
+    },
+    {
+      "cat": "2.7",
+      "vs": "LightBurn",
+      "delta": 0,
+      "claim": "Unconditional replace-on-reimport with no add-as-copy option is an un-ADR'd divergence from LightBurn's add-a-copy default (S1-F5)."
+    }
+  ],
+  "notVerified": [
+    "KerfDesk import behavior on a real-world Illustrator/AutoCAD/Inkscape corpus (repo fixtures are synthetic; only perceptual instrument is the circle IoU test)",
+    "Binary DXF handling (parser is ASCII-only by design, never exercised)",
+    "Decode path for renamed/mislabeled raster bytes (BMP/GIF/WebP renamed to .png/.jpg)",
+    ".lbdev import fidelity against genuine LightBurn Export Devices output (schema guessed, no authentic sample in repo)",
+    "Ruida .rd byte-stream correctness vs a real controller or LightBurn golden file (verification circular through repo's own decoder)",
+    "Live-app drag-drop overlay, toasts, pickers, and re-import diff (code-only verification; no dev-server interaction per rule 4)",
+    "DXF re-import end-to-end (shares the imported-svg pipeline but not separately exercised)",
+    "Whether interactive post-import user scaling re-flattens curves (full-sweep S5-F2 residual)",
+    "U cells: MillMage 2.4 import fidelity, LaserGRBL 2.5 import UX, XCS 2.7 re-import (research debt)"
+  ]
+}

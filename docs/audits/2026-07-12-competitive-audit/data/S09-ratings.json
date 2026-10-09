@@ -1,0 +1,342 @@
+{
+  "sector": 9,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/09-gcode-quality.md",
+  "ratings": [
+    {
+      "cat": "9.1",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Only roster product emitting native G2/G3 (CNC path); laser is G1-only with open MAJOR S5-F2 chord-error amplification"
+    },
+    {
+      "cat": "9.1",
+      "product": "LightBurn",
+      "score": 4,
+      "star": false,
+      "tag": "COMM",
+      "note": "Staff-confirmed no circular interpolation; Bezier segmentation only; imported G2/G3 dropped on re-save"
+    },
+    {
+      "cat": "9.1",
+      "product": "MillMage",
+      "score": 3,
+      "star": false,
+      "tag": "COMM",
+      "note": "Staff-confirmed no G2/G3; fixed ~0.60 mm chord segmentation, not user-adjustable"
+    },
+    {
+      "cat": "9.1",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "COMM",
+      "note": "Stair-stepped G1 vectorization; no arc generation (issue #170); arc preview bug #1134; dormant"
+    },
+    {
+      "cat": "9.1",
+      "product": "XCS",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Export exists but arc vs segment internals of closed pipeline undocumented — unknown"
+    },
+    {
+      "cat": "9.1",
+      "product": "Easel",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "Official spec: linear moves only, arcs must be linearized; G2/G3 imports rejected outright"
+    },
+    {
+      "cat": "9.2",
+      "product": "KerfDesk",
+      "score": 8,
+      "star": false,
+      "tag": "CODE",
+      "note": "S scaled to live-verified $30; M3/M4 per mode per dialect; start gated on $30/$32 proof; no per-layer override (S5-F4)"
+    },
+    {
+      "cat": "9.2",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Mature: S-Value Max/$30 docs, per-layer Constant Power M3 vs M4 toggle, GRBL-M3 device"
+    },
+    {
+      "cat": "9.2",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "CNC framing: per-op spindle RPM, GRBL M3 profile, in-app firmware settings; laser modes N/A"
+    },
+    {
+      "cat": "9.2",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "M3 vs M4 choice at import; S-MIN/S-MAX pixel mapping; solid but manual"
+    },
+    {
+      "cat": "9.2",
+      "product": "XCS",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Percentage presets via EasySet only; no M3/M4 or S-max exposure in closed pipeline"
+    },
+    {
+      "cat": "9.2",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "COMM",
+      "note": "Automatic M3/M5 + spindle RPM; basic on/off adequate for grbl routers, no laser-style scaling"
+    },
+    {
+      "cat": "9.3",
+      "product": "KerfDesk",
+      "score": 3,
+      "star": false,
+      "tag": "CODE",
+      "note": "No user start/end/tool-change hooks or custom headers; only six fixed dialect presets + automatic provenance header"
+    },
+    {
+      "cat": "9.3",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Custom GCode device type can override every emitted command; |RESTORE| macros, hex escapes"
+    },
+    {
+      "cat": "9.3",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Custom GCode tab: tool-change/ATC/coolant hooks, comment chars, variable substitution with change tracking"
+    },
+    {
+      "cat": "9.3",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "COMM",
+      "note": "Custom header/between-passes/footer since v3.0.19 sharing macro language; save-omission bug #1172"
+    },
+    {
+      "cat": "9.3",
+      "product": "XCS",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "No hook capability documented anywhere; likely absent but not provable — unknown"
+    },
+    {
+      "cat": "9.3",
+      "product": "Easel",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Fixed-format .nc export documented; no hooks found either way — unknown"
+    },
+    {
+      "cat": "9.4",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "4 controller families, 6 text dialects + experimental Ruida binary; all non-GRBL simulator-verified only"
+    },
+    {
+      "cat": "9.4",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Broadest: GRBL variants, Smoothie, Marlin, Cohesion3D; Pro adds Ruida/Trocen/TopWisdom DSP + EZCad2/3 galvo"
+    },
+    {
+      "cat": "9.4",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "GRBL family, grblHAL, FluidNC, Smoothie control; export posts for Mach3/4, LinuxCNC, UCCNC, Duet, Masso"
+    },
+    {
+      "cat": "9.4",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Single-dialect: Grbl v0.9/v1.1 only per site and README"
+    },
+    {
+      "cat": "9.4",
+      "product": "XCS",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "Proprietary xTool machines only; no controller or dialect selection; export scoped to D-series"
+    },
+    {
+      "cat": "9.4",
+      "product": "Easel",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "grbl-centric; one generic .nc export flavor, no post-processor list"
+    },
+    {
+      "cat": "9.5",
+      "product": "KerfDesk",
+      "score": 9,
+      "star": false,
+      "tag": "TEST",
+      "note": "Byte-identical across 100 fuzz seeds + snapshot corpus; provenance header (version/commit/emitter/$30-$32); per-layer banners"
+    },
+    {
+      "cat": "9.5",
+      "product": "LightBurn",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Layer comments + Suppress Comments option; determinism and provenance undocumented"
+    },
+    {
+      "cat": "9.5",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Configurable comment character, tool-change comments; header/provenance otherwise undocumented"
+    },
+    {
+      "cat": "9.5",
+      "product": "LaserGRBL",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Save function exists; comment/header conventions and determinism undocumented — unknown"
+    },
+    {
+      "cat": "9.5",
+      "product": "XCS",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Only export mechanics documented; file structure/determinism unknown"
+    },
+    {
+      "cat": "9.5",
+      "product": "Easel",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Command whitelist implies simple vocabulary; header/comment structure and determinism undocumented — unknown"
+    },
+    {
+      "cat": "9.6",
+      "product": "KerfDesk",
+      "score": 9,
+      "star": false,
+      "tag": "TEST",
+      "note": "S0 rapids + post-emit scans: laser-on travel, bounds incl. arc extrema, non-finite XYZIJ; firmware reactions HW-CLAIMED"
+    },
+    {
+      "cat": "9.6",
+      "product": "LightBurn",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "M4 zero-speed-zero-power documented; travel safety delegated to firmware $32; no output-side guards documented"
+    },
+    {
+      "cat": "9.6",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Safe Clearance Height + Fast Retraction Height with explicit collision caveats; user-dependent CNC model"
+    },
+    {
+      "cat": "9.6",
+      "product": "LaserGRBL",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Historic laser-on-G0 bug (#568, 2019); current 7.14.1 guarantees undocumented — unknown"
+    },
+    {
+      "cat": "9.6",
+      "product": "XCS",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "Hardware sensors are marketing; software-emitted motion-safety guarantees undocumented — unknown"
+    },
+    {
+      "cat": "9.6",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Safety height for travels; import validator rejects non-whitelisted commands; bounds/non-finite undocumented"
+    }
+  ],
+  "wins": [
+    {
+      "cat": "9.1",
+      "vs": "LightBurn",
+      "delta": 3,
+      "claim": "KerfDesk is the only roster product emitting native G2/G3 arcs (CNC path); LightBurn/MillMage staff confirm segments-only and Easel's spec rejects arcs."
+    },
+    {
+      "cat": "9.5",
+      "vs": "LightBurn",
+      "delta": 3,
+      "claim": "Test-proven byte-identical determinism plus a provenance header recording version/commit/emitter/$30-$32 assumptions, with no documented competitor equivalent."
+    },
+    {
+      "cat": "9.6",
+      "vs": "LightBurn",
+      "delta": 3,
+      "claim": "Emitted-output safety scans (laser-on travel, bounds with arc-bulge extrema, non-finite coordinates) where competitors delegate travel safety to firmware or user-set clearance heights."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "9.3",
+      "vs": "LightBurn",
+      "delta": -7,
+      "claim": "No user-editable start/end/tool-change G-code or custom headers at all, versus LightBurn's override-everything Custom GCode device type."
+    },
+    {
+      "cat": "9.4",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "Six text dialects plus one experimental binary — all non-GRBL simulator-only — versus LightBurn Pro's DSP/galvo breadth and MillMage's CAM post list."
+    },
+    {
+      "cat": "9.2",
+      "vs": "LightBurn",
+      "delta": -1,
+      "claim": "No per-layer constant/dynamic (M3/M4) power override (open S5-F4); delta within design noise but the missing feature is concrete."
+    }
+  ],
+  "notVerified": [
+    "All firmware-side behavior is HW-CLAIMED: M4 rest-power gating, $32 rapid zeroing, alarm de-energize, and real-controller acceptance of emitted G2/G3 have never been driven on a machine; no physical burn has validated the safety envelope",
+    "No dialect validated on real hardware: grblHAL, FluidNC, Marlin, Smoothieware, Ruida are simulator/research-verified only; no reference .rd file exists to diff the encoder; FluidNC $$ inclusion of $30/$32 unknown",
+    "9.1 rendered curve quality never compared perceptually to source artwork or LightBurn output; the S5-F2 error amplifier (canvas resize writing transform.scale) not traced through scene mutation",
+    "9.5: whether the streamed Start path carries the provenance header (file-actions comment suggests Save-only) not re-traced; determinism across OSes/Node versions untested beyond this Windows machine",
+    "9.3 absence of hooks proven by name-based grep plus reading both emitters; LightBurn's device-settings start/end G-code fields not re-verified against an install this session",
+    "U cells (research debt): XCS 9.1/9.3/9.5/9.6; LaserGRBL 9.5/9.6; Easel 9.3/9.5"
+  ]
+}

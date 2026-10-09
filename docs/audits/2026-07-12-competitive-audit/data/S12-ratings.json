@@ -1,0 +1,287 @@
+{
+  "sector": 12,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/12-camera-registration.md",
+  "ratings": [
+    {
+      "cat": "12.1",
+      "product": "KerfDesk",
+      "score": 8,
+      "star": false,
+      "tag": "CODE",
+      "note": "Complete lens+bed suite: checkerboard fisheye solve, trust/pose gating, A/B review, no-click 5-marker auto-align, manual fallback (ADR-108/109/122); code+test only, unproven on hardware"
+    },
+    {
+      "cat": "12.1",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Mature two-stage: permanent lens-distortion calibration (camera presets) then engraved-target workspace alignment; proven but finicky, must re-run if camera moves"
+    },
+    {
+      "cat": "12.1",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No camera; CNC-only, positions by manual corner/center zeroing. Only hidden shared-with-LightBurn calibration pages exist, not an exposed feature"
+    },
+    {
+      "cat": "12.1",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "COMM",
+      "note": "No camera support of any kind; long-standing feature requests (GitHub #2385/#74) unimplemented. Nothing to calibrate"
+    },
+    {
+      "cat": "12.1",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Camera-first guided per-machine calibrations (manual M1, distant/close P2/P3, Aimed-Measure); a core onboarding step, not an add-on"
+    },
+    {
+      "cat": "12.1",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No camera; XY zero set by manual jog to front-left corner. Only a Z-probe accessory exists, nothing optical to calibrate"
+    },
+
+    {
+      "cat": "12.2",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": true,
+      "tag": "CODE",
+      "note": "Complete matrix3d homography overlay: live USB + captured-still, opacity, zoom/pan, resolution+basis fixes shared with Trace (ADR-134). Accuracy HW-CLAIMED; live rectified overlay refused"
+    },
+    {
+      "cat": "12.2",
+      "product": "LightBurn",
+      "score": 8,
+      "star": true,
+      "tag": "COMM",
+      "note": "Mature live overlay places designs on real material; Width/Height/X-Y-Shift fine-tune; 2.1 adds multi/IP-camera. Accuracy hardware-bound, sub-mm needs care"
+    },
+    {
+      "cat": "12.2",
+      "product": "MillMage",
+      "score": 0,
+      "star": true,
+      "tag": "OFF",
+      "note": "No camera overlay; positions relative to a workpiece corner/center via manual X/Y zeroing set in Project Setup. No live material view"
+    },
+    {
+      "cat": "12.2",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": true,
+      "tag": "COMM",
+      "note": "No camera overlay, the single most-cited missing feature vs LightBurn; users frame by watching the head. Third-party cams monitor only"
+    },
+    {
+      "cat": "12.2",
+      "product": "XCS",
+      "score": 9,
+      "star": true,
+      "tag": "COMM",
+      "note": "Signature camera-first WYSIWYG placement; P2 dual-camera ~0.3mm via Aimed Measure, M1 ~1.5mm. Roster-leading accuracy; degrades with material un-flatness"
+    },
+    {
+      "cat": "12.2",
+      "product": "Easel",
+      "score": 0,
+      "star": true,
+      "tag": "OFF",
+      "note": "No camera and no live material view; placement entirely by manual work-zero jogging plus homing. No overlay surface at all"
+    },
+
+    {
+      "cat": "12.3",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Capture-to-trace (ADR-110) warps aligned frame into bed-mm via inverse homography; traced vectors land at true bed coords. ~102dpi outline-oriented; fidelity unverified"
+    },
+    {
+      "cat": "12.3",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Camera capture-to-vector built into the Cameras workflow: trace artwork/objects placed in the laser directly into editable vectors. Standard documented feature"
+    },
+    {
+      "cat": "12.3",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No camera; inherits LightBurn bitmap trace but only from imported image files, never a live camera capture"
+    },
+    {
+      "cat": "12.3",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No camera; has a file-based raster to vector vectorization tool but nothing is captured from a camera. Camera support entirely absent"
+    },
+    {
+      "cat": "12.3",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Camera machines capture the baseplate; users auto-trace/centerline real objects to vectors. Camera-less machines fall back to phone-photo import"
+    },
+    {
+      "cat": "12.3",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No camera; image trace available only from uploaded files via import, not from any live camera capture"
+    },
+
+    {
+      "cat": "12.4",
+      "product": "KerfDesk",
+      "score": 0,
+      "star": true,
+      "tag": "CODE",
+      "note": "No print-and-cut/registration-mark workflow; ADR-109 defers it to v3.5. Grep finds zero implementation. Only adjacent path is markerless trace-from-camera"
+    },
+    {
+      "cat": "12.4",
+      "product": "LightBurn",
+      "score": 8,
+      "star": true,
+      "tag": "OFF",
+      "note": "Full Print-and-Cut: two Target Positions measure offset/rotation/scale to align a cut to printed media; requires Absolute Coords. The reference implementation"
+    },
+    {
+      "cat": "12.4",
+      "product": "MillMage",
+      "score": 0,
+      "star": true,
+      "tag": "OFF",
+      "note": "No print-and-cut/registration-mark alignment; registration to a workpiece is by probing or manual origin-setting, not by aligning to printed marks"
+    },
+    {
+      "cat": "12.4",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": true,
+      "tag": "COMM",
+      "note": "No print-and-cut or registration-mark workflow; lacks LightBurn's advanced alignment features. Confirmed absent in comparison write-ups"
+    },
+    {
+      "cat": "12.4",
+      "product": "XCS",
+      "score": 6,
+      "star": true,
+      "tag": "OFF",
+      "note": "'Print & blade cut' registers printed patterns for blade-module machines; camera also positions a laser cut onto pre-printed material. Machine/module dependent"
+    },
+    {
+      "cat": "12.4",
+      "product": "Easel",
+      "score": 0,
+      "star": true,
+      "tag": "OFF",
+      "note": "No print-and-cut/registration-mark workflow; machine control limited to manual work-zero plus homing. Nothing aligns a cut to printed artwork"
+    },
+
+    {
+      "cat": "12.5",
+      "product": "KerfDesk",
+      "score": 8,
+      "star": false,
+      "tag": "CODE",
+      "note": "Richest dedicated fixture tooling: Registration Jig + Capture Board Corners (jog to G92 to outline to fit/array/circle, ADR-124/125/126), provenance-locked. Camera-free; jog landing HW-CLAIMED"
+    },
+    {
+      "cat": "12.5",
+      "product": "LightBurn",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "No dedicated fixture library; repurposes Print-and-Cut target marks as jig alignment plus camera-overlay eyeball repeat placement. Proven but not purpose-built"
+    },
+    {
+      "cat": "12.5",
+      "product": "MillMage",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Probing Wizard (XYZ probe on corner) sets origin plus a work offset for repeatable fixture/jig placement. No camera or board-outline capture"
+    },
+    {
+      "cat": "12.5",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No fixture/board-capture or jig workflow; repeatability relies on manual origin/zero setting only. No repeat-placement tooling"
+    },
+    {
+      "cat": "12.5",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Camera captures the full baseplate; Batch Fill/Smart Fill replicate a design across identical pieces for repeat/batch production. Camera-driven fixture-style placement"
+    },
+    {
+      "cat": "12.5",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No jig/board-capture; repeatable placement depends on homing plus manually re-setting the same work zero. No fixture tool"
+    }
+  ],
+  "wins": [
+    {
+      "cat": "12.5",
+      "vs": "LightBurn",
+      "delta": 2,
+      "claim": "KerfDesk is the only roster product with a dedicated Capture-Board-Corners plus jig/fit/array/circle-board fixture tool; LightBurn's own docs state it has no dedicated fixture library (repurposes print-and-cut marks + camera eyeball), though KerfDesk's landing accuracy is HW-CLAIMED."
+    },
+    {
+      "cat": "12.5",
+      "vs": "MillMage",
+      "delta": 3,
+      "claim": "KerfDesk's dedicated board-capture with fit/array/circle beats MillMage's probe-only origin+work-offset fixturing, which has no board-outline capture."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "12.4",
+      "vs": "LightBurn",
+      "delta": -8,
+      "claim": "KerfDesk has no print-and-cut/registration-mark workflow at all (ADR-109 deferred to v3.5, grep-confirmed absent) versus LightBurn's full 2-target Print-and-Cut, the roster reference."
+    },
+    {
+      "cat": "12.2",
+      "vs": "XCS",
+      "delta": -3,
+      "claim": "KerfDesk's camera overlay is complete in code but its accuracy is entirely HW-CLAIMED and never proven, while XCS documents ~0.3mm camera-first placement (LightBurn -2, hardware-proven)."
+    }
+  ],
+  "notVerified": [
+    "12.1 calibration accuracy never verified on real hardware or any perceptual fixture (no camera fixtures exist under src/__fixtures__/perceptual); WORKFLOW.md F-CAM1/F-CAM4 drift (audit S7-F3) not re-checked this session",
+    "12.2 [HW] overlay-lands-on-the-real-bed registration never physically or perceptually verified (HW-CLAIMED, ADR-107/134 explicit); rectified-basis live overlay deliberately replaced by a still-capture notice (no per-frame live de-fisheye); floating panel non-draggable (S7-F9) not re-checked",
+    "12.3 trace-from-camera output fidelity and physical landing never perceptually or hardware verified; inherits the same unverified alignment; TRACE_PIXELS_PER_MM=4 (~102 dpi) outline-oriented; no perceptual fixture drives a known frame through the full warp",
+    "12.4 absence confirmed by ADR-109 decision plus repo-wide grep; the [HW] print-and-cut accuracy question is moot because the feature is absent",
+    "12.5 G92 origin accuracy, jog-to-corner landing, and drawn-outline-vs-real-board registration are HW-CLAIMED, never physically verified; the board outline was never perceptually rendered even at authoring (ADR-124); circle typed-diameter cross-check (S7-F10) and in-capture jog (S7-F6) not re-checked",
+    "All competitor ratings are documentary ([OFF]/[COMM]/[INF]); no hands-on runs. XCS/LightBurn accuracy figures (~0.3mm; sub-mm-with-care) are vendor/community claims, not independently measured here. [INF] cells LaserGRBL 12.4 and Easel 12.4 have absence corroborated by non-INF sources; no win/lose bullet rests on an [INF] cell",
+    "Roster judgment: MillMage 0.8.02 and Easel are rated (not N/R) because S12 includes registration/fixturing where CNC products compete; their camera-category zeros are documented feature absences, not measured failures"
+  ]
+}

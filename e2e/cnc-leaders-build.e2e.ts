@@ -13,6 +13,15 @@ async function openCnc(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
   const notifications = page.getByRole('button', { name: /^Dismiss .+ notification:/ });
   while (await notifications.count()) await notifications.first().click();
 }
+async function openArtworkCreator(page: Page, choice: RegExp): Promise<void> {
+  await page
+    .getByLabel('Drawing tools', { exact: true })
+    .getByRole('button', { name: 'Create artwork', exact: true })
+    .click();
+  const chooser = page.getByRole('dialog', { name: 'Create artwork', exact: true });
+  await chooser.getByRole('button', { name: choice }).click();
+  await expect(chooser).toHaveCount(0);
+}
 async function saveSource(page: Page, kerfdesk: KerfDeskFixture): Promise<Record<string, unknown>> {
   await expect(page).toHaveTitle(/cnc-leaders\.lf2/);
   await expect(
@@ -35,7 +44,7 @@ test('sketch editor reviews 75 mm geometry and saved source retains fractional h
   kerfdesk,
 }) => {
   await openCnc(page, kerfdesk);
-  await page.getByRole('button', { name: 'Create constrained sketch…', exact: true }).click();
+  await openArtworkCreator(page, /^Constrained sketch /);
   const dialog = page.getByRole('dialog', { name: 'Constrained 2D sketch' });
   await dialog.getByLabel('width value or expression', { exact: true }).fill('75');
   await dialog.getByRole('button', { name: 'Review solved geometry' }).click();
@@ -55,15 +64,15 @@ test('sketch editor reviews 75 mm geometry and saved source retains fractional h
   const object = scene.objects.find((o) => o.constrainedSketch !== undefined);
   expect(object?.bounds.maxX).toBeCloseTo(75, 4);
   expect(object?.constrainedSketch?.points.find((p) => p.id === 'hole1')?.x).toBeCloseTo(18.75, 4);
-  await page.screenshot({ path: 'docs/audits/2026-10-08-cnc-leaders/sketch-workspace.png' });
+  await page.screenshot({ path: test.info().outputPath('sketch-workspace.png') });
 });
 test('generated panel preview applies named dimensions and preserves retained generator intent', async ({
   page,
   kerfdesk,
 }) => {
   await openCnc(page, kerfdesk);
-  await page.getByRole('button', { name: 'Create parametric part…', exact: true }).click();
-  const dialog = page.getByRole('dialog', { name: 'Create generated part' });
+  await openArtworkCreator(page, /^Parametric part /);
+  const dialog = page.getByRole('dialog', { name: 'Create parametric part', exact: true });
   await dialog.getByLabel('Overall width (mm)', { exact: true }).fill('75');
   await dialog.getByRole('button', { name: 'Preview geometry and operations' }).click();
   await expect(dialog.getByRole('button', { name: 'Apply reviewed part' })).toBeEnabled();
@@ -77,7 +86,7 @@ test('generated panel preview applies named dimensions and preserves retained ge
   expect(object?.partGenerator?.definition.widthMm).toBe(75);
   expect(object?.bounds.maxX).toBeCloseTo(75, 4);
   await page.screenshot({
-    path: 'docs/audits/2026-10-08-cnc-leaders/generated-part-workspace.png',
+    path: test.info().outputPath('generated-part-workspace.png'),
   });
 });
 test('editable relief worker creates retained components with the requested physical size', async ({
@@ -85,23 +94,39 @@ test('editable relief worker creates retained components with the requested phys
   kerfdesk,
 }) => {
   await openCnc(page, kerfdesk);
-  await page.getByRole('button', { name: 'Create editable relief…', exact: true }).click();
+  await openArtworkCreator(page, /^Editable relief /);
   const dialog = page.getByRole('dialog', { name: 'Create editable relief', exact: true });
   await dialog.getByLabel('Relief width (mm)', { exact: true }).fill('24');
   await dialog.getByLabel('Relief height (mm)', { exact: true }).fill('20');
   await dialog.getByLabel('Maximum relief depth (mm)', { exact: true }).fill('4');
-  await dialog.getByLabel('Authoring grid size (cells per side)', { exact: true }).fill('16');
+  await dialog
+    .getByLabel('Authoring grid size (cells per side)', { exact: true })
+    .selectOption('128');
   await dialog.getByRole('button', { name: 'Create relief', exact: true }).click();
   await expect(dialog).toHaveCount(0);
+  const editor = page.getByRole('dialog', { name: 'Edit relief components', exact: true });
+  await expect(editor).toBeVisible();
+  await editor.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(editor).toHaveCount(0);
   const saved = await saveSource(page, kerfdesk);
   const scene = saved['scene'] as {
     objects: {
       kind: string;
-      reliefAuthoring?: { physicalWidthMm: number; physicalHeightMm: number };
+      reliefAuthoring?: {
+        physicalWidthMm: number;
+        physicalHeightMm: number;
+        maxDepthMm: number;
+        components: unknown[];
+      };
       reliefSource?: { width: number; height: number };
     }[];
   };
   const object = scene.objects.find((o) => o.kind === 'relief');
-  expect(object?.reliefAuthoring).toMatchObject({ physicalWidthMm: 24, physicalHeightMm: 20 });
-  expect(object?.reliefSource).toMatchObject({ width: 16, height: 16 });
+  expect(object?.reliefAuthoring).toMatchObject({
+    physicalWidthMm: 24,
+    physicalHeightMm: 20,
+    maxDepthMm: 4,
+    components: [{ name: 'Sculpting base', source: { kind: 'retained-field-v1' } }],
+  });
+  expect(object?.reliefSource).toMatchObject({ width: 128, height: 128 });
 });

@@ -134,4 +134,78 @@ describe('parametric part operator review', () => {
     await click('Cancel');
     expect(useStore.getState().project.scene.objects).toHaveLength(0);
   });
+  it.each([false, true])(
+    'closes an old document draft when a replacement retains its object ID (reviewed=%s)',
+    async (reviewed) => {
+      const source = generatedPart();
+      const initial = {
+        ...useStore.getState().project,
+        scene: { layers: [], objects: [source] },
+      };
+      useStore.setState({ project: initial, selectedObjectId: source.id });
+      const openingEpoch = useStore.getState().projectDocumentEpoch;
+      await act(async () => root.render(<ParametricPartControls mode="edit" />));
+      expect(host.textContent).not.toContain('Create parametric part');
+      await click('Edit generated part dimensions…');
+      await change('Overall width', '75');
+      if (reviewed) await click('Preview geometry and operations');
+      const replacementSource = generatedPart({
+        ...source.partGenerator.definition,
+        widthMm: 95,
+      });
+      const replacement = {
+        ...initial,
+        scene: { ...initial.scene, objects: [replacementSource] },
+      };
+      await act(async () =>
+        useStore.setState({
+          project: replacement,
+          projectDocumentEpoch: openingEpoch + 1,
+        }),
+      );
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(useStore.getState().project).toBe(replacement);
+      expect(useStore.getState().undoStack).toHaveLength(0);
+      await click('Edit generated part dimensions…');
+      const width = Array.from(host.querySelectorAll('label'))
+        .find((label) => label.textContent?.trim().startsWith('Overall width'))
+        ?.querySelector('input');
+      expect(width?.value).toBe('95');
+      await change('Overall width', '105');
+      await click('Preview geometry and operations');
+      await click('Apply reviewed part');
+      expect(
+        (useStore.getState().project.scene.objects[0] as ImportedSvg).partGenerator?.definition
+          .widthMm,
+      ).toBe(105);
+      expect(useStore.getState().undoStack).toEqual([replacement]);
+      await act(async () => useStore.getState().undo());
+      expect(useStore.getState().project).toBe(replacement);
+      expect(source.partGenerator.definition.widthMm).toBe(60);
+    },
+  );
+  it('discards a draft when selection leaves its source and does not revive it on return', async () => {
+    const source = generatedPart();
+    const other = { ...generatedPart(), id: 'other' };
+    const initial = {
+      ...useStore.getState().project,
+      scene: { layers: [], objects: [source, other] },
+    };
+    useStore.setState({ project: initial, selectedObjectId: source.id });
+    await act(async () => root.render(<ParametricPartControls mode="edit" />));
+    await click('Edit generated part dimensions…');
+    await change('Overall width', '75');
+    await act(async () => useStore.setState({ selectedObjectId: other.id }));
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    await act(async () => useStore.setState({ selectedObjectId: source.id }));
+    expect(host.querySelector('[role="dialog"]')).toBeNull();
+    await click('Edit generated part dimensions…');
+    const width = Array.from(host.querySelectorAll('label'))
+      .find((label) => label.textContent?.trim().startsWith('Overall width'))
+      ?.querySelector('input');
+    expect(width?.value).toBe('60');
+    await click('Cancel');
+    expect(useStore.getState().project).toBe(initial);
+    expect(useStore.getState().undoStack).toHaveLength(0);
+  });
 });

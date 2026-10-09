@@ -66,10 +66,12 @@ export type ReliefLevel = {
   readonly mask?: ReliefVectorMask;
 };
 
+export type ReliefAuthoringAlgorithm = 'retained-relief-v1' | 'retained-relief-v2';
+
 /** Retained intent. The owning reliefSource is its materialised CAM authority. */
 export type ReliefAuthoringDocument = {
   readonly schemaVersion: 1;
-  readonly algorithmRevision: 'retained-relief-v1';
+  readonly algorithmRevision: ReliefAuthoringAlgorithm;
   readonly revision: number;
   readonly width: number;
   readonly height: number;
