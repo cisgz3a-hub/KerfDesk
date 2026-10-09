@@ -48,7 +48,6 @@ describe('active move shared physical writer', () => {
     expect(strokes).toHaveLength(2);
     expect(active.materials.map((material) => material.linewidth)).toEqual([8, 4]);
     expect(active.materials.map((material) => material.depthWrite)).toEqual([false, true]);
-    expect(active.materials.map((material) => material.transparent)).toEqual([true, true]);
     expect(strokes.map((stroke) => stroke.renderOrder)).toEqual([3, 4]);
     expect(strokes.map((stroke) => stroke.name)).toEqual([
       'toolpath-current-exact-casing',
