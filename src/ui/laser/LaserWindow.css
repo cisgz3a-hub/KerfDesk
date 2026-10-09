@@ -85,6 +85,33 @@
   min-width: 0;
 }
 
+.lf-jog-controls--machine-actions > :first-child {
+  align-self: start;
+}
+
+.lf-jog-controls--machine-actions > .lf-btn {
+  min-height: 28px;
+  padding: 3px 5px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.lf-jog-home {
+  grid-area: home;
+}
+
+.lf-jog-autofocus {
+  grid-area: autofocus;
+}
+
+.lf-jog-origin {
+  grid-area: origin;
+}
+
+.lf-manual-air--compact > :last-child {
+  grid-column: 1 / -1;
+}
+
 .lf-machine-disclosure > summary {
   padding: 3px 0;
   border-radius: 4px;

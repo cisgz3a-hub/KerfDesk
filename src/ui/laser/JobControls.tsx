@@ -45,6 +45,8 @@ type Props = {
   readonly onStartJob: () => void;
   readonly dockedJobActions?: boolean;
   readonly setupExtras?: ReactNode;
+  /** LaserWindow places the ordinary setup and Set-origin actions beside jog. */
+  readonly machineActionsInJogPad?: boolean;
 };
 
 // Both setup entries are optional so bare <JobControls> renders standalone;
@@ -89,14 +91,11 @@ export function JobControls(props: Props): JSX.Element {
   const controllerState = useLaserStore((s) => s.statusReport?.state ?? null);
   const controlsBusy = jobControlsBusy(status, motionOperation, controllerOperation);
   const showIdleOverrideReset = shouldShowIdleOverrideReset(controlsBusy, hasOverrides, ovCache);
-  // Maintainer-directed rail order (ADR-225, amended 2026-07-17): origin
-  // directly under the jog pad, job actions next so Start/Frame stay above the
-  // fold on short windows, placement (a set-once compile setting that the Job
-  // Review dialog re-shows at Start, ADR-224) below them, and the
-  // hand-positioning guide last as a fallback.
+  // Standalone consumers keep all setup actions. The integrated rail keeps
+  // origin utilities here while its ordinary actions live beside the jog pad.
   return (
     <div style={containerStyle}>
-      <OriginRow disabled={disabled} streaming={controlsBusy} />
+      <JobOriginControls {...props} streaming={controlsBusy} />
       {!props.dockedJobActions && (
         <div className="lf-machine-section-heading">
           <span style={sectionCaptionStyle}>Job</span>
@@ -111,6 +110,7 @@ export function JobControls(props: Props): JSX.Element {
         dockedJobActions={props.dockedJobActions}
         setupExtras={props.setupExtras}
         setupLabel={machineKind === 'cnc' ? 'Homing & maintenance' : 'Homing & focus'}
+        machineActionsInJogPad={props.machineActionsInJogPad}
       />
       {!props.dockedJobActions && <StartBlockerNotice />}
       <JobStartMarkControl disabled={disabled} />
@@ -155,6 +155,18 @@ export function JobControls(props: Props): JSX.Element {
   );
 }
 
+function JobOriginControls(
+  props: Pick<Props, 'disabled' | 'machineActionsInJogPad'> & { readonly streaming: boolean },
+): JSX.Element | null {
+  return (
+    <OriginRow
+      disabled={props.disabled}
+      streaming={props.streaming}
+      layout={props.machineActionsInJogPad ? 'utilities' : 'all'}
+    />
+  );
+}
+
 function hasNonDefaultOverrides(overrides: {
   feed: number;
   rapid: number;
@@ -180,8 +192,9 @@ function SetupRow(props: {
   readonly dockedJobActions: boolean | undefined;
   readonly setupExtras: ReactNode;
   readonly setupLabel: string;
-}): JSX.Element {
-  const setup = (
+  readonly machineActionsInJogPad: boolean | undefined;
+}): JSX.Element | null {
+  const setup = props.machineActionsInJogPad ? null : (
     <JobSetupControls
       disabled={props.disabled}
       streaming={props.streaming}
@@ -191,12 +204,17 @@ function SetupRow(props: {
     />
   );
   if (props.dockedJobActions) {
+    if (setup === null && props.setupExtras == null) return null;
     return (
       <CollapsibleRailSection
-        label={props.setupLabel}
-        title="Home the machine, configure focus, and open machine maintenance tools."
+        label={setup === null ? 'Machine maintenance' : props.setupLabel}
+        title={
+          setup === null
+            ? 'Open machine maintenance tools.'
+            : 'Home the machine, configure focus, and open machine maintenance tools.'
+        }
       >
-        <div style={actionGridStyle}>{setup}</div>
+        {setup !== null && <div style={actionGridStyle}>{setup}</div>}
         {props.setupExtras}
       </CollapsibleRailSection>
     );

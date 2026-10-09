@@ -1,6 +1,6 @@
 import {
   connectMachineAndDismissFirstSetup,
-  expandMachineUtilities,
+  machineJogAction,
   selectWorkspacePanel,
   toolbarCommand,
 } from './fixtures/workspace-ui';
@@ -162,11 +162,11 @@ async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<vo
   await selectWorkspacePanel(page, 'Machine');
   await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  const home = machineJogAction(page, 'Home');
+  await home.click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine('<Idle|MPos:0.000,0.000,0.000|WCO:0.000,0.000,0.000|FS:0,0>');
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+  await expect(home).toBeEnabled();
 }
 
 async function runMenuCommand(page: Page, family: string, command: string): Promise<void> {

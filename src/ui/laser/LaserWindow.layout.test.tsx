@@ -1,14 +1,19 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { createProject, DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene';
 import type { PlatformAdapter } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
+import { initialLaserState } from '../state/laser-store-helpers';
 import { useUiStore } from '../state/ui-store';
 import { LaserWindow } from './LaserWindow';
+import {
+  closeMachineSetup,
+  useMachineSetupDialogStore,
+} from './device-setup/machine-setup-dialog-store';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -30,17 +35,24 @@ const idleStatus = {
   spindle: 0,
 };
 
+const originalActions = {
+  home: useLaserStore.getState().home,
+  autofocus: useLaserStore.getState().autofocus,
+  setOriginHere: useLaserStore.getState().setOriginHere,
+};
+
+beforeEach(() => {
+  useStore.setState({ project: createProject() });
+  useLaserStore.setState(initialLaserState());
+  closeMachineSetup();
+});
+
 afterEach(() => {
   useStore.getState().newProject();
+  useStore.setState({ project: createProject() });
   useUiStore.getState().setRailPanelVisible('machine', true);
-  useLaserStore.setState({
-    connection: { kind: 'disconnected' },
-    statusReport: null,
-    streamer: null,
-    alarmCode: null,
-    resetRequired: false,
-    airAssistOn: false,
-  });
+  useLaserStore.setState({ ...initialLaserState(), ...originalActions });
+  closeMachineSetup();
 });
 
 describe('LaserWindow anchored controls', () => {
@@ -62,6 +74,15 @@ describe('LaserWindow anchored controls', () => {
       const focus = focusButton(primary);
       expect(focus).toBeInstanceOf(HTMLButtonElement);
       expect(primary.textContent).toContain('Manual Air');
+      for (const label of ['Set up homing', 'Set up auto-focus', 'Set origin here']) {
+        expect(action(primary, label).closest('.lf-jog-controls')).not.toBeNull();
+        expect(
+          [...view.host.querySelectorAll('button')].filter((node) => node.textContent === label),
+        ).toHaveLength(1);
+      }
+      expect(tools.textContent).toContain('Reset origin');
+      expect(tools.textContent).toContain('Go to work zero');
+      expect(tools.textContent).toContain('Advanced origin');
       expect(primary.textContent).toContain('MPos: X 12.000 Y 34.000 Z 5.000');
       expect(primary.textContent).not.toContain('Move to position');
       expect(tools.querySelector('.lf-jog-panel')).toBeNull();
@@ -104,9 +125,16 @@ describe('LaserWindow anchored controls', () => {
       ).toBeInstanceOf(HTMLButtonElement);
       expect(primary.textContent).not.toContain('Probe (touch plate)');
       expect(tools.textContent).toContain('Probe (touch plate)');
-      expect(tools.textContent).toContain('Homing & maintenance');
+      expect(tools.textContent).toContain('Machine maintenance');
       expect(tools.textContent).toContain('Machine hours');
       expect(primary.textContent).not.toContain('Manual Air');
+      expect(action(primary, 'Set up homing')).toBeInstanceOf(HTMLButtonElement);
+      expect(action(primary, 'Set origin here')).toBeInstanceOf(HTMLButtonElement);
+      expect(primary.textContent).not.toContain('auto-focus');
+      await act(async () => useLaserStore.setState({ airAssistOn: true }));
+      expect(
+        primary.querySelector('button[aria-label="Turn manual air assist off (M9)"]'),
+      ).toBeInstanceOf(HTMLButtonElement);
     } finally {
       await view.unmount();
     }
@@ -137,7 +165,88 @@ describe('LaserWindow anchored controls', () => {
       await view.unmount();
     }
   });
+
+  it('keeps disconnected setup links available and blocks them during owned motion', async () => {
+    const view = await renderRail();
+    try {
+      const primary = requiredRegion(view.host, 'Jog and machine status');
+      expect(action(primary, 'Set up homing').disabled).toBe(false);
+      expect(action(primary, 'Set up auto-focus').disabled).toBe(false);
+      expect(action(primary, 'Set origin here').disabled).toBe(true);
+      await act(async () => action(primary, 'Set up homing').click());
+      expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+        kind: 'open',
+        target: { kind: 'step', step: 'confirm' },
+      });
+      closeMachineSetup();
+      await act(async () => action(primary, 'Set up auto-focus').click());
+      expect(useMachineSetupDialogStore.getState().state).toMatchObject({
+        kind: 'open',
+        target: { kind: 'step', step: 'options', highlight: 'autofocus' },
+      });
+      closeMachineSetup();
+      await act(async () => {
+        useLaserStore.setState({
+          motionOperation: {
+            operationId: 1,
+            kind: 'frame',
+            sawControllerBusy: false,
+            idleStatusReports: 0,
+            dispatchComplete: false,
+            pendingLines: [],
+          },
+        });
+      });
+      expect(action(primary, 'Set up homing').disabled).toBe(true);
+      expect(action(primary, 'Set up auto-focus').disabled).toBe(true);
+      expect(action(primary, 'Set origin here').disabled).toBe(true);
+      await act(async () => action(primary, 'Set up homing').click());
+      expect(useMachineSetupDialogStore.getState().state.kind).toBe('idle');
+    } finally {
+      await view.unmount();
+    }
+  });
+
+  it('runs the configured actions and existing Set-origin placement behavior from the jog group', async () => {
+    useStore.setState({
+      project: createProject({
+        ...DEFAULT_DEVICE_PROFILE,
+        homing: { ...DEFAULT_DEVICE_PROFILE.homing, enabled: true },
+        autofocusCommand: '$HZ',
+      }),
+      jobPlacement: { startFrom: 'absolute', anchor: 'front-left' },
+    });
+    const home = vi.fn(async () => undefined);
+    const autofocus = vi.fn(async () => ({ kind: 'ok' as const }));
+    const setOriginHere = vi.fn(async () => undefined);
+    useLaserStore.setState({
+      connection: { kind: 'connected' },
+      statusReport: idleStatus,
+      home,
+      autofocus,
+      setOriginHere,
+    });
+    const view = await renderRail();
+    try {
+      const primary = requiredRegion(view.host, 'Jog and machine status');
+      await act(async () => action(primary, 'Home').click());
+      await act(async () => action(primary, 'Auto-focus').click());
+      await act(async () => action(primary, 'Set origin here').click());
+      expect(home).toHaveBeenCalledOnce();
+      expect(autofocus).toHaveBeenCalledExactlyOnceWith('$HZ');
+      expect(setOriginHere).toHaveBeenCalledOnce();
+      expect(useStore.getState().jobPlacement.startFrom).toBe('user-origin');
+    } finally {
+      await view.unmount();
+    }
+  });
 });
+
+function action(host: HTMLElement, label: string): HTMLButtonElement {
+  const button = [...host.querySelectorAll('button')].find((node) => node.textContent === label);
+  if (button === undefined) throw new Error(`Missing action: ${label}`);
+  return button;
+}
 
 function requiredRegion(host: HTMLElement, label: string): HTMLElement {
   const region = host.querySelector(`section[aria-label="${label}"]`);
