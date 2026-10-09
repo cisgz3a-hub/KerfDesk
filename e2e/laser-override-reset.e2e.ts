@@ -1,4 +1,5 @@
 import {
+  connectMachineAndDismissFirstSetup,
   expandMachineUtilities,
   selectWorkspacePanel,
   toolbarCommand,
@@ -159,7 +160,7 @@ async function frameCurrentJob(page: Page, kerfdesk: KerfDeskFixture): Promise<v
 
 async function connectAndHome(page: Page, kerfdesk: KerfDeskFixture): Promise<void> {
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   await expandMachineUtilities(page);
   await page.getByRole('button', { name: 'Home', exact: true }).click();

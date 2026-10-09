@@ -1,4 +1,9 @@
-import { applicationHeader, selectWorkspacePanel, toolbarCommand } from './fixtures/workspace-ui';
+import {
+  applicationHeader,
+  connectMachineAndDismissFirstSetup,
+  selectWorkspacePanel,
+  toolbarCommand,
+} from './fixtures/workspace-ui';
 import { Buffer } from 'node:buffer';
 import { test, expect, type Page } from './fixtures/kerfdesk-test';
 
@@ -26,7 +31,7 @@ test('connects to deterministic GRBL serial and opens the deterministic USB came
   kerfdesk,
 }) => {
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect
     .poll(async () => (await kerfdesk.events()).map((event) => event.kind))
     .toContain('serial-open');

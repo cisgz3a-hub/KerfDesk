@@ -3,7 +3,11 @@
 // fixture, hold acknowledgements so a disconnect lands at a chosen line, and
 // probe the live stores through the same module instances the app uses.
 
-import { expandMachineUtilities, selectWorkspacePanel } from './workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  expandMachineUtilities,
+  selectWorkspacePanel,
+} from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
 import {
   acknowledgeStartOverrideFence,
@@ -278,7 +282,7 @@ export async function connectAndHome(
   options: { readonly closeRecoveryReview?: boolean } = {},
 ): Promise<void> {
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   if (options.closeRecoveryReview) {
     // Reconnect opens this review once per interrupted run (ADR-341 Amendment 6).
