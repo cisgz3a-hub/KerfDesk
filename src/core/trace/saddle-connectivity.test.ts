@@ -115,8 +115,301 @@ describe('saddle connectivity — binary 4×4 minority window', () => {
     expect(isSaddle(board, 6, 6)).toBe(true);
     expect(createSaddleResolver(line, 'auto', null, 2)(6, 6)).toBe(true);
     expect(createSaddleResolver(board, 'auto', null, 2)(6, 6)).toBe(false);
-    // At pixel scale 1 the enlarged hairline's corner is a blind tie.
-    expect(createSaddleResolver(line, 'auto', null, 1)(6, 6)).toBe(false);
+    // At pixel scale 1 the enlarged hairline's 4×4 mask window is the blind
+    // two-block tie; the wider 6×6 vote (ADR-403 amendment 1) reaches the
+    // neighbouring steps (10 of 36 ink) and joins it, while the enlarged
+    // board stays tied through 8×8 and keeps the tie-break.
+    expect(createSaddleResolver(line, 'auto', null, 1)(6, 6)).toBe(true);
+    expect(createSaddleResolver(board, 'auto', null, 1)(6, 6)).toBe(false);
+  });
+
+  it('widens a 4×4 tie to the 6×6 window (ADR-403 amendment 1)', () => {
+    // Two 2×2 marks kissing at corner (4,4) on a page: the 4×4 window holds
+    // exactly the two marks (8 of 16 ink), the 6×6 window adds 20 paper
+    // pixels, so ink is the minority and the marks join.
+    const marks = maskFrom([
+      '........',
+      '........',
+      '..##....',
+      '..##....',
+      '....##..',
+      '....##..',
+      '........',
+      '........',
+    ]);
+    expect(isSaddle(marks, 4, 4)).toBe(true);
+    expect(createSaddleResolver(marks, 'auto')(4, 4)).toBe(true);
+    // The same contact between two paper pinholes in solid ink: paper is the
+    // 6×6 minority and keeps its diagonal. Grey evidence at the corner still
+    // goes first, so an anti-aliased block that says ink joins the ink.
+    const holes = maskFrom([
+      '########',
+      '########',
+      '##..####',
+      '##..####',
+      '####..##',
+      '####..##',
+      '########',
+      '########',
+    ]);
+    const greyInk = Array.from({ length: 8 }, (_, y) =>
+      Array.from({ length: 8 }, (_, x) => {
+        if ((x === 3 && y === 4) || (x === 4 && y === 3)) return 40;
+        if ((x === 3 && y === 3) || (x === 4 && y === 4)) return 150;
+        return holes.ink[y * 8 + x] === 1 ? 0 : 255;
+      }),
+    );
+    expect(isSaddle(holes, 4, 4)).toBe(true);
+    expect(createSaddleResolver(holes, 'auto')(4, 4)).toBe(false);
+    expect(createSaddleResolver(holes, 'auto', fieldFrom(greyInk, 128))(4, 4)).toBe(true);
+    expect(createSaddleResolver(holes, 'connect-ink')(4, 4)).toBe(true);
+  });
+
+  it('widens a 6×6 tie to the 8×8 window', () => {
+    // Two 3×3 marks kissing at corner (5,5): the 4×4 window holds 8 of 16
+    // ink and the 6×6 window 18 of 36, both ties; the 8×8 window adds 28
+    // paper pixels, so the marks join.
+    const marks = maskFrom([
+      '..........',
+      '..........',
+      '..###.....',
+      '..###.....',
+      '..###.....',
+      '.....###..',
+      '.....###..',
+      '.....###..',
+      '..........',
+      '..........',
+    ]);
+    expect(isSaddle(marks, 5, 5)).toBe(true);
+    expect(createSaddleResolver(marks, 'auto')(5, 5)).toBe(true);
+    // Each wider window is measured in source pixels: enlarged 2x, the 8×8
+    // source window is 16×16 mask pixels.
+    const enlarged = maskFrom(
+      [
+        '..........',
+        '..........',
+        '..###.....',
+        '..###.....',
+        '..###.....',
+        '.....###..',
+        '.....###..',
+        '.....###..',
+        '..........',
+        '..........',
+      ].flatMap((row) => {
+        const wide = row
+          .split('')
+          .map((c) => c + c)
+          .join('');
+        return [wide, wide];
+      }),
+    );
+    expect(createSaddleResolver(enlarged, 'auto', null, 2)(10, 10)).toBe(true);
+  });
+
+  it('shrinks each wider window at the border, per axis and centred', () => {
+    // Corner (2,4) of a 4-wide strip: the x half-size cannot grow past 2,
+    // but y can, so the 6×6 window becomes 4×6 and the rows it adds decide.
+    // Empty added rows: ink is the minority (8 of 24), the marks join.
+    const sparse = maskFrom(['....', '....', '##..', '##..', '..##', '..##', '....', '....']);
+    expect(isSaddle(sparse, 2, 4)).toBe(true);
+    expect(createSaddleResolver(sparse, 'auto')(2, 4)).toBe(true);
+    // Ink-filled added rows: ink is the majority inside the image (16 of
+    // 24). Counting the out-of-image columns as paper would have made it the
+    // minority (16 of 36) and joined it.
+    const dense = maskFrom(['....', '####', '##..', '##..', '..##', '..##', '####', '....']);
+    expect(createSaddleResolver(dense, 'auto')(2, 4)).toBe(false);
+    // Two equal marks filling the whole image stay tied at every window
+    // size (each shrinks to the image), so the tie-break decides.
+    const kiss = maskFrom(['###...', '###...', '###...', '...###', '...###', '...###']);
+    expect(createSaddleResolver(kiss, 'auto')(3, 3)).toBe(false);
+  });
+
+  it('lets grey evidence settle a 4×4 tie before the wider rings', () => {
+    // A 1-px checkerboard ties through 8×8 at every corner. With a
+    // symmetric binary block the tie-break keeps paper joined; an
+    // anti-aliased block past the margin lets the decider join ink.
+    const board = checkerboard(10, 10);
+    const binary = createSaddleResolver(board, 'auto');
+    expect(binary(5, 5)).toBe(false);
+    const rows = Array.from({ length: 10 }, (_, y) =>
+      Array.from({ length: 10 }, (_, x) => ((x + y) % 2 === 0 ? 30 : 225)),
+    );
+    expect(createSaddleResolver(board, 'auto', fieldFrom(rows, 131))(5, 5)).toBe(true);
+    // Two 3×3 marks kissing on a page tie at 4×4 and join at 8×8 on the
+    // mask alone. Grey evidence measured at the corner goes first (ADR-403
+    // amendment 1): the anti-aliased block below says paper, so paper joins.
+    const marks = maskFrom([
+      '..........',
+      '..........',
+      '..###.....',
+      '..###.....',
+      '..###.....',
+      '.....###..',
+      '.....###..',
+      '.....###..',
+      '..........',
+      '..........',
+    ]);
+    const greyPaper = Array.from({ length: 10 }, (_, y) =>
+      Array.from({ length: 10 }, (_, x) => {
+        if ((x === 4 && y === 4) || (x === 5 && y === 5)) return 100;
+        if ((x === 4 && y === 5) || (x === 5 && y === 4)) return 220;
+        return marks.ink[y * 10 + x] === 1 ? 0 : 255;
+      }),
+    );
+    expect(createSaddleResolver(marks, 'auto', fieldFrom(greyPaper, 128))(5, 5)).toBe(false);
+    expect(createSaddleResolver(marks, 'auto')(5, 5)).toBe(true);
+    // Without grey evidence the wider ring decides: a saturated (binary)
+    // block, or a symmetric one whose saddle value sits on the cut.
+    const binaryLuma = Array.from({ length: 10 }, (_, y) =>
+      Array.from({ length: 10 }, (_, x) => (marks.ink[y * 10 + x] === 1 ? 0 : 255)),
+    );
+    expect(createSaddleResolver(marks, 'auto', fieldFrom(binaryLuma, 128))(5, 5)).toBe(true);
+    const onCut = binaryLuma.map((row, y) =>
+      row.map((luma, x) => {
+        if ((x === 4 && y === 4) || (x === 5 && y === 5)) return 100;
+        if ((x === 4 && y === 5) || (x === 5 && y === 4)) return 156;
+        return luma;
+      }),
+    );
+    expect(createSaddleResolver(marks, 'auto', fieldFrom(onCut, 128))(5, 5)).toBe(true);
+  });
+
+  it('lets a wider ring decide only when at least 7/8 of it is one colour', () => {
+    // A 12×12 patch of 2-px checkerboard cells on a 20×20 page (the
+    // topology.clean fixture's pattern). Next to the patch rim the wider
+    // rings hold cells on one side and page on the other: (6,6) adds 15 of
+    // 20 paper at 6×6 and 21 of 28 at 8×8 (3/4, not 7/8), so every rim
+    // corner stays a tie and the tie-break keeps the cells apart. Counting
+    // whole windows instead (6×6: 13 ink of 36) welded the rim.
+    const patch = maskFrom(
+      Array.from({ length: 20 }, (_, y) =>
+        Array.from({ length: 20 }, (_, x) => {
+          if (x < 4 || x >= 16 || y < 4 || y >= 16) return '.';
+          return (((x - 4) >> 1) + ((y - 4) >> 1)) % 2 === 0 ? '#' : '.';
+        }).join(''),
+      ),
+    );
+    const resolve = createSaddleResolver(patch, 'auto');
+    for (const [x, y] of [
+      [6, 6],
+      [6, 8],
+      [8, 6],
+      [6, 14],
+      [14, 14],
+      [12, 14],
+    ] as const) {
+      expect(isSaddle(patch, x, y)).toBe(true);
+      expect(resolve(x, y)).toBe(false);
+    }
+    // One stray speck in an otherwise empty ring is still decisive: two
+    // 2×2 marks kissing at (4,4) with a paper-ring speck (19 of 20 paper).
+    const specked = maskFrom([
+      '........',
+      '.#......',
+      '..##....',
+      '..##....',
+      '....##..',
+      '....##..',
+      '........',
+      '........',
+    ]);
+    expect(createSaddleResolver(specked, 'auto')(4, 4)).toBe(true);
+  });
+
+  it('records that one flipped cell pixel can weld the patch rim', () => {
+    // The 7/8 test clears the rim of the 2-px patch above by one pixel:
+    // corner (14,6) adds 24 of 28 paper at 8×8 and the test needs 25. Turn
+    // cell pixel (10,6) to paper and that ring decides, so the rim cells
+    // join there (ADR-403 amendment 1 records this margin; topology.scan is
+    // the fixture-level guard).
+    const rows = Array.from({ length: 20 }, (_, y) =>
+      Array.from({ length: 20 }, (_, x) => {
+        if (x < 4 || x >= 16 || y < 4 || y >= 16) return '.';
+        return (((x - 4) >> 1) + ((y - 4) >> 1)) % 2 === 0 ? '#' : '.';
+      }),
+    );
+    expect(createSaddleResolver(maskFrom(rows.map((r) => r.join(''))), 'auto')(14, 6)).toBe(false);
+    rows[6]![10] = '.';
+    const noisy = maskFrom(rows.map((r) => r.join('')));
+    expect(isSaddle(noisy, 14, 6)).toBe(true);
+    expect(createSaddleResolver(noisy, 'auto')(14, 6)).toBe(true);
+  });
+
+  it('joins the centre of a small 1-px checkerboard patch on a page', () => {
+    // In a 4×4 patch the 4×4 window is the balanced patch itself and the
+    // 6×6 ring is all page, so the centre corner joins ink: a tiny dither
+    // cluster is the minority. In an 8×8 patch the interior rings are
+    // checkerboard too, so interior corners keep the tie-break.
+    const patchOnPage = (n: number): InkMask =>
+      maskFrom(
+        Array.from({ length: 16 }, (_, y) =>
+          Array.from({ length: 16 }, (_, x) => {
+            const px = x - 4;
+            const py = y - 4;
+            if (px < 0 || py < 0 || px >= n || py >= n) return '.';
+            return (px + py) % 2 === 0 ? '#' : '.';
+          }).join(''),
+        ),
+      );
+    const small = patchOnPage(4);
+    expect(isSaddle(small, 6, 6)).toBe(true);
+    expect(createSaddleResolver(small, 'auto')(6, 6)).toBe(true);
+    const large = patchOnPage(8);
+    for (const [x, y] of [
+      [7, 7],
+      [8, 8],
+      [7, 9],
+    ] as const) {
+      expect(isSaddle(large, x, y)).toBe(true);
+      expect(createSaddleResolver(large, 'auto')(x, y)).toBe(false);
+    }
+  });
+
+  it('lets the 8×8 ring decide when the border clamps one axis', () => {
+    // Corner (6,3) of a 12×6 image: the window can grow to 8 wide but stays
+    // 6 tall. The 4×4 window ties (8 of 16) and the 6×6 ring is 10 of 20;
+    // the 8×8 step adds only columns 2 and 9 (12 pixels, all paper), which
+    // is decisive, so the ink minority joins.
+    const rows = [
+      '...######...',
+      '...#..##....',
+      '...#.#.#....',
+      '...#..##....',
+      '...###......',
+      '............',
+    ];
+    const mask = maskFrom(rows);
+    expect(isSaddle(mask, 6, 3)).toBe(true);
+    expect(createSaddleResolver(mask, 'auto')(6, 3)).toBe(true);
+    // The same 6×6 content as a 6×6 image: both axes are clamped at 6×6,
+    // the vote stops, and the walker's out-of-image paper is not counted.
+    const clamped = maskFrom(rows.map((row) => row.slice(3, 9)));
+    expect(isSaddle(clamped, 3, 3)).toBe(true);
+    expect(createSaddleResolver(clamped, 'auto')(3, 3)).toBe(false);
+  });
+
+  it('decides a ring that is exactly 7/8 one colour (pixel scale 2)', () => {
+    // Two 2×2 source marks kissing at the corner, enlarged 2x: a 12×12 mask,
+    // corner (6,6). The 4×4-source window (8×8 mask px) ties; the 6×6 ring
+    // is 80 mask px. Ten ink pixels in it leave 70 paper, exactly 7/8
+    // (4·60 = 3·80), which decides; eleven do not, and the 8×8 step is
+    // clamped by the border, so that contact keeps the tie-break.
+    const withRingInk = (count: number): InkMask =>
+      maskFrom(
+        Array.from({ length: 12 }, (_, y) =>
+          Array.from({ length: 12 }, (_, x) => {
+            if (y === 0 && x < count) return '#';
+            const inFirst = x >= 2 && x < 6 && y >= 2 && y < 6;
+            const inSecond = x >= 6 && x < 10 && y >= 6 && y < 10;
+            return inFirst || inSecond ? '#' : '.';
+          }).join(''),
+        ),
+      );
+    expect(createSaddleResolver(withRingInk(10), 'auto', null, 2)(6, 6)).toBe(true);
+    expect(createSaddleResolver(withRingInk(11), 'auto', null, 2)(6, 6)).toBe(false);
   });
 
   it('honours the explicit policies regardless of evidence', () => {
