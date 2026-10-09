@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { LicenceServiceError } from './licensing-http.js';
 import { record } from './licensing-verification.js';
 import type { LicenceRecord, LicensingStore } from './licensing-store.js';
 import { SANDBOX_ORIGIN } from '../public/desktop-sandbox-contract.mjs';
@@ -22,6 +23,35 @@ type RenewalIdentity = {
 };
 
 const CHECKOUT_PAGE = 'https://kerfdesk.com/buy.html?_ptxn=';
+
+/**
+ * Checkout refusals the service gives before it contacts the payment provider,
+ * so no order and nothing payable exist for the saved request ID. A saved intent
+ * without an order is then forgotten: keeping it would show a "pending order"
+ * with no order number and hide the trial and purchase actions until the user
+ * found Forget this order. Ambiguous answers (checkout_pending) keep the intent.
+ */
+const UNPAYABLE_CHECKOUT_CODES: ReadonlySet<string> = new Set([
+  'payment_provider_not_configured',
+  'renewal_requires_paid_license',
+  'invalid_credentials',
+  'license_revoked',
+  'license_inactive',
+  'activation_inactive',
+]);
+
+/** The record without an intent the service refused before any provider call; otherwise the same record. */
+export function dropUnpayable(saved: LicenceRecord, error: unknown): LicenceRecord {
+  if (
+    !(error instanceof LicenceServiceError) ||
+    !UNPAYABLE_CHECKOUT_CODES.has(error.code) ||
+    saved.payment === undefined ||
+    saved.payment.order !== undefined
+  )
+    return saved;
+  const { payment: _payment, ...withoutPayment } = saved;
+  return withoutPayment;
+}
 
 export function isLicenceCheckoutOperation(value: unknown): value is 'purchase' | 'renewal' {
   return value === 'purchase' || value === 'renewal';

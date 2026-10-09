@@ -87,6 +87,8 @@ test('verified configuration opens the exact transaction; browser success never 
     Environment: { set: (value) => calls.push(['environment', value]) },
     Initialize: (options) => {
       callback = options.eventCallback;
+      // The payment-link checkout Paddle.js opens by itself inherits these defaults.
+      assert.deepEqual(options.checkout, { settings: { showAddDiscounts: false } });
       calls.push(['initialize', options.token]);
     },
     Checkout: { open: (options) => calls.push(['open', options]) },

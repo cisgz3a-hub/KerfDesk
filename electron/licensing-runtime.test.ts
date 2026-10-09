@@ -532,6 +532,43 @@ describe('main-owned payment proof', () => {
     expect(h.saved()?.payment).toBeUndefined();
     expect(h.saved()?.credential).toBeDefined();
   });
+  it('forgets an intent the service refused before contacting the provider, so the trial stays offered', async () => {
+    const h = harness();
+    h.fetch.mockResolvedValue(
+      Response.json({ error: { code: 'payment_provider_not_configured' } }, { status: 503 }),
+    );
+    const refused = await h.runtime.checkout('purchase');
+    expect(refused).toMatchObject({
+      state: 'activation-required',
+      paymentPending: false,
+      paymentOrderId: null,
+    });
+    expect(refused.message).toContain('not available yet');
+    expect(h.saved()?.payment).toBeUndefined();
+    expect(h.openCheckout).not.toHaveBeenCalled();
+  });
+  it('keeps a saved order when the provider is later switched off, so the payment can still be claimed', async () => {
+    const h = harness();
+    h.fetch.mockResolvedValueOnce(
+      Response.json({
+        orderId: 'order-1',
+        claimToken: token,
+        checkoutUrl,
+        amount: 4950,
+        currency: 'USD',
+      }),
+    );
+    await h.runtime.checkout('purchase');
+    h.fetch.mockResolvedValue(
+      Response.json({ error: { code: 'payment_provider_not_configured' } }, { status: 503 }),
+    );
+    // Reopening the saved checkout needs no service call; the order survives either way.
+    expect(await h.runtime.checkout('purchase')).toMatchObject({
+      paymentPending: true,
+      paymentOrderId: 'order-1',
+    });
+    expect(h.saved()?.payment?.order?.orderId).toBe('order-1');
+  });
   it('does not discard an order when paid activation fails but an old trial is still usable', async () => {
     const h = harness(
       saved(
@@ -557,6 +594,41 @@ describe('main-owned payment proof', () => {
     await h.runtime.checkout('purchase');
     expect(await h.runtime.claimPayment()).toMatchObject({ paymentPending: true, tier: 'trial' });
     expect(h.saved()?.payment).toBeDefined();
+  });
+});
+
+describe('managing the licence’s devices', () => {
+  const KEY = `KD1.${'0'.repeat(8)}-0000-0000-0000-${'0'.repeat(12)}.${'a'.repeat(43)}`;
+  it('lists and frees seats with the saved key, without touching this device’s licence', async () => {
+    const h = harness({ ...saved(), licenseKey: KEY });
+    h.fetch.mockImplementation(async (url, init) => {
+      const body = JSON.parse(String(init.body));
+      expect(body.licenseKey).toBe(KEY);
+      if (url.endsWith('/v1/licenses/deactivate')) {
+        expect(body.activationId).toBe('act-2');
+        return Response.json({ deactivated: true });
+      }
+      expect(url.endsWith('/v1/licenses/activations')).toBe(true);
+      return Response.json({
+        activations: [{ activationId: 'act-2', deviceName: 'Old laptop', createdAt: 1 }],
+      });
+    });
+    expect(await h.runtime.devices()).toEqual({
+      devices: [{ activationId: 'act-2', deviceName: 'Old laptop', createdAt: 1 }],
+      message: null,
+    });
+    const released = await h.runtime.releaseDevice('act-2');
+    expect(released.message).toContain('seat is free');
+    expect(h.store.write).not.toHaveBeenCalled();
+    expect(await h.runtime.status()).toMatchObject({ state: 'ready', tier: 'paid' });
+  });
+  it('needs a key: a typed key serves an unlicensed device, and no key asks for one', async () => {
+    const h = harness();
+    h.fetch.mockResolvedValue(Response.json({ activations: [] }));
+    expect(await h.runtime.devices()).toMatchObject({ devices: null });
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(await h.runtime.devices(KEY)).toEqual({ devices: [], message: null });
+    expect(JSON.parse(String(h.fetch.mock.calls[0]?.[1].body))).toEqual({ licenseKey: KEY });
   });
 });
 

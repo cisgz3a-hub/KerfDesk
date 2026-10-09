@@ -20,8 +20,13 @@ import {
   REVOKED,
   staleOrderMessage,
 } from './licensing-messages.js';
-import { prepareLicenceCheckout, claimLicencePayment } from './licensing-commerce.js';
+import {
+  prepareLicenceCheckout,
+  claimLicencePayment,
+  dropUnpayable,
+} from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
+import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
 import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
 import {
@@ -341,12 +346,12 @@ class LicensingService {
           message: MESSAGES.checkoutOpened,
         };
       } catch (error) {
-        return {
-          ...this.evaluate((await this.options.store.read()) ?? saved, device),
-          message: checkoutFailureMessage(error),
-        };
+        const stored = (await this.options.store.read()) ?? saved;
+        const forgotten = dropUnpayable(stored, error);
+        if (forgotten !== stored) await this.write(forgotten, device);
+        return { ...this.evaluate(forgotten, device), message: checkoutFailureMessage(error) };
       }
-    });
+    }, true);
   readonly claimPayment = () =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
@@ -391,6 +396,11 @@ class LicensingService {
       await this.write(withoutPayment, device);
       return { ...this.evaluate(withoutPayment, device), message: MESSAGES.orderForgotten };
     }, true);
+  readonly devices = (licenseKey?: string) => this.manageDevices({ licenseKey });
+  readonly releaseDevice = (activationId: string, licenseKey?: string) =>
+    this.manageDevices({ licenseKey, activationId });
+  private readonly manageDevices = (input: DeviceInput) =>
+    this.serial(() => manageLicenceDevices(this.options.store, this.request, input));
   readonly isReleaseEligible = (releaseEnvelope: unknown, expectedVersion: string) =>
     this.serial(async () => {
       if (this.config.channel !== 'commercial') return false;

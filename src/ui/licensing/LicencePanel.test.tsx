@@ -222,3 +222,55 @@ it('offers Reset beside Retry while a deactivation is stuck (ADR-523 Amendment 2
   await act(async () => named('Reset saved licence')?.click());
   expect(adapter.resetStore).toHaveBeenCalledOnce();
 });
+
+it('lets the key’s owner see and free the licence’s seats (Manage devices)', async () => {
+  const adapter = client(offered(false));
+  const listed = {
+    devices: [
+      { activationId: 'act-1', deviceName: 'Windows computer', createdAt: 1_800_000_000 },
+      { activationId: 'act-2', deviceName: 'Old laptop', createdAt: 1_800_000_500 },
+    ],
+    message: null,
+  };
+  const devices = vi.fn(async () => listed);
+  const releaseDevice = vi.fn(async () => ({
+    devices: listed.devices.slice(0, 1),
+    message: 'That computer was removed from the licence. Its seat is free for another device.',
+  }));
+  const paid: LicenceStatus = {
+    ...free,
+    state: 'ready',
+    tier: 'paid',
+    edition: 'pro',
+    licenseKey: 'synthetic-saved-key',
+  };
+  await show({ ...adapter, devices, releaseDevice }, paid);
+  await act(async () => button('Manage devices').click());
+  expect(devices).toHaveBeenCalledExactlyOnceWith(undefined);
+  expect(host.textContent).toContain('Old laptop');
+  const remove = () =>
+    [...host.querySelectorAll('li')]
+      .find((item) => item.textContent?.includes('Old laptop'))
+      ?.querySelector('button');
+  await act(async () => remove()?.click());
+  expect(releaseDevice).not.toHaveBeenCalled();
+  expect(remove()?.textContent).toBe('Yes, remove it');
+  await act(async () => remove()?.click());
+  expect(releaseDevice).toHaveBeenCalledExactlyOnceWith('act-2', undefined);
+  expect(host.textContent).not.toContain('Old laptop');
+  expect(host.textContent).toContain('seat is free for another device');
+});
+
+it('manages devices with a typed key when none is saved, and hides the option without a key or adapter support', async () => {
+  const adapter = client(offered(false));
+  const devices = vi.fn(async () => ({ devices: [], message: null }));
+  const releaseDevice = vi.fn(async () => ({ devices: [], message: null }));
+  await show({ ...adapter, devices, releaseDevice });
+  expect(button('Manage devices')).toBeUndefined();
+  await enterKey('synthetic-typed-key');
+  await act(async () => button('Manage devices').click());
+  expect(devices).toHaveBeenCalledExactlyOnceWith('synthetic-typed-key');
+  expect(host.textContent).toContain('not active on any computer');
+  await show(adapter, { ...free, licenseKey: 'synthetic-saved-key' });
+  expect(button('Manage devices')).toBeUndefined();
+});

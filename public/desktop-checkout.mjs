@@ -35,8 +35,12 @@ async function openCheckout(window, config, transaction, onCompleted) {
     if (!paddle?.Initialize || !paddle?.Checkout?.open) throw new Error('Checkout unavailable');
     session = { token: config.token, environment: config.environment, onCompleted };
     if (config.environment === 'sandbox') paddle.Environment.set('sandbox');
+    // Paddle.js also opens a checkout by itself for the `_ptxn` payment link and
+    // takes these defaults for it. The service refuses any discounted payment, so
+    // no checkout opened on this page may offer a discount field.
     paddle.Initialize({
       token: config.token,
+      checkout: { settings: { showAddDiscounts: false } },
       eventCallback: (event) => {
         if (event.name === 'checkout.completed') session.onCompleted();
       },
