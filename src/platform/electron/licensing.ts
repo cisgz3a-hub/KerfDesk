@@ -246,6 +246,7 @@ export function createDesktopLicenceAdapter(
       request('checkout', { operation, ...(licenseKey === undefined ? {} : { licenseKey }) }),
     claimPayment: () => request('claim-payment', {}),
     discardPayment: () => request('discard-payment', {}),
+    openPurchasePage: () => request('open-purchase-page', {}),
     earlyUpdates: async () => parseEarlyUpdates(await send('early-updates')),
     setEarlyUpdates: async (enabled) => parseEarlyUpdates(await send('early-updates', { enabled })),
     updateStatus: () => update('update-status'),

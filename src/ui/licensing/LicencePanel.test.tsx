@@ -274,3 +274,20 @@ it('manages devices with a typed key when none is saved, and hides the option wi
   await show(adapter, { ...free, licenseKey: 'synthetic-saved-key' });
   expect(button('Manage devices')).toBeUndefined();
 });
+
+it('Buy Pro opens the purchase page itself, while Renew updates still starts in the app', async () => {
+  const adapter = client(offered(false));
+  const openPurchasePage = vi.fn(async () => ({
+    ...free,
+    message: 'The KerfDesk purchase page opened in your browser.',
+  }));
+  await show({ ...adapter, openPurchasePage });
+  await act(async () => button('Buy Pro · US$49.50 plus tax').click());
+  expect(openPurchasePage).toHaveBeenCalledOnce();
+  expect(adapter.checkout).not.toHaveBeenCalled();
+  const paid: LicenceStatus = { ...free, state: 'ready', tier: 'paid', edition: 'pro' };
+  await show({ ...adapter, openPurchasePage }, paid);
+  await act(async () => button('Renew updates · US$20 plus tax').click());
+  expect(adapter.checkout).toHaveBeenCalledExactlyOnceWith('renewal');
+  expect(openPurchasePage).toHaveBeenCalledOnce();
+});

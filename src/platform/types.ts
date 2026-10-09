@@ -67,6 +67,8 @@ export type LicenceAdapter = {
   ) => Promise<LicenceStatus>;
   readonly claimPayment: () => Promise<LicenceStatus>;
   readonly discardPayment: () => Promise<LicenceStatus>;
+  /** Buy Pro: opens the purchase page in the browser; the buyer then enters the key here. */
+  readonly openPurchasePage?: () => Promise<LicenceStatus>;
   readonly earlyUpdates: () => Promise<EarlyUpdates>;
   readonly setEarlyUpdates: (enabled: boolean) => Promise<EarlyUpdates>;
   /** Where this device's own updates stand (ADR-547). */

@@ -132,6 +132,7 @@ async function dispatch(
     deactivate: runtime.deactivate,
     reset: runtime.resetStore,
     'claim-payment': runtime.claimPayment,
+    'open-purchase-page': runtime.openPurchasePage,
     'discard-payment': runtime.discardPayment,
   };
   return Object.hasOwn(actions, action)

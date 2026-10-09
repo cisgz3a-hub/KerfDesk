@@ -1,6 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { LicenceServiceError } from './licensing-http.js';
 import { record } from './licensing-verification.js';
+import type { LicensingConfig } from './licensing-config.js';
+import type { LicenceStatus } from './licensing-status.js';
 import type { LicenceRecord, LicensingStore } from './licensing-store.js';
 import { SANDBOX_ORIGIN } from '../public/desktop-sandbox-contract.mjs';
 
@@ -51,6 +53,41 @@ export function dropUnpayable(saved: LicenceRecord, error: unknown): LicenceReco
     return saved;
   const { payment: _payment, ...withoutPayment } = saved;
   return withoutPayment;
+}
+
+/**
+ * Buy Pro opens the first-party purchase page itself (owner's choice, 2026-10-09).
+ * The page creates and claims the order in the browser and shows the key, which
+ * the buyer then enters in Help > Licence; no order is saved on this device.
+ * Renewals still start in the app, because the browser page is purchase-only.
+ */
+export function purchasePageUrl(sandbox = false): string {
+  return `${sandbox ? SANDBOX_ORIGIN : 'https://kerfdesk.com'}/buy.html`;
+}
+
+export const PURCHASE_PAGE_OPENED =
+  'The KerfDesk purchase page opened in your browser. After paying, copy the licence key it shows and enter it here under Licence key.';
+const PURCHASE_PAGE_FAILED =
+  'The purchase page could not be opened. Visit https://kerfdesk.com/buy in your browser, then enter your licence key here.';
+
+export async function openPurchasePage(
+  opener: { readonly openPurchasePage?: (url: string) => Promise<void> },
+  config: LicensingConfig,
+  status: LicenceStatus,
+): Promise<LicenceStatus> {
+  if (
+    config.channel !== 'commercial' ||
+    status.state === 'unavailable' ||
+    status.tier === 'developer'
+  )
+    return status;
+  try {
+    if (opener.openPurchasePage === undefined) throw new Error('Purchase page unavailable');
+    await opener.openPurchasePage(purchasePageUrl(config.sandbox === true));
+    return { ...status, message: PURCHASE_PAGE_OPENED };
+  } catch {
+    return { ...status, message: PURCHASE_PAGE_FAILED };
+  }
 }
 
 export function isLicenceCheckoutOperation(value: unknown): value is 'purchase' | 'renewal' {

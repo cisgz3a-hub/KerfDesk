@@ -24,6 +24,7 @@ import {
   prepareLicenceCheckout,
   claimLicencePayment,
   dropUnpayable,
+  openPurchasePage,
 } from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
@@ -33,7 +34,7 @@ import {
   activationBody,
   grantedRecord,
   grantRequest,
-  requireActivationBody,
+  renewalIdentity,
   verifyGrant,
   type GrantAction,
   type VerifiedGrant,
@@ -53,6 +54,7 @@ type RuntimeOptions = {
   readonly deviceName: string;
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>;
   readonly openCheckout?: (url: string) => Promise<void>;
+  readonly openPurchasePage?: (url: string) => Promise<void>;
   readonly now?: () => number;
 };
 
@@ -312,6 +314,9 @@ class LicensingService {
       if (this.config.channel !== 'commercial') return this.readStatus();
       return resetSavedLicence(this.access(), this.options.store);
     }, true);
+  /** Buy Pro: the purchase page itself, in the browser; nothing is saved here. */
+  readonly openPurchasePage = () =>
+    this.safe(async () => openPurchasePage(this.options, this.config, await this.readStatus()));
   readonly checkout = (operation: 'purchase' | 'renewal', licenseKey?: string) =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
@@ -339,7 +344,7 @@ class LicensingService {
           operation,
           licenseKey,
           true,
-          this.renewalIdentity(operation, saved, device),
+          renewalIdentity(this.config, operation, saved, device),
         );
         return {
           ...this.evaluate((await this.options.store.read()) ?? saved, device),
@@ -426,10 +431,6 @@ class LicensingService {
     this.config.channel === 'commercial' &&
     this.proLatched &&
     (this.trialClock === null || this.trialNow() < this.trialClock.expiresAt);
-  private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
-    operation === 'renewal' && saved.credential !== undefined
-      ? requireActivationBody(this.config, saved.credential, device)
-      : undefined;
 }
 
 export type LicensingRuntime = ReturnType<typeof createLicensingRuntime>;

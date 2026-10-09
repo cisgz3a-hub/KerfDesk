@@ -48,6 +48,18 @@ export function requireActivationBody(
   return body;
 }
 
+/** A renewal checkout names this device's seat; a purchase or an unactivated device names nothing. */
+export function renewalIdentity(
+  config: LicensingConfig,
+  operation: string,
+  saved: LicenceRecord,
+  device: string,
+): ActivationBody | undefined {
+  return operation === 'renewal' && saved.credential !== undefined
+    ? requireActivationBody(config, saved.credential, device)
+    : undefined;
+}
+
 /** The service call for an action, or null when a refresh has nothing to refresh. */
 export function grantRequest(
   config: LicensingConfig,

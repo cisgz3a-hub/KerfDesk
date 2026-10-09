@@ -446,6 +446,40 @@ describe('licence key and recovery (ADR-523 Amendment 1)', () => {
   });
 });
 
+describe('Buy Pro opens the purchase page', () => {
+  it('opens only the first-party purchase page, saves no order and makes no service call', async () => {
+    const h = harness();
+    const openPurchasePage = vi.fn(async (_url: string) => undefined);
+    const runtime = createLicensingRuntime({ ...h.options, openPurchasePage });
+    const result = await runtime.openPurchasePage();
+    expect(openPurchasePage).toHaveBeenCalledExactlyOnceWith('https://kerfdesk.com/buy.html');
+    expect(result).toMatchObject({ state: 'activation-required', paymentPending: false });
+    expect(result.message).toContain('enter it here');
+    expect(h.fetch).not.toHaveBeenCalled();
+    expect(h.saved()).toBeNull();
+  });
+  it('tells the buyer the address when the browser cannot be opened, and offers nothing to a developer licence', async () => {
+    const h = harness();
+    const failing = createLicensingRuntime({
+      ...h.options,
+      openPurchasePage: async () => {
+        throw new Error('no browser');
+      },
+    });
+    expect((await failing.openPurchasePage()).message).toContain('https://kerfdesk.com/buy');
+    const developer = harness(
+      saved(claims({ tier: 'developer', updatesUntil: null, perpetualUpdates: true })),
+    );
+    const open = vi.fn(async (_url: string) => undefined);
+    const result = await createLicensingRuntime({
+      ...developer.options,
+      openPurchasePage: open,
+    }).openPurchasePage();
+    expect(open).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ tier: 'developer', message: null });
+  });
+});
+
 describe('main-owned payment proof', () => {
   it('persists the idempotency key and order proof before opening only the approved checkout page', async () => {
     const h = harness();

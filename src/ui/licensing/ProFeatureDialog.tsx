@@ -2,12 +2,8 @@ import { useState, type FormEvent } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { Button, Dialog, DialogActions } from '../kit';
 import { LicenceActivationForm, licenceMuted } from './LicenceControls';
-import {
-  PRO_FEATURES,
-  PRO_PRICE_LABEL,
-  RENEWAL_PRICE_LABEL,
-  type ProFeature,
-} from './pro-features';
+import { PRO_FEATURES, PRO_PRICE_LABEL, type ProFeature } from './pro-features';
+import { purchaseLabel, purchaseTitle, startPurchase } from './purchase-action';
 
 type Props = {
   readonly feature: ProFeature;
@@ -98,7 +94,6 @@ function UnlockButtons({
   readonly run: (work: () => Promise<LicenceStatus>) => Promise<void>;
 }): JSX.Element {
   const trial = offersTrial(status);
-  const renewal = status.tier === 'paid';
   return (
     <>
       {trial ? (
@@ -115,9 +110,10 @@ function UnlockButtons({
         <Button
           variant={trial ? 'default' : 'primary'}
           disabled={busy}
-          onClick={() => void run(() => client.checkout(renewal ? 'renewal' : 'purchase'))}
+          onClick={() => void run(() => startPurchase(client, status))}
+          title={purchaseTitle(status)}
         >
-          {renewal ? `Renew updates · ${RENEWAL_PRICE_LABEL}` : `Buy Pro · ${PRO_PRICE_LABEL}`}
+          {purchaseLabel(status)}
         </Button>
       ) : null}
     </>
