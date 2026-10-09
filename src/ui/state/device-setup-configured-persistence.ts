@@ -1,6 +1,6 @@
 // Cross-session record of which machine-profile signatures the operator has run
-// through the Device Setup wizard (FU-4). Drives only the passive "set up this
-// machine" nudge — it never auto-opens anything. App-level state (not part of
+// through the Device Setup wizard (FU-4). Drives the passive setup nudge and
+// first-time setup on an explicit Connect click. App-level state (not part of
 // the .lf2 project), so it lives in localStorage beside the other app slots.
 // Storage is injected so the logic is testable without globals; reads/writes
 // fail soft (return empty / false) so a quota or parse error never breaks a

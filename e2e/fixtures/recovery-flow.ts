@@ -3,7 +3,11 @@
 // fixture, hold acknowledgements so a disconnect lands at a chosen line, and
 // probe the live stores through the same module instances the app uses.
 
-import { expandMachineUtilities, selectWorkspacePanel } from './workspace-ui';
+import {
+  connectMachineAndDismissFirstSetup,
+  machineJogAction,
+  selectWorkspacePanel,
+} from './workspace-ui';
 import { expect, type KerfDeskFixture, type Locator, type Page } from './kerfdesk-test';
 import {
   acknowledgeStartOverrideFence,
@@ -278,7 +282,7 @@ export async function connectAndHome(
   options: { readonly closeRecoveryReview?: boolean } = {},
 ): Promise<void> {
   await selectWorkspacePanel(page, 'Machine');
-  await page.getByRole('button', { name: /^Connect/ }).click();
+  await connectMachineAndDismissFirstSetup(page);
   await expect(page.getByText('State: Idle', { exact: true })).toBeVisible();
   if (options.closeRecoveryReview) {
     // Reconnect opens this review once per interrupted run (ADR-341 Amendment 6).
@@ -288,11 +292,11 @@ export async function connectAndHome(
     await review.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(review).not.toBeVisible();
   }
-  await expandMachineUtilities(page);
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
+  const home = machineJogAction(page, 'Home');
+  await home.click();
   await expect.poll(async () => serialWrites(await kerfdesk.events())).toContain('G4 P0.01');
   await kerfdesk.emitSerialLine(IDLE);
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeEnabled();
+  await expect(home).toBeEnabled();
 }
 
 export function serialWrites(events: FixtureEvents): string {

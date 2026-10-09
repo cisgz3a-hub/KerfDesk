@@ -139,7 +139,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 - **Narrow windows**: below 960 px wide, the workspace always uses the single Compact sidebar, including when Spacious is selected. The saved Spacious preference takes effect again when the window is wide enough. Layout changes preserve the panels' existing controls and job workflow.
 - **CNC Canvas Focus**: has no effect. It collapsed the CNC 3D result pane by default when the viewport was 1439 px wide or less (ADR-223), and that pane has not been shown since 2026-08-03 (F-CNC28).
 - **Left tool strip (ADR-051)**: the default strip is 50 px wide and scrolls on short windows. Edit and Draw groups retain Select, Text, Node, Measure, the drawing tools (Rectangle, Ellipse, Polygon, Star, Pen), Position-laser, and named icon buttons for the design library and Design Studio (ADR-272, flows F-DS1..F-DS4). Curve-node actions remain beside the editing tools with readable labels. Preview is in the primary toolbar, with a More fallback at narrow widths, and the Window menu.
-- **Machine-panel hierarchy (ADR-340)**: jog and origin controls remain together in the working area. Homing/focus or CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air OFF uses a quiet state card; its setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
+- **Machine-panel hierarchy (ADR-340, ADR-420 Amendment 2)**: beside the jog arrows, a compact column holds Manual Air, Home or its setup entry, laser Auto-focus or its setup entry, and Set origin here. CNC keeps Home and Set origin when Manual Air is hidden, and still offers OFF for air left on in Laser mode. Reset/persistent-origin and Release motors remain in the lower tools; CNC maintenance, placement/output, history/recovery, and Console use named disclosures. Active interruption notices, repeat offers and the canonical Live Motion controls remain independent of those disclosures. Manual Air's setup guidance and switching behaviour are unchanged. Tutorial buttons no longer sit beside positioning, origin or Frame/Start: lessons live in Learn and on the tool panels that teach a procedure (ADR-348).
 - **After a job completes (ADR-340)**: the job dock shows **Job complete** and **Done** after controller settlement. Done clears only the finished run preview. The editable design, undo history, machine coordinates, Frame state and stored execution history remain intact. Run same job again remains offered while its receipt still matches the job, and like Start it needs a fresh Frame (ADR-372 Amendment 1). Acknowledged-but-finishing, active and interrupted jobs do not offer Done. Clearing a design is still a separate project/editing action.
 - **Workspace colours**: panels, drawing bed, grid, rulers and controls use the application appearance preference, defaulting to Light. Window > Appearance offers Light, Dark and Match System (ADR-339). Dark mode uses the approved charcoal drawing surface and light, readable vector ink. Contrast adjustments happen only while drawing the workspace; saved artwork, raster pixels, exported files and machine output retain their original colours and settings. The layout menu uses the same themed surface as the rest of the workspace.
 - **Notifications**: transient messages stay within the available canvas area, clear of the job dock, Live Motion bar, and zoom controls. An open modal gives notifications a reserved scrolling row so they do not cover its actions. Message lifetimes and dismissal controls are unchanged.
@@ -3100,6 +3100,12 @@ Setup has three visible stages for both Laser and CNC (ADR-240/306, amended 2026
 The stage buttons and Back/Next remain available while a draft needs corrections. Only **Save
 machine setup** requires valid configuration; review cards link back to the relevant fields.
 Connecting a controller is optional, so a complete setup can be saved offline.
+Pressing **Connect** for a profile that has not completed setup opens the Machine
+stage immediately and starts the normal connection in the same click. The saved
+record is per machine profile and Laser/CNC head. Only **Save machine setup**
+completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
+Configured profiles connect directly. Automatic connections and recovery Reconnect
+keep their existing behavior and do not open setup (ADR-420 Amendment 3).
 The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
 profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
 **Check essentials** remains available to edit values first. Neither selecting the shortcut nor
@@ -3797,9 +3803,9 @@ head to one of its corners, and run the next job relative to that
 physical point — without moving the workpiece to the machine origin.
 Matches LightBurn's "Set Job Origin to Current Position" UX.
 
-**Where in the UI.** New `OriginRow` in the Laser panel, between the
-existing SetupRow (Home / Auto-focus / Frame / Start) and the
-streaming controls. Two buttons:
+**Where in the UI.** **Set origin here** sits below Manual Air, Home and Auto-focus
+beside the jog arrows. The lower Origin tools retain Reset origin, Go to work zero,
+Release motors and Advanced origin. The two ordinary origin actions are:
 
 - **Set origin here** — on GRBL-family controllers sends `G54 G92 X0 Y0`. Declares the current head
   position as work-coord (0, 0). Toast confirms the controller's `ok`

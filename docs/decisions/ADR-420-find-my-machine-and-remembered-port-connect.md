@@ -132,6 +132,37 @@ scroller replaces the two regions so the controls remain reachable. The existing
 dock stays outside those scrollers. Connection actions, jog cancellation, ordinary workspace
 shortcuts, qualification, output and the ADR-565 Frame/Start contract are unchanged.
 
+The maintainer's 2026-10-09 refinement places a smaller Manual Air toggle above Home,
+laser Auto-focus and Set origin in a compact column beside the jog arrows. Existing
+action handlers, setup links and busy states are shared with standalone controls.
+Origin utilities and CNC maintenance remain in the lower tools; air setup notices
+span the jog area's full width and the optional hold-to-Fire control remains reachable.
+CNC omits laser Auto-focus and retains Home and Set origin when manual air is hidden.
+
+#### Amendment 3 - Explicit first Connect opens Machine Setup (2026-10-09)
+
+The maintainer requested that pressing Connect open Machine Setup for a machine
+that has not been set up yet. Explicit toolbar, menu and network Connect actions
+read the existing saved completion record for the current profile and selected
+Laser/CNC head. An unfinished profile opens the global Machine stage immediately,
+and the same click starts the normal connection with the current profile's
+controller, baud and streaming options. Connection is not deferred to an effect
+or to saving setup, so a USB port request retains the original user gesture.
+
+Only Save machine setup records completion. Cancelling setup or cancelling or
+failing a connection leaves the next explicit Connect eligible to open setup.
+Saved completion survives restart and is separate for Laser and CNC; a different
+profile, bed size or controller uses its own existing signature. The record is
+logical profile history, not a physical USB serial identity. An already-open
+setup draft is retained rather than replaced by another Connect action.
+Opening first-time setup from the FluidNC details form dismisses that popover;
+closing setup returns keyboard focus to its stable machine-name trigger.
+
+Automatic connection, replug, recovery Reconnect and setup's Find continue using
+their existing transport paths. They do not launch or reset a setup dialog. No
+controller setting is written by opening setup or connecting, and the existing
+draft Save, explicit firmware-write consent and Frame/Start contracts remain.
+
 #### Existing consequences
 
 - On Windows, and for adapters with a USB serial number elsewhere, a machine set up once connects
@@ -141,8 +172,9 @@ shortcuts, qualification, output and the ADR-565 Frame/Start contract are unchan
   Installing a device permission handler that grants the remembered adapter across runs would
   lift that, and is left for a decision that amends ADR-366 (amended by ADR-552: the Windows
   desktop app remembers picks as Chrome does; macOS and Linux still ask after a restart).
-- A first-time setup is: open Machine Setup, press **Find my machine**, pick the port once, check
-  the filled values, Next. The capability cards and catalog stay below for the offline path.
+- A first-time Connect opens Machine Setup: pick the port once, check the filled
+  values or select a catalog profile, then save. Opening Machine Setup directly
+  retains Find my machine and the offline capability cards and catalog.
 - `DeviceSetupAutoDetect` is deleted; its readback list and apply action live in
   `DeviceSetupFoundMachine`. The controller contract fields move from `DeviceSetupIdentifyStep` to
   `DeviceSetupConnectionOptions`, unchanged.

@@ -11,9 +11,10 @@ type Props = {
   readonly onConfigureAutofocus: () => void;
   readonly onConfigureHoming: () => void;
   readonly compact?: boolean;
+  readonly jog?: boolean;
 };
 
-/** Home and autofocus remain in the machine panel when job actions move to the dock. */
+/** Shared Home and autofocus actions for the jog column and standalone job controls. */
 export function JobSetupControls(props: Props): JSX.Element {
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
   const machineKind = useStore((s) => s.project.machine?.kind ?? 'laser');
@@ -31,6 +32,7 @@ export function JobSetupControls(props: Props): JSX.Element {
         streaming={props.streaming}
         homingEnabled={homingEnabled}
         command={homeCommand}
+        jog={props.jog}
       />
       {machineKind !== 'cnc' && (
         <AutofocusButton
@@ -40,6 +42,7 @@ export function JobSetupControls(props: Props): JSX.Element {
           onConfigure={props.onConfigureAutofocus}
           onRun={onAutofocus}
           compact={props.compact}
+          jog={props.jog}
         />
       )}
     </>
@@ -64,12 +67,13 @@ function HomeButton(props: {
   readonly streaming: boolean;
   readonly homingEnabled: boolean;
   readonly command: string | null;
+  readonly jog: boolean | undefined;
 }): JSX.Element {
   if (!props.homingEnabled) {
     return (
       <button
         type="button"
-        className="lf-btn"
+        className={props.jog ? 'lf-btn lf-jog-home' : 'lf-btn'}
         onClick={props.onConfigureHoming}
         disabled={props.streaming}
         title="Homing is off for this machine. Open Machine Setup to configure Home."
@@ -81,7 +85,7 @@ function HomeButton(props: {
   return (
     <button
       type="button"
-      className="lf-btn"
+      className={props.jog ? 'lf-btn lf-jog-home' : 'lf-btn'}
       onClick={props.onHome}
       disabled={props.busy}
       title={
@@ -102,12 +106,13 @@ function AutofocusButton(props: {
   readonly onConfigure: () => void;
   readonly onRun: () => void;
   readonly compact: boolean | undefined;
+  readonly jog: boolean | undefined;
 }): JSX.Element {
   return (
     <button
       type="button"
-      className="lf-btn"
-      style={props.compact ? undefined : gridFullRowStyle}
+      className={props.jog ? 'lf-btn lf-jog-autofocus' : 'lf-btn'}
+      style={props.compact || props.jog ? undefined : gridFullRowStyle}
       onClick={props.needsSetup ? props.onConfigure : props.onRun}
       disabled={props.needsSetup ? props.streaming : props.busy}
       title={

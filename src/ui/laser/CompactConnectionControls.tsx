@@ -16,6 +16,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const popoverId = useId();
+  const triggerId = `${popoverId}-trigger`;
   useRetainedDetailsFocus(open, popoverId);
   const close = useCallback(() => setOpen(false), []);
   const closeAndFocus = (): void => {
@@ -32,6 +33,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
       >
         <button
           ref={triggerRef}
+          id={triggerId}
           type="button"
           className="lf-btn lf-connection-machine-trigger"
           aria-label={`Machine details: ${props.machineName}, ${props.status}`}
@@ -64,6 +66,7 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           label="Machine details"
           role="dialog"
           anchorRef={triggerRef}
+          focusFallbackId={triggerId}
           className="lf-connection-machine-popover"
           initialFocus="select:not(:disabled), button:not(:disabled)"
           closeOnTab={false}
