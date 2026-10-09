@@ -55,7 +55,7 @@ function render(node: ReactNode): void {
 }
 function button(text: string): HTMLButtonElement {
   const node = [...host.querySelectorAll('button')].find(
-    (item) => item.textContent?.trim() === text,
+    (item) => item.textContent?.trim() === text || item.getAttribute('aria-label') === text,
   );
   if (!node) throw new Error(`Missing button: ${text}`);
   return node;
