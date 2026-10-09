@@ -35,11 +35,17 @@ function currentOwner(relief: HeightfieldReliefObject, epoch: number): boolean {
   );
 }
 async function prepareCandidate(
-  candidate: ReliefAuthoringDocument,
+  requested: ReliefAuthoringDocument,
   previewOnly: boolean,
   context: CompositionContext,
 ): Promise<void> {
   const { relief, epoch, request, setBusy, setProgress, setMessage, setPreview } = context;
+  // This path owns explicit edits. Loading and automatic linked refresh retain
+  // the saved interpretation until the operator chooses to edit the relief.
+  const candidate: ReliefAuthoringDocument = {
+    ...requested,
+    algorithmRevision: 'retained-relief-v2',
+  };
   request.current?.abort();
   const controller = new AbortController();
   request.current = controller;
