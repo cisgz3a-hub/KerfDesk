@@ -1,0 +1,556 @@
+{
+  "sector": 7,
+  "categories": [
+    {
+      "id": "7.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "Laser-only: no CNC profile toolpaths. LightBurn Software ships MillMage as its separate CNC product ('MillMage brings LightBurn's design, layout, job planning, and machine-control capabilities to the world of CNC routing').",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ (modes are laser Line/Fill/Offset Fill/Image; no milling operations)" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Full documented control set: Along Line/Inside/Outside, Conventional/Climb, four entry methods (plunge, zig-zag ramp, spiral, helical), Direct/Trochoidal strategies, Stock to Leave. Breadth near VCarve for 2D profiling; no community quality consensus yet (product is 0.x).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/Profile/" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "Laser-only GRBL sender/engraver (raster image and vector laser G-code); no milling toolpath generation of any kind.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "xTool Studio (XCS successor) drives xTool laser and blade-cutting machines only; no CNC milling/routing support found. The only 'CNC'-branded xTool device is a laser metal cutter, not a mill.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio; MetalFab 'CNC Cutter' is a laser machine (https://support.xtool.com/article/2108)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Cut path on/outside/inside path plus pocket fill; tool-radius offset applied automatically. No climb/conventional or strategy control documented; community frames Easel toolpaths as simplified for casual users.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/6380072052371-How-to-change-the-Cut-Path" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/vectric-vcarve-vs-easel-which-cnc-software-is-right-for-you" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/carbide-vs-easel/95708" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Contour toolpath with No Offset/Inside/Outside and tabs in the free tier; ramp entry is Pro-only; climb/conventional choice not documented. Community comparisons call the toolpath options bare-bones next to VCarve.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/toolpaths/" },
+            { "tag": "OFF", "cite": "https://guides.carbide3d.com/files/pdf/carbide-create-v5.pdf" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/carbide-create-pro-vs-vcarve-pro/62494" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Reference-grade 2D Profile: climb/conventional selection, lead-in/out, ramps, tabs, separate last pass, start-point control. Community consensus rates VCarve profiling control above Carbide Create and Easel.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/uiProfileMachineForm/index.html" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/best-paid-cam-software-for-cnc-routers-easel-pro-vs-carveco-vs-vectric-vcarve-vs-fusion-360-pro" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "Its Fill mode is laser hatch-filling, not material-removal pocketing with stepover/stepdown; no CNC pocket operation exists.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Pocket plus Rest Pocket (rest machining for areas a larger tool cannot reach); stepover and depth-per-pass driven from tool library; conventional/climb per operation.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/ToolLibrary/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No pocketing; laser-only sender with no milling operations.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No CNC milling support in XCS or xTool Studio; pocketing does not apply.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "'Clear out a pocket' fill option carves the interior of a shape; no documented stepover, strategy, or multi-tool clearance controls — pocketing is deliberately simplified.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/6380072052371-How-to-change-the-Cut-Path" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/vectric-vcarve-vs-easel-which-cnc-software-is-right-for-you" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/carbide-vs-easel/95708" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Pocket toolpath with depth-per-pass in free tier; Rest Machining (secondary smaller cutter) is Pro-only. Community notes fewer strategy controls than VCarve.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/toolpaths/" },
+            { "tag": "OFF", "cite": "https://carbide3d.com/carbidecreate/pro/" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/carbide-create-pro-vs-vcarve-pro/62494" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Pocketing toolpath with offset/raster strategies and separate clearance plus finishing tools; community cites multi-tool pocketing as a concrete advantage over Carbide Create.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/uiPocketMachineForm/" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/best-paid-cam-software-for-cnc-routers-easel-pro-vs-carveco-vs-vectric-vcarve-vs-fusion-360-pro" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "No drilling/peck operations; laser software.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Drill operation with four types (Plunge, Peck, Spot, Countersink), Depth Per Peck, Dwell Time, retract type/distance/rate controls — the widest documented drilling control set in this roster.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/Drill/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No drilling; laser-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No CNC milling support; drilling does not apply.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Drill-hole feature cuts bit-diameter holes using milling bits with chip-clearing plunge/retract cycles at depth-per-pass; hole size is locked to bit diameter; existing circles convertible via an app.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/34669367969683-Drilling-Holes-with-Easel" },
+            { "tag": "OFF", "cite": "https://easel.com/features/drill-holes" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Drill toolpath with full-depth, peck, and peck-with-full-retract styles; choice driven by chip-clearing needs per community guidance.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/blog/carbide-create-527/" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/question-on-drilling-toolpath-options/99379" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/drilling-in-carbide-create-v-530/34429" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Drilling toolpath with peck drilling (Pass Depth from tool database), full retract or relative Retract Gap options, and Dwell Time at each peck bottom.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/Drilling%20Toolpath/index.html" },
+            { "tag": "COMM", "cite": "https://forum.vectric.com/viewtopic.php?t=33541" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "No V-bit carving; laser engraving is a different mechanism (covered in laser sectors).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "Absent at pinned 0.8.02: Fact Sheet lists 'V-Carving (MillMage Pro)' as upcoming; it shipped only in 0.9.00 Early Access (unreleased Pro tier). Chamfer Profile gives V-bit edge chamfers only. Community flags the gap versus VCarve.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/MillMageFactSheet/" },
+            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/millmage-0-9-00-early-access-pro-features-are-here/191036" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/is-millmage-a-true-v-carve-software/187872" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No V-carving; laser-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No CNC milling support; V-bit carving does not apply.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "V-Carve Projects exist but are Pro-tier only ($24/mo); documented as a guided project type rather than a parametric V-carve toolpath with flat-depth control.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848873-Easel-Pro-Feature-V-Carve-Projects" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012849133-Easel-Pro-FAQ-and-Overview" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "V-carve and Advanced V-carve (max-depth-limited, follows shape outline with flat-bottom clearing) ship in the free tier — the only no-cost V-carving in this roster.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/running-shapeoko/hello-vcarve/" },
+            { "tag": "COMM", "cite": "https://shapeokoenthusiasts.gitbook.io/shapeoko-cnc-a-to-z/toolpath-basics" },
+            { "tag": "COMM", "cite": "https://forum.sienci.com/t/advanced-v-carve-in-carbide-create/1646" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Namesake strength: V-Carve toolpath with flat-depth clearing, plus Prism, Photo V-Carve, and Inlay toolpaths. Community consensus rates Vectric V-carving industry-leading for signs and lettering.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/VCarve%20Toolpath%20Creator/index.html" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/vectric-vcarve-vs-easel-which-cnc-software-is-right-for-you" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "Laser tab/bridge features belong to laser sector S6.5; no CNC holding tabs, ramp entry, or milling lead-ins.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Manual tabs plus Tab Wizard (even spacing, tabs-per-shape, skip-inner); three tab types (full retract, partial retract, ramp) with size/height; four ramp entry methods. Dedicated lead-in/lead-out arcs not documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/AddTabs/" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/Profile/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No CNC tabs/ramps/lead-ins; laser-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No CNC milling support; holding tabs/ramps do not apply.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Automatic and draggable tabs (up to 32 per shape, length/height adjustable) on full-depth cutouts; ramping is Pro-only with 5-degree/20-degree presets; no lead-in/out controls documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012453214-How-To-Use-Tabs" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/5503876590483-Easel-Pro-Feature-Ramping" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Tabs in free tier (added in CCv7: placed in Design, instantiated in Contour toolpath); Ramping entry is Pro-only; lead-in/lead-out not documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/carbidecreate/pro/" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/tab-feature-in-ccv7/55528" },
+            { "tag": "COMM", "cite": "https://willadams.gitbook.io/design-into-3d/toolpaths" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Most complete: 2D and 3D tabs with length/thickness, ramp entry with distance/angle, lead-in/out including 'Ramp on Lead In'. Community cites leads/ramps as a VCarve edge over Carbide Create.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/uiProfileMachineForm/index.html" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/best-paid-cam-software-for-cnc-routers-easel-pro-vs-carveco-vs-vectric-vcarve-vs-fusion-360-pro" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "Laser multi-pass with Z-step exists on the laser side (sector S6.7) but there is no CNC depth management (stepdown scheduling, finishing allowance) because there are no CNC operations.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Start Depth, Final Depth, Depth Per Pass with automatic pass count, and Stock to Leave finishing allowance per operation; ramp Z feed speed separately controlled.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/Profile/" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "Multi-pass G-code repeat exists for laser jobs, but no CNC stepdown/finishing-allowance management.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No CNC milling support; CNC depth management does not apply.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Cut depth and depth-per-pass per shape (rule-of-thumb guidance: max half bit diameter); roughing-plus-detail via Two-Stage Carves; no numeric finishing allowance documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360015957214-Cut-Depth-and-Depth-Per-Pass" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012453174-Two-Stage-Carves-Roughing-and-Detail-Carves" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Depth per pass and max depth per toolpath; Rest Machining (Pro) provides second-tool cleanup; explicit stock-to-leave finishing allowance not documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/carbidecreate/pro/" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/pocket-toolpath-max-depth-vs-depth-per-pass/80184" },
+            { "tag": "COMM", "cite": "https://willadams.gitbook.io/design-into-3d/toolpaths" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Pass depth from tool database with editable pass count, machining allowance, and a separate final-pass option for cleaner finished edges — community comparisons name this depth control a differentiator.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/uiProfileMachineForm/index.html" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/best-paid-cam-software-for-cnc-routers-easel-pro-vs-carveco-vs-vectric-vcarve-vs-fusion-360-pro" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.7",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "No CNC tool library; its Material Library stores laser power/speed presets, not milling tool geometry or feeds/speeds.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Tool Library with geometry types (end mill, V-bit, ball nose, etc.), diameter/flutes, feed/plunge/ramp rates, spindle RPM, chip load, per-tool depth-per-pass and stepover. No material-based feeds/speeds guidance documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/ToolLibrary/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No tool library; laser-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "Material EasySet Library covers laser power/speed presets, not milling tools/feeds; no CNC tool library.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1306" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Bit selection with Easel-recommended cut settings per material — guidance-oriented for beginners rather than a full parametric tool database; feed-rate override available at runtime.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012642954-Changing-Materials-and-Bits-in-Easel" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Tool database with hand-generated feeds per machine/material/cutter combination; community calls defaults very conservative; a large third-party library ecosystem (IDC Woodcraft, Bits&Bits, SpeTools) fills gaps.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/tool-library/" },
+            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/looking-for-tool-database-documentation/21555" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" },
+            { "tag": "COMM", "cite": "https://idcwoodcraft.com/pages/database-downloads" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Tool Database with per-machine configuration management (V12+), material-specific tool settings, and chipload-based feeds; community rates Vectric's feeds/ramps/stepover control the deepest in this roster.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Tool%20Database/index.html" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/tool-database-machine-management/index.html" },
+            { "tag": "COMM", "cite": "https://twotrees3d.com/blogs/twotrees-blog/best-paid-cam-software-for-cnc-routers-easel-pro-vs-carveco-vs-vectric-vcarve-vs-fusion-360-pro" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "7.8",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "No 3D relief or STL machining; laser software.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "Absent at pinned 0.8.02: 'Relief Carving (MillMage Pro)' is listed as upcoming (0.9.00 Early Access only); no STL/heightmap import documented; 'Feature Based Machining' explicitly Not Currently Planned.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/MillMageFactSheet/" },
+            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/millmage-0-9-00-early-access-pro-features-are-here/191036" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No 3D machining; laser-only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No CNC milling support; 3D relief machining does not apply.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" },
+            { "tag": "INF", "cite": "phase0.json coverageNotes: no milling support found in XCS or xTool Studio" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "3D carving is Pro-only: STL import with browser-based 3D toolpath generation (roughing and detail stages documented); scope and depth limits discussed in official 3D FAQs.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/10369535844243-3D-Carving-Instructions" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/10378619827219-FAQs-3D-in-Easel-Pro" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide" }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Pro-only: 3D components from vectors, image-as-heightmap loading, STL import, textures; 3D Rough and 3D Finish (raster) machining toolpaths.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/carbidecreate/pro/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "3D Rough and 3D Finish machining toolpaths with imported 3D models/clipart, documented in the V12.5 manual; full from-scratch 3D modelling is reserved for Vectric's higher-tier Aspire.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/Rough%20Machining%20Toolpath/" },
+            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Finish%20Machining%20Toolpath/index.html" },
+            { "tag": "COMM", "cite": "https://www.robrobsworkshop.com/articles/carbide-create-vs-vectric-vcarve-vs-fusion-360-explained-for-the-beginner" }
+          ]
+        }
+      ]
+    }
+  ]
+}

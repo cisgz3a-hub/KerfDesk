@@ -1,0 +1,467 @@
+{
+  "sector": 10,
+  "categories": [
+    {
+      "id": "10.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Auto-selects the correct serial port; Devices window creates/edits multiple machine profiles via a guided wizard; per-device baud. Mature and well-documented, though USB/driver setup still trips some users (dedicated troubleshooting guide).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/ (auto serial-port select; Devices button; device dropdown)" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Troubleshooting/ConnectionTroubleshooting/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Directly connects to GRBL/Smoothieware over serial and Duet controllers over HTTP; Adding-Your-Machine wizard plus Devices window for profiles. Auto-port-detect not explicitly documented; shares LightBurn's device architecture.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here (connect/jog/zero; Duet over HTTP)" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/AddingYourMachine/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Constantly scans available COM ports; user picks port and baud per GRBL config. Simple manual connect with soft-reset/home/unlock; no auto-connect or saved multi-machine profiles. Windows-only, GRBL 0.9/1.1 only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/ (COM port + baud selection)" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/arduino-connection/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Seamless auto-connect: 'XCS connects to your device automatically' over USB, Wi-Fi, or IP. Zero baud fuss for the user, but confined to xTool's own machines — no third-party controllers.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1580 (USB/Wi-Fi/IP auto-detect)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Guided Machine Setup wizard plus OEM partner machine profiles; connects through the locally installed Easel Driver. Cloud dependency: internet required to load/save projects and finish machine-profile setup.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Detects firmware flavour on connection and auto-selects grbl vs grblHAL; baud configurable in Config; machine-profile picker with Generic-CNC fallback. Widely praised as the best-UX free sender.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://sienci.com/2026/04/16/gsender-1-6-0-release/ (auto firmware-flavour detection; baud in Config)" },
+            { "tag": "COMM", "cite": "https://cncrouterinfo.com/guides/gsender-vs-ugs-vs-cncjs/ + https://github.com/Sienci-Labs/gsender (best-UX free sender)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Move window offers $J continuous jogging, keyboard arrow jog, speed/step-size presets, Go to Origin, Home, and Show Last Position. Complete and daily-driven; movement shortcut keys documented and community-verified.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MoveWindow/ (continuous jog, speed/step presets, Go to Origin, Home)" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/shortcut-keys-for-movement-frame/1862" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Control Mode Move window: Jog tab with variable speeds/step lengths, keyboard numpad and manual coordinate entry; Go To tab moves to coordinates or saved positions; machine/workpiece coordinate toggle.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/UI/ControlMode/ (Jog tab keyboard numpad; Go To saved positions)" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/MoveWindow/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Directional jog buttons with a vertical speed slider and step-size slider; manual positioning plus home/unlock. Functional but basic — no continuous $J hold-jog or go-to-saved-position; keyboard jog limited.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/jogging/ (speed slider, step-size slider)" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Positioning is canvas/camera-driven with a low-power laser-spot and Aimed-measure targeting rather than a rich jog panel; basic directional moves exist. No speed presets or park-to-position workflow documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1580 (Aimed-measure, laser-spot positioning)" },
+            { "tag": "INF", "cite": "No continuous-jog / speed-preset / park panel found across support.xtool.com 2026-07-13" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Jog panel moves X/Y/Z with selectable step intervals; a toggle enables keyboard-controlled movement. Adequate for setup; lacks continuous hold-jog, named speed presets, and go-to-saved-position controls.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://easel.com/features/jog-machine-feature (X/Y/Z jog, interval control, keyboard toggle)" },
+            { "tag": "COMM", "cite": "http://andreabrennan.work/easel-jog-controls" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Best-in-class: continuous jogging, 70+ keyboard shortcuts including shift+arrow axis jog, rapid/normal/precise speed presets, and go-to via six workspaces. Consistently cited as the standout free-sender jog experience.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-gsender-shortcuts/ (70+ shortcuts; shift+arrow jog)" },
+            { "tag": "COMM", "cite": "https://cncrouterinfo.com/guides/gsender-vs-ugs-vs-cncjs/ (best free-sender UX)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Reference implementation: bounding-box Frame, Rubber-Band Frame (minimal irregular perimeter), Frame Continuously, and 'Laser on When Framing' low-power diode trace. Beginner framing guide plus one-key shortcuts; the roster standard.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/ (Frame, Rubber Band Frame, Frame Continuously, Laser on When Framing)" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/FramingBeginner/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Job Control window frames the job, applies tool-offset compensation by cut type, and can frame selected shapes. CNC-appropriate (no low-power trace — moves the tool around the bounds).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/UI/ControlMode/ (Job Control window framing)" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "No native framing button; users build custom-button macros to trace a rectangular frame and turn the laser on at low power. Works but manual, rectangular-only, no rubber-band; longstanding built-in-framing request open.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/ (frame-trace / low-power macros)" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/432 + https://www.facebook.com/groups/lasergrbl/posts/1759404424553546/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Rect mode traces the rectangular boundary and Outline mode follows the object contour with the low-power laser point; strong consumer framing with camera-assisted preview. Positioning tolerance ~1-2 mm.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1851 + https://support.xtool.com/article/2067 (Rect and Outline framing modes)" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/925 (positioning deviation)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No physical framing/outline feature found; Easel relies on on-screen toolpath simulation plus work-zero setting rather than tracing job bounds on the machine before carving.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel (work-zero workflow; no frame step)" },
+            { "tag": "INF", "cite": "No framing/outline feature found across support.easel.com + forum.easel.com 2026-07-13" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Dedicated Outline button physically moves the machine around the job's rough perimeter to confirm dimensions and placement. Well-regarded; CNC (no low-power trace — spindle-off perimeter move).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-additional-features/ (Outline button traces job perimeter)" },
+            { "tag": "COMM", "cite": "https://cncrouterinfo.com/guides/gsender-vs-ugs-vs-cncjs/ (job outlining to preview bounds)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Dedicated Fire button (enabled in Device Settings) fires the diode at a user-set low power for focus/alignment, with a power field; hold-Shift fires the beam while framing. The de-facto diode-alignment control.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MoveWindow/ (Fire button + power field)" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/how-to-enable-fire-button/24950 + https://forum.lightburnsoftware.com/t/how-do-i-turn-on-my-diode-at-low-power-to-focus-it-or-frame-a-job/10520" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-router software with no laser; a diode-alignment fire/test-pulse is not applicable and is not present.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/what-is-millmage (CNC-only; no laser control)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "No dedicated fire button, but a custom-button macro turning the laser on at low power (M3 S-low) for focusing is a documented, common practice. Manual macro-based rather than one-click.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/ (low-power laser-on macro for focusing)" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/how-do-i-turn-on-my-diode-at-low-power-to-focus-it-or-frame-a-job/10520 (cross-tool practice; LaserGRBL macro equivalents on FB group)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Laser-spot mode emits a low-power beam to locate the start position, plus a red-cross positioning indicator; guided consumer alignment rather than a raw pulse-fire control. ~1-2 mm offset, user-calibratable.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/501 (Set the Laser Positioning Mode: laser spot, red cross)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "CNC-router (spindle) software with no laser diode; a fire/test-pulse alignment control is not applicable and is not present.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://easel.inventables.com/ (X-Carve/CNC router product; no laser fire control)" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "no",
+          "quality": "grbl/grblHAL CNC sender with no laser-diode fire/test-pulse feature; diode-alignment pulsing is out of its spindle-CNC scope.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://github.com/Sienci-Labs/gsender (grbl/grblHAL CNC control; no laser fire control)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Console Window sends raw G-code and shows controller responses; the 2.0 Macros Window creates unlimited named macro buttons with right-click editing. Comprehensive manual-command surface.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/ConsoleWindow/" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MacrosWindow/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Console Window displays controller traffic and accepts direct manual commands; Macros Window stores and quickly sends frequently used commands. Mirrors LightBurn's console/macro model.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/UI/ControlMode/ (Console input; Macros Window)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Command box enqueues any typed G-code line with an execution/error log; custom buttons act as macros supporting variables and math expressions in square brackets. Capable manual surface for its class.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/ (command queue + log)" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/ (macro buttons with variables/expressions)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "Closed consumer app exposes no raw-G-code console or user-defined macro buttons; interaction is button/canvas-driven. Inferred absent from documentation across the support center.",
+          "evidence": [
+            { "tag": "INF", "cite": "No console/terminal or user-macro feature found across support.xtool.com 2026-07-13" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Machine Inspector (Ctrl+Shift+D) has a Console field to send GRBL $-commands one at a time ($$, $21=0). Manual-command entry exists, but there are no user-defined macro buttons.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/40531696895123-Grbl-v1-1-System-Commands-Commands (Machine Inspector Console)" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/grbl-inspector-commands/73005 (no macro-button system)" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Console tab shows a true view of computer<->CNC communication and sends commands; Macros are rearrangeable with enhanced variables and individually assignable keyboard shortcuts. Strong, polished implementation.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-additional-features/ (Console tab; macros with variables + shortcuts)" },
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-macros/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Machine Settings window shows a formatted, labeled $$ firmware-settings table (edit/copy/reset); coordinate readout and Disconnected/Ready/Busy/Framing status. Alarm messages surface in the Console but aren't richly decoded into plain-English fixes.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/CommonGrblSetups.html (Machine Settings labeled $$ table)" },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/ (device status readout)" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Tool position shown in both machine and workpiece coordinates with a color-coded wireframe; Machine Settings window views/edits GRBL firmware settings. Alarm-code decoding not documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/UI/ControlMode/ (dual-coordinate DRO; status wireframe)" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/MachineSettings/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Displays machine state (Idle/Run/Alarm) with $X-unlock / $H guidance for alarm exit, runtime position in the preview, and a GRBL Configuration grid editing $$ settings. Solid basics, minimal alarm explanation.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/machine-status/ (state + alarm unlock)" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/configuration/ ($$ configuration grid)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "Closed ecosystem: shows firmware version and processing status only — no user $$ firmware-settings editor, no GRBL-style DRO, and no alarm-code decoding surface. Status is camera/preview-oriented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1580 (firmware version; processing status only)" },
+            { "tag": "INF", "cite": "No $$ firmware editor / machine-coordinate DRO / alarm decoding found on support.xtool.com 2026-07-13" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Machine Inspector reads/edits GRBL firmware settings and checks homing-switch status; jog panel shows position. Alarm handling is present but not a rich decode; a documented $-settings reference backs it.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings (Machine Inspector settings)" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/44251397516563-How-to-Check-Your-Homing-Switch-Status" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Likely sector-leading: 3-axis DRO with manual value entry, an alarm/error Helper (hover the '?' for plain-English detail), and an EEPROM editor replacing the legacy firmware tool for GRBL settings/flashing.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-gsender-grbl-alarm-error-codes/ (alarm/error decoding + Helper)" },
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-additional-features/ (3-axis DRO; EEPROM editor)" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.7",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Buffered transfer mode (default, faster) with a Synchronous fallback for incompatible controllers, plus DTR handling. Robust in practice, but the classic GRBL-over-USB limitation stands: a disconnect stops the job unrecoverably (community reports).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Troubleshooting/GRBLCommunicationProblems/ (Buffered vs Synchronous transfer)" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/laser-stuttering-at-high-speed-ability-to-increase-grbl-buffer-size/87007 + https://forum.lightburnsoftware.com/t/im-having-a-couple-of-problems-with-disconnect/12447" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Streams jobs to GRBL/Smoothieware/Duet via Control Mode. Buffering strategy and long-job stability are not documented and the product is young (0.8.x); robustness stands at existence-level, not community-proven.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/UI/ControlMode/ (direct control/streaming)" },
+            { "tag": "INF", "cite": "No buffering/throughput/long-job-stability documentation found for MillMage 0.8.x 2026-07-13" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Streams G-code to grbl with line-count and time projection. Generally works, but community reports stalls/halts mid-job on some setups (buffer/comms), with no disconnect recovery. Dormant project (v7.14.1, ~16 months no release).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/ (streaming + progress)" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/discussions/1549 (mid-job stops)" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Sends the job to xTool machines over USB or Wi-Fi; work can run on-device (physical start button), so streaming interruptions matter less than for a live-USB sender. Closed pipeline; buffering internals undocumented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1580 (USB/Wi-Fi transfer; machine start button)" },
+            { "tag": "INF", "cite": "No buffering/throughput internals documented for XCS/Studio 2026-07-13" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Streams through the local Easel Driver; once a project is loaded, carving continues offline. Browser-tab/cloud model means a closed tab or lost driver connection risks the run; no line-level disconnect recovery documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements (Easel Driver; carve offline once loaded)" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/offline-version-of-easel/856 + https://forum.easel.com/t/easel-without-internet/13293" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "The roster's job-recovery/robustness reference: development prioritizes interface reliability over features, start-from-line resumes an aborted/failed job, and it is widely cited as the most stable free sender for long jobs. [HW-limited: design + community signal.]",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/ (start-from-line recovery; running jobs)" },
+            { "tag": "COMM", "cite": "https://cncrouterinfo.com/guides/gsender-vs-ugs-vs-cncjs/ (most reliable free sender; stability-first) + https://github.com/Sienci-Labs/gsender" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "10.8",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Devices window holds any number of machine profiles selected from the Laser-window dropdown; switch machines instantly (one active connection at a time). Standard, reliable multi-profile management.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/ (device dropdown = multiple profiles)" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Devices window lists all added machines, supports Make Default, duplicate, and import/export of .mmzip/.mmdev profiles for backup or transfer. Full multi-profile management (one active machine at a time).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Devices/ (device list, Make Default, import/export profiles)" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No saved machine-profile system; you select a COM port and settings are global to the single connected machine. Managing multiple machines means manual reconfiguration each time.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/ (single COM-port connection; no profile catalog)" },
+            { "tag": "INF", "cite": "No multi-machine profile management documented for LaserGRBL 2026-07-13" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Connection interface supports multiple xTool devices with per-machine profiles; switch the active device in the app. Confined to xTool's own hardware lineup.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1580 (support for multiple devices via the connection interface)" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Account-based machine profiles via the Machine Setup wizard and OEM partner profiles; select the machine per project. Cloud-stored profiles, one active machine per carving session.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup" },
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Machine-profile picker with many presets plus Generic-CNC fallback, and up to six saved workspaces/zero positions switchable on the fly. Profile-based, one active machine per connection.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-additional-features/ (machine profiles; six workspaces)" },
+            { "tag": "COMM", "cite": "https://forum.sienci.com/t/different-machine-profiles/11797" }
+          ]
+        }
+      ]
+    }
+  ]
+}

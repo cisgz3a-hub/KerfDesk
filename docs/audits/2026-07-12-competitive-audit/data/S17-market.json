@@ -1,0 +1,358 @@
+{
+  "sector": 17,
+  "categories": [
+    {
+      "id": "17.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Windows 10/11 and macOS 12+ (ARM via Rosetta) desktop; Linux frozen at legacy 1.7 (the 2.x line dropped it); no web or tablet. Solid dual-desktop, narrower than the browser rivals.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/InstallLightBurn/" },
+            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/linux-support-to-end-after-v1-7/144605" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Windows 10/11 and macOS 13+ (ARM via Rosetta) desktop only; no Linux, no web/mobile. Same dual-desktop reach as sibling LightBurn, with a one-version-newer macOS floor.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Windows-only (C#/.NET Framework, WinForms); no native macOS or Linux, so Mac/Linux users need Wine or a VM. Narrowest OS coverage in the roster.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/faq/" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/2626" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio: Windows 10+ and macOS 11+ desktop (no Linux/ChromeOS) plus iOS/Android/iPad apps with xTool-Passport cloud sync across devices. Strong cross-device, but tied to xTool accounts.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2403" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/357" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Browser-based: runs on Windows, macOS, Linux/Ubuntu and Chromebooks via Chrome/Edge/Safari/Firefox, with driverless WebSerial on Chrome/Edge/Opera. Broadest OS reach in the roster, tablet/Chromebook included.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/using-chromebook-to-run-easel/66249" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Native builds for Windows 10+, macOS 10.11+, Linux and single-board (Raspberry Pi). Broadest native-desktop coverage in the roster; no web or mobile client.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-installation/" },
+            { "tag": "OFF", "cite": "https://sienci.com/gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "17.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Installed desktop app; works fully offline (license re-checks online periodically). Updates are manual Help > Check for Updates that downloads the installer, gated to your license's valid update window.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/CheckForUpdates/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/lightburn-core" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Installed desktop app, offline-capable like LightBurn; current, previous and beta builds listed on millmagesoftware.com with a manual updater. Same install/update model as its sibling.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Free lightweight Windows installer; runs fully offline once installed; notifies on new GitHub releases. But the project is dormant — no release since v7.14.1 (Mar 2025), roughly 16 months.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://github.com/arkypita/LaserGRBL/releases" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/faq/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Installed desktop/mobile apps with in-app auto-update; login/cloud drives the material library and sync, so some features expect connectivity. XCS itself is EOL — updates continue only in xTool Studio.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1935" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "No install (browser) and always the latest version — zero update friction. But internet is required to load/save; offline you can keep working and carve a loaded job, yet cannot save until reconnected.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/offline-version-of-easel/856" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Free installer for all four platforms; runs fully offline; in-app update guide and notifications, with frequent releases (1.6.2, May 2026). Smooth, friction-free free install/update story.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-installation/" },
+            { "tag": "OFF", "cite": "https://sienci.zendesk.com/hc/en-us/articles/39594630248724-gSender-Update-Guide" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "17.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Native C++/Qt handles large vector/raster work, but community consistently reports lag as objects/nodes pile up and after heavy image traces, with a restart restoring speed. Solid, degrades at scale.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/software-lagging-the-more-i-add-to-the-work-area-the-slower-the-software-goes/53497" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/lightburn-gets-very-slow-ang-laggy-restart-restores-the-performance/29446" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Inferred: shares LightBurn's native engine, so comparable large-file handling is expected, but the product is too young for an independent community performance record. Parity assumed, not confirmed.",
+          "evidence": [
+            { "tag": "INF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" },
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Lightweight native app; fast on large raster-to-G-code and big files even on modest hardware, but community notes certain JPEGs crash it. Good throughput with occasional input fragility.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Weakest here — official docs admit lag and white-screen crashes on complex images 'even with the recommended configuration'; mitigations are compressing images and disabling precise vector-path selection.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2664" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/713" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Bounded by the browser — large or many-path SVG imports are widely known to bog down browser canvases, and community guidance is to simplify paths before import. Not native-app speed on heavy designs.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/system-requirements-for-running-easel-and-other-carve-software/61281" },
+            { "tag": "INF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Electron sender loads and visualizes large G-code; the 3D visualizer can lag on some GPUs (toggle hardware acceleration) and startup was heavy until load time was cut ~25s to ~4s. Generally handles big jobs.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://forum.sienci.com/t/gsender-is-being-very-slow-and-lethargic/10045" },
+            { "tag": "OFF", "cite": "https://sienci.com/2026/04/16/gsender-1-6-0-release/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "17.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Configurable auto-save plus a post-crash prompt to reload an AutoSave backup from Documents. A real safety net, but community reports it occasionally saves empty or loses recovery on a double-crash.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/auto-save-recovery/47604" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/if-lightburn-crashes-twice-in-a-row-before-autosave-save-it-loses-the-recover/57469" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Inferred parity: same engine as LightBurn, so auto-save/crash-recovery is expected; a patch hardened malformed-file loading to report errors instead of crashing, and it keeps the last 50 preference backups.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-08-01-patch-release" },
+            { "tag": "INF", "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Stable in normal use but no project auto-save or crash recovery — it engraves images/G-code with no saved design state — and certain files crash it. Recovery means re-importing the source. Minimal safety net.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Cloud project storage means work syncs and is recoverable across devices, but blank-screen/freeze crashes on import are documented and there is no local auto-save prompt. Recovery leans on the cloud copy.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/713" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/357" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Strongest recovery model — continuous server-side saving means a browser/tab crash reopens the project from the cloud with little loss. Caveat: edits made offline are lost if you close before reconnecting.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/offline-version-of-easel/856" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "As a sender there is no design to lose; the app is generally stable, persists settings, and offers a Stats > Diagnostic file for issues. Job-level recovery (start-from-line) is covered under execution, not here.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-feedback/" },
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-setup-and-layout/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "17.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Mature XML .lbrn2 (and legacy .lbrn) project format; lossless conversion both directions, smaller/faster since 2.0, and a long track record of opening old files. Robust, near-human-readable format.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/FileManagement/" },
+            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/file-type-lbrn-vs-lbrn2-what-is-difference/59699" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Binary .mage project (art, toolpaths, tools, material, layout); cross-compatible with LightBurn (.lbrn2 opens in MillMage, .mage in LightBurn); a patch improved damaged-file handling. Young but solid.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/" },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No design project format — LaserGRBL operates on imported images and G-code, so there is nothing versioned to migrate. Loading and saving happen at the G-code level only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
+            { "tag": "INF", "cite": "https://lasergrbl.com/usage/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Native .xcs project format with cloud storage and cross-device (PC/iPad/mobile) sharing; format tied to xTool's account ecosystem. Robustness adequate; the migration path points toward xTool Studio.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/357" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1773" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Projects live server-side (no local file), so versioning/migration is vendor-managed and users never hit format-migration breakage; the downside is no offline file and no exposed manual version history.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            { "tag": "INF", "cite": "https://forum.easel.com/t/offline-version-of-easel/856" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "no",
+          "quality": "No design project format (it is a G-code sender). Closest analog is robust, versioned settings backup/restore for preferences and firmware/EEPROM via the Config tab. No project-migration concept.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-setup-and-layout/" },
+            { "tag": "INF", "cite": "https://sienci.com/gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "17.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Inferred: native C++/Qt app with a modest footprint relative to Electron/browser rivals; runs on 4GB minimum (16GB recommended for heavy images). Efficient for its capability, heavier only with large rasters.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/InstallLightBurn/" },
+            { "tag": "INF", "cite": "https://forum.lightburnsoftware.com/t/lightburn-computer-requirement/117390" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Inferred from shared codebase: same native engine and published specs as LightBurn (8GB recommended, ~450MB install), so a comparable modest footprint. Identical requirements table, not independently benchmarked.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/" },
+            { "tag": "INF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Lightest in the roster — a small native Windows/.NET app that runs happily on old, low-spec PCs with minimal RAM/CPU. Being featherweight is its whole appeal.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/" },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/faq/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Heaviest desktop footprint — needs 8GB+ RAM and a capable GPU; docs recommend closing other memory-intensive apps and staying plugged in to avoid lag. Resource-hungry, especially on complex work.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/671" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2664" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Inferred: footprint is a browser tab — memory/CPU bounded by the browser and partly offloaded to Inventables' servers; nothing to install, but a heavy design can still tax browser RAM. 64-bit only.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            { "tag": "INF", "cite": "https://forum.easel.com/t/system-requirements-for-running-easel-and-other-carve-software/61281" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Electron app but deliberately lean — the official minimum is 2GB RAM and it targets Raspberry Pi and mini-PCs; heavier than a bare native sender yet light enough for single-board hardware.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-installation/" },
+            { "tag": "INF", "cite": "https://sienci.com/gsender/" }
+          ]
+        }
+      ]
+    }
+  ]
+}

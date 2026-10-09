@@ -1,0 +1,648 @@
+{
+  "pinnedOn": "2026-07-12",
+  "sourceRun": "wf_d5400618-2a5 phase 0 (session model)",
+  "pins": {
+    "products": [
+      {
+        "name": "LightBurn",
+        "vendor": "LightBurn Software",
+        "version": "2.1.03 (stable patch, released 2026-06-30; 2.1 line announced 2026-05-19; 2.0.05 patch 2026-05-14)",
+        "price": "Core $99 USD / Pro $199 USD; perpetual license (buy once), install on up to 3 computers, optional paid annual update renewal; 30-day free trial; Core->Pro upgrade = pay the difference",
+        "notes": "CONFIRMED: 2.1.03 released June 30, 2026 (official blog). Edition structure: the 2.0/2.1 line did NOT change editions - the Core/Pro restructure happened 2024-10-01, in the 1.x era: GCode license renamed LightBurn Core ($99); DSP + Galvo licenses merged into LightBurn Pro ($199); DSP-only and Galvo-only retired; existing DSP/Galvo customers upgraded to Pro free. Core = GCode controllers (Grbl, Smoothieware, Marlin, Cohesion3D, Grbl-LPC); Pro = all controllers incl. DSP (Ruida, Trocen, TopWisdom) + Galvo EZCad2 (2.1 adds EZCad3 support). 2.1 headline features: Quick Nest (made available to Core too), network/dual camera support, Undo History, Cuttle.xyz integration.",
+        "sources": [
+          "https://lightburnsoftware.com/blogs/news/lightburn-2-1-03-patch-release",
+          "https://lightburnsoftware.com/products/lightburn-core",
+          "https://lightburnsoftware.com/products/lightburn-pro",
+          "https://lightburnsoftware.com/blogs/news/new-lightburn-license-types-and-pricing-coming-oct-1-2024",
+          "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more",
+          "https://release.lightburnsoftware.com/LightBurn/Release/LightBurn-v2.1.03/"
+        ]
+      },
+      {
+        "name": "MillMage",
+        "vendor": "LightBurn Software",
+        "version": "0.8.02 (current stable, released 2026-06-01); 0.9.00 in early access (adds Pro features: V-Carving, Relief Carving, True Nesting); product GA-launched 2026-02-24",
+        "price": "MillMage Core $99 USD perpetual (3 computers, permanent commercial use); MillMage Pro announced at $199 USD but NOT yet released for sale (Core->Pro upgrade will be $100); only Core is purchasable today",
+        "notes": "Ships at 0.x version numbers despite paid GA launch. Supported for CAM+control: GRBL, GRBL M3, GRBL-STM, grblHAL, FluidNC, Smoothieware; CAM-only G-code export: Mach3/Mach4, LinuxCNC, UCCNC, Duet/RRF, Masso. millmage.com 301-redirects to millmagesoftware.com; docs at docs.millmagesoftware.com.",
+        "sources": [
+          "https://lightburnsoftware.com/blogs/news/millmage-is-here",
+          "https://lightburnsoftware.com/products/millmage-core",
+          "https://forum.lightburnsoftware.com/t/millmage-0-8-02-patch-release/190260",
+          "https://forum.lightburnsoftware.com/t/millmage-0-9-00-early-access-pro-features-are-here/191036"
+        ]
+      },
+      {
+        "name": "LaserGRBL",
+        "vendor": "arkypita (open-source project)",
+        "version": "v7.14.1 (released 2025-03-01) - still the latest GitHub release as of 2026-07-12; no release in ~16 months",
+        "price": "Free, open source; donation-supported ('LaserGRBL is free and opensource, but its development require time and money')",
+        "notes": "Windows-only GRBL laser sender/engraver. Third-party download mirrors report stale version numbers (e.g. 6.2.1) - the GitHub releases page is authoritative.",
+        "sources": [
+          "https://github.com/arkypita/LaserGRBL/releases",
+          "https://lasergrbl.com"
+        ]
+      },
+      {
+        "name": "XCS",
+        "vendor": "xTool (Makeblock)",
+        "version": "DISCONTINUED - final desktop release V2.7.22 (2025-06-19); xTool: 'The final release of XCS was V2.7. No further updates will be provided for XCS on PC or mobile; future updates will continue on Studio.' Successor: xTool Studio, latest desktop V1.7.30 (2026-06-15)",
+        "price": "Free download (no purchase required; xTool's own accessible pages do not state a price - 'free' is stated by reseller/aggregator listings)",
+        "notes": "Products launched after Aug 2025 (starting with the P3) are supported exclusively in xTool Studio. XCS and Studio are separate installable apps. For a mid-2026 audit, xTool Studio V1.7.30 is the live competitor, not XCS.",
+        "sources": [
+          "https://support.xtool.com/article/1773",
+          "https://support.xtool.com/article/2909",
+          "https://www.xtool.com/pages/software",
+          "https://www.swingdesign.com/products/xtool-creative-space-desgin-software"
+        ]
+      },
+      {
+        "name": "Easel",
+        "vendor": "Inventables",
+        "version": "Web-based SaaS - no public version number (continuously deployed, browser-based with cloud storage)",
+        "price": "Free tier $0 (1 carve/G-code export per week); Easel Starter $8/mo ($72/yr billed annually, 20 exports/week, raster+ramping); Easel Pro $24/mo ($216/yr billed annually, unlimited exports, 3D carving, V-carving, 3M design library, 300+ fonts)",
+        "notes": "Design+CAM+control in browser. Cabinetmaker is a separate Inventables product with its own pricing.",
+        "sources": [
+          "https://easel.inventables.com/",
+          "https://support.easel.com/hc/en-us/articles/360012849133-Easel-Pro-FAQ-and-Overview"
+        ]
+      },
+      {
+        "name": "Carbide Create",
+        "vendor": "Carbide 3D",
+        "version": "V8 (stable channel; build 836 promoted to stable 2025-12-05; downloads page pins 'V8 Build 843' for Intel Macs; beta builds 846 (2026-05) and 851 (2026-06-11, Apple Silicon fix). Exact current stable build number is served dynamically on the download page - not pinnable from static fetch)",
+        "price": "Carbide Create Core: free, included with Carbide 3D machines, NOT compatible with other CNC machines; Carbide Create Pro: $120/year subscription OR $360 perpetual (includes 1 year of updates, further update years $120/yr); 14-day Pro trial",
+        "notes": "Two-tier model: free Core is locked to Carbide 3D hardware (Shapeoko/Nomad); Pro adds 3D modelling, advanced toolpaths, and support for any CNC machine. V8 breaks 3D-component compatibility with prior-version files.",
+        "sources": [
+          "https://carbide3d.com/carbidecreate/",
+          "https://carbide3d.com/carbidecreate/buy/",
+          "https://community.carbide3d.com/t/latest-carbide-create-pro-v8/98947",
+          "https://community.carbide3d.com/t/carbide-create-851/104276",
+          "https://carbide3d.com/downloads/"
+        ]
+      },
+      {
+        "name": "VCarve",
+        "vendor": "Vectric",
+        "version": "V12.5 (current marketed line on vectric.com; V12 launched May 2024, 12.5 release date not stated on official pages)",
+        "price": "VCarve Desktop $349 USD / VCarve Pro $699 USD, perpetual ('Buy once, own it forever'); free minor updates within a major version; a major version released within 12 months of purchase is free; Desktop->Pro upgrade = pay the difference. CAVEAT: vectric.com renders prices via JavaScript (blank in static fetch); $349/$699 figures corroborated by the search snippet of vectric.com/purchase/vcarve/ and authorized resellers (MillRight, Onefinity)",
+        "notes": "Desktop limited to 24 x 24 inch job size, no nesting/templates/gadgets; Pro is unlimited job size with true-shape nesting, toolpath templates, job setup sheets, gadgets. Design+CAM only - no machine control (uses post-processors).",
+        "sources": [
+          "https://www.vectric.com/products/vcarve/",
+          "https://www.vectric.com/purchase/vcarve/",
+          "https://www.vectric.com/products/vcarve-pro",
+          "https://millrightcnc.com/product/vectric-vcarve-desktop/",
+          "https://www.onefinitycnc.com/product-page/v-carve-pro-perpetual-life-time-purchase"
+        ]
+      },
+      {
+        "name": "gSender",
+        "vendor": "Sienci Labs",
+        "version": "1.6.2 (released 2026-05-28); prior: 1.6.1 (2026-04-30), 1.6.0 (2026-04-17, added built-in G-code editor + full ATC workflow)",
+        "price": "Free, licensed under GNU GPLv3",
+        "notes": "G-code sender/control only (no CAM/design). Optional 'gSender Edge' experimental channel. Grbl and grblHAL focus.",
+        "sources": [
+          "https://sienci.com/gsender/",
+          "https://github.com/Sienci-Labs/gsender/releases"
+        ]
+      }
+    ],
+    "coverageNotes": "Versions pinned as of 2026-07-12, all from official vendor sites/forums/GitHub unless flagged. (a) MillMage sectors: CNC-ONLY (routers and mills) - it does NOT do laser. The launch announcement (https://lightburnsoftware.com/blogs/news/millmage-is-here, 2026-02-24) describes it as built specifically for CNC routers ('Directly connect to and control any CNC running GRBL, Smoothieware, or common GRBL variants' / 'generate toolpaths for any CNC that runs standard GCode') and makes no mention of laser functionality; the product page (https://lightburnsoftware.com/products/millmage-core) lists only CNC control targets (GRBL, GRBL M3, GRBL-STM, grblHAL, FluidNC, Smoothieware) plus CAM-only export (Mach3/Mach4, LinuxCNC, UCCNC, Duet/RRF, Masso). Laser remains LightBurn's product. So MillMage competes with KerfDesk's CNC sector only; LightBurn covers the laser sector - KerfDesk's dual laser+CNC coverage spans what LightBurn Software sells as two separate $99+ products. (b) XCS CNC support: no CNC milling/routing support found. XCS drives xTool's laser lineup (diode/CO2/fiber; S1, P2, F1, M1-series hybrids add blade cutting, not milling). The only 'CNC'-branded device XCS operates is the xTool MetalFab 'CNC Cutter' (XCS V2.0+, https://support.xtool.com/article/2108) - but it is a LASER metal-cutting machine (stainless/carbon steel, aluminum, brass, 3-10 mm), not a spindle mill/router. Same conclusion applies to successor xTool Studio: no milling support found. (c) Discontinued/renamed: (1) XCS is discontinued - final release V2.7 (desktop V2.7.22, 2025-06-19); xTool states no further PC/mobile updates and continues development in xTool Studio (V1.7.30, 2026-06-15); products launched after Aug 2025 (P3 onward) are Studio-exclusive (https://support.xtool.com/article/1773, https://support.xtool.com/article/2909) - an audit row for 'XCS' should really target xTool Studio. (2) LightBurn's editions were renamed/restructured effective 2024-10-01 (pre-2.0, so the 2.x line changed nothing structurally): GCode -> Core $99; DSP + Galvo merged -> Pro $199; DSP-only/Galvo-only licenses retired; existing DSP/Galvo holders upgraded to Pro free (https://lightburnsoftware.com/blogs/news/new-lightburn-license-types-and-pricing-coming-oct-1-2024). (3) millmage.com 301-redirects to millmagesoftware.com (observed today; direct fetch of the old domain 404s after redirect). (4) No discontinuation/renaming found for LaserGRBL, Easel, Carbide Create, VCarve, or gSender - though LaserGRBL has had no release since 2025-03-01 (v7.14.1), making it the most stagnant product in the set. Residual unknowns (not guessed, per no-invention rule): exact current stable Carbide Create V8 build number (download page loads it dynamically; last community-confirmed stable promotion was build 836 on 2025-12-05, Intel-Mac pin is build 843, builds 846/851 are 2026 betas); VCarve 12.5 exact release date; an official on-xtool.com price statement for XCS/Studio (free per reseller listing only); Easel exposes no version numbers (SaaS). VCarve $349/$699 USD figures come from a search-engine snippet of Vectric's own purchase page plus two authorized resellers because vectric.com renders prices client-side."
+  },
+  "packs": {
+    "Easel": {
+      "product": "Easel",
+      "officialDocs": [
+        {
+          "topic": "Support center home (all categories)",
+          "url": "https://support.easel.com/hc/en-us"
+        },
+        {
+          "topic": "Getting started / first carve walkthrough",
+          "url": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+        },
+        {
+          "topic": "Cut settings (feeds, speeds, depth per pass)",
+          "url": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information"
+        },
+        {
+          "topic": "Toolpath simulation",
+          "url": "https://support.easel.com/hc/en-us/articles/360012593293-Toolpath-Simulation-in-Easel"
+        },
+        {
+          "topic": "Raster toolpaths (Pro feature)",
+          "url": "https://support.easel.com/hc/en-us/articles/360012726174-Easel-Pro-Feature-Raster-Toolpaths"
+        },
+        {
+          "topic": "V-carve projects (Pro feature)",
+          "url": "https://support.easel.com/hc/en-us/articles/360012848873-Easel-Pro-Feature-V-Carve-Projects"
+        },
+        {
+          "topic": "3D carving instructions",
+          "url": "https://support.easel.com/hc/en-us/articles/10369535844243-3D-Carving-Instructions"
+        },
+        {
+          "topic": "Two-stage carves (roughing + detail bit)",
+          "url": "https://support.easel.com/hc/en-us/articles/360012453174-Two-Stage-Carves-Roughing-and-Detail-Carves"
+        },
+        {
+          "topic": "Z-probe usage",
+          "url": "https://support.easel.com/hc/en-us/articles/5360405175187-Using-the-Z-Probe"
+        },
+        {
+          "topic": "Work zero and homing (machine control)",
+          "url": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing"
+        },
+        {
+          "topic": "Machine setup wizard",
+          "url": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup"
+        },
+        {
+          "topic": "Machine Inspector / GRBL firmware settings check",
+          "url": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings"
+        },
+        {
+          "topic": "File import (SVG, DXF, STL, G-code)",
+          "url": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+        },
+        {
+          "topic": "Exporting G-code from Easel",
+          "url": "https://support.easel.com/hc/en-us/articles/4406926040979-Exporting-Gcode-from-Easel"
+        },
+        {
+          "topic": "Downloads (Easel Local driver, post-processors)",
+          "url": "https://easel.com/downloads"
+        }
+      ],
+      "communities": [
+        "Easel Community Forum (official Discourse) - https://forum.easel.com/",
+        "Inventables Community Forum, Easel category - https://discuss.inventables.com/c/easel/6",
+        "Inventables official YouTube channel - https://www.youtube.com/user/inventables"
+      ],
+      "notes": "Product site: https://easel.inventables.com/ (verified). support.easel.com returns HTTP 403 to direct fetches (Zendesk bot block); every article URL above was verified via search-result snippets instead. forum.easel.com and discuss.inventables.com appear to be the same Discourse instance under two domains (identical category paths, e.g. /c/x-carve/13 on both; community.inventables.com/categories also resolves). A subreddit r/XCarve is referenced by an Inventables forum thread (https://discuss.inventables.com/t/x-carve-on-reddit/1454) but reddit.com blocks our crawler, so the subreddit URL itself could not be verified - treat as unconfirmed. Additional verified articles if needed: Time Estimates and Toolpaths (https://support.easel.com/hc/en-us/articles/360012453134-Time-Estimates-and-Toolpaths), Machine Setup Glossary (https://support.easel.com/hc/en-us/articles/40226291496467-Machine-Setup-Glossary-of-Terms-and-Concepts), OEM Partner Machine Profile Setup (https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup)."
+    },
+    "Carbide Create": {
+      "product": "Carbide Create",
+      "officialDocs": [
+        {
+          "topic": "Carbide Create course home / introduction (1 of 17 lessons)",
+          "url": "https://carbide3d.com/hub/courses/create/"
+        },
+        {
+          "topic": "Types of toolpaths (six standard toolpaths overview)",
+          "url": "https://carbide3d.com/hub/courses/create/toolpaths/"
+        },
+        {
+          "topic": "Tool library (stock + custom tools)",
+          "url": "https://carbide3d.com/hub/courses/create/tool-library/"
+        },
+        {
+          "topic": "Toolpath simulation",
+          "url": "https://carbide3d.com/hub/courses/create/simulation/"
+        },
+        {
+          "topic": "V-carving walkthrough (Hello V-carve, Running-Shapeoko course)",
+          "url": "https://carbide3d.com/hub/courses/running-shapeoko/hello-vcarve/"
+        },
+        {
+          "topic": "Contour toolpath walkthrough (Hello Contour)",
+          "url": "https://carbide3d.com/hub/courses/running-shapeoko/hello-contour/"
+        },
+        {
+          "topic": "Carbide Create course (guides mirror on my.carbide3d.com)",
+          "url": "https://my.carbide3d.com/carbide-create-course/"
+        },
+        {
+          "topic": "Training hub home (courses + assembly guides)",
+          "url": "https://my.carbide3d.com/"
+        },
+        {
+          "topic": "Legacy V5 PDF user manual (2D CAD/CAM)",
+          "url": "https://guides.carbide3d.com/files/pdf/carbide-create-v5.pdf"
+        },
+        {
+          "topic": "Carbide Create Pro (3D modeling/machining tier)",
+          "url": "https://carbide3d.com/carbidecreate/pro/"
+        },
+        {
+          "topic": "Carbide Motion (companion machine-control software)",
+          "url": "https://carbide3d.com/carbidemotion/"
+        },
+        {
+          "topic": "Carbide Create V7 release announcement (layer-linked toolpaths etc.)",
+          "url": "https://carbide3d.com/blog/carbide-create-v7/"
+        },
+        {
+          "topic": "Carbide Create build 527 release blog (current build-numbered release train)",
+          "url": "https://carbide3d.com/blog/carbide-create-527/"
+        }
+      ],
+      "communities": [
+        "Carbide 3D Community Site (official forum) - https://community.carbide3d.com/",
+        "Shapeoko category on the official forum - https://community.carbide3d.com/c/cnc-machines/shapeoko/10",
+        "Carbide 3D official YouTube channel - https://www.youtube.com/carbide3d"
+      ],
+      "notes": "There is no current-version reference manual: docs.carbide3d.com/assembly/carbidecreate/userguide/ 301-redirects to my.carbide3d.com/manuals/carbide-create/ which 301-redirects to https://carbide3d.com/hub/manuals/ - and that page lists hardware manuals only (verified by fetch). Software documentation is delivered as the training courses above plus the legacy V5 PDF; releases are build-numbered (e.g. build 527 blog post) rather than a versioned manual. guides.carbide3d.com returns 403 to direct fetches, but the manuals page links to course URLs https://guides.carbide3d.com/create/ and https://guides.carbide3d.com/create-pro/ (grounded via that fetch), and https://guides.carbide3d.com/start-here/ appeared as a verified search result. A community-curated deep reference exists at https://willadams.gitbook.io/design-into-3d/toolpaths (verified search result; unofficial, by a Carbide 3D staffer). A shapeoko subreddit could not be verified because reddit.com blocks our crawler - treat as unconfirmed."
+    },
+    "VCarve": {
+      "product": "VCarve",
+      "officialDocs": [
+        {
+          "topic": "Vectric docs index (all products/versions; latest = V12.5)",
+          "url": "https://docs.vectric.com/docs/"
+        },
+        {
+          "topic": "VCarve Pro V12.5 user guide index (interface, CNC workflow, 2D/3D design, rotary job creation, rotary machining & wrapping, post-processor editing)",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html"
+        },
+        {
+          "topic": "VCarve Pro V12.5 full single-page reference manual",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/single-page/index.html"
+        },
+        {
+          "topic": "VCarve Pro V12.5 main window / interface reference",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/main-window/index.html"
+        },
+        {
+          "topic": "Tool database (V12.0 form page)",
+          "url": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Tool%20Database/index.html"
+        },
+        {
+          "topic": "Machine configuration management (V12.5)",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/tool-database-machine-management/index.html"
+        },
+        {
+          "topic": "Preview toolpaths / simulation (V12.0)",
+          "url": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Preview%20Toolpaths/index.html"
+        },
+        {
+          "topic": "3D rough machining toolpath (V12.5)",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/Rough%20Machining%20Toolpath/"
+        },
+        {
+          "topic": "3D finish machining toolpath (V12.0)",
+          "url": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Finish%20Machining%20Toolpath/index.html"
+        },
+        {
+          "topic": "V-carve toolpath form (V10.5 page; V12.5 equivalent is inside the single-page manual)",
+          "url": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/VCarve%20Toolpath%20Creator/"
+        },
+        {
+          "topic": "Inlay toolpath (V12.5)",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/Create%20Inlay%20Toolpath/"
+        },
+        {
+          "topic": "Post-processor editing (V12.5, advanced)",
+          "url": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/form/post-processor-editing/index.html"
+        },
+        {
+          "topic": "Rotary machining and wrapping (dedicated legacy V9.5 chapter; V12.5 rotary lives in user-guide sections 08-10)",
+          "url": "https://docs.vectric.com/docs/V9.5/VCarvePro/ENU/Help/User%20Guide/Process/Rotary/Rotary%20Machining%20and%20Wrapping.html"
+        },
+        {
+          "topic": "Wrapped spiral layout gadget (V12.0, rotary)",
+          "url": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/wrapped-spiral-layout/index.html"
+        },
+        {
+          "topic": "Official VCarve Pro video tutorials",
+          "url": "https://www.vectric.com/support/tutorials/vcarve-pro/"
+        }
+      ],
+      "communities": [
+        "Vectric Customer Forum (official phpBB) - https://forum.vectric.com/",
+        "Vectric Community page (official; free projects, In the Labs) - https://www.vectric.com/vectric-community/",
+        "Vectric Ltd official YouTube channel - https://www.youtube.com/user/Vectric",
+        "CNCZone Vectric subforum (third-party) - https://www.cnczone.com/forums/vectric/"
+      ],
+      "notes": "docs.vectric.com hosts per-version manuals (V9.0 through V12.5; V12.5 confirmed latest via fetch of the docs index). The V12.5 user-guide index was fetched directly and lists 13 numbered sections including 'Creating a Rotary Job', 'Simple Rotary Modelling', 'Rotary Machining and Wrapping', and 'Post-Processor Editing'. Form-level pages (Help/form/<name>/) exist per version but not every page is indexed for V12.5 in search - where only a V12.0 or V10.5 URL was verifiable I listed that version and labeled it. Note constructed URLs are risky: my guessed V12.5 path variant 404'd, so every URL above comes from a verified search snippet or fetch. VCarve Desktop docs parallel the Pro docs (e.g. V12.5/VCarveDesktop/... on the same index). Vectric video tutorials also exist per-product at vectric.com/support/tutorials/ (VCarve Desktop variant verified: https://www.vectric.com/support/tutorials/vcarve-desktop/). CAMheads also runs a Vectric section (https://www.camheads.org/forum/software/vectric-aspire, verified snippet)."
+    },
+    "gSender": {
+      "product": "gSender",
+      "officialDocs": [
+        {
+          "topic": "Product page / overview",
+          "url": "https://sienci.com/gsender/"
+        },
+        {
+          "topic": "Installation",
+          "url": "https://resources.sienci.com/view/gs-installation/"
+        },
+        {
+          "topic": "Setup & layout (UI tour, connection basics)",
+          "url": "https://resources.sienci.com/view/gs-setup-and-layout/"
+        },
+        {
+          "topic": "Using gSender (jogging, probing, workspace zero, running jobs, safety)",
+          "url": "https://resources.sienci.com/view/gs-using-gsender/"
+        },
+        {
+          "topic": "Keyboard shortcuts / gamepad",
+          "url": "https://resources.sienci.com/view/gs-gsender-shortcuts/"
+        },
+        {
+          "topic": "Homing & limits",
+          "url": "https://resources.sienci.com/view/gs-homing-limits/"
+        },
+        {
+          "topic": "Calibration tools",
+          "url": "https://resources.sienci.com/view/gs-calibration-tools/"
+        },
+        {
+          "topic": "Macros & automations",
+          "url": "https://resources.sienci.com/view/gs-macros/"
+        },
+        {
+          "topic": "Tool changing workflows",
+          "url": "https://resources.sienci.com/view/gs-tool-changing/"
+        },
+        {
+          "topic": "Wireless / remote control (headless mode)",
+          "url": "https://resources.sienci.com/view/gs-wireless-control/"
+        },
+        {
+          "topic": "Add-ons",
+          "url": "https://resources.sienci.com/view/gs-add-ons/"
+        },
+        {
+          "topic": "grbl alarm & error codes reference",
+          "url": "https://resources.sienci.com/view/gs-gsender-grbl-alarm-error-codes/"
+        },
+        {
+          "topic": "Edge features (experimental builds)",
+          "url": "https://resources.sienci.com/view/gs-edge-features/"
+        },
+        {
+          "topic": "Zendesk help center gSender category",
+          "url": "https://sienci.zendesk.com/hc/en-us/categories/34747107598868-gSender"
+        },
+        {
+          "topic": "GitHub repository (source, releases, issue tracker)",
+          "url": "https://github.com/Sienci-Labs/gsender"
+        }
+      ],
+      "communities": [
+        "Sienci Community Forum, gSender category - https://forum.sienci.com/c/gsender/14",
+        "GitHub issues/discussions - https://github.com/Sienci-Labs/gsender",
+        "Sienci Labs official YouTube channel - https://www.youtube.com/channel/UCS4SdQ0sqFhvjitLjh4EsGQ"
+      ],
+      "notes": "The resources.sienci.com doc set is the canonical manual; all gs-* URLs above were taken directly from the official docs navigation fetched from https://resources.sienci.com/view/gs-using-gsender/ (nav groups: The Basics, Advanced Topics, Experimental Features). gSender targets grbl and grblHAL controllers (GRBL 1.1 minimum, per GitHub README snippet). Docs are also maintained as markdown in https://github.com/Sienci-Labs/Resources (e.g. gsender/gs-using-gsender.md, verified search results), which is useful for diffing doc history. Additional community pointers: the forum thread 'gSender Resource List' (https://forum.sienci.com/t/gsender-resource-list/3594, verified) aggregates guides. The docs nav also lists a Classic UI page (https://resources.sienci.com/view/gs-classic/) and a problems/feedback page (https://resources.sienci.com/view/gs-feedback/). No dedicated rotary doc page appears in the gSender nav - rotary support was not evidenced in this pass; report unknown rather than assumed."
+    },
+    "LightBurn": {
+      "product": "LightBurn",
+      "officialDocs": [
+        {
+          "topic": "documentation home (current, LightBurn 2.x)",
+          "url": "https://docs.lightburnsoftware.com/latest/"
+        },
+        {
+          "topic": "getting started / first project",
+          "url": "https://docs.lightburnsoftware.com/latest/GetStarted/"
+        },
+        {
+          "topic": "how-to guides index",
+          "url": "https://docs.lightburnsoftware.com/latest/Guides/"
+        },
+        {
+          "topic": "cuts / layers window (layer semantics, operation order)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/"
+        },
+        {
+          "topic": "cut settings editor (Line / Fill / Offset Fill / Image modes)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/"
+        },
+        {
+          "topic": "image mode (dithering, line interval, ~20 raster params)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/ImageMode/"
+        },
+        {
+          "topic": "camera (setup, calibration, alignment, trace via camera)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/Cameras/"
+        },
+        {
+          "topic": "rotary mode",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/"
+        },
+        {
+          "topic": "laser window (machine control: start/stop/pause, framing, positioning)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+        },
+        {
+          "topic": "device settings",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/DeviceSettings/"
+        },
+        {
+          "topic": "material library (preset cut settings)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/"
+        },
+        {
+          "topic": "preview window (cuts vs travel simulation)",
+          "url": "https://docs.lightburnsoftware.com/latest/Reference/Preview/"
+        },
+        {
+          "topic": "legacy docs (LightBurn 1.6 and earlier)",
+          "url": "https://docs.lightburnsoftware.com/legacy/"
+        },
+        {
+          "topic": "full manual as single PDF",
+          "url": "https://docs.lightburnsoftware.com/LightBurnDocs.pdf"
+        }
+      ],
+      "communities": [
+        "Official LightBurn Software Forum (Discourse; 'LightBurn Software Questions' category ~28.6k topics at /c/lightburn-software/6): https://forum.lightburnsoftware.com/",
+        "Official LightBurn Software YouTube channel: https://www.youtube.com/channel/UC-TdV9ThMD6E4MZztA6eZsQ (tutorials index also at https://lightburnsoftware.com/pages/tutorials)",
+        "Official LightBurn Facebook page: https://www.facebook.com/LightBurnLaser/",
+        "Large user-run Facebook groups, e.g. 'Lightburn Users supporting Lightburn Users': https://www.facebook.com/groups/3152715751411282"
+      ],
+      "notes": "All /latest/ Reference URLs were fetch-verified individually; Guides index, legacy root, and PDF verified via search snippets. Current docs cover LightBurn 2.x (docs home notes 'What's New in LightBurn 2.0'; camera page states LightBurn 2.1). A subreddit r/lightburn is repeatedly asserted by search-engine summaries but Reddit is blocked to this crawler, so no reddit URL could be link-verified - treat any reddit URL as unverified rather than cited."
+    },
+    "MillMage": {
+      "product": "MillMage",
+      "officialDocs": [
+        {
+          "topic": "documentation home (current)",
+          "url": "https://docs.millmagesoftware.com/latest/"
+        },
+        {
+          "topic": "getting started (install, machine setup, first project, 11-step path)",
+          "url": "https://docs.millmagesoftware.com/latest/GetStarted/"
+        },
+        {
+          "topic": "toolpaths / operation settings editor (Pocket, Rest Pocket, Profile, Chamfer, Dogbone Slot, Drill, Surfacing, Face, Bore, Fluting; feeds/speeds, cut direction)",
+          "url": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+        },
+        {
+          "topic": "tool library (create/manage CNC tool entries)",
+          "url": "https://docs.millmagesoftware.com/latest/Reference/ToolLibrary/"
+        },
+        {
+          "topic": "machine settings (view/edit GRBL firmware settings)",
+          "url": "https://docs.millmagesoftware.com/latest/Reference/MachineSettings/"
+        },
+        {
+          "topic": "preview window (CNC job simulation, operation order)",
+          "url": "https://docs.millmagesoftware.com/latest/Reference/Preview/"
+        },
+        {
+          "topic": "how-to guides (workholding, probing, coolant/vacuum via custom G-code, licensing)",
+          "url": "https://docs.millmagesoftware.com/latest/Guides/"
+        },
+        {
+          "topic": "MillMage for LightBurn Users (laser vs CNC crossover explainer: force/workholding, operations workflow)",
+          "url": "https://docs.millmagesoftware.com/latest/Explainers/MillMageForLightBurnUsers/"
+        },
+        {
+          "topic": "laser image engraving guide present on MillMage docs site (hidden/shared page: '5 Steps to Perfect Image Engravings', references Laser Tools > Material Test)",
+          "url": "https://docs.millmagesoftware.com/latest/Guides/Hidden/PerfectImageEngraving/"
+        },
+        {
+          "topic": "product overview / machine compatibility ('What is MillMage')",
+          "url": "https://lightburnsoftware.com/pages/what-is-millmage"
+        },
+        {
+          "topic": "launch announcement with feature summary and .lbrn2/.mage cross-compatibility",
+          "url": "https://lightburnsoftware.com/blogs/news/millmage-is-here"
+        }
+      ],
+      "communities": [
+        "MillMage Software Questions - official category on the LightBurn forum (~501 topics at fetch time): https://forum.lightburnsoftware.com/c/millmage-software-questions/61",
+        "MillMage Hardware Compatibility - official forum category: https://forum.lightburnsoftware.com/c/millmage-hardware-compatibility/65",
+        "LightBurn Software YouTube channel (hosts MillMage videos, e.g. 'MillMage is Here!' https://www.youtube.com/watch?v=ntFIv-N2rS8): https://www.youtube.com/channel/UC-TdV9ThMD6E4MZztA6eZsQ"
+      ],
+      "notes": "Docs domain is docs.millmagesoftware.com (NOT docs.millmage.com). MillMage is CNC-router software (launched 2026-02-24 per LightBurn blog), but its docs site demonstrably carries laser-side content: the fetch-verified LightBurn-users explainer, plus 'Hidden' shared pages found via site: search (PerfectImageEngraving; Reference/Hidden/CalibrateCameraLens and CalibrateCameraAlignment) - evidence of shared doc infrastructure with LightBurn and of laser<->CNC file cross-compatibility (.lbrn2 opens in MillMage, .mage opens in LightBurn). Getting Started, OperationSettingsEditor, ToolLibrary, MachineSettings, Preview, Guides, and the explainer were each fetch-verified; Hidden/PerfectImageEngraving and the two lightburnsoftware.com pages are search-snippet-verified. Community lives on the shared LightBurn forum (forum root fetch listed both MillMage categories plus a 'Community CNC Talk' category /c/community-cnc-talk/86); no standalone MillMage forum found. V1E.com forum threads discuss MillMage but its category listing showed no MillMage category, so no hub URL cited."
+    },
+    "LaserGRBL": {
+      "product": "LaserGRBL",
+      "officialDocs": [
+        {
+          "topic": "usage index (basic + advanced usage)",
+          "url": "https://lasergrbl.com/usage/"
+        },
+        {
+          "topic": "user interface (command queue, log, jogging controls)",
+          "url": "https://lasergrbl.com/usage/user-interface/"
+        },
+        {
+          "topic": "machine connection (Arduino/GRBL)",
+          "url": "https://lasergrbl.com/usage/arduino-connection/"
+        },
+        {
+          "topic": "load G-code and send to machine (multi-pass)",
+          "url": "https://lasergrbl.com/usage/load-and-send/"
+        },
+        {
+          "topic": "jogging (manual positioning, speed/step controls)",
+          "url": "https://lasergrbl.com/usage/jogging/"
+        },
+        {
+          "topic": "speed and power overrides",
+          "url": "https://lasergrbl.com/usage/overrides/"
+        },
+        {
+          "topic": "machine state and alarms",
+          "url": "https://lasergrbl.com/usage/machine-status/"
+        },
+        {
+          "topic": "raster image import (image to G-code)",
+          "url": "https://lasergrbl.com/usage/raster-image-import/"
+        },
+        {
+          "topic": "grayscale conversion / import parameters",
+          "url": "https://lasergrbl.com/usage/raster-image-import/import-parameters/"
+        },
+        {
+          "topic": "dithering engraving tool",
+          "url": "https://lasergrbl.com/usage/raster-image-import/dithering-tool/"
+        },
+        {
+          "topic": "image vectorization tool",
+          "url": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+        },
+        {
+          "topic": "custom buttons (user-defined G-code macros)",
+          "url": "https://lasergrbl.com/usage/custom-buttons/"
+        },
+        {
+          "topic": "GRBL configuration ($$ settings for laser)",
+          "url": "https://lasergrbl.com/configuration/"
+        },
+        {
+          "topic": "FAQ",
+          "url": "https://lasergrbl.com/faq/"
+        },
+        {
+          "topic": "GitHub wiki (supplementary docs)",
+          "url": "https://github.com/arkypita/LaserGRBL/wiki"
+        }
+      ],
+      "communities": [
+        "GitHub repository + issue tracker (arkypita/LaserGRBL; releases at /releases): https://github.com/arkypita/LaserGRBL",
+        "GitHub Discussions (General, Show and tell): https://github.com/arkypita/LaserGRBL/discussions",
+        "Official LaserGRBL Facebook group: https://www.facebook.com/groups/lasergrbl/"
+      ],
+      "notes": "Usage index fetch-verified; sub-page URLs enumerated from that live page's own navigation, with load-and-send, jogging, and raster-image-import additionally fetch-verified and user-interface/configuration/faq confirmed by search snippets. Windows-only GUI for GRBL (Arduino Uno/Nano-class controllers); WiFi-via-ESP8266 page also exists (https://lasergrbl.com/usage/wifi-with-esp8266/). No official forum on lasergrbl.com - community activity is GitHub + Facebook. No verifiable subreddit URL found (Reddit crawler-blocked)."
+    },
+    "XCS": {
+      "product": "XCS",
+      "officialDocs": [
+        {
+          "topic": "XCS user guide index (per-machine: S1/P2/F1/D1 Pro/D1/M1/Laserbox)",
+          "url": "https://support.xtool.com/article/1170"
+        },
+        {
+          "topic": "XCS desktop overview, V2.1+ (interface, editing, processing preview)",
+          "url": "https://support.xtool.com/article/1303"
+        },
+        {
+          "topic": "download and install XCS",
+          "url": "https://support.xtool.com/article/257"
+        },
+        {
+          "topic": "software downloads hub",
+          "url": "https://support.xtool.com/download"
+        },
+        {
+          "topic": "software learning center (tutorial collections; XCS v2.0 tutorial collection at /learning-center/collection/33)",
+          "url": "https://support.xtool.com/learning-center"
+        },
+        {
+          "topic": "core cut/engrave workflow: process a flat material on the baseplate (XCS V2.0, F1)",
+          "url": "https://support.xtool.com/article/1673"
+        },
+        {
+          "topic": "material EasySet Library (recommended power/speed parameter presets)",
+          "url": "https://support.xtool.com/article/1306"
+        },
+        {
+          "topic": "define your own materials and parameters",
+          "url": "https://support.xtool.com/article/1865"
+        },
+        {
+          "topic": "camera positioning accuracy/deviations in XCS (<=1.5mm tolerance, fisheye effects)",
+          "url": "https://support.xtool.com/article/925"
+        },
+        {
+          "topic": "rotary: Rotary Attachment 2 (RA2) user guide (roller/chuck modes)",
+          "url": "https://support.xtool.com/article/172"
+        },
+        {
+          "topic": "rotary workflow in xTool software with D1 Pro (mode selection, perimeter/diameter entry, auto-focus)",
+          "url": "https://support.xtool.com/article/160"
+        },
+        {
+          "topic": "machine control workflow: operate xTool P2 with XCS V2.1",
+          "url": "https://support.xtool.com/article/1580"
+        },
+        {
+          "topic": "XCS / xTool Studio release notes",
+          "url": "https://support.xtool.com/article/1773"
+        }
+      ],
+      "communities": [
+        "xTool Official Group (Facebook): https://www.facebook.com/groups/xtoolofficial/",
+        "xTool D1/D1 Pro Official Group (Facebook): https://www.facebook.com/groups/xtoold1/",
+        "xTool official YouTube channel: https://www.youtube.com/channel/UCMLAJJhV2Rrzor87fogEjBw",
+        "xTool Support YouTube channel (official support content): https://www.youtube.com/@xtoolsupport"
+      ],
+      "notes": "XCS (xTool Creative Space) docs are per-machine support-center articles rather than one manual; article/1170 and /1303 and /1673 fetch-verified, the rest search-snippet-verified from support.xtool.com results. Prefer V2.x articles (V2.1 desktop overview) - older V1.7-era articles exist (e.g. editor overview article/1022, RA2-with-F1 article/1000) and per-machine RA2 variants abound (articles 996/1000/1107/1323/1504/2052). Caveats: support.xtool.com/community-support root returns 404 (only individual Q&A detail pages resolve) so it is not cited as a hub; xtool.zendesk.com mirrors some articles (legacy). xTool is also migrating some machines to newer 'xTool Studio' software per the shared release notes (article/1773) - worth tracking in the audit. No verifiable r/xTool URL (Reddit crawler-blocked)."
+    }
+  }
+}

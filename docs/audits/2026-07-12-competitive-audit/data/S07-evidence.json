@@ -1,0 +1,98 @@
+{
+  "sector": 7,
+  "categories": [
+    {
+      "id": "7.1",
+      "summary": "Inside/outside/on-path profiles via clipper2 containment-aware tool-radius offset; open paths always on-path (Easel semantics). Inner contours cut before outer via containment depth. Climb/conventional is opt-in, enforced by shoelace-orientation reversal on closed toolpaths, with entry rotated to the longest-segment midpoint. NaN vertices dropped pre-clipper. No arc lead-ins (documented deferral).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/cnc/profile-paths.ts:30-49 (outside/inside/on-path offset dispatch; open = on-path)" },
+        { "tag": "CODE", "cite": "src/core/cnc/compile-cnc-job.ts:268-279,394-406 (cut-type dispatch; orderInnerFirst containment ordering)" },
+        { "tag": "CODE", "cite": "src/core/cnc/motion-polish.ts:36-56 (climb/conventional per cut type), :13-14 (arc leads deferred)" },
+        { "tag": "CODE", "cite": "src/ui/layers/CncLayerToolFields.tsx:197-213 (Climb/Conventional select, default = compiler natural)" },
+        { "tag": "TEST", "cite": "src/core/cnc/profile-paths.test.ts (6 tests) + motion-polish.test.ts (8 tests) — re-run green this audit 2026-07-13" }
+      ],
+      "notVerified": "No rendered or machine verification that offset contours land the cut edge on the drawn path; correctness rests on clipper2 wrapper tests. Climb/conventional never exercised on hardware (all CNC hardware passes are CLAIMED per PROJECT.md)."
+    },
+    {
+      "id": "7.2",
+      "summary": "Two strategies: contour-parallel offset rings (innermost-first, boundary wall ring last as finishing pass, each ring offset from original contours to avoid error accumulation, 4096-ring backstop) and opt-in raster X/Y serpentine sweeps (ADR-105 G10) reusing the laser fill-hatching engine. Islands handled by containment-aware offsets. Stepover clamped 10-85%. No adaptive/trochoidal clearing, no wall finish allowance.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/cnc/pocket-paths.ts:26-89 (rings + raster strategies, island handling, MAX_POCKET_RINGS)" },
+        { "tag": "CODE", "cite": "src/core/cnc/compile-cnc-job.ts:443-459 (strategy dispatch on settings.pocketStrategy)" },
+        { "tag": "CODE", "cite": "DECISIONS.md:4473 (ADR-105 — Easel-parity pocket raster fill)" },
+        { "tag": "TEST", "cite": "src/core/cnc/pocket-paths.test.ts (7 tests incl. innermost-first ordering and wall-last) — green 2026-07-13" }
+      ],
+      "notVerified": "Pocket floor coverage (no uncut slivers between rings/sweeps) is asserted structurally, never perceptually rendered or cut; the 2026-07-10 full-sweep audit likewise flagged pocket coverage as unverified fidelity."
+    },
+    {
+      "id": "7.3",
+      "summary": "'Drill' cut type: every closed shape becomes one hole at its bounding-box center with an explicit peck cycle (step down depthPerPass, retract to stock top to clear chips, repeat), encoded as path3d since GRBL lacks G81/G83. Whole cycle pinned to the plunge feed at compile. No point-object drilling, no dwell-at-bottom, no configurable retract height, no peck-vs-plain choice.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/cnc/drill-peck.ts:26-52 (peck cycle, chip-clear to Z0, bounds-center placement)" },
+        { "tag": "CODE", "cite": "src/core/cnc/compile-cnc-job.ts:164-170,243-249 (drill group feed = min(feed, plunge); dedicated dispatch)" },
+        { "tag": "CODE", "cite": "src/core/scene/machine.ts:285-286 (cut-type label 'Drill (peck at centers)')" },
+        { "tag": "TEST", "cite": "src/core/cnc/cnc-multi-tool.test.ts:71-89 (drillPeckPasses pecks with chip-clear retracts) — green 2026-07-13" }
+      ],
+      "notVerified": "Hole positional accuracy and actual chip evacuation are hardware behaviors — never machine-verified (CLAIMED). Behavior with non-circular closed shapes (drills at bbox center regardless of shape) not compared against any reference CAM."
+    },
+    {
+      "id": "7.4",
+      "summary": "True V-carving via inward offset ladder z(d) = -min(d/tan(θ/2), maxDepth) converging to the medial axis (ADR-098 H.3); cone-height cap prevents modeling deeper than the bit's flank (VCarve-style flat-depth limit); auto resolution tool/8 with 0.1 mm floor, 8192-ring backstop. Two-stage clearing pockets flat floors with a separate flat bit before the v-bit ladder. Analytic perceptual test proves a 90° bit carves the exact pyramid frustum through the real pipeline.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/cnc/vcarve-ladder.ts:1-62 (depth law, cone cap, resolution, ring backstop)" },
+        { "tag": "CODE", "cite": "src/core/cnc/vcarve-clearance.ts:1-30 + src/core/cnc/compile-cnc-job.ts:189-226 (two-stage flat-floor clearing group)" },
+        { "tag": "CODE", "cite": "src/ui/layers/CncLayerToolFields.tsx:92-101 (clearing-bit select UI)" },
+        { "tag": "TEST", "cite": "src/core/cnc/vcarve-perceptual.test.ts:19-36 (removal-grid vs analytic groove through compileCncJob → buildToolpath → removal grid; 2 tests) — re-run green 2026-07-13" }
+      ],
+      "notVerified": "The perceptual test is analytic (computed removal grid vs formula), not a rendered visual comparison or a cut in wood; carved-letter quality vs VCarve/Carbide Create never compared side by side. Full-depth sharp-corner behavior verified only on a square fixture."
+    },
+    {
+      "id": "7.5",
+      "summary": "Holding tabs on profile cuts: passes below tab-top skip tab windows, an extra pass lands exactly at the tab top so height never quantizes to the pass grid, bridge width compensated by tool diameter, hole slugs tabbed too. Default remains tabsEnabled:false with depth == stock (M-17); mitigated post-audit by a through-cut-without-tabs advisory (CNC-06). Ramp entry opt-in (along-path descent + level re-cut). Lead-ins v1 = start at longest-segment midpoint; arc leads and drag-placeable tabs deferred.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/cnc/cnc-tabs.ts:13-45 + src/core/cnc/compile-cnc-job.ts:306-358 (tab ladder, exact tab-top pass, slug tabs)" },
+        { "tag": "CODE", "cite": "src/core/scene/machine.ts:217-226 (DEFAULT_CNC_LAYER_SETTINGS: profile-outside, depthMm 6.35 == stock, tabsEnabled false)" },
+        { "tag": "CODE", "cite": "src/ui/laser/cnc-through-cut-tab-warnings.ts:15-36 (advisory, wired via machine-job-warnings.ts:13) — commit 0ba73436 (CNC-06)" },
+        { "tag": "CODE", "cite": "src/core/cnc/motion-polish.ts:59-122 (rotateStartToLongestSegment; applyRampEntry with level re-cut); src/ui/layers/CncLayerAdvancedFields.tsx:251-286 (tabs UI, Basic group)" },
+        { "tag": "TEST", "cite": "src/ui/laser/cnc-through-cut-tab-warnings.test.ts (6 tests) + src/core/cnc/motion-polish.test.ts — green 2026-07-13" }
+      ],
+      "notVerified": "cnc-through-cut-tab-warnings.ts:10 claims the Easel-divergent tabs-off default is 'recorded in the CNC-defaults ADR' — no such ADR found in DECISIONS.md (grep for tabs/through-cut/CNC-defaults); the divergence appears un-ADR'd doc drift. Physical tab strength/breakout never cut on hardware."
+    },
+    {
+      "id": "7.6",
+      "summary": "zPassDepths ladder with the final pass exactly at -depth; contour-major for profiles (each shape to full depth, Easel-style) vs depth-major for pockets. Preflight blocks depth > stock + through-cut allowance and re-proves no emitted Z below -(stock+allowance) on the final G-code text. Relief roughing leaves a 0.5 mm allowance for the finishing skim. No finishing allowance / stock-to-leave for profiles or pockets.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/cnc/depth-passes.ts:11-24 (ladder, exact floor)" },
+        { "tag": "CODE", "cite": "src/core/cnc/compile-cnc-job.ts:306-331,362-373 (contour-major vs depth-major)" },
+        { "tag": "CODE", "cite": "src/core/preflight/cnc-preflight.ts:1-16 (depth-vs-stock check + findOverdeepCutIssues on emitted text)" },
+        { "tag": "CODE", "cite": "src/core/relief/relief-roughing.ts:26,38-50 (DEFAULT_RELIEF_ALLOWANCE_MM = 0.5)" },
+        { "tag": "TEST", "cite": "src/core/cnc/depth-passes.test.ts (7 tests) + compile-cnc-job.test.ts (10 tests) — green 2026-07-13" }
+      ],
+      "notVerified": "No stock-to-leave / separate finishing pass for 2D ops exists to verify (gap vs VCarve/Carbide Create, stated from absence in CncLayerSettings, src/core/scene/machine.ts:80-122). Actual floor precision at -depth is a machine claim, not measured."
+    },
+    {
+      "id": "7.7",
+      "summary": "18 starter bits (end-mill/ball-nose/v-bit/engraving, mm-first names, stable ids) plus persisted custom-bit add/delete. Chipload calculator (feed = RPM × flutes × chipload; 5 materials × 4 diameter bands, device.maxFeed cap) feeds three UX tiers — project material (ADR-112), per-layer material (ADR-111), advanced calculator — through one calculateFeeds. Multi-bit jobs: contiguous per-bit sections, streamer tool-change hold with named bit and unlocked jog/probe/Zero-Z (CNC-01/R5 fixes). Untouched 1000/1.5 defaults now draw an advisory. Tools store no per-tool feeds/flutes (vs Vectric tool database).",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/core/scene/machine.ts:163-188 (DEFAULT_CNC_TOOLS, 18 bits); src/ui/machine/CncLibraryPanels.tsx:19-50 (custom bit manager)" },
+        { "tag": "CODE", "cite": "src/core/cnc/feeds-calculator.ts:1-103 (chipload chart, bands, maxFeed cap); DECISIONS.md:5017,5084 (ADR-111/112)" },
+        { "tag": "CODE", "cite": "src/core/cnc/cnc-tool-sections.ts:1-37 (per-bit sections, profiles last); src/core/controllers/grbl/streamer.ts:39-59,187-205 (tool-change hold, M0 left queued); src/ui/state/laser-store-helpers.ts:52-71 (jog/probe/zero unlocked at Idle tool-change); src/core/output/tool-change-labels.ts:1-20 (bit named at hold)" },
+        { "tag": "CODE", "cite": "src/ui/laser/cnc-default-feed-warnings.ts + machine-job-warnings.ts:9 (untouched-default advisory)" },
+        { "tag": "TEST", "cite": "feeds-calculator.test.ts (9), cnc-multi-tool.test.ts (11), streamer-tool-change.test.ts (7), cnc-library-actions.test.ts — green 2026-07-13" }
+      ],
+      "notVerified": "Chipload numbers are labeled provisional industry-typical values; never validated against a real cut (all hardware CLAIMED). The full in-app tool-change flow (hold → swap → re-zero → Continue) verified only via streamer unit tests, never on a machine or live app this audit."
+    },
+    {
+      "id": "7.8",
+      "summary": "STL import (ASCII + binary parsers) via drag-and-drop → ReliefObject (ADR-098 H.4); mesh→heightmap; waterline roughing at tool/8 cells leaving 0.5 mm; optional finishing skim with its own bit, scallop-driven row spacing for ball noses, serpentine XYZ rows over the tool-tip-offset surface; 3D relief viewer and persistent CNC 3D pane through the single contained three.js seam (ADR-102). Known defect S8-F5 still open: no menu/command/help entry for STL — drag-drop is the only path. No image-to-heightmap route found.",
+      "evidence": [
+        { "tag": "CODE", "cite": "src/io/stl/parse-stl.ts + parse-stl-ascii.ts + parse-stl-binary.ts; src/ui/app/stl-import-action.ts:1-30 (drag-drop only; use-import-drag-drop.ts:88 sole call site)" },
+        { "tag": "CODE", "cite": "src/core/relief/relief-roughing.ts:1-50, relief-finishing.ts:1-26, heightmap-tool-offset.ts:18-34; src/core/cnc/compile-cnc-relief.ts:40-100 (rough + finish groups, transform-aware)" },
+        { "tag": "CODE", "cite": "src/ui/workspace/Cnc3DPane.tsx + src/ui/relief-viewer/relief-three-scene.ts (ADR-102 three.js containment, DECISIONS.md:4303)" },
+        { "tag": "CODE", "cite": "grep 'import-stl' in src/ui/commands/ = no matches (S8-F5 unfixed at pinned commit)" },
+        { "tag": "TEST", "cite": "parse-stl.test.ts (8), relief-roughing/finishing/surface-mesh/mesh-to-heightmap/marching-squares tests — green 2026-07-13" }
+      ],
+      "notVerified": "No perceptual/visual comparison of carved relief output (roughing terraces, finishing scallops) — relief tests are analytic; the 2026-07-10 audit flagged the same. No grayscale-image→heightmap workflow found (grep); competitors' 3D-from-image feature has no KerfDesk analog to verify. Live 3D-pane behavior on large meshes not exercised (no dev-server interaction per rules)."
+    }
+  ]
+}
