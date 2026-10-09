@@ -51,9 +51,8 @@ export function withLinearPickDepth(shader: ShaderSource): ShaderSource {
     }
     gl_FragDepth = ( pickEyeDistance - ${RANGE}.x ) / ( ${RANGE}.y - ${RANGE}.x );
   } else if ( ${PERSPECTIVE} > 0.5 ) {
-    float pickEyeDistance = ${RANGE}.x * ${RANGE}.y /
-      ( ${RANGE}.y - gl_FragCoord.z * ( ${RANGE}.y - ${RANGE}.x ) );
-    gl_FragDepth = ( pickEyeDistance - ${RANGE}.x ) / ( ${RANGE}.y - ${RANGE}.x );
+    gl_FragDepth = ${RANGE}.x * gl_FragCoord.z /
+      ( ${RANGE}.x + ( 1.0 - gl_FragCoord.z ) * ( ${RANGE}.y - ${RANGE}.x ) );
   }
 `,
     ),

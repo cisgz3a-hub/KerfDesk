@@ -7,7 +7,14 @@ describe('cropped ID eye-depth encoding', () => {
   it.each(['fat', 'native'] as const)(
     'composes physical clipping and resolved planes for %s',
     (kind) => {
-      const material = new LineMaterial();
+      const material =
+        kind === 'fat'
+          ? new LineMaterial()
+          : new three.ShaderMaterial({
+              vertexShader:
+                'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+              fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }',
+            });
       const previousCompile = vi.fn();
       const previousRender = vi.fn();
       material.onBeforeCompile = previousCompile;
@@ -68,4 +75,87 @@ describe('cropped ID eye-depth encoding', () => {
     const source = { vertexShader: 'void main() {}', fragmentShader: 'void main() {}' };
     expect(withLinearPickDepth(source)).toBe(source);
   });
+
+  it('preserves raster near/far endpoints in Float32 without inverse-depth cancellation', () => {
+    const material = new three.ShaderMaterial({
+      vertexShader: 'void main() {}',
+      fragmentShader: 'void main() {}',
+    });
+    installPickDepth(three, material, 'native');
+    const shader = {
+      vertexShader: material.vertexShader,
+      fragmentShader: material.fragmentShader,
+      uniforms: {},
+    };
+    material.onBeforeCompile(shader as never, {} as never);
+    const fallback = shader.fragmentShader.slice(
+      shader.fragmentShader.lastIndexOf('else if ( kerfdeskPickPerspective'),
+    );
+    for (const far of [1000, 100000]) {
+      const camera = new three.PerspectiveCamera(40, 1, 0.1, far);
+      for (const z of [0, 0.5, 1]) {
+        const variables: Record<string, number> = {
+          'kerfdeskPickClipRange.x': Math.fround(camera.near),
+          'kerfdeskPickClipRange.y': Math.fround(far),
+          'gl_FragCoord.z': Math.fround(z),
+        };
+        const temporary = fallback.match(/float pickEyeDistance = ([\s\S]*?);/);
+        if (temporary?.[1]) variables.pickEyeDistance = evaluateFloat32(temporary[1], variables);
+        const assignment = fallback.match(/gl_FragDepth = ([\s\S]*?);/);
+        expect(assignment).not.toBeNull();
+        const actual = evaluateFloat32(assignment?.[1] ?? '', variables);
+        const eye = new three.Vector3(0, 0, z * 2 - 1).applyMatrix4(camera.projectionMatrixInverse);
+        const expected = (-eye.z - camera.near) / (far - camera.near);
+        expect(Math.abs(actual - expected)).toBeLessThanOrEqual(
+          Math.max(4 * 2 ** -23 * Math.abs(expected), 4 * Number.EPSILON),
+        );
+        if (z === 0 || z === 1) expect(actual).toBe(z);
+      }
+    }
+    material.dispose();
+  });
 });
+
+// Evaluate the emitted scalar GLSL expression, rounding each operation as a
+// separate Float32 step. The expected depth above comes from Three's inverse
+// projection, independently of the shader's selected algebra.
+function evaluateFloat32(source: string, values: Record<string, number>): number {
+  const tokens = source.match(/[A-Za-z_][\w.]*|\d+(?:\.\d+)?|[()+*/-]/g) ?? [];
+  const precedence: Record<string, number> = { '+': 1, '-': 1, '*': 2, '/': 2 };
+  let at = 0;
+  const expression = (minimum = 0): number => {
+    const token = tokens[at++];
+    let left: number;
+    if (token === '(') {
+      left = expression();
+      if (tokens[at++] !== ')') throw Error('Unbalanced GLSL expression');
+    } else {
+      left = Math.fround(values[token ?? ''] ?? Number(token));
+      if (!Number.isFinite(left)) throw Error('Unknown GLSL operand: ' + token);
+    }
+    while ((precedence[tokens[at] ?? ''] ?? -1) >= minimum) {
+      const operator = tokens[at++] ?? '';
+      const right = expression((precedence[operator] ?? 0) + 1);
+      left = Math.fround(binaryValue(operator, left, right));
+    }
+    return left;
+  };
+  const result = expression();
+  if (at !== tokens.length) throw Error('Unconsumed GLSL expression');
+  return result;
+}
+
+function binaryValue(operator: string, left: number, right: number): number {
+  switch (operator) {
+    case '+':
+      return left + right;
+    case '-':
+      return left - right;
+    case '*':
+      return left * right;
+    case '/':
+      return left / right;
+    default:
+      throw Error('Unknown GLSL operator: ' + operator);
+  }
+}
