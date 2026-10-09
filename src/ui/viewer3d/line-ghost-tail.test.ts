@@ -233,7 +233,7 @@ describe('ghost tail draw and callback composition', () => {
     expect(previousRender).toHaveBeenCalledTimes(3);
   });
 
-  it('keeps source class and plane predicates when depth batching clones the trimmed base ghost', () => {
+  it('keeps the physical source plane and cap hooks on the original trimmed ghost', () => {
     const source = scene();
     installGhostTail(three, source.ghostMaterial, source.ghost.geometry, source.state);
     const batches = createDepthBatches({
@@ -245,7 +245,7 @@ describe('ghost tail draw and callback composition', () => {
       colors: source.colors,
     });
     for (const material of batches.materials) materials.add(material);
-    for (const index of [1, 4, 5]) {
+    for (const index of [1]) {
       const material = batches.materials[index]!;
       const shader = compiled(material);
       expect(shader.uniforms.kerfdeskGhostActiveIndex).toBe(source.state.index);
@@ -258,16 +258,13 @@ describe('ghost tail draw and callback composition', () => {
       draw(material, source.ghost.geometry);
       expect(shader.uniforms.kerfdeskGhostTailEnabled?.value).toBe(1);
     }
-    const constant = compiled(batches.materials[4]!);
-    expect(constant.vertexShader).toContain('instanceStart.z != instanceEnd.z');
-    expect(constant.vertexShader).toContain('instanceStart.z == instanceEnd.z');
-    expect(constant.vertexShader).toContain('-instanceStart.z');
-    expect(constant.vertexShader).not.toContain('kerfdeskGhostStart.z != instanceEnd.z');
-    const ramp = compiled(batches.materials[5]!);
-    expect(ramp.vertexShader).toContain('instanceStart.z == instanceEnd.z');
-    expect(ramp.fragmentShader).not.toContain('gl_FragDepth');
-    for (const index of [0, 2, 3])
-      expect(compiled(batches.materials[index]!).vertexShader).not.toContain('kerfdeskGhostStart');
+    expect(batches.objects).toHaveLength(2);
+    const ghost = compiled(batches.materials[1]!);
+    expect(ghost.vertexShader).toContain('instanceStart.z == instanceEnd.z');
+    expect(ghost.vertexShader).toContain('kerfdeskXYPlaneMatrix * kerfdeskDepthPlane');
+    expect(ghost.vertexShader).not.toContain('kerfdeskGhostStart.z == instanceEnd.z');
+    expect(ghost.fragmentShader).toContain('gl_FragDepth = planeDepth;');
+    expect(compiled(batches.materials[0]!).vertexShader).not.toContain('kerfdeskGhostStart');
   });
 });
 

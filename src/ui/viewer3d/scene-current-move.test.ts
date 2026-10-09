@@ -3,10 +3,8 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDepthBatches } from './line-depth-batches';
-import { addTrail, setTrail } from './line-trail';
-import { createProgramGeometry, shareProgramGeometry } from './program-lines';
-import { createCurrentMove, type CurrentMove } from './scene-current-move';
+import { DEPTH_PLANE_ATTRIBUTE } from './line-depth-plane-geometry';
+import { createCurrentMove } from './scene-current-move';
 import { disposeChildren } from './scene-furniture';
 import { resolveViewer3dTheme } from './viewer3d-theme';
 
@@ -33,10 +31,6 @@ function current(planar = false, Material: typeof LineMaterial = LineMaterial) {
   return active;
 }
 
-function visible(active: CurrentMove) {
-  return active.object.children.map((child) => child.visible);
-}
-
 function compiled(material: LineMaterial) {
   const shader = {
     vertexShader: material.vertexShader,
@@ -47,92 +41,78 @@ function compiled(material: LineMaterial) {
   return shader;
 }
 
-function completed() {
-  const colors = new Uint16Array([10000, 20000, 30000, 65535, 10000, 20000, 30000, 65535]);
-  const { geometry } = createProgramGeometry(
-    three,
-    LineSegmentsGeometry,
-    new Float32Array([0, 0, 0, 10, 0, 0, 10, 0, 0, 20, 0, 1]),
-    colors,
-  );
-  const material = new LineMaterial();
-  const trail = addTrail(three, material);
-  const lines = new LineSegments2(geometry, material);
-  const ghost = new LineSegments2(
-    shareProgramGeometry(LineSegmentsGeometry, geometry),
-    new LineMaterial(),
-  );
-  const batches = createDepthBatches({ three, LineSegments2, lines, ghost, trail, colors });
-  const group = new three.Group();
-  group.add(...batches.objects);
-  groups.push(group);
-  return { batches, colors, trail };
-}
-
-describe('active move exact and hardware ramp pairs', () => {
-  it('keeps exact depth by default, with every hidden pair attached to the same geometry', () => {
+describe('active move shared physical writer', () => {
+  it('keeps one casing/core pair and one position/plane buffer for every ramp', () => {
     const active = current();
     const strokes = active.object.children as LineSegments2[];
-    expect(strokes).toHaveLength(4);
-    expect(active.materials).toHaveLength(4);
-    expect(visible(active)).toEqual([true, true, false, false]);
-    expect(strokes.map((stroke) => stroke.renderOrder)).toEqual([3, 4, 3, 4]);
-    expect(active.materials.map((material) => material.linewidth)).toEqual([8, 4, 8, 4]);
-    expect(active.materials.map((material) => material.depthWrite)).toEqual([
-      false,
-      true,
-      false,
-      true,
+    expect(strokes).toHaveLength(2);
+    expect(active.materials.map((material) => material.linewidth)).toEqual([8, 4]);
+    expect(active.materials.map((material) => material.depthWrite)).toEqual([false, true]);
+    expect(strokes.map((stroke) => stroke.renderOrder)).toEqual([3, 4]);
+    expect(strokes.map((stroke) => stroke.name)).toEqual([
+      'toolpath-current-exact-casing',
+      'toolpath-current-exact-core',
     ]);
     expect(new Set(strokes.map((stroke) => stroke.geometry)).size).toBe(1);
-    expect(new Set(strokes.map((stroke) => stroke.name)).size).toBe(4);
-    for (const stroke of strokes) expect(stroke.frustumCulled).toBe(false);
-    for (const index of [0, 1])
-      expect(compiled(active.materials[index]!).fragmentShader).toContain('gl_FragDepth');
-    for (const index of [2, 3])
-      expect(compiled(active.materials[index]!).fragmentShader).not.toContain('gl_FragDepth');
+    for (const stroke of strokes) {
+      expect(stroke.visible).toBe(true);
+      expect(stroke.frustumCulled).toBe(false);
+      expect(stroke.geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE).array).toBeInstanceOf(
+        Float32Array,
+      );
+      expect(compiled(stroke.material).fragmentShader).toContain('gl_FragDepth = planeDepth');
+    }
   });
 
-  it('changes pair immediately on permission changes and on ramp/flat placement', () => {
-    const active = current();
-    active.object.visible = true;
-    active.place([0, 0, 0], [10, 0, 1]);
-    expect(visible(active)).toEqual([true, true, false, false]);
-    active.useHardwareDepth(true);
-    expect(visible(active)).toEqual([false, false, true, true]);
-    active.place([10, 0, 1], [20, 0, 1]);
-    expect(visible(active)).toEqual([true, true, false, false]);
-    active.place([20, 0, 1], [30, 0, -1]);
-    expect(visible(active)).toEqual([false, false, true, true]);
-    active.useHardwareDepth(false);
-    expect(visible(active)).toEqual([true, true, false, false]);
-    active.useHardwareDepth(true);
-    expect(visible(active)).toEqual([false, false, true, true]);
-    expect(active.object.visible).toBe(true);
-  });
-
-  it('classifies the stored Float32 endpoints, including a tiny unequal stored depth', () => {
+  it('derives depth from the actual placed Float32 endpoints and uploads only that short move', () => {
     const active = current();
     const buffer = active.positions();
+    const stroke = active.object.children[0] as LineSegments2;
+    const plane = stroke.geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE) as three.BufferAttribute;
+    const coefficients = plane.array;
+    const initialVersion = plane.version;
+    active.place([0, 0, 0], [50, 0, 0.5]);
+    expect([...coefficients]).toEqual([Math.fround(-0.01), 0, 1, 0]);
     active.useHardwareDepth(true);
+    expect(active.object.children.map((child) => child.visible)).toEqual([true, true]);
     active.place([0, 0, 1], [10, 0, 1 + 2e-8]);
-    expect(active.positions()[2]).toBe(active.positions()[5]);
-    expect(visible(active)).toEqual([true, true, false, false]);
+    expect(buffer[2]).toBe(buffer[5]);
+    expect([...coefficients]).toEqual([0, 0, 1, -1]);
     active.place([0, 0, 1], [10, 0, 1 + 2 ** -22]);
-    expect(active.positions()[2]).not.toBe(active.positions()[5]);
-    expect(visible(active)).toEqual([false, false, true, true]);
+    expect(coefficients[0]).toBe(Math.fround(-(2 ** -22) / 10));
     expect(active.positions()).toBe(buffer);
-    expect(active.positions()).toHaveLength(6);
+    expect(plane.array).toBe(coefficients);
+    expect(coefficients).toHaveLength(4);
+    expect(plane.version).toBe(initialVersion + 3);
+    expect(active.object.children.map((child) => child.visible)).toEqual([true, true]);
   });
 
-  it('keeps planar moves on the original two materials and makes the permission method a no-op', () => {
+  it('retains the full stored source plane when a non-dyadic prefix endpoint rounds', () => {
+    const active = current();
+    active.place([1, 0, 0], [1.4, 0.4, 0.4], new Float32Array([2, 1, 1]));
+    const stroke = active.object.children[0] as LineSegments2;
+    expect([...active.positions()]).toEqual([
+      1,
+      0,
+      0,
+      Math.fround(1.4),
+      Math.fround(0.4),
+      Math.fround(0.4),
+    ]);
+    expect([...stroke.geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE).array]).toEqual([
+      -0.5, -0.5, 1, 0.5,
+    ]);
+    active.place([2, 1, 1], [1.4, 0.4, 0.4], new Float32Array([1, 0, 0]));
+    expect([...stroke.geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE).array]).toEqual([
+      -0.5, -0.5, 1, 0.5,
+    ]);
+  });
+
+  it('leaves the planar ordered draw on two original materials without a depth writer', () => {
     const active = current(true);
     active.useHardwareDepth(true);
     active.place([0, 0, 0], [10, 0, 1]);
-    active.useHardwareDepth(false);
     expect(active.object.children).toHaveLength(2);
-    expect(active.materials).toHaveLength(2);
-    expect(visible(active)).toEqual([true, true]);
     for (const material of active.materials) {
       expect(material.depthWrite).toBe(false);
       expect(material.blending).toBe(three.NoBlending);
@@ -140,77 +120,53 @@ describe('active move exact and hardware ramp pairs', () => {
     }
   });
 
-  it('exposes all materials for resize/clipping and disposes both the visible and hidden pairs', () => {
+  it('exposes every material to resize/clipping and disposes the entire pair once', () => {
     const active = current();
-    const strokes = active.object.children as LineSegments2[];
     const planes = [new three.Plane(new three.Vector3(1, 0, 0), -2)];
     const disposals = active.materials.map((material) => vi.spyOn(material, 'dispose'));
     for (const material of active.materials) {
       material.resolution.set(1600, 1200);
       material.clippingPlanes = planes;
     }
-    for (const [index, stroke] of strokes.entries()) {
-      expect(stroke.material).toBe(active.materials[index]);
-      expect(stroke.material.resolution).toEqual(new three.Vector2(1600, 1200));
-      expect(stroke.material.clippingPlanes).toBe(planes);
+    for (const child of active.object.children as LineSegments2[]) {
+      expect(child.material.resolution).toEqual(new three.Vector2(1600, 1200));
+      expect(child.material.clippingPlanes).toBe(planes);
     }
     disposeChildren(active.object);
     for (const dispose of disposals) expect(dispose).toHaveBeenCalledOnce();
     expect(active.object.children).toHaveLength(0);
   });
 
-  it('copies parent hooks and captures hardware cache identity before the source hook changes', () => {
-    const hooks: { cell: { value: number }; key: string; render: ReturnType<typeof vi.fn> }[] = [];
+  it('composes each parent compile/render hook exactly once without material clones', () => {
+    const hooks: { cell: { value: number }; render: ReturnType<typeof vi.fn> }[] = [];
     class ParentMaterial extends LineMaterial {
       constructor(parameters?: ConstructorParameters<typeof LineMaterial>[0]) {
         super(parameters);
-        const cell = { value: hooks.length + 1 };
-        const render = vi.fn();
+        const cell = { value: hooks.length + 1 },
+          render = vi.fn();
         this.onBeforeCompile = (shader) => {
           shader.uniforms.parentCell = cell;
         };
         this.onBeforeRender = render;
-        // This callback closes over the original material, so copying it alone
-        // would read that material's later XY-depth callback and change the key.
-        this.customProgramCacheKey = () => cell.value + ':' + this.onBeforeCompile.toString();
-        hooks.push({ cell, key: this.customProgramCacheKey(), render });
+        this.customProgramCacheKey = () => 'custom-parent';
+        hooks.push({ cell, render });
       }
     }
     const active = current(false, ParentMaterial);
-    for (const [exact, hardware] of [
-      [0, 2],
-      [1, 3],
-    ] as const) {
-      expect(compiled(active.materials[exact]!).uniforms.parentCell).toBe(hooks[exact]?.cell);
-      expect(compiled(active.materials[hardware]!).uniforms.parentCell).toBe(hooks[exact]?.cell);
-      expect(active.materials[hardware]?.customProgramCacheKey()).toBe(hooks[exact]?.key);
-      expect(active.materials[hardware]?.onBeforeRender).toBe(hooks[exact]?.render);
+    expect(hooks).toHaveLength(2);
+    const renderer = { getCurrentViewport: (value: three.Vector4) => value.set(0, 0, 800, 600) };
+    for (const [index, child] of (active.object.children as LineSegments2[]).entries()) {
+      expect(compiled(child.material).uniforms.parentCell).toBe(hooks[index]?.cell);
+      expect(child.material.customProgramCacheKey()).toBe('custom-parent-physical-plane-depth-fat');
+      child.material.onBeforeRender(
+        renderer as never,
+        new three.Scene(),
+        new three.Camera(),
+        child.geometry,
+        child,
+        {} as never,
+      );
+      expect(hooks[index]?.render).toHaveBeenCalledOnce();
     }
-  });
-
-  it('tracks the cached completed split guard through paused colours and fading from move zero', () => {
-    const active = current();
-    const { batches, colors, trail } = completed();
-    active.place([0, 0, 0], [10, 0, 1]);
-    const sync = () => active.useHardwareDepth(batches.split);
-    expect(batches.split).toBe(true);
-    sync();
-    expect(visible(active)).toEqual([false, false, true, true]);
-    colors[4] = 10001;
-    expect(batches.split).toBe(true);
-    batches.refreshColors();
-    expect(batches.split).toBe(false);
-    sync();
-    expect(visible(active)).toEqual([true, true, false, false]);
-    colors[4] = 10000;
-    batches.refreshColors();
-    setTrail(trail, 0, 1, [0.1, 0.2, 0.3]);
-    expect(batches.split).toBe(false);
-    sync();
-    expect(visible(active)).toEqual([true, true, false, false]);
-    setTrail(trail, 0, 1, null);
-    expect(batches.split).toBe(true);
-    sync();
-    expect(visible(active)).toEqual([false, false, true, true]);
   });
 });

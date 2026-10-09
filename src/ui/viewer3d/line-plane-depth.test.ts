@@ -2,12 +2,8 @@ import * as three from 'three';
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { describe, expect, it, vi } from 'vitest';
 import { addTrail } from './line-trail';
-import {
-  addXYPlaneFlags,
-  installXYPlaneDepth,
-  withXYPlaneDepth,
-  XY_PLANE_ATTRIBUTE,
-} from './line-plane-depth';
+import { installXYPlaneDepth, withXYPlaneDepth } from './line-plane-depth';
+import { addDepthPlanes, DEPTH_PLANE_ATTRIBUTE } from './line-depth-plane-geometry';
 
 function compiled(
   material: three.Material,
@@ -18,8 +14,8 @@ function compiled(
   return shader;
 }
 
-describe('native XY plane eligibility', () => {
-  it('shares one byte per vertex only for exact equal-Z pairs, retaining ramp depth', () => {
+describe('native physical plane attributes', () => {
+  it('shares one canonical Float32 plane per native pair, including ramps', () => {
     const geometry = new three.BufferGeometry();
     geometry.setAttribute(
       'position',
@@ -28,12 +24,37 @@ describe('native XY plane eligibility', () => {
         3,
       ),
     );
-    addXYPlaneFlags(three, geometry);
-    const flags = geometry.getAttribute(XY_PLANE_ATTRIBUTE);
-    expect(flags.array).toBeInstanceOf(Uint8Array);
-    expect([...flags.array]).toEqual([1, 1, 0, 0, 1, 1]);
-    addXYPlaneFlags(three, geometry);
-    expect(geometry.getAttribute(XY_PLANE_ATTRIBUTE)).toBe(flags);
+    addDepthPlanes(three, geometry, 'native');
+    const flags = geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE);
+    expect(flags.array).toBeInstanceOf(Float32Array);
+    expect([...flags.array]).toEqual([
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      Math.fround(-0.1),
+      0,
+      1,
+      0,
+      Math.fround(-0.1),
+      0,
+      1,
+      0,
+      0,
+      0,
+      1,
+      -2,
+      0,
+      0,
+      1,
+      -2,
+    ]);
+    addDepthPlanes(three, geometry, 'native');
+    expect(geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE)).toBe(flags);
     geometry.dispose();
   });
 });
@@ -47,10 +68,13 @@ describe('plane depth shader composition', () => {
     expect(shader.uniforms.trailStart).toBe(trail.trailStart);
     expect(shader.vertexShader).toContain('instanceShown');
     expect(shader.vertexShader).toContain('gl_InstanceID');
-    expect(shader.vertexShader).toContain('instanceStart.z == instanceEnd.z');
+    expect(shader.vertexShader).toContain('attribute vec4 kerfdeskDepthPlane;');
+    expect(shader.vertexShader).toContain('invariant vKerfdeskXYPlane;');
+    expect(shader.fragmentShader).toContain('invariant gl_FragDepth;');
+    expect(shader.vertexShader).toContain('kerfdeskXYPlaneMatrix[3] * kerfdeskDepthPlaneOffset');
     expect(shader.fragmentShader).toContain('gl_FragDepth = gl_FragCoord.z');
     expect(shader.fragmentShader).toContain('abs( vKerfdeskXYPlane.z ) > 1e-8');
-    expect(material.customProgramCacheKey()).toBe('kerfdesk-solid-path-xy-plane-depth-fat');
+    expect(material.customProgramCacheKey()).toBe('kerfdesk-solid-path-physical-plane-depth-fat');
     material.dispose();
   });
 
@@ -61,11 +85,13 @@ describe('plane depth shader composition', () => {
       fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }',
     };
     const edited = withXYPlaneDepth(source, 'native');
-    expect(edited.vertexShader).toContain('attribute float kerfdeskFlatXY;');
-    expect(edited.vertexShader).toContain('kerfdeskFlatXY > 0.5');
+    expect(edited.vertexShader).toContain('attribute vec4 kerfdeskDepthPlane;');
+    expect(edited.vertexShader).toContain(
+      'vKerfdeskXYPlane = kerfdeskXYPlaneMatrix * kerfdeskDepthPlane',
+    );
     expect(edited.fragmentShader).toContain('gl_FragDepth = planeDepth');
     expect(edited.fragmentShader.indexOf('gl_FragColor')).toBeLessThan(
-      edited.fragmentShader.indexOf('gl_FragDepth'),
+      edited.fragmentShader.indexOf('gl_FragDepth ='),
     );
   });
 

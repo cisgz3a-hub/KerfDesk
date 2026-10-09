@@ -154,19 +154,18 @@ describe('toolpath progress geometry', () => {
   });
 });
 
-// Uniform, unfaded opaque colours make flat/ramp depth batches equivalent;
-// a lens or trail must restore source-order rendering before the next frame.
+// Mixed-depth strokes retain their original source-order draw for every lens and trail.
 describe('mixed-depth batch integration', () => {
   const mixed = 'G21 G90\nM3 S500\nG1 X100 Z1 F600\nG1 X0\nG1 Y10 Z0';
 
-  it('keeps one reveal buffer and changes modes when lens or trail colours differ', () => {
+  it('keeps one source-order reveal buffer when lens or trail colours differ', () => {
     const f = fixture(null, mixed);
     const solid = f.reveal.solid!;
     const geometry = solid.geometry;
     const visibleCompleted = () =>
       f.objects.filter((object) => object.renderOrder === 1 && object.visible);
     expect(f.reveal.planarDensity).toBeNull();
-    expect(visibleCompleted()).toHaveLength(2);
+    expect(visibleCompleted()).toHaveLength(1);
     applyReveal(f.reveal, { segmentIndex: 2, point: { x: 0, y: 5, z: 0.5 } });
     expect(solid.geometry).toBe(geometry);
     expect(geometry.instanceCount).toBe(2);
@@ -176,18 +175,18 @@ describe('mixed-depth batch integration', () => {
     applyRecolor(f.reveal, (index) => (index === 0 ? [1, 0, 0] : [0, 0, 1]));
     expect(visibleCompleted()).toHaveLength(1);
     applyRecolor(f.reveal, () => [0, 1, 0]);
-    expect(visibleCompleted()).toHaveLength(2);
+    expect(visibleCompleted()).toHaveLength(1);
     applyReveal(f.reveal, { segmentIndex: 2, point: { x: 0, y: 5, z: 0.5 }, trailFrom: 0 });
     expect(visibleCompleted()).toHaveLength(1);
     applyReveal(f.reveal, { segmentIndex: 2, point: { x: 0, y: 5, z: 0.5 } });
-    expect(visibleCompleted()).toHaveLength(2);
+    expect(visibleCompleted()).toHaveLength(1);
     applyReveal(f.reveal, null);
     expect(f.reveal.solidGhost?.visible).toBe(false);
     expect(geometry.instanceCount).toBe(3);
     disposeChildren(f.group);
   });
 
-  it('clips all fast and fallback materials while retaining the original source identities', () => {
+  it('clips all physical materials while retaining the original source identities', () => {
     const f = fixture(null, mixed);
     const planes = [new three.Plane(new three.Vector3(1, 0, 0), -25)];
     clipObjects(f.group, planes);
@@ -222,5 +221,44 @@ describe('mixed-depth batch integration', () => {
     setToolpathTravelVisibility(f.reveal, true);
     expect(f.reveal.ghostTail!.index.value).toBe(-1);
     disposeChildren(f.group);
+  });
+  it('keeps an active ramp on physical depth through paused lens and trail changes', () => {
+    const f = fixture(null, 'G21 G90\nM3 S500\nG1 X100 Z1 F600\nM5\nG0 Z1\nG0 X0 Z0\nG0 Y10');
+    const geometry = f.reveal.solid!.geometry;
+    const activePositions = f.reveal.active.positions();
+    const assertPhysical = () => {
+      const visible = f.reveal.active.object.children.filter((object) => object.visible);
+      expect(visible.map((object) => object.name)).toEqual([
+        'toolpath-current-exact-casing',
+        'toolpath-current-exact-core',
+      ]);
+      expect(f.reveal.active.positions()).toBe(activePositions);
+      expect([...activePositions]).toEqual([0, 0, 0, 50, 0, 0.5]);
+      expect(f.reveal.solid!.geometry).toBe(geometry);
+    };
+    try {
+      applyReveal(f.reveal, { segmentIndex: 0, point: { x: 50, y: 0, z: 0.5 } });
+      expect(f.reveal.solid!.depthBatches!.split).toBe(false);
+      expect(geometry.instanceCount).toBe(0);
+      expect(f.reveal.travelGhost!.visible).toBe(true);
+      assertPhysical();
+      // Paused lens changes must not select the hardware pair again.
+      applyRecolor(f.reveal, () => [0, 1, 0]);
+      assertPhysical();
+      setToolpathTravelVisibility(f.reveal, false);
+      setToolpathTravelVisibility(f.reveal, true);
+      assertPhysical();
+      applyReveal(f.reveal, {
+        segmentIndex: 0,
+        point: { x: 50, y: 0, z: 0.5 },
+        trailFrom: 0,
+      });
+      assertPhysical();
+      applyReveal(f.reveal, { segmentIndex: 0, point: { x: 50, y: 0, z: 0.5 } });
+      expect(f.reveal.solid!.depthBatches!.split).toBe(false);
+      assertPhysical();
+    } finally {
+      disposeChildren(f.group);
+    }
   });
 });

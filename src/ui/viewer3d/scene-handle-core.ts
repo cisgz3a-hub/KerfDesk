@@ -39,7 +39,7 @@ import type { ThreeModules } from './viewer3d-modules';
 import { CLASSIC_STAGE, srgbToLinear, type Viewer3dStage } from './viewer3d-look';
 import type { Viewer3dTheme } from './viewer3d-theme';
 import { createViewer3dFramePreparation } from './wait-for-viewer3d-gpu';
-import { disposeViewer3dRenderer } from './viewer3d-context';
+import { disposeViewer3dRenderer, preserveViewer3dClearColor } from './viewer3d-context';
 
 export type ColorOf = (segmentIndex: number) => readonly [number, number, number];
 
@@ -152,6 +152,10 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     renderChangeEvents: rig.controls,
   });
   const requestRender = scheduler.requestRender;
+  const disposeRestoration = preserveViewer3dClearColor(renderer, new three.Color(), requestRender);
+  // Bootstrap yields before creating the core; an earlier restoration may
+  // already have reset the constructor's configured background.
+  renderer.setClearColor(deps.theme.background);
   const markers = createMarkers(three, scene);
   const measure = createMeasureOverlay(modules, deps);
   const encode = (): ((channel: number) => number) | undefined =>
@@ -193,7 +197,13 @@ export function createSceneCore(deps: SceneHandleDeps): SceneCore {
     },
     applyClipping: () => clipToolpath(core),
   };
-  return { ...core, dispose: () => disposeCore(core) };
+  return {
+    ...core,
+    dispose: () => {
+      disposeRestoration();
+      disposeCore(core);
+    },
+  };
 }
 
 // Travel reads projected planar coverage; LOD keeps its nearest-point scale.

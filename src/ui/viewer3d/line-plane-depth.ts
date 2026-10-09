@@ -1,8 +1,10 @@
 // Screen-width ribbons can disagree in depth when an XY stroke is reversed or
 // shortened. Compare their shared work plane at the raster sample instead.
-// Different Z planes, sloping fat strokes and scene geometry retain real depth.
+// Each nonvertical stroke uses its physical least-slope XY plane; vertical
+// and edge-on strokes retain raster depth. Scene geometry still occludes it.
 import type * as ThreeNamespace from 'three';
 import { insertBefore, MAIN, type ShaderSource } from './line-shader-edits';
+import { DEPTH_PLANE_ATTRIBUTE, DEPTH_PLANE_OFFSET_ATTRIBUTE } from './line-depth-plane-geometry';
 
 type StrokeKind = 'fat' | 'native';
 
@@ -16,23 +18,16 @@ export type CoveredGhost = {
 const PLANE_MATRIX = 'kerfdeskXYPlaneMatrix';
 const VIEWPORT = 'kerfdeskDepthViewport';
 const PLANE = 'vKerfdeskXYPlane';
-export const XY_PLANE_ATTRIBUTE = 'kerfdeskFlatXY';
 
 function declarations(): string {
   return `flat varying vec4 ${PLANE};\n`;
 }
 
-/** Applies one geometric depth definition to constant-Z fat and native lines. */
-export function withXYPlaneDepth(shader: ShaderSource, kind: StrokeKind): ShaderSource {
+/** Fat and native strokes evaluate the same physical plane at the raster pixel. */
+export function withXYPlaneDepth(shader: ShaderSource, _kind: StrokeKind): ShaderSource {
   if (!shader.vertexShader.includes(MAIN) || !shader.fragmentShader.includes(MAIN)) return shader;
-  const plane =
-    kind === 'fat'
-      ? `${PLANE} = vec4( 0.0 );
-  if ( instanceStart.z == instanceEnd.z )
-    ${PLANE} = ${PLANE_MATRIX} * vec4( 0.0, 0.0, 1.0, -instanceStart.z );`
-      : `${PLANE} = vec4( 0.0 );
-  if ( ${XY_PLANE_ATTRIBUTE} > 0.5 )
-    ${PLANE} = ${PLANE_MATRIX} * vec4( 0.0, 0.0, 1.0, -position.z );`;
+  const plane = `${PLANE} = ${PLANE_MATRIX} * ${DEPTH_PLANE_ATTRIBUTE}
+    + ${PLANE_MATRIX}[3] * ${DEPTH_PLANE_OFFSET_ATTRIBUTE};`;
   const depth = `
   gl_FragDepth = gl_FragCoord.z;
   if ( abs( ${PLANE}.z ) > 1e-8 ) {
@@ -49,32 +44,22 @@ export function withXYPlaneDepth(shader: ShaderSource, kind: StrokeKind): Shader
         shader.vertexShader,
         MAIN,
         `uniform mat4 ${PLANE_MATRIX};\n` +
-          (kind === 'native' ? `attribute float ${XY_PLANE_ATTRIBUTE};\n` : '') +
-          declarations(),
+          `attribute vec4 ${DEPTH_PLANE_ATTRIBUTE};\n` +
+          `attribute float ${DEPTH_PLANE_OFFSET_ATTRIBUTE};\n` +
+          declarations() +
+          `invariant ${PLANE};\n`,
       ),
       '\n  ' + plane + '\n',
     ),
     fragmentShader: appendMain(
-      insertBefore(shader.fragmentShader, MAIN, `uniform vec4 ${VIEWPORT};\n` + declarations()),
+      insertBefore(
+        shader.fragmentShader,
+        MAIN,
+        `uniform vec4 ${VIEWPORT};\n` + declarations() + 'invariant gl_FragDepth;\n',
+      ),
       depth,
     ),
   };
-}
-
-/** Both native vertices carry one byte: varying-Z rapids keep their original depth. */
-export function addXYPlaneFlags(
-  three: typeof ThreeNamespace,
-  geometry: ThreeNamespace.BufferGeometry,
-): void {
-  if (geometry.hasAttribute(XY_PLANE_ATTRIBUTE)) return;
-  const positions = geometry.getAttribute('position');
-  const flags = new Uint8Array(positions.count);
-  for (let vertex = 0; vertex + 1 < positions.count; vertex += 2) {
-    if (positions.getZ(vertex) !== positions.getZ(vertex + 1)) continue;
-    flags[vertex] = 1;
-    flags[vertex + 1] = 1;
-  }
-  geometry.setAttribute(XY_PLANE_ATTRIBUTE, new three.BufferAttribute(flags, 1));
 }
 
 function appendMain(source: string, body: string): string {
@@ -116,7 +101,8 @@ uniform float kerfdeskCoveredEnabled;
 `,
         ),
         `
-  if ( kerfdeskCoveredEnabled > 0.5 && abs( ${PLANE}.z ) > 1e-8
+  if ( kerfdeskCoveredEnabled > 0.5 && instanceStart.z == instanceEnd.z
+    && abs( ${PLANE}.z ) > 1e-8
     && float( gl_InstanceID ) >= kerfdeskCoveredStart
     && float( gl_InstanceID ) < kerfdeskCoveredEnd )
     gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
@@ -125,7 +111,7 @@ uniform float kerfdeskCoveredEnabled;
     }
   };
   material.customProgramCacheKey = () =>
-    cacheKey + '-xy-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
+    cacheKey + '-physical-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
   material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
     render.call(material, renderer, scene, camera, geometry, object, group);
     planeMatrix

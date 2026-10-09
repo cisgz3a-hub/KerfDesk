@@ -9,6 +9,11 @@ import type { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import type { ToolpathBuildArgs } from './scene-toolpath';
 import { installXYPlaneDepth } from './line-plane-depth';
+import {
+  addDepthPlanes,
+  DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  writeDepthPlane,
+} from './line-depth-plane-geometry';
 
 const CORE_PX = 4;
 const CASING_PX = 8;
@@ -30,8 +35,12 @@ export type CurrentMove = {
   readonly object: ThreeNamespace.Group;
   readonly materials: ReadonlyArray<LineMaterial>;
   /** The drawn part of the move: x0 y0 z0 x1 y1 z1. */
-  readonly place: (from: ArrayLike<number>, to: ArrayLike<number>) => void;
-  /** Match hardware ramp depth only while completed ramps use that shader. */
+  readonly place: (
+    from: ArrayLike<number>,
+    to: ArrayLike<number>,
+    sourceEnd?: ArrayLike<number>,
+  ) => void;
+  /** Comparison hook: nonplanar strokes always retain the shared physical writer. */
   readonly useHardwareDepth: (enabled: boolean) => void;
   /** Start and end as last placed, for tests. */
   readonly positions: () => Float32Array;
@@ -41,36 +50,68 @@ export function createCurrentMove(args: CurrentMoveArgs, planar: boolean): Curre
   const geometry = new args.LineSegmentsGeometry();
   geometry.setPositions(new Float32Array(6));
   const exact = currentStrokes(args, geometry, planar);
-  // Clone before adding fragment-depth edits: hardware ramps retain the base
-  // shader's per-sample MSAA depth, matching the completed hardware ramp batch.
-  const hardware = planar ? [] : exact.map((stroke) => hardwareStroke(args, stroke));
+  const plane = planar ? null : addDepthPlanes(args.three, geometry, 'fat');
+  const offset = planar ? null : geometry.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE);
   if (!planar) for (const stroke of exact) installXYPlaneDepth(args.three, stroke.material, 'fat');
   const object = new args.three.Group();
   object.visible = false;
-  object.add(...exact, ...hardware);
+  object.add(...exact);
   const start = geometry.getAttribute('instanceStart') as InterleavedBufferAttribute;
   const array = start.data.array as Float32Array;
-  let hardwareAllowed = false;
-  const sync = () => {
-    const selected = !planar && hardwareAllowed && array[2] !== array[5];
-    for (const stroke of exact) stroke.visible = !selected;
-    for (const stroke of hardware) stroke.visible = selected;
-  };
   return {
     object,
-    materials: [...exact, ...hardware].map((stroke) => stroke.material),
-    place: (from, to) => {
-      array.set([from[0] ?? 0, from[1] ?? 0, from[2] ?? 0, to[0] ?? 0, to[1] ?? 0, to[2] ?? 0]);
-      start.data.needsUpdate = true;
-      sync();
+    materials: exact.map((stroke) => stroke.material),
+    place: (from, to, sourceEnd) => {
+      placePositionBuffer(start, array, from, to);
+      placePlaneBuffer(plane, offset, array, sourceEnd);
     },
-    useHardwareDepth: (enabled) => {
-      if (planar) return;
-      hardwareAllowed = enabled;
-      sync();
-    },
+    useHardwareDepth: () => undefined,
     positions: () => array,
   };
+}
+
+function placePositionBuffer(
+  start: InterleavedBufferAttribute,
+  array: Float32Array,
+  from: ArrayLike<number>,
+  to: ArrayLike<number>,
+): void {
+  array.set([from[0] ?? 0, from[1] ?? 0, from[2] ?? 0, to[0] ?? 0, to[1] ?? 0, to[2] ?? 0]);
+  start.data.needsUpdate = true;
+}
+
+type PlaneAttribute = ThreeNamespace.BufferAttribute | InterleavedBufferAttribute;
+
+function placePlaneBuffer(
+  plane: PlaneAttribute | null,
+  offset: PlaneAttribute | null,
+  array: Float32Array,
+  sourceEnd: ArrayLike<number> | undefined,
+): void {
+  if (plane === null || offset === null) return;
+  // A prefix retains the full stored source plane even when its endpoint rounds.
+  writeDepthPlane(
+    plane.array as Float32Array,
+    0,
+    array[0] ?? 0,
+    array[1] ?? 0,
+    array[2] ?? 0,
+    sourceCoordinate(sourceEnd, array, 0),
+    sourceCoordinate(sourceEnd, array, 1),
+    sourceCoordinate(sourceEnd, array, 2),
+    offset.array as Float32Array,
+    0,
+  );
+  plane.needsUpdate = true;
+  offset.needsUpdate = true;
+}
+
+function sourceCoordinate(
+  sourceEnd: ArrayLike<number> | undefined,
+  array: Float32Array,
+  axis: number,
+): number {
+  return Math.fround(sourceEnd?.[axis] ?? array[axis + 3] ?? 0);
 }
 
 function currentStrokes(
@@ -105,19 +146,4 @@ function currentStrokes(
     line.frustumCulled = false;
     return line;
   });
-}
-
-function hardwareStroke(args: CurrentMoveArgs, source: LineSegments2): LineSegments2 {
-  const material = source.material.clone();
-  material.onBeforeCompile = source.material.onBeforeCompile;
-  material.onBeforeRender = source.material.onBeforeRender;
-  const cacheKey = source.material.customProgramCacheKey();
-  material.customProgramCacheKey = () => cacheKey;
-  const line = new args.LineSegments2(source.geometry, material);
-  line.copy(source, false);
-  line.material = material;
-  line.onBeforeRender = source.onBeforeRender;
-  line.name = source.name.replace('-exact-', '-hardware-');
-  line.visible = false;
-  return line;
 }

@@ -8,6 +8,7 @@
 import type * as ThreeNamespace from 'three';
 import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import type { MoveDetail } from './move-detail';
+import { addDepthPlanes } from './line-depth-plane-geometry';
 import { COLOR_STRIDE, SHOWN_ATTRIBUTE, shareProgramGeometry } from './program-lines';
 
 const FLOATS_PER_SEGMENT = 6;
@@ -47,6 +48,7 @@ export function createDetailLines(
     }
     const geometry = new Geometry();
     geometry.setPositions(lines);
+    addDepthPlanes(three, geometry, 'fat');
     const colors = new Uint16Array(count * DETAIL_STRIDE);
     const colorBuffer = new three.InstancedInterleavedBuffer(colors, DETAIL_STRIDE, 1);
     const attribute = (size: number, offset: number): ThreeNamespace.InterleavedBufferAttribute =>

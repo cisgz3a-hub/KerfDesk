@@ -7,7 +7,7 @@ import type * as LineMaterialModule from 'three/examples/jsm/lines/LineMaterial.
 import type * as LineSegments2Module from 'three/examples/jsm/lines/LineSegments2.js';
 import type * as LineSegmentsGeometryModule from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { editLineMaterial, withShownMoves } from './line-shader-edits';
-import { addXYPlaneFlags, installXYPlaneDepth, XY_PLANE_ATTRIBUTE } from './line-plane-depth';
+import { lineSegmentsObject } from './scene-native-lines';
 import { addTrail, setTrail, type TrailUniforms } from './line-trail';
 import { createDepthBatches } from './line-depth-batches';
 import { installGhostTail, type GhostTailState } from './line-ghost-tail';
@@ -94,7 +94,9 @@ export function applyRecolor(
   writeProgramColors(targets.solid.colors, colorOf, encode);
   targets.solid.colorBuffer.needsUpdate = true;
   targets.solid.depthBatches?.refreshColors();
-  targets.active.useHardwareDepth(targets.solid.depthBatches?.split ?? false);
+  // Native travel writes fragment depth too. Mixing its exact ramp with an
+  // active hardware ramp can tint fully covered core pixels under MSAA.
+  targets.active.useHardwareDepth(false);
   if (targets.detail !== null) paintDetailLines(targets.detail.levels, targets.solid.colors);
   return true;
 }
@@ -144,7 +146,7 @@ function applyActiveMove(
   for (const ghost of [targets.solidGhost, targets.travelGhost]) {
     if (ghost !== null) ghost.visible = playhead !== null;
   }
-  targets.active.useHardwareDepth(targets.solid?.depthBatches?.split ?? false);
+  targets.active.useHardwareDepth(false);
   targets.activeSegment = partial ? (playhead?.segmentIndex ?? -1) : -1;
 
   setToolpathTravelVisibility(targets, targets.travelVisible);
@@ -158,7 +160,11 @@ function placeActiveMove(
   point: { x: number; y: number; z: number },
 ): void {
   const base = index * 6;
-  targets.active.place(targets.positions.subarray(base, base + 3), [point.x, point.y, point.z]);
+  targets.active.place(
+    targets.positions.subarray(base, base + 3),
+    [point.x, point.y, point.z],
+    targets.positions.subarray(base + 3, base + 6),
+  );
   if (targets.ghostTail) {
     const placed = targets.active.positions();
     targets.ghostTail.point.value.set(placed[3] ?? 0, placed[4] ?? 0, placed[5] ?? 0);
@@ -266,7 +272,7 @@ function buildTravel(args: ToolpathBuildArgs, positions: Float32Array) {
     args.theme.travel,
     0.1,
     -1,
-    line.geometry.getAttribute(XY_PLANE_ATTRIBUTE),
+    line.geometry,
   );
   ghost.visible = false;
   const group = new args.three.Group();
@@ -416,32 +422,6 @@ function fatLineMaterial(
   material.toneMapped = false;
   material.resolution.set(args.viewWidth, args.viewHeight);
   return material;
-}
-
-function lineSegmentsObject(
-  three: ThreeModule,
-  positions: Float32Array,
-  color: number,
-  opacity: number,
-  renderOrder: number,
-  sharedFlags?: ThreeNamespace.BufferAttribute | ThreeNamespace.InterleavedBufferAttribute,
-): ThreeNamespace.LineSegments<ThreeNamespace.BufferGeometry, ThreeNamespace.LineBasicMaterial> {
-  const geometry = new three.BufferGeometry();
-  geometry.setAttribute('position', new three.BufferAttribute(positions, 3));
-  const material = new three.LineBasicMaterial({
-    color,
-    transparent: opacity < 1,
-    opacity,
-    toneMapped: false,
-    depthWrite: false,
-    depthFunc: three.LessDepth,
-  });
-  if (sharedFlags) geometry.setAttribute(XY_PLANE_ATTRIBUTE, sharedFlags);
-  else addXYPlaneFlags(three, geometry);
-  installXYPlaneDepth(three, material, 'native');
-  const lines = new three.LineSegments(geometry, material);
-  lines.renderOrder = renderOrder;
-  return lines;
 }
 
 function hexRgb(hex: number): [number, number, number] {

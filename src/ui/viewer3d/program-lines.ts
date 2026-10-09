@@ -13,6 +13,11 @@
 import type * as ThreeNamespace from 'three';
 import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { SEG_KIND } from '../../core/gcode-view';
+import {
+  addDepthPlanes,
+  DEPTH_PLANE_ATTRIBUTE,
+  DEPTH_PLANE_OFFSET_ATTRIBUTE,
+} from './line-depth-plane-geometry';
 import { rgbTriple, type Viewer3dSegmentsInput } from './segment-buckets';
 import type { Viewer3dTheme } from './viewer3d-theme';
 
@@ -79,6 +84,7 @@ export function createProgramGeometry(
   const geometry = new Geometry();
   // setPositions keeps a Float32Array as it is: no copy of the program.
   geometry.setPositions(positions.subarray(0, count * FLOATS_PER_SEGMENT));
+  addDepthPlanes(three, geometry, 'fat');
   const colorBuffer = new three.InstancedInterleavedBuffer(colors, COLOR_STRIDE, 1);
   const rgb = new three.InterleavedBufferAttribute(colorBuffer, 3, 0, true);
   geometry.setAttribute('instanceColorStart', rgb);
@@ -102,6 +108,10 @@ export function shareProgramGeometry(
   for (const name of ['instanceStart', 'instanceEnd', SHOWN_ATTRIBUTE]) {
     geometry.setAttribute(name, source.getAttribute(name));
   }
+  const depthPlane = source.getAttribute(DEPTH_PLANE_ATTRIBUTE);
+  if (depthPlane !== undefined) geometry.setAttribute(DEPTH_PLANE_ATTRIBUTE, depthPlane);
+  const planeOffset = source.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE);
+  if (planeOffset !== undefined) geometry.setAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE, planeOffset);
   geometry.instanceCount = source.getAttribute('instanceStart').count;
   geometry.boundingBox = source.boundingBox?.clone() ?? null;
   geometry.boundingSphere = source.boundingSphere?.clone() ?? null;

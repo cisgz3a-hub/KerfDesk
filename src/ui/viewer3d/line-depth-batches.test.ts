@@ -3,10 +3,10 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDepthBatches, type DepthBatches } from './line-depth-batches';
-import { editLineMaterial, MAIN, withShownMoves } from './line-shader-edits';
+import { createDepthBatches } from './line-depth-batches';
+import { editLineMaterial, withShownMoves } from './line-shader-edits';
 import { addTrail, setTrail } from './line-trail';
-import { createProgramGeometry, shareProgramGeometry } from './program-lines';
+import { createProgramGeometry, shareProgramGeometry, writeProgramColors } from './program-lines';
 
 const geometries = new Set<LineSegmentsGeometry>();
 const materials = new Set<LineMaterial>();
@@ -18,12 +18,17 @@ afterEach(() => {
 });
 
 function sourceScene() {
-  // A horizontal move, a genuine ramp, then a horizontal move on a second plane.
+  // Constant-Z, varying-Z, then constant-Z on another plane, in program order.
   const positions = new Float32Array([0, 0, 0, 10, 0, 0, 10, 0, 0, 20, 0, 1, 20, 0, 1, 30, 0, 1]);
   const colors = new Uint16Array([
     50000, 15000, 3000, 65535, 50000, 15000, 3000, 65535, 50000, 15000, 3000, 65535,
   ]);
-  const { geometry } = createProgramGeometry(three, LineSegmentsGeometry, positions, colors);
+  const { geometry, colorBuffer } = createProgramGeometry(
+    three,
+    LineSegmentsGeometry,
+    positions,
+    colors,
+  );
   const material = new LineMaterial({ vertexColors: true, linewidth: 2.5 });
   const trail = addTrail(three, material);
   const lines = new LineSegments2(geometry, material);
@@ -42,14 +47,10 @@ function sourceScene() {
   );
   ghost.renderOrder = -1;
   ghost.visible = false;
-  geometries.add(geometry);
-  geometries.add(ghost.geometry);
-  const build = () => {
-    const batches = createDepthBatches({ three, LineSegments2, lines, ghost, trail, colors });
-    for (const entry of batches.materials) materials.add(entry);
-    return batches;
-  };
-  return { positions, colors, geometry, lines, ghost, trail, build };
+  for (const entry of [geometry, ghost.geometry]) geometries.add(entry);
+  for (const entry of [material, ghostMaterial]) materials.add(entry);
+  const build = () => createDepthBatches({ three, LineSegments2, lines, ghost, trail, colors });
+  return { positions, colors, geometry, colorBuffer, lines, ghost, trail, build };
 }
 
 function compiled(material: LineMaterial) {
@@ -62,22 +63,15 @@ function compiled(material: LineMaterial) {
   return shader;
 }
 
-function visible(batches: DepthBatches) {
-  return batches.objects.map((object) => object.visible);
-}
-
-function lodGeometry() {
-  const geometry = new LineSegmentsGeometry();
-  geometry.setPositions(new Float32Array([0, 0, 0, 30, 0, 1]));
-  geometries.add(geometry);
-  return geometry;
+function programAttribute(geometry: LineSegmentsGeometry, name: string) {
+  return geometry.getAttribute(name) as three.InterleavedBufferAttribute;
 }
 
 function beforeRender(object: LineSegments2, viewport = vi.fn()) {
   const renderer = {
-    getCurrentViewport: (target: three.Vector4) => {
+    getCurrentViewport: (value: three.Vector4) => {
       viewport();
-      return target.set(0, 0, 800, 600);
+      return value.set(0, 0, 800, 600);
     },
   };
   object.material.onBeforeRender(
@@ -91,112 +85,147 @@ function beforeRender(object: LineSegments2, viewport = vi.fn()) {
   return viewport;
 }
 
-describe('program-wide cached colour and fade guard', () => {
-  it('uses split meshes only until a whole-program repaint discovers a different colour', () => {
+function lodGeometry() {
+  const geometry = new LineSegmentsGeometry();
+  geometry.setPositions(new Float32Array([0, 0, 0, 30, 0, 1]));
+  geometries.add(geometry);
+  return geometry;
+}
+
+describe('original program-order strokes', () => {
+  it('keeps mixed depth classes in one original draw with the original buffers and two materials', () => {
+    const source = sourceScene();
+    const solidClone = vi.spyOn(source.lines.material, 'clone');
+    const ghostClone = vi.spyOn(source.ghost.material, 'clone');
+    const batches = source.build();
+    expect(batches.objects).toEqual([source.lines, source.ghost]);
+    expect(batches.materials).toEqual([source.lines.material, source.ghost.material]);
+    expect(batches.lines).toBe(source.lines);
+    expect(batches.ghost).toBe(source.ghost);
+    expect(batches.split).toBe(false);
+    expect(solidClone).not.toHaveBeenCalled();
+    expect(ghostClone).not.toHaveBeenCalled();
+    expect(batches.objects.map((object) => object.name)).toEqual([
+      'toolpath-solid-depth-fallback',
+      'toolpath-ghost-depth-fallback',
+    ]);
+    const position = programAttribute(batches.lines.geometry, 'instanceStart');
+    expect(position.data.array.buffer).toBe(source.positions.buffer);
+    expect([...position.data.array]).toEqual([...source.positions]);
+    expect(programAttribute(batches.lines.geometry, 'instanceColorStart').data.array).toBe(
+      source.colors,
+    );
+    expect(batches.ghost.geometry.getAttribute('instanceStart')).toBe(position);
+    source.geometry.instanceCount = 2;
+    expect(batches.lines.geometry.instanceCount).toBe(2);
+    expect(batches.ghost.geometry.instanceCount).toBe(3);
+  });
+
+  it('recolours an unrevealed move in place without changing draw order, buffers or visibility', () => {
     const source = sourceScene();
     const batches = source.build();
-    batches.ghost.visible = true;
-    expect(visible(batches)).toEqual([false, false, true, true, true, true]);
+    const positions = programAttribute(source.geometry, 'instanceStart').data.array;
+    const colours = programAttribute(source.geometry, 'instanceColorStart');
+    const version = colours.data.version;
     source.geometry.instanceCount = 1;
-    // An unrevealed move still matters. sync must not rescan this array per frame.
-    source.colors[8] = 50001;
-    batches.sync();
-    expect(visible(batches)).toEqual([false, false, true, true, true, true]);
-    batches.refreshColors();
-    expect(visible(batches)).toEqual([true, true, false, false, false, false]);
-    source.colors[8] = 50000;
-    batches.refreshColors();
-    expect(visible(batches)).toEqual([false, false, true, true, true, true]);
-  });
-
-  it.each([0, 1, 2])('rejects a single Uint16 difference in RGB channel %s', (channel) => {
-    const source = sourceScene();
-    source.colors[4 + channel] = (source.colors[4 + channel] ?? 0) + 1;
-    expect(visible(source.build())).toEqual([true, false, false, false, false, false]);
-  });
-
-  it('ignores colours of hidden moves but conservatively retains originals when none are shown', () => {
-    const source = sourceScene();
-    source.colors[4] = 1;
-    source.colors[7] = 0;
-    const batches = source.build();
-    expect(visible(batches)).toEqual([false, false, true, true, false, false]);
-    source.colors[3] = 0;
-    source.colors[11] = 0;
-    batches.refreshColors();
-    expect(visible(batches)).toEqual([true, false, false, false, false, false]);
-  });
-
-  it('changes modes before render collection when trail fading starts at move zero', () => {
-    const source = sourceScene();
-    const batches = source.build();
     batches.ghost.visible = true;
-    setTrail(source.trail, 0, 2, [0.1, 0.2, 0.3]);
+    writeProgramColors(source.colors, (index) => (index === 2 ? [1, 0, 0] : [0, 0, 1]));
+    source.colorBuffer.needsUpdate = true;
+    batches.refreshColors();
     batches.sync();
-    expect(visible(batches)).toEqual([true, true, false, false, false, false]);
+    expect(colours.data.array).toBe(source.colors);
+    expect(colours.data.version).toBe(version + 1);
+    expect([...source.colors.slice(8, 12)]).toEqual([65535, 0, 0, 65535]);
+    expect(programAttribute(source.geometry, 'instanceStart').data.array).toBe(positions);
+    expect(batches.objects).toEqual([source.lines, source.ghost]);
+    expect(batches.objects.map((object) => object.visible)).toEqual([true, true]);
+    expect(source.geometry.instanceCount).toBe(1);
+    expect(batches.split).toBe(false);
+  });
+
+  it('retains hidden/future shown flags rather than rebuilding or sorting their instances', () => {
+    const source = sourceScene();
+    source.colors[7] = 0;
+    source.colors[8] = 1;
+    const batches = source.build();
+    source.geometry.instanceCount = 1;
+    batches.refreshColors();
+    batches.sync();
+    const shown = programAttribute(source.geometry, 'instanceShown');
+    expect(shown.data.array).toBe(source.colors);
+    expect(shown.getX(0)).toBe(1);
+    expect(shown.getX(1)).toBe(0);
+    expect(shown.getX(2)).toBe(1);
+    expect(compiled(batches.lines.material).vertexShader).toContain('instanceShown < 0.5');
+    expect(batches.lines.geometry.instanceCount).toBe(1);
+    expect(batches.split).toBe(false);
+  });
+
+  it.each([0, 1])('shares fading uniforms with the original draw from move %s', (start) => {
+    const source = sourceScene();
+    const batches = source.build();
+    const shader = compiled(batches.lines.material);
+    source.geometry.instanceCount = 2;
+    batches.ghost.visible = true;
+    setTrail(source.trail, start, 2, [0.1, 0.2, 0.3]);
+    batches.sync();
+    batches.refreshColors();
+    expect(shader.uniforms.trailStart).toBe(source.trail.trailStart);
+    expect(shader.uniforms.trailEnd).toBe(source.trail.trailEnd);
+    expect(shader.uniforms.trailFade).toBe(source.trail.trailFade);
+    expect(shader.uniforms.trailFadeColor).toBe(source.trail.trailFadeColor);
+    expect(shader.uniforms.trailStart?.value).toBe(start);
+    expect(shader.uniforms.trailEnd?.value).toBe(2);
+    expect(shader.uniforms.trailFade?.value).toBe(0.7);
+    expect(batches.objects.map((object) => object.visible)).toEqual([true, true]);
+    expect(batches.split).toBe(false);
     setTrail(source.trail, 0, 2, null);
     batches.sync();
-    expect(visible(batches)).toEqual([false, false, true, true, true, true]);
+    expect(shader.uniforms.trailFade?.value).toBe(0);
+    expect(batches.split).toBe(false);
   });
 });
 
-describe('shared geometry and visibility aliases', () => {
-  it('keeps original meshes first and creates materials rather than position or colour copies', () => {
+describe('direct LOD, visibility and clipping state', () => {
+  it('swaps original drawings while retaining full reveal counts and shared full buffers', () => {
     const source = sourceScene();
     const batches = source.build();
-    expect(batches.objects.slice(0, 2)).toEqual([source.lines, source.ghost]);
-    expect(new Set(batches.objects).size).toBe(6);
-    expect(new Set(batches.materials).size).toBe(6);
-    expect(new Set(batches.objects.map((object) => object.name)).size).toBe(6);
-    for (const index of [0, 2, 3]) expect(batches.objects[index]?.geometry).toBe(source.geometry);
-    for (const index of [1, 4, 5])
-      expect(batches.objects[index]?.geometry).toBe(source.ghost.geometry);
-    expect(source.ghost.geometry.getAttribute('instanceStart')).toBe(
-      source.geometry.getAttribute('instanceStart'),
-    );
-    source.geometry.instanceCount = 2;
-    for (const index of [0, 2, 3]) expect(batches.objects[index]?.geometry.instanceCount).toBe(2);
-    for (const index of [1, 4, 5]) expect(batches.objects[index]?.geometry.instanceCount).toBe(3);
-  });
-
-  it('swaps all variants through LOD proxies while retaining the independent full reveal geometry', () => {
-    const source = sourceScene();
-    const batches = source.build();
-    const fullGhost = source.ghost.geometry;
-    const solidLod = lodGeometry();
-    const ghostLod = lodGeometry();
+    const fullGhost = source.ghost.geometry,
+      solidLod = lodGeometry(),
+      ghostLod = lodGeometry();
     batches.lines.geometry = solidLod;
     batches.ghost.geometry = ghostLod;
-    for (const index of [0, 2, 3]) expect(batches.objects[index]?.geometry).toBe(solidLod);
-    for (const index of [1, 4, 5]) expect(batches.objects[index]?.geometry).toBe(ghostLod);
+    expect(source.lines.geometry).toBe(solidLod);
+    expect(source.ghost.geometry).toBe(ghostLod);
     source.geometry.instanceCount = 2;
     expect(solidLod.instanceCount).toBe(1);
     expect(fullGhost.instanceCount).toBe(3);
     batches.lines.geometry = source.geometry;
     batches.ghost.geometry = fullGhost;
-    expect(batches.lines.geometry).toBe(source.geometry);
-    expect(batches.ghost.geometry).toBe(fullGhost);
-    for (const index of [0, 2, 3]) expect(batches.objects[index]?.geometry.instanceCount).toBe(2);
+    expect(batches.lines.geometry.instanceCount).toBe(2);
+    expect(batches.ghost.geometry.instanceCount).toBe(3);
+    expect(fullGhost.getAttribute('instanceStart')).toBe(
+      source.geometry.getAttribute('instanceStart'),
+    );
   });
 
-  it('preserves logical ghost visibility across fallback and split transitions', () => {
+  it('keeps both original visibility values through recolour/fade synchronization', () => {
     const source = sourceScene();
     const batches = source.build();
-    batches.ghost.visible = true;
-    expect(batches.ghost.visible).toBe(true);
-    expect(source.ghost.visible).toBe(false);
-    source.colors[0] = 3;
-    batches.refreshColors();
-    expect(batches.ghost.visible).toBe(true);
-    expect(source.ghost.visible).toBe(true);
-    batches.ghost.visible = false;
-    source.colors[0] = 50000;
-    batches.refreshColors();
-    expect(batches.ghost.visible).toBe(false);
-    for (const index of [1, 4, 5]) expect(batches.objects[index]?.visible).toBe(false);
+    for (const value of [true, false, true]) {
+      batches.ghost.visible = value;
+      batches.lines.visible = !value;
+      source.colors[0] = value ? 1 : 50000;
+      setTrail(source.trail, 0, 2, value ? [0.1, 0.2, 0.3] : null);
+      batches.refreshColors();
+      batches.sync();
+      expect(source.ghost.visible).toBe(value);
+      expect(source.lines.visible).toBe(!value);
+      expect(batches.split).toBe(false);
+    }
   });
 
-  it('keeps render order, clipping changes and object callbacks consistent across variants', () => {
+  it('keeps clipping and render-order changes on the same materials and object callbacks', () => {
     const source = sourceScene();
     const objectHook = vi.fn();
     source.lines.onBeforeRender = objectHook;
@@ -206,146 +235,92 @@ describe('shared geometry and visibility aliases', () => {
       original.material.clippingPlanes = planes;
       original.material.clipIntersection = true;
       original.material.clipShadows = true;
+      original.material.clipping = true;
       original.renderOrder += 10;
     }
     batches.sync();
-    for (const index of [0, 2, 3]) {
-      expect(batches.objects[index]?.renderOrder).toBe(11);
-      expect(batches.objects[index]?.onBeforeRender).toBe(objectHook);
-    }
-    for (const index of [1, 4, 5]) expect(batches.objects[index]?.renderOrder).toBe(9);
+    expect(batches.lines.onBeforeRender).toBe(objectHook);
+    expect(batches.objects.map((object) => object.renderOrder)).toEqual([11, 9]);
     for (const material of batches.materials) {
       expect(material.clippingPlanes).toBe(planes);
       expect(material.clipIntersection).toBe(true);
       expect(material.clipShadows).toBe(true);
+      expect(material.clipping).toBe(true);
     }
   });
 });
 
-describe('real LineMaterial shader and callback composition', () => {
-  it('keeps trail/shown edits and exact uniform cells while ramp programs never write fragment depth', () => {
-    const source = sourceScene();
-    const batches = source.build();
-    expect(
-      new Set(batches.materials.map((material) => material.customProgramCacheKey())).size,
-    ).toBe(6);
-    for (const index of [0, 2, 3]) {
-      const shader = compiled(batches.materials[index]!);
-      expect(shader.uniforms.trailStart).toBe(source.trail.trailStart);
-      expect(shader.uniforms.trailEnd).toBe(source.trail.trailEnd);
-      expect(shader.uniforms.trailFade).toBe(source.trail.trailFade);
-      expect(shader.uniforms.trailFadeColor).toBe(source.trail.trailFadeColor);
+describe('original material depth and parent hooks', () => {
+  it.each(['lines', 'ghost'] as const)(
+    'composes %s compile/render/cache hooks without cloning',
+    (role) => {
+      const source = sourceScene(),
+        material = source[role].material;
+      const compile = material.onBeforeCompile,
+        cell = { value: 7 };
+      const parentCompile = vi.fn(function (
+        this: LineMaterial,
+        ...args: Parameters<typeof compile>
+      ) {
+        compile.call(this, ...args);
+        args[0].uniforms.parentCell = cell;
+      });
+      const order: string[] = [];
+      const parentRender = vi.fn(() => order.push('parent'));
+      material.onBeforeCompile = parentCompile;
+      material.onBeforeRender = parentRender;
+      material.customProgramCacheKey = () => 'custom-parent-' + role;
+      const batches = source.build(),
+        object = batches[role],
+        shader = compiled(object.material);
+      expect(shader.uniforms.parentCell).toBe(cell);
+      expect(shader.fragmentShader).toContain('gl_FragDepth');
       expect(shader.vertexShader).toContain('instanceShown');
-    }
-    for (const index of [0, 1, 2, 4])
-      expect(compiled(batches.materials[index]!).fragmentShader).toContain('gl_FragDepth');
-    for (const index of [3, 5]) {
-      const shader = compiled(batches.materials[index]!);
-      expect(shader.fragmentShader).not.toContain('gl_FragDepth');
-      expect(shader.vertexShader).toContain('instanceShown');
-      const rejection = shader.vertexShader.indexOf('instanceStart.z == instanceEnd.z');
-      expect(rejection).toBeGreaterThan(shader.vertexShader.indexOf(MAIN));
-      expect(rejection).toBeLessThan(
-        shader.vertexShader.indexOf('float aspect = resolution.x / resolution.y;'),
+      expect(material.customProgramCacheKey()).toContain('custom-parent-' + role);
+      expect(material.customProgramCacheKey()).not.toContain('depth-batch-early');
+      const viewport = beforeRender(
+        object,
+        vi.fn(() => order.push('viewport')),
       );
-    }
-    for (const index of [2, 4])
-      expect(compiled(batches.materials[index]!).vertexShader).toContain(
-        'instanceStart.z != instanceEnd.z',
-      );
-  });
-
-  it('rejects opposite classes before extrusion and preserves accepted shader arithmetic exactly', () => {
-    const source = sourceScene();
-    const baseSolid = compiled(source.lines.material);
-    const baseGhost = compiled(source.ghost.material);
-    const batches = source.build();
-    for (const { index, accepted, comparison, kind } of [
-      { index: 2, accepted: compiled(batches.materials[0]!), comparison: '!=', kind: 'constant' },
-      { index: 3, accepted: baseSolid, comparison: '==', kind: 'ramp' },
-      { index: 4, accepted: compiled(batches.materials[1]!), comparison: '!=', kind: 'constant' },
-      { index: 5, accepted: baseGhost, comparison: '==', kind: 'ramp' },
-    ]) {
-      const material = batches.materials[index]!;
-      const shader = compiled(material);
-      const mainEnd = shader.vertexShader.indexOf(MAIN) + MAIN.length;
-      const block = shader.vertexShader
-        .slice(mainEnd)
-        .match(/^\n\s*if \( instanceStart\.z (!=|==) instanceEnd\.z \) \{\n[\s\S]*?\n\s*\}\n/)?.[0];
-      expect(block, 'opposite-class rejection must be the first statement in main').toBeDefined();
-      expect(block).toContain('instanceStart.z ' + comparison + ' instanceEnd.z');
-      expect(block).toMatch(/gl_Position = vec4\( 0\.0, 0\.0, 2\.0, 1\.0 \);[\s\S]*return;/);
-      const extrusion = shader.vertexShader.indexOf('float aspect = resolution.x / resolution.y;');
-      expect(extrusion).toBeGreaterThan(mainEnd);
-      expect(mainEnd + block!.length).toBeLessThan(extrusion);
-      expect(
-        shader.vertexShader.slice(0, mainEnd) + shader.vertexShader.slice(mainEnd + block!.length),
-      ).toBe(accepted.vertexShader);
-      expect(shader.fragmentShader).toBe(accepted.fragmentShader);
-      expect(material.customProgramCacheKey()).toContain('-depth-batch-early-' + kind);
-    }
-  });
-
-  it('explicitly retains custom parent compile/render/cache hooks lost by Material.clone', () => {
-    const source = sourceScene();
-    const material = source.lines.material;
-    const compile = material.onBeforeCompile;
-    const cell = { value: 7 };
-    const parentCompile = vi.fn(function (this: LineMaterial, ...args: Parameters<typeof compile>) {
-      compile.call(this, ...args);
-      args[0].uniforms.parentCell = cell;
-    });
-    const parentRender = vi.fn();
-    material.onBeforeCompile = parentCompile;
-    material.onBeforeRender = parentRender;
-    material.customProgramCacheKey = () => 'custom-parent';
-    const batches = source.build();
-    for (const index of [0, 2, 3]) {
-      const object = batches.objects[index]!;
-      expect(compiled(object.material).uniforms.parentCell).toBe(cell);
-      expect(object.material.customProgramCacheKey()).toContain('custom-parent');
-      const viewport = beforeRender(object);
-      expect(viewport).toHaveBeenCalledTimes(index === 3 ? 0 : 1);
-    }
-    expect(parentCompile.mock.contexts).toEqual([
-      batches.materials[0],
-      batches.materials[2],
-      batches.materials[3],
-    ]);
-    expect(parentRender.mock.contexts).toEqual(parentCompile.mock.contexts);
-  });
+      expect(viewport).toHaveBeenCalledOnce();
+      expect(order).toEqual(['parent', 'viewport']);
+      expect(parentCompile.mock.contexts).toEqual([material]);
+      expect(parentRender.mock.contexts).toEqual([material]);
+    },
+  );
 });
 
-describe('conservative completed ghost range', () => {
-  it('shares trail bounds after the exact plane decision and never edits a ramp ghost', () => {
-    const source = sourceScene();
-    const batches = source.build();
-    for (const index of [1, 4]) {
-      const shader = compiled(batches.materials[index]!);
-      expect(shader.uniforms.kerfdeskCoveredStart).toBe(source.trail.trailStart);
-      expect(shader.uniforms.kerfdeskCoveredEnd).toBe(source.trail.trailEnd);
-      expect(shader.vertexShader.indexOf('kerfdeskCoveredEnabled > 0.5')).toBeGreaterThan(
-        shader.vertexShader.indexOf('if ( instanceStart.z == instanceEnd.z )'),
-      );
-      expect(shader.vertexShader).toContain('abs( vKerfdeskXYPlane.z ) > 1e-8');
-    }
-    const ramp = compiled(batches.materials[5]!);
-    expect(ramp.uniforms.kerfdeskCoveredStart).toBeUndefined();
-    expect(ramp.fragmentShader).not.toContain('gl_FragDepth');
+describe('conservative completed constant-Z ghost range', () => {
+  it('shares live trail bounds and keeps coverage after the constant-Z plane decision', () => {
+    const source = sourceScene(),
+      batches = source.build(),
+      shader = compiled(batches.ghost.material);
+    expect(shader.uniforms.kerfdeskCoveredStart).toBe(source.trail.trailStart);
+    expect(shader.uniforms.kerfdeskCoveredEnd).toBe(source.trail.trailEnd);
+    const cullAt = shader.vertexShader.indexOf('kerfdeskCoveredEnabled > 0.5');
+    expect(cullAt).toBeGreaterThan(shader.vertexShader.lastIndexOf('vKerfdeskXYPlane ='));
+    const cull = shader.vertexShader.slice(cullAt);
+    expect(cull).toContain('instanceStart.z == instanceEnd.z');
+    expect(cull).toContain('abs( vKerfdeskXYPlane.z ) > 1e-8');
+    expect(cull).toContain('float( gl_InstanceID ) >= kerfdeskCoveredStart');
+    expect(cull).toContain('float( gl_InstanceID ) < kerfdeskCoveredEnd');
+    setTrail(source.trail, 1, 2, null);
+    expect(shader.uniforms.kerfdeskCoveredStart?.value).toBe(1);
+    expect(shader.uniforms.kerfdeskCoveredEnd?.value).toBe(2);
+    expect(batches.ghost.material.depthFunc).toBe(three.LessDepth);
+    expect(batches.ghost.material.depthWrite).toBe(false);
   });
 
-  it('enables covered full geometry with a visible solid, disabling it for either LOD geometry', () => {
-    const source = sourceScene();
-    const batches = source.build();
+  it('disables coverage for either LOD or a shared-attribute replacement and restores it on full geometry', () => {
+    const source = sourceScene(),
+      batches = source.build(),
+      fullGhost = source.ghost.geometry;
     batches.ghost.visible = true;
-    const fullGhost = source.ghost.geometry;
-    const exactGhost = batches.objects[4]!;
-    const shader = compiled(exactGhost.material);
+    const shader = compiled(batches.ghost.material);
     const enabled = () => {
-      beforeRender(exactGhost);
+      beforeRender(batches.ghost);
       return shader.uniforms.kerfdeskCoveredEnabled?.value;
     };
-    expect(source.lines.visible).toBe(false);
     expect(enabled()).toBe(1);
     batches.lines.geometry = lodGeometry();
     expect(enabled()).toBe(0);
@@ -353,24 +328,41 @@ describe('conservative completed ghost range', () => {
     expect(enabled()).toBe(1);
     batches.ghost.geometry = lodGeometry();
     expect(enabled()).toBe(0);
+    const shared = shareProgramGeometry(LineSegmentsGeometry, fullGhost);
+    geometries.add(shared);
+    batches.ghost.geometry = shared;
+    expect(enabled()).toBe(0);
     batches.ghost.geometry = fullGhost;
     expect(enabled()).toBe(1);
-    for (const index of [0, 2, 3]) batches.objects[index]!.visible = false;
-    expect(enabled()).toBe(0);
+    source.lines.material.linewidth = source.ghost.material.linewidth;
+    expect(enabled()).toBe(1);
   });
 
-  it.each(['narrow', 'transparent', 'opacity'] as const)(
-    'keeps ghost coverage when the completed source is %s',
+  it.each(['hidden', 'narrow', 'transparent', 'opacity'] as const)(
+    'retains ghost coverage when the completed source is %s',
     (change) => {
-      const source = sourceScene();
+      const source = sourceScene(),
+        batches = source.build(),
+        shader = compiled(batches.ghost.material);
+      if (change === 'hidden') source.lines.visible = false;
       if (change === 'narrow') source.lines.material.linewidth = 0.5;
       if (change === 'transparent') source.lines.material.transparent = true;
       if (change === 'opacity') source.lines.material.opacity = 0.9;
-      const batches = source.build();
-      const exactGhost = batches.objects[4]!;
-      const shader = compiled(exactGhost.material);
-      beforeRender(exactGhost);
+      beforeRender(batches.ghost);
       expect(shader.uniforms.kerfdeskCoveredEnabled?.value).toBe(0);
     },
   );
+
+  it('checks live coverage eligibility after the original ghost material render callback', () => {
+    const source = sourceScene();
+    const parent = vi.fn(() => {
+      source.lines.visible = false;
+    });
+    source.ghost.material.onBeforeRender = parent;
+    const batches = source.build(),
+      shader = compiled(batches.ghost.material);
+    beforeRender(batches.ghost);
+    expect(parent).toHaveBeenCalledOnce();
+    expect(shader.uniforms.kerfdeskCoveredEnabled?.value).toBe(0);
+  });
 });
