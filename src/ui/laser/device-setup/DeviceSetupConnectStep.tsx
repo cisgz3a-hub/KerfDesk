@@ -16,14 +16,16 @@ import { findMachinePhase, type FindMachinePhase } from './find-machine-phase';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 import { useFindMachine, type FindMachineModel } from './use-find-machine';
 import type { DeviceSetupAutomatic } from './use-controller-auto-fill';
+import type { MachineSetupConnection } from './machine-setup-connection';
 
 type Props = DeviceSetupStepProps & {
   readonly automatic?: DeviceSetupAutomatic | undefined;
   readonly openOptions?: boolean;
+  readonly connection?: MachineSetupConnection | undefined;
 };
 
 export function DeviceSetupConnectStep(props: Props): JSX.Element {
-  const model = useFindMachine(props.state, props.automatic);
+  const model = useFindMachine(props.state, props.automatic, props.connection);
   const [offline, setOffline] = useState(false);
   const phase = findMachinePhase(model, offline);
   return (
@@ -31,7 +33,13 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
       <div className="lf-setup-find-head">
         <h4>{phase.title}</h4>
         <p>{phase.detail}</p>
+        {model.networkTarget === undefined ? null : (
+          <p title={`Retries reconnect only to ${model.networkTarget}.`}>
+            Network target: {model.networkTarget}
+          </p>
+        )}
       </div>
+      {model.connectionBlocked === null ? null : <p role="alert">{model.connectionBlocked}</p>}
       {phase.kind === 'found' ? (
         <DeviceSetupFoundMachine
           state={props.state}
@@ -44,15 +52,21 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
       ) : null}
       <FindActions model={model} phase={phase} onOffline={setOffline} />
       <details className="lf-setup-disclosure lf-setup-disclosure--nested" open={props.openOptions}>
-        <summary title="Choose the controller firmware, baud rate, output dialect and streaming used to connect.">
+        <summary title="Choose the controller firmware, output dialect and connection settings.">
           <span>Connection options</span>
           <small>
             {model.guide.label}
-            {model.driver.capabilities.transport === 'serial' ? ` · ${model.baudRate} baud` : ''}
+            {model.networkTarget === undefined && model.driver.capabilities.transport === 'serial'
+              ? ` · ${model.baudRate} baud`
+              : ''}
           </small>
         </summary>
         <div className="lf-setup-disclosure-body">
-          <DeviceSetupConnectionOptions state={props.state} dispatch={props.dispatch} />
+          <DeviceSetupConnectionOptions
+            state={props.state}
+            dispatch={props.dispatch}
+            networkTarget={model.networkTarget}
+          />
           <CommandContract guide={model.guide} />
         </div>
       </details>
@@ -60,11 +74,21 @@ export function DeviceSetupConnectStep(props: Props): JSX.Element {
   );
 }
 
-function FindActions(props: {
+type FindActionsProps = {
   readonly model: FindMachineModel;
   readonly phase: FindMachinePhase;
   readonly onOffline: (offline: boolean) => void;
-}): JSX.Element | null {
+};
+
+function FindActions(props: FindActionsProps): JSX.Element | null {
+  const { model } = props;
+  if (model.networkTarget !== undefined && model.connectionBlocked !== null) {
+    return model.connected ? <Button onClick={model.disconnect}>Disconnect</Button> : null;
+  }
+  return <ConnectionPhaseActions {...props} />;
+}
+
+function ConnectionPhaseActions(props: FindActionsProps): JSX.Element | null {
   const { model, phase } = props;
   switch (phase.kind) {
     case 'idle':
@@ -72,17 +96,7 @@ function FindActions(props: {
     case 'offline':
       return <StartActions {...props} failed={phase.kind === 'failed'} />;
     case 'silent':
-      return (
-        <div className="lf-setup-find-actions">
-          <Button variant="primary" onClick={model.scan.start}>
-            Try other speeds
-          </Button>
-          <ChoosePort model={model} />
-          <Button variant="ghost" onClick={model.disconnect}>
-            Disconnect
-          </Button>
-        </div>
-      );
+      return <SilentActions model={model} />;
     case 'scanning':
       return (
         <div className="lf-setup-find-actions">
@@ -99,6 +113,23 @@ function FindActions(props: {
     default:
       return assertNever(phase.kind);
   }
+}
+
+function SilentActions({ model }: { readonly model: FindMachineModel }): JSX.Element {
+  return (
+    <div className="lf-setup-find-actions">
+      <Button
+        variant="primary"
+        onClick={model.networkTarget === undefined ? model.scan.start : model.reconnect}
+      >
+        {model.networkTarget === undefined ? 'Try other speeds' : 'Try again'}
+      </Button>
+      <ChoosePort model={model} />
+      <Button variant="ghost" onClick={model.disconnect}>
+        Disconnect
+      </Button>
+    </div>
+  );
 }
 
 function StartActions(props: {
@@ -152,7 +183,8 @@ function FoundActions({ model }: { readonly model: FindMachineModel }): JSX.Elem
   );
 }
 
-function ChoosePort({ model }: { readonly model: FindMachineModel }): JSX.Element {
+function ChoosePort({ model }: { readonly model: FindMachineModel }): JSX.Element | null {
+  if (model.networkTarget !== undefined) return null;
   return (
     <Button
       onClick={model.choosePort}
@@ -199,7 +231,11 @@ function ConnectionMismatch(
       )}
       <div className="lf-setup-find-actions">
         {model.driverMismatch ? (
-          <Button variant="primary" onClick={model.reconnect}>
+          <Button
+            variant="primary"
+            onClick={model.reconnect}
+            disabled={model.connectionBlocked !== null}
+          >
             Reconnect using selected profile
           </Button>
         ) : null}

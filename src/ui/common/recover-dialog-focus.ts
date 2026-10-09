@@ -48,11 +48,12 @@ export function dialogControlIsUnavailable(element: HTMLElement): boolean {
 /** Return focus without taking it away from another dialog or a deliberate move. */
 export function restoreDialogFocus(node: HTMLElement, target: HTMLElement | null): void {
   if (target === null) return;
-  // Responsive toolbars can move an opener into an overflow menu while its
-  // dialog is open. Return to that menu's trigger when the original is gone.
-  const restoredTarget = target.isConnected
-    ? target
-    : document.getElementById(target.dataset['dialogFocusFallback'] ?? '');
+  // An opener can disappear into overflow or become disabled while its dialog
+  // is open. Its stable toolbar trigger remains an available return target.
+  const restoredTarget =
+    target.isConnected && !dialogControlIsUnavailable(target)
+      ? target
+      : document.getElementById(target.dataset['dialogFocusFallback'] ?? '');
   if (restoredTarget === null || dialogControlIsUnavailable(restoredTarget)) return;
   const active = document.activeElement;
   if (active !== null && active !== document.body && !node.contains(active)) return;

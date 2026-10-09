@@ -3810,6 +3810,9 @@ Release motors and Advanced origin. The two ordinary origin actions are:
   Coordinates placement to User Origin after that `ok` and its bounded
   work-offset wait finish; an explicit User, Verified, or Current Position
   choice is kept (ADR-327). A cancelled action leaves placement unchanged.
+  If another project opens before the acknowledgement completes, that project's
+  placement stays unchanged; the acknowledged machine origin is still recorded.
+  The same document ownership applies to Set persistent origin.
 - **Reset origin** — on GRBL-family controllers sends `G54 G92.1`. Clears all temporary
   G92 offsets, including temporary Z zero. Any stored G54 offset remains, so work
   coordinates do not necessarily return to machine zero. Disabled when no custom
