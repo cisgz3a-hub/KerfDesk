@@ -4,6 +4,8 @@
 // thin layout shell.
 
 import { ConfirmSaveDialog, SaveFilenamePanel, StatusBar, Toasts } from '../common';
+import { ArtworkCreationHost } from '../layers/ArtworkCreationHost';
+import { ProjectSheetsBar } from '../commands/ProjectSheetsBar';
 import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
@@ -90,6 +92,7 @@ export function App(): JSX.Element {
       <Toasts />
       <LiveMotionBar />
       <PwaUpdateWatcherGate />
+      <ArtworkCreationHost />
       <AddTextDialog />
       <DesignLibraryDialog />
       <ImportImageDialog />
@@ -167,6 +170,7 @@ function CanvasArea(): JSX.Element {
   return (
     <WorkspaceViewport
       controls={<CanvasViewSwitch showGcode={showGcode} onChange={changeView} />}
+      footer={<ProjectSheetsBar />}
       content={
         showGcode ? (
           <div className="lf-workspace-stage">

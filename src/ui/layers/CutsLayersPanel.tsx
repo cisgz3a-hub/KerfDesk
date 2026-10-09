@@ -1,9 +1,6 @@
 // The artwork inspector is the primary editor. The operation list is a
 // secondary management surface; it must never push the active settings away.
-import { ParametricPartControls } from './ParametricPartControls';
-import { ConstrainedSketchControls } from './ConstrainedSketchControls';
 import { CncPreparationStatus } from './CncPreparationStatus';
-import { CreateEditableReliefButton } from './CreateEditableReliefButton';
 import { useState } from 'react';
 import { machineKindOf, type Layer } from '../../core/scene';
 import { CollapsedRail } from '../common';
@@ -83,9 +80,6 @@ function LayersView({ layers }: { readonly layers: ReadonlyArray<Layer> }): JSX.
   return (
     <>
       {layers.length === 0 ? <EmptyArtwork /> : null}
-      <CreateEditableReliefButton />
-      <ConstrainedSketchControls />
-      <ParametricPartControls />
       <CncPreparationStatus />
       <SelectedObjectProperties />
       <DesignHierarchyPanel />

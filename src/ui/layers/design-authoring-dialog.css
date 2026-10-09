@@ -1,0 +1,251 @@
+.lf-dialog.lf-authoring-dialog {
+  box-sizing: border-box;
+  width: min(1040px, calc(100vw - 24px));
+  max-width: none;
+  min-width: 0;
+  gap: 16px;
+}
+.lf-authoring-dialog p {
+  margin: 0;
+  line-height: 1.5;
+}
+.lf-authoring-intro,
+.lf-authoring-hint {
+  color: var(--lf-text-muted);
+}
+.lf-authoring-hint {
+  font-size: 12px;
+}
+.lf-authoring-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.lf-authoring-form,
+.lf-authoring-review {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+.lf-authoring-review {
+  position: sticky;
+  top: 0;
+  padding: 16px;
+  border: 1px solid var(--lf-border);
+  border-radius: 8px;
+  background: var(--lf-bg-0);
+}
+.lf-authoring-review h3 {
+  margin: 0;
+  font-size: 14px;
+}
+.lf-authoring-review section,
+.lf-authoring-review [role='status'] {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.lf-authoring-dialog label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--lf-text-muted);
+}
+.lf-authoring-dialog input,
+.lf-authoring-dialog select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 6px 8px;
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 5px;
+  background: var(--lf-bg-input);
+  color: var(--lf-text);
+  font: inherit;
+  font-size: 13px;
+}
+.lf-authoring-dialog button {
+  min-height: 32px;
+  border: 1px solid var(--lf-border-strong);
+  border-radius: 5px;
+  padding: 6px 10px;
+  background: var(--lf-bg-1);
+  color: var(--lf-text);
+  font: inherit;
+  cursor: pointer;
+}
+.lf-authoring-dialog button:hover {
+  background: var(--lf-bg-2);
+}
+.lf-authoring-dialog button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.lf-authoring-dialog button.lf-btn--primary {
+  background: var(--lf-accent);
+  color: #fff;
+  border-color: var(--lf-accent);
+}
+.lf-authoring-dialog fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+}
+.lf-authoring-dialog legend {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lf-authoring-dialog details {
+  min-width: 0;
+  border-top: 1px solid var(--lf-border);
+  padding-top: 10px;
+}
+.lf-authoring-dialog summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+.lf-authoring-preview {
+  display: block;
+  width: 100%;
+  height: 260px;
+  min-width: 0;
+  color: var(--lf-accent);
+  border: 1px solid var(--lf-border);
+  border-radius: 6px;
+  background: var(--lf-bg-1);
+}
+.lf-authoring-dimensions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.lf-sketch-parameter-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 1fr) minmax(90px, 1.25fr) 76px;
+  gap: 8px;
+  align-items: end;
+}
+.lf-sketch-parameter-row > button {
+  grid-column: 1 / -1;
+  justify-self: end;
+  min-height: 24px;
+  padding: 3px 6px;
+  font-size: 11px;
+}
+.lf-sketch-constraint-row,
+.lf-sketch-constraint-composer,
+.lf-sketch-composer {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--lf-border);
+  border-radius: 5px;
+}
+.lf-sketch-constraint-row > span {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.lf-sketch-constraint-row > button {
+  justify-self: end;
+  font-size: 11px;
+}
+.lf-sketch-point-row {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 12px;
+}
+.lf-sketch-entities {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lf-sketch-entities li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  min-width: 0;
+}
+.lf-sketch-entities li > span {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.lf-sketch-entities li > button {
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.lf-creation-choices {
+  display: grid;
+  gap: 10px;
+}
+.lf-creation-choices > button {
+  display: flex;
+  align-items: center;
+  text-align: left;
+  gap: 14px;
+  padding: 16px;
+}
+.lf-creation-choices > button > svg {
+  flex: 0 0 auto;
+  color: var(--lf-accent);
+}
+.lf-creation-choices span {
+  display: grid;
+  gap: 5px;
+}
+.lf-creation-choices small {
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.lf-authoring-dialog [role='alert'] {
+  padding: 10px;
+  border: 1px solid var(--lf-danger);
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .lf-authoring-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lf-authoring-review {
+    position: static;
+  }
+  .lf-authoring-preview {
+    height: 220px;
+  }
+  .lf-sketch-parameter-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .lf-sketch-parameter-row > label:last-of-type {
+    grid-column: 1;
+  }
+  .lf-sketch-parameter-row > button {
+    grid-column: 2;
+  }
+}
+
+.lf-dialog.lf-creation-dialog {
+  width: min(560px, calc(100vw - 24px));
+}
+
+.lf-authoring-dialog .lf-dialog-actions {
+  bottom: calc(-1 * var(--lf-space-6));
+  z-index: 2;
+}

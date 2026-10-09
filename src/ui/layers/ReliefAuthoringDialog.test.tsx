@@ -10,6 +10,7 @@ import { createProject, IDENTITY_TRANSFORM } from '../../core/scene';
 import type { HeightfieldReliefObject } from '../../core/scene/scene-object';
 import { DEFAULT_CNC_MACHINE_CONFIG } from '../../core/scene/machine';
 import { materializeReliefAuthoring } from '../../core/relief/materialize-relief-authoring';
+import { createReliefAuthoringDocument } from '../../core/relief/relief-authoring-document';
 import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { ReliefAuthoringDialog } from './ReliefAuthoringDialog';
@@ -289,4 +290,52 @@ it('cancels composition after target placement changes and ignores a late worker
   expect(relief.transform.x).toBe(10);
   expect(relief.reliefAuthoring).toBeUndefined();
   expect(useStore.getState().undoStack).toHaveLength(1);
+});
+
+it('keeps component and rail control identities distinct through sculpting and undo', async () => {
+  const original = object();
+  install({ ...original, reliefAuthoring: createReliefAuthoringDocument(original.reliefSource) });
+  const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  try {
+    await act(async () => root.render(<CurrentDialog />));
+    const canvas = host.querySelector('canvas') as HTMLCanvasElement;
+    canvas.setPointerCapture = () => undefined;
+    canvas.getBoundingClientRect = () => ({
+      x: 0,
+      y: 0,
+      left: 0,
+      top: 0,
+      right: 6,
+      bottom: 6,
+      width: 6,
+      height: 6,
+      toJSON: () => ({}),
+    });
+    const pointer = { pointerId: 1, clientX: 3, clientY: 3 };
+    await act(async () => {
+      Simulate.pointerDown(canvas, { button: 0, ...pointer });
+      Simulate.pointerUp(canvas, pointer);
+    });
+    const edited = useStore
+      .getState()
+      .project.scene.objects.find((item) => item.id === 'R1') as HeightfieldReliefObject;
+    expect(edited.reliefAuthoring?.strokes).toHaveLength(1);
+    expect(edited.reliefSource.samplesBase64).not.toBe(original.reliefSource.samplesBase64);
+    await act(async () => useStore.getState().undo());
+    expect(
+      (
+        useStore
+          .getState()
+          .project.scene.objects.find((item) => item.id === 'R1') as HeightfieldReliefObject
+      ).reliefSource,
+    ).toBe(original.reliefSource);
+    expect(host.querySelectorAll('[aria-label="Relief component name"]')).toHaveLength(1);
+    expect(
+      errors.mock.calls.filter((call) =>
+        /same key|duplicate.*key|unique.*key/i.test(call.map(String).join(' ')),
+      ),
+    ).toEqual([]);
+  } finally {
+    errors.mockRestore();
+  }
 });

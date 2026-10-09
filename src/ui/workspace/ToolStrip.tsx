@@ -16,6 +16,7 @@ import { TOOL_HELP, toolHelpId, type ToolHelpKey } from '../help/help-topics';
 import { useUiStore, type ToolMode } from '../state/ui-store';
 import { useStore } from '../state/store';
 import { curveCommandNode } from '../state/path-node-command-geometry';
+import { openArtworkCreation } from '../layers/artwork-creation-store';
 import { BooleanCompoundControls } from './BooleanCompoundControls';
 import { NodeCoordinateControls } from './NodeCoordinateControls';
 import './tool-strip.css';
@@ -48,6 +49,15 @@ export function ToolStrip(): JSX.Element {
   return (
     <aside aria-label="Drawing tools" className="lf-rail lf-toolstrip">
       <BooleanCompoundControls />
+      <span className="lf-toolstrip__caption" aria-hidden="true">
+        Create
+      </span>
+      <IconButton
+        icon="plus"
+        label="Create artwork"
+        title="Create a constrained sketch, parametric part or editable relief"
+        onClick={() => openArtworkCreation('choose')}
+      />
       {toolMode.kind === 'node' ? <NodeCoordinateControls /> : null}
       {TOOLS.map((tool) => (
         <Fragment key={tool.helpKey}>
