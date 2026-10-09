@@ -126,9 +126,9 @@ function currentStrokes(
     { color: args.theme.arrow, linewidth: CORE_PX },
   ].map((stroke, order) => {
     const material = new args.LineMaterial({
-      // The flat toolpath shares one ordered draw queue. Its different stroke
-      // directions must not occlude each other through slope-dependent depth.
-      transparent: planar,
+      // Faint future context draws before the active stroke in the same queue.
+      // Depth still compares this stroke against completed cuts and scene geometry.
+      transparent: true,
       blending: planar ? args.three.NoBlending : args.three.NormalBlending,
       depthWrite: !planar,
       ...stroke,
