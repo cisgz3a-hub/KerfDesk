@@ -1357,8 +1357,10 @@ the completed physical Frame is the spatial source of truth.
   A later failed Save does not replace that owner. A failed replay that may have changed an alias
   marks an affected handoff unsaved promptly once its final restoration fails. Notifications check
   each saved owner independently; unrelated later replays and older feedback handlers cannot delay
-  them. A newer owner's own replay can still succeed without becoming unsaved. Once a handoff is
-  uncertain, save it again; a different carrier's later replay does not automatically clear it.
+  them. A newer Save that is still pending cannot silence a completed restoration failure, even
+  when it cancels the affected owner's remaining restoration. A newer owner's own replay can still
+  succeed without becoming unsaved. Once a handoff is uncertain, save it again; a different carrier's
+  later replay does not automatically clear it.
   A replacement document or a genuinely newer successful handoff cannot be dirtied by that callback.
 
 #### Edge — save in web context

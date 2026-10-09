@@ -254,7 +254,11 @@ async function repairCapturedWrites(group: DestinationWriteGroup): Promise<void>
   // The earliest chosen write already ran. Replay the later snapshots in
   // request order: aliases finish newest, distinct files keep their own bytes.
   for (const [index, operation] of writes.entries()) {
-    if (!isCurrentGroup(group)) return;
+    if (!isCurrentGroup(group)) {
+      // Supersession cancels the remaining own replays, not completed failures.
+      reportAffectedSaveOwners(group, failures, restored, [], notifiedOwners);
+      return;
+    }
     try {
       await operation.target.write(operation.contents);
       restored.push({ operation, index });
@@ -275,9 +279,9 @@ function reportAffectedSaveOwners(
 ): void {
   // A failed later selection does not replace a successful handoff. A throwing
   // write may already have changed an unknown alias, so notify each potentially
-  // affected successful owner. Its saved-epoch/document guards decide ownership.
+  // affected successful owner. Its saved-epoch/document guards decide ownership,
+  // even if a newer pending selection has superseded this repair group.
   for (const owner of group.members) {
-    if (!isCurrentGroup(group)) return;
     if (!owner.status.selectedSucceeded || notifiedOwners.has(owner.id) || pending.includes(owner))
       continue;
     const failure = [...failures]
