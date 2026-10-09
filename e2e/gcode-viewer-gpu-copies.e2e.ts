@@ -1,3 +1,4 @@
+import { buildGcodeRenderModel, SEG_KIND } from '../src/core/gcode-view';
 import { expect, test, type Page } from './fixtures/kerfdesk-test';
 
 // A 20,000-move serpentine at one depth: enough moves that a second GPU copy
@@ -17,8 +18,22 @@ function serpentine(): string {
   return lines.join('\n');
 }
 
-// A few kilobytes for the rapids' own pick copy and the hover outline.
+// Fat IDs derive their axis from shared endpoints; only native pairs store XYZ.
+const NATIVE_SOURCE_AXIS_BYTES = 2 * 3 * Float32Array.BYTES_PER_ELEMENT;
+// Bound the hover outline, native pick IDs and newly visible playback geometry.
+// This stays smaller than another positions or colour buffer for this program.
 const SMALL_BYTES = 64 * 1024;
+
+function expectedNativePickAxisBytes(text: string): number {
+  const parsed = buildGcodeRenderModel(text);
+  if (parsed.kind !== 'ok') throw new Error(parsed.reason);
+  const { model } = parsed;
+  let nativePairs = 0;
+  for (let index = 0; index < model.segmentCount; index += 1) {
+    if (model.segKind[index] === SEG_KIND.travel) nativePairs += 1;
+  }
+  return nativePairs * NATIVE_SOURCE_AXIS_BYTES;
+}
 
 // Counts the bytes held in WebGL buffers, so the test sees what the view
 // keeps on the GPU rather than what it meant to.
@@ -64,9 +79,11 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   page.on('console', (message) => {
     if (message.type() === 'error') problems.push(message.text());
   });
+  const text = serpentine();
+  const nativeAxisBytes = expectedNativePickAxisBytes(text);
   await trackGpuBuffers(page);
   await page.goto('/');
-  await kerfdesk.setOpenFiles([{ name: 'gpu-serpentine.nc', text: serpentine() }]);
+  await kerfdesk.setOpenFiles([{ name: 'gpu-serpentine.nc', text }]);
   await page.getByText('File', { exact: true }).click();
   await page.getByRole('menuitem').filter({ hasText: 'Open G-code...' }).click();
   const dialog = page.getByRole('dialog', { name: 'G-code Inspector: gpu-serpentine.nc' });
@@ -81,7 +98,8 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   // Twenty thousand moves at 24 bytes of positions each, at least.
   expect(opened).toBeGreaterThan(ROWS * STEPS_PER_ROW * 24);
 
-  // Pointing at a move builds the pick pass over the drawn lines' buffers.
+  // Pointing shares fat endpoints and allocates native axes once, plus small
+  // fixed geometry. Keep the original total64KB limit, including those axes.
   const view = dialog.getByLabel('3D G-code toolpath', { exact: true });
   const box = await view.boundingBox();
   if (box === null) throw new Error('view has no size');
@@ -90,6 +108,17 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   await page.mouse.move(box.x + box.width / 2 + 9, box.y + box.height / 2 + 5);
   await settle();
   const picked = await gpuBytes();
+  await test.info().attach('gpu-first-pick-memory.json', {
+    body: JSON.stringify({
+      opened,
+      picked,
+      addedBytes: picked - opened,
+      nativeAxisBytes,
+      limitBytes: SMALL_BYTES,
+    }),
+    contentType: 'application/json',
+  });
+  expect(picked - opened).toBeGreaterThanOrEqual(nativeAxisBytes);
   expect(picked - opened).toBeLessThan(SMALL_BYTES);
 
   // A lens repaints the colours in place: no new buffer, nothing left behind.
@@ -106,6 +135,20 @@ test('the 3D view keeps one GPU copy of the moves through pick, lens and playbac
   if (track === null) throw new Error('timeline has no size');
   await page.mouse.click(track.x + track.width * 0.5, track.y + track.height / 2);
   await settle();
-  expect((await gpuBytes()) - opened).toBeLessThan(SMALL_BYTES);
+  // Playback retains the original total64KB limit and the post-pick budget.
+  const playback = await gpuBytes();
+  await test.info().attach('gpu-playback-memory.json', {
+    body: JSON.stringify({
+      opened,
+      picked,
+      playback,
+      addedSinceOpen: playback - opened,
+      addedSincePick: playback - picked,
+      limitBytes: SMALL_BYTES,
+    }),
+    contentType: 'application/json',
+  });
+  expect(playback - opened).toBeLessThan(SMALL_BYTES);
+  expect(playback - picked).toBeLessThan(SMALL_BYTES);
   expect(problems).toEqual([]);
 });

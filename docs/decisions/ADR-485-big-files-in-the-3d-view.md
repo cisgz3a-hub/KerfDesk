@@ -171,10 +171,15 @@ to millions of moves.
   program order; the shader edits land after their anchors, leave other shaders alone and each
   have their own program key; `buildTravelBucket` copies out only the drawn rapids.
 - Browser (`e2e/gcode-viewer-gpu-copies.e2e.ts`): on a 20,000-move program the bytes held in WebGL
-  buffers, counted by wrapping `bufferData` and `deleteBuffer`, stay within 64 KB of what opening
-  took through a hover, four lens changes and playback, with no console error. On main the hover
-  alone added 640 KB (32 bytes a move). The pick, keys, connected-script and large-worker specs
-  pass unchanged.
+  buffers are counted by wrapping `bufferData` and `deleteBuffer`. ADR-470's source-axis
+  refinement (2026-10-09) derives fat axes from existing shared endpoints without another
+  per-row buffer; native pairs retain24 bytes each, allocated once on first pick. This fixture's
+  total first-hover increase, including native axes, stays below the original64KB limit.
+  Four lens changes keep the post-pick byte total exactly. Playback stays within64KB of both
+  opening and first pick, so it cannot copy the program buffers or allocate the axes again.
+  Raw before/after byte counts are attached to the browser test. No console error is allowed.
+  Before this decision the hover alone added640KB (32 bytes a move). The pick, keys,
+  connected-script and large-worker specs pass unchanged.
 - Page array memory after opening a generated serpentine program in the Inspector (Chrome, after a
   forced collection; `Runtime.getHeapUsage` backing storage):
 
