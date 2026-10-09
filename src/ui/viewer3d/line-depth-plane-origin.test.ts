@@ -58,6 +58,7 @@ describe('canonical stored source origins', () => {
     { input: [4, 9, 2, 20, -3, 2], xyz: [4, 9, 2] },
     { input: [10, 9, 2, 10, -3, 2], xyz: [10, -3, 2] },
     { input: [5, 7, -4, 5, 7, -4], xyz: [5, 7, -4] },
+    { input: [5, 7, -4, 5, 7, 8], xyz: [5, 7, -4] },
     { input: [0, -0, 0, -0, 0, -0], xyz: [0, 0, 0] },
     { input: [3, 7, 2, 6, 11, 7], xyz: [3, 7, 2] },
     { input: [10000100, 0, 30, 10000000, 0, 0], xyz: [10000000, 0, 0] },
@@ -122,7 +123,6 @@ describe('canonical stored source origins', () => {
   });
 
   it.each([
-    [5, 7, -4, 5, 7, 8],
     [0, 0, 0, 2 ** -149, 0, Math.fround(3.4028234663852886e38)],
     [NaN, 0, 2, 10, 0, 2],
     [0, 0, 2, Infinity, 0, 2],
@@ -148,6 +148,29 @@ describe('canonical stored source origins', () => {
 });
 
 describe('source-origin geometry companions', () => {
+  it.each(['fat', 'native'] as const)(
+    'marks only valid varying-Z %s sources for the shared vertical plane',
+    (kind) => {
+      const source: Segment = [5, 7, -4, 5, 7, 8];
+      const geometry = geometryFor(kind, [source, reverse(source)]);
+      addDepthPlanes(three, geometry, kind);
+      expect([...geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE).array]).toEqual(
+        new Array(kind === 'fat' ? 8 : 16).fill(0),
+      );
+      expect([...geometry.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE).array]).toEqual(
+        new Array(kind === 'fat' ? 2 : 4).fill(0),
+      );
+      const origin = geometry.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE);
+      const expected = [5, 7, -4, 1];
+      for (let row = 0; row < origin.count; row++)
+        expect([...origin.array.slice(row * 4, row * 4 + 4)]).toEqual(expected);
+      const prefix = descriptor([5, 7, -4, 5, 7, 2]);
+      expect([...prefix.normal]).toEqual([0, 0, 0, 0]);
+      expect([...prefix.origin]).toEqual(expected);
+      geometry.dispose();
+    },
+  );
+
   const source: Segment = [10000000, 0, 0, 10000100, 0, 30];
 
   it.each(['fat', 'native'] as const)(

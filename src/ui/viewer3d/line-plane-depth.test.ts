@@ -75,7 +75,7 @@ describe('plane depth shader composition', () => {
     expect(shader.fragmentShader).toContain('gl_FragDepth = gl_FragCoord.z');
     expect(shader.fragmentShader).toContain('abs( vKerfdeskXYPlane.z ) > 1e-8');
     expect(material.customProgramCacheKey()).toBe(
-      'kerfdesk-solid-path-physical-origin-plane-depth-fat',
+      'kerfdesk-solid-path-physical-source-plane-depth-fat',
     );
     material.dispose();
   });

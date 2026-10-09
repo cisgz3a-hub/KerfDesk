@@ -114,8 +114,10 @@ All still depth-test against scene geometry, with a small work-plane bias. Nonpl
 strokes and the active core remain opaque and write depth against scene geometry; the active casing
 writes none. Each nonvertical stored source stroke compares its physical least-slope XY plane at the
 raster sample, independently of ribbon width, direction and shortened playback endpoints. Completed,
-active, faint future and native travel strokes share that definition; vertical and edge-on strokes
-retain raster depth. Reversed endpoints and active prefixes keep the full stored source plane through
+active, faint future and native travel strokes share that definition. Finite vertical sources carry a
+canonical-origin marker and share the camera-facing vertical plane through that origin, independent of
+direction and prefix length. Edge-on planes, or a vertical source directly under the camera, retain
+raster depth. Reversed endpoints and active prefixes keep the full stored source plane through
 byte-identical packed normal, high/low offset and canonical-origin descriptors, with invariant shader outputs. The shader evaluates the
 plane using a split camera-relative origin, the draw's normal matrix and inverse projection. The actual
 framebuffer viewport accounts for pixel ratio and the cropped picking target. Rendered qualification

@@ -158,7 +158,7 @@ describe('active move shared physical writer', () => {
     for (const [index, child] of (active.object.children as LineSegments2[]).entries()) {
       expect(compiled(child.material).uniforms.parentCell).toBe(hooks[index]?.cell);
       expect(child.material.customProgramCacheKey()).toBe(
-        'custom-parent-physical-origin-plane-depth-fat',
+        'custom-parent-physical-source-plane-depth-fat',
       );
       child.material.onBeforeRender(
         renderer as never,

@@ -52,7 +52,10 @@ export function writeDepthPlane(
   const dz = (first ? z1 : z0) - z;
   const lengthSquared = dx * dx + dy * dy;
   // A varying-Z vertical segment cannot define a plane with z coefficient 1.
-  if (lengthSquared === 0) return;
+  if (lengthSquared === 0) {
+    writeVerticalOrigin(originTarget, originOffset, x0, y0, z0, x1, y1, z1);
+    return;
+  }
   // Anchor the offset to the coefficients actually uploaded, not their double precursors.
   const a = packedGradient((-dx * dz) / lengthSquared);
   const b = packedGradient((-dy * dz) / lengthSquared);
@@ -72,6 +75,25 @@ export function writeDepthPlane(
     y1,
     z1,
   );
+}
+
+/** W=1 with a zero normal selects the shared camera-facing vertical plane. */
+function writeVerticalOrigin(
+  origin: Float32Array | undefined,
+  offset: number,
+  x0: number,
+  y0: number,
+  z0: number,
+  x1: number,
+  y1: number,
+  z1: number,
+): void {
+  if (origin === undefined || !finiteEndpoints(x0, y0, z0, x1, y1, z1)) return;
+  const z = Math.min(z0, z1);
+  origin[offset] = x0 === 0 ? 0 : x0;
+  origin[offset + 1] = y0 === 0 ? 0 : y0;
+  origin[offset + 2] = z === 0 ? 0 : z;
+  origin[offset + 3] = 1;
 }
 
 function firstEndpoint(

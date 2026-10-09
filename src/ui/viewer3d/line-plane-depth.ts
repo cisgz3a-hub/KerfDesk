@@ -1,7 +1,7 @@
 // Screen-width ribbons can disagree in depth when an XY stroke is reversed or
 // shortened. Compare their shared work plane at the raster sample instead.
-// Each nonvertical stroke uses its physical least-slope XY plane; vertical
-// and edge-on strokes retain raster depth. Scene geometry still occludes it.
+// Nonvertical strokes use their physical least-slope XY plane; vertical strokes
+// share a camera-facing plane. Edge-on strokes retain raster depth.
 import type * as ThreeNamespace from 'three';
 import { insertBefore, MAIN, type ShaderSource } from './line-shader-edits';
 import {
@@ -34,11 +34,17 @@ export function withXYPlaneDepth(shader: ShaderSource, _kind: StrokeKind): Shade
   if (!shader.vertexShader.includes(MAIN) || !shader.fragmentShader.includes(MAIN)) return shader;
   // Subtract the camera from the canonical source origin before evaluating the
   // plane, keeping its constant local without cancellation through a rotation.
-  const plane = `vec3 kerfdeskDepthNormalEye = normalMatrix * ${DEPTH_PLANE_ATTRIBUTE}.xyz;
-  vec3 kerfdeskDepthOriginDelta = ( ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.xyz - ${CAMERA_HIGH} ) - ${CAMERA_LOW};
+  const plane = `vec3 kerfdeskDepthOriginDelta = ( ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.xyz - ${CAMERA_HIGH} ) - ${CAMERA_LOW};
+  vec3 kerfdeskDepthNormal = ${DEPTH_PLANE_ATTRIBUTE}.xyz;
+  float kerfdeskDepthLocalOffset = ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.w + ${DEPTH_PLANE_OFFSET_ATTRIBUTE};
+  if ( all( equal( kerfdeskDepthNormal, vec3( 0.0 ) ) )
+    && ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.w == 1.0 ) {
+    kerfdeskDepthNormal = vec3( kerfdeskDepthOriginDelta.xy, 0.0 );
+    kerfdeskDepthLocalOffset = 0.0;
+  }
+  vec3 kerfdeskDepthNormalEye = normalMatrix * kerfdeskDepthNormal;
   ${PLANE} = ${PLANE_MATRIX} * vec4( kerfdeskDepthNormalEye,
-    ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.w + ${DEPTH_PLANE_OFFSET_ATTRIBUTE}
-    - dot( ${DEPTH_PLANE_ATTRIBUTE}.xyz, kerfdeskDepthOriginDelta ) );`;
+    kerfdeskDepthLocalOffset - dot( kerfdeskDepthNormal, kerfdeskDepthOriginDelta ) );`;
   const depth = `
   gl_FragDepth = gl_FragCoord.z;
   if ( abs( ${PLANE}.z ) > 1e-8 ) {
@@ -131,7 +137,7 @@ uniform float kerfdeskCoveredEnabled;
     }
   };
   material.customProgramCacheKey = () =>
-    cacheKey + '-physical-origin-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
+    cacheKey + '-physical-source-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
   material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
     render.call(material, renderer, scene, camera, geometry, object, group);
     planeMatrix.copy(camera.projectionMatrix).invert().transpose();
