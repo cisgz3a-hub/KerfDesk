@@ -26,7 +26,10 @@ type Rail = {
 };
 
 /** An injective oriented strip is the supported scalar domain; folds are rejected. */
-export function railProfileTriangles(source: ReliefRailProfileSource): ReadonlyArray<Triangle> {
+export function railProfileTriangles(
+  source: ReliefRailProfileSource,
+  legacy = false,
+): ReadonlyArray<Triangle> {
   const first = measuredRail(
     source.rail.reversed === true ? [...source.rail.points].reverse() : source.rail.points,
   );
@@ -50,10 +53,11 @@ export function railProfileTriangles(source: ReliefRailProfileSource): ReadonlyA
   };
   const error = reliefBoundaryError(boundary, false);
   if (error !== null) throw new Error(`Rail sweep is not single-valued: ${error}`);
-  return triangulatedSides(sides);
+  return triangulatedSides(sides, legacy);
 }
 function triangulatedSides(
   sides: ReadonlyArray<{ readonly left: Vertex; readonly right: Vertex }>,
+  legacy: boolean,
 ): ReadonlyArray<Triangle> {
   const out: Triangle[] = [];
   let sign = 0;
@@ -67,7 +71,7 @@ function triangulatedSides(
       left1: next.left,
       right1: next.right,
     };
-    requireInjectiveStrip(strip);
+    if (!legacy) requireInjectiveStrip(strip);
     const triangles = [
       orientedTriangle(previous.left, previous.right, next.right, sign, strip),
       orientedTriangle(previous.left, next.right, next.left, sign, strip),
@@ -122,8 +126,11 @@ function orientedTriangle(a: Vertex, b: Vertex, c: Vertex, sign: number, strip: 
     maxY: Math.max(a.y, b.y, c.y),
   };
 }
-export function railProfileSampler(source: ReliefRailProfileSource): ReliefComponentSampler {
-  const triangles = railProfileTriangles(source);
+export function railProfileSampler(
+  source: ReliefRailProfileSource,
+  legacy = false,
+): ReliefComponentSampler {
+  const triangles = railProfileTriangles(source, legacy);
   return (p) => {
     for (const triangle of triangles) {
       if (
@@ -133,7 +140,7 @@ export function railProfileSampler(source: ReliefRailProfileSource): ReliefCompo
         p.y > triangle.maxY + 1e-9
       )
         continue;
-      const location = triangleLocation(triangle, p);
+      const location = triangleLocation(triangle, p, legacy);
       if (location !== null)
         return {
           included: true,
@@ -220,12 +227,18 @@ function stripSides(
 function cross(a: Vec2, b: Vec2, c: Vec2): number {
   return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
 }
-function triangleLocation(triangle: Triangle, p: Vec2): { u: number; t: number } | null {
+function triangleLocation(
+  triangle: Triangle,
+  p: Vec2,
+  legacy: boolean,
+): { u: number; t: number } | null {
   const { a, b, c, area } = triangle;
   const wa = cross(p, b, c) / area,
     wb = cross(a, p, c) / area,
     wc = 1 - wa - wb;
   if (Math.min(wa, wb, wc) < -1e-9) return null;
+  // v1 interpolated the two triangles, including non-bilinear strips.
+  if (legacy) return { u: wa * a.u + wb * b.u + wc * c.u, t: wa * a.t + wb * b.t + wc * c.t };
   return stripLocation(triangle.strip, p);
 }
 function surroundingSections(

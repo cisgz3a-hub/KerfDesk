@@ -163,6 +163,12 @@ export function ReliefAuthoringDialog(props: {
         One-sided scalar surface. Stock top is Z = 0; heights below use the relief floor as their
         base. Undercuts and solid CAD are unsupported.
       </p>
+      {document.algorithmRevision === 'retained-relief-v1' ? (
+        <p>
+          This relief keeps its saved edges and rail profiles. Editing it applies corrected edges
+          and profiles, which can change the relief. Undo restores the saved result.
+        </p>
+      ) : null}
       <p>
         Authoring {document.width} × {document.height} cells;{' '}
         {(document.physicalWidthMm / document.width).toPrecision(4)} ×{' '}

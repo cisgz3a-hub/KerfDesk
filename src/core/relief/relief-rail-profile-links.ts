@@ -30,6 +30,7 @@ export function refreshReliefRailLinks(
   objects: ReadonlyArray<SceneObject>,
   root: Transform,
   component: Transform,
+  legacy = false,
 ): { readonly source: ReliefRailProfileSource; readonly changed: boolean } {
   const refresh = (rail: ReliefOpenRail): ReliefOpenRail => {
     if (rail.linkedObjectId === undefined) return rail;
@@ -44,7 +45,7 @@ export function refreshReliefRailLinks(
     rail: refresh(source.rail),
     ...(source.secondRail === undefined ? {} : { secondRail: refresh(source.secondRail) }),
   };
-  const error = reliefRailProfileError(updated);
+  const error = reliefRailProfileError(updated, legacy);
   if (error !== null) throw new Error(error);
   const changed = JSON.stringify(updated) !== JSON.stringify(source);
   return { source: changed ? updated : source, changed };

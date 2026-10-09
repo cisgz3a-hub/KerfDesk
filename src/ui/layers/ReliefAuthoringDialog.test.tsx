@@ -1,4 +1,8 @@
 import { composeReliefInWorker } from './relief-authoring-worker-client';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { gunzipSync } from 'node:zlib';
+import { createReliefAuthoringDocument } from '../../core/relief/relief-authoring-document';
 import type { ReliefAuthoringMaterializationResult } from '../../core/relief/materialize-relief-authoring';
 import type { ReliefAuthoringDocument } from '../../core/scene/relief/relief-authoring';
 import { act } from 'react';
@@ -289,4 +293,45 @@ it('cancels composition after target placement changes and ignores a late worker
   expect(relief.transform.x).toBe(10);
   expect(relief.reliefAuthoring).toBeUndefined();
   expect(useStore.getState().undoStack).toHaveLength(1);
+});
+
+it('preserves legacy relief on opening, applies current semantics on editing and restores exact Undo', async () => {
+  const original = object();
+  const legacy: HeightfieldReliefObject = {
+    ...original,
+    reliefAuthoring: {
+      ...createReliefAuthoringDocument(original.reliefSource),
+      algorithmRevision: 'retained-relief-v1',
+    },
+  };
+  install(legacy);
+  await act(async () => root.render(<CurrentDialog />));
+  expect(host.textContent).toContain('Editing it applies corrected edges and profiles');
+  expect(useStore.getState().project.scene.objects[0]).toBe(legacy);
+  await act(async () => button('Create shape from vector').click());
+  const edited = useStore.getState().project.scene.objects[0] as HeightfieldReliefObject;
+  expect(edited.reliefAuthoring?.algorithmRevision).toBe('retained-relief-v2');
+  expect(edited.reliefAuthoring?.revision).toBe(original.reliefSource.revision + 1);
+  await act(async () => useStore.getState().undo());
+  expect(useStore.getState().project.scene.objects[0]).toBe(legacy);
+});
+
+it('rejects an over-budget legacy edit before worker dispatch and preserves its original field', async () => {
+  const saved = JSON.parse(
+    gunzipSync(
+      readFileSync(resolve('src/__fixtures__/parent-saved-512px-clipped-import.lf2.gz')),
+    ).toString('utf8'),
+  ) as { scene: { objects: HeightfieldReliefObject[] } };
+  const savedRelief = saved.scene.objects[0];
+  if (savedRelief === undefined) throw new Error('Missing legacy fixture');
+  const legacy = { ...savedRelief, id: 'R1' };
+  install(legacy);
+  const before = useStore.getState().project;
+  vi.mocked(composeReliefInWorker).mockClear();
+  await act(async () => root.render(<CurrentDialog />));
+  await act(async () => button('Create shape from vector').click());
+  expect(host.textContent).toContain('work budget');
+  expect(composeReliefInWorker).not.toHaveBeenCalled();
+  expect(useStore.getState().project).toBe(before);
+  expect(useStore.getState().undoStack).toHaveLength(0);
 });
