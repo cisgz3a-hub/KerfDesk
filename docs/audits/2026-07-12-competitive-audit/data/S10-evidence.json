@@ -1,0 +1,209 @@
+{
+  "sector": 10,
+  "categories": [
+    {
+      "id": "10.1",
+      "summary": "WebSerial connect opens at the profile's baud (options.baudRate ?? driver.defaultBaudRate), catches no-WebSerial/policy throws, and models connecting/connected/failed/disconnected. Firmware welcome-banner auto-detect (FluidNC/grblHAL/GRBL/Marlin/Smoothie, ordered) is advisory — it surfaces a mismatch, never silently switches. Profile catalog suggests+applies one active machine profile; a 6-step Device Setup wizard onboards. Wrong-baud hint now reaches the console.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-connection-actions.ts:69-76 — requestPort then port.open({ baudRate: options.baudRate ?? refs.driver.defaultBaudRate }); :99-102 catch sets connection:{kind:'failed'} (requestPort throws inside the try)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/detect-controller.ts:14-33 — BANNER_MATCHERS (FluidNC before generic Grbl, grblHAL, Marlin start/M115, Smoothie); returns null for non-banners so the profile-selected driver is kept and detection merely surfaced"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-connection-actions.ts:155-199 — 2 s handshake; on no line, appendSystemNotice('[lf2] No controller response within 2 s. Check baud rate (…) and that the device is …') routes the wrong-baud hint into the console transcript (S6-F1 fix for this case)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/MachineSetupProfiles.tsx:49-125 — ProfileCatalogPanel/CatalogCard: suggestMachineProfiles from detected controller kind + settings, replaceDeviceProfile applies ONE active profile; device-setup/ wizard steps connect→firmware→probe→safety→review→confirm"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/help/connection-help.ts:12-16,36 — supported-browser list now carries the Brave WebSerial/Shields caveat (S6-F4 partial), CH340 driver guidance, and 'Wrong baud rate: most GRBL machines use 115200'"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run src/core/controllers src/ui/laser src/ui/state — 166 files / 1132 tests pass this session, incl. detect-controller.test.ts (6), laser-connection-actions.test.ts (2), LaserWindow.connection-hints.test.tsx (1)"
+        }
+      ],
+      "notVerified": "No live-app or hardware connect performed (side-effect-free rule + no dev server). Full-sweep S12-F2 (connect FAILURE never links the existing troubleshooting guide) was NOT re-verified this session — status unknown. Real baud/port negotiation against a controller untested; auto-detect banner matching validated only against test strings, not real firmware boot output."
+    },
+    {
+      "id": "10.2",
+      "summary": "Step-jog only: 9 XY steps 0.1–100 mm, a 5-step Focus/Z jog with CNC Zero-Z (G92 Z0), and an air-assist toggle. Jog direction is origin-aware; jog paths now refuse crossing enabled no-go zones (DEV-04). Feed is hardcoded min(maxFeed,3000) with no speed selector; there is still no continuous/hold-down jog, no arrow-key jog (only Ctrl+Return start / Ctrl+. stop), and no Go-to-origin/park button.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/JogPad.tsx:19 (STEPS_MM 0.1–100, 9 steps), :20-21 (FOCUS_STEPS_MM), :24,35 (DEFAULT_JOG_FEED_MM_PER_MIN=3000 named; comment 'dedicated speed selector is the remaining MCH-06 parity item'), :4-6 ('continuous / hold-down jogging is Phase B polish'), :42 (jogAxisSignsForOrigin so rear-origin machines jog correctly)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/use-job-shortcuts.ts:19-34 — keyboard is Ctrl/Cmd+Return (Start) and Ctrl/Cmd+. (Stop) only; no arrow-key jog binding anywhere"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/OriginRow.tsx:36-108 — Set origin (G92)/Reset (G92.1)/Release motors ($SLP) + Advanced persistent G54 set/clear (G10 L20 P1 / G92.1); no 'Go to origin'/'Go to zero'/park control; jogToMachinePosition (laser-store) is used only by board capture"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-jog-actions.ts:60,122-145 — assertJogClearsNoGoZones refuses a jog whose straight path crosses an enabled keep-out zone ('Jog blocked: this move would cross the no-go zone \"…\"'), closing consolidated A.4.4 / DEV-04; shared relative-jog-commands.ts abstracts Marlin/Smoothie jog builders"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run … — passing incl. JogPad.test.tsx, laser-jog-actions.zone-guard.test.ts, laser-store-jog-to-point.test.ts within the 1132-test run"
+        }
+      ],
+      "notVerified": "Motion smoothness, jog latency, and continuous-jog feel were not exercised (no hardware/live app). The remaining LightBurn Move-window parity gaps (S6-F3: continuous jog, keyboard jog, jog-speed field, Go-to-origin/park) are confirmed still absent in code; whether any are ADR-deferred vs un-recorded was not fully cross-checked in DECISIONS.md this session."
+    },
+    {
+      "id": "10.3",
+      "summary": "Framing traces the job's bounding box as five absolute $J= perimeter jogs (beam off — jog moves never fire the laser), with a CNC safe-Z retract jogged first so the bit clears stock (S6-F8 driver-seam fix). A hard-limit trip during a frame names the offending axis from GRBL Pn pins. There is no convex-hull/rubber-band frame and no low-power beam-on 'trace outline' mode.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/frame-lines.ts:7-17 — buildGrblFrameJogLines: 5 absolute $J=G90 G21 X..Y..F.. jogs (minXY→maxX,minY→maxXY→minX,maxY→minXY), verbatim perimeter; jog protocol keeps the beam off"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/frame-lines.ts:22-24 — buildGrblFrameRetract emits '$J=G90 G21 Z{z} F{f}' so a CNC frame lifts to safe Z before the XY box (the literal moved out of ui/state into the driver, closing S6-F8)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/status-parser.ts (Pn pins) + LaserWindow alarm banner — a frame that trips a hard limit names the triggered axis (ADR-053 P3); frameVerification state tracked in the laser store"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep rubber|hull|convex over src returned no laser-framing hit (only preview/toolpath/box/dogbone) — no convex-hull/rubber-band frame; grep fire|pulse — no beam-on low-power trace-outline mode exists"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run … — frame-lines.test.ts (3) and frame-verification.test.ts (7) pass within the 1132-test run"
+        }
+      ],
+      "notVerified": "HW-CLAIMED: that the frame perimeter physically lands on the workpiece (bed calibration, backlash) is never machine-verified. Whether the emitted $J= frame executes as expected on real GRBL/grblHAL controllers is unproven; no rubber-band/low-power-trace framing exists to compare."
+    },
+    {
+      "id": "10.4",
+      "summary": "ABSENT. There is no Fire / test-pulse control anywhere in the tree — no firePulse/testPulse action, no Fire button, and no governing ADR recording the omission, making it an un-recorded divergence from LightBurn's Fire button on exactly the Creality Falcon diode machines the shipped catalog targets (no red-dot pointer). Framing only partially substitutes: it traces a beam-off box, never shows the current spot.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "grep firePulse|testPulse|fireLaser|onFire|handleFire across src — No matches found; JogPad.tsx, JobControls.tsx, JobRunControls.tsx and OriginRow.tsx contain no such control"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md — case-insensitive grep for a Fire/test-pulse ADR finds only 'fire the beam'/'fires' prose (e.g. :1610,:2119); no ADR adds or deliberately excludes a Fire button, so the divergence remains un-recorded (full-sweep S6-F2 MAJOR still open)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/falcon-profiles.ts — shipped catalog is Creality Falcon diode machines, the class LightBurn users rely on Fire for; framing (frame-lines.ts) traces a box with the beam off and cannot show 'where is the spot now'"
+        }
+      ],
+      "notVerified": "Nothing to hardware-verify — the capability does not exist. (A Codex mega-PR audited earlier this cycle, PR #58, added a 5%-hard-capped Fire; that PR was report-only and is not present at this pinned commit 3e453074.)"
+    },
+    {
+      "id": "10.5",
+      "summary": "Console shows a filtered transcript (direction/kind/raw/decoded, show-status/show-stream toggles, copy-visible, clear) with a validated single-line input and per-firmware quick commands ($X,$$,$#,$I,$G,?); persistent-setting writes require confirmation and are gated on connection/Idle/active-op. Application/system notices (wrong-baud, banner mismatch) now render as transcript system rows (S6-F1 fix). There are still no user-definable macros — a recorded deferral.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/ConsolePanel.tsx:64-96 (transcript + filters + quick-command row + input), :133-158 (QuickCommandRow from driver.consoleQuickCommands, ? stays live during ops), :261-273 (confirm persistent settings), :309-332 (disabled reason: disconnected/active-op/requiresIdle)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/driver.ts:80-88 — driver-defined quick commands only; ConsolePanel offers NO editable/persisted macro buttons (S6-F11); WORKFLOW.md:707 + PROJECT.md:486 record macros/scripting as deferred/out-of-scope"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-transcript.ts:87 systemTranscriptEntry + src/ui/state/laser-system-notice.ts appendSystemNotice — '[lf2]' application lines now enter the transcript the console renders (the orphaned-LaserLog surface is gone; LaserLog.tsx no longer exists in the tree)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run … — ConsolePanel.test.tsx, console-command.test.ts, laser-store-console.test.ts, laser-system-notice.test.ts (2) pass within the 1132-test run"
+        }
+      ],
+      "notVerified": "Not exercised against a live controller (no round-trip of a typed command). Some low-priority pushLog info lines ('Connected. Querying settings…', laser-connection-actions.ts:187,191) still write to state.log; no reader of state.log was found this session, so those specific lines may remain non-surfaced (residual of S6-F1). User-macro absence is confirmed."
+    },
+    {
+      "id": "10.6",
+      "summary": "DRO shows State(:subState), MPos X/Y/Z, work-origin (custom highlighted), Feed and Spindle S, polled via ? at 250 ms (1 Hz idle). Alarm decoding is full: GRBL v1.1 alarms 1–9 plus grblHAL 10–13 with title/detail/position-lost/recovery action driving a red banner with $H and capability-gated $X; error:N decoded into the console. Firmware settings are read + backed-up + guided-write ($30/$32), not a free-form editor grid.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/StatusDisplay.tsx:13-42 — State(:subState), MPos X/Y/Z (wPos fallback), Origin from wcoCache (custom shown in danger-red), F mm/min + S; src/ui/state/laser-connection-actions.ts:40-42,219-245 — ? poll 250 ms, IDLE_POLL_DIVISOR=4 (1 Hz idle)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/alarm-codes.ts:20-121 — ALARM_CODES 1–13 each {title, detail, positionLost, action}; describeAlarm degrades unknown codes; grblHAL 10–13 flagged as extensions; drives the F-B9 red banner ($H / gated $X)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/MachineSettingsPanel.tsx:14-70 — 'Read / Backup Controller Settings': readMachineSettings ($$), lists GrblSettingRow, exportGrblSettingsBackup; guided writes live in GrblLaserSetupPanel + core/controllers/grbl/grbl-setting-write.ts; raw $N=value goes through the console with confirmation (not a full inline settings editor)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/smoothieware/comma-status-report.ts + fluidnc/driver.ts exist — the consolidated-audit A.3.5 (Smoothie comma DRO) and A.3.9 (FluidNC $N write-guard) gaps have code addressing them, though firmware-side behavior stays unverified"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run … — MachineSettingsPanel.test.tsx, grbl-settings.test.ts, grbl-setting-write.test.ts, error-codes.test.ts (4), status-parser.test.ts, alarm-recovery/sleep-recovery LaserWindow tests pass within the 1132-test run"
+        }
+      ],
+      "notVerified": "DRO/alarm behavior validated against parser test strings, not real GRBL wire output on hardware. Whether Smoothie comma-status and FluidNC settings parse correctly from real controllers is HW-unverified. There is no free-form $$-editor grid (LightBurn's Machine Settings edits every field); KerfDesk edits only key laser settings + raw console."
+    },
+    {
+      "id": "10.7",
+      "summary": "The streamer is a pure, heavily audit-hardened reducer: char-counted (120-byte CNCjs-margin) plus ping-pong modes, oversized-line preflight that refuses a >RX-buffer line loudly, terminal-absorbing statuses (trailing oks after error:N can't fake a clean finish), paused-drain semantics, alarm wipes in-flight accounting, and a lone-M0 tool-change hold (CNC multi-bit resume, closing critical S8-F1). An untracked-ack ledger, stall watchdog, and fingerprint checkpoint back it. Real long-job hardware stability stays CLAIMED.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/streamer.ts:101-241 (createStreamer/fillBuffer/step: char-counted vs ping-pong, greedy RX-headroom fill), :158-169 (findOversizedLine refuses a line > RX buffer), :176-180 (isTerminal absorbs trailing acks, H5), :266-330 (onAck alarm→cancel/error→errored/paused-drain), :247-255 (continueToolChange drops the held M0)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/JobRunControls.tsx:18-84 — tool-change hold surfaces a Continue button + pendingToolLabel ('Load {bit} and re-zero Z … then Continue'); the streamer leaves M0 at the queue head so GRBL settles Idle for jog/probe/G92 re-zero (closes full-sweep S8-F1 CRITICAL)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-safe-write.ts + laser-stream-ack.ts — untracked-ack ledger attributes every terminal ack to stream vs non-job writes in receive order, Start blocks until it drains; src/ui/state/laser-connection-actions.ts:227-229 stall watchdog (10 s grace, 90 s Run); errored/disconnected/cancelled distinguished; auto beam-off after mid-job error"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run src/core/controllers src/ui/laser src/ui/state — 166 files / 1132 tests pass, incl. streamer.test.ts, streamer-tool-change.test.ts, JobRunControls.tool-change.test.tsx, laser-lifecycle.simulator.test.ts + Marlin/Smoothie simulator lifecycles, laser-store-untracked-ack-guard.test.ts"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md §6 'Not verified' + §8-F1 'Not verified' — connect/jog/frame/stream and the M0-hold GRBL behavior were never exercised on a controller/simulator; repo hardware ledger: every KerfDesk hardware pass is CLAIMED, not VERIFIED"
+        }
+      ],
+      "notVerified": "HW-CLAIMED [⚠HW]: real serial throughput, RX-buffer headroom under a genuine 128-byte controller, USB stability across a multi-hour job, and GRBL's actual acceptance of the tool-change M0-at-head trick were never run on hardware. Determinism/robustness is proven structurally (tests + pure reducer), not perceptually on a machine."
+    },
+    {
+      "id": "10.8",
+      "summary": "Single active device profile per project (project.device). Machine Setup's profile catalog suggests matches from detected controller/settings and swaps the one active profile via replaceDeviceProfile; custom profiles save/load through machine-profile-io and .lbdev import. There is no app-level saved-machine roster and no side-by-side multiple-machine management — multi-device library switching is explicitly deferred.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/MachineSetupProfiles.tsx:49-125 — the catalog is a picker that applies ONE profile (replaceDeviceProfile); OverviewPanel shows a single 'Active Profile'; the app models exactly one device (useStore(s=>s.project.device))"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep savedDevices|deviceList|machineProfiles|multiDevice|activeDeviceId across src — only cnc-library (tool library) matches; no saved-machine roster / device dropdown exists (confirms consolidated-audit 'no app-level device list')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/machine-profile + src/io/lightburn/lbdev-import.ts — custom profiles persist and .lbdev imports one profile at a time; DECISIONS.md:2293-2296 records 'multi-device library switching' as deliberately deferred until calibration grids are hardware-useful"
+        },
+        {
+          "tag": "TEST",
+          "cite": "npx vitest run … — machine-profile-actions.test.ts, machine-profile-io.test.ts, device-setup-configured-persistence.test.ts pass within the 1132-test run"
+        }
+      ],
+      "notVerified": "Whether switching between machines mid-session preserves per-machine settings cleanly was not exercised; the single-device model means there is nothing multi-device to test. LightBurn's device-list dropdown behavior was asserted from product knowledge, not re-verified against an install this session."
+    }
+  ]
+}

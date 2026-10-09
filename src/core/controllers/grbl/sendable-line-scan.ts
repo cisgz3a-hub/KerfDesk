@@ -7,6 +7,12 @@
 // sendable line (trimmed, non-empty, not a ';' comment) and of its byte count
 // (trimmed length plus the '\n' the streamer appends).
 
+import {
+  MAX_LINE_CODE_UNIT,
+  wireEncodingError,
+  type WireEncodingError,
+} from '../serial-wire-encoding';
+
 // String.prototype.trim strips exactly the characters \s matches.
 const TRIM_WHITESPACE = /\s/;
 
@@ -68,4 +74,33 @@ export function findFirstSendableLineOver(
     return true;
   });
   return oversized;
+}
+
+export interface UnencodableSendableLine {
+  /** 1-based index among the sendable lines. */
+  readonly lineNumber: number;
+  readonly error: WireEncodingError;
+}
+
+/** The first sendable line the serial wire cannot carry as a queued line, if any. */
+export function findFirstUnencodableSendableLine(gcode: string): UnencodableSendableLine | null {
+  let lineNumber = 0;
+  let unencodable: UnencodableSendableLine | null = null;
+  visitSendableLines(gcode, (first, end) => {
+    lineNumber += 1;
+    for (let index = first; index < end; index += 1) {
+      if (gcode.charCodeAt(index) <= MAX_LINE_CODE_UNIT) continue;
+      // Only the trimmed text the streamer sends is measured exactly.
+      const error = wireEncodingError(`${gcode.slice(first, end).trim()}\n`);
+      if (error === null) return false;
+      unencodable = { lineNumber, error };
+      return true;
+    }
+    return false;
+  });
+  return unencodable;
+}
+
+export function unencodableLineMessage(line: UnencodableSendableLine): string {
+  return `G-code line ${line.lineNumber}: ${line.error.message}`;
 }

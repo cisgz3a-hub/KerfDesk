@@ -97,7 +97,7 @@ describe('ConnectionBar controller information recovery', () => {
         'Controller is in Alarm. Unlock or Home before reading settings.',
     });
     expect(
-      container.querySelector('[role="status"]:not(.lf-connection-card-status)')?.textContent,
+      container.querySelector('[role="status"]:not(.lf-connection-status-live)')?.textContent,
     ).toContain('Controller is in Alarm');
     expect(container.textContent).not.toContain('Waiting for fresh Idle');
     expect(findButton(container, 'Reconnect controller')).toBeUndefined();
@@ -121,7 +121,7 @@ describe('ConnectionBar controller information recovery', () => {
       qualificationReadBlockReason: 'Machine settings are already being read.',
     });
     expect(
-      container.querySelector('[role="status"]:not(.lf-connection-card-status)')?.textContent,
+      container.querySelector('[role="status"]:not(.lf-connection-status-live)')?.textContent,
     ).toBe('Reading controller settings…');
   });
 });

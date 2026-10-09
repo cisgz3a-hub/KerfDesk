@@ -8,7 +8,11 @@ interface SavedProductionProject {
   readonly productionManifest?: ProductionManifest;
   readonly sheetBook?: {
     readonly activeId: string;
-    readonly inactive: readonly { readonly id: string; readonly projectJson: string }[];
+    readonly inactive: readonly {
+      readonly id: string;
+      readonly name: string;
+      readonly projectJson: string;
+    }[];
   };
 }
 
@@ -51,12 +55,12 @@ test('duplicates completed artwork into a separate explicitly allocated run and 
   });
   expect(originalManifest.rows[0]?.reviewedProjectJson).toBeTruthy();
 
-  await page.getByRole('button', { name: 'Project sheets…', exact: true }).click();
-  const sheets = page.getByRole('dialog', { name: 'Project sheets', exact: true });
+  const sheets = await openSheets(page);
   await sheets
     .getByRole('textbox', { name: 'New sheet name', exact: true })
     .fill('Separate repeat');
   await sheets.getByRole('button', { name: 'Duplicate active sheet', exact: true }).click();
+  await sheets.getByText('Production runs and saved arrays', { exact: true }).click();
   await sheets.getByRole('button', { name: 'Production run…', exact: true }).click();
   production = page.getByRole('dialog', { name: 'Production run', exact: true });
   await expect(production.getByRole('textbox', { name: 'Run name', exact: true })).toBeVisible();
@@ -91,10 +95,12 @@ test('duplicates completed artwork into a separate explicitly allocated run and 
   await kerfdesk.setOpenFiles([{ name: 'separate-runs.lf2', text: JSON.stringify(combined) }]);
   await (await toolbarCommand(page, 'Open...')).click();
   await expect(page).toHaveTitle(/separate-runs\.lf2/);
-  await page.getByRole('button', { name: 'Project sheets…', exact: true }).click();
-  await sheets.getByRole('combobox', { name: 'Active project sheet' }).selectOption(archived.id);
-  await sheets.getByRole('button', { name: 'Production run…', exact: true }).click();
-  production = page.getByRole('dialog', { name: 'Production run', exact: true });
+  const archivedTab = page
+    .getByRole('tablist', { name: 'Project sheets', exact: true })
+    .getByRole('tab', { name: archived.name, exact: true });
+  await archivedTab.click();
+  await expect(archivedTab).toHaveAttribute('aria-selected', 'true');
+  production = await openProduction(page);
   await expect(
     production.getByRole('heading', { name: 'Original run', exact: true }),
   ).toBeVisible();
@@ -112,12 +118,19 @@ test('duplicates completed artwork into a separate explicitly allocated run and 
 });
 
 async function openProduction(page: Page) {
-  await page.getByRole('button', { name: 'Project sheets…', exact: true }).click();
-  await page
-    .getByRole('dialog', { name: 'Project sheets', exact: true })
-    .getByRole('button', { name: 'Production run…', exact: true })
-    .click();
+  const sheets = await openSheets(page);
+  await sheets.getByText('Production runs and saved arrays', { exact: true }).click();
+  await sheets.getByRole('button', { name: 'Production run…', exact: true }).click();
   return page.getByRole('dialog', { name: 'Production run', exact: true });
+}
+async function openSheets(page: Page) {
+  await page
+    .getByRole('navigation', { name: 'Project sheets', exact: true })
+    .getByRole('button', { name: 'Manage project sheets', exact: true })
+    .click();
+  const sheets = page.getByRole('dialog', { name: 'Project sheets', exact: true });
+  await expect(sheets).toBeVisible();
+  return sheets;
 }
 async function closeProduction(page: Page): Promise<void> {
   await page

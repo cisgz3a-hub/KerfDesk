@@ -1,6 +1,6 @@
 import type { ConstrainedSketch2d, SketchSolveResult } from './constrained-sketch';
 import { sketchAt } from './sketch-indexed';
-import { sketchJacobian, type SketchEvaluator } from './sketch-jacobian';
+import { sketchJacobian, type SketchEvaluator, type SketchDerivative } from './sketch-jacobian';
 import { sketchMatrixRank } from './sketch-linear';
 import { parseConstrainedSketch, SKETCH_MAX_RADIUS_MM } from './sketch-validation';
 export const SKETCH_SOLVE_TOLERANCE_MM = 1e-5;
@@ -8,6 +8,7 @@ export function summarizeSketchSolve(
   sketch: ConstrainedSketch2d,
   inputValues: readonly number[],
   evaluate: SketchEvaluator,
+  derivative?: SketchDerivative,
 ): SketchSolveResult {
   if (inputValues.some((value) => !Number.isFinite(value)))
     return { kind: 'invalid', reason: 'The sketch solve contains nonfinite coordinates.' };
@@ -30,6 +31,7 @@ export function summarizeSketchSolve(
     values,
     residual.map((item) => item.value),
     evaluate,
+    derivative,
   );
   if (jacobian.some((row) => row.some((value) => !Number.isFinite(value))))
     return { kind: 'invalid', reason: 'The sketch solve contains a nonfinite derivative.' };

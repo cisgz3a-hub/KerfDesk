@@ -27,6 +27,7 @@ type ResetTransaction = {
   readonly resetWriteResult: Promise<void>;
   readonly finishResetWrite: (error: unknown | null) => void;
   closeRequested: boolean;
+  settled: boolean;
   owner: ResetOwnership | null;
 };
 type ResetTransactionOptions = {
@@ -57,7 +58,9 @@ export function runGrblDisconnectTransaction(
   const existing = transactions.get(connectionKey);
   if (existing !== undefined) {
     if (!options.retainConnection) return finishForDisconnect(existing, safeWrite);
-    return options.awaitResetWriteOnly ? existing.resetWriteResult : existing.result;
+    if (!existing.settled) {
+      return options.awaitResetWriteOnly ? existing.resetWriteResult : existing.result;
+    }
   }
   const transaction = createResetTransaction(connectionKey, set, refs, safeWrite, options);
   return options.awaitResetWriteOnly ? transaction.resetWriteResult : transaction.result;
@@ -92,12 +95,19 @@ function createResetTransaction(
     resetWriteResult,
     finishResetWrite,
     closeRequested: !options.retainConnection,
+    settled: false,
     owner: null,
   };
   transactions.set(connectionKey, transaction);
   void runOwnedReset(connectionKey, transaction, set, refs, safeWrite, options).then(
-    resolveTransaction,
-    rejectTransaction,
+    () => {
+      transaction.settled = true;
+      resolveTransaction();
+    },
+    (error: unknown) => {
+      transaction.settled = true;
+      rejectTransaction(error);
+    },
   );
   return transaction;
 }

@@ -1,4 +1,5 @@
 import { normalizeSceneObject } from './normalize-scene-object';
+import type { ReliefAuthoringResolutions } from './project-relief-authoring-validator';
 // deserializeProject - parses a .lf2 string and returns a typed Project, or a
 // structured error describing why it cannot be loaded.
 
@@ -96,12 +97,13 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
     migratedFrom = version;
   }
 
-  const shapeError = validateProjectShape(workingRaw);
+  const resolvedDocuments: ReliefAuthoringResolutions = new Map();
+  const shapeError = validateProjectShape(workingRaw, resolvedDocuments);
   if (shapeError !== null) return { kind: 'invalid', reason: shapeError };
 
   let project: Project;
   try {
-    project = normalizeProject(workingRaw);
+    project = normalizeProject(workingRaw, resolvedDocuments);
   } catch (error) {
     return {
       kind: 'invalid',
@@ -115,7 +117,10 @@ export function deserializeProjectValue(raw: unknown): DeserializeResult {
   return { kind: 'ok', project };
 }
 
-function normalizeProject(raw: Record<string, unknown>): Project {
+function normalizeProject(
+  raw: Record<string, unknown>,
+  resolvedDocuments: ReliefAuthoringResolutions,
+): Project {
   const dev = (raw['device'] ?? {}) as Record<string, unknown>;
   const scene = (raw['scene'] ?? {}) as Record<string, unknown>;
   const objects = Array.isArray(scene['objects']) ? scene['objects'] : [];
@@ -129,7 +134,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     notes: typeof raw['notes'] === 'string' ? raw['notes'] : '',
     scene: {
       ...scene,
-      objects: objects.map(normalizeSceneObject),
+      objects: objects.map((object) => normalizeSceneObject(object, resolvedDocuments)),
       layers: layers.map(normalizeLayer),
       groups,
     },

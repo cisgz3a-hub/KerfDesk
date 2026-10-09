@@ -1,0 +1,288 @@
+{
+  "sector": 14,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/14-material-test.md",
+  "ratings": [
+    {
+      "cat": "14.1",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "Configurable power×speed grid (ADR-044), burned numeric labels, normal Scene pipeline; two axes only vs LightBurn's six; code-only, unrendered."
+    },
+    {
+      "cat": "14.1",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Reference generator: 6-param dropdown, 10×10 default, min/max, separate material/text/border settings, preset export. Roster's most flexible."
+    },
+    {
+      "cat": "14.1",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R: CNC-only per binding Phase-0 note; power×speed grids are a laser feature absent from MillMage's CNC operation set."
+    },
+    {
+      "cat": "14.1",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No in-app generator; testing done by importing fixed downloadable grid files or generating in LightBurn/online tools."
+    },
+    {
+      "cat": "14.1",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Material Test Array: power×speed, adjustable min/max/count/spacing, editable header labels, vector+bitmap; solid two-axis, fewer axes than LightBurn."
+    },
+    {
+      "cat": "14.1",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "CNC; no power×speed grid generator (inferred absent). Offers a feeds/speeds calculator and tested defaults, not a test grid."
+    },
+    {
+      "cat": "14.1",
+      "product": "Carbide Create",
+      "score": 0,
+      "star": false,
+      "tag": "COMM",
+      "note": "No test-grid generator; open forum feature request asks for a LightBurn-style N×M grid; users script external Python."
+    },
+
+    {
+      "cat": "14.2",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Interval Test functional (1-20 steps, burned labels); Focus Test permanently disabled stub (no Z-motion generator); bonus scan-offset generator."
+    },
+    {
+      "cat": "14.2",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Two dedicated generators: Interval Test and Focus Test (Z ramp: start/end Z, steps, speed, max power). Roster-leading."
+    },
+    {
+      "cat": "14.2",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R: CNC-only per binding note; interval/focus tests are laser concepts with no MillMage equivalent."
+    },
+    {
+      "cat": "14.2",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No in-app interval or focus generator; provides fixed downloadable Depth-of-Focus and accuracy test files to import and run."
+    },
+    {
+      "cat": "14.2",
+      "product": "XCS",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No interval-test or focus-ramp generator; focus handled by autofocus/manual measurement plus downloadable focus files."
+    },
+    {
+      "cat": "14.2",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "CNC; interval/focus are laser concepts, absent (inferred). Z handled by Z-probe zeroing, not a focus ramp."
+    },
+    {
+      "cat": "14.2",
+      "product": "Carbide Create",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "CNC; no interval or focus-ramp generator (inferred absent). Toolpath set is contour/pocket/drill/V-carve."
+    },
+
+    {
+      "cat": "14.3",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Numeric fields plus safety clamps (power 0-100, floors); labels auto numeric-only (7-seg, no titles); fixed axes, no param choice."
+    },
+    {
+      "cat": "14.3",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Highly customizable: text-label and border toggles, per-axis param choice (6), min/max/count, rect H/W, absolute positioning, preset save/export."
+    },
+    {
+      "cat": "14.3",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R: CNC-only; no laser material-test generator, so no customization surface to rate."
+    },
+    {
+      "cat": "14.3",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No generator to customize; downloadable test files are fixed artifacts, editable only externally."
+    },
+    {
+      "cat": "14.3",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Customizable within power/speed: min/max, count, spacing, editable header/title, per-element editing; no interval/passes axes, no border toggle or caps."
+    },
+    {
+      "cat": "14.3",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "INF",
+      "note": "No material-test generator, so no customization controls; cut settings edited per-toolpath (inferred)."
+    },
+    {
+      "cat": "14.3",
+      "product": "Carbide Create",
+      "score": 0,
+      "star": false,
+      "tag": "COMM",
+      "note": "No material-test generator to customize; the requested LightBurn-style grid tool does not exist (open feature request)."
+    },
+
+    {
+      "cat": "14.4",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Full scan-offset round-trip writes profile; but power×speed/interval→preset path removed (ADR-047), leaving manual wizard re-entry only."
+    },
+    {
+      "cat": "14.4",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Manual round-trip: apply best cell to layer, 'Create new from layer' saves to Material Library (name/thickness/desc). Auto-save still requested."
+    },
+    {
+      "cat": "14.4",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R: CNC-only; no laser material-test flow, so no test-result-to-saved-material round-trip."
+    },
+    {
+      "cat": "14.4",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No material library; chosen speed/power transcribed manually into engrave params or G-code each time."
+    },
+    {
+      "cat": "14.4",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Manual round-trip: a winning Material Test Array cell's power/speed can be saved as a user-defined material; no one-click save."
+    },
+    {
+      "cat": "14.4",
+      "product": "Easel",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "Has Inventables-tested default cut settings and a feeds/speeds calculator, but no in-app test result saves back to a material."
+    },
+    {
+      "cat": "14.4",
+      "product": "Carbide Create",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "Tool library associates feeds/speeds with tool+material, but no material test feeds it — no test-result round-trip."
+    }
+  ],
+  "wins": [
+    {
+      "cat": "14.1",
+      "vs": "Carbide Create",
+      "delta": 6,
+      "claim": "KerfDesk generates a configurable power×speed material-test grid in-app; Carbide Create has none (open feature request; users script external Python)."
+    },
+    {
+      "cat": "14.1",
+      "vs": "LaserGRBL",
+      "delta": 4,
+      "claim": "KerfDesk generates power×speed grids in-app; LaserGRBL can only import and run fixed downloadable test files."
+    },
+    {
+      "cat": "14.2",
+      "vs": "LaserGRBL",
+      "delta": 3,
+      "claim": "KerfDesk ships a working interval-test generator; LaserGRBL only runs downloadable focus/accuracy files, generating nothing in-app."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "14.2",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "KerfDesk's Focus Test is a permanently-disabled stub (no Z-motion generator); LightBurn ships a working Z-ramp Focus Test."
+    },
+    {
+      "cat": "14.4",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "No automated path from a power×speed test cell to a saved material preset (removed per ADR-047); LightBurn and XCS save a winning cell's settings."
+    },
+    {
+      "cat": "14.1",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "KerfDesk's grid varies only power×speed; LightBurn varies six parameters including interval and passes."
+    },
+    {
+      "cat": "14.3",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "KerfDesk labels are auto numeric-only (7-segment, no titles/text); LightBurn and XCS support editable text labels."
+    }
+  ],
+  "notVerified": [
+    "No PERC/render/burn proof for any KerfDesk generator (14.1-14.3): grids/interval swatches/labels never rendered-compared or burned; label legibility at small cell sizes and cell usability unproven; repo hardware ledger = CLAIMED.",
+    "Focus Test (14.2) is a disabled stub — no Z-ramp output can be produced, so nothing to verify beyond 'disabled'.",
+    "14.4 round-trip unproven on hardware: scan-offset loop never closed on a machine (HW-CLAIMED); material/interval→preset is manual transcription, hand-off correctness unmeasured.",
+    "Competitor cells anchored on [INF] — Easel 14.1/14.2/14.3/14.4, Carbide Create 14.2 — cannot support win/lose bullets; wins anchored only on OFF (LaserGRBL) / COMM (Carbide Create 14.1).",
+    "MillMage rated N/R from the binding Phase-0 coverage note plus official docs; not independently re-verified.",
+    "Scoping judgment: Easel and Carbide Create scored 0 (not N/R) on laser-specific categories 14.1-14.3 — a rater call following the design's S14 enrolment and P2 weighting, not a hands-on determination.",
+    "Whole-scene-replace vs LightBurn's insert-at-job-origin behavior not perceptually assessed."
+  ]
+}

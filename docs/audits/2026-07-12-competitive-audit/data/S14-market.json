@@ -1,0 +1,367 @@
+{
+  "sector": 14,
+  "categories": [
+    {
+      "id": "14.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Built-in Material Test generator: Param dropdown (Power/Speed/Interval/Passes/Frequency/Q-Pulse), Count grid (default 10x10), Min/Max ranges, separate material/text/border cut settings, preset export/import. Roster's most flexible grid generator and the reference.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/MaterialTest/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://www.rabbitlaserusa.com/transform-your-projects-must-know-material-testing-in-lightburn"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://www.1laser.com/blogs/topic/lightburn-material-test-card"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only (no laser); material power×speed grids are a laser feature. MillMage's Operation Settings Editor lists only CNC ops (Pocket/Profile/Drill/Surfacing/Face/Bore/etc.); no material-test or feeds/speeds grid generator.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: absence inferred from MillMage's CNC-only feature set (Phase-0 coverage note; docs list no material-test tool)."
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No built-in grid generator. Testing is done by importing fixed downloadable test files (lasergrbl.com test-file page) or generating grids in LightBurn/online tools; LaserGRBL only runs an imported file.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/test-file-and-samples/" },
+            {
+              "tag": "COMM",
+              "cite": "https://www.crealityfalcon.com/blogs/laser-academy/laser-cutter-test-file"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Material Test Array (Array > Material Test Array): Power=X columns, Speed=Y rows; adjustable min/max, row/column count, spacing, editable header labels; supports vector+bitmap. Solid but two-axis only (power×speed), fewer axes than LightBurn.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/872" },
+            {
+              "tag": "COMM",
+              "cite": "https://www.silhouetteschoolblog.com/2023/09/how-to-quickly-make-xtool-test-grid.html"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://thevixensden.com/how-to-find-the-right-p2-laser-power-and-speed-settings/"
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "CNC; no material power×speed grid generator. Provides Inventables-tested default feeds/speeds per bit+material and a feeds/speeds calculator; its downloadable 'calibration test pattern' checks machine mechanics (lost steps, perpendicularity), not material settings.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://www.inventables.com/projects/calibration-test-pattern"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: no material-test grid generator found in Easel docs; inferred absent (feeds/speeds is a calculator, not a test-grid generator)."
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "no",
+          "quality": "No built-in test grid generator; an official-forum feature request explicitly asks for a LightBurn-style N×M power/feed grid, and users script external Python to build grids. CNC design/CAM only.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-feature-request-test-grid-generation/71552"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/grid-pattern-tool-paths/40576"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "14.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Two dedicated Laser Tools generators: Interval Test (squares at varied Line Interval) and Focus Test (Z ramp — Start Z/End Z/Steps/Speed/Max Power; requires a motorized Z controllable in LightBurn). Roster-leading.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/IntervalTest/"
+            },
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/FocusTest.html" },
+            { "tag": "COMM", "cite": "https://lahobbyguy.com/bb/viewtopic.php?t=428" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; line-interval (raster) and focus-ramp tests are laser concepts with no MillMage equivalent. No such generator in the CNC toolpath/operation feature set.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" },
+            {
+              "tag": "INF",
+              "cite": "INF: interval/focus tests are laser-specific; inferred absent from MillMage's CNC-only scope (Phase-0 coverage note)."
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No in-app interval or focus-ramp generator. LaserGRBL provides fixed downloadable 'Depth of Focus Test' and accuracy-test files to import and run; nothing is generated inside the app.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/test-file-and-samples/depth-of-focus-test/"
+            },
+            { "tag": "OFF", "cite": "https://lasergrbl.com/test-file-and-samples/" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "No line-interval-test or focus-ramp generator. Focus is handled by autofocus / automatic distance measurement and manual focal-ruler measurement (plus downloadable focus test files), not a generated ramp; no interval-test tool documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1336" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/37?from=learning-center" },
+            {
+              "tag": "INF",
+              "cite": "INF: no interval-test or focus-ramp generator found; XCS focus is autofocus/manual-measure — inferred no ramp generator."
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "CNC; no line-interval or focus-ramp test generator (laser concepts). Z handling is Z-probe zeroing, not a focus ramp; no such tool in Easel's toolpath feature set.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/5360405175187-Using-the-Z-Probe"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: interval/focus tests are laser-specific and absent from Easel's CNC toolpath docs — inferred absent."
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "no",
+          "quality": "CNC; no interval or focus-ramp test generator. The toolpath set is Contour/Pocket/Drill/V-carve/etc.; no laser-style calibration ramp exists.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/toolpaths/" },
+            {
+              "tag": "INF",
+              "cite": "INF: interval/focus tests are laser-specific and absent from Carbide Create's CNC toolpath set — inferred absent."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "14.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Highly customizable: 'Enable Text' labels and 'Enable Border' toggles, per-axis Param choice (6 params), Min/Max/Count, rectangle Height/Width, absolute positioning, preset save/export/import (User Bundle). No explicit power safety cap beyond user Min/Max.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/MaterialTest/"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no laser material-test generator exists, so there are no test-customization controls (labels/axes/safety caps) to rate.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: no material-test generator in MillMage, therefore no customization surface — inferred from CNC-only scope."
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No generator to customize. Downloadable test files are fixed artifacts (no in-app label/axis/cap controls); any customization means editing the file elsewhere.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/test-file-and-samples/" },
+            {
+              "tag": "INF",
+              "cite": "INF: LaserGRBL has no test generator, so no customization controls — inferred from absence of the tool."
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Customizable within power/speed only: adjustable min/max, row/column count, spacing, and editable header/title values; the array is grouped but per-element editable. No interval/passes axes and no documented border/label toggles or safety caps.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/872" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No material-test generator, so no test-customization controls. Cut settings (feedrate/plunge/depth-per-pass/spindle) are edited per-toolpath, not as a customizable test matrix.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: absent test generator implies no customization surface — inferred."
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "no",
+          "quality": "No material-test generator, so no test-customization controls; the requested LightBurn-style grid tool does not exist in Carbide Create.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-feature-request-test-grid-generation/71552"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: absent test generator implies no customization surface — inferred."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "14.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Manual round-trip: pick the best test cell, apply its settings to a layer, then 'Create new from layer' saves it to the Material Library (Name/Thickness/Description). Documented 'First Material Test' guide; automatic save is still a feature request.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/FirstMaterialTest/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://github.com/LightBurnSoftware/Documentation/blob/master/MaterialLibrary.md"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://help.omtech.com/en/material-setting&library/material-library"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburn.fider.io/posts/2765/ability-to-automatically-save-all-or-specifically-selected-material-test-results-into-the-library"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "CNC-only; no laser material-test flow, so no test-result-to-saved-material round-trip. Tool library holds CNC feeds/speeds but is not fed by a material test.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/ToolLibrary/"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: no material-test tool in MillMage, so no calibration round-trip — inferred from CNC-only scope."
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No material library. After running a downloaded/imported test, the chosen speed/power is transcribed manually into the engrave parameters or G-code; no in-app test-result-to-saved-material round-trip.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/import-parameters/"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: LaserGRBL exposes no material-preset store fed by a test; round-trip inferred absent."
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Manual round-trip: XCS supports user-defined materials/parameters and testing self-defined materials, so a winning Material Test Array cell's power/speed can be saved as a custom material. No one-click save from the grid; less streamlined than LightBurn.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1865" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1864?from=learning-center" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/872" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "No test-result round-trip. Easel offers Inventables-tested default cut settings per bit+material and a feeds/speeds calculator, but there is no in-app material test whose result saves back into a material setting.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://inventableshardwaresupport.zendesk.com/hc/en-us/articles/34390465589268-How-do-I-calculate-the-right-cut-settings-for-my-bit"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: Easel has default cut-setting libraries but no test-to-setting round-trip flow — inferred from docs."
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "no",
+          "quality": "No material test, so no round-trip. The tool library associates feeds/speeds with tool+material, but there is no test-result-to-saved-setting workflow.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/tool-library/" },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-feature-request-test-grid-generation/71552"
+            },
+            {
+              "tag": "INF",
+              "cite": "INF: no material-test tool exists, so no calibration round-trip — inferred."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

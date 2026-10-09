@@ -1,0 +1,413 @@
+{
+  "sector": 4,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/04-raster-engrave.md",
+  "ratings": [
+    {
+      "cat": "4.1",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "TEST",
+      "note": "11 dither modes structurally test-proven (43/43); no halftone/newsprint (S9-F11); zero perceptual coverage - capped at 6 per §5.3"
+    },
+    {
+      "cat": "4.1",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "COMM",
+      "note": "Roster superset: 10 modes incl. Halftone/Newsprint cell-size/angle and Sketch; community photo-engraving reference"
+    },
+    {
+      "cat": "4.1",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - CNC-only, no laser raster/dither pipeline"
+    },
+    {
+      "cat": "4.1",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "COMM",
+      "note": "FS/Jarvis/Stucki/Atkinson/Sierra/Burkes/Random per community; good for free, trails LightBurn on complex photos"
+    },
+    {
+      "cat": "4.1",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Seven bitmap modes with per-mode guidance documented; no halftone family; quality beyond docs not established"
+    },
+    {
+      "cat": "4.1",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no laser raster pipeline; Raster Toolpaths is CNC pocket clearing"
+    },
+    {
+      "cat": "4.2",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "TEST",
+      "note": "Linear luma-to-S between sMin/sMax numerically test-proven, white stays off; no gamma LUT; unburned - capped per §5.3"
+    },
+    {
+      "cat": "4.2",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "COMM",
+      "note": "Min/Max power grayscale; community-confirmed excellent for depth/3D; diode caveat is material, not software"
+    },
+    {
+      "cat": "4.2",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - CNC-only, no power-modulated laser engraving"
+    },
+    {
+      "cat": "4.2",
+      "product": "LaserGRBL",
+      "score": 7,
+      "star": false,
+      "tag": "COMM",
+      "note": "Line-to-Line S-MIN/S-MAX mapping with M3/M4 choice documented; community: close to LightBurn for basic photos"
+    },
+    {
+      "cat": "4.2",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Grayscale default per-pixel modulation; no documented user control of the power mapping curve"
+    },
+    {
+      "cat": "4.2",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "COMM",
+      "note": "N/R - CNC depth from Z, not power modulation"
+    },
+    {
+      "cat": "4.3",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Brightness/contrast/gamma/invert dialog with preview and user presets, vector mask plus crop, processed-PNG export; not live-verified"
+    },
+    {
+      "cat": "4.3",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Adjust Image with live preview plus editable, non-destructive vector masking/cropping"
+    },
+    {
+      "cat": "4.3",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no laser image pipeline to adjust"
+    },
+    {
+      "cat": "4.3",
+      "product": "LaserGRBL",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Import-time-only brightness/contrast/threshold, three grayscale formulas, custom RGB weights, crop/flip; invert an open request"
+    },
+    {
+      "cat": "4.3",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Brightness/contrast/saturation/sharpness/temperature sliders, invert, filters; no gamma or mask documented"
+    },
+    {
+      "cat": "4.3",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - rasters consumed only via Image Trace"
+    },
+    {
+      "cat": "4.4",
+      "product": "KerfDesk",
+      "score": 8,
+      "star": false,
+      "tag": "TEST",
+      "note": "Paired mm-interval and DPI fields; 5-25 lines/mm clamp, warn constant, 4M-pixel/64MB budget test-proven"
+    },
+    {
+      "cat": "4.4",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Per-layer interval with linked DPI plus halftone cells-per-inch; rich material guidance; no guardrails"
+    },
+    {
+      "cat": "4.4",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - milling stepover is a different concept (S7)"
+    },
+    {
+      "cat": "4.4",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Quality in lines/mm only; no DPI-unit display documented"
+    },
+    {
+      "cat": "4.4",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Lines-per-cm with visual 10-300 examples; metric-only; fixed resolution on F1 bitmap engrave"
+    },
+    {
+      "cat": "4.4",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no laser raster pipeline"
+    },
+    {
+      "cat": "4.5",
+      "product": "KerfDesk",
+      "score": 4,
+      "star": false,
+      "tag": "CODE",
+      "note": "Position/scale/mirror/origin correctly baked; rotation refused at preflight (S9-F2 MAJOR); no skew"
+    },
+    {
+      "cat": "4.5",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Images first-class objects with editable masks; engraves rotated images per prior audit; free-rotate doc itself is INF"
+    },
+    {
+      "cat": "4.5",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no raster engrave operation to transform"
+    },
+    {
+      "cat": "4.5",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Rotate/crop/flip fixed at import conversion; no on-canvas object model, no arbitrary angle"
+    },
+    {
+      "cat": "4.5",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Full canvas object editing (move/rotate/scale/flip) applies to bitmaps; skew/warp undocumented"
+    },
+    {
+      "cat": "4.5",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - rasters exist only as trace sources"
+    },
+    {
+      "cat": "4.6",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Bidirectional toggle plus ADR-052 scan-offset compensation with calibration generator; overscan fixed 5mm, no scan angle"
+    },
+    {
+      "cat": "4.6",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Deepest set: any scan angle, per-pass increment, bi-di, overscan, dot-width correction, fill grouping"
+    },
+    {
+      "cat": "4.6",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no laser scan-line options"
+    },
+    {
+      "cat": "4.6",
+      "product": "LaserGRBL",
+      "score": 4,
+      "star": false,
+      "tag": "COMM",
+      "note": "Horizontal/vertical/diagonal direction per community; uni-directional was a user request; overscan unknown"
+    },
+    {
+      "cat": "4.6",
+      "product": "XCS",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Uni/bi-directional documented; angle plus cross-hatch gated to F1 Ultra vector engrave; overscan machine-managed"
+    },
+    {
+      "cat": "4.6",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - X/Y direction choice is CNC pocket clearing only"
+    },
+    {
+      "cat": "4.7",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Negative, Convert-to-Bitmap, processed-PNG export; pass-through still dithers - un-ADR'd LightBurn divergence, tooltip overstates"
+    },
+    {
+      "cat": "4.7",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Both modes documented per layer: Pass-Through skipping resample/dither, and Negative Image"
+    },
+    {
+      "cat": "4.7",
+      "product": "MillMage",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - no laser image modes"
+    },
+    {
+      "cat": "4.7",
+      "product": "LaserGRBL",
+      "score": -1,
+      "star": false,
+      "tag": "COMM",
+      "note": "U - no pass-through/negative documented; invert was an open request (#130); later builds unverified"
+    },
+    {
+      "cat": "4.7",
+      "product": "XCS",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Negative/invert documented incl. dark materials; pass-through inferred absent (INF)"
+    },
+    {
+      "cat": "4.7",
+      "product": "Easel",
+      "score": -2,
+      "star": false,
+      "tag": "COMM",
+      "note": "N/R - no raster engrave pipeline at all"
+    }
+  ],
+  "wins": [
+    {
+      "cat": "4.3",
+      "vs": "LaserGRBL",
+      "delta": 2,
+      "claim": "Full per-image adjust dialog with gamma, presets, vector mask and processed-bitmap export beats LaserGRBL's import-time-only controls with invert still an open request."
+    },
+    {
+      "cat": "4.4",
+      "vs": "LaserGRBL",
+      "delta": 2,
+      "claim": "Dual mm/DPI per-layer fields plus test-proven clamps and a pixel/memory pre-compile budget vs lines/mm-only Quality with no DPI display."
+    },
+    {
+      "cat": "4.4",
+      "vs": "XCS",
+      "delta": 2,
+      "claim": "Dual-unit interval/DPI control with guardrails vs metric-only lines-per-cm that is fixed-resolution on some machines."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "4.1",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "No halftone/newsprint angle screens and zero perceptual proof of any dither output; KerfDesk capped at 6 per §5.3 against the community photo-engraving reference."
+    },
+    {
+      "cat": "4.2",
+      "vs": "LightBurn",
+      "delta": -3,
+      "claim": "Linear-only luma-to-S ramp with no gamma/power LUT for diode non-linearity; tone ramp never rendered or burned."
+    },
+    {
+      "cat": "4.5",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "Rotated images are refused at preflight while LightBurn engraves them (S9-F2 MAJOR); no skew in the transform model."
+    },
+    {
+      "cat": "4.5",
+      "vs": "XCS",
+      "delta": -3,
+      "claim": "xTool Studio applies full canvas rotate/scale/flip to bitmap objects; KerfDesk blocks rotation at preflight."
+    },
+    {
+      "cat": "4.6",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "No scan angle for image mode and overscan is a fixed 5mm compile constant vs LightBurn's per-layer angle/increment/overscan/dot-width set."
+    },
+    {
+      "cat": "4.7",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "Pass-through still runs the layer dither, defeating pre-dithered workflows; un-ADR'd divergence from LightBurn's documented full bypass (§5.6 severity bump)."
+    }
+  ],
+  "notVerified": [
+    "4.1/4.2: zero perceptual or rendered evidence for any dither/grayscale output (perceptual harness covers trace only); KerfDesk scores capped at 6 per §5.3",
+    "4.2: grayscale tone ramp never burned (PROJECT.md:100 F.2.f pending, HW-CLAIMED); code itself predicts diode non-linearity without a LUT",
+    "4.3: Adjust Image live preview not exercised (read-only audit, rule 4); adjustment curves never compared against a reference",
+    "4.4: live typing/rounding of paired interval/DPI fields not exercised; whether the 20 lines/mm warn constant surfaces in the UI not traced",
+    "4.5: canvas rotation-handle behavior on rasters not live-verified; only compile/preflight behavior code-verified",
+    "4.6: scan-offset compensation effectiveness is hardware-dependent and unburned; zipper cancellation proven as geometry only",
+    "4.7: no LightBurn side-by-side for pass-through semantics; the still-dithers finding is code-traced, not perceptually demonstrated",
+    "LaserGRBL 4.7 is U (research debt); LaserGRBL overscan/bi-di controls in 4.6 also unknown within a scored cell",
+    "LightBurn free rotation of image objects is [INF] in the market pack; 4.5 cell corroborated only by KerfDesk prior-audit S9-F2 statement",
+    "XCS quality is OFF existence-level in every row - no community quality signal found for xTool Studio's raster pipeline",
+    "MillMage/Easel N/R determinations rest on OFF product pages plus community consensus; no hands-on confirmation"
+  ]
+}

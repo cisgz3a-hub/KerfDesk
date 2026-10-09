@@ -1,0 +1,516 @@
+{
+  "sector": 18,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/18-onboarding-commercial.md",
+  "ratings": [
+    {
+      "cat": "18.1",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Device Setup wizard + CNC beginner mode/safe-feed picker, but no first-run tour, no laser beginner mode, flagged CNC safety-default gaps."
+    },
+    {
+      "cat": "18.1",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Find My Laser discovery wizard, beginner add/configure docs, safe dummy-profile path; strong guided setup but no persistent beginner-mode toggle."
+    },
+    {
+      "cat": "18.1",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Project Setup Wizard with explicit Beginner Setup mode, per-step visual examples, leave-defaults fallback; solid onboarding for a young product."
+    },
+    {
+      "cat": "18.1",
+      "product": "LaserGRBL",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Simple COM/baud connect plus GRBL-config import; praised as easiest free laser tool but sparse onboarding, no guided first-project wizard."
+    },
+    {
+      "cat": "18.1",
+      "product": "XCS",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Consumer guided flow: EasySet presets, one-click auto-adjust, AI helpers, camera positioning, step-by-step beginner tutorials; very beginner-friendly."
+    },
+    {
+      "cat": "18.1",
+      "product": "Easel",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Purpose-built beginner CNC reference: setup wizard plus Start Carving walkthrough, safe defaults, minimal friction, browser-based no install."
+    },
+    {
+      "cat": "18.1",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Clean simple UI plus official Hello Contour/V-carve courses; setup via companion Carbide Motion, but no in-app beginner wizard."
+    },
+    {
+      "cat": "18.1",
+      "product": "VCarve",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Structured job-setup form and getting-started tutorials, but professional CAM with steeper curve, no beginner mode; assumes CNC literacy."
+    },
+
+    {
+      "cat": "18.2",
+      "product": "KerfDesk",
+      "score": 3,
+      "star": false,
+      "tag": "CODE",
+      "note": "Two markdown guides plus comprehensive README; only three in-app alert help entries, and the guides' docs/ paths 404 in the deployed bundle."
+    },
+    {
+      "cat": "18.2",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Comprehensive versioned reference site plus single-PDF manual covering every window and feature; the documentation benchmark of the roster."
+    },
+    {
+      "cat": "18.2",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Structured docs sharing LightBurn's infrastructure; well-organized getting-started/reference/explainers but newer and thinner than LightBurn."
+    },
+    {
+      "cat": "18.2",
+      "product": "LaserGRBL",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Modest usage guide, FAQ and GitHub wiki; adequate for its narrow sender scope but shallow and infrequently updated."
+    },
+    {
+      "cat": "18.2",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Extensive per-machine support articles, learning center and academy courses, but no single unified manual; broad yet fragmented."
+    },
+    {
+      "cat": "18.2",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Well-organized Zendesk support center with task-focused articles; clear beginner coverage but not a deep single reference manual."
+    },
+    {
+      "cat": "18.2",
+      "product": "Carbide Create",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "No current versioned manual (only legacy V5 PDF); docs delivered as courses, Pro under-documented; weakest formal CNC docs."
+    },
+    {
+      "cat": "18.2",
+      "product": "VCarve",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Full per-version reference manuals plus in-app video-tutorial browser; comprehensive and precise, rivaling LightBurn."
+    },
+
+    {
+      "cat": "18.3",
+      "product": "KerfDesk",
+      "score": 1,
+      "star": false,
+      "tag": "CODE",
+      "note": "No learning ecosystem: no in-app tutorials/tour/videos, no forum/Discord; only README how-tos and a GitHub-issues feedback path; self-described young."
+    },
+    {
+      "cat": "18.3",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Largest laser ecosystem: official forum (~28.6k topics), YouTube, large Facebook groups, abundant third-party tutorials; clear category leader."
+    },
+    {
+      "cat": "18.3",
+      "product": "MillMage",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Shares LightBurn forum (~501 topics) and YouTube with official videos, but community small and new (GA Feb 2026)."
+    },
+    {
+      "cat": "18.3",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Active Facebook group, GitHub discussions and heavy third-party YouTube as the default free option; no official forum, uneven."
+    },
+    {
+      "cat": "18.3",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Large vendor ecosystem: xTool Academy, learning center, YouTube, 100k+ Studio users, big Facebook groups; strong but brand-centric."
+    },
+    {
+      "cat": "18.3",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Official Inventables forum and YouTube plus third-party academies; solid beginner community but smaller and quieter than LightBurn/xTool."
+    },
+    {
+      "cat": "18.3",
+      "product": "Carbide Create",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Official course hub, active Carbide 3D/Shapeoko forum, YouTube, community wikis; healthy hardware-anchored community among owners."
+    },
+    {
+      "cat": "18.3",
+      "product": "VCarve",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Official tutorials/YouTube and forum plus ~65k-member Facebook group and third-party training; strong CNC-CAM learning ecosystem."
+    },
+
+    {
+      "cat": "18.4",
+      "product": "KerfDesk",
+      "score": 4,
+      "star": false,
+      "tag": "CODE",
+      "note": "Bundled offline design library (~76 provenance-tagged entries, mostly icons) plus box generator and material libraries; no marketplace, community, or cloud sharing."
+    },
+    {
+      "cat": "18.4",
+      "product": "LightBurn",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Built-in curated Art Library plus 2.1 Cuttle web-tool for parametric designs; integrated but modest scale versus dedicated libraries."
+    },
+    {
+      "cat": "18.4",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No built-in project/asset marketplace or clip-art library; only .lbrn2/.mage file cross-compatibility, no ready-to-cut content."
+    },
+    {
+      "cat": "18.4",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No asset library or marketplace; imports user images and G-code but ships no ready-to-cut content or clip-art."
+    },
+    {
+      "cat": "18.4",
+      "product": "XCS",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Integrated Atomm project ecosystem (1000+ free files/templates), one-click open, publish-to-community; strong ready-to-make content, xTool-tied."
+    },
+    {
+      "cat": "18.4",
+      "product": "Easel",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Pro Design Library of 3M+ shapes plus 300+ fonts built into the editor; huge, but gated behind Pro ($24/mo)."
+    },
+    {
+      "cat": "18.4",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "CutRocket project-sharing site and free project gallery provide ready-to-cut content, but web-based, not an in-app library."
+    },
+    {
+      "cat": "18.4",
+      "product": "VCarve",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Bundled free clip-art plus community free projects and the Design & Make store (2000+ models, 185 packs); premium store paid."
+    },
+
+    {
+      "cat": "18.5",
+      "product": "KerfDesk",
+      "score": 1,
+      "star": false,
+      "tag": "CODE",
+      "note": "No plugin/scripting/API; console has fixed driver quick-commands, not user macros; only file-format interop (.lf2/.lfml.json/.lbdev, SVG/DXF/STL)."
+    },
+    {
+      "cat": "18.5",
+      "product": "LightBurn",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "User-defined G-code macros (machine-control only) and Cuttle web-tools, but no scripting/plugin API; open-API request outstanding."
+    },
+    {
+      "cat": "18.5",
+      "product": "MillMage",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No scripting/plugin API; only custom G-code injection; an extension-language user request is open and unaddressed."
+    },
+    {
+      "cat": "18.5",
+      "product": "LaserGRBL",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Shareable custom-button G-code macros plus open-source (GPL) forkability and a community Inkscape extension; extensible informally, no formal API."
+    },
+    {
+      "cat": "18.5",
+      "product": "XCS",
+      "score": 1,
+      "star": false,
+      "tag": "OFF",
+      "note": "Built-in AI tools exist but no user scripting, plugin system or open API; a closed consumer app extended only by vendor."
+    },
+    {
+      "cat": "18.5",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Easel Apps platform (JavaScript apps) and a developer API exist, but the API is on hiatus; extensibility real but stalled."
+    },
+    {
+      "cat": "18.5",
+      "product": "Carbide Create",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No scripting, plugin or API surface; a closed proprietary design+CAM app extended only through Carbide 3D releases."
+    },
+    {
+      "cat": "18.5",
+      "product": "VCarve",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Gadgets system: LUA-scripted add-ins with SDK and a downloadable gadget library; powerful but Pro-only, absent from Desktop."
+    },
+
+    {
+      "cat": "18.6",
+      "product": "KerfDesk",
+      "score": 0,
+      "star": false,
+      "tag": "CODE",
+      "note": "English-only; no i18n framework/dependency, no language switcher, no string catalog, no RTL; only toLocaleString numeric formatting."
+    },
+    {
+      "cat": "18.6",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "~25 in-app UI languages (27 per vendor case study) with automatic RTL for Arabic/Hebrew; broadest localization in the roster."
+    },
+    {
+      "cat": "18.6",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "English-only UI; documentation itself suggests using Google Translate for other languages; no native localization."
+    },
+    {
+      "cat": "18.6",
+      "product": "LaserGRBL",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "~10+ community-contributed UI languages auto-selected by Windows locale; a long-standing community localization strength."
+    },
+    {
+      "cat": "18.6",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "~11+ UI languages plus Studio v1.5.8 RTL and vertical text; strong localization across major markets."
+    },
+    {
+      "cat": "18.6",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No documented in-app language switcher; app and support center English-only (partly inferred); no localization found."
+    },
+    {
+      "cat": "18.6",
+      "product": "Carbide Create",
+      "score": 0,
+      "star": false,
+      "tag": "COMM",
+      "note": "English-only; community reports the app is not internationalized and no language options are documented."
+    },
+    {
+      "cat": "18.6",
+      "product": "VCarve",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "13 selectable UI languages via a launch-icon language flag; broad established localization."
+    },
+
+    {
+      "cat": "18.7",
+      "product": "KerfDesk",
+      "score": 10,
+      "star": false,
+      "tag": "CODE",
+      "note": "Free, MIT, public source, zero-install web PWA plus free Windows desktop, no account/telemetry; only free+permissive+actively-developed product in roster."
+    },
+    {
+      "cat": "18.7",
+      "product": "LightBurn",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "$99 Core/$199 Pro perpetual (3 machines), 30-day trial, optional paid update renewal; proprietary closed-source; frequently updated."
+    },
+    {
+      "cat": "18.7",
+      "product": "MillMage",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "$99 Core perpetual (3 machines, commercial use); Pro $199 announced; proprietary closed-source; actively developed."
+    },
+    {
+      "cat": "18.7",
+      "product": "LaserGRBL",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Free and open-source (donation-supported), the only other open-source product, but dormant with no release since Mar 2025."
+    },
+    {
+      "cat": "18.7",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Free download, no purchase, but proprietary closed-source and tied to xTool's hardware ecosystem; actively developed."
+    },
+    {
+      "cat": "18.7",
+      "product": "Easel",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Freemium SaaS: Free (1 export/week), Starter $8, Pro $24/mo; proprietary closed-source and cloud/account-dependent."
+    },
+    {
+      "cat": "18.7",
+      "product": "Carbide Create",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Free Core (locked to Carbide 3D machines)/Pro $120·yr or $360 perpetual; proprietary closed-source; free tier hardware-gated."
+    },
+    {
+      "cat": "18.7",
+      "product": "VCarve",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "$349 Desktop/$699 Pro perpetual with free in-major-version updates; proprietary closed-source; most expensive in the roster."
+    }
+  ],
+  "wins": [
+    {
+      "cat": "18.7",
+      "vs": "LaserGRBL/XCS",
+      "delta": 3,
+      "claim": "KerfDesk is the only free, permissively (MIT) open-source, actively-developed, zero-install, no-account/telemetry product in the roster; the free competitors are dormant (LaserGRBL) or closed and hardware-tied (XCS)."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "18.6",
+      "vs": "LightBurn",
+      "delta": -10,
+      "claim": "English-only with no i18n framework at all, versus LightBurn's ~25 localized UIs plus RTL."
+    },
+    {
+      "cat": "18.3",
+      "vs": "LightBurn",
+      "delta": -9,
+      "claim": "No learning ecosystem (no tutorials, videos, forum, or community), only a README and a GitHub-issues feedback path."
+    },
+    {
+      "cat": "18.2",
+      "vs": "LightBurn",
+      "delta": -7,
+      "claim": "Two markdown guides plus a README and three in-app alert help entries, and the guides 404 in the deployed bundle; no reference manual."
+    },
+    {
+      "cat": "18.5",
+      "vs": "VCarve",
+      "delta": -6,
+      "claim": "No plugin/scripting/API and not even user-savable macros; the whole roster is weak here so the delta vs LightBurn is only -3."
+    },
+    {
+      "cat": "18.4",
+      "vs": "XCS",
+      "delta": -5,
+      "claim": "A small bundled offline library and box generator, no marketplace, community content, or cloud sharing."
+    },
+    {
+      "cat": "18.1",
+      "vs": "Easel/XCS",
+      "delta": -4,
+      "claim": "Device wizard and CNC beginner mode exist, but no first-run onboarding tour, no laser beginner mode, and flagged CNC safety-default divergences."
+    }
+  ],
+  "notVerified": [
+    "No live-app first-run observed this audit (static code reading only): splash visual quality, empty-first-paint, help-alert rendering, and design-library 'Lib' button discoverability (S8-F4) not exercised.",
+    "Whether kerfdesk.com hosts documentation outside the app bundle (which would mitigate the dead docs/ links) cannot be verified from the tree.",
+    "ADR-092 wizard hardware behaviour (reading $$ on connect, firmware writes, origin-corner G-code flip) is ADR-recorded HW-CLAIMED, not machine-verified.",
+    "Flagged CNC beginner-safety default divergences (S8-F2/F3/F4: no work-zero advisory at Start, through-cut default with tabs off, no warning) not re-checked here.",
+    "KerfDesk external community size, hosted tutorials/videos, and any kerfdesk.com learning pages are off-repo and unverifiable (absence-based).",
+    "Production update-feed hosting, real release cadence, and Windows packaged-update behaviour are CLAIMED, not verified live; the 18.7 lead rests on verifiable license/openness facts, not cadence.",
+    "All competitor ratings are documentary ([OFF]/[COMM]); no hands-on runs. Easel 18.6 and Carbide Create 18.6 rest partly on inferred ([INF]) English-only signals and did not anchor any win/lose bullet.",
+    "No [fidelity] or [⚠HW] categories exist in S18: no PERC-capped cells, no '*' design-intent cells, and no 'U' unknown cells in the scorecard."
+  ]
+}

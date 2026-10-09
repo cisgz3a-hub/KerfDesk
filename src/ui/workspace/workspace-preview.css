@@ -7,7 +7,8 @@
   grid-template:
     'controls' auto
     'stage' minmax(0, 1fr)
-    'preview' auto / minmax(0, 1fr);
+    'preview' auto
+    'sheets' auto / minmax(0, 1fr);
 }
 
 .lf-workspace-view-controls {
@@ -68,4 +69,17 @@
 
 .lf-preview-details[open] > summary {
   margin-bottom: 8px;
+}
+
+.lf-workspace-sheet-footer {
+  grid-area: sheets;
+  min-width: 0;
+  background: var(--lf-bg-1);
+  border-top: 1px solid var(--lf-border);
+}
+
+@media (max-width: 700px) and (max-height: 500px) {
+  .lf-workspace-view-controls {
+    --lf-text-md: 12px;
+  }
 }

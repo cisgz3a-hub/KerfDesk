@@ -10,6 +10,8 @@ import {
 import { SelectedBarcodeSummary } from '../barcode/SelectedBarcodeSummary';
 import { useStore } from '../state';
 import { ArtworkEditorTabs, type ArtworkEditorView } from './ArtworkEditorTabs';
+import { ConstrainedSketchControls } from './ConstrainedSketchControls';
+import { ParametricPartControls } from './ParametricPartControls';
 import { DogboneRow } from './DogboneRow';
 import { OffsetPathsRow } from './OffsetPathsRow';
 import { SelectedImageAdjustments } from './SelectedImageAdjustments';
@@ -121,6 +123,8 @@ function ArtworkPropertiesInspector(props: ArtworkPropertiesInspectorProps): JSX
       >
         <ArtworkAdjustmentFields key={contextKey} {...props} />
         <div className="lf-artwork-disclosure__body">
+          <ConstrainedSketchControls mode="edit" />
+          <ParametricPartControls mode="edit" />
           <OffsetPathsRow />
           <DogboneRow />
           <SelectedReliefProperties />
