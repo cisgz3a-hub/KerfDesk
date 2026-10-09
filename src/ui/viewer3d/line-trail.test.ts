@@ -9,7 +9,12 @@ describe('withTrail', () => {
     const shader = withTrail(material);
     const vertex = shader.vertexShader;
     expect(vertex.indexOf('uniform float trailStart;')).toBeLessThan(vertex.indexOf('void main()'));
-    expect(vertex.indexOf('gl_InstanceID')).toBeGreaterThan(
+    expect(vertex.indexOf('gl_InstanceID')).toBeGreaterThan(vertex.indexOf('void main()'));
+    expect(vertex.indexOf('if ( float( gl_InstanceID ) < trailStart )')).toBeLessThan(
+      vertex.indexOf('float aspect = resolution.x / resolution.y;'),
+    );
+    expect(vertex).toContain('gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );\n    return;');
+    expect(vertex.indexOf('float trailInstance =')).toBeGreaterThan(
       vertex.lastIndexOf('#include <fog_vertex>'),
     );
     const fragment = shader.fragmentShader;
@@ -24,6 +29,24 @@ describe('withTrail', () => {
   it('leaves a shader without the anchors as it is', () => {
     const shader = { vertexShader: 'void f() {}', fragmentShader: 'void g() {}' };
     expect(withTrail(shader)).toEqual(shader);
+    const unknownMain = {
+      vertexShader: 'void main() { gl_Position = vec4(1.0); }',
+      fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }',
+    };
+    expect(withTrail(unknownMain)).toBe(unknownMain);
+  });
+
+  it('keeps admitted line extrusion and the existing fade expression intact', () => {
+    const original = new LineMaterial();
+    const edited = withTrail(original);
+    const start = 'float aspect = resolution.x / resolution.y;';
+    const end = '#include <fog_vertex>';
+    const body = (source: string) =>
+      source.slice(source.indexOf(start), source.lastIndexOf(end) + end.length);
+    expect(body(edited.vertexShader)).toBe(body(original.vertexShader));
+    expect(edited.vertexShader).toContain(
+      'vTrailFade = trailFade * ( 1.0 - clamp( ( trailInstance - trailStart ) / trailSpan, 0.0, 1.0 ) );',
+    );
   });
 });
 

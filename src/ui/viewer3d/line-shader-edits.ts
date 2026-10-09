@@ -15,15 +15,20 @@ export const VERTEX_END = '#include <fog_vertex>';
 const SHOWN_DECLARATION = `attribute float ${SHOWN_ATTRIBUTE};
 `;
 const SHOWN_BODY = `
-  if ( ${SHOWN_ATTRIBUTE} < 0.5 ) gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
+  if ( ${SHOWN_ATTRIBUTE} < 0.5 ) {
+    gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
+    return;
+  }
 `;
 
 /** Drops the moves whose shown flag is off (rapids, filtered moves). */
 export function withShownMoves(shader: ShaderSource): ShaderSource {
+  if (!shader.vertexShader.includes(MAIN) || !shader.vertexShader.includes(VERTEX_END))
+    return shader;
   return {
     vertexShader: insertAfter(
       insertBefore(shader.vertexShader, MAIN, SHOWN_DECLARATION),
-      VERTEX_END,
+      MAIN,
       SHOWN_BODY,
     ),
     fragmentShader: shader.fragmentShader,
@@ -45,7 +50,8 @@ export function editLineMaterial(
     Object.assign(shader.uniforms, uniforms);
     Object.assign(shader, edit(shader));
   };
-  material.customProgramCacheKey = () => key;
+  // Every caller using the changed shown/trail edit gets a new compiled key.
+  material.customProgramCacheKey = () => key + '-early-hidden-v1';
 }
 
 export function insertBefore(source: string, anchor: string, text: string): string {

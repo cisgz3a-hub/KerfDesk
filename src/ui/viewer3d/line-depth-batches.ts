@@ -3,6 +3,7 @@
 import type * as ThreeNamespace from 'three';
 import type { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js';
 import type { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js';
+import { coveredRampEligibility } from './line-covered-ramp';
 import { installXYPlaneDepth, type CoveredGhost } from './line-plane-depth';
 import type { TrailUniforms } from './line-trail';
 
@@ -33,6 +34,7 @@ export function createDepthBatches(args: {
   const covered: CoveredGhost = {
     start: trail.trailStart,
     end: trail.trailEnd,
+    rampEligible: coveredRampEligibility(three, lines, ghost, trail.trailEnd),
     eligible: (geometry) =>
       geometry === fullGhost &&
       lines.geometry === fullLines &&

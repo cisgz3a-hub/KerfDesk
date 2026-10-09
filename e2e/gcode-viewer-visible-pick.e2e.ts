@@ -207,6 +207,82 @@ test('edge-on full-source retraces name the visible cut at admitted coplanar poi
   expect(errors).toEqual([]);
 });
 
+test('native picks exclude the visible far boundary and preserve internal equal-depth order', async ({
+  page,
+}, info) => {
+  const errors = await openProbe(page);
+  const results: Results = [];
+  for (const perspective of [false, true]) {
+    for (const mixed of [false, true]) {
+      const text = CUT_TRAVEL + (mixed ? '\nG0 Z1' : '');
+      const base: VisiblePickOptions = {
+        text,
+        sample: { x: 50, y: 0, z: 0 },
+        look: 'classic',
+        perspective,
+        travel: true,
+        angle: 'top',
+        alignToPixelCentre: true,
+        hiddenSegments: mixed ? [0, 2, 3] : [0, 2],
+      };
+      for (const control of [
+        { range: [1, 260] as const, expected: 1, visible: true },
+        { range: [130, 260] as const, expected: 1, visible: true },
+        { range: [131, 260] as const, expected: null, visible: false },
+        { range: [65, 130.001] as const, expected: 1, visible: true },
+        { range: [65, 130] as const, expected: null, visible: false },
+        { range: [1, 129] as const, expected: null, visible: false },
+      ]) {
+        const frame = await capture(
+          page,
+          info,
+          { ...base, clipRange: control.range },
+          results,
+          'native-visible-camera-range',
+        );
+        expect(frame.pick?.segmentIndex ?? null).toBe(control.expected);
+        // Classic native travel uses alpha .35 over the dark clear colour.
+        // The frozen isolated-native read is [90,44,47], rather than opaque red.
+        expect(frame.pixel).toEqual(control.visible ? [90, 44, 47, 255] : [28, 31, 36, 255]);
+      }
+      const farCut = await capture(
+        page,
+        info,
+        {
+          ...base,
+          hiddenSegments: mixed ? [1, 2, 3] : [1, 2],
+          clipRange: [65, 130],
+        },
+        results,
+        'inclusive-fat-far-boundary',
+      );
+      expect(farCut.pixel).toEqual([151, 209, 255, 255]);
+      expect(farCut.pick?.segmentIndex).toBe(0);
+
+      // Both rapids cover the same admitted body. Preserve the established
+      // later-source ID tie, including the nonplanar depth-writing ID pass.
+      const ties = await capture(
+        page,
+        info,
+        {
+          ...base,
+          text: 'G21 G90\nM5\nG1 X100 F600\nG1 X0\nG1 Y10' + (mixed ? '\nG0 Z1' : ''),
+          hiddenSegments: mixed ? [2, 3] : [2],
+          clipRange: [1, 260],
+        },
+        results,
+        'native-native-internal-tie',
+      );
+      expect(ties.planar).toBe(!mixed);
+      // Two .35-alpha native bodies accumulate over the same clear pixel.
+      expect(ties.pixel).toEqual([130, 52, 54, 255]);
+      expect(ties.pick?.segmentIndex).toBe(1);
+    }
+  }
+  await saveResults(info, results);
+  expect(errors).toEqual([]);
+});
+
 test('clipping excludes hidden endpoint snaps and measurement points but keeps visible boundary endpoints', async ({
   page,
 }, info) => {

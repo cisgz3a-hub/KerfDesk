@@ -1,8 +1,11 @@
 // The ID pass needs a full-source axis even when the least-slope plane is edge-on.
-// This immutable descriptor never changes the source position or visible geometry.
+// Fat IDs derive it from shared endpoints; native IDs store the same Float32 steps.
 import type * as ThreeNamespace from 'three';
 
 export const PICK_SOURCE_AXIS_ATTRIBUTE = 'kerfdeskPickSourceAxis';
+const HALF_FLOAT32_MAX = 1.7014117331926443e38;
+const MIN_NORMAL = 2 ** -126;
+const SUBNORMAL_UPSCALE = 2 ** 24;
 
 /** Canonical stored endpoints give exact retraces identical packed direction bits. */
 export function writePickSourceAxis(
@@ -17,19 +20,45 @@ export function writePickSourceAxis(
 ): void {
   target.fill(0, offset, offset + 3);
   if (!finiteEndpoints(x0, y0, z0, x1, y1, z1)) return;
-  const first = x0 < x1 || (x0 === x1 && (y0 < y1 || (y0 === y1 && z0 < z1)));
-  const dx = first ? x1 - x0 : x0 - x1;
-  const dy = first ? y1 - y0 : y0 - y1;
-  const dz = first ? z1 - z0 : z0 - z1;
-  // Scale by a power of two before packing: finite Float32 differences can
-  // exceed Float32. This keeps every component below two without an extra
-  // non-power-of-two division rounding of an already representable direction.
-  const maximum = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz));
-  if (maximum === 0) return;
+  const first = sourceForward(x0, y0, z0, x1, y1, z1);
+  const factor = needsHalf(x0, x1) || needsHalf(y0, y1) || needsHalf(z0, z1) ? 0.5 : 1;
+  let dx = roundedDifference(x0, x1, first, factor);
+  let dy = roundedDifference(y0, y1, first, factor);
+  let dz = roundedDifference(z0, z1, first, factor);
+  let maximum = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz));
+  if (!Number.isFinite(maximum) || maximum === 0) return;
+  if (maximum < MIN_NORMAL) {
+    dx = Math.fround(dx * SUBNORMAL_UPSCALE);
+    dy = Math.fround(dy * SUBNORMAL_UPSCALE);
+    dz = Math.fround(dz * SUBNORMAL_UPSCALE);
+    maximum = Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz));
+  }
   const scale = 2 ** Math.floor(Math.log2(maximum));
   target[offset] = packedDirection(dx / scale);
   target[offset + 1] = packedDirection(dy / scale);
   target[offset + 2] = packedDirection(dz / scale);
+}
+
+function sourceForward(
+  x0: number,
+  y0: number,
+  z0: number,
+  x1: number,
+  y1: number,
+  z1: number,
+): boolean {
+  return x0 < x1 || (x0 === x1 && (y0 < y1 || (y0 === y1 && z0 < z1)));
+}
+
+function needsHalf(first: number, last: number): boolean {
+  const opposed = (first < 0 && last > 0) || (first > 0 && last < 0);
+  return opposed && Math.max(Math.abs(first), Math.abs(last)) > HALF_FLOAT32_MAX;
+}
+
+function roundedDifference(first: number, last: number, forward: boolean, factor: number): number {
+  const start = Math.fround((forward ? first : last) * factor);
+  const end = Math.fround((forward ? last : first) * factor);
+  return Math.fround(end - start);
 }
 
 function packedDirection(value: number): number {
@@ -55,36 +84,64 @@ function finiteEndpoints(
   );
 }
 
-/** Lazy ID geometry only: 12 bytes/fat row or 24 bytes/native pair, no positions copy. */
+// Mirror the native writer's explicit Float32 operations. The half guard must
+// pair opposite signs and a large magnitude in the SAME component: a large
+// common X coordinate must not destroy a tiny, unrelated Y-only source axis.
+export const PICK_SOURCE_AXIS_GLSL = /* glsl */ `
+bool kerfdeskPickNeedsHalf( float first, float last ) {
+  bool opposed = ( first < 0.0 && last > 0.0 ) || ( first > 0.0 && last < 0.0 );
+  return opposed && max( abs( first ), abs( last ) ) > ${HALF_FLOAT32_MAX};
+}
+vec3 kerfdeskPickFullSourceAxis( vec3 first, vec3 last ) {
+  if ( any( isnan( first ) ) || any( isinf( first ) )
+    || any( isnan( last ) ) || any( isinf( last ) ) ) return vec3( 0.0 );
+  bool forward = first.x < last.x || ( first.x == last.x
+    && ( first.y < last.y || ( first.y == last.y && first.z < last.z ) ) );
+  vec3 start = forward ? first : last;
+  vec3 end = forward ? last : first;
+  if ( kerfdeskPickNeedsHalf( start.x, end.x )
+    || kerfdeskPickNeedsHalf( start.y, end.y )
+    || kerfdeskPickNeedsHalf( start.z, end.z ) ) {
+    start *= 0.5;
+    end *= 0.5;
+  }
+  vec3 delta = end - start;
+  float maximum = max( max( abs( delta.x ), abs( delta.y ) ), abs( delta.z ) );
+  if ( isnan( maximum ) || isinf( maximum ) || maximum == 0.0 ) return vec3( 0.0 );
+  if ( maximum < ${MIN_NORMAL} ) {
+    delta *= ${SUBNORMAL_UPSCALE}.0;
+    maximum = max( max( abs( delta.x ), abs( delta.y ) ), abs( delta.z ) );
+  }
+  float scale = uintBitsToFloat( floatBitsToUint( maximum ) & 0x7f800000u );
+  vec3 direction = delta / scale;
+  return vec3( direction.x == 0.0 ? 0.0 : direction.x,
+    direction.y == 0.0 ? 0.0 : direction.y, direction.z == 0.0 ? 0.0 : direction.z );
+}
+`;
+
+/** Lazy native ID geometry only: 24 bytes/pair, no positions copy or per-frame scan. */
 export function addPickSourceAxes(
   three: typeof ThreeNamespace,
   geometry: ThreeNamespace.BufferGeometry,
-  kind: 'fat' | 'native',
 ): ThreeNamespace.BufferAttribute {
   const existing = geometry.getAttribute(PICK_SOURCE_AXIS_ATTRIBUTE);
   if (existing !== undefined) return existing as ThreeNamespace.BufferAttribute;
-  const start = geometry.getAttribute(kind === 'fat' ? 'instanceStart' : 'position');
-  const end = kind === 'fat' ? geometry.getAttribute('instanceEnd') : start;
-  const axes = new Float32Array(start.count * 3);
-  const step = kind === 'fat' ? 1 : 2;
-  for (let index = 0; index + step - 1 < start.count; index += step) {
-    const last = index + step - 1;
+  const position = geometry.getAttribute('position');
+  const axes = new Float32Array(position.count * 3);
+  for (let index = 0; index + 1 < position.count; index += 2) {
     writePickSourceAxis(
       axes,
       index * 3,
-      start.getX(index),
-      start.getY(index),
-      start.getZ(index),
-      end.getX(last),
-      end.getY(last),
-      end.getZ(last),
+      position.getX(index),
+      position.getY(index),
+      position.getZ(index),
+      position.getX(index + 1),
+      position.getY(index + 1),
+      position.getZ(index + 1),
     );
-    if (kind === 'native') axes.copyWithin((index + 1) * 3, index * 3, index * 3 + 3);
+    axes.copyWithin((index + 1) * 3, index * 3, index * 3 + 3);
   }
-  const attribute =
-    kind === 'fat'
-      ? new three.InstancedBufferAttribute(axes, 3)
-      : new three.BufferAttribute(axes, 3);
+  const attribute = new three.BufferAttribute(axes, 3);
   geometry.setAttribute(PICK_SOURCE_AXIS_ATTRIBUTE, attribute);
   return attribute;
 }

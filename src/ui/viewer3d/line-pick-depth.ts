@@ -3,7 +3,7 @@
 import type * as ThreeNamespace from 'three';
 import { installXYPlaneDepth } from './line-plane-depth';
 import { DEPTH_PLANE_ATTRIBUTE, DEPTH_PLANE_ORIGIN_ATTRIBUTE } from './line-depth-plane-geometry';
-import { PICK_SOURCE_AXIS_ATTRIBUTE } from './line-pick-source-axis';
+import { PICK_SOURCE_AXIS_ATTRIBUTE, PICK_SOURCE_AXIS_GLSL } from './line-pick-source-axis';
 import { insertBefore, MAIN, type ShaderSource } from './line-shader-edits';
 import type { ViewCamera } from './scene-setup';
 
@@ -18,24 +18,23 @@ function appendMain(source: string, body: string): string {
   return end < 0 ? source : source.slice(0, end) + body + source.slice(end);
 }
 
-/** Compose after the physical plane helper; keep its original clipping. */
-export function withLinearPickDepth(shader: ShaderSource): ShaderSource {
-  if (
-    !shader.vertexShader.includes('vec3 kerfdeskDepthNormalEye =') ||
-    !shader.fragmentShader.includes('gl_FragDepth = planeDepth;')
-  )
-    return shader;
-  const declaration = `flat varying vec4 ${EYE_PLANE};\nflat varying float ${CLIP_Z};\n`;
-  return {
-    vertexShader: appendMain(
-      insertBefore(
-        shader.vertexShader,
-        MAIN,
-        declaration +
-          `invariant ${EYE_PLANE};\ninvariant ${CLIP_Z};\n` +
-          `attribute vec3 ${PICK_SOURCE_AXIS_ATTRIBUTE};\nuniform float ${PERSPECTIVE};\n`,
-      ),
-      `
+function withPickVertex(source: string, kind: 'fat' | 'native'): string {
+  const axisDeclaration =
+    kind === 'fat' ? PICK_SOURCE_AXIS_GLSL : `attribute vec3 ${PICK_SOURCE_AXIS_ATTRIBUTE};\n`;
+  const axis =
+    kind === 'fat'
+      ? 'kerfdeskPickFullSourceAxis( instanceStart, instanceEnd )'
+      : PICK_SOURCE_AXIS_ATTRIBUTE;
+  return appendMain(
+    insertBefore(
+      source,
+      MAIN,
+      `flat varying vec4 ${EYE_PLANE};\nflat varying float ${CLIP_Z};\n` +
+        `invariant ${EYE_PLANE};\ninvariant ${CLIP_Z};\n` +
+        axisDeclaration +
+        `uniform float ${PERSPECTIVE};\n`,
+    ),
+    `
   ${EYE_PLANE} = vec4( kerfdeskDepthNormalEye,
     kerfdeskDepthLocalOffset - dot( kerfdeskDepthNormal, kerfdeskDepthOriginDelta ) );
   ${CLIP_Z} = vKerfdeskXYPlane.z;
@@ -44,25 +43,43 @@ export function withLinearPickDepth(shader: ShaderSource): ShaderSource {
   bool pickSourcePlaneKnown = ${DEPTH_PLANE_ATTRIBUTE}.z == 1.0
     || ( all( equal( ${DEPTH_PLANE_ATTRIBUTE}.xyz, vec3( 0.0 ) ) )
       && ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.w == 1.0 );
-  float pickAxisSquared = dot( ${PICK_SOURCE_AXIS_ATTRIBUTE}, ${PICK_SOURCE_AXIS_ATTRIBUTE} );
-  if ( !( abs( ${CLIP_Z} ) > 1e-8 ) && pickSourcePlaneKnown && pickAxisSquared > 0.0 ) {
-    vec3 pickViewRay = ${PERSPECTIVE} > 0.5
-      ? kerfdeskDepthOriginDelta : vec3( 0.0, 0.0, 1.0 ) * normalMatrix;
-    vec3 pickFacingNormal = pickViewRay - ${PICK_SOURCE_AXIS_ATTRIBUTE}
-      * ( dot( pickViewRay, ${PICK_SOURCE_AXIS_ATTRIBUTE} ) / pickAxisSquared );
-    vec3 pickFacingNormalEye = normalMatrix * pickFacingNormal;
-    vec4 pickFacingEyePlane = vec4( pickFacingNormalEye,
-      -dot( pickFacingNormal, kerfdeskDepthOriginDelta ) );
-    float pickFacingClipZ = ( ${PLANE_MATRIX} * pickFacingEyePlane ).z;
-    if ( abs( pickFacingClipZ ) > 1e-8
-      && !any( isnan( pickFacingEyePlane ) ) && !any( isinf( pickFacingEyePlane ) )
-      && !isnan( pickFacingClipZ ) && !isinf( pickFacingClipZ ) ) {
-      ${EYE_PLANE} = pickFacingEyePlane;
-      ${CLIP_Z} = pickFacingClipZ;
+  if ( !( abs( ${CLIP_Z} ) > 1e-8 ) && pickSourcePlaneKnown ) {
+    vec3 pickSourceAxis = ${axis};
+    float pickAxisSquared = dot( pickSourceAxis, pickSourceAxis );
+    if ( pickAxisSquared > 0.0 ) {
+      vec3 pickViewRay = ${PERSPECTIVE} > 0.5
+        ? kerfdeskDepthOriginDelta : vec3( 0.0, 0.0, 1.0 ) * normalMatrix;
+      vec3 pickFacingNormal = pickViewRay - pickSourceAxis
+        * ( dot( pickViewRay, pickSourceAxis ) / pickAxisSquared );
+      vec3 pickFacingNormalEye = normalMatrix * pickFacingNormal;
+      vec4 pickFacingEyePlane = vec4( pickFacingNormalEye,
+        -dot( pickFacingNormal, kerfdeskDepthOriginDelta ) );
+      float pickFacingClipZ = ( ${PLANE_MATRIX} * pickFacingEyePlane ).z;
+      if ( abs( pickFacingClipZ ) > 1e-8
+        && !any( isnan( pickFacingEyePlane ) ) && !any( isinf( pickFacingEyePlane ) )
+        && !isnan( pickFacingClipZ ) && !isinf( pickFacingClipZ ) ) {
+        ${EYE_PLANE} = pickFacingEyePlane;
+        ${CLIP_Z} = pickFacingClipZ;
+      }
     }
   }
 `,
-    ),
+  );
+}
+
+/** Compose after the physical plane helper; keep its original clipping. */
+export function withLinearPickDepth(shader: ShaderSource, kind: 'fat' | 'native'): ShaderSource {
+  if (
+    !shader.vertexShader.includes('vec3 kerfdeskDepthNormalEye =') ||
+    !shader.fragmentShader.includes('gl_FragDepth = planeDepth;')
+  )
+    return shader;
+  const declaration = `flat varying vec4 ${EYE_PLANE};\nflat varying float ${CLIP_Z};\n`;
+  // Test the original visible writer's depth before converting the ID encoding.
+  // Native travel uses LESS against clear depth 1; internal ID ties remain LEQUAL.
+  const nativeVisibleFar = kind === 'native' ? '\n  if ( !( gl_FragDepth < 1.0 ) ) discard;\n' : '';
+  return {
+    vertexShader: withPickVertex(shader.vertexShader, kind),
     fragmentShader: appendMain(
       insertBefore(
         shader.fragmentShader,
@@ -70,7 +87,8 @@ export function withLinearPickDepth(shader: ShaderSource): ShaderSource {
         declaration +
           `uniform mat4 ${PLANE_MATRIX};\nuniform vec2 ${RANGE};\nuniform float ${PERSPECTIVE};\n`,
       ),
-      `
+      nativeVisibleFar +
+        `
   if ( abs( ${CLIP_Z} ) > 1e-8 ) {
     vec2 pickNdc = ( gl_FragCoord.xy - kerfdeskDepthViewport.xy ) / kerfdeskDepthViewport.zw * 2.0 - 1.0;
     float pickEyeDistance;
@@ -112,7 +130,7 @@ export function installPickDepth(
     compile.call(material, shader, renderer);
     shader.uniforms[RANGE] = { value: range };
     shader.uniforms[PERSPECTIVE] = perspective;
-    Object.assign(shader, withLinearPickDepth(shader));
+    Object.assign(shader, withLinearPickDepth(shader, kind));
   };
   material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
     render.call(material, renderer, scene, camera, geometry, object, group);
@@ -120,5 +138,6 @@ export function installPickDepth(
     range.set(view.near, view.far);
     perspective.value = 'isPerspectiveCamera' in view ? 1 : 0;
   };
-  material.customProgramCacheKey = () => cacheKey + '-linear-pick-eye-depth-source-axis-v1';
+  material.customProgramCacheKey = () =>
+    cacheKey + '-linear-pick-eye-depth-source-axis-f32-visible-far-v3-' + kind;
 }

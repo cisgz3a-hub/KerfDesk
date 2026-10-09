@@ -17,6 +17,12 @@ export type CoveredGhost = {
   readonly start: { value: number };
   readonly end: { value: number };
   readonly eligible: (geometry: ThreeNamespace.BufferGeometry) => boolean;
+  /** Separate conservative opt-in; the historical constant-Z guard is unchanged. */
+  readonly rampEligible?: (
+    renderer: ThreeNamespace.WebGLRenderer,
+    geometry: ThreeNamespace.BufferGeometry,
+    object: ThreeNamespace.Object3D,
+  ) => boolean;
 };
 
 const PLANE_MATRIX = 'kerfdeskXYPlaneMatrix';
@@ -101,6 +107,7 @@ export function installXYPlaneDepth(
   const cameraHigh = new three.Vector3();
   const cameraLow = new three.Vector3();
   const coveredEnabled = { value: 0 };
+  const coveredRampEnabled = { value: 0 };
   const compile = material.onBeforeCompile;
   const render = material.onBeforeRender;
   const cacheKey = material.customProgramCacheKey();
@@ -115,8 +122,9 @@ export function installXYPlaneDepth(
       shader.uniforms.kerfdeskCoveredStart = covered.start;
       shader.uniforms.kerfdeskCoveredEnd = covered.end;
       shader.uniforms.kerfdeskCoveredEnabled = coveredEnabled;
+      shader.uniforms.kerfdeskCoveredRampEnabled = coveredRampEnabled;
       // This runs after the helper has decided whether plane depth applies.
-      // A ramp or edge-on fallback must keep its original ghost coverage.
+      // The old flat guard stays separate from the stricter ramp opt-in.
       shader.vertexShader = appendMain(
         insertBefore(
           shader.vertexShader,
@@ -124,6 +132,7 @@ export function installXYPlaneDepth(
           `uniform float kerfdeskCoveredStart;
 uniform float kerfdeskCoveredEnd;
 uniform float kerfdeskCoveredEnabled;
+uniform float kerfdeskCoveredRampEnabled;
 `,
         ),
         `
@@ -132,12 +141,17 @@ uniform float kerfdeskCoveredEnabled;
     && float( gl_InstanceID ) >= kerfdeskCoveredStart
     && float( gl_InstanceID ) < kerfdeskCoveredEnd )
     gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
+  if ( kerfdeskCoveredRampEnabled > 0.5 && instanceStart.z != instanceEnd.z
+    && ${DEPTH_PLANE_ATTRIBUTE}.z == 1.0 && abs( ${PLANE}.z ) > 1e-8
+    && float( gl_InstanceID ) >= kerfdeskCoveredStart
+    && float( gl_InstanceID ) < kerfdeskCoveredEnd )
+    gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
 `,
       );
     }
   };
   material.customProgramCacheKey = () =>
-    cacheKey + '-physical-source-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
+    cacheKey + '-physical-source-plane-depth-' + kind + (covered ? '-covered-ghost-ramp-v1' : '');
   material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
     render.call(material, renderer, scene, camera, geometry, object, group);
     planeMatrix.copy(camera.projectionMatrix).invert().transpose();
@@ -156,5 +170,6 @@ uniform float kerfdeskCoveredEnabled;
     // Current viewport is in drawing-buffer pixels, including target/window and DPR.
     renderer.getCurrentViewport(viewport);
     coveredEnabled.value = covered?.eligible(geometry) ? 1 : 0;
+    coveredRampEnabled.value = covered?.rampEligible?.(renderer, geometry, object) ? 1 : 0;
   };
 }

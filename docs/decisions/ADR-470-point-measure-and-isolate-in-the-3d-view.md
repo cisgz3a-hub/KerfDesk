@@ -130,10 +130,18 @@ depth. The visible toolpath, camera and its clipping range are unchanged.
 
 Where the ordinary physical plane is edge-on, the ID pass uses a second camera-facing plane
 through the canonical stored source origin and packed full-source axis. Fat and native IDs
-therefore share that fallback calculation for exact retraces. Its direction descriptor costs
-12 bytes per fat source row and 24 bytes per native pair, allocated once on the first pick;
-it neither copies positions nor scans them per frame. Float32 packing can still round endpoint
-differences, so exact arbitrary-coordinate containment is not promised. A zero axis, unknown
+therefore share that fallback calculation for exact retraces. Fat IDs derive the axis in the
+vertex shader from their original shared full endpoints, adding no per-row GPU buffer. Native
+IDs retain a 24-byte descriptor per pair, allocated once on the first pick. Neither copies
+positions or scans them on the CPU per frame; native first-pick preparation is linear in rapid count,
+and its latency is not bounded here. Both writers canonicalise stored endpoints, prevent
+opposed-component subtraction overflow by halving when that same component is large, round
+the subtraction to Float32, lift subnormal major deltas and divide by a power of two. This
+packing can still round endpoint differences or underflow a subdominant direction component.
+Rounding subtraction before normalisation can also double-round a tiny component to zero
+where normalising the double difference would retain the smallest Float32 subnormal; this
+shared shader/native policy does not promise the previous CPU-only packing at that limit.
+Exact arbitrary-coordinate containment is not promised. A zero axis, unknown
 descriptor, camera on the axis or unusable alternate plane retains raster fallback. The visible
 edge-on strokes retain their existing raster rendering.
 
@@ -197,3 +205,7 @@ unclipped overlay remain whole when isolation changes.
   view and O back, M and Esc turn Measure on and off without closing the Inspector, a 5-second
   trail draws with no shader error, and a last Esc closes the Inspector. Screenshots of a 20-second
   trail in both looks.
+
+### Native visible far boundary (2026-10-09)
+
+Native travel uses `LESS` in the visible renderer and is absent at the original physical or raster depth of 1. The native ID shader now rejects that original visible depth before converting it to linear eye depth. Fat cuts retain their inclusive far boundary, and ID `LEQUAL` retains existing native/native order at internal equal depths. The change adds no epsilon and changes no source point, camera, visible material or depth-write policy. Browser controls cover both projections, planar and mixed-Z classification, exact near and far boundaries, before-near and beyond-far rejection, just-inside-far native visibility, and the internal native/native tie.

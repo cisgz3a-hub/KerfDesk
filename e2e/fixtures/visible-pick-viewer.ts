@@ -28,6 +28,8 @@ export interface VisiblePickOptions {
   hiddenSegments?: readonly number[];
   /** Fixed CSS pixel index for the separate coplanar pointer control. */
   pointerPixel?: readonly [number, number];
+  /** Change only the camera range after the original framing/alignment. */
+  clipRange?: readonly [number, number];
 }
 
 /** Read pixels and pick IDs from the actual production toolpath and picker. */
@@ -113,6 +115,10 @@ function frameCamera(options: VisiblePickOptions) {
   camera.updateMatrixWorld();
   if (options.alignToPixelCentre)
     centreCameraOnPixel(camera, options.sample, options.pixelRatio ?? 1);
+  if (options.clipRange !== undefined) {
+    [camera.near, camera.far] = options.clipRange;
+    camera.updateProjectionMatrix();
+  }
   return camera;
 }
 

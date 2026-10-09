@@ -87,11 +87,38 @@ describe('cropped ID eye-depth encoding', () => {
       uniforms: {},
     };
     material.onBeforeCompile(shader as never, {} as never);
-    expect(shader.vertexShader).toContain('attribute vec3 kerfdeskPickSourceAxis;');
+    if (kind === 'fat') {
+      expect(shader.vertexShader).not.toContain('attribute vec3 kerfdeskPickSourceAxis;');
+      expect(shader.vertexShader).toContain(
+        'vec3 pickSourceAxis = kerfdeskPickFullSourceAxis( instanceStart, instanceEnd );',
+      );
+      expect(shader.vertexShader.indexOf('start *= 0.5;')).toBeLessThan(
+        shader.vertexShader.indexOf('vec3 delta = end - start;'),
+      );
+      for (const component of ['x', 'y', 'z']) {
+        expect(shader.vertexShader).toContain(
+          `kerfdeskPickNeedsHalf( start.${component}, end.${component} )`,
+        );
+      }
+      expect(shader.vertexShader).toContain('delta *= 16777216.0;');
+      expect(shader.vertexShader.indexOf('delta *= 16777216.0;')).toBeLessThan(
+        shader.vertexShader.indexOf('float scale = uintBitsToFloat('),
+      );
+      expect(shader.vertexShader).toContain(
+        'uintBitsToFloat( floatBitsToUint( maximum ) & 0x7f800000u )',
+      );
+      expect(shader.vertexShader).not.toContain('log2(');
+      expect(shader.vertexShader).not.toContain('exp2(');
+    } else {
+      expect(shader.vertexShader).toContain('attribute vec3 kerfdeskPickSourceAxis;');
+      expect(shader.vertexShader).toContain('vec3 pickSourceAxis = kerfdeskPickSourceAxis;');
+      expect(shader.vertexShader).not.toContain('kerfdeskPickFullSourceAxis');
+    }
+    expect(shader.vertexShader).toContain('if ( pickAxisSquared > 0.0 )');
     expect(shader.vertexShader).toContain('uniform float kerfdeskPickPerspective;');
     expect(shader.vertexShader).toContain('invariant vKerfdeskPickPlaneZ;');
     expect(shader.vertexShader).toContain(
-      '!( abs( vKerfdeskPickPlaneZ ) > 1e-8 ) && pickSourcePlaneKnown && pickAxisSquared > 0.0',
+      '!( abs( vKerfdeskPickPlaneZ ) > 1e-8 ) && pickSourcePlaneKnown',
     );
     expect(shader.vertexShader).toContain(
       '? kerfdeskDepthOriginDelta : vec3( 0.0, 0.0, 1.0 ) * normalMatrix;',
@@ -101,6 +128,19 @@ describe('cropped ID eye-depth encoding', () => {
     expect(shader.vertexShader).toContain(
       '!any( isnan( pickFacingEyePlane ) ) && !any( isinf( pickFacingEyePlane ) )',
     );
+
+    const nativeFar = 'if ( !( gl_FragDepth < 1.0 ) ) discard;';
+    if (kind === 'native') {
+      expect(shader.fragmentShader).toContain(nativeFar);
+      expect(shader.fragmentShader.indexOf('gl_FragDepth = planeDepth;')).toBeLessThan(
+        shader.fragmentShader.indexOf(nativeFar),
+      );
+      expect(shader.fragmentShader.indexOf(nativeFar)).toBeLessThan(
+        shader.fragmentShader.indexOf('float pickEyeDistance;'),
+      );
+    } else {
+      expect(shader.fragmentShader).not.toContain(nativeFar);
+    }
     expect(shader.fragmentShader).toContain('if ( abs( vKerfdeskPickPlaneZ ) > 1e-8 )');
     expect(shader.fragmentShader).toContain(
       'if ( !( pickDepth >= 0.0 && pickDepth <= 1.0 ) ) discard;',
@@ -109,12 +149,14 @@ describe('cropped ID eye-depth encoding', () => {
       shader.fragmentShader.indexOf('if ( planeDepth < 0.0 || planeDepth > 1.0 ) discard;'),
     ).toBeLessThan(shader.fragmentShader.indexOf('float pickDepth ='));
     expect(shader.fragmentShader).toContain('else if ( kerfdeskPickPerspective > 0.5 )');
-    expect(material.customProgramCacheKey()).toContain('-linear-pick-eye-depth-source-axis-v1');
+    expect(material.customProgramCacheKey()).toContain(
+      '-linear-pick-eye-depth-source-axis-f32-visible-far-v3-' + kind,
+    );
     material.dispose();
   });
   it('requires the physical helper instead of changing an unknown shader', () => {
     const source = { vertexShader: 'void main() {}', fragmentShader: 'void main() {}' };
-    expect(withLinearPickDepth(source)).toBe(source);
+    expect(withLinearPickDepth(source, 'fat')).toBe(source);
   });
 
   it('preserves raster near/far endpoints in Float32 without inverse-depth cancellation', () => {

@@ -32,11 +32,17 @@ uniform float trailFade;
 varying float vTrailFade;
 `;
 
-// After the line's own clip position: an instance before the trail moves
-// past the far plane, and the rest carry how faded they are.
+// Reject the same old trail interval before extrusion or physical-plane work.
+const VERTEX_EARLY = `
+  if ( float( gl_InstanceID ) < trailStart ) {
+    gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
+    return;
+  }
+`;
+
+// Admitted instances retain the original fade arithmetic and its position.
 const VERTEX_BODY = `
   float trailInstance = float( gl_InstanceID );
-  if ( trailInstance < trailStart ) gl_Position = vec4( 0.0, 0.0, 2.0, 1.0 );
   float trailSpan = max( trailEnd - trailStart, 1.0 );
   vTrailFade = trailFade * ( 1.0 - clamp( ( trailInstance - trailStart ) / trailSpan, 0.0, 1.0 ) );
 `;
@@ -51,9 +57,11 @@ const FRAGMENT_BODY = `
 
 /** Adds the trail to a line shader's source; a source without the anchors stays as it is. */
 export function withTrail(shader: ShaderSource): ShaderSource {
+  if (!shader.vertexShader.includes(MAIN) || !shader.vertexShader.includes(VERTEX_END))
+    return shader;
   return {
     vertexShader: insertAfter(
-      insertBefore(shader.vertexShader, MAIN, VERTEX_DECLARATIONS),
+      insertAfter(insertBefore(shader.vertexShader, MAIN, VERTEX_DECLARATIONS), MAIN, VERTEX_EARLY),
       VERTEX_END,
       VERTEX_BODY,
     ),
