@@ -26,6 +26,8 @@ export interface VisiblePickOptions {
   pixelRatio?: 1 | 2;
   planes?: readonly Viewer3dClipPlane[];
   hiddenSegments?: readonly number[];
+  /** Fixed CSS pixel index for the separate coplanar pointer control. */
+  pointerPixel?: readonly [number, number];
 }
 
 /** Read pixels and pick IDs from the actual production toolpath and picker. */
@@ -70,8 +72,8 @@ export async function visiblePickFrame(options: VisiblePickOptions) {
     camera,
   );
   const pointer = {
-    xPx: (projected.x + 1) * 400,
-    yPx: (1 - projected.y) * 300,
+    xPx: options.pointerPixel?.[0] ?? (projected.x + 1) * 400,
+    yPx: options.pointerPixel?.[1] ?? (1 - projected.y) * 300,
     widthPx: 800,
     heightPx: 600,
   };

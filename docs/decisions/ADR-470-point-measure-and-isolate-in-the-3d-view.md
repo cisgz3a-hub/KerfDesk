@@ -128,6 +128,15 @@ physical-plane clipping, local clipping and coplanar cut priority. Raster fallba
 perspective depth to the same encoding; it cannot recover precision already lost in raster
 depth. The visible toolpath, camera and its clipping range are unchanged.
 
+Where the ordinary physical plane is edge-on, the ID pass uses a second camera-facing plane
+through the canonical stored source origin and packed full-source axis. Fat and native IDs
+therefore share that fallback calculation for exact retraces. Its direction descriptor costs
+12 bytes per fat source row and 24 bytes per native pair, allocated once on the first pick;
+it neither copies positions nor scans them per frame. Float32 packing can still round endpoint
+differences, so exact arbitrary-coordinate containment is not promised. A zero axis, unknown
+descriptor, camera on the axis or unusable alternate plane retains raster fallback. The visible
+edge-on strokes retain their existing raster rendering.
+
 A new pick computes its closest point on the original move's retained interval under the current
 section and Z planes. Only original endpoints that remain in that interval and in the viewport
 can supply a fresh measurement snap; inclusive boundary endpoints still snap, and a clipping

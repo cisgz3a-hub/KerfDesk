@@ -10,6 +10,7 @@ import type { WebGLRenderer } from 'three';
 import type { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js';
 import { editLineMaterial, withShownMoves } from './line-shader-edits';
 import { installPickDepth } from './line-pick-depth';
+import { addPickSourceAxes } from './line-pick-source-axis';
 import { addDepthPlanes } from './line-depth-plane-geometry';
 import {
   encodePickIds,
@@ -181,6 +182,7 @@ function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPas
       material.depthWrite = !planar;
       if (solid === null) return;
       programGeometry = shareProgramGeometry(modules.LineSegmentsGeometry, solid.geometry);
+      addPickSourceAxes(three, programGeometry, 'fat');
       const lines = new modules.LineSegments2(programGeometry, programMaterial);
       // The line width is in the pick window's pixels, not the view's.
       // Name the visible cut above its recessive coplanar travel.
@@ -192,6 +194,7 @@ function createPickPass(modules: ThreeModules, renderer: WebGLRenderer): PickPas
     add: (ghost, source) => {
       if (ghost === null) return null;
       addDepthPlanes(three, ghost.geometry, 'native');
+      addPickSourceAxes(three, ghost.geometry, 'native');
       const ids = new three.BufferAttribute(encodePickIds(source), 4, true);
       ghost.geometry.setAttribute(PICK_ATTRIBUTE, ids);
       const lines = new three.LineSegments(ghost.geometry, material);

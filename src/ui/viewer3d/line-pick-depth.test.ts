@@ -71,6 +71,47 @@ describe('cropped ID eye-depth encoding', () => {
     },
   );
 
+  it.each(['fat', 'native'] as const)('adds a source-plane tier only to ID %s shaders', (kind) => {
+    const material =
+      kind === 'fat'
+        ? new LineMaterial()
+        : new three.ShaderMaterial({
+            vertexShader:
+              'void main() { gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+            fragmentShader: 'void main() { gl_FragColor = vec4(1.0); }',
+          });
+    installPickDepth(three, material, kind);
+    const shader = {
+      vertexShader: material.vertexShader,
+      fragmentShader: material.fragmentShader,
+      uniforms: {},
+    };
+    material.onBeforeCompile(shader as never, {} as never);
+    expect(shader.vertexShader).toContain('attribute vec3 kerfdeskPickSourceAxis;');
+    expect(shader.vertexShader).toContain('uniform float kerfdeskPickPerspective;');
+    expect(shader.vertexShader).toContain('invariant vKerfdeskPickPlaneZ;');
+    expect(shader.vertexShader).toContain(
+      '!( abs( vKerfdeskPickPlaneZ ) > 1e-8 ) && pickSourcePlaneKnown && pickAxisSquared > 0.0',
+    );
+    expect(shader.vertexShader).toContain(
+      '? kerfdeskDepthOriginDelta : vec3( 0.0, 0.0, 1.0 ) * normalMatrix;',
+    );
+    expect(shader.vertexShader).toContain('-dot( pickFacingNormal, kerfdeskDepthOriginDelta )');
+    expect(shader.vertexShader).toContain('if ( abs( pickFacingClipZ ) > 1e-8');
+    expect(shader.vertexShader).toContain(
+      '!any( isnan( pickFacingEyePlane ) ) && !any( isinf( pickFacingEyePlane ) )',
+    );
+    expect(shader.fragmentShader).toContain('if ( abs( vKerfdeskPickPlaneZ ) > 1e-8 )');
+    expect(shader.fragmentShader).toContain(
+      'if ( !( pickDepth >= 0.0 && pickDepth <= 1.0 ) ) discard;',
+    );
+    expect(
+      shader.fragmentShader.indexOf('if ( planeDepth < 0.0 || planeDepth > 1.0 ) discard;'),
+    ).toBeLessThan(shader.fragmentShader.indexOf('float pickDepth ='));
+    expect(shader.fragmentShader).toContain('else if ( kerfdeskPickPerspective > 0.5 )');
+    expect(material.customProgramCacheKey()).toContain('-linear-pick-eye-depth-source-axis-v1');
+    material.dispose();
+  });
   it('requires the physical helper instead of changing an unknown shader', () => {
     const source = { vertexShader: 'void main() {}', fragmentShader: 'void main() {}' };
     expect(withLinearPickDepth(source)).toBe(source);

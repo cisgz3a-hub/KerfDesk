@@ -166,6 +166,47 @@ test('varying-Z travel retains genuine nearer and farther pick depth', async ({ 
   expect(errors).toEqual([]);
 });
 
+test('edge-on full-source retraces name the visible cut at admitted coplanar pointers', async ({
+  page,
+}, info) => {
+  const errors = await openProbe(page);
+  const results: Results = [];
+  const text =
+    'G21 G90\nG0 Z-25\nM3 S500\nG1 X100 Z25 F600\nM5\nG0 X100 Y0 Z25\nG0 X0 Z-25\nG0 Y10';
+  for (const control of [
+    { perspective: false, pointerPixel: [400, 299] as const },
+    { perspective: true, pointerPixel: [398, 300] as const },
+  ]) {
+    // Both fixed pixels have independent visible-body and isolated-ID admissions.
+    const options: VisiblePickOptions = {
+      text,
+      sample: { x: 50, y: 0, z: 0 },
+      look: 'classic',
+      travel: true,
+      angle: 'grazing',
+      alignToPixelCentre: false,
+      ...control,
+    };
+    const frame = await capture(page, info, options, results, 'edge-on-coplanar-cut');
+    const cutOnly = await capture(
+      page,
+      info,
+      { ...options, travel: false },
+      results,
+      'edge-on-cut-only',
+    );
+    expect(frame.pointer.xPx).toBe(control.pointerPixel[0]);
+    expect(frame.pointer.yPx).toBe(control.pointerPixel[1]);
+    expect(cutOnly.pick?.segmentIndex).toBe(1);
+    expect(frame.pick?.segmentIndex, 'the coplanar rapid must recede behind the visible cut').toBe(
+      1,
+    );
+    if (control.perspective) expect(frame.pixel).toEqual([151, 209, 255, 255]);
+  }
+  await saveResults(info, results);
+  expect(errors).toEqual([]);
+});
+
 test('clipping excludes hidden endpoint snaps and measurement points but keeps visible boundary endpoints', async ({
   page,
 }, info) => {
