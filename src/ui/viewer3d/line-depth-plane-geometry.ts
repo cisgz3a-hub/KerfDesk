@@ -1,9 +1,10 @@
 // One depth descriptor per stored Float32 source segment. The XY gradient has
-// minimum norm; the offset anchors the actual packed normal to its source.
+// minimum norm; the offsets and canonical origin anchor the packed normal.
 import type * as ThreeNamespace from 'three';
 
 export const DEPTH_PLANE_ATTRIBUTE = 'kerfdeskDepthPlane';
 export const DEPTH_PLANE_OFFSET_ATTRIBUTE = 'kerfdeskDepthPlaneOffset';
+export const DEPTH_PLANE_ORIGIN_ATTRIBUTE = 'kerfdeskDepthPlaneOrigin';
 
 /** Inputs are stored Float32 endpoints; anchor the offset to the packed normal. */
 export function writeDepthPlane(
@@ -17,12 +18,28 @@ export function writeDepthPlane(
   z1: number,
   residualTarget?: Float32Array,
   residualOffset = 0,
+  originTarget?: Float32Array,
+  originOffset = 0,
 ): void {
-  clearPlane(target, offset, residualTarget, residualOffset);
+  clearPlane(target, offset, residualTarget, residualOffset, originTarget, originOffset);
   if (z0 === z1) {
     target[offset + 2] = 1;
     target[offset + 3] = z0 === 0 ? 0 : -z0;
     retainFinitePlane(target, offset, residualTarget, residualOffset);
+    writeOrigin(
+      target,
+      offset,
+      residualTarget,
+      residualOffset,
+      originTarget,
+      originOffset,
+      x0,
+      y0,
+      z0,
+      x1,
+      y1,
+      z1,
+    );
     return;
   }
   // Canonical direction and anchor give reversed endpoints identical arithmetic.
@@ -41,6 +58,20 @@ export function writeDepthPlane(
   const b = packedGradient((-dy * dz) / lengthSquared);
   const c = -z - a * x - b * y;
   writeCoefficients(target, offset, a, b, c, residualTarget, residualOffset);
+  writeOrigin(
+    target,
+    offset,
+    residualTarget,
+    residualOffset,
+    originTarget,
+    originOffset,
+    x0,
+    y0,
+    z0,
+    x1,
+    y1,
+    z1,
+  );
 }
 
 function firstEndpoint(
@@ -80,17 +111,95 @@ function writeCoefficients(
   retainFinitePlane(target, offset, residualTarget, residualOffset);
 }
 
+function writeOrigin(
+  target: Float32Array,
+  offset: number,
+  residualTarget: Float32Array | undefined,
+  residualOffset: number,
+  originTarget: Float32Array | undefined,
+  originOffset: number,
+  x0: number,
+  y0: number,
+  z0: number,
+  x1: number,
+  y1: number,
+  z1: number,
+): void {
+  if (originTarget === undefined || target[offset + 2] === 0) return;
+  if (!finiteEndpoints(x0, y0, z0, x1, y1, z1)) {
+    clearPlane(target, offset, residualTarget, residualOffset, originTarget, originOffset);
+    return;
+  }
+  const first = firstEndpoint(x0, y0, z0, x1, y1, z1);
+  const x = first ? x0 : x1;
+  const y = first ? y0 : y1;
+  const z = first ? z0 : z1;
+  // Canonicalise exact signed zero only; source position buffers remain untouched.
+  originTarget[originOffset] = x === 0 ? 0 : x;
+  originTarget[originOffset + 1] = y === 0 ? 0 : y;
+  originTarget[originOffset + 2] = z === 0 ? 0 : z;
+  // The local constant uses the normal/high offset and origin actually packed.
+  const local = localPlaneOffset(target, offset, originTarget, originOffset);
+  originTarget[originOffset + 3] = local === 0 ? 0 : local;
+  if (!finiteOrigin(originTarget, originOffset))
+    clearPlane(target, offset, residualTarget, residualOffset, originTarget, originOffset);
+}
+
+function localPlaneOffset(
+  plane: Float32Array,
+  offset: number,
+  origin: Float32Array,
+  originOffset: number,
+): number {
+  return Math.fround(
+    (plane[offset + 3] ?? 0) +
+      (plane[offset] ?? 0) * (origin[originOffset] ?? 0) +
+      (plane[offset + 1] ?? 0) * (origin[originOffset + 1] ?? 0) +
+      (origin[originOffset + 2] ?? 0),
+  );
+}
+
+function finiteEndpoints(
+  x0: number,
+  y0: number,
+  z0: number,
+  x1: number,
+  y1: number,
+  z1: number,
+): boolean {
+  return (
+    Number.isFinite(x0) &&
+    Number.isFinite(y0) &&
+    Number.isFinite(z0) &&
+    Number.isFinite(x1) &&
+    Number.isFinite(y1) &&
+    Number.isFinite(z1)
+  );
+}
+
+function finiteOrigin(target: Float32Array, offset: number): boolean {
+  return (
+    Number.isFinite(target[offset]) &&
+    Number.isFinite(target[offset + 1]) &&
+    Number.isFinite(target[offset + 2]) &&
+    Number.isFinite(target[offset + 3])
+  );
+}
+
 function clearPlane(
   target: Float32Array,
   offset: number,
   residualTarget?: Float32Array,
   residualOffset = 0,
+  originTarget?: Float32Array,
+  originOffset = 0,
 ): void {
   target[offset] = 0;
   target[offset + 1] = 0;
   target[offset + 2] = 0;
   target[offset + 3] = 0;
   if (residualTarget !== undefined) residualTarget[residualOffset] = 0;
+  if (originTarget !== undefined) originTarget.fill(0, originOffset, originOffset + 4);
 }
 
 function retainFinitePlane(
@@ -110,7 +219,7 @@ function retainFinitePlane(
     clearPlane(target, offset, residualTarget, residualOffset);
 }
 
-/** Immutable geometry gets a vec4 and low-offset scalar, with no position copy. */
+/** Immutable geometry gets normal, low offset and source origin without a position copy. */
 export function addDepthPlanes(
   three: typeof ThreeNamespace,
   geometry: ThreeNamespace.BufferGeometry,
@@ -118,19 +227,30 @@ export function addDepthPlanes(
 ): ThreeNamespace.BufferAttribute {
   const existing = geometry.getAttribute(DEPTH_PLANE_ATTRIBUTE);
   const existingOffset = geometry.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE);
-  if (existing !== undefined && existingOffset !== undefined)
+  const existingOrigin = geometry.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE);
+  if (existing !== undefined && existingOffset !== undefined && existingOrigin !== undefined)
     return existing as ThreeNamespace.BufferAttribute;
   const start = geometry.getAttribute(kind === 'fat' ? 'instanceStart' : 'position');
   const end = kind === 'fat' ? geometry.getAttribute('instanceEnd') : start;
-  const planes = (existing?.array as Float32Array | undefined) ?? new Float32Array(start.count * 4);
-  const offsets =
-    (existingOffset?.array as Float32Array | undefined) ?? new Float32Array(start.count);
-  fillDepthPlanes(start, end, planes, offsets, kind);
+  const planes = planeValues(existing, start.count, 4);
+  const offsets = planeValues(existingOffset, start.count, 1);
+  const origins = planeValues(existingOrigin, start.count, 4);
+  fillDepthPlanes(start, end, planes, offsets, origins, kind);
   const attribute = existing ?? depthAttribute(three, planes, 4, kind);
   const offsetAttribute = existingOffset ?? depthAttribute(three, offsets, 1, kind);
+  const originAttribute = existingOrigin ?? depthAttribute(three, origins, 4, kind);
   geometry.setAttribute(DEPTH_PLANE_ATTRIBUTE, attribute);
   geometry.setAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE, offsetAttribute);
+  geometry.setAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE, originAttribute);
   return attribute as ThreeNamespace.BufferAttribute;
+}
+
+function planeValues(
+  attribute: ThreeNamespace.BufferAttribute | ThreeNamespace.InterleavedBufferAttribute | undefined,
+  count: number,
+  size: number,
+): Float32Array {
+  return (attribute?.array as Float32Array | undefined) ?? new Float32Array(count * size);
 }
 
 function fillDepthPlanes(
@@ -138,6 +258,7 @@ function fillDepthPlanes(
   end: ThreeNamespace.BufferAttribute | ThreeNamespace.InterleavedBufferAttribute,
   planes: Float32Array,
   offsets: Float32Array,
+  origins: Float32Array,
   kind: 'fat' | 'native',
 ): void {
   if (kind === 'fat') {
@@ -153,6 +274,8 @@ function fillDepthPlanes(
         end.getZ(instance),
         offsets,
         instance,
+        origins,
+        instance * 4,
       );
   } else {
     for (let vertex = 0; vertex + 1 < start.count; vertex += 2) {
@@ -168,9 +291,12 @@ function fillDepthPlanes(
         end.getZ(vertex + 1),
         offsets,
         vertex,
+        origins,
+        offset,
       );
       planes.copyWithin(offset + 4, offset, offset + 4);
       offsets.copyWithin(vertex + 1, vertex, vertex + 1);
+      origins.copyWithin(offset + 4, offset, offset + 4);
     }
   }
 }

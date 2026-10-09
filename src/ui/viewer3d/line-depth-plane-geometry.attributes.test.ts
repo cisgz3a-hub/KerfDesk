@@ -5,6 +5,7 @@ import {
   addDepthPlanes,
   DEPTH_PLANE_ATTRIBUTE,
   DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  DEPTH_PLANE_ORIGIN_ATTRIBUTE,
   writeDepthPlane,
 } from './line-depth-plane-geometry';
 
@@ -43,7 +44,7 @@ describe('physical plane attributes', () => {
     [10, 4, 2, 30, -8, 2],
   ];
 
-  it('adds instanced vec4 and scalar buffers at 20 bytes per instance without position or colour copies', () => {
+  it('adds three instanced descriptor buffers at 36 bytes per instance without position or colour copies', () => {
     const geometry = fat(segments);
     geometry.setColors(new Float32Array(segments.length * 6).fill(0.5));
     const start = geometry.getAttribute('instanceStart');
@@ -73,13 +74,14 @@ describe('physical plane attributes', () => {
       ...before,
       DEPTH_PLANE_ATTRIBUTE,
       DEPTH_PLANE_OFFSET_ATTRIBUTE,
+      DEPTH_PLANE_ORIGIN_ATTRIBUTE,
     ]);
     for (const [index, segment] of segments.entries())
       expect([...attribute.array.slice(index * 4, index * 4 + 4)]).toEqual([...plane(segment)]);
     geometry.dispose();
   });
 
-  it('duplicates identical normal and residual bits for native vertices at 40 bytes per pair', () => {
+  it('duplicates the descriptor companions for native vertices at 72 bytes per pair', () => {
     const geometry = native(segments);
     const position = geometry.getAttribute('position');
     const array = position.array;
@@ -195,14 +197,18 @@ describe('physical plane attributes', () => {
       const residual = geometry.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE);
       expect([...residual.array]).toEqual(kind === 'fat' ? [-0.25] : [-0.25, -0.25]);
       expect(positions.array).toBe(originalArray);
+      const origin = geometry.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE);
       const shared = new three.BufferGeometry();
       shared.setAttribute(DEPTH_PLANE_ATTRIBUTE, attribute);
       shared.setAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE, residual);
+      shared.setAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE, origin);
       // No source positions on this shared geometry: reuse must need neither a scan nor a copy.
       expect(addDepthPlanes(three, shared, kind)).toBe(attribute);
       expect(shared.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE)).toBe(residual);
       expect(shared.getAttribute(DEPTH_PLANE_ATTRIBUTE).array).toBe(attribute.array);
       expect(shared.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE).array).toBe(residual.array);
+      expect(shared.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE)).toBe(origin);
+      expect(shared.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE).array).toBe(origin.array);
       geometry.dispose();
       shared.dispose();
     },

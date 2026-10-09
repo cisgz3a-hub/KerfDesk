@@ -17,6 +17,7 @@ import {
   addDepthPlanes,
   DEPTH_PLANE_ATTRIBUTE,
   DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  DEPTH_PLANE_ORIGIN_ATTRIBUTE,
 } from './line-depth-plane-geometry';
 import { rgbTriple, type Viewer3dSegmentsInput } from './segment-buckets';
 import type { Viewer3dTheme } from './viewer3d-theme';
@@ -112,6 +113,8 @@ export function shareProgramGeometry(
   if (depthPlane !== undefined) geometry.setAttribute(DEPTH_PLANE_ATTRIBUTE, depthPlane);
   const planeOffset = source.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE);
   if (planeOffset !== undefined) geometry.setAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE, planeOffset);
+  const planeOrigin = source.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE);
+  if (planeOrigin !== undefined) geometry.setAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE, planeOrigin);
   geometry.instanceCount = source.getAttribute('instanceStart').count;
   geometry.boundingBox = source.boundingBox?.clone() ?? null;
   geometry.boundingSphere = source.boundingSphere?.clone() ?? null;

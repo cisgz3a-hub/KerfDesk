@@ -5,6 +5,7 @@ import {
   addDepthPlanes,
   DEPTH_PLANE_ATTRIBUTE,
   DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  DEPTH_PLANE_ORIGIN_ATTRIBUTE,
 } from './line-depth-plane-geometry';
 
 type ThreeModule = typeof ThreeNamespace;
@@ -38,6 +39,10 @@ export function lineSegmentsObject(
     geometry.setAttribute(
       DEPTH_PLANE_OFFSET_ATTRIBUTE,
       sharedGeometry.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE),
+    );
+    geometry.setAttribute(
+      DEPTH_PLANE_ORIGIN_ATTRIBUTE,
+      sharedGeometry.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE),
     );
   } else addDepthPlanes(three, geometry, 'native');
   installXYPlaneDepth(three, material, 'native');

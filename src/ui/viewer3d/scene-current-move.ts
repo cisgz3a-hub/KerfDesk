@@ -12,6 +12,7 @@ import { installXYPlaneDepth } from './line-plane-depth';
 import {
   addDepthPlanes,
   DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  DEPTH_PLANE_ORIGIN_ATTRIBUTE,
   writeDepthPlane,
 } from './line-depth-plane-geometry';
 
@@ -52,6 +53,7 @@ export function createCurrentMove(args: CurrentMoveArgs, planar: boolean): Curre
   const exact = currentStrokes(args, geometry, planar);
   const plane = planar ? null : addDepthPlanes(args.three, geometry, 'fat');
   const offset = planar ? null : geometry.getAttribute(DEPTH_PLANE_OFFSET_ATTRIBUTE);
+  const origin = planar ? null : geometry.getAttribute(DEPTH_PLANE_ORIGIN_ATTRIBUTE);
   if (!planar) for (const stroke of exact) installXYPlaneDepth(args.three, stroke.material, 'fat');
   const object = new args.three.Group();
   object.visible = false;
@@ -63,7 +65,7 @@ export function createCurrentMove(args: CurrentMoveArgs, planar: boolean): Curre
     materials: exact.map((stroke) => stroke.material),
     place: (from, to, sourceEnd) => {
       placePositionBuffer(start, array, from, to);
-      placePlaneBuffer(plane, offset, array, sourceEnd);
+      placePlaneBuffer(plane, offset, origin, array, sourceEnd);
     },
     useHardwareDepth: () => undefined,
     positions: () => array,
@@ -85,10 +87,11 @@ type PlaneAttribute = ThreeNamespace.BufferAttribute | InterleavedBufferAttribut
 function placePlaneBuffer(
   plane: PlaneAttribute | null,
   offset: PlaneAttribute | null,
+  origin: PlaneAttribute | null,
   array: Float32Array,
   sourceEnd: ArrayLike<number> | undefined,
 ): void {
-  if (plane === null || offset === null) return;
+  if (plane === null || offset === null || origin === null) return;
   // A prefix retains the full stored source plane even when its endpoint rounds.
   writeDepthPlane(
     plane.array as Float32Array,
@@ -101,9 +104,12 @@ function placePlaneBuffer(
     sourceCoordinate(sourceEnd, array, 2),
     offset.array as Float32Array,
     0,
+    origin.array as Float32Array,
+    0,
   );
   plane.needsUpdate = true;
   offset.needsUpdate = true;
+  origin.needsUpdate = true;
 }
 
 function sourceCoordinate(

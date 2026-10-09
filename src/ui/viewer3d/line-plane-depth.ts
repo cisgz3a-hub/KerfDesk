@@ -4,7 +4,11 @@
 // and edge-on strokes retain raster depth. Scene geometry still occludes it.
 import type * as ThreeNamespace from 'three';
 import { insertBefore, MAIN, type ShaderSource } from './line-shader-edits';
-import { DEPTH_PLANE_ATTRIBUTE, DEPTH_PLANE_OFFSET_ATTRIBUTE } from './line-depth-plane-geometry';
+import {
+  DEPTH_PLANE_ATTRIBUTE,
+  DEPTH_PLANE_OFFSET_ATTRIBUTE,
+  DEPTH_PLANE_ORIGIN_ATTRIBUTE,
+} from './line-depth-plane-geometry';
 
 type StrokeKind = 'fat' | 'native';
 
@@ -17,6 +21,8 @@ export type CoveredGhost = {
 
 const PLANE_MATRIX = 'kerfdeskXYPlaneMatrix';
 const VIEWPORT = 'kerfdeskDepthViewport';
+const CAMERA_HIGH = 'kerfdeskDepthCameraHigh';
+const CAMERA_LOW = 'kerfdeskDepthCameraLow';
 const PLANE = 'vKerfdeskXYPlane';
 
 function declarations(): string {
@@ -26,8 +32,13 @@ function declarations(): string {
 /** Fat and native strokes evaluate the same physical plane at the raster pixel. */
 export function withXYPlaneDepth(shader: ShaderSource, _kind: StrokeKind): ShaderSource {
   if (!shader.vertexShader.includes(MAIN) || !shader.fragmentShader.includes(MAIN)) return shader;
-  const plane = `${PLANE} = ${PLANE_MATRIX} * ${DEPTH_PLANE_ATTRIBUTE}
-    + ${PLANE_MATRIX}[3] * ${DEPTH_PLANE_OFFSET_ATTRIBUTE};`;
+  // Subtract the camera from the canonical source origin before evaluating the
+  // plane, keeping its constant local without cancellation through a rotation.
+  const plane = `vec3 kerfdeskDepthNormalEye = normalMatrix * ${DEPTH_PLANE_ATTRIBUTE}.xyz;
+  vec3 kerfdeskDepthOriginDelta = ( ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.xyz - ${CAMERA_HIGH} ) - ${CAMERA_LOW};
+  ${PLANE} = ${PLANE_MATRIX} * vec4( kerfdeskDepthNormalEye,
+    ${DEPTH_PLANE_ORIGIN_ATTRIBUTE}.w + ${DEPTH_PLANE_OFFSET_ATTRIBUTE}
+    - dot( ${DEPTH_PLANE_ATTRIBUTE}.xyz, kerfdeskDepthOriginDelta ) );`;
   const depth = `
   gl_FragDepth = gl_FragCoord.z;
   if ( abs( ${PLANE}.z ) > 1e-8 ) {
@@ -44,8 +55,11 @@ export function withXYPlaneDepth(shader: ShaderSource, _kind: StrokeKind): Shade
         shader.vertexShader,
         MAIN,
         `uniform mat4 ${PLANE_MATRIX};\n` +
+          `uniform vec3 ${CAMERA_HIGH};\n` +
+          `uniform vec3 ${CAMERA_LOW};\n` +
           `attribute vec4 ${DEPTH_PLANE_ATTRIBUTE};\n` +
           `attribute float ${DEPTH_PLANE_OFFSET_ATTRIBUTE};\n` +
+          `attribute vec4 ${DEPTH_PLANE_ORIGIN_ATTRIBUTE};\n` +
           declarations() +
           `invariant ${PLANE};\n`,
       ),
@@ -67,7 +81,7 @@ function appendMain(source: string, body: string): string {
   return end < 0 ? source : source.slice(0, end) + body + source.slice(end);
 }
 
-/** Compose existing edits and update the clip-plane transform once per draw. */
+/** Compose existing edits and update the inverse projection once per draw. */
 export function installXYPlaneDepth(
   three: typeof ThreeNamespace,
   material: ThreeNamespace.Material,
@@ -76,6 +90,10 @@ export function installXYPlaneDepth(
 ): void {
   const planeMatrix = new three.Matrix4();
   const viewport = new three.Vector4();
+  const cameraMatrix = new three.Matrix4();
+  const cameraOrigin = new three.Vector3();
+  const cameraHigh = new three.Vector3();
+  const cameraLow = new three.Vector3();
   const coveredEnabled = { value: 0 };
   const compile = material.onBeforeCompile;
   const render = material.onBeforeRender;
@@ -84,6 +102,8 @@ export function installXYPlaneDepth(
     compile.call(material, shader, renderer);
     shader.uniforms[PLANE_MATRIX] = { value: planeMatrix };
     shader.uniforms[VIEWPORT] = { value: viewport };
+    shader.uniforms[CAMERA_HIGH] = { value: cameraHigh };
+    shader.uniforms[CAMERA_LOW] = { value: cameraLow };
     Object.assign(shader, withXYPlaneDepth(shader, kind));
     if (covered && kind === 'fat') {
       shader.uniforms.kerfdeskCoveredStart = covered.start;
@@ -111,13 +131,22 @@ uniform float kerfdeskCoveredEnabled;
     }
   };
   material.customProgramCacheKey = () =>
-    cacheKey + '-physical-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
+    cacheKey + '-physical-origin-plane-depth-' + kind + (covered ? '-covered-ghost' : '');
   material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
     render.call(material, renderer, scene, camera, geometry, object, group);
-    planeMatrix
-      .multiplyMatrices(camera.projectionMatrix, object.modelViewMatrix)
-      .invert()
-      .transpose();
+    planeMatrix.copy(camera.projectionMatrix).invert().transpose();
+    cameraMatrix.copy(object.modelViewMatrix).invert();
+    cameraOrigin.setFromMatrixPosition(cameraMatrix);
+    cameraHigh.set(
+      Math.fround(cameraOrigin.x),
+      Math.fround(cameraOrigin.y),
+      Math.fround(cameraOrigin.z),
+    );
+    cameraLow.set(
+      Math.fround(cameraOrigin.x - cameraHigh.x),
+      Math.fround(cameraOrigin.y - cameraHigh.y),
+      Math.fround(cameraOrigin.z - cameraHigh.z),
+    );
     // Current viewport is in drawing-buffer pixels, including target/window and DPR.
     renderer.getCurrentViewport(viewport);
     coveredEnabled.value = covered?.eligible(geometry) ? 1 : 0;

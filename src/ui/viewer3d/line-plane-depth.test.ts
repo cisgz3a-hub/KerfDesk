@@ -71,10 +71,12 @@ describe('plane depth shader composition', () => {
     expect(shader.vertexShader).toContain('attribute vec4 kerfdeskDepthPlane;');
     expect(shader.vertexShader).toContain('invariant vKerfdeskXYPlane;');
     expect(shader.fragmentShader).toContain('invariant gl_FragDepth;');
-    expect(shader.vertexShader).toContain('kerfdeskXYPlaneMatrix[3] * kerfdeskDepthPlaneOffset');
+    expect(shader.vertexShader).toContain('kerfdeskDepthPlaneOrigin.w + kerfdeskDepthPlaneOffset');
     expect(shader.fragmentShader).toContain('gl_FragDepth = gl_FragCoord.z');
     expect(shader.fragmentShader).toContain('abs( vKerfdeskXYPlane.z ) > 1e-8');
-    expect(material.customProgramCacheKey()).toBe('kerfdesk-solid-path-physical-plane-depth-fat');
+    expect(material.customProgramCacheKey()).toBe(
+      'kerfdesk-solid-path-physical-origin-plane-depth-fat',
+    );
     material.dispose();
   });
 
@@ -87,7 +89,7 @@ describe('plane depth shader composition', () => {
     const edited = withXYPlaneDepth(source, 'native');
     expect(edited.vertexShader).toContain('attribute vec4 kerfdeskDepthPlane;');
     expect(edited.vertexShader).toContain(
-      'vKerfdeskXYPlane = kerfdeskXYPlaneMatrix * kerfdeskDepthPlane',
+      'vKerfdeskXYPlane = kerfdeskXYPlaneMatrix * vec4( kerfdeskDepthNormalEye',
     );
     expect(edited.fragmentShader).toContain('gl_FragDepth = planeDepth');
     expect(edited.fragmentShader.indexOf('gl_FragColor')).toBeLessThan(
@@ -145,7 +147,16 @@ describe('raster plane depth against an independent ray oracle', () => {
       expect(shader.uniforms.kerfdeskDepthViewport?.value).toEqual(actualViewport);
       const matrix = shader.uniforms.kerfdeskXYPlaneMatrix?.value as three.Matrix4;
       const planeAt = (ndc: three.Vector2, z: number) => {
-        const plane = new three.Vector4(0, 0, 1, -z).applyMatrix4(matrix);
+        const normal = new three.Vector3(0, 0, 1).applyMatrix3(
+          new three.Matrix3().getNormalMatrix(object.modelViewMatrix),
+        );
+        const originEye = new three.Vector3(0, 0, z).applyMatrix4(object.modelViewMatrix);
+        const plane = new three.Vector4(
+          normal.x,
+          normal.y,
+          normal.z,
+          -normal.dot(originEye),
+        ).applyMatrix4(matrix);
         const raster = new three.Vector2(
           viewport[0]! + ((ndc.x + 1) * viewport[2]!) / 2,
           viewport[1]! + ((ndc.y + 1) * viewport[3]!) / 2,

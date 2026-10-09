@@ -261,7 +261,7 @@ describe('ghost tail draw and callback composition', () => {
     expect(batches.objects).toHaveLength(2);
     const ghost = compiled(batches.materials[1]!);
     expect(ghost.vertexShader).toContain('instanceStart.z == instanceEnd.z');
-    expect(ghost.vertexShader).toContain('kerfdeskXYPlaneMatrix * kerfdeskDepthPlane');
+    expect(ghost.vertexShader).toContain('kerfdeskXYPlaneMatrix * vec4( kerfdeskDepthNormalEye,');
     expect(ghost.vertexShader).not.toContain('kerfdeskGhostStart.z == instanceEnd.z');
     expect(ghost.fragmentShader).toContain('gl_FragDepth = planeDepth;');
     expect(compiled(batches.materials[0]!).vertexShader).not.toContain('kerfdeskGhostStart');

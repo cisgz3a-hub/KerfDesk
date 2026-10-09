@@ -157,7 +157,9 @@ describe('active move shared physical writer', () => {
     const renderer = { getCurrentViewport: (value: three.Vector4) => value.set(0, 0, 800, 600) };
     for (const [index, child] of (active.object.children as LineSegments2[]).entries()) {
       expect(compiled(child.material).uniforms.parentCell).toBe(hooks[index]?.cell);
-      expect(child.material.customProgramCacheKey()).toBe('custom-parent-physical-plane-depth-fat');
+      expect(child.material.customProgramCacheKey()).toBe(
+        'custom-parent-physical-origin-plane-depth-fat',
+      );
       child.material.onBeforeRender(
         renderer as never,
         new three.Scene(),
