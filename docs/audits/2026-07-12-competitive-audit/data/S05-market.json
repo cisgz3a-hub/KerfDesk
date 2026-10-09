@@ -9,7 +9,10 @@
           "existence": "yes",
           "quality": "Color-palette layers carry full cut settings; picking a palette color assigns objects; image-on-vector layers auto-split. The reference model for this sector.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/"
+            }
           ]
         },
         {
@@ -17,32 +20,37 @@
           "existence": "yes",
           "quality": "Color layers exist but are organizational by default ('don't have any effect on the output'); operations attach to shapes; optional 'Auto Use Layer' binds an operation to every shape on a layer.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/LayersWindow/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/LayersWindow/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "no",
           "quality": "No layer concept: docs describe loading a single file/program with global settings; no per-layer or per-color model anywhere in official usage docs.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }]
         },
         {
           "product": "XCS",
           "existence": "yes",
           "quality": "xTool Studio defines layers by vector stroke color (8 preset colors) but 'layers do not directly establish parameters' — they only speed multi-select; new same-color objects need manual re-assignment.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/2532" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2532" }]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "No settings-layer model; 'creating layers' in docs means z-order stacking via Edit > Send backward/Send to back; cut settings live on individual shapes.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers"
+            }
           ]
         }
       ]
@@ -55,8 +63,14 @@
           "existence": "yes",
           "quality": "Per layer: Speed, Max/Min Power, passes, interval, air assist, frequency/Q-Pulse (galvo), name, output — plus Common/Advanced tabs per mode in the Cut Settings Editor. Broadest documented set in roster.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SharedSettings/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SharedSettings/"
+            }
           ]
         },
         {
@@ -64,7 +78,10 @@
           "existence": "yes",
           "quality": "CNC analog: per-operation Start/Final Depth, feed rate, plunge rate, spindle speed, auto chip-load, climb/conventional direction. No laser params — CNC-only app.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
@@ -73,7 +90,10 @@
           "quality": "No per-layer parameters (no layers); only whole-job settings — import-dialog speed/power and a numeric multi-pass repeat counter at send time.",
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/import-parameters/" }
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/import-parameters/"
+            }
           ]
         },
         {
@@ -82,8 +102,14 @@
           "quality": "Per-object power, speed, passes plus processing type; Studio adds material thickness measurement. Community guides confirm power/speed/passes as the core triad — narrower than LightBurn's per-layer set.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" },
-            { "tag": "COMM", "cite": "https://eolasprints.com/en-us/blogs/laser-cutting-engraving/xtool-laser-settings-guide-power-speed-materials" },
-            { "tag": "COMM", "cite": "https://vectosolve.com/blog/xtool-dxf-workflow-engraving-cutting-2026" }
+            {
+              "tag": "COMM",
+              "cite": "https://eolasprints.com/en-us/blogs/laser-cutting-engraving/xtool-laser-settings-guide-power-speed-materials"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://vectosolve.com/blog/xtool-dxf-workflow-engraving-cutting-2026"
+            }
           ]
         },
         {
@@ -91,8 +117,14 @@
           "existence": "yes",
           "quality": "CNC analog: material/bit-level feed rate, plunge rate, depth per pass; per-shape overall depth. Deliberately small beginner set; no spindle-RPM-per-op breadth in core UI.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information" },
-            { "tag": "OFF", "cite": "https://inventables.zendesk.com/hc/en-us/articles/360015957214-Walkthrough-Tutorial-Cut-Depth-and-Depth-Per-Pass" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://inventables.zendesk.com/hc/en-us/articles/360015957214-Walkthrough-Tutorial-Cut-Depth-and-Depth-Per-Pass"
+            }
           ]
         }
       ]
@@ -105,7 +137,10 @@
           "existence": "yes",
           "quality": "Up to 11 Sub-Layers per layer, each with its own mode/power/speed and output toggle; drag tabs to reorder execution; auto-converts legacy Fill+Line projects.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SubLayers/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SubLayers/"
+            }
           ]
         },
         {
@@ -113,32 +148,37 @@
           "existence": "yes",
           "quality": "Multiple operations can reference identical shapes — duplicating an operation 'is assigned to the exact same shapes as the original' — giving stacked ops per geometry.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsWindow/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "no",
           "quality": "No layers or per-shape operations; a loaded program is one job (repeatable via multi-pass counter only).",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }]
         },
         {
           "product": "XCS",
           "existence": "no",
           "quality": "Layers hold no parameters and each object carries a single processing type; no sub-layer or stacked-ops feature found in Studio docs. Inferred from absence — flagged.",
-          "evidence": [
-            { "tag": "INF", "cite": "https://support.xtool.com/article/2532" }
-          ]
+          "evidence": [{ "tag": "INF", "cite": "https://support.xtool.com/article/2532" }]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "One cut type per shape; Two-Stage Carves split a job by bit (roughing/detail), not stacked operations on one shape. Inferred from docs — flagged.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012453174-Two-Stage-Carves-Roughing-and-Detail-Carves" },
-            { "tag": "INF", "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012453174-Two-Stage-Carves-Roughing-and-Detail-Carves"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers"
+            }
           ]
         }
       ]
@@ -151,9 +191,18 @@
           "existence": "yes",
           "quality": "Shape Properties window gives per-shape Power Scale — rescales power between Min and Max Power per shape; multi-selection edits all at once. Narrow (power only), widely used for test grids.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/ShapeProperties/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/under-shape-properties-what-is-the-power-scale-used-for/12712" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/shape-properties-aka-power-settings-per-selection/920" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/ShapeProperties/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/under-shape-properties-what-is-the-power-scale-used-for/12712"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/shape-properties-aka-power-settings-per-selection/920"
+            }
           ]
         },
         {
@@ -161,31 +210,33 @@
           "existence": "yes",
           "quality": "Native by construction: operations are assigned to selected shapes directly, so any shape subset gets its own full parameter set.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "no",
           "quality": "No object model; settings apply to the whole loaded job.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }]
         },
         {
           "product": "XCS",
           "existence": "yes",
           "quality": "Native by construction: parameters attach to objects, not layers — per-object settings are the default (and only) model in xTool Studio.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/2532" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2532" }]
         },
         {
           "product": "Easel",
           "existence": "yes",
           "quality": "Native: per-shape depth slider and cut type (fill; outline on/inside/outside path) in the Cut menu; tabs auto-added on through-cuts.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers"
+            }
           ]
         }
       ]
@@ -198,10 +249,22 @@
           "existence": "yes",
           "quality": ".clb libraries: create-from-layer, Assign vs Link (synced/locked), merge, shared network libraries, device-linked. Ships empty — no built-in presets; new users repeatedly surprised, community shares .clb files.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/default-material-libraries-download/156489" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/cant-find-materials-library/2868" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/after-installing-lightburn-after-2-times-installing-there-is-no-library-content-no-art-no-material-and-no-clb-files-on-my-pc/88874" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/default-material-libraries-download/156489"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/cant-find-materials-library/2868"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/after-installing-lightburn-after-2-times-installing-there-is-no-library-content-no-art-no-material-and-no-clb-files-on-my-pc/88874"
+            }
           ]
         },
         {
@@ -209,17 +272,21 @@
           "existence": "yes",
           "quality": "Operations Library saves device-specific operation presets in nestable folders, Apply-to-selection; no material feeds/speeds database documented (a 'Hidden' MaterialLibrary docs page appears to be shared LightBurn doc infrastructure, not a confirmed feature).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsLibrary/" },
-            { "tag": "INF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Hidden/MaterialLibrary/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsLibrary/"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/Hidden/MaterialLibrary/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "no",
           "quality": "No material or preset library appears anywhere in the official usage docs or FAQ. Inferred from absence — flagged.",
-          "evidence": [
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/" }
-          ]
+          "evidence": [{ "tag": "INF", "cite": "https://lasergrbl.com/usage/" }]
         },
         {
           "product": "XCS",
@@ -236,7 +303,10 @@
           "quality": "Built-in recommended cut settings per machine+material+bit combination; Easel Pro adds Stored Cut Settings that auto-apply to new projects using the same combo.",
           "evidence": [
             { "tag": "OFF", "cite": "https://easel.com/features/stored-cut-settings" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information"
+            }
           ]
         }
       ]
@@ -249,7 +319,10 @@
           "existence": "yes",
           "quality": "Drag or up/down layer reorder; 'Sort Cuts Last' auto-orders layers least-likely-to-cut-through first (engrave before cut); per-layer Output toggles.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/"
+            }
           ]
         },
         {
@@ -257,16 +330,17 @@
           "existence": "yes",
           "quality": "Operations run top-to-bottom; drag or up/down buttons reorder; per-operation Output toggle controls inclusion in Preview/Start/G-code save.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsWindow/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "no",
           "quality": "Executes loaded G-code in file order; no reordering or priority controls documented. Inferred from absence — flagged.",
-          "evidence": [
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
-          ]
+          "evidence": [{ "tag": "INF", "cite": "https://lasergrbl.com/usage/load-and-send/" }]
         },
         {
           "product": "XCS",
@@ -282,7 +356,10 @@
           "existence": "no",
           "quality": "No native cut-order control; community consensus workaround is splitting designs across workpieces; ordering bugs (outlines before centers) and efficiency feature requests recur on the forum.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.easel.com/t/using-workpieces-to-change-cut-order/129345" },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/using-workpieces-to-change-cut-order/129345"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/more-efficient-cut-order/128745" },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/cut-order-problems/43581" }
           ]
@@ -297,7 +374,10 @@
           "existence": "yes",
           "quality": "Cuts/Layers table with inline editing of pass/speed/power/interval, drag reorder, Output/Show/Air toggles, settings Copy/Paste, right-click context menus on layers and headers — the daily-driver panel this sector is benchmarked against.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutsLayersWindow/"
+            }
           ]
         },
         {
@@ -305,32 +385,37 @@
           "existence": "yes",
           "quality": "Operations Window table (name, mode, tool, output, vacuum/coolant columns) with drag reorder — LightBurn-style ergonomics ported to CNC ops. Product too new (~4 months GA) for community quality consensus.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationsWindow/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "no",
           "quality": "No cut-settings panel exists; the UI is a command queue, log, and jogging controls around a loaded file.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }]
         },
         {
           "product": "XCS",
           "existence": "yes",
           "quality": "Right-hand settings panel to 'view or adjust processing parameters such as power and speed' plus framing; parameter depth per panel not documented in detail. Quality signal unknown — no community consensus found.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2442" }]
         },
         {
           "product": "Easel",
           "existence": "yes",
           "quality": "Settings split between a per-shape Cut menu and a project-level material/bit picker; no consolidated settings table. Deliberately minimal, beginner-oriented. Ergonomics-vs-power judgment inferred — flagged.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers" },
-            { "tag": "INF", "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012847833-Adjusting-Design-Depth-and-Creating-Layers"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848433-Calculating-Your-Cut-Settings-Basic-Feeds-and-Speeds-Information"
+            }
           ]
         }
       ]

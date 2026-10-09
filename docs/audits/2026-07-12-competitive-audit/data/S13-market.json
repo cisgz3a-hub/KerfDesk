@@ -9,8 +9,14 @@
           "existence": "yes",
           "quality": "Reference rotary: Laser Tools -> Rotary Setup (Ctrl+R), Roller vs Chuck type, axis assignment (Y/Z/A), mm-per-rotation, Roller/Object Diameter, Mirror Output, and a Test button that spins one 360-degree rotation to verify calibration.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/RotaryModeGCode/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/RotaryModeGCode/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/"
+            }
           ]
         },
         {
@@ -18,8 +24,14 @@
           "existence": "no",
           "quality": "Docs (CNC Types explainer) state verbatim: 'MillMage does not support rotaries at this time.' No rotary/4th-axis/wrapping operation exists in the CAM list (Pocket/Profile/Drill/Surfacing/V-carve/Relief).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Explainers/CNCTypes/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Explainers/CNCTypes/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
@@ -27,7 +39,10 @@
           "existence": "yes",
           "quality": "No rotary UI or roller/chuck wizard. Rotary runs as the scaled Y axis by editing GRBL $101 steps/mm in the console (third-party machine guides); manual calibration only, no diameter entry.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://www.sainsmart.com/blogs/news/how-to-use-your-rotary-axis-for-the-le5040-with-lasergrbl" },
+            {
+              "tag": "COMM",
+              "cite": "https://www.sainsmart.com/blogs/news/how-to-use-your-rotary-axis-for-the-le5040-with-lasergrbl"
+            },
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/" }
           ]
         },
@@ -59,8 +74,14 @@
           "existence": "yes",
           "quality": "Circumference mapped from mm-per-rotation plus measured Object/Roller Diameter; wrong values leave output 'shrunk or stretched'. Test button validates one revolution. No visual wrapped preview - axis remapped at output. HW-unverified.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/RotaryModeGCode/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/rotary-setting-and-test-button/124861" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/RotaryMode/RotaryModeGCode/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/rotary-setting-and-test-button/124861"
+            }
           ]
         },
         {
@@ -68,7 +89,10 @@
           "existence": "no",
           "quality": "No rotary support, so there is no rotary output path to assess (CNC Types explainer: 'MillMage does not support rotaries at this time').",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Explainers/CNCTypes/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Explainers/CNCTypes/"
+            }
           ]
         },
         {
@@ -76,7 +100,10 @@
           "existence": "yes",
           "quality": "Correctness depends entirely on manually calibrating $101 so one revolution equals circumference; no per-object diameter mapping, so recalibrate per diameter. Design rolls onto itself if wider than circumference. HW-unverified.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://www.sainsmart.com/blogs/news/how-to-use-your-rotary-axis-for-the-le5040-with-lasergrbl" }
+            {
+              "tag": "COMM",
+              "cite": "https://www.sainsmart.com/blogs/news/how-to-use-your-rotary-axis-for-the-le5040-with-lasergrbl"
+            }
           ]
         },
         {
@@ -107,8 +134,14 @@
           "quality": "Dedicated Focus Test generator (Laser Tools -> Focus Test): Z-stepped lines labeled by height to find focus; Material-thickness field, per-layer Z offset and Z-step-per-pass, per-lens autofocus, relative/absolute Z moves.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/FocusTest.html" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/DeviceSettings/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/z-axis-offset-for-different-layers/147706" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/DeviceSettings/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/z-axis-offset-for-different-layers/147706"
+            }
           ]
         },
         {
@@ -117,7 +150,10 @@
           "quality": "Laser focus/autofocus N/A. CNC Z tooling present: XYZ/puck probe block plus tool-length probing (Probing guide), depth-per-pass control. Stock/thickness handled via project origin, not a focus-ramp test.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Guides/Probing/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
@@ -126,7 +162,10 @@
           "quality": "No focus test, material-thickness, or autofocus tooling in the usage docs; diode focus is set manually on hardware. Z jog only if the machine happens to have a Z axis.",
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/" },
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/user-interface/ (no focus/Z/material-thickness tool documented)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/user-interface/ (no focus/Z/material-thickness tool documented)"
+            }
           ]
         },
         {
@@ -143,8 +182,14 @@
           "existence": "yes",
           "quality": "Laser focus N/A. Z-probe supported for automatic Z-zeroing; stock thickness set in the workpiece; two-stage roughing+detail carves. Beginner-friendly Z handling, no focus-ramp test.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/5360405175187-Using-the-Z-Probe" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012453174-Two-Stage-Carves-Roughing-and-Detail-Carves" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/5360405175187-Using-the-Z-Probe"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012453174-Two-Stage-Carves-Roughing-and-Detail-Carves"
+            }
           ]
         }
       ]
@@ -157,8 +202,14 @@
           "existence": "yes",
           "quality": "Automated per-layer Air Assist is the headline specialty toggle (emits M7/M8 when the layer runs, disable per layer). No curved/tilted-surface compensation in LightBurn.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SharedSettings/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/possible-to-add-air-assist-toggle-to-layers/31142" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/SharedSettings/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/possible-to-add-air-assist-toggle-to-layers/31142"
+            }
           ]
         },
         {
@@ -166,7 +217,10 @@
           "existence": "yes",
           "quality": "No laser air assist or curved-surface compensation. CNC analog present: per-operation automated Coolant and Vacuum toggles that switch on when the operation begins (require a controller-connected system).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
@@ -175,7 +229,10 @@
           "quality": "No automated air-assist toggle or surface compensation. Only user-defined Custom Buttons can emit M7/M8/M9 macros manually; no curved/tilted-surface mode exists.",
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/" },
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no air-assist/surface-compensation feature documented)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (no air-assist/surface-compensation feature documented)"
+            }
           ]
         },
         {
@@ -185,7 +242,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/3236" },
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1781" },
-            { "tag": "COMM", "cite": "https://nelidesign.com/how-to-engrave-on-a-curved-surface-with-the-xtool-s1-laser-cutter/" }
+            {
+              "tag": "COMM",
+              "cite": "https://nelidesign.com/how-to-engrave-on-a-curved-surface-with-the-xtool-s1-laser-cutter/"
+            }
           ]
         },
         {
@@ -193,7 +253,10 @@
           "existence": "no",
           "quality": "No air assist (CNC), no curved/tilted-surface compensation, no rotary specialty modes. Easel targets flat 2.5D stock only.",
           "evidence": [
-            { "tag": "INF", "cite": "https://support.easel.com/hc/en-us (no air-assist/curved-surface/rotary specialty feature documented)" },
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us (no air-assist/curved-surface/rotary specialty feature documented)"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/4th-axis-any-help/130967" }
           ]
         }

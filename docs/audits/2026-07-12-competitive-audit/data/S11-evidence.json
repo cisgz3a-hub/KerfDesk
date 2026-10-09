@@ -5,11 +5,26 @@
       "id": "11.1",
       "summary": "Four start-position modes as a discriminated union: absolute, current-position, user-origin, verified-origin, each resolved against live machine state with actionable per-mode refusals. Verified Origin adds a mandatory Verified-Frame physical bounds check (beyond LightBurn); Absolute refuses while a custom origin is active. Known gap: jobPlacement is not persisted to .lf2, so it resets to absolute/front-left each session.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/job-placement.ts:39-148 resolveJobPlacement — 4-mode union, mode-specific gates and messages; Absolute refuses with active custom origin (69-77)" },
-        { "tag": "CODE", "cite": "src/core/job/job-origin.ts (JobOriginPlacement/anchors); src/ui/laser/start-job-readiness.ts:237-258 verified-frame gate (ADR-053 P2)" },
-        { "tag": "TEST", "cite": "src/ui/job-placement.test.ts — 9 tests pass (run 2026-07-13, vitest)" },
-        { "tag": "CODE", "cite": "DECISIONS.md:2918 ADR-053 Verified Origin; :778 ADR-021 G92 set-origin" },
-        { "tag": "CODE", "cite": "src/ui/laser/live-job-estimate.ts / full-sweep S3-F6: jobPlacement lives only in Zustand, not serialized to .lf2 (session-friction gap)" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/job-placement.ts:39-148 resolveJobPlacement — 4-mode union, mode-specific gates and messages; Absolute refuses with active custom origin (69-77)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/job-origin.ts (JobOriginPlacement/anchors); src/ui/laser/start-job-readiness.ts:237-258 verified-frame gate (ADR-053 P2)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/job-placement.test.ts — 9 tests pass (run 2026-07-13, vitest)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:2918 ADR-053 Verified Origin; :778 ADR-021 G92 set-origin"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/live-job-estimate.ts / full-sweep S3-F6: jobPlacement lives only in Zustand, not serialized to .lf2 (session-friction gap)"
+        }
       ],
       "notVerified": "Physical landing accuracy of each origin mode is hardware-CLAIMED, not measured. The non-persistence of jobPlacement across sessions is a confirmed friction gap (no ADR)."
     },
@@ -17,11 +32,26 @@
       "id": "11.2",
       "summary": "Pause = realtime feed hold, gated on proven $32=1 for lasers (a hold at $32=0/unknown can leave the beam on); CNC exempt (spindle keeps spinning is standard); firmwares that cannot report $-settings pause stream-side with an explicit unsupported message. Resume re-enters laser (position, then arm) vs CNC (spin up, then plunge) — safety-differentiated from audit bug C1. Resume plunge feed is now reconstructed from modal state, not a hard-coded F300.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/state/laser-job-actions.ts:187-217 pause $32 gate + unsupported message; :219-254 resume (write-time functional set avoids buffer-accounting drift)" },
-        { "tag": "CODE", "cite": "src/core/controllers/grbl/resume-program.ts:161-210 laser-first-position vs CNC-spin-up ordering (C1 fix); :116-122,189-191 plunge feed reconstructed from modal G1, F300 only fallback (fixes M-03/P1-b)" },
-        { "tag": "TEST", "cite": "src/core/controllers/grbl/resume-program.test.ts — 10 tests pass (run 2026-07-13)" },
-        { "tag": "CODE", "cite": "DECISIONS.md ADR-096 (pause $32 gate); resume-program.ts:170 machine-kind detection by presence of Z words" },
-        { "tag": "HW-CLAIMED", "cite": "Beam-off during hold, position hold, and clean physical resume are hardware-CLAIMED per repo ledger (MEMORY.md); no machine verification exists" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-job-actions.ts:187-217 pause $32 gate + unsupported message; :219-254 resume (write-time functional set avoids buffer-accounting drift)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/resume-program.ts:161-210 laser-first-position vs CNC-spin-up ordering (C1 fix); :116-122,189-191 plunge feed reconstructed from modal G1, F300 only fallback (fixes M-03/P1-b)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/controllers/grbl/resume-program.test.ts — 10 tests pass (run 2026-07-13)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md ADR-096 (pause $32 gate); resume-program.ts:170 machine-kind detection by presence of Z words"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "Beam-off during hold, position hold, and clean physical resume are hardware-CLAIMED per repo ledger (MEMORY.md); no machine verification exists"
+        }
       ],
       "notVerified": "Physical beam-off on feed hold, position hold, and byte-clean resume never hardware-verified. Minor open defect: the Start-from-line/resume confirm dialog (start-job-flow.ts:186-188) uses CNC 'restart the spindle… feed back to depth' wording for laser jobs too (S5-F9 polish)."
     },
@@ -29,9 +59,18 @@
       "id": "11.3",
       "summary": "Stop = GRBL soft reset (Ctrl-X): wipes in-flight ack accounting so beam-off cleanup acks are not claimed by the dead stream (audit F1), and defers the beam-off cleanup until the boot banner arrives (audit F2); it also drops cached WCO and air-assist. Marlin (no soft reset) sends stop-laser lines stream-side. Stop stays mounted through done/errored states; a failed Stop write raises a blunt safety notice naming the physical control.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/state/laser-job-actions.ts:114-159 stopJob — softReset, wipeInFlight, armResetCleanup deferral, WCO/air-assist drop" },
-        { "tag": "CODE", "cite": "src/ui/laser/JobControls.tsx:39-49 Stop kept mounted through streaming/paused/tool-change/errored/done" },
-        { "tag": "CODE", "cite": "src/ui/state/laser-safety-notice.ts write-failed notice names the PHYSICAL control; buffer keeps moving after Stop is documented" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-job-actions.ts:114-159 stopJob — softReset, wipeInFlight, armResetCleanup deferral, WCO/air-assist drop"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/JobControls.tsx:39-49 Stop kept mounted through streaming/paused/tool-change/errored/done"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-safety-notice.ts write-failed notice names the PHYSICAL control; buffer keeps moving after Stop is documented"
+        }
       ],
       "notVerified": "Physical halt latency not measured — GRBL keeps executing its 127-byte buffer after a soft reset on a live link; the app documents this but cannot prove the machine stopped."
     },
@@ -39,11 +78,26 @@
       "id": "11.4",
       "summary": "Fingerprint-gated crash/power-loss resume (ADR-118), checkpoint schema v3: FNV-1a fingerprint + sendable/acked line counts + machineKind + output scope + RESOLVED job origin. Resume recompiles the project and refuses on any byte difference. The R1/PST-02 fixes persist scope+resolved origin, closing the old false 'project was edited' refusal for selective/placed jobs. Disconnect wipes WCO/origin so a custom-origin resume is refused after power loss. Exceeds LightBurn (no crash-checkpoint resume).",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/recovery/job-checkpoint.ts:27,44-68 schema v3 stores outputScope+resolved jobOrigin (R1/PST-02); :151-195 strict parse, future-schema discarded" },
-        { "tag": "CODE", "cite": "src/ui/laser/start-job-flow.ts:102-124 runCheckpointResumeFlow recompiles with frozen scope/origin, refuses on fingerprint mismatch; resume re-enters full start-readiness gate" },
-        { "tag": "TEST", "cite": "src/core/recovery/job-checkpoint.test.ts — 16 tests pass (run 2026-07-13)" },
-        { "tag": "CODE", "cite": "src/ui/job-placement.ts:103-127 resolveJobPlacement refuses user/verified-origin resume when controller no longer reports the origin (refutes 'never re-validates work zero')" },
-        { "tag": "HW-CLAIMED", "cite": "Actual resume-at-correct-line/position after real controller power loss is hardware-CLAIMED (ADR-118 admits this); a few acked-but-unexecuted buffer lines may not have run" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/recovery/job-checkpoint.ts:27,44-68 schema v3 stores outputScope+resolved jobOrigin (R1/PST-02); :151-195 strict parse, future-schema discarded"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/start-job-flow.ts:102-124 runCheckpointResumeFlow recompiles with frozen scope/origin, refuses on fingerprint mismatch; resume re-enters full start-readiness gate"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/recovery/job-checkpoint.test.ts — 16 tests pass (run 2026-07-13)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/job-placement.ts:103-127 resolveJobPlacement refuses user/verified-origin resume when controller no longer reports the origin (refutes 'never re-validates work zero')"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "Actual resume-at-correct-line/position after real controller power loss is hardware-CLAIMED (ADR-118 admits this); a few acked-but-unexecuted buffer lines may not have run"
+        }
       ],
       "notVerified": "Physical power-loss recovery never verified on a machine. Residual defects: single global checkpoint slot — starting another job overwrites an unresumed record (A.1.6 minor); autosave stale-slot lifecycle can re-offer a saved-past copy (A.1.2, mostly S17); no one-click 'back up N lines' affordance (polish)."
     },
@@ -51,11 +105,26 @@
       "id": "11.5",
       "summary": "Deep pre-write gate. Laser preflight checks output layers, power/speed/passes ranges, layer-mode mismatch, offset/island-fill open contours, unsupported raster transform, machine-profile, bed bounds, no-go zones, laser-on-travel, long-blank-feed, and a NON-FINITE (NaN/Infinity) coordinate guard that closes the long-standing S1-F1/M-11 lead. CNC preflight adds depth-vs-stock, feeds, spindle, dropped-layer, plunged-travel, over-deep. Controller-readiness proves $30/$32 against live firmware before Start.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/preflight/preflight.ts:90-132 check list; :404-417 appendNonFiniteCoordIssues (NaN/Infinity guard — closes S1-F1/S5-F1/M-11)" },
-        { "tag": "CODE", "cite": "src/core/preflight/cnc-preflight.ts:43-89 CNC checks (depth-vs-stock, plunged-travel, over-deep, non-finite, no-go)" },
-        { "tag": "CODE", "cite": "src/core/preflight/controller-readiness.ts:39-208 $30=maxPowerS/$32=1 (laser), $32=0/$30=RPM (CNC), capability-aware degradation; src/ui/laser/start-job-readiness.ts:83-134 placement bounds + no-go gate" },
-        { "tag": "TEST", "cite": "controller-readiness.test.ts (16) + non-finite-coords.test.ts (7) pass (run 2026-07-13)" },
-        { "tag": "CODE", "cite": "Open defect M-17: src/core/scene/machine.ts:217-230 DEFAULT_CNC_LAYER_SETTINGS is a full-depth through-cut (depthMm 6.35 = default stock) with tabsEnabled:false; cnc-preflight.ts issues no release warning" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/preflight.ts:90-132 check list; :404-417 appendNonFiniteCoordIssues (NaN/Infinity guard — closes S1-F1/S5-F1/M-11)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/cnc-preflight.ts:43-89 CNC checks (depth-vs-stock, plunged-travel, over-deep, non-finite, no-go)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/controller-readiness.ts:39-208 $30=maxPowerS/$32=1 (laser), $32=0/$30=RPM (CNC), capability-aware degradation; src/ui/laser/start-job-readiness.ts:83-134 placement bounds + no-go gate"
+        },
+        {
+          "tag": "TEST",
+          "cite": "controller-readiness.test.ts (16) + non-finite-coords.test.ts (7) pass (run 2026-07-13)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "Open defect M-17: src/core/scene/machine.ts:217-230 DEFAULT_CNC_LAYER_SETTINGS is a full-depth through-cut (depthMm 6.35 = default stock) with tabsEnabled:false; cnc-preflight.ts issues no release warning"
+        }
       ],
       "notVerified": "M-17 CNC through-cut-with-tabs-off default still accepted by preflight with no warning (present). G2/G3 arc bulge past the bed is not caught by the text bounds scanner (S5-F6, latent — no production compiler emits arcs). Physical bed-fit not hardware-verified."
     },
@@ -63,9 +132,18 @@
       "id": "11.6",
       "summary": "In-run progress bar shows acked/total SENDABLE lines + percent + a 'Machine finishing' done state (title explains ack semantics). Alarms are fully surfaced: GRBL v1.1 alarms 1-9 and grblHAL 10-13 humanized with title/detail/recovery-action in a red banner ($H/$X); error:N decoded to console; frame hard-limit names the axis. Confirmed gap: NO mid-job elapsed/remaining ETA — the WORKFLOW F-B11 Phase-C label never landed; LaserGRBL/LightBurn show live remaining time.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/laser/JobControls.tsx:183-217 ProgressBar — lines-only, no time; :171-181 pre-job EstimateBadge does not update during run" },
-        { "tag": "CODE", "cite": "src/core/controllers/grbl/alarm-codes.ts (alarms 1-13 humanized); src/ui/laser/LaserWindow.tsx banner + src/ui/laser/SafetyNoticeBanner.tsx runtime notices" },
-        { "tag": "CODE", "cite": "full-sweep S4-F8 (no elapsed/remaining during run) + S6-F5(3): F-B11 promised Phase-C ETA label; src/ui/laser/JobControls.tsx:190-207 still lines-only" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/JobControls.tsx:183-217 ProgressBar — lines-only, no time; :171-181 pre-job EstimateBadge does not update during run"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/alarm-codes.ts (alarms 1-13 humanized); src/ui/laser/LaserWindow.tsx banner + src/ui/laser/SafetyNoticeBanner.tsx runtime notices"
+        },
+        {
+          "tag": "CODE",
+          "cite": "full-sweep S4-F8 (no elapsed/remaining during run) + S6-F5(3): F-B11 promised Phase-C ETA label; src/ui/laser/JobControls.tsx:190-207 still lines-only"
+        }
       ],
       "notVerified": "Mid-job elapsed/remaining ETA is confirmed absent (present gap). Time-estimate accuracy vs real runtime is unmeasured (planner is estimation-only; hardware ledger CLAIMED)."
     },
@@ -73,10 +151,22 @@
       "id": "11.7",
       "summary": "Two run-selection features. (a) Output scope — cutSelectedGraphics + useSelectionOrigin (LightBurn 'Cut Selected Graphics' / 'Use Selection Origin' parity), validated/filtered before compile and now frozen into the checkpoint so a selective burn can resume. (b) Start-from-line (run-from-here) — StartFromLineControl drives buildResumeProgram modal-state replay (units/spindle/feed/safe-Z/position), gSender-style; ungated manual path. Both share the full start-readiness gate.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/scene/output-scope.ts:3-29 OutputScope + validateOutputScope + filterSceneForOutputScope; frozen into checkpoint (job-checkpoint.ts:207-217)" },
-        { "tag": "CODE", "cite": "src/ui/laser/StartFromLineControl.tsx + src/ui/laser/start-job-flow.ts:92-96 runStartFromLineFlow (ADR-103 G7)" },
-        { "tag": "CODE", "cite": "src/core/controllers/grbl/resume-program.ts:54-89 buildResumeProgram modal replay + safe re-entry preamble" },
-        { "tag": "TEST", "cite": "src/core/scene/output-scope.test.ts (validate/filter cases); resume-program.test.ts covers Start-from-line replay (10 tests pass)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/output-scope.ts:3-29 OutputScope + validateOutputScope + filterSceneForOutputScope; frozen into checkpoint (job-checkpoint.ts:207-217)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/StartFromLineControl.tsx + src/ui/laser/start-job-flow.ts:92-96 runStartFromLineFlow (ADR-103 G7)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/resume-program.ts:54-89 buildResumeProgram modal replay + safe re-entry preamble"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/scene/output-scope.test.ts (validate/filter cases); resume-program.test.ts covers Start-from-line replay (10 tests pass)"
+        }
       ],
       "notVerified": "Physical accuracy of a run-from-line re-entry (correct position/depth) is hardware-CLAIMED. Start-from-line is deliberately ungated (operator vouches for the line)."
     },
@@ -84,10 +174,22 @@
       "id": "11.8",
       "summary": "Layered safety. Emit-time: laser-off-on-travel enforced three ways; $30/$32 readiness proven before any byte; pause refused on a laser without proven $32=1. Runtime: SafetyNoticeBanner raises blunt write-failed / disconnect-during-job / controller-error / stream-stalled / controller-reboot / frame-limit notices naming the PHYSICAL e-stop; a watchdog catches silent USB death. Interlock awareness: parses GRBL Door state, door pins, error 13. Help/EULA safety notice covers fire, eyes, fumes, PVC.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/state/laser-safety-notice.ts (6 notice kinds naming the physical control); src/ui/laser/SafetyNoticeBanner.tsx persistent banner; laser-job-actions.ts:206-210 pause $32 gate" },
-        { "tag": "CODE", "cite": "src/ui/help/safety-notice.ts SAFETY_NOTICE_TEXT (fire/eye/fumes/PVC, 'never leave unattended, keep a fire extinguisher'); shown via Help (CommandShell.tsx:90) + install-time public/eula.txt" },
-        { "tag": "CODE", "cite": "src/core/controllers/grbl/status-parser + alarm-codes.ts / error-codes.ts:64 decode GRBL Door state, door pins, error 13 safety-door (interlock awareness)" },
-        { "tag": "CODE", "cite": "src/ui/laser/cnc-start-advisories.ts cncWorkZeroAdvisory — warn-not-block Z0/stock-top advisory at CNC Start (ADR-111)" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-safety-notice.ts (6 notice kinds naming the physical control); src/ui/laser/SafetyNoticeBanner.tsx persistent banner; laser-job-actions.ts:206-210 pause $32 gate"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/help/safety-notice.ts SAFETY_NOTICE_TEXT (fire/eye/fumes/PVC, 'never leave unattended, keep a fire extinguisher'); shown via Help (CommandShell.tsx:90) + install-time public/eula.txt"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/status-parser + alarm-codes.ts / error-codes.ts:64 decode GRBL Door state, door pins, error 13 safety-door (interlock awareness)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/cnc-start-advisories.ts cncWorkZeroAdvisory — warn-not-block Z0/stock-top advisory at CNC Start (ADR-111)"
+        }
       ],
       "notVerified": "Software reflects but cannot ENFORCE a hardware interlock. The safety notice is on-demand (Help) plus install EULA, not an in-app first-run mandatory gate. Fire/test-pulse alignment control is absent (S6-F2, rated in 10.4). M-17 beginner-hostile through-cut default remains."
     }

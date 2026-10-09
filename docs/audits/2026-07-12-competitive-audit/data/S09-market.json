@@ -9,10 +9,22 @@
           "existence": "no",
           "quality": "Emits only G1 line segments; staff confirm 'LB and MillMage do not use circular interpolation'. Imported G2/G3 are dropped on re-save. Long-standing feature request open; segmentation via Bezier splines, not exact arcs.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/using-g02-arc-instead-of-multiple-line-segments/188115 (staff RalphU 2026-03-04 + Oz 2026-03-05)" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/g2-g3-circular-moves/11529" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/gcode-files-created-in-autodesk-fusion-360-open-but-no-g2-or-g3-codes-are-processed/155877" },
-            { "tag": "COMM", "cite": "https://lightburn.fider.io/posts/650/arcs-written-with-g02-and-g03-g-code-for-supported-laser-controllers" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/using-g02-arc-instead-of-multiple-line-segments/188115 (staff RalphU 2026-03-04 + Oz 2026-03-05)"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/g2-g3-circular-moves/11529"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/gcode-files-created-in-autodesk-fusion-360-open-but-no-g2-or-g3-codes-are-processed/155877"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://lightburn.fider.io/posts/650/arcs-written-with-g02-and-g03-g-code-for-supported-laser-controllers"
+            }
           ]
         },
         {
@@ -20,7 +32,10 @@
           "existence": "no",
           "quality": "Staff-confirmed no G2/G3: Bezier splines segmented at ~0.60 mm chord length, not user-adjustable. Devs argue arc emission 'only gets you file compression' and reclamation isn't worth CPU cost on hobby controllers.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/using-g02-arc-instead-of-multiple-line-segments/188115 (MillMage/Oz 2026-03-05; MikeyH chord-length measurement 2026-03-08)" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/using-g02-arc-instead-of-multiple-line-segments/188115 (MillMage/Oz 2026-03-05; MikeyH chord-length measurement 2026-03-08)"
+            }
           ]
         },
         {
@@ -37,8 +52,14 @@
           "existence": "unknown",
           "quality": "xTool Studio/XCS can export G-code (D-series, S1, M1, F2 Ultra articles), but no source documents whether output uses arcs or segments; internals of the closed pipeline unverified.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/636 (export exists; no arc detail)" },
-            { "tag": "INF", "cite": "No arc/segmentation documentation found across support.xtool.com search passes 2026-07-13" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/636 (export exists; no arc detail)"
+            },
+            {
+              "tag": "INF",
+              "cite": "No arc/segmentation documentation found across support.xtool.com search passes 2026-07-13"
+            }
           ]
         },
         {
@@ -46,8 +67,14 @@
           "existence": "no",
           "quality": "Official G-code spec allows linear moves only — 'arcs must be linearized'; imports containing G2/G3 are rejected outright, and users report Easel-generated code is entirely G1.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012642474-Easel-G-code-Spec (whitelist: G0,G1,G4,G17,G20,G21,G40,G54,G61,G90,G94)" },
-            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/does-easel-use-arcs-g2-g3-if-not-why/24114" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012642474-Easel-G-code-Spec (whitelist: G0,G1,G4,G17,G20,G21,G40,G54,G61,G90,G94)"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://discuss.inventables.com/t/does-easel-use-arcs-g2-g3-if-not-why/24114"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/arcs-in-easel/34960" }
           ]
         }
@@ -61,9 +88,18 @@
           "existence": "yes",
           "quality": "Mature: S-Value Max must mirror GRBL $30 (docs explain mismatch failure modes); per-layer Constant Power toggle (M3) vs M4 variable power with zero-speed-zero-power; dedicated GRBL-M3 device for pre-1.1f firmware.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Guides/GRBLConfiguration/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/Troubleshooting/GRBLPowerOutput.html" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/s-value-or-30-setting/153189 + https://forum.lightburnsoftware.com/t/what-is-the-proper-s-max-value/165766" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Guides/GRBLConfiguration/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/Troubleshooting/GRBLPowerOutput.html"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/s-value-or-30-setting/153189 + https://forum.lightburnsoftware.com/t/what-is-the-proper-s-max-value/165766"
+            }
           ]
         },
         {
@@ -71,9 +107,18 @@
           "existence": "yes",
           "quality": "CNC framing: per-operation feeds/speeds including spindle RPM in the Operation Settings Editor; separate 'GRBL M3' device profile; GRBL firmware settings viewable/editable in-app. Laser power modes N/A (CNC-only product).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core (GRBL M3 listed as distinct target)" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/MachineSettings/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/products/millmage-core (GRBL M3 listed as distinct target)"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/MachineSettings/"
+            }
           ]
         },
         {
@@ -81,7 +126,10 @@
           "existence": "yes",
           "quality": "Import dialog offers M3 constant vs M4 dynamic power (grbl 1.1+ laser mode); S-MIN/S-MAX map white/black pixels onto the PWM range; docs tell users to match machine PWM config. Solid but manual.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/target-image-size-and-laser-options/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/target-image-size-and-laser-options/"
+            },
             { "tag": "OFF", "cite": "https://lasergrbl.com/configuration/" }
           ]
         },
@@ -90,9 +138,18 @@
           "existence": "no",
           "quality": "Power is exposed only as percentage presets via the EasySet material library or manual %/speed fields; no user-facing M3/M4 selection or S-max/$30 mapping in the closed xTool ecosystem.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1306 (EasySet parameter presets)" },
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1865 (user-defined material %/speed parameters)" },
-            { "tag": "INF", "cite": "No M3/M4/S-max controls documented anywhere in support.xtool.com; inferred absent from closed pipeline" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/1306 (EasySet parameter presets)"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/1865 (user-defined material %/speed parameters)"
+            },
+            {
+              "tag": "INF",
+              "cite": "No M3/M4/S-max controls documented anywhere in support.xtool.com; inferred absent from closed pipeline"
+            }
           ]
         },
         {
@@ -101,7 +158,10 @@
           "quality": "Automatic/manual spindle control adds M3/M5 with spindle RPM to G-code (shipped 2015); no laser-style scaling. Basic on/off + RPM, adequate for its grbl router audience.",
           "evidence": [
             { "tag": "COMM", "cite": "https://forum.easel.com/t/spindle-control-from-easel/148" },
-            { "tag": "COMM", "cite": "https://forums.maslowcnc.com/t/can-easel-automatically-include-spindle-control-m4-m5-codes/13965" }
+            {
+              "tag": "COMM",
+              "cite": "https://forums.maslowcnc.com/t/can-easel-automatically-include-spindle-control-m4-m5-codes/13965"
+            }
           ]
         }
       ]
@@ -114,8 +174,14 @@
           "existence": "yes",
           "quality": "Deep: GCode device-settings tab tweaks output; Custom GCode device type (since 1.5) can override every emitted command, with |RESTORE| mode macros and \\x hex control-character escapes (2.1+). Expert-oriented but comprehensive.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/DeviceSettings/GCode/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/DeviceSettings/CustomGCode/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/DeviceSettings/GCode/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/DeviceSettings/CustomGCode/"
+            }
           ]
         },
         {
@@ -123,8 +189,14 @@
           "existence": "yes",
           "quality": "Custom GCode tab: tool-change output and ATC toggles, coolant on/off hooks (M8/M9 guide), configurable comment characters, variable-substitution syntax with change-tracking ([x] = unchanged, * = skip-line-if-unchanged).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/DeviceSettings/CustomGCode/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/0.8/Guides/CoolantCustomGCode/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/DeviceSettings/CustomGCode/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/0.8/Guides/CoolantCustomGCode/"
+            }
           ]
         },
         {
@@ -132,9 +204,18 @@
           "existence": "yes",
           "quality": "Custom header/between-passes/footer G-code since v3.0.19, sharing the custom-button macro language incl. realtime commands; a reported bug omitted header/footer from saved files (issue #1172).",
           "evidence": [
-            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/783 (beta test for custom header/footer)" },
-            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/348 + https://github.com/arkypita/LaserGRBL/issues/1172" },
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/ (macro language the hooks reuse)" }
+            {
+              "tag": "COMM",
+              "cite": "https://github.com/arkypita/LaserGRBL/issues/783 (beta test for custom header/footer)"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://github.com/arkypita/LaserGRBL/issues/348 + https://github.com/arkypita/LaserGRBL/issues/1172"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/custom-buttons/ (macro language the hooks reuse)"
+            }
           ]
         },
         {
@@ -142,7 +223,10 @@
           "existence": "unknown",
           "quality": "No custom header/footer/hook capability documented anywhere in the xTool support center; likely absent in the closed app but not provably so.",
           "evidence": [
-            { "tag": "INF", "cite": "Absence across support.xtool.com article searches 2026-07-13 (articles 636/933/1303/2442 reviewed)" }
+            {
+              "tag": "INF",
+              "cite": "Absence across support.xtool.com article searches 2026-07-13 (articles 636/933/1303/2442 reviewed)"
+            }
           ]
         },
         {
@@ -150,8 +234,14 @@
           "existence": "unknown",
           "quality": "No custom start/end/tool-change hook documented; export is a fixed-format .nc download requiring a 'Non-GRBL Machine Profile'. No evidence of user-editable headers.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4406926040979-Exporting-Gcode-from-Easel" },
-            { "tag": "INF", "cite": "No customization hooks found in support.easel.com search passes 2026-07-13" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4406926040979-Exporting-Gcode-from-Easel"
+            },
+            {
+              "tag": "INF",
+              "cite": "No customization hooks found in support.easel.com search passes 2026-07-13"
+            }
           ]
         }
       ]
@@ -166,7 +256,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/lightburn-core" },
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/lightburn-pro" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more (EZCad3 in 2.1)" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more (EZCad3 in 2.1)"
+            }
           ]
         },
         {
@@ -183,8 +276,14 @@
           "existence": "yes",
           "quality": "Single-dialect: official site and README state compatibility with Grbl v0.9/v1.1 only; no other firmware documented. Narrowest G-code breadth in roster besides XCS.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/faq/ ('work with any engraver that use Grbl as controller firmware')" },
-            { "tag": "OFF", "cite": "https://github.com/arkypita/LaserGRBL (README: compatible with Grbl v0.9 and v1.1)" }
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/faq/ ('work with any engraver that use Grbl as controller firmware')"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://github.com/arkypita/LaserGRBL (README: compatible with Grbl v0.9 and v1.1)"
+            }
           ]
         },
         {
@@ -192,8 +291,14 @@
           "existence": "no",
           "quality": "Drives only xTool's own machines over a proprietary link; no controller or dialect selection. G-code export exists but targets xTool D-series firmware (community notes files 'can be run in LightBurn').",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/933 (gcode import/export scoped to xTool D1/D1 Pro)" },
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1170 (per-xTool-machine user guides only)" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/933 (gcode import/export scoped to xTool D1/D1 Pro)"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/1170 (per-xTool-machine user guides only)"
+            }
           ]
         },
         {
@@ -201,7 +306,10 @@
           "existence": "yes",
           "quality": "grbl-centric (X-Carve/Carvey native); generic .nc export via 'Non-GRBL Machine Profile' for use in any sender, but no selectable post-processor list documented — one flavor fits all.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4406926040979-Exporting-Gcode-from-Easel" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4406926040979-Exporting-Gcode-from-Easel"
+            }
           ]
         }
       ]
@@ -214,8 +322,14 @@
           "existence": "yes",
           "quality": "Emits layer comments (';layer C0' style); documented 'Suppress Comments' option strips them for picky controllers. Determinism and richer provenance headers not documented anywhere found.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/CustomGCode.html (Suppress Comments)" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/save-gcode-file-format/7578 + https://forum.lightburnsoftware.com/t/save-gcode-running-output-from-offline-controller/23090" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/CustomGCode.html (Suppress Comments)"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/save-gcode-file-format/7578 + https://forum.lightburnsoftware.com/t/save-gcode-running-output-from-offline-controller/23090"
+            }
           ]
         },
         {
@@ -223,8 +337,14 @@
           "existence": "yes",
           "quality": "Comment character configurable (; ( ) ! @ # % ^ &) in Custom GCode settings; tool-change comments emitted (user request open for variable substitution inside them). Header/provenance details otherwise undocumented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/DeviceSettings/CustomGCode/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/custom-gcode-allow-variable-substitution-inside-tool-change-comments/190395" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/DeviceSettings/CustomGCode/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/custom-gcode-allow-variable-substitution-inside-tool-change-comments/190395"
+            }
           ]
         },
         {
@@ -233,7 +353,10 @@
           "quality": "A save-G-code function exists (evidenced by the header/footer omission bug report), but comment/header conventions and determinism of generated files are undocumented.",
           "evidence": [
             { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/1172" },
-            { "tag": "INF", "cite": "No output-structure documentation on lasergrbl.com usage pages reviewed 2026-07-13" }
+            {
+              "tag": "INF",
+              "cite": "No output-structure documentation on lasergrbl.com usage pages reviewed 2026-07-13"
+            }
           ]
         },
         {
@@ -241,8 +364,14 @@
           "existence": "unknown",
           "quality": "Exported G-code file structure, comments, and determinism are undocumented; only the export mechanics (TF-card tmp.gcode workflow) are described.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/636 (export mechanics only)" },
-            { "tag": "INF", "cite": "No structure documentation found on support.xtool.com 2026-07-13" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/636 (export mechanics only)"
+            },
+            {
+              "tag": "INF",
+              "cite": "No structure documentation found on support.xtool.com 2026-07-13"
+            }
           ]
         },
         {
@@ -250,8 +379,14 @@
           "existence": "unknown",
           "quality": "A published G-code spec exists (command whitelist), implying a constrained, simple output vocabulary, but exported files' header/comment structure and determinism are undocumented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012642474-Easel-G-code-Spec" },
-            { "tag": "INF", "cite": "No export-structure documentation found in support.easel.com search passes 2026-07-13" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012642474-Easel-G-code-Spec"
+            },
+            {
+              "tag": "INF",
+              "cite": "No export-structure documentation found in support.easel.com search passes 2026-07-13"
+            }
           ]
         }
       ]
@@ -264,9 +399,18 @@
           "existence": "yes",
           "quality": "Docs guarantee M4 mode zero-speed-zero-power (pausing kills the beam); laser-off-during-G0 discipline is delegated to GRBL $32 laser mode rather than stated as an output-side guarantee. No documented non-finite/bounds guards.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Guides/GRBLConfiguration/ (M4 zero speed = zero power)" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/Troubleshooting/GRBLPowerOutput.html ($32 laser mode)" },
-            { "tag": "INF", "cite": "Travel-safety attributed to firmware laser mode; no LightBurn-side emitted-G-code guarantee documented" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Guides/GRBLConfiguration/ (M4 zero speed = zero power)"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/Troubleshooting/GRBLPowerOutput.html ($32 laser mode)"
+            },
+            {
+              "tag": "INF",
+              "cite": "Travel-safety attributed to firmware laser mode; no LightBurn-side emitted-G-code guarantee documented"
+            }
           ]
         },
         {
@@ -274,7 +418,10 @@
           "existence": "yes",
           "quality": "Documented Safe Clearance Height above stock/fixtures governs travels, plus optional Fast Retraction Height with explicit collision caveats (workholding not auto-included). CNC-appropriate safety model, user-dependent.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/ProjectSetupWizard/ (Safe Clearance Height, Fast Retraction Height)" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/ProjectSetupWizard/ (Safe Clearance Height, Fast Retraction Height)"
+            }
           ]
         },
         {
@@ -283,7 +430,10 @@
           "quality": "Historic bug emitted G0 travels that grbl 1.1 laser-mode gates against laser-on (issue #568, 2019-era); no documented safety guarantees for current 7.14.1 output. Dormancy means no recent statements.",
           "evidence": [
             { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/568" },
-            { "tag": "INF", "cite": "No motion-safety documentation on lasergrbl.com; current behavior unverified" }
+            {
+              "tag": "INF",
+              "cite": "No motion-safety documentation on lasergrbl.com; current behavior unverified"
+            }
           ]
         },
         {
@@ -291,7 +441,10 @@
           "existence": "unknown",
           "quality": "Machine-side safety (flame/tilt sensors) is hardware marketing; nothing documents software-emitted motion-safety guarantees (laser-off travels, bounds discipline) in XCS/Studio output.",
           "evidence": [
-            { "tag": "INF", "cite": "No output-safety documentation found across support.xtool.com searches 2026-07-13" }
+            {
+              "tag": "INF",
+              "cite": "No output-safety documentation found across support.xtool.com searches 2026-07-13"
+            }
           ]
         },
         {
@@ -299,8 +452,14 @@
           "existence": "yes",
           "quality": "Safety height lifts the bit above clamps for travel moves; the import validator rejects any command outside its whitelist — a de-facto command-safety guard. Bounds/non-finite guarantees undocumented.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://www.designsbyphil.com/x-carve-tips.html + https://forum.easel.com/t/spindle-control-from-easel/148 (safety-height usage)" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012642474-Easel-G-code-Spec (whole-file rejection of unlisted commands)" }
+            {
+              "tag": "COMM",
+              "cite": "https://www.designsbyphil.com/x-carve-tips.html + https://forum.easel.com/t/spindle-control-from-easel/148 (safety-height usage)"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012642474-Easel-G-code-Spec (whole-file rejection of unlisted commands)"
+            }
           ]
         }
       ]

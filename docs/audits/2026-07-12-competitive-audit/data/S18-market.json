@@ -9,7 +9,10 @@
           "existence": "yes",
           "quality": "'Find My Laser' device-discovery wizard auto-detects USB machines with beginner add/configure docs and a safe dummy-profile path. Strong guided setup, but no persistent 'beginner mode' toggle.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/FindMyLaser/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/FindMyLaser/"
+            },
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/BeginnerAddConfig.html" },
             { "tag": "COMM", "cite": "https://optlasers.com/lightburn-device-setup-wizard" }
           ]
@@ -19,7 +22,10 @@
           "existence": "yes",
           "quality": "Project Setup Wizard with an explicit Beginner Setup mode, visual examples per step, and leave-defaults fallback; guided getting-started path. Solid onboarding for a young (0.8) product.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/ProjectSetupBeginners/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/GetStarted/ProjectSetupBeginners/"
+            },
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/" }
           ]
         },
@@ -30,7 +36,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/arduino-connection/" },
             { "tag": "COMM", "cite": "https://cncphilosophy.com/free-laser-engraving-software/" },
-            { "tag": "COMM", "cite": "https://tyvok.com/blogs/news/lasergrbl-the-free-beginner-friendly-laser-engraving-software" }
+            {
+              "tag": "COMM",
+              "cite": "https://tyvok.com/blogs/news/lasergrbl-the-free-beginner-friendly-laser-engraving-software"
+            }
           ]
         },
         {
@@ -40,7 +49,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/3275" },
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1306" },
-            { "tag": "COMM", "cite": "https://createdworkshop.com/blog/beginners-walkthrough-of-xtool-studio" }
+            {
+              "tag": "COMM",
+              "cite": "https://createdworkshop.com/blog/beginners-walkthrough-of-xtool-studio"
+            }
           ]
         },
         {
@@ -48,8 +60,14 @@
           "existence": "yes",
           "quality": "Purpose-built for beginners and the CNC-beginner reference: machine-setup wizard plus a 'Start Carving' walkthrough, safe defaults, minimal friction, browser-based with no install.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup"
+            },
             { "tag": "COMM", "cite": "https://all3dp.com/2/easel-inventables-simply-explained/" }
           ]
         },
@@ -59,7 +77,10 @@
           "quality": "Clean simple UI plus official step-by-step 'Hello Contour/V-carve' courses; machine setup handled by companion Carbide Motion. Good guided learning but no in-app beginner wizard.",
           "evidence": [
             { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/" },
-            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/running-shapeoko/hello-contour/" },
+            {
+              "tag": "OFF",
+              "cite": "https://carbide3d.com/hub/courses/running-shapeoko/hello-contour/"
+            },
             { "tag": "OFF", "cite": "https://carbide3d.com/carbidemotion/" }
           ]
         },
@@ -68,9 +89,15 @@
           "existence": "yes",
           "quality": "Structured job-setup form and getting-started tutorials, but a professional CAM tool with a steeper curve and no beginner mode; onboarding assumes prior CNC literacy.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/user-guide/index.html"
+            },
             { "tag": "OFF", "cite": "https://www.vectric.com/support/tutorials/vcarve-pro/" },
-            { "tag": "COMM", "cite": "https://thecnchub.com/blog/the-best-place-to-learn-vectric-software-cut2d-vcarve-aspire" }
+            {
+              "tag": "COMM",
+              "cite": "https://thecnchub.com/blog/the-best-place-to-learn-vectric-software-cut2d-vcarve-aspire"
+            }
           ]
         }
       ]
@@ -93,7 +120,10 @@
           "quality": "Structured docs (getting-started, operation/tool/machine reference, explainers, fact sheet) sharing LightBurn's doc infrastructure; solid and well-organized but newer and thinner than LightBurn's.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/OperationSettingsEditor/"
+            }
           ]
         },
         {
@@ -121,7 +151,10 @@
           "quality": "Well-organized Zendesk support center with task-focused articles (setup, cut settings, import/export, probing, simulation); clear beginner coverage, though not a deep single reference manual.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
           ]
         },
         {
@@ -130,8 +163,14 @@
           "quality": "No current versioned reference manual (only a legacy V5 PDF); docs delivered as training courses, and Pro features are notably under-documented per community. Weakest formal docs among the CNC tools.",
           "evidence": [
             { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/" },
-            { "tag": "OFF", "cite": "https://guides.carbide3d.com/files/pdf/carbide-create-v5.pdf" },
-            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/user-guide-for-carbide-create-pro-features/37716" }
+            {
+              "tag": "OFF",
+              "cite": "https://guides.carbide3d.com/files/pdf/carbide-create-v5.pdf"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/user-guide-for-carbide-create-pro-features/37716"
+            }
           ]
         },
         {
@@ -139,7 +178,10 @@
           "existence": "yes",
           "quality": "Full per-version reference manuals plus an in-app video-tutorial browser; comprehensive and precise, rivaling LightBurn for documentation depth.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/single-page/index.html" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.5/VCarvePro/ENU/Help/page/single-page/index.html"
+            },
             { "tag": "OFF", "cite": "https://www.vectric.com/support/tutorials/vcarve-pro/" }
           ]
         }
@@ -163,7 +205,10 @@
           "existence": "yes",
           "quality": "Shares LightBurn's forum (MillMage category ~501 topics) and YouTube; official launch/tutorial videos exist but the community is small and new (product GA Feb 2026).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/c/millmage-software-questions/61" },
+            {
+              "tag": "OFF",
+              "cite": "https://forum.lightburnsoftware.com/c/millmage-software-questions/61"
+            },
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
           ]
         },
@@ -194,7 +239,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://forum.easel.com/" },
             { "tag": "OFF", "cite": "https://www.youtube.com/user/inventables" },
-            { "tag": "COMM", "cite": "https://www.learnyourcnc.com/cnc-learning-center/cnc-software/easel" }
+            {
+              "tag": "COMM",
+              "cite": "https://www.learnyourcnc.com/cnc-learning-center/cnc-software/easel"
+            }
           ]
         },
         {
@@ -213,7 +261,10 @@
           "quality": "Official tutorials/YouTube and forum plus a ~65k-member 'Vectric Tips & Tricks' Facebook group and third-party training; strong CNC-CAM learning ecosystem.",
           "evidence": [
             { "tag": "OFF", "cite": "https://www.vectric.com/support/tutorials/vcarve-pro/" },
-            { "tag": "COMM", "cite": "https://thecnchub.com/blog/the-best-place-to-learn-vectric-software-cut2d-vcarve-aspire" },
+            {
+              "tag": "COMM",
+              "cite": "https://thecnchub.com/blog/the-best-place-to-learn-vectric-software-cut2d-vcarve-aspire"
+            },
             { "tag": "COMM", "cite": "https://forum.vectric.com/viewtopic.php?t=44893" }
           ]
         }
@@ -228,7 +279,10 @@
           "quality": "Built-in Art Library of curated clip-art plus 2.1 Cuttle web-tool integration for parametric, personalized designs; integrated into the workspace but modest in scale versus dedicated design libraries.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Resources/" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more"
+            }
           ]
         },
         {
@@ -263,8 +317,14 @@
           "existence": "yes",
           "quality": "Pro Design Library of 3M+ shapes and a 300+ font library built into the editor; large integrated asset library, but gated behind the Easel Pro ($24/mo) tier.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/5503660393363-Easel-Pro-Feature-Pro-Design-Library" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/29448607953939-Easel-Pro-Feature-Custom-Fonts" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/5503660393363-Easel-Pro-Feature-Pro-Design-Library"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/29448607953939-Easel-Pro-Feature-Custom-Fonts"
+            }
           ]
         },
         {
@@ -272,7 +332,10 @@
           "existence": "yes",
           "quality": "Official CutRocket project-sharing site and a free project-file gallery provide ready-to-cut content, but assets are web-based, not an in-app library or clip-art store.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://carbide3d.com/blog/cutrocket-a-cnc-project-sharing-site/" },
+            {
+              "tag": "OFF",
+              "cite": "https://carbide3d.com/blog/cutrocket-a-cnc-project-sharing-site/"
+            },
             { "tag": "OFF", "cite": "https://carbide3d.com/projects/" }
           ]
         },
@@ -295,8 +358,14 @@
           "existence": "yes",
           "quality": "User-defined G-code macros (machine control only) and 2.1 web-tools/Cuttle integration, but no scripting or plugin API; an open-API request remains outstanding. Extensibility is weak even for the reference.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/MacrosWindow/" },
-            { "tag": "OFF", "cite": "https://lightburn.fider.io/posts/1089/open-api-or-interface-for-external-script-or-extension-programming" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/MacrosWindow/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburn.fider.io/posts/1089/open-api-or-interface-for-external-script-or-extension-programming"
+            }
           ]
         },
         {
@@ -305,7 +374,10 @@
           "quality": "No scripting/plugin API; only custom G-code injection (e.g. coolant/vacuum). An extension-language user request is open and unaddressed on the forum.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Guides/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/will-millmage-provide-support-for-an-extension-language/191037" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/will-millmage-provide-support-for-an-extension-language/191037"
+            }
           ]
         },
         {
@@ -315,7 +387,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/custom-buttons/" },
             { "tag": "OFF", "cite": "https://github.com/arkypita/LaserGRBL" },
-            { "tag": "COMM", "cite": "https://www.inkscape.org/forums/cutplot/new-inkscape-extension-for-easy-laser-cutting-with-lasergrbl/" }
+            {
+              "tag": "COMM",
+              "cite": "https://www.inkscape.org/forums/cutplot/new-inkscape-extension-for-easy-laser-cutting-with-lasergrbl/"
+            }
           ]
         },
         {
@@ -352,7 +427,10 @@
           "quality": "Gadgets system: LUA-scripted add-ins with an SDK and a downloadable gadget library (gadgets.vectric.com); powerful, but Pro-only — VCarve Desktop has no gadgets support.",
           "evidence": [
             { "tag": "OFF", "cite": "https://gadgets.vectric.com/" },
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/gadgets/index.html" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/gadgets/index.html"
+            },
             { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" }
           ]
         }
@@ -366,8 +444,14 @@
           "existence": "yes",
           "quality": "~25 in-app UI languages (27 per the vendor's localization case study) with automatic RTL for Arabic/Hebrew; the broadest localization in the roster.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/UI/LanguageMenu/" },
-            { "tag": "COMM", "cite": "https://taia.io/resources/case-studies/software-localization-workflow-case-study/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/UI/LanguageMenu/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://taia.io/resources/case-studies/software-localization-workflow-case-study/"
+            },
             { "tag": "COMM", "cite": "https://support.salasers.com/lightburn-language-menu-guide" }
           ]
         },
@@ -377,7 +461,10 @@
           "quality": "English-only UI; the documentation itself suggests using Google Translate for other languages. No native localization.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/will-millmage-provide-support-for-an-extension-language/191037" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/will-millmage-provide-support-for-an-extension-language/191037"
+            }
           ]
         },
         {
@@ -412,7 +499,10 @@
           "existence": "no",
           "quality": "English-only; community reports the app is not internationalized and no language options are documented on the product or download pages.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://community.carbide3d.com/t/curious-what-language-is-carbide-create-written-in/13357" },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/curious-what-language-is-carbide-create-written-in/13357"
+            },
             { "tag": "INF", "cite": "https://carbide3d.com/carbidecreate/" }
           ]
         },
@@ -421,7 +511,10 @@
           "existence": "yes",
           "quality": "13 UI languages (Czech, German, English, Spanish, Finnish, French, Italian, Japanese, Korean, Dutch, Polish, Portuguese, Russian), selectable via a launch-icon language flag.",
           "evidence": [
-            { "tag": "OFF", "cite": "http://support.vectric.com/cut3d-questions/item/what-languages-is-software-available-in" },
+            {
+              "tag": "OFF",
+              "cite": "http://support.vectric.com/cut3d-questions/item/what-languages-is-software-available-in"
+            },
             { "tag": "COMM", "cite": "https://forum.vectric.com/viewtopic.php?t=22585" }
           ]
         }
@@ -436,7 +529,10 @@
           "quality": "$99 Core / $199 Pro, perpetual (install on 3 machines), 30-day trial, optional paid update renewal; proprietary closed-source; frequent updates (2.1.03, Jun 2026).",
           "evidence": [
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/lightburn-core" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-03-patch-release" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-03-patch-release"
+            }
           ]
         },
         {
@@ -445,7 +541,10 @@
           "quality": "$99 Core perpetual (3 machines, permanent commercial use); Pro $199 announced but not yet on sale; proprietary closed-source; actively developed (0.8.02, Jun 2026).",
           "evidence": [
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/millmage-core" },
-            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/millmage-0-8-02-patch-release/190260" }
+            {
+              "tag": "OFF",
+              "cite": "https://forum.lightburnsoftware.com/t/millmage-0-8-02-patch-release/190260"
+            }
           ]
         },
         {
@@ -471,7 +570,10 @@
           "existence": "yes",
           "quality": "Freemium SaaS: Free (1 export/week), Starter $8/mo, Pro $24/mo; proprietary closed-source and cloud-dependent (requires account/browser); continuously updated.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012849133-Easel-Pro-FAQ-and-Overview" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012849133-Easel-Pro-FAQ-and-Overview"
+            },
             { "tag": "OFF", "cite": "https://easel.inventables.com/" }
           ]
         },

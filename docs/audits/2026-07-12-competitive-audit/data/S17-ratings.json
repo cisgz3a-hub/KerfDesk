@@ -2,66 +2,405 @@
   "sector": 17,
   "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/17-platform-reliability.md",
   "ratings": [
-    { "cat": "17.1", "product": "KerfDesk", "score": 7, "star": false, "tag": "CODE", "note": "Web PWA on any Chromium OS (Win/Mac/Linux/ChromeOS) plus a Windows Electron .exe; no tablet/mobile UI; packaged .exe never built or run." },
-    { "cat": "17.1", "product": "LightBurn", "score": 6, "star": false, "tag": "OFF", "note": "Windows and macOS desktop; Linux frozen at legacy 1.7; no web or tablet. Solid dual-desktop, narrower than the browser rivals." },
-    { "cat": "17.1", "product": "MillMage", "score": 5, "star": false, "tag": "OFF", "note": "Windows and macOS desktop only; no Linux, no web/mobile. Same dual-desktop reach as sibling LightBurn but no legacy Linux build." },
-    { "cat": "17.1", "product": "LaserGRBL", "score": 3, "star": false, "tag": "OFF", "note": "Windows-only (.NET/WinForms); Mac and Linux need Wine or a VM. Narrowest OS coverage in the roster." },
-    { "cat": "17.1", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "xTool Studio on Windows/macOS desktop plus iOS/Android/iPad apps with cloud sync; strong cross-device but no Linux and no web." },
-    { "cat": "17.1", "product": "Easel", "score": 9, "star": false, "tag": "OFF", "note": "Browser-based on Windows/macOS/Linux/Chromebook via multiple browsers; broadest OS reach in the roster, tablet included; web-only, no native." },
-    { "cat": "17.1", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Native Windows/macOS/Linux plus Raspberry Pi; broadest native-desktop coverage in the roster, but no web or mobile client." },
+    {
+      "cat": "17.1",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Web PWA on any Chromium OS (Win/Mac/Linux/ChromeOS) plus a Windows Electron .exe; no tablet/mobile UI; packaged .exe never built or run."
+    },
+    {
+      "cat": "17.1",
+      "product": "LightBurn",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Windows and macOS desktop; Linux frozen at legacy 1.7; no web or tablet. Solid dual-desktop, narrower than the browser rivals."
+    },
+    {
+      "cat": "17.1",
+      "product": "MillMage",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Windows and macOS desktop only; no Linux, no web/mobile. Same dual-desktop reach as sibling LightBurn but no legacy Linux build."
+    },
+    {
+      "cat": "17.1",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Windows-only (.NET/WinForms); Mac and Linux need Wine or a VM. Narrowest OS coverage in the roster."
+    },
+    {
+      "cat": "17.1",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "xTool Studio on Windows/macOS desktop plus iOS/Android/iPad apps with cloud sync; strong cross-device but no Linux and no web."
+    },
+    {
+      "cat": "17.1",
+      "product": "Easel",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Browser-based on Windows/macOS/Linux/Chromebook via multiple browsers; broadest OS reach in the roster, tablet included; web-only, no native."
+    },
+    {
+      "cat": "17.1",
+      "product": "gSender",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Native Windows/macOS/Linux plus Raspberry Pi; broadest native-desktop coverage in the roster, but no web or mobile client."
+    },
 
-    { "cat": "17.2", "product": "KerfDesk", "score": 7, "star": false, "tag": "CODE", "note": "Fully-offline installable PWA with mid-burn-safe updates; desktop auto-update ships unsigned with no signature check, and offline/update never verified on a device." },
-    { "cat": "17.2", "product": "LightBurn", "score": 7, "star": false, "tag": "OFF", "note": "Installed desktop app, fully offline (periodic online license recheck); manual Check-for-Updates gated to the license's valid update window." },
-    { "cat": "17.2", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Installed desktop app, offline-capable; current/previous/beta builds with a manual updater. Same install/update model as sibling LightBurn." },
-    { "cat": "17.2", "product": "LaserGRBL", "score": 5, "star": false, "tag": "OFF", "note": "Lightweight free Windows installer, fully offline once installed; GitHub-release notifications, but dormant with no release in ~16 months." },
-    { "cat": "17.2", "product": "XCS", "score": 5, "star": false, "tag": "OFF", "note": "In-app auto-update, but login/cloud drives material library and sync so some features need connectivity; XCS itself is EOL." },
-    { "cat": "17.2", "product": "Easel", "score": 6, "star": false, "tag": "OFF", "note": "No install, always latest, zero update friction; but internet required to load/save, and offline edits cannot be saved until reconnected." },
-    { "cat": "17.2", "product": "gSender", "score": 9, "star": false, "tag": "OFF", "note": "Free installer for all four platforms, fully offline, in-app update guide and frequent releases; smoothest, friction-free install/update story in the roster." },
+    {
+      "cat": "17.2",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Fully-offline installable PWA with mid-burn-safe updates; desktop auto-update ships unsigned with no signature check, and offline/update never verified on a device."
+    },
+    {
+      "cat": "17.2",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Installed desktop app, fully offline (periodic online license recheck); manual Check-for-Updates gated to the license's valid update window."
+    },
+    {
+      "cat": "17.2",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Installed desktop app, offline-capable; current/previous/beta builds with a manual updater. Same install/update model as sibling LightBurn."
+    },
+    {
+      "cat": "17.2",
+      "product": "LaserGRBL",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Lightweight free Windows installer, fully offline once installed; GitHub-release notifications, but dormant with no release in ~16 months."
+    },
+    {
+      "cat": "17.2",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "In-app auto-update, but login/cloud drives material library and sync so some features need connectivity; XCS itself is EOL."
+    },
+    {
+      "cat": "17.2",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "No install, always latest, zero update friction; but internet required to load/save, and offline edits cannot be saved until reconnected."
+    },
+    {
+      "cat": "17.2",
+      "product": "gSender",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Free installer for all four platforms, fully offline, in-app update guide and frequent releases; smoothest, friction-free install/update story in the roster."
+    },
 
-    { "cat": "17.3", "product": "KerfDesk", "score": 5, "star": false, "tag": "CODE", "note": "Refuse-before-freeze budgets plus Web Workers and decimated strokes, but entirely unmeasured; known O(N^2) streamer, App-root re-render storm, uncached raster compile remain." },
-    { "cat": "17.3", "product": "LightBurn", "score": 7, "star": false, "tag": "COMM", "note": "Native C++/Qt handles large work but community reports lag as objects/nodes and heavy traces pile up; a restart restores speed." },
-    { "cat": "17.3", "product": "MillMage", "score": 6, "star": false, "tag": "INF", "note": "Inferred parity with LightBurn's native engine; too young for an independent community performance record. Parity assumed, not confirmed." },
-    { "cat": "17.3", "product": "LaserGRBL", "score": 6, "star": false, "tag": "COMM", "note": "Lightweight native, fast on large raster-to-G-code even on modest hardware, but community notes certain JPEGs crash it." },
-    { "cat": "17.3", "product": "XCS", "score": 3, "star": false, "tag": "OFF", "note": "Weakest here: docs admit lag and white-screen crashes on complex images even at recommended specs; mitigations compress images and disable precise vector paths." },
-    { "cat": "17.3", "product": "Easel", "score": 5, "star": false, "tag": "COMM", "note": "Browser-bounded: large or many-path SVG imports bog down the canvas; community guidance is to simplify paths before import." },
-    { "cat": "17.3", "product": "gSender", "score": 6, "star": false, "tag": "COMM", "note": "Electron sender loads and visualizes large G-code; 3D visualizer can lag on some GPUs; startup was cut from ~25s to ~4s." },
+    {
+      "cat": "17.3",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Refuse-before-freeze budgets plus Web Workers and decimated strokes, but entirely unmeasured; known O(N^2) streamer, App-root re-render storm, uncached raster compile remain."
+    },
+    {
+      "cat": "17.3",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "COMM",
+      "note": "Native C++/Qt handles large work but community reports lag as objects/nodes and heavy traces pile up; a restart restores speed."
+    },
+    {
+      "cat": "17.3",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "INF",
+      "note": "Inferred parity with LightBurn's native engine; too young for an independent community performance record. Parity assumed, not confirmed."
+    },
+    {
+      "cat": "17.3",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "COMM",
+      "note": "Lightweight native, fast on large raster-to-G-code even on modest hardware, but community notes certain JPEGs crash it."
+    },
+    {
+      "cat": "17.3",
+      "product": "XCS",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Weakest here: docs admit lag and white-screen crashes on complex images even at recommended specs; mitigations compress images and disable precise vector paths."
+    },
+    {
+      "cat": "17.3",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "COMM",
+      "note": "Browser-bounded: large or many-path SVG imports bog down the canvas; community guidance is to simplify paths before import."
+    },
+    {
+      "cat": "17.3",
+      "product": "gSender",
+      "score": 6,
+      "star": false,
+      "tag": "COMM",
+      "note": "Electron sender loads and visualizes large G-code; 3D visualizer can lag on some GPUs; startup was cut from ~25s to ~4s."
+    },
 
-    { "cat": "17.4", "product": "KerfDesk", "score": 6, "star": false, "tag": "CODE", "note": "ErrorBoundary crash screen, 30s autosave, boot restore, fingerprint checkpoint resume; two known bugs (phantom restore prompt, selective-job resume dead-end); checkpoint HW-CLAIMED." },
-    { "cat": "17.4", "product": "LightBurn", "score": 7, "star": false, "tag": "OFF", "note": "Configurable auto-save plus a post-crash reload prompt from Documents; community reports it occasionally saves empty or loses recovery on a double-crash." },
-    { "cat": "17.4", "product": "MillMage", "score": 6, "star": false, "tag": "INF", "note": "Inferred parity (same engine); a patch hardened malformed-file loading to report errors, and it keeps the last 50 preference backups." },
-    { "cat": "17.4", "product": "LaserGRBL", "score": 3, "star": false, "tag": "COMM", "note": "Stable in normal use but no project auto-save or crash recovery, and certain files crash it; recovery means re-importing the source." },
-    { "cat": "17.4", "product": "XCS", "score": 5, "star": false, "tag": "OFF", "note": "Cloud project storage makes work recoverable across devices, but blank-screen/freeze crashes on import are documented; no local auto-save prompt." },
-    { "cat": "17.4", "product": "Easel", "score": 8, "star": false, "tag": "OFF", "note": "Strongest recovery: continuous server-side saving reopens the project after a browser/tab crash with little loss; offline edits lost if closed before reconnecting." },
-    { "cat": "17.4", "product": "gSender", "score": 6, "star": false, "tag": "OFF", "note": "As a sender there is no design to lose; generally stable, persists settings, offers a diagnostic file; job-level recovery sits under execution." },
+    {
+      "cat": "17.4",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "ErrorBoundary crash screen, 30s autosave, boot restore, fingerprint checkpoint resume; two known bugs (phantom restore prompt, selective-job resume dead-end); checkpoint HW-CLAIMED."
+    },
+    {
+      "cat": "17.4",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Configurable auto-save plus a post-crash reload prompt from Documents; community reports it occasionally saves empty or loses recovery on a double-crash."
+    },
+    {
+      "cat": "17.4",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "INF",
+      "note": "Inferred parity (same engine); a patch hardened malformed-file loading to report errors, and it keeps the last 50 preference backups."
+    },
+    {
+      "cat": "17.4",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "COMM",
+      "note": "Stable in normal use but no project auto-save or crash recovery, and certain files crash it; recovery means re-importing the source."
+    },
+    {
+      "cat": "17.4",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Cloud project storage makes work recoverable across devices, but blank-screen/freeze crashes on import are documented; no local auto-save prompt."
+    },
+    {
+      "cat": "17.4",
+      "product": "Easel",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Strongest recovery: continuous server-side saving reopens the project after a browser/tab crash with little loss; offline edits lost if closed before reconnecting."
+    },
+    {
+      "cat": "17.4",
+      "product": "gSender",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "As a sender there is no design to lose; generally stable, persists settings, offers a diagnostic file; job-level recovery sits under execution."
+    },
 
-    { "cat": "17.5", "product": "KerfDesk", "score": 6, "star": false, "tag": "TEST", "note": "Tested, DoS-capped, Result-typed .lf2 save degrades not crashes, but schema frozen at v1 with empty migrators; downgrade silently drops unknown blocks." },
-    { "cat": "17.5", "product": "LightBurn", "score": 8, "star": false, "tag": "OFF", "note": "Mature XML .lbrn2/.lbrn; lossless both directions, smaller/faster since 2.0, long track record of opening old files. Robust, near-human-readable." },
-    { "cat": "17.5", "product": "MillMage", "score": 7, "star": false, "tag": "OFF", "note": "Binary .mage (art, toolpaths, tools, material, layout); cross-compatible with LightBurn; a patch improved damaged-file handling. Young but solid." },
-    { "cat": "17.5", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "No design project format: operates on imported images and G-code only, so there is nothing versioned to save or migrate." },
-    { "cat": "17.5", "product": "XCS", "score": 5, "star": false, "tag": "OFF", "note": "Native .xcs with cloud storage and cross-device sharing, tied to xTool accounts; robustness adequate, migration path points toward xTool Studio." },
-    { "cat": "17.5", "product": "Easel", "score": 6, "star": false, "tag": "OFF", "note": "Projects live server-side, so versioning/migration is vendor-managed and users never hit format breakage; downside is no offline file or exposed version history." },
-    { "cat": "17.5", "product": "gSender", "score": 2, "star": false, "tag": "OFF", "note": "No design project format; closest analog is robust versioned settings and firmware/EEPROM backup-restore via the Config tab. No project-migration concept." },
+    {
+      "cat": "17.5",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "TEST",
+      "note": "Tested, DoS-capped, Result-typed .lf2 save degrades not crashes, but schema frozen at v1 with empty migrators; downgrade silently drops unknown blocks."
+    },
+    {
+      "cat": "17.5",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Mature XML .lbrn2/.lbrn; lossless both directions, smaller/faster since 2.0, long track record of opening old files. Robust, near-human-readable."
+    },
+    {
+      "cat": "17.5",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Binary .mage (art, toolpaths, tools, material, layout); cross-compatible with LightBurn; a patch improved damaged-file handling. Young but solid."
+    },
+    {
+      "cat": "17.5",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No design project format: operates on imported images and G-code only, so there is nothing versioned to save or migrate."
+    },
+    {
+      "cat": "17.5",
+      "product": "XCS",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Native .xcs with cloud storage and cross-device sharing, tied to xTool accounts; robustness adequate, migration path points toward xTool Studio."
+    },
+    {
+      "cat": "17.5",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Projects live server-side, so versioning/migration is vendor-managed and users never hit format breakage; downside is no offline file or exposed version history."
+    },
+    {
+      "cat": "17.5",
+      "product": "gSender",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No design project format; closest analog is robust versioned settings and firmware/EEPROM backup-restore via the Config tab. No project-migration concept."
+    },
 
-    { "cat": "17.6", "product": "KerfDesk", "score": 4, "star": false, "tag": "CODE", "note": "Disciplined caps (undo, transcripts, WeakMap) but a known unbounded raster-cache leak (~800MB worst case) plus Electron/browser heft; footprint never measured." },
-    { "cat": "17.6", "product": "LightBurn", "score": 7, "star": false, "tag": "OFF", "note": "Native C++/Qt with a modest footprint versus Electron/browser rivals; 4GB minimum, 16GB for heavy images. Efficient for its capability." },
-    { "cat": "17.6", "product": "MillMage", "score": 7, "star": false, "tag": "INF", "note": "Inferred from the shared codebase: same native engine and specs as LightBurn (8GB recommended, ~450MB install); comparable footprint, not independently benchmarked." },
-    { "cat": "17.6", "product": "LaserGRBL", "score": 9, "star": false, "tag": "COMM", "note": "Lightest in the roster: a small native .NET app that runs happily on old, low-spec PCs. Featherweight is its whole appeal." },
-    { "cat": "17.6", "product": "XCS", "score": 3, "star": false, "tag": "OFF", "note": "Heaviest desktop footprint: needs 8GB+ RAM and a capable GPU; docs recommend closing other apps and staying plugged in to avoid lag." },
-    { "cat": "17.6", "product": "Easel", "score": 5, "star": false, "tag": "OFF", "note": "Footprint is a browser tab, bounded by the browser and partly server-offloaded; heavy designs still tax browser RAM. 64-bit only." },
-    { "cat": "17.6", "product": "gSender", "score": 6, "star": false, "tag": "OFF", "note": "Electron but deliberately lean: 2GB minimum, targets Raspberry Pi and mini-PCs; heavier than a bare native sender but single-board-capable." }
+    {
+      "cat": "17.6",
+      "product": "KerfDesk",
+      "score": 4,
+      "star": false,
+      "tag": "CODE",
+      "note": "Disciplined caps (undo, transcripts, WeakMap) but a known unbounded raster-cache leak (~800MB worst case) plus Electron/browser heft; footprint never measured."
+    },
+    {
+      "cat": "17.6",
+      "product": "LightBurn",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Native C++/Qt with a modest footprint versus Electron/browser rivals; 4GB minimum, 16GB for heavy images. Efficient for its capability."
+    },
+    {
+      "cat": "17.6",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "INF",
+      "note": "Inferred from the shared codebase: same native engine and specs as LightBurn (8GB recommended, ~450MB install); comparable footprint, not independently benchmarked."
+    },
+    {
+      "cat": "17.6",
+      "product": "LaserGRBL",
+      "score": 9,
+      "star": false,
+      "tag": "COMM",
+      "note": "Lightest in the roster: a small native .NET app that runs happily on old, low-spec PCs. Featherweight is its whole appeal."
+    },
+    {
+      "cat": "17.6",
+      "product": "XCS",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Heaviest desktop footprint: needs 8GB+ RAM and a capable GPU; docs recommend closing other apps and staying plugged in to avoid lag."
+    },
+    {
+      "cat": "17.6",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Footprint is a browser tab, bounded by the browser and partly server-offloaded; heavy designs still tax browser RAM. 64-bit only."
+    },
+    {
+      "cat": "17.6",
+      "product": "gSender",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Electron but deliberately lean: 2GB minimum, targets Raspberry Pi and mini-PCs; heavier than a bare native sender but single-board-capable."
+    }
   ],
   "wins": [
-    { "cat": "17.4", "vs": "LaserGRBL", "delta": 3, "claim": "KerfDesk ships an ErrorBoundary crash screen, 30s autosave, a boot restore prompt and a fingerprint-gated checkpoint resume, where LaserGRBL has no project auto-save or crash recovery at all." },
-    { "cat": "17.2", "vs": "XCS", "delta": 2, "claim": "A fully-offline installable PWA with mid-burn-safe updates versus XCS's cloud-tethered, now-EOL update path that expects connectivity for its material library and sync." },
-    { "cat": "17.1", "vs": "MillMage", "delta": 2, "claim": "The web PWA runs on macOS, Linux and ChromeOS via any Chromium browser, reaching platforms MillMage's Windows-and-macOS-only desktop cannot." }
+    {
+      "cat": "17.4",
+      "vs": "LaserGRBL",
+      "delta": 3,
+      "claim": "KerfDesk ships an ErrorBoundary crash screen, 30s autosave, a boot restore prompt and a fingerprint-gated checkpoint resume, where LaserGRBL has no project auto-save or crash recovery at all."
+    },
+    {
+      "cat": "17.2",
+      "vs": "XCS",
+      "delta": 2,
+      "claim": "A fully-offline installable PWA with mid-burn-safe updates versus XCS's cloud-tethered, now-EOL update path that expects connectivity for its material library and sync."
+    },
+    {
+      "cat": "17.1",
+      "vs": "MillMage",
+      "delta": 2,
+      "claim": "The web PWA runs on macOS, Linux and ChromeOS via any Chromium browser, reaching platforms MillMage's Windows-and-macOS-only desktop cannot."
+    }
   ],
   "gaps": [
-    { "cat": "17.6", "vs": "LaserGRBL", "delta": -5, "claim": "Resource footprint: an Electron/browser stack plus a known unbounded raster-preview cache leak (~800MB static worst case) versus LaserGRBL's featherweight native app; footprint never measured." },
-    { "cat": "17.3", "vs": "LightBurn", "delta": -2, "claim": "Large-design performance is entirely unmeasured (static call-path analysis only) with a known O(N^2) streamer, App-root re-render storm and uncached raster compile still unfixed." },
-    { "cat": "17.5", "vs": "LightBurn", "delta": -2, "claim": "Project format frozen at schema v1 with an empty migrator registry, so an older build silently drops unknown blocks on downgrade, and no historical .lf2 corpus loads in CI." },
-    { "cat": "17.4", "vs": "Easel", "delta": -2, "claim": "Crash recovery is local-only with two confirmed seam bugs (phantom restore prompt, selective-job resume dead-end) versus Easel's continuous server-side save." },
-    { "cat": "17.2", "vs": "gSender", "delta": -2, "claim": "Desktop auto-update ships unsigned with no code-signature verification (a security-adjacent tamper window), and offline install/update was never verified on a device." },
-    { "cat": "17.1", "vs": "Easel", "delta": -2, "claim": "No tablet/mobile UI and the packaged Windows .exe is never built or run in CI, so platform drift between release tags goes uncaught." }
+    {
+      "cat": "17.6",
+      "vs": "LaserGRBL",
+      "delta": -5,
+      "claim": "Resource footprint: an Electron/browser stack plus a known unbounded raster-preview cache leak (~800MB static worst case) versus LaserGRBL's featherweight native app; footprint never measured."
+    },
+    {
+      "cat": "17.3",
+      "vs": "LightBurn",
+      "delta": -2,
+      "claim": "Large-design performance is entirely unmeasured (static call-path analysis only) with a known O(N^2) streamer, App-root re-render storm and uncached raster compile still unfixed."
+    },
+    {
+      "cat": "17.5",
+      "vs": "LightBurn",
+      "delta": -2,
+      "claim": "Project format frozen at schema v1 with an empty migrator registry, so an older build silently drops unknown blocks on downgrade, and no historical .lf2 corpus loads in CI."
+    },
+    {
+      "cat": "17.4",
+      "vs": "Easel",
+      "delta": -2,
+      "claim": "Crash recovery is local-only with two confirmed seam bugs (phantom restore prompt, selective-job resume dead-end) versus Easel's continuous server-side save."
+    },
+    {
+      "cat": "17.2",
+      "vs": "gSender",
+      "delta": -2,
+      "claim": "Desktop auto-update ships unsigned with no code-signature verification (a security-adjacent tamper window), and offline install/update was never verified on a device."
+    },
+    {
+      "cat": "17.1",
+      "vs": "Easel",
+      "delta": -2,
+      "claim": "No tablet/mobile UI and the packaged Windows .exe is never built or run in CI, so platform drift between release tags goes uncaught."
+    }
   ],
   "notVerified": [
     "17.1 — no packaged Windows .exe was built, opened or run by anyone (release-manual); no macOS/Linux, tablet or touch UI verified to exist; WebSerial availability on mobile/tablet Chromium unconfirmed; CI exercises only the ubuntu web target, so Windows platform drift between release tags is uncaught.",

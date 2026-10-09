@@ -9,8 +9,14 @@
           "existence": "yes",
           "quality": "Windows 10/11 and macOS 12+ (ARM via Rosetta) desktop; Linux frozen at legacy 1.7 (the 2.x line dropped it); no web or tablet. Solid dual-desktop, narrower than the browser rivals.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/InstallLightBurn/" },
-            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/linux-support-to-end-after-v1-7/144605" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/InstallLightBurn/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://forum.lightburnsoftware.com/t/linux-support-to-end-after-v1-7/144605"
+            }
           ]
         },
         {
@@ -18,7 +24,10 @@
           "existence": "yes",
           "quality": "Windows 10/11 and macOS 13+ (ARM via Rosetta) desktop only; no Linux, no web/mobile. Same dual-desktop reach as sibling LightBurn, with a one-version-newer macOS floor.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/"
+            }
           ]
         },
         {
@@ -44,8 +53,14 @@
           "existence": "yes",
           "quality": "Browser-based: runs on Windows, macOS, Linux/Ubuntu and Chromebooks via Chrome/Edge/Safari/Firefox, with driverless WebSerial on Chrome/Edge/Opera. Broadest OS reach in the roster, tablet/Chromebook included.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
-            { "tag": "COMM", "cite": "https://forum.easel.com/t/using-chromebook-to-run-easel/66249" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/using-chromebook-to-run-easel/66249"
+            }
           ]
         },
         {
@@ -67,7 +82,10 @@
           "existence": "yes",
           "quality": "Installed desktop app; works fully offline (license re-checks online periodically). Updates are manual Help > Check for Updates that downloads the installer, gated to your license's valid update window.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/CheckForUpdates/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/CheckForUpdates/"
+            },
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/products/lightburn-core" }
           ]
         },
@@ -76,7 +94,10 @@
           "existence": "yes",
           "quality": "Installed desktop app, offline-capable like LightBurn; current, previous and beta builds listed on millmagesoftware.com with a manual updater. Same install/update model as its sibling.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/"
+            },
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
           ]
         },
@@ -103,7 +124,10 @@
           "existence": "yes",
           "quality": "No install (browser) and always the latest version — zero update friction. But internet is required to load/save; offline you can keep working and carve a loaded job, yet cannot save until reconnected.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/offline-version-of-easel/856" }
           ]
         },
@@ -113,7 +137,10 @@
           "quality": "Free installer for all four platforms; runs fully offline; in-app update guide and notifications, with frequent releases (1.6.2, May 2026). Smooth, friction-free free install/update story.",
           "evidence": [
             { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-installation/" },
-            { "tag": "OFF", "cite": "https://sienci.zendesk.com/hc/en-us/articles/39594630248724-gSender-Update-Guide" }
+            {
+              "tag": "OFF",
+              "cite": "https://sienci.zendesk.com/hc/en-us/articles/39594630248724-gSender-Update-Guide"
+            }
           ]
         }
       ]
@@ -126,8 +153,14 @@
           "existence": "yes",
           "quality": "Native C++/Qt handles large vector/raster work, but community consistently reports lag as objects/nodes pile up and after heavy image traces, with a restart restoring speed. Solid, degrades at scale.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/software-lagging-the-more-i-add-to-the-work-area-the-slower-the-software-goes/53497" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/lightburn-gets-very-slow-ang-laggy-restart-restores-the-performance/29446" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/software-lagging-the-more-i-add-to-the-work-area-the-slower-the-software-goes/53497"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/lightburn-gets-very-slow-ang-laggy-restart-restores-the-performance/29446"
+            }
           ]
         },
         {
@@ -144,7 +177,10 @@
           "existence": "yes",
           "quality": "Lightweight native app; fast on large raster-to-G-code and big files even on modest hardware, but community notes certain JPEGs crash it. Good throughput with occasional input fragility.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/" },
+            {
+              "tag": "COMM",
+              "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/"
+            },
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" }
           ]
         },
@@ -162,8 +198,14 @@
           "existence": "yes",
           "quality": "Bounded by the browser — large or many-path SVG imports are widely known to bog down browser canvases, and community guidance is to simplify paths before import. Not native-app speed on heavy designs.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.easel.com/t/system-requirements-for-running-easel-and-other-carve-software/61281" },
-            { "tag": "INF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/system-requirements-for-running-easel-and-other-carve-software/61281"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements"
+            }
           ]
         },
         {
@@ -171,7 +213,10 @@
           "existence": "yes",
           "quality": "Electron sender loads and visualizes large G-code; the 3D visualizer can lag on some GPUs (toggle hardware acceleration) and startup was heavy until load time was cut ~25s to ~4s. Generally handles big jobs.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.sienci.com/t/gsender-is-being-very-slow-and-lethargic/10045" },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.sienci.com/t/gsender-is-being-very-slow-and-lethargic/10045"
+            },
             { "tag": "OFF", "cite": "https://sienci.com/2026/04/16/gsender-1-6-0-release/" }
           ]
         }
@@ -185,8 +230,14 @@
           "existence": "yes",
           "quality": "Configurable auto-save plus a post-crash prompt to reload an AutoSave backup from Documents. A real safety net, but community reports it occasionally saves empty or loses recovery on a double-crash.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://forum.lightburnsoftware.com/t/auto-save-recovery/47604" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/if-lightburn-crashes-twice-in-a-row-before-autosave-save-it-loses-the-recover/57469" }
+            {
+              "tag": "OFF",
+              "cite": "https://forum.lightburnsoftware.com/t/auto-save-recovery/47604"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/if-lightburn-crashes-twice-in-a-row-before-autosave-save-it-loses-the-recover/57469"
+            }
           ]
         },
         {
@@ -194,8 +245,14 @@
           "existence": "yes",
           "quality": "Inferred parity: same engine as LightBurn, so auto-save/crash-recovery is expected; a patch hardened malformed-file loading to report errors instead of crashing, and it keeps the last 50 preference backups.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-08-01-patch-release" },
-            { "tag": "INF", "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-08-01-patch-release"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            }
           ]
         },
         {
@@ -203,7 +260,10 @@
           "existence": "yes",
           "quality": "Stable in normal use but no project auto-save or crash recovery — it engraves images/G-code with no saved design state — and certain files crash it. Recovery means re-importing the source. Minimal safety net.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/" },
+            {
+              "tag": "COMM",
+              "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/"
+            },
             { "tag": "INF", "cite": "https://lasergrbl.com/usage/load-and-send/" }
           ]
         },
@@ -221,7 +281,10 @@
           "existence": "yes",
           "quality": "Strongest recovery model — continuous server-side saving means a browser/tab crash reopens the project from the cloud with little loss. Caveat: edits made offline are lost if you close before reconnecting.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/offline-version-of-easel/856" }
           ]
         },
@@ -244,8 +307,14 @@
           "existence": "yes",
           "quality": "Mature XML .lbrn2 (and legacy .lbrn) project format; lossless conversion both directions, smaller/faster since 2.0, and a long track record of opening old files. Robust, near-human-readable format.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/FileManagement/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/file-type-lbrn-vs-lbrn2-what-is-difference/59699" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/FileManagement/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/file-type-lbrn-vs-lbrn2-what-is-difference/59699"
+            }
           ]
         },
         {
@@ -253,7 +322,10 @@
           "existence": "yes",
           "quality": "Binary .mage project (art, toolpaths, tools, material, layout); cross-compatible with LightBurn (.lbrn2 opens in MillMage, .mage in LightBurn); a patch improved damaged-file handling. Young but solid.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            },
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
           ]
         },
@@ -280,7 +352,10 @@
           "existence": "yes",
           "quality": "Projects live server-side (no local file), so versioning/migration is vendor-managed and users never hit format-migration breakage; the downside is no offline file and no exposed manual version history.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements"
+            },
             { "tag": "INF", "cite": "https://forum.easel.com/t/offline-version-of-easel/856" }
           ]
         },
@@ -303,8 +378,14 @@
           "existence": "yes",
           "quality": "Inferred: native C++/Qt app with a modest footprint relative to Electron/browser rivals; runs on 4GB minimum (16GB recommended for heavy images). Efficient for its capability, heavier only with large rasters.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/InstallLightBurn/" },
-            { "tag": "INF", "cite": "https://forum.lightburnsoftware.com/t/lightburn-computer-requirement/117390" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/InstallLightBurn/"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://forum.lightburnsoftware.com/t/lightburn-computer-requirement/117390"
+            }
           ]
         },
         {
@@ -312,7 +393,10 @@
           "existence": "yes",
           "quality": "Inferred from shared codebase: same native engine and published specs as LightBurn (8GB recommended, ~450MB install), so a comparable modest footprint. Identical requirements table, not independently benchmarked.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/GetStarted/InstallMillMage/"
+            },
             { "tag": "INF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
           ]
         },
@@ -321,7 +405,10 @@
           "existence": "yes",
           "quality": "Lightest in the roster — a small native Windows/.NET app that runs happily on old, low-spec PCs with minimal RAM/CPU. Being featherweight is its whole appeal.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/" },
+            {
+              "tag": "COMM",
+              "cite": "https://engravingfuture.com/software-for-laser-engraving/lasergrbl/"
+            },
             { "tag": "OFF", "cite": "https://lasergrbl.com/faq/" }
           ]
         },
@@ -339,8 +426,14 @@
           "existence": "yes",
           "quality": "Inferred: footprint is a browser tab — memory/CPU bounded by the browser and partly offloaded to Inventables' servers; nothing to install, but a heavy design can still tax browser RAM. 64-bit only.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements" },
-            { "tag": "INF", "cite": "https://forum.easel.com/t/system-requirements-for-running-easel-and-other-carve-software/61281" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012725734-What-are-Easel-s-System-Requirements"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://forum.easel.com/t/system-requirements-for-running-easel-and-other-carve-software/61281"
+            }
           ]
         },
         {

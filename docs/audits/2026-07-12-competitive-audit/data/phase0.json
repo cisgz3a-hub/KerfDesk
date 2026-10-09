@@ -37,10 +37,7 @@
         "version": "v7.14.1 (released 2025-03-01) - still the latest GitHub release as of 2026-07-12; no release in ~16 months",
         "price": "Free, open source; donation-supported ('LaserGRBL is free and opensource, but its development require time and money')",
         "notes": "Windows-only GRBL laser sender/engraver. Third-party download mirrors report stale version numbers (e.g. 6.2.1) - the GitHub releases page is authoritative.",
-        "sources": [
-          "https://github.com/arkypita/LaserGRBL/releases",
-          "https://lasergrbl.com"
-        ]
+        "sources": ["https://github.com/arkypita/LaserGRBL/releases", "https://lasergrbl.com"]
       },
       {
         "name": "XCS",

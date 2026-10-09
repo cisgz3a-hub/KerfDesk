@@ -5,12 +5,30 @@
       "id": "12.1",
       "summary": "Full lens+bed calibration suite: printable checkerboard capture with live detection, fisheye/Brown-Conrady solve with pose-diversity + trust gating and an A/B review (ADR-108), and a bed-alignment wizard that burns a 5-marker pattern and auto-detects it to solve the homography with no clicks (ADR-109/122). Manual 4-point bed-corner fallback exists for the machine camera (now letterbox-corrected).",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/camera/wizard/CameraCalibrationWizard.tsx, print-checkerboard.ts, use-live-detection.ts (lens calibration capture + live checkerboard detection)" },
-        { "tag": "CODE", "cite": "src/core/camera/calibrate.ts, calibration-trust.ts, pose-diversity.ts (LM solve + trust/pose-diversity gating; ReviewStep A/B)" },
-        { "tag": "CODE", "cite": "src/core/camera/align-markers.ts + src/ui/camera/align-wizard/burn-markers-step.ts + src/ui/camera/auto-align.ts (5-marker no-click auto-align, ADR-109/122)" },
-        { "tag": "CODE", "cite": "src/ui/camera/NetworkCameraView.tsx:32-58,73-91 (manual 4-point bed-corner fallback; clickToIntrinsicPixel now maps through the object-fit content rect, fixing 2026-07-10 letterbox major S7-F1)" },
-        { "tag": "TEST", "cite": "src/core/camera/calibrate.test.ts, detect-checkerboard.test.ts, align-markers.test.ts, auto-align.test.ts; src/ui/camera/NetworkCameraView.test.ts" },
-        { "tag": "CODE", "cite": "DECISIONS.md:4713-4746 (ADR-108 lens calibration), 4934-4979 (ADR-109 auto-align markers), 5771-5806 (ADR-122 alignment wizard)" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/wizard/CameraCalibrationWizard.tsx, print-checkerboard.ts, use-live-detection.ts (lens calibration capture + live checkerboard detection)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/camera/calibrate.ts, calibration-trust.ts, pose-diversity.ts (LM solve + trust/pose-diversity gating; ReviewStep A/B)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/camera/align-markers.ts + src/ui/camera/align-wizard/burn-markers-step.ts + src/ui/camera/auto-align.ts (5-marker no-click auto-align, ADR-109/122)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/NetworkCameraView.tsx:32-58,73-91 (manual 4-point bed-corner fallback; clickToIntrinsicPixel now maps through the object-fit content rect, fixing 2026-07-10 letterbox major S7-F1)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/camera/calibrate.test.ts, detect-checkerboard.test.ts, align-markers.test.ts, auto-align.test.ts; src/ui/camera/NetworkCameraView.test.ts"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:4713-4746 (ADR-108 lens calibration), 4934-4979 (ADR-109 auto-align markers), 5771-5806 (ADR-122 alignment wizard)"
+        }
       ],
       "notVerified": "Calibration accuracy never verified on real hardware or a perceptual fixture (no camera fixtures exist under src/__fixtures__/perceptual). WORKFLOW.md F-CAM1/F-CAM4 drift (audit S7-F3, describes a nonexistent drag-marker flow) was not re-checked in the current tree this session. Marker contrast/lighting robustness is HW-only per ADR-109."
     },
@@ -18,13 +36,34 @@
       "id": "12.2",
       "summary": "Live USB overlay via CSS matrix3d plus a captured-still 'Update Overlay' path, opacity control, tracks zoom/pan. The two 2026-07-10 mis-registration majors are now fixed: apply-time resolution rescale of the homography and basis-honoring (rectified stills de-fisheyed first; a rectified live-video overlay is refused with a notice), sharing one helper with Trace so they cannot diverge (ADR-134/R2). Physical registration accuracy is hardware-CLAIMED.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/camera/WorkspaceCameraOverlay.tsx:24-126 (still/live overlay, opacity, zoom/pan tracking, basis-mismatch notice)" },
-        { "tag": "CODE", "cite": "src/ui/camera/camera-overlay-transform.ts:15-29 (compose homography x view x cssScale into matrix3d)" },
-        { "tag": "CODE", "cite": "src/core/camera/alignment-resolution.ts:33-46 (scaleAlignmentHomographyToFrame — fixes resolution-mismatch major S7-F2; consumed at WorkspaceCameraOverlay.tsx:97 and trace-from-camera.ts:55)" },
-        { "tag": "CODE", "cite": "src/core/camera/rectify-for-alignment.ts:19-39 + src/ui/camera/workspace-overlay-plan.ts:27-44 (basis honoring shared with Trace — fixes overlay raw-vs-rectified bug)" },
-        { "tag": "TEST", "cite": "src/ui/camera/WorkspaceCameraOverlay.test.tsx, camera-overlay-transform.test.ts, workspace-overlay-plan.test.ts, src/core/camera/alignment-resolution.test.ts, rectify-for-alignment.test.ts" },
-        { "tag": "CODE", "cite": "DECISIONS.md:6385-6408 (ADR-134 overlay honors alignment basis)" },
-        { "tag": "HW-CLAIMED", "cite": "DECISIONS.md:4694-4704 (ADR-107: overlay-lands-on-bed accuracy is HW-only, never proven); 6408 (ADR-134: not perceptually verified, needs rendered comparison on real hardware)" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/WorkspaceCameraOverlay.tsx:24-126 (still/live overlay, opacity, zoom/pan tracking, basis-mismatch notice)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/camera-overlay-transform.ts:15-29 (compose homography x view x cssScale into matrix3d)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/camera/alignment-resolution.ts:33-46 (scaleAlignmentHomographyToFrame — fixes resolution-mismatch major S7-F2; consumed at WorkspaceCameraOverlay.tsx:97 and trace-from-camera.ts:55)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/camera/rectify-for-alignment.ts:19-39 + src/ui/camera/workspace-overlay-plan.ts:27-44 (basis honoring shared with Trace — fixes overlay raw-vs-rectified bug)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/camera/WorkspaceCameraOverlay.test.tsx, camera-overlay-transform.test.ts, workspace-overlay-plan.test.ts, src/core/camera/alignment-resolution.test.ts, rectify-for-alignment.test.ts"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:6385-6408 (ADR-134 overlay honors alignment basis)"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "DECISIONS.md:4694-4704 (ADR-107: overlay-lands-on-bed accuracy is HW-only, never proven); 6408 (ADR-134: not perceptually verified, needs rendered comparison on real hardware)"
+        }
       ],
       "notVerified": "Overlay-lands-on-the-real-bed registration was never physically or perceptually verified; no camera perceptual fixture exists. A rectified-basis alignment on a live USB stream is deliberately replaced by a 'capture a still' notice (no per-frame live de-fisheye). Overlay panel is a fixed non-draggable floating panel (audit S7-F9 polish) — not re-checked."
     },
@@ -32,11 +71,26 @@
       "id": "12.3",
       "summary": "Capture-to-trace (ADR-110): the aligned camera frame is warped top-down into bed-mm space via the inverse homography and handed to the existing trace pipeline as a RasterImage whose bounds ARE the bed, so traced vectors land at true machine coordinates with no manual positioning. Basis-enforced (rectified de-fisheyes first, refuses without calibration) and resolution-rescaled.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/camera/trace-from-camera.ts:37-81 (buildCameraTraceImage → bed-registered RasterImage, bounds = bed)" },
-        { "tag": "CODE", "cite": "src/core/camera/warp-to-bed.ts (output→input sampling through inverse homography, shared bilinear sampler)" },
-        { "tag": "CODE", "cite": "src/ui/camera/trace-from-camera.ts:44-55 (rectifyForAlignmentBasis basis guard + scaleAlignmentHomographyToFrame resolution guard)" },
-        { "tag": "TEST", "cite": "src/ui/camera/trace-from-camera.test.ts; src/core/camera/warp-to-bed.test.ts" },
-        { "tag": "CODE", "cite": "DECISIONS.md:4983-5001 (ADR-110 capture-to-trace at true bed coordinates)" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/trace-from-camera.ts:37-81 (buildCameraTraceImage → bed-registered RasterImage, bounds = bed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/camera/warp-to-bed.ts (output→input sampling through inverse homography, shared bilinear sampler)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/trace-from-camera.ts:44-55 (rectifyForAlignmentBasis basis guard + scaleAlignmentHomographyToFrame resolution guard)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/camera/trace-from-camera.test.ts; src/core/camera/warp-to-bed.test.ts"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:4983-5001 (ADR-110 capture-to-trace at true bed coordinates)"
+        }
       ],
       "notVerified": "Trace-from-camera output fidelity and physical landing were never perceptually or hardware verified; it inherits the same unverified alignment. TRACE_PIXELS_PER_MM=4 (~102 dpi) is outline-oriented, not a fine-detail warp. No perceptual fixture synthesizes a known frame through the full warp (audit S14-F10 recommendation not implemented)."
     },
@@ -44,10 +98,22 @@
       "id": "12.4",
       "summary": "KerfDesk has NO dedicated print-and-cut / registration-mark workflow — no crop/registration-mark generation and no 2-point re-registration of an externally printed sheet. ADR-109 explicitly defers print-and-cut as the 'v3.5 follow-on.' The only adjacent capability is trace-from-camera (capture placed printed artwork → trace → cut at bed coordinates), which is markerless. The 5-marker system is for bed calibration, not sheet registration.",
       "evidence": [
-        { "tag": "CODE", "cite": "DECISIONS.md:4976-4979 (ADR-109 'Out of scope: Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5 follow-on … deferred')" },
-        { "tag": "CODE", "cite": "grep 'print-and-cut|registration mark|fiducial|crop mark' across src/ → zero implementation matches (sole hit src/ui/library/design-library-owned-svg.ts is unrelated)" },
-        { "tag": "CODE", "cite": "DECISIONS.md:4682 (ADR-107 staging listed '2-point print-and-cut' under v3, but shipped v3 = auto-align markers only per ADR-109)" },
-        { "tag": "CODE", "cite": "src/ui/camera/trace-from-camera.ts (adjacent markerless capture-to-cut path — not print-and-cut registration)" }
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:4976-4979 (ADR-109 'Out of scope: Print-and-cut (2-point re-registration of a printed sheet) — the natural v3.5 follow-on … deferred')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep 'print-and-cut|registration mark|fiducial|crop mark' across src/ → zero implementation matches (sole hit src/ui/library/design-library-owned-svg.ts is unrelated)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:4682 (ADR-107 staging listed '2-point print-and-cut' under v3, but shipped v3 = auto-align markers only per ADR-109)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/camera/trace-from-camera.ts (adjacent markerless capture-to-cut path — not print-and-cut registration)"
+        }
       ],
       "notVerified": "N/A — the feature is absent by ADR decision, not unverified. Note the burned 5-marker pattern (align-markers.ts) registers the CAMERA to the bed, not an externally printed design; it is not a print-and-cut path."
     },
@@ -55,12 +121,30 @@
       "id": "12.5",
       "summary": "Strong, camera-free. Two fixture workflows: the ADR-057 Registration Jig (burn an outline, place material inside for repeat placement) and Capture Board Corners (ADR-124) — jog to a physical board's corners, set G92 origin, draw an exact outline, then center/Fit/Array artwork (ADR-125), including circle boards (ADR-126). Order-independent geometry with off-square/first-corner diagnostics; captured boards are provenance-locked from the jig panel (ADR-130).",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/scene/board-capture.ts:63-89,168-182 (order-independent best-fit rect; off-square + firstCornerOffsetMm diagnostics — the latter fixes audit minor S7-F5)" },
-        { "tag": "CODE", "cite": "src/core/scene/board-fit-region.ts (inscribed-square fit for circle boards); src/ui/laser/board-capture/ (BoardCapturePanel, capture steps, BoardArrayForm, placement controls)" },
-        { "tag": "CODE", "cite": "src/ui/workspace/RegistrationJigOutlineControls.tsx:31-78 (jig outline create/lock; disabled for a captured board via box.provenance === 'captured-board')" },
-        { "tag": "CODE", "cite": "DECISIONS.md:5889-5958 (ADR-124 capture board corners), 6055 (ADR-125 fill/auto-fit/array), 6122 (ADR-126 board-shape union/circle), 6291-6309 (ADR-130 registration-box provenance guard)" },
-        { "tag": "TEST", "cite": "src/core/scene/board-capture.test.ts, board-fit-region.test.ts; src/ui/laser/board-capture/use-board-capture.test.ts, BoardCapturePanel.test.tsx" },
-        { "tag": "HW-CLAIMED", "cite": "DECISIONS.md:6016-6021 (ADR-124: board-capture G92 origin, jog-to-corner, and burn placement are hardware-CLAIMED, not verified); PROJECT.md 'Hardware still CLAIMED'" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/board-capture.ts:63-89,168-182 (order-independent best-fit rect; off-square + firstCornerOffsetMm diagnostics — the latter fixes audit minor S7-F5)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/board-fit-region.ts (inscribed-square fit for circle boards); src/ui/laser/board-capture/ (BoardCapturePanel, capture steps, BoardArrayForm, placement controls)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/RegistrationJigOutlineControls.tsx:31-78 (jig outline create/lock; disabled for a captured board via box.provenance === 'captured-board')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:5889-5958 (ADR-124 capture board corners), 6055 (ADR-125 fill/auto-fit/array), 6122 (ADR-126 board-shape union/circle), 6291-6309 (ADR-130 registration-box provenance guard)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/scene/board-capture.test.ts, board-fit-region.test.ts; src/ui/laser/board-capture/use-board-capture.test.ts, BoardCapturePanel.test.tsx"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "DECISIONS.md:6016-6021 (ADR-124: board-capture G92 origin, jog-to-corner, and burn placement are hardware-CLAIMED, not verified); PROJECT.md 'Hardware still CLAIMED'"
+        }
       ],
       "notVerified": "G92 origin accuracy, jog-to-corner landing, and drawn-outline-vs-real-board registration are hardware-CLAIMED, never physically verified. The board outline was never perceptually rendered even at authoring (per ADR-124). Circle typed-diameter cross-check (audit polish S7-F10) and in-capture jog controls (S7-F6) remain gaps; not re-checked whether they landed."
     }

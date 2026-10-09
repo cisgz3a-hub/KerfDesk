@@ -9,10 +9,22 @@
           "existence": "yes",
           "quality": "Potrace-licensed Trace Image tool; docs and community agree it is clean on high-contrast logos/line art but weak on fine detail; forum consensus workaround is upscaling input before tracing.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/image-trace-quality/154882" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/optimizing-image-trace-input/124871" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/trace-image-procedure/114000" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/image-trace-quality/154882"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/optimizing-image-trace-input/124871"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/trace-image-procedure/114000"
+            }
           ]
         },
         {
@@ -20,8 +32,14 @@
           "existence": "yes",
           "quality": "Trace Image tool documented with the same dialog/controls as LightBurn's (Cutoff/Threshold, Optimize 0.2 default, Smoothness 0-1.33). No community quality data found for MillMage specifically; same engine as LightBurn inferred [INF].",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/" },
-            { "tag": "INF", "cite": "Shared LightBurn Software doc infrastructure and identical control set imply the same Potrace-based engine; unverified." }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/"
+            },
+            {
+              "tag": "INF",
+              "cite": "Shared LightBurn Software doc infrastructure and identical control set imply the same Potrace-based engine; unverified."
+            }
           ]
         },
         {
@@ -29,9 +47,15 @@
           "existence": "yes",
           "quality": "Potrace-based Vectorize tool; community rates it well for logos ('best they could find' vs other Potrace tools), but stroke art gets the classic double-line outline problem; optional fill pass documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
             { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/1218" },
-            { "tag": "COMM", "cite": "https://vectosolve.com/blog/best-image-to-gcode-converters-2026" }
+            {
+              "tag": "COMM",
+              "cite": "https://vectosolve.com/blog/best-image-to-gcode-converters-2026"
+            }
           ]
         },
         {
@@ -41,7 +65,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/2527" },
             { "tag": "COMM", "cite": "https://craftetch.com/xcs-vs-lightburn/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/xcs-vs-lightburn/166171" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/xcs-vs-lightburn/166171"
+            }
           ]
         },
         {
@@ -49,7 +76,10 @@
           "existence": "yes",
           "quality": "Image Trace app (JPG/PNG only); official guidance: best on high-contrast two-tone images. Community reports small lettering traces blurry and low-res clipart works poorly.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/image-trace-quality/90653" },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/resolution/63057" }
           ]
@@ -64,9 +94,18 @@
           "existence": "no",
           "quality": "No centerline trace as of 2.1; long-standing open feature request (fider) and repeated forum threads confirm absence; users are pointed to Inkscape centerline extensions.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://lightburn.fider.io/posts/371/trace-center-line-option" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/centerline-trace-feature-in-2024/117672" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/ (no centerline option listed in the Trace Image dialog)" }
+            {
+              "tag": "COMM",
+              "cite": "https://lightburn.fider.io/posts/371/trace-center-line-option"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/centerline-trace-feature-in-2024/117672"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/TraceImage/ (no centerline option listed in the Trace Image dialog)"
+            }
           ]
         },
         {
@@ -74,8 +113,14 @@
           "existence": "no",
           "quality": "MillMage's Trace Image reference documents the same option set as LightBurn's with no centerline mode listed; absence inferred from the complete documented dialog [INF].",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/" },
-            { "tag": "INF", "cite": "Doc page enumerates all trace options and none is a centerline mode; no hands-on confirmation." }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/"
+            },
+            {
+              "tag": "INF",
+              "cite": "Doc page enumerates all trace options and none is a centerline mode; no hands-on confirmation."
+            }
           ]
         },
         {
@@ -83,7 +128,10 @@
           "existence": "yes",
           "quality": "Documented 'centerline' vectorization option producing a single line; official docs themselves say it 'gives less accurate results' than outline mode and has no fill option.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
             { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/597" }
           ]
         },
@@ -91,18 +139,22 @@
           "product": "XCS",
           "existence": "yes",
           "quality": "xTool Studio documents a 'Center tracing' mode generating vectors along the centerline of color blocks, aimed at single-color bitmaps and line drawings. Quality unverified by community sources.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/2527" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2527" }]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "No centerline trace; Image Trace offers only outline ('Trace Outlines'). Community threads on single-line text/drawings resolve via external tools (Inkscape centerline trace, Hershey text).",
           "evidence": [
-            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/import-image-trace-single-line-drawing-issue/32810" },
+            {
+              "tag": "COMM",
+              "cite": "https://discuss.inventables.com/t/import-image-trace-single-line-drawing-issue/32810"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/single-line-fonts/15239" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            }
           ]
         }
       ]
@@ -123,7 +175,10 @@
           "existence": "yes",
           "quality": "Identical documented control set to LightBurn: Cutoff/Threshold, Ignore Less Than, Optimize, Smoothness, Trace Transparency, Sketch Trace, boundary select, fade/show-points, live preview. No presets documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/"
+            }
           ]
         },
         {
@@ -131,7 +186,10 @@
           "existence": "yes",
           "quality": "Documented controls: Threshold, Brightness/Contrast, Spot Removal, Smoothing, Optimize, Downsampling, Adaptive Quality, Optimize Travel, optional Filling pass; preview in the import dialog. Utilitarian WinForms UX, no presets documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" }
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            }
           ]
         },
         {
@@ -148,7 +206,10 @@
           "existence": "yes",
           "quality": "Minimal documented control set: Threshold, Smoothing, Invert, Trace Outlines; JPG/PNG input only. Simplest UX in the roster; no boundary select, node display, or presets documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            }
           ]
         }
       ]
@@ -169,7 +230,10 @@
           "existence": "yes",
           "quality": "Same limited story as LightBurn: Sketch Trace for unevenly-lit sketch photos; docs state results vary with photograph quality and recommend high-contrast sources. No color/multi-tone decomposition documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/"
+            }
           ]
         },
         {
@@ -177,7 +241,10 @@
           "existence": "no",
           "quality": "No multi-tone trace: vectorization is single-threshold black/white (brightness/contrast only prep) and docs position it for logos/clean graphics; photos are routed to the grayscale/dithering raster importer instead (a different sector).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" }
           ]
         },
@@ -196,7 +263,10 @@
           "existence": "yes",
           "quality": "Minimal: single Threshold binarization of grayscale sources only; official guidance says two-tone/high-contrast works best; community confirms photos and low-res sources trace poorly. No multi-level or color separation.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/image-trace-quality/90653" },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/resolution/63057" }
           ]
@@ -211,8 +281,14 @@
           "existence": "unknown",
           "quality": "No documented size limits or performance claims for 2.1. Historical (mostly 1.x-era) community reports of freezes/crashes tracing large or complex images exist; current 2.1 behavior at size unverified.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/lightburn-crashes-when-tracing-images/41661" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/freezing-while-using-offset-or-trace/45712" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/lightburn-crashes-when-tracing-images/41661"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/freezing-while-using-offset-or-trace/45712"
+            }
           ]
         },
         {
@@ -220,7 +296,10 @@
           "existence": "unknown",
           "quality": "No documentation or community evidence found on trace robustness or speed with large images in MillMage 0.8.x.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/ (no size/performance guidance present)" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/TraceImage/ (no size/performance guidance present)"
+            }
           ]
         },
         {
@@ -228,7 +307,10 @@
           "existence": "yes",
           "quality": "Only product with documented at-size mitigations: Downsampling reduces resolution to kill jaggy noise and Adaptive Quality auto-adjusts detail to job size; docs claim good results 'with any type of image'. Independent speed benchmarks not found.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" }
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            }
           ]
         },
         {
@@ -236,7 +318,10 @@
           "existence": "unknown",
           "quality": "No documentation or community evidence found on xTool Studio trace behavior with large images or degenerate inputs.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/2527 (no size/performance guidance present)" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.xtool.com/article/2527 (no size/performance guidance present)"
+            }
           ]
         },
         {
@@ -244,7 +329,10 @@
           "existence": "unknown",
           "quality": "Web SaaS; JPG/PNG only is the sole documented input constraint. No published upload size limit or performance data found; community complaints center on low-resolution inputs, not large-image failures.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            },
             { "tag": "COMM", "cite": "https://forum.easel.com/t/resolution/63057" }
           ]
         }

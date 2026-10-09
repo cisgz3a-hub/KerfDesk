@@ -5,12 +5,30 @@
       "id": "14.1",
       "summary": "Configurable power×speed grid (ADR-044). Rows=speed (high→low), columns=power (low→high via object powerScale); rows/cols clamped 1-20, default 10×10; cell W/H, gap, origin adjustable; burned numeric axis labels. Emits ordinary Scene → normal preview/save/frame/start pipeline. Only two axes: no passes or interval axis (LightBurn Material Test also varies Interval/Passes).",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/job/material-test-grid.ts:71-133 generateMaterialTestGrid — speeds mapped to per-row fill layers (89,93-100), powers mapped to columns via object powerScale (90,108-115), labels appended (129,159-182); counts clamped 1-20 (17-18,72-73), power 0-100 (252-254)" },
-        { "tag": "CODE", "cite": "src/core/job/material-test-grid.ts:26-40 MaterialTestGridOptions exposes only rows/columns/speedMin-Max/powerMin-Max/cellW-H/gap/origin — no passes or interval field" },
-        { "tag": "CODE", "cite": "src/ui/commands/CommandShell.tsx:238-248 MaterialDialog calls generateMaterialTestGrid then replaceSceneWithGeneratedScene (whole-scene replace); command enabled at src/ui/commands/command-families.ts:283-289" },
-        { "tag": "CODE", "cite": "src/ui/calibration/MaterialTestDialog.tsx:28-55 default draft 10×10, speed 1000-3000, power 10-40; localStorage draft persistence" },
-        { "tag": "CODE", "cite": "DECISIONS.md:2262-2264 ADR-044 records LightBurn Material Test varies Power/Speed/Interval/Passes; KerfDesk implements speed×power only (point 2, lines 2283-2286)" },
-        { "tag": "TEST", "cite": "src/core/job/material-test-grid.test.ts (4 tests) — fill layers + closed squares, burned labels match settings, row/column ordering; passed this session (50/50 S14 run via vitest)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/material-test-grid.ts:71-133 generateMaterialTestGrid — speeds mapped to per-row fill layers (89,93-100), powers mapped to columns via object powerScale (90,108-115), labels appended (129,159-182); counts clamped 1-20 (17-18,72-73), power 0-100 (252-254)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/material-test-grid.ts:26-40 MaterialTestGridOptions exposes only rows/columns/speedMin-Max/powerMin-Max/cellW-H/gap/origin — no passes or interval field"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/CommandShell.tsx:238-248 MaterialDialog calls generateMaterialTestGrid then replaceSceneWithGeneratedScene (whole-scene replace); command enabled at src/ui/commands/command-families.ts:283-289"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/calibration/MaterialTestDialog.tsx:28-55 default draft 10×10, speed 1000-3000, power 10-40; localStorage draft persistence"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:2262-2264 ADR-044 records LightBurn Material Test varies Power/Speed/Interval/Passes; KerfDesk implements speed×power only (point 2, lines 2283-2286)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/material-test-grid.test.ts (4 tests) — fill layers + closed squares, burned labels match settings, row/column ordering; passed this session (50/50 S14 run via vitest)"
+        }
       ],
       "notVerified": "No perceptual/hardware proof: the grid has never been rendered-compared or burned on real material to confirm labels are readable and chosen cells usable — the hardware verification ADR-044 explicitly requires (Consequences, DECISIONS.md:2305-2307). Repo hardware ledger = CLAIMED. Whole-scene replace vs LightBurn's insert-at-job-origin not perceptually assessed."
     },
@@ -18,12 +36,30 @@
       "id": "14.2",
       "summary": "Interval Test is functional: fixed speed/power, hatch interval swept across 1-20 steps (min 0.05mm) as fill swatches with burned labels; default 10 steps 0.08-0.2mm. Focus Test menu item exists but is PERMANENTLY DISABLED (no Z-motion generator) and never runs even when the profile advertises verified Z. A bidirectional scan-offset calibration generator also exists.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/job/interval-test-grid.ts:57-112 generateIntervalTestGrid — steps clamp 1-20 (17-18), interval floor 0.05mm (23-24,190-192), per-step fill layer carries hatchSpacingMm (114-127); labels burned (97-108)" },
-        { "tag": "CODE", "cite": "src/ui/calibration/IntervalTestDialog.tsx:26-49 default 10 steps, speed 1500, power 30, interval 0.08-0.2mm; wired via src/ui/commands/CommandShell.tsx:226-235 (replaceSceneWithGeneratedScene) and enabled command-families.ts:290-296" },
-        { "tag": "CODE", "cite": "src/ui/commands/command-families.ts:308-317 focusTestCommand returns disabled('tools.focus-test', … 'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run')" },
-        { "tag": "CODE", "cite": "src/ui/commands/use-app-commands.ts:149-151 focusTestAvailable = profileSupportsCapability(device,'z-axis') && zTravelConfirmed — computed but NOT consumed to enable the command; no focus-test grid generator exists (grep 'focus' in src/core/job = 0 files)" },
-        { "tag": "CODE", "cite": "src/core/job/scan-offset-calibration-pattern.ts:59-138 generateScanOffsetCalibrationPattern — bidirectional scanline swatches sweeping speed, third functional calibration generator (Scan Offset Test, command-families.ts:297-303)" },
-        { "tag": "TEST", "cite": "src/core/job/interval-test-grid.test.ts (5) + scan-offset-calibration-pattern.test.ts (3) pass; src/ui/commands/command-registry.test.ts:221-245 asserts Focus Test stays disabled and never calls focusTest even with focusTestAvailable:true (29 tests pass this session)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/interval-test-grid.ts:57-112 generateIntervalTestGrid — steps clamp 1-20 (17-18), interval floor 0.05mm (23-24,190-192), per-step fill layer carries hatchSpacingMm (114-127); labels burned (97-108)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/calibration/IntervalTestDialog.tsx:26-49 default 10 steps, speed 1500, power 30, interval 0.08-0.2mm; wired via src/ui/commands/CommandShell.tsx:226-235 (replaceSceneWithGeneratedScene) and enabled command-families.ts:290-296"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/command-families.ts:308-317 focusTestCommand returns disabled('tools.focus-test', … 'Focus Test needs a dedicated, hardware-verified Z-motion generator before it can run')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/commands/use-app-commands.ts:149-151 focusTestAvailable = profileSupportsCapability(device,'z-axis') && zTravelConfirmed — computed but NOT consumed to enable the command; no focus-test grid generator exists (grep 'focus' in src/core/job = 0 files)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/scan-offset-calibration-pattern.ts:59-138 generateScanOffsetCalibrationPattern — bidirectional scanline swatches sweeping speed, third functional calibration generator (Scan Offset Test, command-families.ts:297-303)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/interval-test-grid.test.ts (5) + scan-offset-calibration-pattern.test.ts (3) pass; src/ui/commands/command-registry.test.ts:221-245 asserts Focus Test stays disabled and never calls focusTest even with focusTestAvailable:true (29 tests pass this session)"
+        }
       ],
       "notVerified": "Focus Test is a stub — no Z-ramp/focus-ramp output can be produced, so nothing to verify beyond 'disabled'. Interval-test swatches never rendered/burned to confirm the readable-best-interval workflow. Autofocus (probe-based, src/ui/state/autofocus-action.ts) is separate from a focus test grid and HW-CLAIMED."
     },
@@ -31,11 +67,26 @@
       "id": "14.3",
       "summary": "Each generator exposes numeric fields (material: rows/cols/speed·power ranges/cell W·H/gap; interval: steps/speed/power/interval range/swatch/gap; scan-offset: adds hatch spacing/overscan). Labels are auto-generated numeric only via a 7-segment renderer (digits, '.', '-') burned as a line layer at 20% / 1500. Safety caps: power clamped 0-100, min speed/interval/cell floors. No custom titles, no per-axis parameter choice, no passes axis.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/calibration/MaterialTestDialog.tsx:45-55 FIELD_SPECS (power min0 max100), IntervalTestDialog.tsx:41-49, ScanOffsetCalibrationDialog fields — all numeric CalibrationNumberField inputs; drafts persisted to localStorage (calibration-draft-storage)" },
-        { "tag": "CODE", "cite": "src/core/job/calibration-labels.ts:19-40 seven-segment SEGMENTS/DIGITS render digits only; 106-112 segmentsForChar handles '0'-'9','.','-' and returns [] for letters (no text/title/unit labels); labels burned as a 'line' layer at LABEL_POWER 20 / LABEL_SPEED 1500 (12-13,42-48)" },
-        { "tag": "CODE", "cite": "src/core/job/material-test-grid.ts:72-73 counts clamped 1-20, 252-254 clampPower 0-100, 82-86 cell min 0.1mm; axes are fixed (speed=rows 89, power=columns 90) with no UI to swap which parameter varies per axis" },
-        { "tag": "CODE", "cite": "src/core/job/interval-test-grid.ts:186-192 clampPower 0-100 + clampInterval floor 0.05mm; scan-offset-calibration-pattern.ts:219-221 clampPower — power safety cap is a field max plus a core clamp, no explicit fire-risk warning" },
-        { "tag": "TEST", "cite": "src/core/job/material-test-grid.test.ts:56-87 'adds burned speed and power labels matching the generated settings' (labels ['10','25','40','3000','1000']); MaterialTestDialog.test.tsx (3) + IntervalTestDialog.test.tsx (3) pass this session" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/calibration/MaterialTestDialog.tsx:45-55 FIELD_SPECS (power min0 max100), IntervalTestDialog.tsx:41-49, ScanOffsetCalibrationDialog fields — all numeric CalibrationNumberField inputs; drafts persisted to localStorage (calibration-draft-storage)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/calibration-labels.ts:19-40 seven-segment SEGMENTS/DIGITS render digits only; 106-112 segmentsForChar handles '0'-'9','.','-' and returns [] for letters (no text/title/unit labels); labels burned as a 'line' layer at LABEL_POWER 20 / LABEL_SPEED 1500 (12-13,42-48)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/material-test-grid.ts:72-73 counts clamped 1-20, 252-254 clampPower 0-100, 82-86 cell min 0.1mm; axes are fixed (speed=rows 89, power=columns 90) with no UI to swap which parameter varies per axis"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/interval-test-grid.ts:186-192 clampPower 0-100 + clampInterval floor 0.05mm; scan-offset-calibration-pattern.ts:219-221 clampPower — power safety cap is a field max plus a core clamp, no explicit fire-risk warning"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/material-test-grid.test.ts:56-87 'adds burned speed and power labels matching the generated settings' (labels ['10','25','40','3000','1000']); MaterialTestDialog.test.tsx (3) + IntervalTestDialog.test.tsx (3) pass this session"
+        }
       ],
       "notVerified": "Whether the auto-numeric labels are physically legible at small cell sizes is unproven (no render/burn). No arbitrary-text or unit annotation on cells; not perceptually assessed. Power cap of 100% is a value clamp only — no safety-warning UX verified. LightBurn's Interval/Passes-axis flexibility not matched (see 14.1)."
     },
@@ -43,11 +94,26 @@
       "id": "14.4",
       "summary": "Scan-offset has a full round-trip: burn the swatch pattern, read each speed's best offset, type speed/offset pairs in Measured Scan Offset Apply, and 'Apply measured offsets' writes device.scanningOffsets (merged by speed) into the active DeviceProfile, later applied at compile. Material/Interval → saved material preset has NO automated path: the test-swatch→preset create path was removed (ADR-047); the Material Library wizard is the sole manual-entry authoring route.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/ui/laser/MeasuredScanOffsetApply.tsx:60-67 'Apply measured offsets' → updateDeviceProfile({ scanningOffsets: measured }); rows seeded from profile (112-121), merged/deduped by speed (130-137 mergeScanOffsetTableBySpeed)" },
-        { "tag": "CODE", "cite": "src/core/job/scan-offset-calibration-pattern.ts:120-135 burns a speed label under each swatch specifically so the operator can enter the offset for that speed in the apply UI — the two halves of the round-trip are coupled by design" },
-        { "tag": "CODE", "cite": "DECISIONS.md:3508-3512 ADR-047 — 'the calibration-from-test-swatch create path are removed (maintainer decision, Phase 5): the wizard is the sole authoring path … turning a selected test swatch into a calibrated preset can be reintroduced later'; no material-cell→preset action exists" },
-        { "tag": "TEST", "cite": "src/ui/laser/MeasuredScanOffsetApply.test.tsx (2 tests) pass this session — apply writes measured offsets to the profile" },
-        { "tag": "CODE", "cite": "src/core/job/scan-offset.ts (offsetForSpeed, per consolidated-audit v2 §A.4 line 615) defines off-table behavior (linear-from-rest below first point, clamp above last, zero for empty table) so the applied calibration feeds compile deterministically" }
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/MeasuredScanOffsetApply.tsx:60-67 'Apply measured offsets' → updateDeviceProfile({ scanningOffsets: measured }); rows seeded from profile (112-121), merged/deduped by speed (130-137 mergeScanOffsetTableBySpeed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/scan-offset-calibration-pattern.ts:120-135 burns a speed label under each swatch specifically so the operator can enter the offset for that speed in the apply UI — the two halves of the round-trip are coupled by design"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:3508-3512 ADR-047 — 'the calibration-from-test-swatch create path are removed (maintainer decision, Phase 5): the wizard is the sole authoring path … turning a selected test swatch into a calibrated preset can be reintroduced later'; no material-cell→preset action exists"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/ui/laser/MeasuredScanOffsetApply.test.tsx (2 tests) pass this session — apply writes measured offsets to the profile"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/scan-offset.ts (offsetForSpeed, per consolidated-audit v2 §A.4 line 615) defines off-table behavior (linear-from-rest below first point, clamp above last, zero for empty table) so the applied calibration feeds compile deterministically"
+        }
       ],
       "notVerified": "The scan-offset round-trip is never closed on hardware — no burn has validated that a measured offset actually squares up bidirectional scan lines (HW-CLAIMED; repo ledger). For material/interval tests the round-trip is manual transcription only: the operator reads burned labels by eye and re-types settings; correctness of that hand-off is unmeasured. No power/speed test cell can be one-click saved to a material preset."
     }

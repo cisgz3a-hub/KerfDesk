@@ -5,11 +5,26 @@
       "id": "6.1",
       "summary": "Closed contours re-seal via withClosingPoint before emit (fixed the DXF seam-drop open-cut bug); closed CutSegments end at their start by construction; a non-finite-coordinate emit guard covers every producer. Direction is only automatic reversal of open polylines during travel optimization; no user cut-direction or start-point/seam placement control exists.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/scene/polyline-closure.ts:26-45 (withClosingPoint re-seals closed polylines whose producer dropped the seam vertex)" },
-        { "tag": "CODE", "cite": "src/core/job/compile-job.ts:418 (withClosingPoint applied to every line-mode segment at compile)" },
-        { "tag": "TEST", "cite": "src/core/job/compile-job-closure.test.ts (3 tests green in targeted vitest run 2026-07-12: closed DXF square emits its final edge)" },
-        { "tag": "CODE", "cite": "src/core/job/optimize-paths.ts:30-34 (direction-aware traversal: open polylines may reverse; closed ones keep their seam)" },
-        { "tag": "CODE", "cite": "src/core/invariants/non-finite-coords.ts:1-11 (last-line NaN/Infinity coordinate scan on emitted G-code, catching kerf/tabs/trace/text/offset-fill producers)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/polyline-closure.ts:26-45 (withClosingPoint re-seals closed polylines whose producer dropped the seam vertex)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:418 (withClosingPoint applied to every line-mode segment at compile)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/compile-job-closure.test.ts (3 tests green in targeted vitest run 2026-07-12: closed DXF square emits its final edge)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/optimize-paths.ts:30-34 (direction-aware traversal: open polylines may reverse; closed ones keep their seam)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/invariants/non-finite-coords.ts:1-11 (last-line NaN/Infinity coordinate scan on emitted G-code, catching kerf/tabs/trace/text/offset-fill producers)"
+        }
       ],
       "notVerified": "No perceptual/rendered comparison of line-mode cut output against source geometry this session. No user-facing start-point, seam-placement, or cut-direction control was found (grep startPoint/lead-in across src: none) - absence verified by grep only, not by walking the running UI. Actual cuts on hardware never verified."
     },
@@ -17,14 +32,38 @@
       "id": "6.2",
       "summary": "Deep per-layer fill model: hatch angle, spacing (0.05 mm floor), snake/unidirectional toggle, cross-hatch, three fill styles (scanline / offset 'Follow Shape' / island), per-layer overscan, continuous S0-blanked sweeps, M4 dynamic power, scan-offset zipper compensation. Fill+line stacking exists via sub-layers (LightBurn-divergent, no ADR). Known defect: Offset Fill hidden inside the Fill dialog, not the Mode dropdown.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/scene/layer.ts:18,32-37 (fillStyle union scanline|offset|island; hatchAngleDeg, hatchSpacingMm, fillOverscanMm, fillBidirectional, fillCrossHatch)" },
-        { "tag": "CODE", "cite": "src/core/job/fill-hatching.ts:1-60 (scanline even-odd hatch, any angle, snake order, ADR-038 unidirectional option)" },
-        { "tag": "CODE", "cite": "src/core/job/offset-fill.ts:13-26 (concentric offset fill via clipper2, pass-limited)" },
-        { "tag": "CODE", "cite": "src/core/job/island-fill.ts:32-40 (island grouping with micro-island clustering)" },
-        { "tag": "CODE", "cite": "DECISIONS.md:1268,1498,1567,1646,1717,1872,2804 (ADR-031 overscan lead-in/out, ADR-033 short-run skip, ADR-034 continuous sweep, ADR-035 gap split, ADR-036 M4 dynamic power, ADR-038 unidirectional, ADR-052 scan-offset compensation)" },
-        { "tag": "TEST", "cite": "src/core/job/compile-job-fill.test.ts + src/core/job/fill-hatching.test.ts (25 tests green in targeted vitest run 2026-07-12)" },
-        { "tag": "CODE", "cite": "src/core/scene/layer.ts:46-51,204-208 (sub-layers: extra operations per color enable fill+line stacking; no ADR records the divergence - full-sweep S3-F6)" },
-        { "tag": "CODE", "cite": "docs/audits/2026-07-10-full-sweep-audit.md:505-513 (S3-F11: Offset Fill not in Mode dropdown where LightBurn users look)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:18,32-37 (fillStyle union scanline|offset|island; hatchAngleDeg, hatchSpacingMm, fillOverscanMm, fillBidirectional, fillCrossHatch)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/fill-hatching.ts:1-60 (scanline even-odd hatch, any angle, snake order, ADR-038 unidirectional option)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/offset-fill.ts:13-26 (concentric offset fill via clipper2, pass-limited)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/island-fill.ts:32-40 (island grouping with micro-island clustering)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:1268,1498,1567,1646,1717,1872,2804 (ADR-031 overscan lead-in/out, ADR-033 short-run skip, ADR-034 continuous sweep, ADR-035 gap split, ADR-036 M4 dynamic power, ADR-038 unidirectional, ADR-052 scan-offset compensation)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/compile-job-fill.test.ts + src/core/job/fill-hatching.test.ts (25 tests green in targeted vitest run 2026-07-12)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:46-51,204-208 (sub-layers: extra operations per color enable fill+line stacking; no ADR records the divergence - full-sweep S3-F6)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:505-513 (S3-F11: Offset Fill not in Mode dropdown where LightBurn users look)"
+        }
       ],
       "notVerified": "Rendered hatch quality at arbitrary angles, offset-fill and island-fill visual output beyond the three 32x32 perceptual fixtures, and any side-by-side against LightBurn fill output. Scan-offset compensation (ADR-052) requires per-machine calibration - hardware effect never verified."
     },
@@ -32,11 +71,26 @@
       "id": "6.3",
       "summary": "Even-odd scanline fill handles holes; nonzero rule auto-selected for text layers (glyph winding). Perceptual proof re-run this session: compiled toolpath AND emitted G-code rasterized back match source masks - solid square IoU>=0.9, annulus hole preserved (hole pixel empty, IoU>=0.85), cross-hatch IoU>=0.78 - at 32x32 px. Small features and shared edges have zero perceptual coverage.",
       "evidence": [
-        { "tag": "PERC", "cite": "src/__fixtures__/perceptual/toolpath-rasterize.test.ts:27-97 (3 tests re-run green 2026-07-12 via `pnpm vitest run` targeted: fill toolpath + emitted G-code vs source ink mask, solid/annulus/cross-hatch)" },
-        { "tag": "PERC", "cite": "src/__fixtures__/perceptual/gcode-rasterize.test.ts (4 tests green same run - the G-code-to-burn-mask instrument itself is tested first, per ADR-025 discipline)" },
-        { "tag": "CODE", "cite": "src/core/job/fill-rule.ts:5-11 (evenodd default; nonzero when the layer carries text objects)" },
-        { "tag": "TEST", "cite": "src/core/job/fill-hatching-nonzero.test.ts (2 tests green 2026-07-12)" },
-        { "tag": "CODE", "cite": "DECISIONS.md:868 (ADR-025 - perceptual fidelity harness governing these instruments)" }
+        {
+          "tag": "PERC",
+          "cite": "src/__fixtures__/perceptual/toolpath-rasterize.test.ts:27-97 (3 tests re-run green 2026-07-12 via `pnpm vitest run` targeted: fill toolpath + emitted G-code vs source ink mask, solid/annulus/cross-hatch)"
+        },
+        {
+          "tag": "PERC",
+          "cite": "src/__fixtures__/perceptual/gcode-rasterize.test.ts (4 tests green same run - the G-code-to-burn-mask instrument itself is tested first, per ADR-025 discipline)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/fill-rule.ts:5-11 (evenodd default; nonzero when the layer carries text objects)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/fill-hatching-nonzero.test.ts (2 tests green 2026-07-12)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:868 (ADR-025 - perceptual fidelity harness governing these instruments)"
+        }
       ],
       "notVerified": "Perceptual masks are 32x32 px: small-feature fidelity, thin slivers, shared edges between adjacent same-layer shapes, and hatch quality at real output resolution are unproven. No comparison against LightBurn's fill output, no hardware burn. The IoU thresholds' own calibration is flagged as unvalidated (docs/audits/2026-07-10-full-sweep-audit.md:1964). ADR-128's maintainer-approved perceptual pass covers the trace pipeline, not fill - it is not evidence here."
     },
@@ -45,9 +99,18 @@
       "summary": "Per-layer signed kerfOffsetMm (sign selects outward/inward) applied at compile to closed line-mode contours only, via clipper2 miter inflate; containment-depth orientation offsets holes opposite to outers; the R6 re-audit fix wraps clipper throws so pathological geometry yields empty output instead of aborting compile. Not applied to open polylines or fill mode.",
       "evidence": [
         { "tag": "CODE", "cite": "src/core/scene/layer.ts:27 (kerfOffsetMm per layer/operation)" },
-        { "tag": "CODE", "cite": "src/core/job/compile-job.ts:421-428 (kerf applies iff mode==='line' && kerfOffsetMm!==0 && polyline.closed)" },
-        { "tag": "CODE", "cite": "src/core/geometry/kerf-offset.ts:9-32,59-65 (clipper2 inflatePathsD, JoinType.Miter; orientByContainment flips holes; tryVectorOp guard per R6)" },
-        { "tag": "TEST", "cite": "src/core/geometry/kerf-offset-op-failure.test.ts (1 test green 2026-07-12: clipper failure returns empty, never throws out of pure core)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:421-428 (kerf applies iff mode==='line' && kerfOffsetMm!==0 && polyline.closed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/geometry/kerf-offset.ts:9-32,59-65 (clipper2 inflatePathsD, JoinType.Miter; orientByContainment flips holes; tryVectorOp guard per R6)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/geometry/kerf-offset-op-failure.test.ts (1 test green 2026-07-12: clipper failure returns empty, never throws out of pure core)"
+        }
       ],
       "notVerified": "Kerf-compensated output was never rendered or dimension-checked perceptually; no hardware kerf calibration (cut-and-measure) has ever been verified; parity of join/corner behavior with LightBurn's kerf offset unchecked."
     },
@@ -55,10 +118,22 @@
       "id": "6.5",
       "summary": "Automatic laser tabs/bridges on closed line-mode contours: per-layer enable, tab size (mm), tabs per shape, skip-inner-shapes; applied after machine transforms, splitting closed segments into open ones; exposed in the cut-settings UI. No perforation/dash mode, no dot mode, no manual/drag-placed tabs (drag-placeable tabs recorded as deferred).",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/scene/layer.ts:28-31 (tabsEnabled, tabSizeMm, tabsPerShape, tabSkipInnerShapes)" },
-        { "tag": "TEST", "cite": "src/core/job/compile-job-tabs-bridges.test.ts (2 tests green 2026-07-12: tabs applied post-transform produce open segments; inner contours kept whole with tabSkipInnerShapes)" },
-        { "tag": "CODE", "cite": "src/ui/layers/CutSettingsCommonFields.tsx:80-88 (laser tabs exposed: 'Leave small uncut bridges on closed Line cuts')" },
-        { "tag": "CODE", "cite": "docs/audits/2026-07-10-full-sweep-audit.md:482-483 (perforation, dot mode absent from settings model vs LightBurn); grep 'perforat' in src = no matches" },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:28-31 (tabsEnabled, tabSizeMm, tabsPerShape, tabSkipInnerShapes)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/compile-job-tabs-bridges.test.ts (2 tests green 2026-07-12: tabs applied post-transform produce open segments; inner contours kept whole with tabSkipInnerShapes)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/layers/CutSettingsCommonFields.tsx:80-88 (laser tabs exposed: 'Leave small uncut bridges on closed Line cuts')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:482-483 (perforation, dot mode absent from settings model vs LightBurn); grep 'perforat' in src = no matches"
+        },
         { "tag": "CODE", "cite": "DECISIONS.md:4418 (drag-placeable tabs listed as deferred)" }
       ],
       "notVerified": "Tab geometry never rendered or burned; whether tab placement lands where a user expects (e.g. avoiding corners) has no perceptual or hardware proof. Perforation/dot-mode absence rests on grep + prior audit, not a UI walk."
@@ -67,9 +142,18 @@
       "id": "6.6",
       "summary": "No vector lead-in/lead-out and no start-point/seam placement control exist for cuts (repo-wide grep finds none). The only 'lead-in' is the fill/raster overscan runway (ADR-031/033), emitted as laser-off rapids beyond each sweep - a scan feature, not a cut lead-in. Effectively absent versus LightBurn's start-point tool.",
       "evidence": [
-        { "tag": "CODE", "cite": "DECISIONS.md:1268,1498 (ADR-031/ADR-033: overscan lead-in/out runway for fill hatching only)" },
-        { "tag": "TEST", "cite": "src/core/output/grbl-strategy.test.ts:203-235 (overscan lead-in/out emitted as laser-off G0 rapids - part of full local suites, not re-run this session)" },
-        { "tag": "CODE", "cite": "grep -i 'leadIn|lead-in|startPoint|start point' across src: no vector-cut lead-in or start-point feature exists (absence evidence)" }
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:1268,1498 (ADR-031/ADR-033: overscan lead-in/out runway for fill hatching only)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/output/grbl-strategy.test.ts:203-235 (overscan lead-in/out emitted as laser-off G0 rapids - part of full local suites, not re-run this session)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep -i 'leadIn|lead-in|startPoint|start point' across src: no vector-cut lead-in or start-point feature exists (absence evidence)"
+        }
       ],
       "notVerified": "Absence conclusion rests on repo-wide grep plus the 2026-07-10 audits; the running app's UI was not walked this session. No perceptual evidence exists or is applicable - the capability is absent."
     },
@@ -78,10 +162,22 @@
       "summary": "Per-layer integer passes >=1, clamped at compile; the GRBL emitter repeats each cut/fill/offset-fill group per pass with pass-count comments. Sub-layers permit different settings per operation as a per-pass-variation workaround. No Z-step/Z-offset per pass and no Z motion in laser output - a known gap versus LightBurn.",
       "evidence": [
         { "tag": "CODE", "cite": "src/core/scene/layer.ts:25 (passes: integer >= 1)" },
-        { "tag": "CODE", "cite": "src/core/job/compile-job.ts:197 (passes: Math.max(1, Math.floor(layer.passes)))" },
-        { "tag": "CODE", "cite": "src/core/output/grbl-strategy.ts:119-122,151-152,181-182 (per-pass emit loops for cut, fill, and offset-fill groups)" },
-        { "tag": "CODE", "cite": "grep -i 'zStep|stepdown|zPerPass' in src/core: no laser matches; docs/audits/2026-07-10-full-sweep-audit.md:482-483 (Z offset / Z step per pass absent vs LightBurn)" },
-        { "tag": "CODE", "cite": "src/core/scene/layer.ts:46-51 (sub-layers: extra operations per color)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:197 (passes: Math.max(1, Math.floor(layer.passes)))"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:119-122,151-152,181-182 (per-pass emit loops for cut, fill, and offset-fill groups)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "grep -i 'zStep|stepdown|zPerPass' in src/core: no laser matches; docs/audits/2026-07-10-full-sweep-audit.md:482-483 (Z offset / Z step per pass absent vs LightBurn)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/scene/layer.ts:46-51 (sub-layers: extra operations per color)"
+        }
       ],
       "notVerified": "Multi-pass registration on real material (hardware) never verified - all KerfDesk hardware passes remain CLAIMED per the standing ledger. Z-step absence verified by grep, not exhaustive UI walk."
     },
@@ -89,11 +185,26 @@
       "id": "6.8",
       "summary": "Deterministic nearest-neighbor travel optimizer with inside-first containment buckets (inner shapes cut before outers) and direction-aware reversal of open paths; opt-in via a single 'Reduce travel moves' checkbox. Above 2,000 segments per group it silently keeps source order with no UI indication. PROJECT.md's earlier 2-opt promise was rewritten to match shipped behavior; a stale 2-opt reference survives in the module header comment.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/job/optimize-paths.ts:1-48 (NN heuristic, determinism contract, MAX_NEAREST_NEIGHBOR_SEGMENTS=2000 silent cutoff), 129-136 (inside-first containment buckets)" },
-        { "tag": "TEST", "cite": "src/core/job/optimize-paths.test.ts (19 tests green in targeted vitest run 2026-07-12)" },
-        { "tag": "CODE", "cite": "src/ui/laser/OptimizationSettingsDialog.tsx:28-31 (single 'Reduce travel moves' checkbox; no further knobs)" },
-        { "tag": "CODE", "cite": "PROJECT.md:75 ('path optimization (nearest-neighbor, inner-shapes-first)' - the 2-opt doc-drift from full-sweep S4-F4 is fixed in PROJECT.md; optimize-paths.ts:3 comment still cites the old 2-opt wording)" },
-        { "tag": "CODE", "cite": "docs/audits/2026-07-10-full-sweep-audit.md:571-575 (S4-F4: silent 2,000-segment cutoff with no UI indication - still present at optimize-paths.ts:48)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/optimize-paths.ts:1-48 (NN heuristic, determinism contract, MAX_NEAREST_NEIGHBOR_SEGMENTS=2000 silent cutoff), 129-136 (inside-first containment buckets)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/job/optimize-paths.test.ts (19 tests green in targeted vitest run 2026-07-12)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/OptimizationSettingsDialog.tsx:28-31 (single 'Reduce travel moves' checkbox; no further knobs)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "PROJECT.md:75 ('path optimization (nearest-neighbor, inner-shapes-first)' - the 2-opt doc-drift from full-sweep S4-F4 is fixed in PROJECT.md; optimize-paths.ts:3 comment still cites the old 2-opt wording)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "docs/audits/2026-07-10-full-sweep-audit.md:571-575 (S4-F4: silent 2,000-segment cutoff with no UI indication - still present at optimize-paths.ts:48)"
+        }
       ],
       "notVerified": "Travel-reduction quality was never benchmarked against LightBurn's optimizer (which offers multiple ordering strategies); no simulated or rendered travel-path comparison exists. Behavior above the 2,000-segment cutoff on real dense designs untested."
     }

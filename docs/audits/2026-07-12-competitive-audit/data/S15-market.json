@@ -10,8 +10,14 @@
           "quality": "Grid Array (rows/cols, center-to-center or padding spacing, mirror, randomize), Radial/circular array, Virtual Array of synced clones, and Copy-Along-Path. The roster's most complete design-time array toolset.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/GridArray/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CopyAlongPath/" },
-            { "tag": "COMM", "cite": "https://support.salasers.com/optimizing-designs-grid-array-tool" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CopyAlongPath/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://support.salasers.com/optimizing-designs-grid-array-tool"
+            }
           ]
         },
         {
@@ -19,8 +25,14 @@
           "existence": "yes",
           "quality": "Inherits LightBurn's layout suite: Grid Array (rows/cols) and Circular/radial Array; auto-increment offsets pair with Variable Text for serialized copies.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/CircularArray/" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/CircularArray/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here"
+            }
           ]
         },
         {
@@ -55,8 +67,14 @@
           "existence": "yes",
           "quality": "Array Copy (rows/cols, gap or offset), Copy-Along-Vectors, and linked Array-Copy-Toolpath with a 'minimize tool changes' option. Strong production-grade replication.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/Array%20Copy/index.html" },
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Copy%20Along%20Vectors/index.html" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/Array%20Copy/index.html"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Copy%20Along%20Vectors/index.html"
+            }
           ]
         }
       ]
@@ -70,7 +88,10 @@
           "quality": "Quick Nest auto-packs parts' bounding boxes into a rectangular container (adjustable padding, optional rotation) to maximize sheet usage; made available to Core in 2.1.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/QuickNest/" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more"
+            }
           ]
         },
         {
@@ -78,7 +99,10 @@
           "existence": "yes",
           "quality": "Quick Nest bounding-box auto-packing into a rectangular container with padding and optional rotation; same engine as LightBurn.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/QuickNest/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/QuickNest/"
+            }
           ]
         },
         {
@@ -114,7 +138,10 @@
           "quality": "True Shape Nesting (Pro) auto-arranges vectors into the material or user-defined area for optimal usage; VCarve Desktop has no nesting.",
           "evidence": [
             { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" },
-            { "tag": "COMM", "cite": "https://www.learnyourcnc.com/blog/easily-make-toolpaths-after-nesting-objects" }
+            {
+              "tag": "COMM",
+              "cite": "https://www.learnyourcnc.com/blog/easily-make-toolpaths-after-nesting-objects"
+            }
           ]
         }
       ]
@@ -136,8 +163,14 @@
           "existence": "yes",
           "quality": "True Nest arranges by actual contours with four optimization levels, stoppable mid-calc. Only in 0.9 early-access Pro (not yet on sale); stable 0.8 has bounding-box Quick Nest only.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/millmage-0-9-00-early-access-pro-features-are-here/191036" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/millmage-0-9-00-early-access-pro-features-are-here/191036"
+            }
           ]
         },
         {
@@ -172,8 +205,14 @@
           "existence": "yes",
           "quality": "True Shape Nesting (Pro) packs by actual contours into sheets, the roster's reference-quality nesting for irregular parts. Absent from VCarve Desktop.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Nest%20Parts/Nest%20Parts.html" },
-            { "tag": "COMM", "cite": "https://www.learnyourcnc.com/blog/easily-make-toolpaths-after-nesting-objects" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Nest%20Parts/Nest%20Parts.html"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://www.learnyourcnc.com/blog/easily-make-toolpaths-after-nesting-objects"
+            }
           ]
         }
       ]
@@ -194,8 +233,14 @@
           "existence": "yes",
           "quality": "Rectangular workspace and rectangle-only nesting container; 0.9 adds Multi-Page projects. No circular/custom stock outlines or offcut handling found.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/QuickNest/" },
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/QuickNest/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here"
+            }
           ]
         },
         {
@@ -231,7 +276,10 @@
           "quality": "Material Setup defines a rectangular block; nesting targets the material size or a user-definable area across multiple sheets. Rectangular sheets; no circular/offcut stock modeling. Desktop capped at 24x24in.",
           "evidence": [
             { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" },
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Nest%20Parts/Nest%20Parts.html" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Nest%20Parts/Nest%20Parts.html"
+            }
           ]
         }
       ]
@@ -244,9 +292,15 @@
           "existence": "yes",
           "quality": "Variable Text with Serial Number, Date/Time, Merge/CSV, and Cut-Setting modes; auto-advance; CSV column %n syntax; plus QR-code and Barcode generators that accept variable data. Roster-leading batch personalization.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/VariableText/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/VariableText/"
+            },
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/Tools/BarCode.html" },
-            { "tag": "COMM", "cite": "https://support.salasers.com/using-variable-text-in-lightburn" }
+            {
+              "tag": "COMM",
+              "cite": "https://support.salasers.com/using-variable-text-in-lightburn"
+            }
           ]
         },
         {
@@ -254,7 +308,10 @@
           "existence": "yes",
           "quality": "Variable Text with Serial Number, Date/Time, and Merge/CSV modes plus auto-advance, substituted on Preview/Start/Export; inherits LightBurn's batch engine.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/VariableText/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/VariableText/"
+            }
           ]
         },
         {
@@ -270,16 +327,17 @@
           "product": "XCS",
           "existence": "yes",
           "quality": "Batch Processing mode assigns per-copy variables for text, images (PNG/JPG/BMP/WEBP), and vectors (SVG/DXF) via a downloadable template or manual rows. Strong batch personalization for a consumer tool.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1869" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1869" }]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "No documented variable-text, serialization, or CSV-merge feature; the text tool is static. Batch personalization requires manual duplication/editing or project copies.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/6138903275667-Easel-Features-Text-and-Fonts" },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/6138903275667-Easel-Features-Text-and-Fonts"
+            },
             { "tag": "INF", "cite": "https://discuss.inventables.com/t/templates-in-easel/142246" }
           ]
         },
@@ -288,8 +346,14 @@
           "existence": "yes",
           "quality": "Plate Production drives batch badges/nameplates from a text-file list using !!variable!! placeholders with consecutive numbering; gadgets extend automation. Solid for serialized engraving.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Plate%20Production/Plate%20Production.html" },
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/gadgets/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Drawing/Plate%20Production/Plate%20Production.html"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/gadgets/"
+            }
           ]
         }
       ]
@@ -302,8 +366,14 @@
           "existence": "yes",
           "quality": "Reusable .lbrn2 project files, Material Library presets, and Variable Text auto-advance that persists serial state across runs. No dedicated saved-job/template queue.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/VariableText/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/MaterialLibrary/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/VariableText/"
+            }
           ]
         },
         {
@@ -311,8 +381,14 @@
           "existence": "yes",
           "quality": "Reusable .mage project files and 0.9 Multi-Page projects for multi-sheet jobs; Variable Text auto-advance persists serials. No formal saved-job template system.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/VariableText/" }
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/millmage-0-9-release-candidate-pro-features-are-here"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/VariableText/"
+            }
           ]
         },
         {
@@ -338,7 +414,10 @@
           "existence": "yes",
           "quality": "Cloud-saved projects, a copy-a-project-to-customize workflow, and shareable/community templates. Convenient for hobby reuse but no formal job-template or serial-run system.",
           "evidence": [
-            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/templates-in-easel/142246" },
+            {
+              "tag": "COMM",
+              "cite": "https://discuss.inventables.com/t/templates-in-easel/142246"
+            },
             { "tag": "OFF", "cite": "https://easel.inventables.com/" }
           ]
         },
@@ -348,7 +427,10 @@
           "quality": "Production-grade: Toolpath Templates apply saved settings across nested sheets, Job Setup Sheets document runs, and Gadgets automate task sequences (all Pro). The roster's strongest repeat-job tooling.",
           "evidence": [
             { "tag": "OFF", "cite": "https://www.vectric.com/products/vcarve/" },
-            { "tag": "OFF", "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/gadgets/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V10.5/VCarvePro/ENU/Help/form/gadgets/"
+            }
           ]
         }
       ]

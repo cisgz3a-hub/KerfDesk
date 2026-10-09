@@ -5,12 +5,30 @@
       "id": "9.1",
       "summary": "Laser output is G0/G1 polylines only — no G2/G3. Curves flatten once at SVG import (0.25 mm scene-space tolerance, audit-C2 fix); post-import scaling multiplies chord error with no output-time re-flatten (open MAJOR S5-F2, no governing ADR). CNC emits native G2/G3 arc passes with sampled-G1 fallback for invalid radii.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/output/grbl-strategy.ts:95-112 — emitSegment emits G0 rapid + G1 polyline chain; no arc words anywhere in the laser emitter" },
-        { "tag": "CODE", "cite": "src/io/svg/flatten-curves.ts:12 — DEFAULT_FLATNESS_MM = 0.25 (import-time flatten)" },
-        { "tag": "CODE", "cite": "src/io/svg/parse-svg.ts:217 — chord tolerance divided by the transform's distance stretch (audit C2 fix present)" },
-        { "tag": "CODE", "cite": "src/core/job/compile-job.ts:381,409 — obj.transform applied to already-flattened stored points at compile; no re-flatten (full-sweep S5-F2 CONFIRMED MAJOR still open; DECISIONS.md grep for flatten/chord shows no ADR recording the divergence)" },
-        { "tag": "CODE", "cite": "src/core/output/cnc-grbl-strategy.ts:232-283 — appendArcPass emits native G2/G3 with I/J when circularArcGeometry ok, else sampled-G1 contour fallback" },
-        { "tag": "TEST", "cite": "pnpm vitest run src/core/output src/core/invariants src/io/gcode src/io/rd — 32 files / 216 tests pass this session (incl. cnc-grbl-strategy.test.ts arc cases)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:95-112 — emitSegment emits G0 rapid + G1 polyline chain; no arc words anywhere in the laser emitter"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/flatten-curves.ts:12 — DEFAULT_FLATNESS_MM = 0.25 (import-time flatten)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/svg/parse-svg.ts:217 — chord tolerance divided by the transform's distance stretch (audit C2 fix present)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/job/compile-job.ts:381,409 — obj.transform applied to already-flattened stored points at compile; no re-flatten (full-sweep S5-F2 CONFIRMED MAJOR still open; DECISIONS.md grep for flatten/chord shows no ADR recording the divergence)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/cnc-grbl-strategy.ts:232-283 — appendArcPass emits native G2/G3 with I/J when circularArcGeometry ok, else sampled-G1 contour fallback"
+        },
+        {
+          "tag": "TEST",
+          "cite": "pnpm vitest run src/core/output src/core/invariants src/io/gcode src/io/rd — 32 files / 216 tests pass this session (incl. cnc-grbl-strategy.test.ts arc cases)"
+        }
       ],
       "notVerified": "Rendered curve quality never compared perceptually to source artwork or LightBurn output. Whether canvas resize writes transform.scale (the S5-F2 error amplifier) was not traced through scene mutation. Real-controller execution of emitted G2/G3 arcs unverified (no hardware)."
     },
@@ -18,12 +36,30 @@
       "id": "9.2",
       "summary": "S = round(power/100 × device.maxPowerS); preamble arms M3 S0. Cut=M3 constant, fill/raster=M4 dynamic per dialect (ADR-036), mode flips emitted only on change. Start gated on live $30/$32 proof with capability-aware degradation and correct CNC inversion; Pause refused unless $32=1 proven. No per-layer constant/dynamic override (S5-F4 still open). Marlin fan dialect converts to M106/M107.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/output/grbl-strategy.ts:39-41 (scaleS), 75-83 (M3 S0 preamble rationale), 368-405 (M3/M4 modal switching, flips only on change)" },
-        { "tag": "CODE", "cite": "src/core/devices/gcode-dialects.ts:55-125 — cutPowerMode/fillPowerMode/rasterPowerMode fixed per dialect; no per-layer field (grep for powerMode in src/core/job = 0 hits, S5-F4 unfixed)" },
-        { "tag": "CODE", "cite": "src/core/preflight/controller-readiness.ts:108-196 — $30 must equal maxPowerS / spindle RPM, $32=1 laser vs $32=0 router, honest 'NOT verified' warnings when settings capability absent" },
-        { "tag": "CODE", "cite": "src/ui/state/laser-job-actions.ts:41 — 'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead...'" },
-        { "tag": "CODE", "cite": "src/core/output/marlin-strategy.ts:14-21 — marlin-inline shares GRBL wire shape (maxPowerS=255); marlin-fan post-transforms to M106/M107" },
-        { "tag": "TEST", "cite": "src/core/output/grbl-strategy.fill-power-mode.test.ts + grbl-strategy-machine-compatibility.test.ts — pass in this session's 216/216 run" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:39-41 (scaleS), 75-83 (M3 S0 preamble rationale), 368-405 (M3/M4 modal switching, flips only on change)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/gcode-dialects.ts:55-125 — cutPowerMode/fillPowerMode/rasterPowerMode fixed per dialect; no per-layer field (grep for powerMode in src/core/job = 0 hits, S5-F4 unfixed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/controller-readiness.ts:108-196 — $30 must equal maxPowerS / spindle RPM, $32=1 laser vs $32=0 router, honest 'NOT verified' warnings when settings capability absent"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/laser-job-actions.ts:41 — 'Pause requires confirmed GRBL laser mode ($32=1). Use Stop instead...'"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/marlin-strategy.ts:14-21 — marlin-inline shares GRBL wire shape (maxPowerS=255); marlin-fan post-transforms to M106/M107"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/output/grbl-strategy.fill-power-mode.test.ts + grbl-strategy-machine-compatibility.test.ts — pass in this session's 216/216 run"
+        }
       ],
       "notVerified": "Firmware-side behavior (M4 power gates to zero at rest; $32=1 zeroing power on rapids; hold semantics) is HW-CLAIMED — asserted from GRBL v1.1 docs, never driven on a machine. No burn comparing M3 vs M4 energy deposition."
     },
@@ -31,12 +67,30 @@
       "id": "9.3",
       "summary": "No user-editable start/end/tool-change G-code hooks and no custom headers — the device profile carries only a dialect selection. Customization is six fixed presets (4 GRBL + 2 Marlin) toggling preamble mode, S0-on-rapid, park, modal feed, controlled laser-off travel. Automatic provenance header on export; CNC tool changes emit M0 with machine-parsable bit labels; per-layer air assist maps to M7/M8.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/devices/device-profile.ts:136 — gcodeDialect: GcodeDialectSelection is the only output-shaping device field; repo-wide grep for startGcode/endGcode/customGcode/customPreamble/headerLines found no user hook" },
-        { "tag": "CODE", "cite": "src/core/devices/gcode-dialects.ts:86-125 — the four GRBL presets (grbl-compatible/dynamic/raster/neotronics-4040-safe) differ in requiresS0OnRapid, parkAtOriginAfterJob, controlledLaserOffTravelFeedMmPerMin, emitSOnEveryBurnMove, modalFeedrate" },
-        { "tag": "CODE", "cite": "src/io/gcode/gcode-metadata.ts:41-74 — automatic provenance header (not user-customizable)" },
-        { "tag": "CODE", "cite": "src/core/output/tool-change-labels.ts:7-20 — shared '; tool change: load ' prefix between CNC emitter M0 pauses and the streamer's pause UI (R5 fix)" },
-        { "tag": "CODE", "cite": "src/core/output/grbl-strategy.ts:345-355 — per-layer airAssist -> M7/M8/M9 coolant transitions" },
-        { "tag": "TEST", "cite": "src/core/output/tool-change-labels.test.ts + grbl-strategy-air-assist.test.ts — pass in this session's 216/216 run" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/device-profile.ts:136 — gcodeDialect: GcodeDialectSelection is the only output-shaping device field; repo-wide grep for startGcode/endGcode/customGcode/customPreamble/headerLines found no user hook"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/gcode-dialects.ts:86-125 — the four GRBL presets (grbl-compatible/dynamic/raster/neotronics-4040-safe) differ in requiresS0OnRapid, parkAtOriginAfterJob, controlledLaserOffTravelFeedMmPerMin, emitSOnEveryBurnMove, modalFeedrate"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/gcode/gcode-metadata.ts:41-74 — automatic provenance header (not user-customizable)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/tool-change-labels.ts:7-20 — shared '; tool change: load ' prefix between CNC emitter M0 pauses and the streamer's pause UI (R5 fix)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:345-355 — per-layer airAssist -> M7/M8/M9 coolant transitions"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/output/tool-change-labels.test.ts + grbl-strategy-air-assist.test.ts — pass in this session's 216/216 run"
+        }
       ],
       "notVerified": "Absence of hooks is proven by name-based grep (startGcode, endGcode, customGcode, userGcode, macro, preambleOverride, headerLines) plus reading both emitters; an unconventionally named hook could theoretically exist but none surfaced. LightBurn's device-settings start/end G-code fields not re-verified against an install this session."
     },
@@ -44,12 +98,30 @@
       "id": "9.4",
       "summary": "Four controller families, six text dialects, one binary format: GRBL v1.1/grblHAL/FluidNC share one emitter; Marlin inline (S 0-255) and fan (M106/M107) wrappers; Smoothieware wraps the GRBL emitter; Ruida exports binary .rd through the same prepareOutput pipeline (ADR-097, explicitly experimental). Ruida layer min power is hardcoded equal to max. Every non-GRBL family is simulator/research-verified only.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/output/select-output-strategy.ts:15-35 — grbl-v1.1/grblhal/fluidnc/undefined -> grblStrategy; marlin -> marlinStrategy; smoothieware -> smoothiewareStrategy; ruida save routes to io/rd before any strategy" },
-        { "tag": "CODE", "cite": "src/core/devices/gcode-dialects.ts:1-42 — 4 GRBL + 2 Marlin dialect ids (ADR-095)" },
-        { "tag": "CODE", "cite": "src/io/rd/emit-rd.ts:26-55 — .rd export runs the identical prepareOutput + rotary machine-space stage as emitGcode (preview=save carried into the binary path, review R3)" },
-        { "tag": "CODE", "cite": "src/core/controllers/ruida/rd-encoder.ts:70-71 — layerMinPower and layerMaxPower both written from group.power (min==max mapping, consolidated-audit A.3.4 residual); rd-encoder-golden.test.ts:9 notes real min power as future work" },
-        { "tag": "TEST", "cite": "src/io/rd/emit-rd.test.ts (3 tests), smoothieware-strategy.test.ts (5), marlin-strategy.test.ts, grbl-family-drivers.test.ts — all pass in this session's runs" },
-        { "tag": "HW-CLAIMED", "cite": "docs/audits/2026-07-10-consolidated-audit-v2.md §A.3 'Not verified': grblHAL, FluidNC, Marlin, Smoothieware, Ruida are all simulator- or research-verified only (ADR-094..097); no reference .rd file exists in-tree to diff the encoder against" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/select-output-strategy.ts:15-35 — grbl-v1.1/grblhal/fluidnc/undefined -> grblStrategy; marlin -> marlinStrategy; smoothieware -> smoothiewareStrategy; ruida save routes to io/rd before any strategy"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/devices/gcode-dialects.ts:1-42 — 4 GRBL + 2 Marlin dialect ids (ADR-095)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/rd/emit-rd.ts:26-55 — .rd export runs the identical prepareOutput + rotary machine-space stage as emitGcode (preview=save carried into the binary path, review R3)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/ruida/rd-encoder.ts:70-71 — layerMinPower and layerMaxPower both written from group.power (min==max mapping, consolidated-audit A.3.4 residual); rd-encoder-golden.test.ts:9 notes real min power as future work"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/rd/emit-rd.test.ts (3 tests), smoothieware-strategy.test.ts (5), marlin-strategy.test.ts, grbl-family-drivers.test.ts — all pass in this session's runs"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "docs/audits/2026-07-10-consolidated-audit-v2.md §A.3 'Not verified': grblHAL, FluidNC, Marlin, Smoothieware, Ruida are all simulator- or research-verified only (ADR-094..097); no reference .rd file exists in-tree to diff the encoder against"
+        }
       ],
       "notVerified": "No dialect has been validated on real hardware. Whether a real Ruida controller accepts the encoder's minimal command stream is unknown (only witness is the repo's own decoder). Whether FluidNC's $$ compatibility dump includes $30/$32 (which the readiness gate harvests) is unknown."
     },
@@ -57,11 +129,26 @@
       "id": "9.5",
       "summary": "Deterministic by construction (fixed 3-decimal formatting, LF endings, indexed iteration) and by test: 100-fuzz-seed determinism properties, a byte-identical G-code snapshot corpus, reimport-parity tests. Per-group comment banners record layer/color/power/speed/passes/overscan. Optional provenance header records app version, commit, build time, emitter revision, and machine-specific $30/$32 assumptions; preflight always runs on the header-free motion body.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/output/grbl-strategy.ts:1-14,31-37 — determinism invariants documented and enforced at fmt/LINE_END; :118-119,138-139 per-layer comment banners" },
-        { "tag": "TEST", "cite": "src/core/output/grbl-strategy.property.test.ts:111,214 — 'deterministic across 100 fuzz seeds' incl. fill groups; src/io/svg/pipeline.snapshot.test.ts:88 — two-run byte-identical + recorded snapshot corpus; src/core/invariants/cnc-depth.test.ts:107 — CNC 100-seed byte-identical; all pass this session" },
-        { "tag": "CODE", "cite": "src/io/gcode/gcode-metadata.ts:23 (EMITTER_REVISION 'adr-039-raster-gap-rapid-v1'), 52-74 (header lines: app/version/commit/built/emitter + $30/$32 assumption lines, control chars sanitized)" },
-        { "tag": "CODE", "cite": "src/io/gcode/emit-gcode.ts:63-74 — preflight runs on the motion body only; header prepended after, so comments can never mask a verdict" },
-        { "tag": "TEST", "cite": "src/io/gcode/gcode-reimport-parity.test.ts + emit-gcode.snapshot.test.ts + emit-gcode-rotary.test.ts — pass in this session's 216/216 run" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:1-14,31-37 — determinism invariants documented and enforced at fmt/LINE_END; :118-119,138-139 per-layer comment banners"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/core/output/grbl-strategy.property.test.ts:111,214 — 'deterministic across 100 fuzz seeds' incl. fill groups; src/io/svg/pipeline.snapshot.test.ts:88 — two-run byte-identical + recorded snapshot corpus; src/core/invariants/cnc-depth.test.ts:107 — CNC 100-seed byte-identical; all pass this session"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/gcode/gcode-metadata.ts:23 (EMITTER_REVISION 'adr-039-raster-gap-rapid-v1'), 52-74 (header lines: app/version/commit/built/emitter + $30/$32 assumption lines, control chars sanitized)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/gcode/emit-gcode.ts:63-74 — preflight runs on the motion body only; header prepended after, so comments can never mask a verdict"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/gcode/gcode-reimport-parity.test.ts + emit-gcode.snapshot.test.ts + emit-gcode-rotary.test.ts — pass in this session's 216/216 run"
+        }
       ],
       "notVerified": "Whether the streamed Start path carries the provenance header (consolidated audit v2 noted a file-actions comment saying it is Save-only) was not re-traced this session. Determinism across OSes/Node versions untested beyond this Windows machine."
     },
@@ -69,12 +156,30 @@
       "id": "9.6",
       "summary": "Layered defense, strengthened since the 2026-07-10 audits: constructive S0-on-rapid plus zero-length-move suppression; post-emit text scans for laser-on travel, long blank feeds, out-of-bounds — now including G2/G3 arc-bulge extrema (S5-F6 fixed) — and non-finite XYZIJ coordinates in both laser and CNC preflight (S5-F1 fixed); raster emitter validates finite bounds; CNC retract/plunge invariants re-proven on emitted text; rotary wrap-limit bounds; streamer auto beam-off on error.",
       "evidence": [
-        { "tag": "CODE", "cite": "src/core/output/grbl-strategy.ts:47-54 (every rapid carries S0 / controlled-feed S0), 274-283 (head tracker skips zero-length moves so positive S never rides a stationary G1)" },
-        { "tag": "CODE", "cite": "src/core/preflight/preflight.ts:353 (findOutOfBoundsCoords), 410 (findNonFiniteCoords), 420 (findLaserOnTravelIssues), 439 (findLongBlankFeedMoves); src/core/preflight/cnc-preflight.ts:168 (non-finite scan on CNC path)" },
-        { "tag": "CODE", "cite": "src/core/invariants/non-finite-coords.ts:20-40 — NaN/Infinity/-Infinity on X/Y/Z/I/J flagged at the text boundary, catching every producer (kerf, tabs, trace, text, offset-fill); closes full-sweep S5-F1 and defuses consolidated A.1.4's 'G0 ZInfinity'" },
-        { "tag": "CODE", "cite": "src/core/invariants/arc-bounds.ts:25-61 + src/core/invariants/predicates.ts:155 — G2/G3 AABB with swept cardinal extrema feeds the bounds scan; closes full-sweep S5-F6 (arc bulging past the bed edge)" },
-        { "tag": "CODE", "cite": "src/core/raster/emit-raster.ts:442-470 — finite-bounds/feed/overscan validation (audit C4); src/core/invariants/cnc-motion.ts — plunged-travel/overdeep re-verification; src/io/gcode/emit-gcode.ts:96-101 — rotary one-revolution wrap limit as bounds override (ADR-127); src/ui/state/laser-error-line.ts:98-112 — deferred beam-off cleanup after mid-job error" },
-        { "tag": "TEST", "cite": "pnpm vitest run src/core/preflight src/core/job/planner.test.ts src/io/svg/pipeline.snapshot.test.ts — 11 files / 129 tests pass this session (incl. non-finite-preflight.test.ts); plus laser-off property fuzz in the 216/216 output run. Junction-velocity estimator clamp also verified fixed (planner.ts:240-244, 269-273)" }
+        {
+          "tag": "CODE",
+          "cite": "src/core/output/grbl-strategy.ts:47-54 (every rapid carries S0 / controlled-feed S0), 274-283 (head tracker skips zero-length moves so positive S never rides a stationary G1)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/preflight/preflight.ts:353 (findOutOfBoundsCoords), 410 (findNonFiniteCoords), 420 (findLaserOnTravelIssues), 439 (findLongBlankFeedMoves); src/core/preflight/cnc-preflight.ts:168 (non-finite scan on CNC path)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/invariants/non-finite-coords.ts:20-40 — NaN/Infinity/-Infinity on X/Y/Z/I/J flagged at the text boundary, catching every producer (kerf, tabs, trace, text, offset-fill); closes full-sweep S5-F1 and defuses consolidated A.1.4's 'G0 ZInfinity'"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/invariants/arc-bounds.ts:25-61 + src/core/invariants/predicates.ts:155 — G2/G3 AABB with swept cardinal extrema feeds the bounds scan; closes full-sweep S5-F6 (arc bulging past the bed edge)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/emit-raster.ts:442-470 — finite-bounds/feed/overscan validation (audit C4); src/core/invariants/cnc-motion.ts — plunged-travel/overdeep re-verification; src/io/gcode/emit-gcode.ts:96-101 — rotary one-revolution wrap limit as bounds override (ADR-127); src/ui/state/laser-error-line.ts:98-112 — deferred beam-off cleanup after mid-job error"
+        },
+        {
+          "tag": "TEST",
+          "cite": "pnpm vitest run src/core/preflight src/core/job/planner.test.ts src/io/svg/pipeline.snapshot.test.ts — 11 files / 129 tests pass this session (incl. non-finite-preflight.test.ts); plus laser-off property fuzz in the 216/216 output run. Junction-velocity estimator clamp also verified fixed (planner.ts:240-244, 269-273)"
+        }
       ],
       "notVerified": "All firmware-side reactions are HW-CLAIMED: whether GRBL alarm de-energizes the laser, hold behavior under $32, real rejection of malformed lines — never driven on a machine (repo hardware ledger: every pass CLAIMED). No physical burn has ever validated the safety envelope end-to-end."
     }

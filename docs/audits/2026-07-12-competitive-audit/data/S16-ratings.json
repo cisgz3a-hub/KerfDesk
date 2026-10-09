@@ -2,55 +2,330 @@
   "sector": 16,
   "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/16-device-breadth.md",
   "ratings": [
-    { "cat": "16.1", "product": "KerfDesk", "score": 7, "star": false, "tag": "CODE", "note": "Deep grbl-1.1 in code (pure $$ parser, alarm/error tables, $J jog, probe, gated overrides); grblHAL/FluidNC thin deltas; FluidNC console still accepts numeric $-writes (A.3.9)" },
-    { "cat": "16.1", "product": "LightBurn", "score": 9, "star": false, "tag": "OFF", "note": "GRBL, grblHAL and FluidNC all first-class selectable in the New Device Wizard; broadest first-class grbl-family laser coverage in the roster" },
-    { "cat": "16.1", "product": "MillMage", "score": 8, "star": false, "tag": "OFF", "note": "CAM+control for GRBL >=1.1, GRBL-STM, grblHAL and FluidNC; full grbl-family CNC breadth from LightBurn's own vendor" },
-    { "cat": "16.1", "product": "LaserGRBL", "score": 6, "star": false, "tag": "OFF", "note": "Built around GRBL 1.1; connects to any grbl serial device. grblHAL/FluidNC only as grbl-compatible, not first-class selectable (INF, not load-bearing)" },
-    { "cat": "16.1", "product": "XCS", "score": 0, "star": false, "tag": "OFF", "note": "Closed ecosystem; connects only to xTool's own machines; no user-selectable grbl/grblHAL/FluidNC and no generic grbl connect at all" },
-    { "cat": "16.1", "product": "Easel", "score": 6, "star": false, "tag": "OFF", "note": "Controls grbl-based machines, Grbl 0.8c through 1.1h; no grblHAL or FluidNC. Solid for classic grbl, narrow beyond it" },
-    { "cat": "16.1", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Purpose-built for grbl AND grblHAL (1.1 min), firmware flavour selectable at connect; among best-regarded free grbl/grblHAL senders; no first-class FluidNC" },
+    {
+      "cat": "16.1",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Deep grbl-1.1 in code (pure $$ parser, alarm/error tables, $J jog, probe, gated overrides); grblHAL/FluidNC thin deltas; FluidNC console still accepts numeric $-writes (A.3.9)"
+    },
+    {
+      "cat": "16.1",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "GRBL, grblHAL and FluidNC all first-class selectable in the New Device Wizard; broadest first-class grbl-family laser coverage in the roster"
+    },
+    {
+      "cat": "16.1",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "CAM+control for GRBL >=1.1, GRBL-STM, grblHAL and FluidNC; full grbl-family CNC breadth from LightBurn's own vendor"
+    },
+    {
+      "cat": "16.1",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Built around GRBL 1.1; connects to any grbl serial device. grblHAL/FluidNC only as grbl-compatible, not first-class selectable (INF, not load-bearing)"
+    },
+    {
+      "cat": "16.1",
+      "product": "XCS",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "Closed ecosystem; connects only to xTool's own machines; no user-selectable grbl/grblHAL/FluidNC and no generic grbl connect at all"
+    },
+    {
+      "cat": "16.1",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Controls grbl-based machines, Grbl 0.8c through 1.1h; no grblHAL or FluidNC. Solid for classic grbl, narrow beyond it"
+    },
+    {
+      "cat": "16.1",
+      "product": "gSender",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Purpose-built for grbl AND grblHAL (1.1 min), firmware flavour selectable at connect; among best-regarded free grbl/grblHAL senders; no first-class FluidNC"
+    },
 
-    { "cat": "16.2", "product": "KerfDesk", "score": 7, "star": false, "tag": "CODE", "note": "Marlin (ADR-095) + Smoothieware (ADR-096) real drivers: M400 settle, idle M114, comma-status fallback, fractional-S rescale; simulator-verified only; open A.3.3 unsafe-profile path" },
-    { "cat": "16.2", "product": "LightBurn", "score": 8, "star": false, "tag": "OFF", "note": "Marlin and Smoothieware long-established first-class selectable firmware alongside GRBL; the sector's mature reference for non-grbl firmware" },
-    { "cat": "16.2", "product": "MillMage", "score": 6, "star": false, "tag": "OFF", "note": "Smoothieware (Labs) + Duet/RepRap over HTTP; no Marlin; CAM-only export also covers Mach3/4, LinuxCNC, UCCNC, Masso" },
-    { "cat": "16.2", "product": "LaserGRBL", "score": 3, "star": false, "tag": "OFF", "note": "Experimental Smoothieware and very early-stage Marlin (generated G-code may not be fully compatible); both clearly secondary to GRBL" },
-    { "cat": "16.2", "product": "XCS", "score": 0, "star": false, "tag": "OFF", "note": "No Marlin/Smoothieware or any third-party firmware; xTool devices run xTool's own firmware over a proprietary protocol" },
-    { "cat": "16.2", "product": "Easel", "score": 2, "star": false, "tag": "OFF", "note": "No non-grbl live control (grbl-only); can only export G-code for some non-grbl OEM partner machines, not stream/drive them; token export path" },
-    { "cat": "16.2", "product": "gSender", "score": 0, "star": false, "tag": "OFF", "note": "No Marlin/Smoothieware; grbl-family only. FluidNC not officially supported (connects as grbl)" },
+    {
+      "cat": "16.2",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "Marlin (ADR-095) + Smoothieware (ADR-096) real drivers: M400 settle, idle M114, comma-status fallback, fractional-S rescale; simulator-verified only; open A.3.3 unsafe-profile path"
+    },
+    {
+      "cat": "16.2",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Marlin and Smoothieware long-established first-class selectable firmware alongside GRBL; the sector's mature reference for non-grbl firmware"
+    },
+    {
+      "cat": "16.2",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Smoothieware (Labs) + Duet/RepRap over HTTP; no Marlin; CAM-only export also covers Mach3/4, LinuxCNC, UCCNC, Masso"
+    },
+    {
+      "cat": "16.2",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Experimental Smoothieware and very early-stage Marlin (generated G-code may not be fully compatible); both clearly secondary to GRBL"
+    },
+    {
+      "cat": "16.2",
+      "product": "XCS",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No Marlin/Smoothieware or any third-party firmware; xTool devices run xTool's own firmware over a proprietary protocol"
+    },
+    {
+      "cat": "16.2",
+      "product": "Easel",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "No non-grbl live control (grbl-only); can only export G-code for some non-grbl OEM partner machines, not stream/drive them; token export path"
+    },
+    {
+      "cat": "16.2",
+      "product": "gSender",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No Marlin/Smoothieware; grbl-family only. FluidNC not officially supported (connects as grbl)"
+    },
 
-    { "cat": "16.3", "product": "KerfDesk", "score": 2, "star": false, "tag": "CODE", "note": "Token: experimental file-only .rd export from a clean-room encoder; no file accepted by real Ruida, no live transport (no socket), EXPERIMENTAL on every save; not usable DSP support" },
-    { "cat": "16.3", "product": "LightBurn", "score": 10, "star": false, "tag": "OFF", "note": "Pro drives Ruida, Trocen, TopWisdom DSP plus EZCad2/2Lite/3 and BSL galvo; DSP/proprietary breadth unmatched in this roster" },
-    { "cat": "16.3", "product": "MillMage", "score": 0, "star": false, "tag": "OFF", "note": "No DSP/Ruida support; targets GRBL-family CNC controllers plus CAM-only post exports (CNC app drives no laser DSP)" },
-    { "cat": "16.3", "product": "LaserGRBL", "score": 0, "star": false, "tag": "OFF", "note": "No DSP/Ruida; speaks only GRBL-style serial G-code to Arduino-class boards" },
-    { "cat": "16.3", "product": "XCS", "score": 0, "star": false, "tag": "OFF", "note": "No third-party DSP; xTool machines use xTool's own closed controllers, not open DSP boards" },
-    { "cat": "16.3", "product": "Easel", "score": 0, "star": false, "tag": "OFF", "note": "grbl-based CNC router platform; no DSP laser controller path" },
-    { "cat": "16.3", "product": "gSender", "score": 0, "star": false, "tag": "OFF", "note": "Controls grbl and grblHAL CNCs only; no DSP/Ruida" },
+    {
+      "cat": "16.3",
+      "product": "KerfDesk",
+      "score": 2,
+      "star": false,
+      "tag": "CODE",
+      "note": "Token: experimental file-only .rd export from a clean-room encoder; no file accepted by real Ruida, no live transport (no socket), EXPERIMENTAL on every save; not usable DSP support"
+    },
+    {
+      "cat": "16.3",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Pro drives Ruida, Trocen, TopWisdom DSP plus EZCad2/2Lite/3 and BSL galvo; DSP/proprietary breadth unmatched in this roster"
+    },
+    {
+      "cat": "16.3",
+      "product": "MillMage",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No DSP/Ruida support; targets GRBL-family CNC controllers plus CAM-only post exports (CNC app drives no laser DSP)"
+    },
+    {
+      "cat": "16.3",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No DSP/Ruida; speaks only GRBL-style serial G-code to Arduino-class boards"
+    },
+    {
+      "cat": "16.3",
+      "product": "XCS",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No third-party DSP; xTool machines use xTool's own closed controllers, not open DSP boards"
+    },
+    {
+      "cat": "16.3",
+      "product": "Easel",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "grbl-based CNC router platform; no DSP laser controller path"
+    },
+    {
+      "cat": "16.3",
+      "product": "gSender",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "Controls grbl and grblHAL CNCs only; no DSP/Ruida"
+    },
 
-    { "cat": "16.4", "product": "KerfDesk", "score": 6, "star": false, "tag": "CODE", "note": "12 profiles with typed evidence badges + start-gate that cross-checks declared bed/feed vs live $130/$131/$110/$111; no RESEARCH_LOG provenance, guessed .lbdev schema, no saved-machines list" },
-    { "cat": "16.4", "product": "LightBurn", "score": 9, "star": false, "tag": "OFF", "note": "Find My Laser auto-identifies firmware; importable vendor/user manufacturer settings bundles plus a broad built-in controller list; correctness community-trusted" },
-    { "cat": "16.4", "product": "MillMage", "score": 8, "star": false, "tag": "OFF", "note": "Searchable machine-compatibility database returns each machine's firmware and support level; MachineSettings reads/edits GRBL firmware settings on connect" },
-    { "cat": "16.4", "product": "LaserGRBL", "score": 2, "star": false, "tag": "OFF", "note": "Ships no built-in machine-profile catalog; users import community grbl-config files and custom-button .zbn sets and edit $$ directly; manual substitute only" },
-    { "cat": "16.4", "product": "XCS", "score": 6, "star": false, "tag": "OFF", "note": "Curated catalog of xTool's own lineup (S1, P2, F1, D1/D1 Pro, M1, Laserbox), tightly matched and correct; no third-party machines -- high correctness, narrow breadth" },
-    { "cat": "16.4", "product": "Easel", "score": 6, "star": false, "tag": "OFF", "note": "Ships Inventables profiles (X-Carve, X-Carve Pro, Carvey) plus an OEM-partner catalog with manufacturer/model selection and homing/Z-probe presets" },
-    { "cat": "16.4", "product": "gSender", "score": 5, "star": false, "tag": "OFF", "note": "Ships presets for Sienci LongMill and AltMill and works out-of-box on many grbl machines; thin shipped catalog with a broad grbl fallback" },
+    {
+      "cat": "16.4",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "12 profiles with typed evidence badges + start-gate that cross-checks declared bed/feed vs live $130/$131/$110/$111; no RESEARCH_LOG provenance, guessed .lbdev schema, no saved-machines list"
+    },
+    {
+      "cat": "16.4",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Find My Laser auto-identifies firmware; importable vendor/user manufacturer settings bundles plus a broad built-in controller list; correctness community-trusted"
+    },
+    {
+      "cat": "16.4",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Searchable machine-compatibility database returns each machine's firmware and support level; MachineSettings reads/edits GRBL firmware settings on connect"
+    },
+    {
+      "cat": "16.4",
+      "product": "LaserGRBL",
+      "score": 2,
+      "star": false,
+      "tag": "OFF",
+      "note": "Ships no built-in machine-profile catalog; users import community grbl-config files and custom-button .zbn sets and edit $$ directly; manual substitute only"
+    },
+    {
+      "cat": "16.4",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Curated catalog of xTool's own lineup (S1, P2, F1, D1/D1 Pro, M1, Laserbox), tightly matched and correct; no third-party machines -- high correctness, narrow breadth"
+    },
+    {
+      "cat": "16.4",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Ships Inventables profiles (X-Carve, X-Carve Pro, Carvey) plus an OEM-partner catalog with manufacturer/model selection and homing/Z-probe presets"
+    },
+    {
+      "cat": "16.4",
+      "product": "gSender",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Ships presets for Sienci LongMill and AltMill and works out-of-box on many grbl machines; thin shipped catalog with a broad grbl fallback"
+    },
 
-    { "cat": "16.5", "product": "KerfDesk", "score": 7, "star": false, "tag": "CODE", "note": "7-step draft-commit wizard prefilled from live $$ dump, guarded verify-by-reread firmware writes, assertNever exhaustiveness; two open defects (A.3.3, A.4.3), no runtime/hardware verification" },
-    { "cat": "16.5", "product": "LightBurn", "score": 9, "star": false, "tag": "OFF", "note": "Two-path onboarding: Find My Laser auto-detect, or Create Manually New Device Wizard with firmware picker, origin and work-area entry; the sector's reference wizard" },
-    { "cat": "16.5", "product": "MillMage", "score": 8, "star": false, "tag": "OFF", "note": "Guided Getting Started path (install, machine setup, first project) plus the searchable machine database; onboarding mirrors LightBurn's" },
-    { "cat": "16.5", "product": "LaserGRBL", "score": 4, "star": false, "tag": "OFF", "note": "Minimal onboarding: select COM port and baud, optionally flash grbl and import a config file; no guided multi-step wizard or firmware picker" },
-    { "cat": "16.5", "product": "XCS", "score": 7, "star": false, "tag": "OFF", "note": "Guided per-machine onboarding with USB/Wi-Fi auto-detection and machine-specific first-run setup; polished for xTool's consumer audience but xTool-only" },
-    { "cat": "16.5", "product": "Easel", "score": 7, "star": false, "tag": "OFF", "note": "First-run wizard: choose machine type then manufacturer/model, configure homing and Z-probe; beginner-friendly, the reference KerfDesk's ADR-111 pack targeted" },
-    { "cat": "16.5", "product": "gSender", "score": 7, "star": false, "tag": "OFF", "note": "Guided setup & layout onboarding with a connection wizard and selectable firmware flavour; widely praised free-sender UX" }
+    {
+      "cat": "16.5",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "CODE",
+      "note": "7-step draft-commit wizard prefilled from live $$ dump, guarded verify-by-reread firmware writes, assertNever exhaustiveness; two open defects (A.3.3, A.4.3), no runtime/hardware verification"
+    },
+    {
+      "cat": "16.5",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Two-path onboarding: Find My Laser auto-detect, or Create Manually New Device Wizard with firmware picker, origin and work-area entry; the sector's reference wizard"
+    },
+    {
+      "cat": "16.5",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Guided Getting Started path (install, machine setup, first project) plus the searchable machine database; onboarding mirrors LightBurn's"
+    },
+    {
+      "cat": "16.5",
+      "product": "LaserGRBL",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Minimal onboarding: select COM port and baud, optionally flash grbl and import a config file; no guided multi-step wizard or firmware picker"
+    },
+    {
+      "cat": "16.5",
+      "product": "XCS",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Guided per-machine onboarding with USB/Wi-Fi auto-detection and machine-specific first-run setup; polished for xTool's consumer audience but xTool-only"
+    },
+    {
+      "cat": "16.5",
+      "product": "Easel",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "First-run wizard: choose machine type then manufacturer/model, configure homing and Z-probe; beginner-friendly, the reference KerfDesk's ADR-111 pack targeted"
+    },
+    {
+      "cat": "16.5",
+      "product": "gSender",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Guided setup & layout onboarding with a connection wizard and selectable firmware flavour; widely praised free-sender UX"
+    }
   ],
   "wins": [
-    { "cat": "16.2", "vs": "gSender", "delta": 7, "claim": "KerfDesk drives Marlin and Smoothieware first-class with genuine dialect handling (M400 settle, comma-status fallback, fractional-S rescale); the grbl-only senders gSender and XCS have no non-grbl firmware at all and Easel only a token OEM export (+5 vs Easel, +4 vs LaserGRBL). Caveat: simulator-verified only, open A.3.3, still trails LightBurn (8)." },
-    { "cat": "16.4", "vs": "LaserGRBL", "delta": 4, "claim": "KerfDesk ships a real 12-entry machine-profile catalog with typed evidence badges and a start-gate cross-checking declared bed/feed against live $130/$131/$110/$111 (evidence: stronger than LightBurn); LaserGRBL ships no catalog at all (+1 vs gSender). Caveat: loses to LightBurn (9) and MillMage (8), ties XCS/Easel (6)." }
+    {
+      "cat": "16.2",
+      "vs": "gSender",
+      "delta": 7,
+      "claim": "KerfDesk drives Marlin and Smoothieware first-class with genuine dialect handling (M400 settle, comma-status fallback, fractional-S rescale); the grbl-only senders gSender and XCS have no non-grbl firmware at all and Easel only a token OEM export (+5 vs Easel, +4 vs LaserGRBL). Caveat: simulator-verified only, open A.3.3, still trails LightBurn (8)."
+    },
+    {
+      "cat": "16.4",
+      "vs": "LaserGRBL",
+      "delta": 4,
+      "claim": "KerfDesk ships a real 12-entry machine-profile catalog with typed evidence badges and a start-gate cross-checking declared bed/feed against live $130/$131/$110/$111 (evidence: stronger than LightBurn); LaserGRBL ships no catalog at all (+1 vs gSender). Caveat: loses to LightBurn (9) and MillMage (8), ties XCS/Easel (6)."
+    }
   ],
   "gaps": [
-    { "cat": "16.3", "vs": "LightBurn", "delta": -8, "claim": "No usable DSP/Ruida support -- the .rd export is experimental, file-only and never accepted by real hardware; the whole CO2/DSP laser segment is unserved. ADR-097-recorded scope limit (not a severity bump). P1 for a DSP buyer, P2 for KerfDesk's diode/grbl-centric persona." },
-    { "cat": "16.4", "vs": "LightBurn", "delta": -3, "claim": "12 profiles with no RESEARCH_LOG provenance, a guessed .lbdev import schema (A.4.5) and no app-level saved-machines list (A.4.2), vs LightBurn auto-identify + importable manufacturer bundles and MillMage's searchable machine DB (-2 vs MillMage). P2." },
-    { "cat": "16.1", "vs": "LightBurn", "delta": -2, "claim": "grblHAL/FluidNC are thin driver deltas and the FluidNC console still accepts numeric $N=value writes with no prepareConsoleCommand guard (A.3.9) -- the catalog even claims this is 'blocked in-app' when it is not (un-ADR'd safe-handling divergence, severity-relevant). P2." },
-    { "cat": "16.5", "vs": "LightBurn", "delta": -2, "claim": "Sophisticated 7-step wizard held back by two open defects (A.3.3 unsafe streamingMode path; A.4.3 old machine numbers under a newly-picked profile name) and zero runtime/hardware verification of the $$ read/write-verify flow (-1 vs MillMage). P2." }
+    {
+      "cat": "16.3",
+      "vs": "LightBurn",
+      "delta": -8,
+      "claim": "No usable DSP/Ruida support -- the .rd export is experimental, file-only and never accepted by real hardware; the whole CO2/DSP laser segment is unserved. ADR-097-recorded scope limit (not a severity bump). P1 for a DSP buyer, P2 for KerfDesk's diode/grbl-centric persona."
+    },
+    {
+      "cat": "16.4",
+      "vs": "LightBurn",
+      "delta": -3,
+      "claim": "12 profiles with no RESEARCH_LOG provenance, a guessed .lbdev import schema (A.4.5) and no app-level saved-machines list (A.4.2), vs LightBurn auto-identify + importable manufacturer bundles and MillMage's searchable machine DB (-2 vs MillMage). P2."
+    },
+    {
+      "cat": "16.1",
+      "vs": "LightBurn",
+      "delta": -2,
+      "claim": "grblHAL/FluidNC are thin driver deltas and the FluidNC console still accepts numeric $N=value writes with no prepareConsoleCommand guard (A.3.9) -- the catalog even claims this is 'blocked in-app' when it is not (un-ADR'd safe-handling divergence, severity-relevant). P2."
+    },
+    {
+      "cat": "16.5",
+      "vs": "LightBurn",
+      "delta": -2,
+      "claim": "Sophisticated 7-step wizard held back by two open defects (A.3.3 unsafe streamingMode path; A.4.3 old machine numbers under a newly-picked profile name) and zero runtime/hardware verification of the $$ read/write-verify flow (-1 vs MillMage). P2."
+    }
   ],
   "notVerified": [
     "No fidelity (SS5.3) and no hardware (SS5.4 [HW]) categories exist in S16; every score is a plain capability rating with no PERC cap and no '*' design-intent stars. Several KerfDesk cells lean partly on [HW-CLAIMED] catalog evidence (Falcon A1 Pro grblHAL 'hardware-verified') that is CLAIMED per the repo ledger, not re-verified, and does not raise any score.",

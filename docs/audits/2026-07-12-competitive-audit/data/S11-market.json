@@ -9,8 +9,14 @@
           "existence": "yes",
           "quality": "Three explicit Start From modes (Absolute Coords, Current Position, User Origin) plus a 9-dot Job Origin anchor selector; the roster's most complete positioning model.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CoordinatesOrigin/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CoordinatesOrigin/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            }
           ]
         },
         {
@@ -18,8 +24,14 @@
           "existence": "yes",
           "quality": "CNC work/machine coordinate model; project origin chosen from four corners or center, Z-zero top/bottom, set by jogging+Zero or Probing Wizard. No LightBurn-style current/user-origin toggle.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/CoordinatesOrigin/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/CoordinatesOrigin/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            }
           ]
         },
         {
@@ -35,16 +47,17 @@
           "product": "XCS",
           "existence": "yes",
           "quality": "Manual positioning by moving the laser module and recording vertices; real-time coordinate readout on canvas; homed machines use absolute bed placement.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1109" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1109" }]
         },
         {
           "product": "Easel",
           "existence": "yes",
           "quality": "Work Zero vs Home distinction; carve wizard sets work zero (toolpaths start at material's lower-left corner); homing switches establish machine home.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4413288405395-Work-Zero-and-Homing"
+            }
           ]
         },
         {
@@ -65,8 +78,14 @@
           "existence": "yes",
           "quality": "Pause/Resume plus Ctrl+Break stop; resume works but GRBL feed-hold resume behavior is firmware-dependent and community threads report occasionally imperfect restarts.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/interrupted-cut-resume-job-workarounds-grbl/18824" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/interrupted-cut-resume-job-workarounds-grbl/18824"
+            }
           ]
         },
         {
@@ -74,16 +93,17 @@
           "existence": "yes",
           "quality": "Pause key pauses, Resume continues, Ctrl+Break stops; pause/abort issued as feed-hold to the CNC controller.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "yes",
           "quality": "Feed-hold and Resume buttons issue grbl pause/resume; functional but no documented position-hold guarantees.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }]
         },
         {
           "product": "XCS",
@@ -100,7 +120,10 @@
           "quality": "Pause/Resume in the carve panel; X-Carve Pro raises to safety height, stops spindle, then resumes at the same location—though some community reports note spindle not restarting on resume.",
           "evidence": [
             { "tag": "OFF", "cite": "https://easel.com/features/x-carve-pro-spindle-pause" },
-            { "tag": "COMM", "cite": "https://community.inventables.com/t/pause-resume-not-turning-spindle-back-on/151632" }
+            {
+              "tag": "COMM",
+              "cite": "https://community.inventables.com/t/pause-resume-not-turning-spindle-back-on/151632"
+            }
           ]
         },
         {
@@ -121,7 +144,10 @@
           "existence": "yes",
           "quality": "Stop 'immediately aborts a currently running job'; Ctrl+Break keyboard shortcut also stops.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            }
           ]
         },
         {
@@ -129,16 +155,17 @@
           "existence": "yes",
           "quality": "Stop sends an abort command to the controller; docs stress a physical E-stop must not be MillMage's only stop method.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            }
           ]
         },
         {
           "product": "LaserGRBL",
           "existence": "yes",
           "quality": "Soft-reset/stop button halts grbl and resets the controller; combined with feed-hold for interruption.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }]
         },
         {
           "product": "XCS",
@@ -146,7 +173,10 @@
           "quality": "Opening the enclosure stops the laser (interlock); device button and lid abort processing. Stop safe and hardware-backed.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1109" },
-            { "tag": "COMM", "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/" }
+            {
+              "tag": "COMM",
+              "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/"
+            }
           ]
         },
         {
@@ -154,7 +184,10 @@
           "existence": "yes",
           "quality": "Cancel button aborts the carve from the panel; spindle stops and bit raises.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+            }
           ]
         },
         {
@@ -175,8 +208,14 @@
           "existence": "yes",
           "quality": "No automatic recovery, but Preview 'Start Here' scrubs the time slider to resume partway through—an officially documented, community-endorsed manual workaround for power-loss/disconnect.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/restart-job-on-power-loss-or-disconnect/166292" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/restart-job-on-power-loss-or-disconnect/166292"
+            }
           ]
         },
         {
@@ -184,7 +223,10 @@
           "existence": "yes",
           "quality": "Stopped jobs recoverable via 'Start Here' in the Preview window—manual resume-from-point, mirroring LightBurn's approach.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            },
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
           ]
         },
@@ -194,24 +236,31 @@
           "quality": "No built-in resume; strong community consensus it's impossible to continue an interrupted job—only manual G-code editing or a full restart.",
           "evidence": [
             { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/153" },
-            { "tag": "COMM", "cite": "https://www.facebook.com/groups/lasergrbl/posts/1549561152204542/" }
+            {
+              "tag": "COMM",
+              "cite": "https://www.facebook.com/groups/lasergrbl/posts/1549561152204542/"
+            }
           ]
         },
         {
           "product": "XCS",
           "existence": "no",
           "quality": "No resume-after-failure/start-from-line found in XCS docs; interrupted jobs restart. Move/flame events pause but do not recover position.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1109" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1109" }]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "No reliable resume-from-line; official 'restart after power loss' guidance plus community reports confirm you effectively re-home, re-zero and re-carve.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4415686677523-How-to-restart-a-carve-after-losing-power" },
-            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/is-there-any-way-to-restart-a-job-where-it-left-off/20392" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4415686677523-How-to-restart-a-carve-after-losing-power"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://discuss.inventables.com/t/is-there-any-way-to-restart-a-job-where-it-left-off/20392"
+            }
           ]
         },
         {
@@ -220,7 +269,10 @@
           "quality": "'Start from Line' is purpose-built for power-loss/USB-disconnect/overnight recovery; replays prior state (accessories, spindle/laser power, macros) up to the chosen line—the roster's strongest recovery.",
           "evidence": [
             { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" },
-            { "tag": "COMM", "cite": "https://forum.sienci.com/t/inadequate-documentation-for-the-start-from-line-functionality/10661" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.sienci.com/t/inadequate-documentation-for-the-start-from-line-functionality/10661"
+            }
           ]
         }
       ]
@@ -233,8 +285,14 @@
           "existence": "yes",
           "quality": "Framing (bounding-box and rubber-band) plus out-of-bounds warnings ('Cut might be out of bounds', 'frame exceeds bounds of machine') surface config/position problems before running.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/cut-might-be-out-of-bounds-continue-anyway/441" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/cut-might-be-out-of-bounds-continue-anyway/441"
+            }
           ]
         },
         {
@@ -242,7 +300,10 @@
           "existence": "yes",
           "quality": "Framing (bounding-box/rubber-band/continuous) and a wireframe Preview to catch problems before starting; no documented soft-limit/bounds warning.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            },
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
           ]
         },
@@ -261,7 +322,10 @@
           "quality": "Framing walks the border pre-job; Preview shows the toolpath and estimated time; enclosure/lid must be closed to start—positioning verified before processing.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1109" },
-            { "tag": "COMM", "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/" }
+            {
+              "tag": "COMM",
+              "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/"
+            }
           ]
         },
         {
@@ -269,8 +333,14 @@
           "existence": "yes",
           "quality": "Carve wizard checklist—confirm material secure, confirm bit size, set work zero—before spindle start; toolpath simulation and soft-limit pausing guard travel.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/16251170421267-Machine-is-Pausing-Limits-Enabled" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/16251170421267-Machine-is-Pausing-Limits-Enabled"
+            }
           ]
         },
         {
@@ -291,7 +361,10 @@
           "existence": "yes",
           "quality": "Busy status shows streaming progress with time; console surfaces machine status and decoded alarms. Current-line visibility via console rather than a headline counter.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            }
           ]
         },
         {
@@ -299,7 +372,10 @@
           "existence": "yes",
           "quality": "Busy-state progress bar shows percentage of commands streamed with elapsed time and an estimate of remaining streaming time.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            }
           ]
         },
         {
@@ -317,7 +393,10 @@
           "quality": "Preview shows estimated time and a scrubbable progress bar; live real-processing progress/current-line telemetry is limited in documentation.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1109" },
-            { "tag": "COMM", "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/" }
+            {
+              "tag": "COMM",
+              "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/"
+            }
           ]
         },
         {
@@ -325,8 +404,14 @@
           "existence": "yes",
           "quality": "Carve panel shows job progress while carving; Easel provides time estimates for toolpaths.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012453134-Time-Estimates-and-Toolpaths" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012453134-Time-Estimates-and-Toolpaths"
+            }
           ]
         },
         {
@@ -335,7 +420,10 @@
           "quality": "Fullest in-run telemetry—animated progress bar with completion %, estimated time remaining, g-code line counter and running timer, plus grbl alarm/error codes decoded to plain language.",
           "evidence": [
             { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" },
-            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-gsender-grbl-alarm-error-codes/" }
+            {
+              "tag": "OFF",
+              "cite": "https://resources.sienci.com/view/gs-gsender-grbl-alarm-error-codes/"
+            }
           ]
         }
       ]
@@ -348,7 +436,10 @@
           "existence": "yes",
           "quality": "'Cut Selected Graphics' toggle runs only selected objects, with optional 'Use Selection Origin'; Preview 'Start Here' also runs from an arbitrary point—the most complete run-subset control.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            },
             { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/" }
           ]
         },
@@ -357,7 +448,10 @@
           "existence": "yes",
           "quality": "'Start Here' in the Preview window runs the job from a chosen point (run-from-here); object-level cut-selected not documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            },
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
           ]
         },
@@ -374,17 +468,21 @@
           "product": "XCS",
           "existence": "yes",
           "quality": "Per-object Output toggle—disabled objects aren't framed, previewed or processed—effectively runs only the enabled/selected objects.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://support.xtool.com/article/1109" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1109" }]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "Carves the entire design; no documented run-selected-only or mid-file run-from-here.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel" },
-            { "tag": "COMM", "cite": "https://discuss.inventables.com/t/is-there-any-way-to-restart-a-job-where-it-left-off/20392" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://discuss.inventables.com/t/is-there-any-way-to-restart-a-job-where-it-left-off/20392"
+            }
           ]
         },
         {
@@ -405,8 +503,14 @@
           "existence": "yes",
           "quality": "Software-side posture—framing, out-of-bounds warnings, safety docs—but no hardware interlock (drives third-party machines), so fire safety relies on the user and hardware.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/cut-might-be-out-of-bounds-continue-anyway/441" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/LaserWindow/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/cut-might-be-out-of-bounds-continue-anyway/441"
+            }
           ]
         },
         {
@@ -414,7 +518,10 @@
           "existence": "yes",
           "quality": "Prominent in-app warnings—CNC can cause severe injury, never leave a running machine unattended, always have a physical E-stop, software stop must not be the sole method.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/JobControlWindow/"
+            }
           ]
         },
         {
@@ -440,8 +547,14 @@
           "existence": "yes",
           "quality": "Wizard enforces bit/material/work-zero confirmation and raises to safety height; soft-limit pausing; router+vacuum-on reminders. CNC injury risk handled procedurally, no software interlock.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/16251170421267-Machine-is-Pausing-Limits-Enabled" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012848233-Start-Carving-in-Easel"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/16251170421267-Machine-is-Pausing-Limits-Enabled"
+            }
           ]
         },
         {

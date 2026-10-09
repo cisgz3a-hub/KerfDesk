@@ -9,8 +9,14 @@
           "existence": "yes",
           "quality": "Supports GRBL, grblHAL, and FluidNC as selectable GCode firmware in the New Device Wizard; the broadest first-class grbl-family laser coverage in this roster.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/"
+            }
           ]
         },
         {
@@ -29,7 +35,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/arduino-connection/" },
             { "tag": "OFF", "cite": "https://lasergrbl.com/configuration/" },
-            { "tag": "INF", "cite": "https://lasergrbl.com/faq/ (grblHAL/FluidNC not named as first-class; inferred grbl-compatible only)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/faq/ (grblHAL/FluidNC not named as first-class; inferred grbl-compatible only)"
+            }
           ]
         },
         {
@@ -38,7 +47,10 @@
           "quality": "Closed ecosystem: XCS and successor xTool Studio connect only to xTool's own machines and expose no user-selectable grbl/grblHAL/FluidNC controller support (no generic grbl connect).",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1170" },
-            { "tag": "INF", "cite": "https://www.xtool.com/pages/software (xTool devices only; no generic grbl-controller support surfaced, inferred)" }
+            {
+              "tag": "INF",
+              "cite": "https://www.xtool.com/pages/software (xTool devices only; no generic grbl-controller support surfaced, inferred)"
+            }
           ]
         },
         {
@@ -46,7 +58,10 @@
           "existence": "yes",
           "quality": "Controls grbl-based machines only, supporting Grbl 0.8c through 1.1h; no grblHAL or FluidNC. Solid for classic grbl, narrow beyond it.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings"
+            }
           ]
         },
         {
@@ -55,8 +70,14 @@
           "quality": "Purpose-built for grbl and grblHAL (GRBL 1.1 minimum), firmware flavour selectable at connect; among the best-regarded free grbl/grblHAL senders.",
           "evidence": [
             { "tag": "OFF", "cite": "https://github.com/Sienci-Labs/gsender" },
-            { "tag": "OFF", "cite": "https://sienci.com/2024/01/23/gsender-1-4-0-release-rotary-grblhal-jobs-stats-and-more/" },
-            { "tag": "COMM", "cite": "https://forum.v1e.com/t/gsender-has-a-ton-of-nice-features/50139" }
+            {
+              "tag": "OFF",
+              "cite": "https://sienci.com/2024/01/23/gsender-1-4-0-release-rotary-grblhal-jobs-stats-and-more/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.v1e.com/t/gsender-has-a-ton-of-nice-features/50139"
+            }
           ]
         }
       ]
@@ -69,8 +90,14 @@
           "existence": "yes",
           "quality": "Marlin and Smoothieware are long-established first-class selectable firmware options alongside GRBL in the device wizard.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/"
+            }
           ]
         },
         {
@@ -97,7 +124,10 @@
           "quality": "No Marlin/Smoothieware or any third-party firmware; xTool devices run xTool's own firmware over a proprietary protocol.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1170" },
-            { "tag": "INF", "cite": "https://www.xtool.com/pages/software (no open-firmware support; inferred from xTool-only device list)" }
+            {
+              "tag": "INF",
+              "cite": "https://www.xtool.com/pages/software (no open-firmware support; inferred from xTool-only device list)"
+            }
           ]
         },
         {
@@ -105,8 +135,14 @@
           "existence": "no",
           "quality": "No direct Marlin/Smoothieware control (grbl-only for live control); Easel can export G-code for some non-grbl OEM machines but not stream/drive them.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/8521182372371-Non-Grbl-Machine-Setup-OEM-Partner-Machine" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/8521182372371-Non-Grbl-Machine-Setup-OEM-Partner-Machine"
+            }
           ]
         },
         {
@@ -128,7 +164,10 @@
           "existence": "yes",
           "quality": "Pro edition drives Ruida, Trocen, and TopWisdom DSP controllers plus EZCad2/2Lite/3 and BSL galvo systems; DSP/proprietary breadth unmatched in this roster.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/" },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/"
+            },
             { "tag": "OFF", "cite": "https://lightburnsoftware.com/pages/which-version-do-i-need" }
           ]
         },
@@ -147,7 +186,10 @@
           "quality": "No DSP/Ruida support; LaserGRBL speaks only GRBL-style serial G-code to Arduino-class boards.",
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/arduino-connection/" },
-            { "tag": "INF", "cite": "https://lasergrbl.com/faq/ (grbl-serial scope only; DSP absence inferred)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/faq/ (grbl-serial scope only; DSP absence inferred)"
+            }
           ]
         },
         {
@@ -156,7 +198,10 @@
           "quality": "No third-party DSP (Ruida/Trocen) support; xTool machines use xTool's own proprietary closed controllers, not open DSP boards.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1170" },
-            { "tag": "INF", "cite": "https://www.xtool.com/pages/software (no third-party DSP; inferred from closed xTool-only ecosystem)" }
+            {
+              "tag": "INF",
+              "cite": "https://www.xtool.com/pages/software (no third-party DSP; inferred from closed xTool-only ecosystem)"
+            }
           ]
         },
         {
@@ -164,8 +209,14 @@
           "existence": "no",
           "quality": "No DSP/Ruida support; Easel is a grbl-based CNC router platform with no DSP laser controller path.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings" },
-            { "tag": "INF", "cite": "https://support.easel.com/hc/en-us (grbl-only platform; DSP absence inferred)" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4412374394387-How-to-Check-Your-Firmware-Settings"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us (grbl-only platform; DSP absence inferred)"
+            }
           ]
         },
         {
@@ -174,7 +225,10 @@
           "quality": "No DSP/Ruida support; gSender controls grbl and grblHAL CNCs only.",
           "evidence": [
             { "tag": "OFF", "cite": "https://github.com/Sienci-Labs/gsender" },
-            { "tag": "INF", "cite": "https://sienci.com/gsender/ (grbl/grblHAL scope only; DSP absence inferred)" }
+            {
+              "tag": "INF",
+              "cite": "https://sienci.com/gsender/ (grbl/grblHAL scope only; DSP absence inferred)"
+            }
           ]
         }
       ]
@@ -187,8 +241,14 @@
           "existence": "yes",
           "quality": "Find My Laser auto-identifies firmware; importable manufacturer settings bundles (vendor/user bundles) plus a broad built-in controller list. Correctness widely relied upon by the community.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/"
+            }
           ]
         },
         {
@@ -197,7 +257,10 @@
           "quality": "Searchable machine-compatibility database returns each machine's firmware and MillMage support level; MachineSettings reads/edits GRBL firmware settings on connect.",
           "evidence": [
             { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/MillMageFactSheet/" },
-            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/MachineSettings/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/MachineSettings/"
+            }
           ]
         },
         {
@@ -223,8 +286,14 @@
           "existence": "yes",
           "quality": "Ships profiles for Inventables machines (X-Carve, X-Carve Pro, Carvey) plus an OEM-partner catalog with manufacturer/model selection and per-profile homing/Z-probe presets.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/4411752200467-Machine-Profile-Set-Up-for-X-Carve" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4411752200467-Machine-Profile-Set-Up-for-X-Carve"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup"
+            }
           ]
         },
         {
@@ -233,7 +302,10 @@
           "quality": "Ships presets for Sienci LongMill and AltMill and works out-of-box on many grbl machines; any grbl-based CNC is controllable even when not listed.",
           "evidence": [
             { "tag": "OFF", "cite": "https://github.com/Sienci-Labs/gsender" },
-            { "tag": "COMM", "cite": "https://sienci.zendesk.com/hc/en-us/articles/42466349394964-Using-gSender-with-a-3rd-Party-CNC-Machine" }
+            {
+              "tag": "COMM",
+              "cite": "https://sienci.zendesk.com/hc/en-us/articles/42466349394964-Using-gSender-with-a-3rd-Party-CNC-Machine"
+            }
           ]
         }
       ]
@@ -246,8 +318,14 @@
           "existence": "yes",
           "quality": "Two-path onboarding: Find My Laser auto-detect, or Create Manually New Device Wizard with firmware picker, origin, and work-area entry. The sector's reference wizard.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreateManually/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/GetStarted/LaserID/"
+            }
           ]
         },
         {
@@ -274,7 +352,10 @@
           "quality": "Guided per-machine onboarding with USB/Wi-Fi auto-detection and machine-specific first-run setup; polished for xTool's consumer audience but limited to xTool devices.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1170" },
-            { "tag": "COMM", "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/" }
+            {
+              "tag": "COMM",
+              "cite": "https://reforge.io/how-to-use-xtools-studio-for-the-s1-and-p2-lasers/"
+            }
           ]
         },
         {
@@ -282,8 +363,14 @@
           "existence": "yes",
           "quality": "First-run machine setup wizard: choose machine type then manufacturer/model, configure homing and Z-probe; beginner-friendly, the reference KerfDesk's ADR-111 pack targeted.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup" },
-            { "tag": "OFF", "cite": "https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup" }
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/40225326175251-Navigating-to-the-Machine-Setup"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/37425869235219-OEM-Partner-Machine-Profile-Setup"
+            }
           ]
         },
         {
@@ -292,7 +379,10 @@
           "quality": "Guided setup & layout onboarding with a connection wizard and selectable firmware flavour; widely praised free-sender UX.",
           "evidence": [
             { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-setup-and-layout/" },
-            { "tag": "COMM", "cite": "https://forum.v1e.com/t/gsender-has-a-ton-of-nice-features/50139" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.v1e.com/t/gsender-has-a-ton-of-nice-features/50139"
+            }
           ]
         }
       ]

@@ -9,9 +9,18 @@
           "existence": "yes",
           "quality": "Reference-grade seam control: Set Start Point tool moves seam to any node, Shift-click or Edit > Reverse Shape Direction flips direction; Edit Nodes adds seam nodes; optimizer can auto-choose start/direction. Community guides show routine use.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/SetStartPoint/" },
-            { "tag": "COMM", "cite": "https://support.salasers.com/using-the-start-point-editor-in-lightburn-for-co2-lasers" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/starting-point-when-cutting/54451" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/SetStartPoint/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://support.salasers.com/using-the-start-point-editor-in-lightburn-for-co2-lasers"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/starting-point-when-cutting/54451"
+            }
           ]
         },
         {
@@ -28,8 +37,14 @@
           "quality": "Vector line cutting exists via Inkscape-tuned SVG import and vectorization; vectorizer emits internal paths before external for cutting. No seam/start-point or direction controls documented anywhere in official usage docs [INF from absence].",
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/perfect-cut-with-lasergrbl/" },
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no start-point/direction pages in nav)" }
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (no start-point/direction pages in nav)"
+            }
           ]
         },
         {
@@ -39,7 +54,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1885" },
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1425" },
-            { "tag": "INF", "cite": "https://support.xtool.com/learning-center (no seam/direction article found)" }
+            {
+              "tag": "INF",
+              "cite": "https://support.xtool.com/learning-center (no seam/direction article found)"
+            }
           ]
         },
         {
@@ -49,7 +67,10 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" },
             { "tag": "COMM", "cite": "https://jtechphotonics.com/?page_id=1980" },
-            { "tag": "COMM", "cite": "https://forum.easel.com/t/how-to-burn-first-laser-project/32522" }
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/how-to-burn-first-laser-project/32522"
+            }
           ]
         }
       ]
@@ -62,8 +83,14 @@
           "existence": "yes",
           "quality": "Broadest in roster: scan angle, line interval/LPI, cross-hatch, bi-directional, flood fill, fill grouping (all-at-once/groups/individually), separate Offset Fill contour mode, and sub-layers to stack fill+line settings on one layer.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/"
+            }
           ]
         },
         {
@@ -79,7 +106,10 @@
           "existence": "yes",
           "quality": "Minimal: only a silhouette 'filling pass' option inside the raster vectorization tool. No fill angle, spacing, cross-hatch, offset-fill, or fill-of-imported-SVG controls documented.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
             { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no vector-fill settings pages)" }
           ]
         },
@@ -112,8 +142,14 @@
           "existence": "yes",
           "quality": "Fill of closed shapes with documented grouping semantics (all-at-once vs individually) governing hole/nesting behavior. Widely used in production as the de-facto reference; fill correctness NOT perceptually verified in this audit [INF for reference status].",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/" },
-            { "tag": "INF", "cite": "https://forum.lightburnsoftware.com/ (ubiquity of fill workflows; no systematic correctness complaints located)" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://forum.lightburnsoftware.com/ (ubiquity of fill workflows; no systematic correctness complaints located)"
+            }
           ]
         },
         {
@@ -129,8 +165,14 @@
           "existence": "yes",
           "quality": "Unknown correctness: the vectorization filling pass exists, but no evidence found on hole/even-odd handling, shared edges, or small-feature behavior.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
-            { "tag": "INF", "cite": "No official or community source found on fill correctness details" }
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
+            {
+              "tag": "INF",
+              "cite": "No official or community source found on fill correctness details"
+            }
           ]
         },
         {
@@ -139,16 +181,17 @@
           "quality": "Unknown correctness: vector fill engraving exists with display of fills ('Display vector fill' toggle), but no evidence found on hole/even-odd, shared-edge, or small-feature handling.",
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/3450" },
-            { "tag": "INF", "cite": "No official or community source found on fill correctness details" }
+            {
+              "tag": "INF",
+              "cite": "No official or community source found on fill correctness details"
+            }
           ]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "Outside sector: no laser fill capability to assess.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }]
         }
       ]
     },
@@ -160,7 +203,10 @@
           "existence": "yes",
           "quality": "Kerf Offset in Line mode: positive values offset the beam path outside closed shapes, negative inside; documented as compensation for material removed.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/"
+            }
           ]
         },
         {
@@ -176,7 +222,10 @@
           "existence": "no",
           "quality": "No kerf compensation documented anywhere in official usage docs (vectorization, import parameters, load-and-send all checked).",
           "evidence": [
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no kerf setting in any documented page)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (no kerf setting in any documented page)"
+            }
           ]
         },
         {
@@ -193,9 +242,7 @@
           "product": "Easel",
           "existence": "no",
           "quality": "Outside sector: no laser kerf feature.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }]
         }
       ]
     },
@@ -207,7 +254,10 @@
           "existence": "yes",
           "quality": "Both Tabs/Bridges (skip sections so parts don't fall) and Perforation Mode (alternate cut/skip distances) documented in Line mode common settings - available across laser types.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/"
+            }
           ]
         },
         {
@@ -223,7 +273,10 @@
           "existence": "no",
           "quality": "No tabs, bridges, or perforation mode documented in official usage docs.",
           "evidence": [
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/ (no tab/perforation page in nav)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (no tab/perforation page in nav)"
+            }
           ]
         },
         {
@@ -240,9 +293,7 @@
           "product": "Easel",
           "existence": "no",
           "quality": "Outside sector: Easel tabs are CNC holding tabs, not laser tabs.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }]
         }
       ]
     },
@@ -254,8 +305,14 @@
           "existence": "yes",
           "quality": "Start points fully controllable via Set Start Point tool (any node, either direction). Lead-In/Lead-Out (angle, length, style) documented but DSP-lasers-only - not offered for GCode/Core devices. Start/End Pause Time also DSP-only.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/2.1/Reference/SetStartPoint/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Reference/SetStartPoint/"
+            }
           ]
         },
         {
@@ -279,16 +336,17 @@
           "existence": "no",
           "quality": "No lead-in/lead-out or user start-point control found in xTool support articles for XCS or xTool Studio (searched; absence inferred).",
           "evidence": [
-            { "tag": "INF", "cite": "https://support.xtool.com/learning-center (no lead-in/start-point article found)" }
+            {
+              "tag": "INF",
+              "cite": "https://support.xtool.com/learning-center (no lead-in/start-point article found)"
+            }
           ]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "Outside sector: no laser lead-in/start-point features.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }]
         }
       ]
     },
@@ -300,8 +358,14 @@
           "existence": "yes",
           "quality": "Number of Passes plus Z Offset and Z Step per Pass documented in both Line and Fill mode common settings (raise/lower laser each pass).",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/" },
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/LineMode/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/CutSettingsEditor/FillMode/"
+            }
           ]
         },
         {
@@ -318,7 +382,10 @@
           "quality": "Whole-program loop counter repeats the job N times, decrementing per pass. No per-pass Z step or any Z control between passes documented.",
           "evidence": [
             { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
-            { "tag": "INF", "cite": "https://lasergrbl.com/usage/load-and-send/ (Z step absent from multi-pass doc)" }
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/load-and-send/ (Z step absent from multi-pass doc)"
+            }
           ]
         },
         {
@@ -328,16 +395,17 @@
           "evidence": [
             { "tag": "OFF", "cite": "https://support.xtool.com/article/2425" },
             { "tag": "OFF", "cite": "https://support.xtool.com/article/1891" },
-            { "tag": "INF", "cite": "https://support.xtool.com/article/1325 (embossing = layered depth; no Z-step-per-pass article found)" }
+            {
+              "tag": "INF",
+              "cite": "https://support.xtool.com/article/1325 (embossing = layered depth; no Z-step-per-pass article found)"
+            }
           ]
         },
         {
           "product": "Easel",
           "existence": "no",
           "quality": "Outside sector: Easel depth-per-pass is CNC cutting, not laser.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }]
         }
       ]
     },
@@ -349,9 +417,18 @@
           "existence": "yes",
           "quality": "Full Cut Planner: order by layer/priority/group, cut inner shapes first, reduce travel moves, reduce direction changes, choose best start point/direction; effects visible in Preview. Forum threads show it is tunable and effective in practice.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/how-to-optimize-moves/13470" },
-            { "tag": "COMM", "cite": "https://forum.lightburnsoftware.com/t/optimization-settings-and-actual-cut-path/16172" }
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/OptimizationSettings/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/how-to-optimize-moves/13470"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/optimization-settings-and-actual-cut-path/16172"
+            }
           ]
         },
         {
@@ -367,7 +444,10 @@
           "existence": "yes",
           "quality": "'Optimize Travel' (shortest-order routing) exists only inside the vectorization tool, plus fixed inner-before-outer cutting order. No optimization documented for imported G-code or SVG jobs.",
           "evidence": [
-            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/" },
+            {
+              "tag": "OFF",
+              "cite": "https://lasergrbl.com/usage/raster-image-import/vectorization-tool/"
+            },
             { "tag": "OFF", "cite": "https://lasergrbl.com/perfect-cut-with-lasergrbl/" }
           ]
         },
@@ -385,9 +465,7 @@
           "product": "Easel",
           "existence": "no",
           "quality": "Outside sector: no laser job travel optimization.",
-          "evidence": [
-            { "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }
-          ]
+          "evidence": [{ "tag": "OFF", "cite": "https://www.inventables.com/pages/easel" }]
         }
       ]
     }
