@@ -151,4 +151,19 @@ describe('dialog opener ownership before descendant autofocus', () => {
     await modal.render(null);
     expect(document.activeElement).toBe(fallback);
   });
+
+  it.each(['disabled', 'hidden', 'inert'] as const)(
+    'uses the stable trigger when the original opener becomes %s',
+    async (attribute) => {
+      const fallback = opener('Machine details');
+      fallback.id = 'dialog-opener-machine';
+      const target = opener('Connect');
+      target.dataset['dialogFocusFallback'] = fallback.id;
+      const modal = view(true);
+      await modal.render(autofocusDialog());
+      target.setAttribute(attribute, '');
+      await modal.render(null);
+      expect(document.activeElement).toBe(fallback);
+    },
+  );
 });

@@ -238,14 +238,20 @@ type OriginHandlerDeps = {
   readonly pushToast: (message: string, variant: 'success') => void;
 };
 
-// A fresh origin makes only Absolute unusable (it refuses while a custom origin
-// is active), so that is the one mode Set origin upgrades to User Origin. An
-// explicit User, Verified, or Current Position choice is the operator's and is
+// Set origin upgrades Absolute Coordinates to User Origin. An explicit
+// User, Verified, or Current Position choice is the operator's and is
 // never rewritten under them (ADR-193; ADR-327). The mode is read when the
 // controller acknowledges, not when the button rendered: Set origin waits up to
 // a few seconds for the work-offset frame and the dropdown may change meanwhile.
-function placementAfterSetOrigin(setJobPlacement: OriginHandlerDeps['setJobPlacement']): void {
-  const startFrom: JobStartMode = useStore.getState().jobPlacement.startFrom;
+// The controller origin is global, but its placement update belongs only to
+// the document in which the operator clicked, even if New/Open ran meanwhile.
+function placementAfterSetOrigin(
+  setJobPlacement: OriginHandlerDeps['setJobPlacement'],
+  documentEpoch: number,
+): void {
+  const state = useStore.getState();
+  if (state.projectDocumentEpoch !== documentEpoch) return;
+  const startFrom: JobStartMode = state.jobPlacement.startFrom;
   if (startFrom === 'absolute') setJobPlacement({ startFrom: 'user-origin' });
 }
 
@@ -260,10 +266,11 @@ function makeOriginHandlers(deps: OriginHandlerDeps): {
 } {
   return {
     onSet: () => {
+      const documentEpoch = useStore.getState().projectDocumentEpoch;
       void deps
         .setOrigin()
         .then(() => {
-          placementAfterSetOrigin(deps.setJobPlacement);
+          placementAfterSetOrigin(deps.setJobPlacement, documentEpoch);
           deps.pushToast('Origin set to current head position (G92).', 'success');
         })
         .catch(reportOriginActionFailure);
@@ -354,10 +361,11 @@ function AdvancedOriginControls(props: {
   const setJobPlacement = useStore((s) => s.setJobPlacement);
   const pushToast = useToastStore((s) => s.pushToast);
   const onSetPersistent = (): void => {
+    const documentEpoch = useStore.getState().projectDocumentEpoch;
     if (!jobAwareConfirm(SET_PERSISTENT_ORIGIN_CONFIRM)) return;
     void setPersistentOrigin()
       .then(() => {
-        placementAfterSetOrigin(setJobPlacement);
+        placementAfterSetOrigin(setJobPlacement, documentEpoch);
         pushToast('Persistent G54 XY origin set; temporary offsets cleared.', 'success');
       })
       .catch(reportOriginActionFailure);

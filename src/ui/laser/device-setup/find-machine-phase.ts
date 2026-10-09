@@ -40,6 +40,7 @@ export type FindMachineFacts = {
   readonly portUsb: string | null;
   readonly connectedBaudRate: number | null;
   readonly scan: BaudScanStatus;
+  readonly networkTarget?: string | undefined;
 };
 
 export function findMachinePhase(
@@ -57,6 +58,7 @@ export function findMachinePhase(
       readonly connectedBaudRate: number | null;
     };
     readonly scan: { readonly status: BaudScanStatus };
+    readonly networkTarget?: string | undefined;
   },
   offline: boolean,
 ): FindMachinePhase {
@@ -75,6 +77,7 @@ export function findMachinePhase(
       portUsb: usbIdLabel(laser.serialPortInfo),
       connectedBaudRate: laser.connectedBaudRate,
       scan: model.scan.status,
+      networkTarget: model.networkTarget,
     },
     offline,
   );
@@ -100,7 +103,9 @@ export function phaseFromFacts(facts: FindMachineFacts, offline: boolean): FindM
       return phase(
         'connecting',
         'Connecting…',
-        'If your browser asks, choose the port your machine is on.',
+        facts.networkTarget === undefined
+          ? 'If your browser asks, choose the port your machine is on.'
+          : `Opening ${facts.networkTarget}. Nothing moves while KerfDesk connects.`,
       );
     case 'failed':
       return phase(
@@ -142,17 +147,22 @@ function disconnectedPhase(facts: FindMachineFacts, offline: boolean): FindMachi
   return phase(
     'idle',
     'Find your machine',
-    'Plug it in by USB and switch it on. KerfDesk reads its firmware, work area, speed and power range and fills them in for you. Nothing moves, and no controller setting is changed.',
+    facts.networkTarget === undefined
+      ? 'Plug it in by USB and switch it on. KerfDesk reads its firmware, work area, speed and power range and fills them in for you. Nothing moves, and no controller setting is changed.'
+      : `Connect to ${facts.networkTarget} to read its firmware and settings. Nothing moves, and no controller setting is changed.`,
   );
 }
 
 function connectedPhase(facts: FindMachineFacts): FindMachinePhase {
-  const where = portText(facts.portUsb, facts.connectedBaudRate);
+  const where =
+    facts.networkTarget === undefined ? portText(facts.portUsb, facts.connectedBaudRate) : '';
   if (facts.qualification.kind === 'failed' && !facts.heardController) {
     return phase(
       'silent',
       'Your machine didn’t answer',
-      `Nothing came back at ${facts.connectedBaudRate ?? facts.baudRate} baud. The controller may use another speed, or this port belongs to another device.`,
+      facts.networkTarget === undefined
+        ? `Nothing came back at ${facts.connectedBaudRate ?? facts.baudRate} baud. The controller may use another speed, or this port belongs to another device.`
+        : `No controller answer came back from ${facts.networkTarget}. Check the target and its enabled FluidNC channel, then retry explicitly.`,
     );
   }
   if (facts.qualification.kind === 'qualifying') {

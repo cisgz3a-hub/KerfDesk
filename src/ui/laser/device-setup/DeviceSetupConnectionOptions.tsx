@@ -21,10 +21,15 @@ import {
   machineSetupControllerGuides,
 } from './machine-setup-controller-guide';
 
+type ConnectionOptionsProps = DeviceSetupStepProps & {
+  readonly networkTarget?: string | undefined;
+};
+
 export function DeviceSetupConnectionOptions({
   state,
   dispatch,
-}: DeviceSetupStepProps): JSX.Element {
+  networkTarget,
+}: ConnectionOptionsProps): JSX.Element {
   const controllerKind = state.draft.controllerKind ?? 'grbl-v1.1';
   const guide = machineSetupControllerGuide(controllerKind, state.draft.controllerCommandSet);
   const driver = selectControllerDriver(controllerKind, state.draft.controllerCommandSet);
@@ -36,6 +41,7 @@ export function DeviceSetupConnectionOptions({
         controllerKind={controllerKind}
         dispatch={dispatch}
         update={update}
+        networkTarget={networkTarget}
       />
       {deviceSetupSupportsMachineKind(state, 'cnc') && !driver.capabilities.cncJobs ? (
         <p role="alert" style={warningStyle}>
@@ -44,7 +50,12 @@ export function DeviceSetupConnectionOptions({
         </p>
       ) : null}
       {driver.capabilities.transport === 'serial' ? (
-        <AdvancedConnection state={state} controllerKind={controllerKind} update={update} />
+        <AdvancedConnection
+          state={state}
+          controllerKind={controllerKind}
+          update={update}
+          networkTarget={networkTarget}
+        />
       ) : null}
     </>
   );
@@ -55,6 +66,7 @@ function ControllerContract(props: {
   readonly controllerKind: ControllerKind;
   readonly dispatch: DeviceSetupStepProps['dispatch'];
   readonly update: (patch: Partial<DeviceProfile>) => void;
+  readonly networkTarget?: string | undefined;
 }): JSX.Element {
   const guide = machineSetupControllerGuide(
     props.controllerKind,
@@ -70,7 +82,7 @@ function ControllerContract(props: {
       <Row label="Controller">
         <select
           aria-label="Controller firmware"
-          title="Choose the controller firmware family before opening the serial connection."
+          title="Choose the controller firmware family before opening the connection."
           value={props.controllerKind}
           onChange={(event) =>
             props.dispatch({
@@ -85,9 +97,11 @@ function ControllerContract(props: {
             </option>
           ))}
         </select>
-        <span style={mutedInlineStyle}>{guide.transportLabel}</span>
+        <span style={mutedInlineStyle}>
+          {props.networkTarget === undefined ? guide.transportLabel : 'FluidNC TCP'}
+        </span>
       </Row>
-      {driver.capabilities.transport === 'serial' ? (
+      {props.networkTarget === undefined && driver.capabilities.transport === 'serial' ? (
         <BaudRow state={props.state} guide={guide} update={props.update} />
       ) : null}
       {driver.capabilities.transport === 'serial' ? (
@@ -181,6 +195,7 @@ function AdvancedConnection(props: {
   readonly state: DeviceSetupStepProps['state'];
   readonly controllerKind: ControllerKind;
   readonly update: (patch: Partial<DeviceProfile>) => void;
+  readonly networkTarget?: string | undefined;
 }): JSX.Element {
   const guide = machineSetupControllerGuide(
     props.controllerKind,
@@ -213,9 +228,13 @@ function AdvancedConnection(props: {
         {props.state.draft.streamingMode === 'char-counted' ? (
           <RxWindowRow state={props.state} update={props.update} />
         ) : null}
-        {isGrblFamilyDriver(selectControllerDriver(props.controllerKind)) ? (
+        {props.networkTarget === undefined &&
+        isGrblFamilyDriver(selectControllerDriver(props.controllerKind)) ? (
           <HostedStreamingRow state={props.state} update={props.update} />
         ) : null}
+        {props.networkTarget === undefined ? null : (
+          <p style={mutedStyle}>Network streaming runs in this window. Reconnect explicitly.</p>
+        )}
         <p style={mutedStyle}>{guide.streamingExplanation}</p>
       </div>
     </details>

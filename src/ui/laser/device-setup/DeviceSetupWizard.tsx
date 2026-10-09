@@ -21,6 +21,7 @@ import {
 } from './device-setup-flow';
 import { useCncStartupWizardDraft } from './cnc-startup-wizard-draft';
 import type { DeviceSetupHighlight, MachineSetupTarget } from './machine-setup-dialog-store';
+import type { MachineSetupConnection } from './machine-setup-connection';
 import { useMachineSetupSave } from './use-machine-setup-save';
 import { useMachineSetupTargetFocus } from './use-machine-setup-target-focus';
 import { DeviceSetupShell } from './DeviceSetupShell';
@@ -34,6 +35,7 @@ type DeviceSetupWizardProps = {
   readonly initialStep?: DeviceSetupStep;
   readonly highlight?: DeviceSetupHighlight | undefined;
   readonly target?: MachineSetupTarget | undefined;
+  readonly connection?: MachineSetupConnection | undefined;
 };
 
 export function DeviceSetupWizard(props: DeviceSetupWizardProps): JSX.Element {
@@ -104,6 +106,7 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
         layers={project.scene.layers}
         cncSetup={cncSetup}
         automatic={automatic}
+        connection={props.connection}
         onClose={props.onClose}
         onSave={save.onSave}
         saving={save.saving}
