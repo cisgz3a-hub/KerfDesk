@@ -19,7 +19,6 @@ import { controllerActionFailureHandler } from './report-controller-action-failu
 import { FluidNcNetworkConnect } from './FluidNcNetworkConnect';
 
 type Props = {
-  readonly layout?: 'card' | 'compact';
   readonly machineKind: MachineKind;
   readonly autofocusBusy: boolean;
   readonly motionOperation: ReturnType<typeof useLaserStore.getState>['motionOperation'];
@@ -75,11 +74,10 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
       />
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <ConnectionBar
-        layout={props.layout ?? 'card'}
         machineName={machineName}
         machine={<ConnectedMachineProfile />}
-        details={props.layout === 'compact' ? <MachineDetailsContent /> : undefined}
-        setup={<DeviceSetupControls compact={props.layout === 'compact'} />}
+        details={<MachineDetailsContent />}
+        setup={<DeviceSetupControls />}
         onChoosePort={() => void choosePort().catch(controllerActionFailureHandler('Connect'))}
         autoConnect={autoConnect.enabled}
         onAutoConnectChange={autoConnect.change}
@@ -102,7 +100,6 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
           isFileOnlyProfile
         }
       />
-      {props.layout !== 'compact' && <FluidNcNetworkConnect />}
     </>
   );
 }

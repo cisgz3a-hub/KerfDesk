@@ -49,7 +49,7 @@ function SketchParameterRow(props: {
 }): JSX.Element {
   const { parameter: p, patch } = props;
   return (
-    <div>
+    <div className="lf-sketch-parameter-row">
       <label>
         Parameter name
         <input
@@ -97,11 +97,11 @@ function SketchParameterRow(props: {
   );
 }
 function addDimension(sketch: ConstrainedSketch2d): ConstrainedSketch2d {
+  let ordinal = 1;
+  while (sketch.parameters.some((parameter) => parameter.name === 'dimension_' + ordinal))
+    ordinal += 1;
   return {
     ...sketch,
-    parameters: [
-      ...sketch.parameters,
-      { name: 'dimension_' + (sketch.parameters.length + 1), unit: 'mm', value: 10 },
-    ],
+    parameters: [...sketch.parameters, { name: 'dimension_' + ordinal, unit: 'mm', value: 10 }],
   };
 }

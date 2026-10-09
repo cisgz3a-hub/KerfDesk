@@ -292,15 +292,11 @@ function SleepBanner({ onWake }: { readonly onWake: () => void }): JSX.Element {
 }
 
 const panelStyle: React.CSSProperties = {
-  // The primary controls and lower machine tools own separate scrollers so
-  // opening Console or History does not move the jog pad out of view. This
-  // outer rail stays within the workspace body above its Frame/Start dock.
-  // Surface chrome and spacing come from .lf-machine-rail; layout only here.
+  // This outer rail stays within the workspace body above its Frame/Start dock.
+  // Surface chrome, spacing and scrolling come from .lf-machine-rail.
   width: '100%',
   height: '100%',
   boxSizing: 'border-box',
-  overflowY: 'hidden',
-  overflowX: 'hidden',
   fontFamily: 'system-ui, sans-serif',
   display: 'flex',
   flexDirection: 'column',

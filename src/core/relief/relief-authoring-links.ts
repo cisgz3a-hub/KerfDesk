@@ -49,6 +49,7 @@ export function refreshReliefVectorLinks(
           objects,
           reliefTransform,
           component.transform,
+          document.algorithmRevision === 'retained-relief-v1',
         );
         source = updated.source;
         changed ||= updated.changed;

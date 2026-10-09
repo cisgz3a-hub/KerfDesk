@@ -1,0 +1,559 @@
+{
+  "sector": 8,
+  "categories": [
+    {
+      "id": "8.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Docs call Preview 'an accurate simulation of laser output' - cuts black, travels red, built from the actual planned job (Start Here resume works off the slider). Community treats preview as ground truth for cut order.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://support.thunderlaserusa.com/portal/en/kb/articles/improving-job-time-estimates-in-lightburn-s-preview"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Docs: preview renders 'accurate representation of what MillMage will send to your machine'; dual panel - shaded stock left, wireframe toolpaths right. Fidelity claim is vendor-only; no independent community verification found (young product).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Static 'Engraving preview' area 'show[s] final work preview' of loaded G-code; blue cross tracks live laser position at runtime. No documented claim it replays planner output; render-vs-emitted fidelity unverified [INF].",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" },
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ (no fidelity statement anywhere in usage docs)"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio Preview shows 'the expected processing effect' with distinct moving vs processing paths and laser-position tracking; material-aware result rendering (swap material to approximate output). Vendor claim only; fidelity not community-verified.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1907" },
+            {
+              "tag": "COMM",
+              "cite": "https://createdworkshop.com/blog/beginners-walkthrough-of-xtool-studio"
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Simulate shows 'the exact toolpaths your machine will take' - blue cutting passes, red rapid moves - updating live with project edits. Vendor claim; no independent fidelity verification found.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593293-Toolpath-Simulation-in-Easel"
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Simulation gives 'a three-dimensional representation of the tool paths' to catch toolpath errors. Community reports rendering defects: blank simulation pages, small pockets not rendered, 3D-model view diverging from rough-toolpath sim.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/simulation/" },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-shows-blank-page-for-toolpath-simulation/39645"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-not-showing-simulation-for-small-pocket-cuts/5686"
+            }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Preview Toolpaths draws 'the material being removed by the cutter as the preview is drawn', tool rendered to scale; per-toolpath coloring flags what was previewed. Long-standing CNC-preview quality ceiling; docs-level fidelity claim.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Preview%20Toolpaths/index.html"
+            }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Visualizer renders the loaded G-code file in 3D ('check out how it looks') with rotate/zoom/view-cube; renders the file as parsed, i.e. the actual stream sent. Path-line render only - no result rendering.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Reference-grade: Time Slider scrubs the whole job, Play animates at Playback Speed from 1/10x to 40x actual speed, zoom/pan inside preview; Start Here turns the scrub position into a resume point.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Same playback engine as LightBurn: time slider to 'slide quickly through the project and see the cut order', Play button start-to-finish animation, Playback Speed 1/10x-40x.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No pre-run simulation playback: usage docs document only a static preview plus live position cross and file Play/hold/resume (execution controls, not simulation). No scrub/speed/step-through anywhere in official usage pages.",
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" }]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio Preview: Play/Pause, speed gears x0.1/x0.2/x0.5/x1/x2/x5/x10/x20/x40, draggable progress bar, zoom 1%-102400%. Matches LightBurn's control set on paper.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1907" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Simulation has play button, pause, and a scrub slider ('drag it back and forth' to control the animation manually). No documented playback-speed multiplier control.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593293-Toolpath-Simulation-in-Easel"
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Animated simulation added as a vendor-flagged 'deep change to the rendering system' test; community still requests fast-forward/start-at-arbitrary-point scrubbing, so playback control lags LightBurn/VCarve.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://community.carbide3d.com/t/carbide-create-now-with-animated-simulation/76274"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/fast-forward-skip-parts-of-playback-at-simulate-toolpaths/104131"
+            }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "'Full video-like playback control': Run, Single Step, Run to Retract, with the cutting tool animated to scale. Step-based control rather than a scrub-anywhere timeline slider.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Preview%20Toolpaths/index.html"
+            }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "no",
+          "quality": "No pre-run simulation playback: visualizer animates only the live job (blue planned / yellow current / grey past); docs list no scrub, speed, or step-through simulation controls beyond Start/Pause/Stop of the real job.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Cut/rapid/total time shown under slider. Community consensus: defaults can be far off (e.g. 45min est vs 70min actual) until Device Settings > Additional Settings simulation params are synced; Read From Controller (GRBL/Ruida) makes estimates close.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/Troubleshooting/PreviewWindow/InaccurateTimeEstimates/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/job-time-estimation-does-not-match-actual-runtime/16165"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://support.thunderlaserusa.com/portal/en/kb/articles/improving-job-time-estimates-in-lightburn-s-preview"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Preview shows cut distance, rapid moves, and 'total estimated time' for all operations. Accuracy vs real runs unknown - no community accuracy data found for this young product.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Two-tier: pre-run estimate uses theoretical speeds ignoring acceleration (author: 'very difficult' to model); runtime projection from actual progress 'refines itself... very accurate after just a few minutes'. Big gaps signal limiting firmware config.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/user-interface/" },
+            { "tag": "OFF", "cite": "https://github.com/arkypita/LaserGRBL/discussions/1223" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Preview shows 'Estimated total duration'; full estimate also on the Check-before-processing page. Community complaints across XCS/Studio era that estimates are inaccurate; one reviewer notes estimate placement moved (Process page, top-right).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1907" },
+            { "tag": "COMM", "cite": "https://support.xtool.com/community-support/detail/1995" },
+            {
+              "tag": "COMM",
+              "cite": "https://www.facebook.com/groups/friendliestxtoolp2/posts/1540483210474056/"
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Simulate returns 'estimated completion time', recalculated on every settings tweak; shipped as a dedicated feature ('Carving Time Estimation'). Accuracy vs real runs: no independent consensus found - unknown.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012453134-Time-Estimates-and-Toolpaths"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.easel.com/t/new-feature-carving-time-estimation/23635"
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Estimate exists but community consensus is poor accuracy: V8 estimates ~30-40% under actual Carbide Motion times; CC vs CM vs Fusion produce wildly different numbers (e.g. 1h55 vs 2h31); recurring 2025-2026 complaints.",
+          "evidence": [
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/toolpath-time-estimates/104110"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/3-different-time-estimates-not-very-consistent/89352"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-vs-fusion-360-massive-estimated-time-differences/100894"
+            }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Estimates with per-tool Rapid Rate + user-calibrated Scale Factor (time actual/estimated). Raw estimates ignore acceleration; forum consensus: calibrate scale 1.1-1.5x vector, up to 3-4x for 3D/V-carve - accurate only after calibration.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V9.0/VCarvePro/ENU/Help/Toolpaths/Estimating%20Machining%20Times.html"
+            },
+            { "tag": "COMM", "cite": "https://forum.vectric.com/viewtopic.php?t=28445" },
+            { "tag": "COMM", "cite": "https://forum.vectric.com/viewtopic.php?t=1662" }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Progress bar shows 'completion %, estimated time remaining, g-code line counter, and a running timer' during the job. Pre-run estimate accuracy: no independent accuracy data found - unknown.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Reference: 'Shade According to Power' grayscale (works with grayscale images, Power Scaling, Ramp Length), Invert for dark materials (white-on-black), 'Show Traversal Moves' red travel toggle; direction visible via playback.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "CNC equivalent: color-coded lines separate cutting, travel, and Z-axis moves; red-cross tool-location marker; operation order visible on timeline. Power shading N/A for CNC.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Engraving preview renders the expected raster appearance (grayscale/dither result from import tools). No documented power-shading of vectors, travel-move display, or direction indicators [INF from absence in usage docs].",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" },
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/user-interface/ (no travel/power visualization documented)"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Preview separates 'Moving path' (non-processing) from 'Processing path', with show/hide trajectory toggle; material-aware result rendering approximates burn appearance. No per-move power shading documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/1907" },
+            {
+              "tag": "COMM",
+              "cite": "https://createdworkshop.com/blog/beginners-walkthrough-of-xtool-studio"
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Red lines = spindle rapids between sections, blue lines = cutting passes. No depth/feed shading or direction arrows documented. Power shading N/A for CNC.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593293-Toolpath-Simulation-in-Easel"
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Simulation renders toolpaths three-dimensionally over stock; official course gives no detail on travel-vs-cut coloring or direction display - visualization vocabulary unknown beyond basic path rendering.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/simulation/" }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Machined-area coloring by material, global fill, or per-toolpath colors (with toolpath-list indicators); tool animated to scale; lithophane backlight mode. Direction/rapid display exists in 2D toolpath drawing; power N/A for CNC.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Preview%20Toolpaths/index.html"
+            }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "State-based coloring: planned cutting moves blue, current moves yellow, past moves grey during a run. No power/feed shading; mode visualization is execution-status oriented, not physics-oriented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "Laser-only application; Preview is a 2D cut/travel-line simulation with power shading - no stock model or 3D material-removal simulation exists.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "3D stock simulation: material rendered with selectable textures (woods, metals, painted), green stock border, cuts applied to the block alongside wireframe panel. Depth/quality of removal accuracy not yet community-verified.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/" }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "Laser-only GRBL sender; no CNC stock or material-removal simulation in any official usage page.",
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/" }]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "xTool Studio previews laser jobs (paths + material-aware appearance); no CNC milling stock-removal simulation - xTool's ecosystem has no router CAM surface for it.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1907" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "3D result rendering rather than step-through removal sim: design pane / Detailed Preview (HD Preview on Pro) renders the carved outcome including 3D carvings; Simulate playback itself animates path lines only.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://inventables.zendesk.com/hc/en-us/articles/360012453194-HD-Preview"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/10369535844243-3D-Carving-Instructions"
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "3D stock simulation with animated material removal (vendor-shipped animated sim rewrite). Community-reported defects: blank sim pages, small pockets not rendered - functional but rougher than VCarve.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://carbide3d.com/hub/courses/create/simulation/" },
+            {
+              "tag": "OFF",
+              "cite": "https://community.carbide3d.com/t/carbide-create-now-with-animated-simulation/76274"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-shows-blank-page-for-toolpath-simulation/39645"
+            }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Sector ceiling: animated cutter-removes-material simulation, solid/wood/metal/stone textures plus custom textures, lithophane backlit mode, per-toolpath machined-area coloring, both-sides preview, reset block, save preview image (BMP/PNG/JPG/GIF).",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Preview%20Toolpaths/index.html"
+            }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "no",
+          "quality": "Sender, not CAM: visualizer draws G-code path lines in 3D only; no stock model or material-removal rendering documented.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-using-gsender/" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "8.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Preview handles production-scale raster jobs (users routinely preview multi-hour 400-DPI 350mm images); no documented performance modes. No community consensus of preview-scaling problems found - performance quality unknown beyond that.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/Preview/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/reduce-image-engraving-time/144188"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "unknown",
+          "quality": "No official statements or community reports found on preview behavior at production scale (large 3D jobs, long operations). Young product; unknown.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/Preview/ (no performance guidance present)"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "unknown",
+          "quality": "Marketed as light enough for 'old and low cost' Windows PCs, but no specific evidence found on preview rendering behavior with production-scale rasters. Unknown.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/ (lightweight positioning; no preview-scale data)"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "unknown",
+          "quality": "Preview advertises 'lossless zooming' 1%-102400%, but no evidence found on playback/render behavior with production-scale jobs in xTool Studio V1.7.x. Unknown.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/1907" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "unknown",
+          "quality": "Browser-based; HD Preview (Pro) raises render fidelity but no independent data found on simulation performance with large/production-scale projects. Unknown.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://inventables.zendesk.com/hc/en-us/articles/360012453194-HD-Preview"
+            }
+          ]
+        },
+        {
+          "product": "Carbide Create",
+          "existence": "yes",
+          "quality": "Animated-sim rewrite was vendor-flagged as risky ('deep change to the rendering system... interested in rendering problems'); community reports blank simulations and camera/zoom misbehavior - preview robustness is a known weak spot.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://community.carbide3d.com/t/carbide-create-now-with-animated-simulation/76274"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/carbide-create-shows-blank-page-for-toolpath-simulation/39645"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://community.carbide3d.com/t/no-simulation-showing/37199"
+            }
+          ]
+        },
+        {
+          "product": "VCarve",
+          "existence": "yes",
+          "quality": "Preview quality options exist (Standard/High/Ultra-style simulation quality trade speed vs detail in Vectric products); no community consensus of scale problems found. Docs-level only; detailed performance data unknown.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.vectric.com/docs/V12.0/VCarvePro/ENU/Help/form/Preview%20Toolpaths/index.html"
+            },
+            {
+              "tag": "INF",
+              "cite": "https://forum.vectric.com/ (no scale-complaint consensus located this session)"
+            }
+          ]
+        },
+        {
+          "product": "gSender",
+          "existence": "yes",
+          "quality": "Best-documented scaling story: Lightweight Mode (feather icon) with three presets - full animation, 'Lighter' pre-rendered top-down SVG visualizer, and 'Off' - explicitly for 'less powerful hardware or when running larger files'; per-mode configurable.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-classic/" },
+            { "tag": "OFF", "cite": "https://resources.sienci.com/view/gs-setup-and-layout/" },
+            { "tag": "COMM", "cite": "https://github.com/Sienci-Labs/gsender/releases/tag/v1.5.0" }
+          ]
+        }
+      ]
+    }
+  ]
+}

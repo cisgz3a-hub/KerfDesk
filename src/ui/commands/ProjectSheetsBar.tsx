@@ -1,64 +1,93 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import type { ProjectSheetBook } from '../../core/scene/project-sheets';
 import { Button, Dialog, DialogActions } from '../kit';
 import { useStore } from '../state';
 import { ProductionManifestButton } from './ProductionManifestButton';
 import { RetainedArraysButton } from './RetainedArraysButton';
 import './ProjectSheetsBar.css';
 
+type SheetTab = { readonly id: string; readonly name: string };
+function currentSheets(book: ProjectSheetBook | undefined): SheetTab[] {
+  return book === undefined
+    ? [{ id: 'current', name: 'Sheet 1' }]
+    : [{ id: book.activeId, name: book.activeName }, ...book.inactive];
+}
+function nextSheetName(sheets: readonly SheetTab[]): string {
+  const names = new Set(sheets.map((sheet) => sheet.name));
+  let number = sheets.length + 1;
+  while (names.has(`Sheet ${number}`)) number += 1;
+  return `Sheet ${number}`;
+}
+
 export function ProjectSheetsBar(): JSX.Element {
+  const book = useStore((state) => state.project.sheetBook);
+  const switchSheet = useStore((state) => state.switchProjectSheet);
+  const addSheet = useStore((state) => state.addProjectSheet);
   const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState('');
+  const sheets = currentSheets(book);
+  const activeId = book?.activeId ?? 'current';
+  const tabs = useSheetTabs(book);
+  const openSheet = (id: string): void => {
+    if (id === activeId) return;
+    setStatus(switchSheet(id) ? '' : 'This sheet could not be opened. The active sheet was kept.');
+  };
   return (
     <>
-      <Button
-        aria-label="Project sheets…"
-        title="Manage project sheets, production runs and saved arrays"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-      >
-        <span className="lf-project-sheets-label-wide">Project sheets…</span>
-        <span className="lf-project-sheets-label-narrow">Sheets…</span>
-      </Button>
+      <nav className="lf-project-sheets-bar" aria-label="Project sheets">
+        <ProjectSheetTabs tabs={tabs} activeId={activeId} onOpen={openSheet} />
+        <button
+          className="lf-project-sheet-add"
+          type="button"
+          aria-label="Add blank project sheet"
+          title="Add and open a blank sheet"
+          disabled={sheets.length >= 100}
+          onClick={() =>
+            setStatus(
+              addSheet(nextSheetName(sheets), false) === null
+                ? 'This sheet could not be created. The active sheet was kept.'
+                : '',
+            )
+          }
+        >
+          +
+        </button>
+        <Button
+          aria-label="Manage project sheets"
+          title="Rename, duplicate or remove sheets"
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
+        >
+          Manage sheets…
+        </Button>
+      </nav>
+      {status ? (
+        <p className="lf-project-sheets-status" role="status">
+          {status}
+        </p>
+      ) : null}
       {open ? <ProjectSheetsDialog onClose={() => setOpen(false)} /> : null}
     </>
   );
 }
 
-function ActiveProjectSheet(): JSX.Element {
-  const book = useStore((state) => state.project.sheetBook);
-  const switchSheet = useStore((state) => state.switchProjectSheet);
-  return (
-    <label>
-      Active sheet{' '}
-      <select
-        aria-label="Active project sheet"
-        title="Open another sheet's artwork and setup; only the active sheet is output, and switching resets the current review."
-        value={book?.activeId ?? 'current'}
-        onChange={(event) => switchSheet(event.currentTarget.value)}
-      >
-        <option value={book?.activeId ?? 'current'}>{book?.activeName ?? 'Sheet 1'}</option>
-        {book?.inactive.map((sheet) => (
-          <option key={sheet.id} value={sheet.id}>
-            {sheet.name}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Element {
-  const state = useStore();
+  const book = useStore((state) => state.project.sheetBook);
+  const productionRowOpen = useStore(
+    (state) => state.project.productionManifest?.activeRowId !== undefined,
+  );
+  const addSheet = useStore((state) => state.addProjectSheet);
   const [name, setName] = useState('');
   const [status, setStatus] = useState('');
-  const book = state.project.sheetBook;
-  const productionRowOpen = state.project.productionManifest?.activeRowId !== undefined;
+  const sheets = currentSheets(book);
+  const activeId = book?.activeId ?? 'current';
   const create = (duplicate: boolean | 'production-design'): void => {
-    const id = state.addProjectSheet(name, duplicate);
+    const id = addSheet(name, duplicate);
     setStatus(
       id === null
-        ? 'Give the sheet a name. Up to 100 sheets fit in one project.'
-        : 'Opened the new sheet. Only the active sheet is previewed and output.',
+        ? 'The sheet could not be created. Use a name of up to 200 characters and no more than 100 sheets.'
+        : 'Opened the new sheet.',
     );
     if (id !== null) setName('');
   };
@@ -69,54 +98,41 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
       size="md"
       panelClassName="lf-project-sheets-dialog"
     >
-      <div className="lf-project-sheets-controls">
-        <ActiveProjectSheet />
-        <ProductionManifestButton />
-        <RetainedArraysButton />
-      </div>
-      <ProjectSheetHelp />
-      <label>
-        New sheet name
-        <input
-          aria-label="New sheet name"
-          title="Name the blank sheet or copy that the Add or Duplicate action will create."
-          maxLength={200}
-          value={name}
-          onChange={(event) => setName(event.currentTarget.value)}
-        />
-      </label>
-      <SheetCreationButtons
-        disabled={name.trim() === ''}
+      <p>
+        Each sheet keeps its artwork and job setup. Preview, Frame and output use the active sheet.
+        Save the project to keep all sheets together.
+      </p>
+      <ul className="lf-project-sheet-list" aria-label="Sheets in this project">
+        {sheets.map((sheet) => (
+          <ProjectSheetRow
+            key={sheet.id}
+            sheet={sheet}
+            active={sheet.id === activeId}
+            onStatus={setStatus}
+          />
+        ))}
+      </ul>
+      <SheetCreationControls
+        name={name}
+        setName={setName}
+        count={sheets.length}
         productionRowOpen={productionRowOpen}
-        onCreate={create}
+        create={create}
       />
-      {book === undefined ? null : (
-        <>
-          <label>
-            Active sheet name
-            <input
-              aria-label="Active sheet name"
-              title="Rename the active sheet when you leave this field; the name is saved with the project."
-              maxLength={200}
-              defaultValue={book.activeName}
-              key={book.activeId}
-              onBlur={(event) => state.renameProjectSheet(book.activeId, event.currentTarget.value)}
-            />
-          </label>
-          <ul>
-            {book.inactive.map((sheet) => (
-              <li key={sheet.id}>
-                {sheet.name}{' '}
-                <Button onClick={() => state.switchProjectSheet(sheet.id)}>Open</Button>
-                <Button onClick={() => state.deleteInactiveProjectSheet(sheet.id)}>
-                  Delete inactive sheet
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      <p role="status">{status}</p>
+      <details className="lf-project-sheet-production">
+        <summary title="Show production runs and saved placement arrays for this sheet">
+          Production runs and saved arrays
+        </summary>
+        <div className="lf-project-sheet-actions">
+          <ProductionManifestButton />
+          <RetainedArraysButton />
+        </div>
+        <p>
+          Copies start without production results. An editable design copy restores the original
+          variable settings for a new batch.
+        </p>
+      </details>
+      {status ? <p role="status">{status}</p> : null}
       <DialogActions>
         <Button onClick={props.onClose}>Close</Button>
       </DialogActions>
@@ -124,50 +140,174 @@ function ProjectSheetsDialog(props: { readonly onClose: () => void }): JSX.Eleme
   );
 }
 
-function SheetCreationButtons(props: {
-  readonly disabled: boolean;
-  readonly productionRowOpen: boolean;
-  readonly onCreate: (duplicate: boolean | 'production-design') => void;
+function ProjectSheetRow(props: {
+  readonly sheet: SheetTab;
+  readonly active: boolean;
+  readonly onStatus: (message: string) => void;
 }): JSX.Element {
+  const renameSheet = useStore((state) => state.renameProjectSheet);
+  const switchSheet = useStore((state) => state.switchProjectSheet);
+  const deleteSheet = useStore((state) => state.deleteInactiveProjectSheet);
   return (
-    <>
-      <Button disabled={props.disabled} onClick={() => props.onCreate(false)}>
-        Add blank sheet
-      </Button>
-      <Button
-        disabled={props.disabled}
-        title="Copy the current artwork, including any fixed production text and barcodes. The original keeps its run results."
-        onClick={() => props.onCreate(true)}
-      >
-        Duplicate active sheet
-      </Button>
-      {props.productionRowOpen ? (
-        <Button
-          disabled={props.disabled}
-          title="Start a new batch from this run's saved editable design and variable settings."
-          onClick={() => props.onCreate('production-design')}
-        >
-          Duplicate editable design
-        </Button>
-      ) : null}
-    </>
+    <li>
+      <input
+        key={`${props.sheet.id}:${props.sheet.name}`}
+        aria-label={props.active ? 'Active sheet name' : `Sheet name: ${props.sheet.name}`}
+        title="Rename this sheet; changes are saved with the project"
+        maxLength={200}
+        defaultValue={props.sheet.name}
+        onBlur={(event) => {
+          const name = event.currentTarget.value.trim();
+          if (name === '') {
+            event.currentTarget.value = props.sheet.name;
+            props.onStatus('A sheet name cannot be empty.');
+            return;
+          }
+          renameSheet(props.sheet.id, name);
+        }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            event.currentTarget.blur();
+          }
+          if (event.key === 'Escape') {
+            event.currentTarget.value = props.sheet.name;
+            event.stopPropagation();
+          }
+        }}
+      />
+      {props.active ? (
+        <span className="lf-project-sheet-active">Active</span>
+      ) : (
+        <>
+          <Button
+            onClick={() =>
+              props.onStatus(switchSheet(props.sheet.id) ? '' : 'This sheet could not be opened.')
+            }
+          >
+            Open
+          </Button>
+          <Button
+            title={`Delete ${props.sheet.name}; Undo restores it`}
+            onClick={() => deleteSheet(props.sheet.id)}
+          >
+            Delete
+          </Button>
+        </>
+      )}
+    </li>
   );
 }
 
-function ProjectSheetHelp(): JSX.Element {
+function useSheetTabs(book: ProjectSheetBook | undefined): SheetTab[] {
+  const order = useRef<string[]>([]);
+  const sheets = currentSheets(book);
+  // Navigation rotates archived records; keep the visible tabs in place.
+  if (book === undefined) order.current = ['current'];
+  else if (order.current.includes('current'))
+    order.current = order.current.map((id) =>
+      id === 'current' ? (book.inactive[0]?.id ?? book.activeId) : id,
+    );
+  const available = new Map(sheets.map((sheet) => [sheet.id, sheet]));
+  order.current = [
+    ...order.current.filter((id) => available.has(id)),
+    ...sheets.map((sheet) => sheet.id).filter((id) => !order.current.includes(id)),
+  ];
+  return order.current.flatMap((id) => available.get(id) ?? []);
+}
+function ProjectSheetTabs(props: {
+  readonly tabs: readonly SheetTab[];
+  readonly activeId: string;
+  readonly onOpen: (id: string) => void;
+}): JSX.Element {
   return (
-    <>
-      <p>
-        Each sheet retains its artwork, machine setup, placement, selected-output scope and variable
-        data. Switches reset current review and Frame ownership. Save the project to keep all sheets
-        together.
-      </p>
-      <p>
-        Duplicate active sheet keeps the current artwork, including fixed text and barcodes. When a
-        production row is open, Duplicate editable design restores the run's saved editable design
-        and variable settings for a new batch. Both copies start without a production run; run
-        results stay on the original sheet.
-      </p>
-    </>
+    <div className="lf-project-sheet-tabs" role="tablist" aria-label="Project sheets">
+      {props.tabs.map((sheet, index) => (
+        <button
+          key={sheet.id}
+          type="button"
+          role="tab"
+          id={`lf-project-sheet-tab-${sheet.id}`}
+          aria-controls="lf-project-sheet-content"
+          aria-selected={sheet.id === props.activeId}
+          tabIndex={sheet.id === props.activeId ? 0 : -1}
+          title={`${sheet.name}: open this sheet's artwork and setup`}
+          onClick={() => props.onOpen(sheet.id)}
+          onKeyDown={(event) => navigateSheetTabs(event, index, props.tabs, props.onOpen)}
+        >
+          {sheet.name}
+        </button>
+      ))}
+    </div>
+  );
+}
+function navigateSheetTabs(
+  event: React.KeyboardEvent<HTMLButtonElement>,
+  index: number,
+  tabs: readonly SheetTab[],
+  onOpen: (id: string) => void,
+): void {
+  let next: number | undefined;
+  if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+  if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+  if (event.key === 'Home') next = 0;
+  if (event.key === 'End') next = tabs.length - 1;
+  if (next === undefined) return;
+  event.preventDefault();
+  const target = tabs[next];
+  if (target !== undefined) onOpen(target.id);
+  event.currentTarget.parentElement
+    ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+    [next]?.focus();
+}
+function SheetCreationControls(props: {
+  readonly name: string;
+  readonly setName: (name: string) => void;
+  readonly count: number;
+  readonly productionRowOpen: boolean;
+  readonly create: (duplicate: boolean | 'production-design') => void;
+}): JSX.Element {
+  const disabled = props.name.trim() === '' || props.count >= 100;
+  return (
+    <fieldset className="lf-project-sheet-create">
+      <legend>Add or duplicate a sheet</legend>
+      <label>
+        New sheet name
+        <input
+          aria-label="New sheet name"
+          title="Name the blank sheet or copy"
+          maxLength={200}
+          value={props.name}
+          onChange={(event) => props.setName(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && !disabled) {
+              event.preventDefault();
+              props.create(false);
+            }
+          }}
+        />
+      </label>
+      <div className="lf-project-sheet-actions">
+        <Button disabled={disabled} onClick={() => props.create(false)}>
+          Add blank sheet
+        </Button>
+        <Button
+          disabled={disabled}
+          title="Copy the current artwork; production results stay on the original sheet"
+          onClick={() => props.create(true)}
+        >
+          Duplicate active sheet
+        </Button>
+        {props.productionRowOpen ? (
+          <Button
+            disabled={disabled}
+            title="Restore this run's editable design and variable settings for a new batch"
+            onClick={() => props.create('production-design')}
+          >
+            Duplicate editable design
+          </Button>
+        ) : null}
+      </div>
+    </fieldset>
   );
 }

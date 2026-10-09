@@ -1,0 +1,440 @@
+{
+  "sector": 2,
+  "categories": [
+    {
+      "id": "2.1",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Broadest importer of roster: .ai, .svg, .dxf, .pdf, .plt/.hpgl. No EPS or CDR. Fonts must be installed locally; embedded fonts unsupported.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/FileManagement/"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/2.1/GetStarted/CreatingAndImportingArtwork/"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Identical format list to LightBurn (shared engine): .ai, .svg, .dxf, .pdf, .plt/.hpgl. No EPS/CDR.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "SVG only, officially 'in an early state of development', Inkscape-tuned; text and fills unsupported. No DXF/AI/PDF (DXF is a long-open feature request, issue #408).",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/faq/" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/408" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio imports SVG and DXF only; PDF/AI files from third-party apps must be converted before import per official FAQ.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2520" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2805" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "SVG and DXF (DXF capped below 5 MB); also STL for 3D and custom fonts. No AI/PDF/EPS import.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2.2",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "PNG, JPG/JPEG, BMP, GIF, TIF/TIFF. No WebP in the documented list.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Same five formats as LightBurn: PNG, JPG/JPEG, BMP, GIF, TIF/TIFF. No WebP documented.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "BMP, JPG, PNG, GIF per official docs; raster-to-G-code conversion is the app's core design. No TIFF/WebP documented.",
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/raster-image-import/" }]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Widest raster list of roster: JPG, JPEG, GIF, PNG, BMP, WEBP per xTool's import FAQ - only roster product with documented WebP support.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/544" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2805" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Narrowest: JPG and PNG only, and only via Image Trace (auto-vectorization) or Pro raster toolpaths - no general raster canvas object.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2.3",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Native .lbrn/.lbrn2; opens MillMage .mage (cross-compatibility stated at MillMage launch); G-code import extracts geometry only, no speed/power. No .crv/.easel/RDWorks import.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/FileManagement/"
+            },
+            { "tag": "OFF", "cite": "https://lightburnsoftware.com/blogs/news/millmage-is-here" }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Opens .mage, .lbrn and .lbrn2 project files directly. G-code import is not documented on the file-management page. No .crv/.easel.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "G-code (.nc/.gcode) load, on-screen preview and streaming is the product's core function. No foreign project-file formats.",
+          "evidence": [{ "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" }]
+        },
+        {
+          "product": "XCS",
+          "existence": "no",
+          "quality": "Only .xcs project files can be opened from local disk in xTool Studio; the official exhaustive import list contains no G-code, .lbrn or other foreign project formats.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2805" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Imports G-code (.nc) with toolpath visualization, but files must first pass through a post-processor to match the Easel G-code spec. No .lbrn/.crv.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/42822994372243-Importing-G-Code-to-Easel"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2.4",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Documented SVG-DPI preference and improved DXF spline importer (v1.5), but recurring community reports of DXF scale/unit mis-sizing (25.4x, mm-vs-inch) and spline artifacts; clipboard paste shows 72-vs-96-DPI size drift.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/SettingsPreferences/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/incorrect-scale-when-importing-drawing-from-dxf/148027"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/dxf-import-bug-w-splines/46146"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/copy-paste-dpi-issue-how-to-fix-it/50888"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Import controls exist (docs mirror LightBurn's file engine), but the product is too young for community fidelity consensus - quality unknown. Inferred to share LightBurn's importer behavior.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            },
+            {
+              "tag": "INF",
+              "cite": "Docs format lists/UI are verbatim-identical to LightBurn's FileManagement page; same vendor - inferred shared import code, unverified"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Weak by its own docs: SVG handled 'as is', no text/fonts, no fill (borders only), no per-layer/color handling, tuned to Inkscape output; other editors 'expect some problems'.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/faq/" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/issues/451" }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio documents a per-import DPI setting for SVG sizing, automatic DXF unit detection (toggleable), and Best/High/Medium vector parse quality; a dedicated import-failure troubleshooting FAQ exists. Community consensus on fidelity not established.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2520" },
+            { "tag": "OFF", "cite": "https://support.xtool.com/article/2805" }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Documented hard limits: DXF must be under 5 MB, SVG text elements are not supported, G-code must match the Easel spec. Units/DPI handling not documented.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/42822881692435-Importing-an-SVG-to-Easel"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2.5",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Universal import dialog, drag-and-drop into canvas, clipboard paste of images and text from other apps, Recent Projects and Recent Templates submenus - fullest import UX of roster.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/FileManagement/"
+            },
+            {
+              "tag": "COMM",
+              "cite": "https://forum.lightburnsoftware.com/t/copy-paste-from-illustrator-changes-dimension-in-lightburn/31505"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Drag-and-drop import plus Recent Projects/Recent Templates documented, mirroring LightBurn. Clipboard paste not explicitly documented.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "unknown",
+          "quality": "File-open workflow documented; drag-drop, clipboard paste and recent-files behavior not documented anywhere found - unknown.",
+          "evidence": [
+            { "tag": "OFF", "cite": "https://lasergrbl.com/usage/load-and-send/" },
+            {
+              "tag": "INF",
+              "cite": "lasergrbl.com usage docs reviewed (load-and-send, raster-image-import, user-interface topics) contain no drag-drop/clipboard/recent-files statements"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "Import via file picker with per-import parse options is documented; drag-and-drop and clipboard paste are not evidenced in xTool Studio articles found - beyond-picker UX unknown.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2520" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "Import tab groups SVG / DXF / Image Trace / G-code entry points; cloud dashboard lists projects. Drag-drop and clipboard paste not documented.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/360012593313-Image-Trace"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/35388639766163-File-Import-Guide"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2.6",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "yes",
+          "quality": "Exports vectors as .ai, .svg or .dxf, plus single-image .png/.jpg/.bmp export; saves .lbrn/.lbrn2 projects (lbrn2 default). Broadest export of roster.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "yes",
+          "quality": "Exports .ai/.svg/.dxf with two DXF dialects (R12 legacy, R2007 modern); saves .mage projects; 'Save GCode or Machine File' varies by controller (GRBL, Smoothieware, Marlin...).",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "yes",
+          "quality": "Can save/append generated G-code files for reuse (community tutorials show File save workflow); no vector export - exporting the vectorization result to DXF is an unfulfilled user request.",
+          "evidence": [
+            { "tag": "COMM", "cite": "https://www.youtube.com/watch?v=4vPG4QJXu4o" },
+            { "tag": "COMM", "cite": "https://github.com/arkypita/LaserGRBL/discussions/2163" },
+            {
+              "tag": "COMM",
+              "cite": "https://www.facebook.com/groups/lasergrbl/posts/2132466337247351/"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "yes",
+          "quality": "xTool Studio exports PNG/JPG with selectable 50-1000 DPI plus SVG (Export dialog and canvas right-click); can also export legacy .xcs projects for old-app compatibility. No G-code or DXF export documented.",
+          "evidence": [{ "tag": "OFF", "cite": "https://support.xtool.com/article/2546" }]
+        },
+        {
+          "product": "Easel",
+          "existence": "yes",
+          "quality": "G-code export documented, but tier-gated: free tier 1 export/week, Starter 20/week, Pro unlimited. No SVG/DXF design export documented; community resorts to workarounds.",
+          "evidence": [
+            {
+              "tag": "OFF",
+              "cite": "https://support.easel.com/hc/en-us/articles/4406926040979-Exporting-Gcode-from-Easel"
+            },
+            { "tag": "OFF", "cite": "https://easel.inventables.com/" },
+            { "tag": "COMM", "cite": "https://forum.easel.com/t/g-code-to-svg-success/25216" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "2.7",
+      "products": [
+        {
+          "product": "LightBurn",
+          "existence": "no",
+          "quality": "No replace-on-reimport or linked-external-file feature in the file-management docs. Nearest capability: the 2.1 Cuttle.xyz parametric-design integration feeds designs into LightBurn.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://docs.lightburnsoftware.com/latest/Reference/FileManagement/ documents open/import/export only; no linked-source or update-from-file workflow appears"
+            },
+            {
+              "tag": "OFF",
+              "cite": "https://lightburnsoftware.com/blogs/news/lightburn-2-1-quick-nest-enhanced-camera-support-undo-history-and-more"
+            }
+          ]
+        },
+        {
+          "product": "MillMage",
+          "existence": "no",
+          "quality": "No re-import or update-from-file feature documented on the file-management page.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://docs.millmagesoftware.com/latest/Reference/FileManagement/ reviewed; no linked-source/re-import workflow documented"
+            }
+          ]
+        },
+        {
+          "product": "LaserGRBL",
+          "existence": "no",
+          "quality": "No project or linked-file concept at all; each image/SVG/G-code load is a one-shot conversion.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://lasergrbl.com/usage/ docs set reviewed (load-and-send, raster-image-import); no re-import or linked-source workflow exists in the documentation"
+            }
+          ]
+        },
+        {
+          "product": "XCS",
+          "existence": "unknown",
+          "quality": "No re-import/linked-source workflow found in xTool Studio articles; absence not confirmed exhaustively because Studio docs are scattered per-machine support articles.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://support.xtool.com/article/2520 and https://support.xtool.com/article/2546 cover import/export only; no update-from-file feature located"
+            }
+          ]
+        },
+        {
+          "product": "Easel",
+          "existence": "no",
+          "quality": "Cloud projects auto-save, but no external linked-file or replace-on-reimport workflow is documented in the import/export article set.",
+          "evidence": [
+            {
+              "tag": "INF",
+              "cite": "https://support.easel.com/hc/en-us/sections/42822691403027-File-Importing-and-Exporting section reviewed via search; no re-import/linked-source article exists"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

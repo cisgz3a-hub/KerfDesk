@@ -11,7 +11,11 @@ import {
   findLineBufferOverflow,
   lineBufferOverflowMessage,
 } from '../../core/controllers/grbl/line-buffer-limit';
-import { hasSendableGcodeLine } from '../../core/controllers/grbl/sendable-line-scan';
+import {
+  findFirstUnencodableSendableLine,
+  hasSendableGcodeLine,
+  unencodableLineMessage,
+} from '../../core/controllers/grbl/sendable-line-scan';
 import type { ControllerKind } from '../../core/devices';
 import { PREPARATION_COMPILED_SEGMENT_BUDGET, type Job } from '../../core/job';
 import { scenePreparationSize } from '../../core/job/preparation-complexity';
@@ -131,9 +135,10 @@ function cncOverrideStartIssues(
 }
 
 /** The program-text failures that can never stream or run: nothing sendable,
- * one line longer than the controller's receive buffer, or one longer than the
- * connected controller's line buffer. Everything else the emitter reports is a
- * Job Review warning (ADR-228). */
+ * one line longer than the controller's receive buffer, one carrying a byte the
+ * serial wire cannot send as text, or one longer than the connected
+ * controller's line buffer. Everything else the emitter reports is a Job
+ * Review warning (ADR-228). */
 export function preparedProgramIntegrityIssue(
   gcode: string,
   rxBufferBytes: number,
@@ -149,6 +154,10 @@ export function preparedProgramIntegrityIssue(
       `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
         `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not framed or started.`,
     ];
+  }
+  const unencodable = findFirstUnencodableSendableLine(gcode);
+  if (unencodable !== null) {
+    return [`${unencodableLineMessage(unencodable)} Job not framed or started.`];
   }
   // Refusal (a) under PROJECT.md non-negotiable 21: the connected controller
   // answers the line with error:11 and never runs it. Start refuses it too

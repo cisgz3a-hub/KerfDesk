@@ -182,6 +182,19 @@ describe('causal reset response ownership', () => {
     },
   );
 
+  it('sends a fresh reset for a later explicit Abort after an unconfirmed reset settled', async () => {
+    const f = await connect();
+    await abortWithOldJobDebt(f);
+    await vi.advanceTimersByTimeAsync(600);
+    expectFenced(f);
+    await useLaserStore.getState().stopJob();
+    await vi.advanceTimersByTimeAsync(600);
+    expect(f.writes.filter((line) => line === '\x18')).toHaveLength(2);
+    expect(f.writes.filter((line) => line === 'M5\n')).toHaveLength(2);
+    expect(f.writes.filter((line) => line === 'M9\n')).toHaveLength(2);
+    expect(f.close).not.toHaveBeenCalled();
+  });
+
   it('joins a later Disconnect without a second reset or duplicate cleanup', async () => {
     const f = await connect();
     await abortWithOldJobDebt(f);

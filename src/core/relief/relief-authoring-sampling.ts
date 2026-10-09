@@ -1,5 +1,8 @@
 import { railProfileSampler } from './relief-rail-profile';
-import type { ReliefComponentSource } from '../scene/relief/relief-authoring';
+import type {
+  ReliefAuthoringAlgorithm,
+  ReliefComponentSource,
+} from '../scene/relief/relief-authoring';
 import type { ReliefHeightfield } from '../scene/relief/relief-heightfield';
 import type { Vec2 } from '../scene/scene-object';
 import { canonicalBase64ByteLength, decodeCanonicalBase64 } from './depth-map-base64';
@@ -10,8 +13,12 @@ import { reliefBoundaryBounds, reliefBoundaryContains } from './relief-vector-bo
 export type ComponentSample = { readonly heightMm: number; readonly included: boolean };
 export type ReliefComponentSampler = (point: Vec2) => ComponentSample;
 
-export function createComponentSampler(source: ReliefComponentSource): ReliefComponentSampler {
-  if (source.kind === 'rail-profile-v1') return railProfileSampler(source);
+export function createComponentSampler(
+  source: ReliefComponentSource,
+  algorithmRevision: ReliefAuthoringAlgorithm = 'retained-relief-v2',
+): ReliefComponentSampler {
+  if (source.kind === 'rail-profile-v1')
+    return railProfileSampler(source, algorithmRevision === 'retained-relief-v1');
   if (source.kind === 'vector-shape-v1') {
     const bounds = reliefBoundaryBounds(source.boundary);
     const cx = (bounds.minX + bounds.maxX) / 2,

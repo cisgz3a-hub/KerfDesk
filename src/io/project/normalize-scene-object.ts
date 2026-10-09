@@ -2,13 +2,19 @@ import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { normalizeLibraryAssetProvenance } from './project-library-provenance-normalizer';
 import { withNormalizedTraceSettings } from './project-trace-settings-normalizer';
 import { normalizeBooleanCompound } from './normalize-boolean-compound';
-import { normalizeReliefAuthoringObject } from './project-relief-authoring-validator';
+import {
+  normalizeReliefAuthoringObject,
+  type ReliefAuthoringResolutions,
+} from './project-relief-authoring-validator';
 import { parsePartGeneratorSource } from './project-part-generator-validator';
 import { parseConstrainedSketch } from './project-constrained-sketch-validator';
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-export function normalizeSceneObject(obj: unknown): unknown {
+export function normalizeSceneObject(
+  obj: unknown,
+  resolvedDocuments?: ReliefAuthoringResolutions,
+): unknown {
   if (!isObject(obj)) return obj;
   const { libraryProvenance: rawLibraryProvenance, ...withoutLibraryProvenance } = obj;
   const libraryProvenance =
@@ -22,7 +28,8 @@ export function normalizeSceneObject(obj: unknown): unknown {
         : { ...withoutLibraryProvenance, libraryProvenance },
     ),
   );
-  if (obj['kind'] === 'relief') return normalizeReliefAuthoringObject(normalized);
+  if (obj['kind'] === 'relief')
+    return normalizeReliefAuthoringObject(normalized, resolvedDocuments?.get(obj));
   const intent = normalizedDesignIntent(obj, normalized);
   if (intent !== null) return intent;
   if (obj['kind'] !== 'text') return normalized;

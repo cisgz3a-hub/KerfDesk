@@ -176,7 +176,7 @@ function componentGrid(
   const count = doc.width * doc.height,
     heights = new Float64Array(count),
     coverage = new Uint8Array(count);
-  const sample = createComponentSampler(component.source);
+  const sample = createComponentSampler(component.source, doc.algorithmRevision);
   for (let y = 0; y < doc.height; y += 1) {
     if (cancelled()) throw new Error('Relief authoring cancelled.');
     for (let x = 0; x < doc.width; x += 1) {
@@ -201,11 +201,8 @@ function componentSampleLocation(
   x: number,
   y: number,
 ): ComponentSampleLocation {
-  const p = {
-    x: ((x + 0.5) / doc.width) * doc.physicalWidthMm,
-    y: ((y + 0.5) / doc.height) * doc.physicalHeightMm,
-  };
-  const footprint = doc.outsideMask === 'excluded' ? reliefCellFootprint(doc, x, y) : [];
+  const p = reliefSamplePoint(doc, x, y);
+  const footprint = usesWholeCellCoverage(doc) ? reliefCellFootprint(doc, x, y) : [];
   return {
     p,
     local: inverseReliefPoint(p, component.transform),
@@ -221,21 +218,22 @@ function componentSampleCovered(
   location: ComponentSampleLocation,
 ): boolean {
   const { p, local, footprint, localFootprint } = location;
-  if (!maskSampleCovered(doc.clip, doc.outsideMask, p, footprint)) return false;
-  if (!maskSampleCovered(level.mask, doc.outsideMask, p, footprint)) return false;
-  if (!maskSampleCovered(component.mask, doc.outsideMask, local, localFootprint)) return false;
-  if (doc.outsideMask !== 'excluded' || component.source.kind !== 'vector-shape-v1') return true;
+  const wholeCell = usesWholeCellCoverage(doc);
+  if (!maskSampleCovered(doc.clip, wholeCell, p, footprint)) return false;
+  if (!maskSampleCovered(level.mask, wholeCell, p, footprint)) return false;
+  if (!maskSampleCovered(component.mask, wholeCell, local, localFootprint)) return false;
+  if (!wholeCell || component.source.kind !== 'vector-shape-v1') return true;
   return reliefVectorFootprintCovered(component.source.boundary, localFootprint);
 }
 
 function maskSampleCovered(
   mask: ReliefVectorMask | undefined,
-  outsideMask: ReliefAuthoringDocument['outsideMask'],
+  wholeCell: boolean,
   point: Vec2,
   footprint: ReadonlyArray<Vec2>,
 ): boolean {
   if (mask === undefined) return true;
-  return outsideMask === 'excluded'
+  return wholeCell
     ? reliefVectorFootprintCovered(mask, footprint)
     : reliefBoundaryContains(mask, point);
 }
@@ -251,17 +249,12 @@ function encodeComposite(
   for (let y = 0; y < doc.height; y += 1)
     for (let x = 0; x < doc.width; x += 1) {
       const i = y * doc.width + x;
-      const p = {
-        x: ((x + 0.5) / doc.width) * doc.physicalWidthMm,
-        y: ((y + 0.5) / doc.height) * doc.physicalHeightMm,
-      };
+      const p = reliefSamplePoint(doc, x, y);
       const inside = documentSampleIncluded(
         doc,
         covered[i] ?? 0,
         p,
-        doc.outsideMask === 'excluded' && doc.clip !== undefined
-          ? reliefCellFootprint(doc, x, y)
-          : [],
+        usesWholeCellCoverage(doc) && doc.clip !== undefined ? reliefCellFootprint(doc, x, y) : [],
       );
       const height = encodedCompositeHeight(doc, heights[i] ?? 0, inside);
       if (inside && (height < 0 || height > doc.maxDepthMm)) clipped += 1;
@@ -339,12 +332,26 @@ function documentSampleIncluded(
   footprint: ReadonlyArray<{ x: number; y: number }>,
 ): boolean {
   return (
-    (doc.clip === undefined ||
-      (doc.outsideMask === 'excluded'
-        ? reliefVectorFootprintCovered(doc.clip, footprint)
-        : reliefBoundaryContains(doc.clip, point))) &&
+    maskSampleCovered(doc.clip, usesWholeCellCoverage(doc), point, footprint) &&
     (doc.outsideMask !== 'excluded' || coverage !== 0)
   );
+}
+
+function usesWholeCellCoverage(doc: ReliefAuthoringDocument): boolean {
+  return doc.algorithmRevision === 'retained-relief-v2' && doc.outsideMask === 'excluded';
+}
+
+function reliefSamplePoint(doc: ReliefAuthoringDocument, x: number, y: number): Vec2 {
+  // Preserve v1's floating-point evaluation order for exact persisted-field proofs.
+  return doc.algorithmRevision === 'retained-relief-v1'
+    ? {
+        x: ((x + 0.5) * doc.physicalWidthMm) / doc.width,
+        y: ((y + 0.5) * doc.physicalHeightMm) / doc.height,
+      }
+    : {
+        x: ((x + 0.5) / doc.width) * doc.physicalWidthMm,
+        y: ((y + 0.5) / doc.height) * doc.physicalHeightMm,
+      };
 }
 
 function reliefCellFootprint(doc: ReliefAuthoringDocument, x: number, y: number) {

@@ -113,6 +113,31 @@ describe('WorkspaceContextBar', () => {
     expect(Number.parseFloat(menu.style.top)).toBeLessThan(999);
   });
 
+  it('consumes Escape so dismissing the menu does not also run the workspace Escape shortcut', async () => {
+    const workspaceEscape = vi.fn();
+    window.addEventListener('keydown', workspaceEscape);
+    try {
+      useUiStore
+        .getState()
+        .openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+      await renderBar(commands());
+      const escape = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      await act(async () => {
+        document.body.dispatchEvent(escape);
+      });
+
+      expect(useUiStore.getState().workspaceContextBar).toBeNull();
+      expect(escape.defaultPrevented).toBe(true);
+      expect(workspaceEscape).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', workspaceEscape);
+    }
+  });
+
   it('runs a More action exactly once and dismisses both menu levels', async () => {
     const alignLeft = vi.fn();
     const duplicate = vi.fn();

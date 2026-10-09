@@ -4,15 +4,21 @@ import { reliefAuthoringError } from '../../core/relief/relief-authoring-validat
 import {
   materializeReliefAuthoring,
   unchangedImportedReliefField,
+  type ReliefAuthoringMaterializationResult,
 } from '../../core/relief/materialize-relief-authoring';
 import { validateReliefHeightfield } from './project-relief-heightfield-validator';
 import { isObject } from './project-shape-primitives';
+
+export type ReliefAuthoringResolutions = Map<unknown, ReliefAuthoringDocument>;
 
 /** Optional metadata never becomes a second CAM source; reject a stale baked field. */
 export function validateReliefAuthoringObject(
   object: Record<string, unknown>,
   path: string,
-  options: { readonly verifyComposition?: boolean } = {},
+  options: {
+    readonly verifyComposition?: boolean;
+    readonly resolvedDocuments?: ReliefAuthoringResolutions | undefined;
+  } = {},
 ): string | null {
   const value = object['reliefAuthoring'];
   if (value === undefined) return null;
@@ -27,11 +33,40 @@ export function validateReliefAuthoringObject(
   if (options.verifyComposition === false)
     return trustedMappingError(document, source as ReliefHeightfield, path);
   const expected = materializeReliefAuthoring(document);
-  if (expected.kind !== 'ok')
-    return `invalid ${path}.reliefAuthoring: ${expected.kind === 'error' ? expected.reason : 'composition cancelled'}`;
-  return reliefFieldsEquivalent(expected.field, source as ReliefHeightfield)
-    ? null
-    : `invalid ${path}.reliefAuthoring: materialised field does not match retained intent`;
+  if (expected.kind === 'ok' && reliefFieldsEquivalent(expected.field, source as ReliefHeightfield))
+    return null;
+  if (
+    resolveUnversionedComposition(
+      object,
+      document,
+      source as ReliefHeightfield,
+      options.resolvedDocuments,
+    )
+  )
+    return null;
+  return `invalid ${path}.reliefAuthoring: ${compositionMismatchReason(expected)}`;
+}
+
+function compositionMismatchReason(result: ReliefAuthoringMaterializationResult): string {
+  if (result.kind === 'error') return result.reason;
+  if (result.kind === 'cancelled') return 'composition cancelled';
+  return 'materialised field does not match retained intent';
+}
+
+function resolveUnversionedComposition(
+  owner: Record<string, unknown>,
+  document: ReliefAuthoringDocument,
+  source: ReliefHeightfield,
+  resolvedDocuments?: ReliefAuthoringResolutions,
+): boolean {
+  // #1109 changed composition without changing the v1 marker. Resolve only by
+  // an exact field proof, with each interpretation subject to its own work cap.
+  if (document.algorithmRevision !== 'retained-relief-v1') return false;
+  const current: ReliefAuthoringDocument = { ...document, algorithmRevision: 'retained-relief-v2' };
+  const recomposed = materializeReliefAuthoring(current);
+  if (recomposed.kind !== 'ok' || !reliefFieldsEquivalent(recomposed.field, source)) return false;
+  resolvedDocuments?.set(owner, current);
+  return true;
 }
 
 export function reliefFieldsEquivalent(a: ReliefHeightfield, b: ReliefHeightfield): boolean {
@@ -46,12 +81,16 @@ export function reliefFieldsEquivalent(a: ReliefHeightfield, b: ReliefHeightfiel
   );
 }
 
-/** Preserve all admitted floats/source bytes. No flattening or implicit migration. */
+/** Resolve only the proven interpretation marker; preserve source bytes and floats. */
 export function normalizeReliefAuthoringObject(
   object: Record<string, unknown>,
+  resolvedDocument?: ReliefAuthoringDocument,
 ): Record<string, unknown> {
   if (object['reliefAuthoring'] === undefined) return object;
-  return { ...object, reliefAuthoring: object['reliefAuthoring'] };
+  return {
+    ...object,
+    reliefAuthoring: resolvedDocument ?? object['reliefAuthoring'],
+  };
 }
 
 function canonicalAuthoringMapping(

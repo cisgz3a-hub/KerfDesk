@@ -17,7 +17,6 @@ import { RecentProjectMenuGroup } from '../recent-projects/RecentProjectMenuGrou
 import { MOVE_LASER_TO_SELECTION_IDS } from './machine-move-commands';
 import { ARRANGE_LAYOUT_IDS } from './arrange-command-family';
 import { TOOLS_VECTOR_IDS } from './tools-vector-menu-ids';
-import { ProjectSheetsBar } from './ProjectSheetsBar';
 
 export function AppMenuBar(props: {
   readonly commands: ReadonlyArray<AppCommand>;
@@ -70,9 +69,6 @@ export function AppMenuBar(props: {
           ))}
         </nav>
         <MenuBarHistoryControls commands={props.commands} />
-      </div>
-      <div className="lf-menu-project-controls">
-        <ProjectSheetsBar />
       </div>
     </AppMenuChrome>
   );
@@ -253,6 +249,9 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
     {
       label: 'Create & measure',
       ids: [
+        'tools.constrained-sketch',
+        'tools.parametric-part',
+        'tools.editable-relief',
         'tools.measure',
         'tools.add-text',
         'tools.registration-jig',

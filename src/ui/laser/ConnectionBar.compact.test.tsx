@@ -110,6 +110,22 @@ describe('compact machine connection', () => {
     expect(onForget).toHaveBeenCalledOnce();
   });
 
+  it('announces status outside the machine button and keeps its accessible name stable', async () => {
+    const host = await renderBar({ connection: { kind: 'disconnected' } });
+    const trigger = machineTrigger(host);
+    const name = 'Machine details: Creality Falcon A1 Pro (vendor command set)';
+    expect(trigger?.getAttribute('aria-label')).toBe(name);
+    expect(trigger?.querySelector('[role="status"], [aria-live]')).toBeNull();
+    const description = () =>
+      document.getElementById(trigger?.getAttribute('aria-describedby') ?? '')?.textContent;
+    expect(description()).toBe('Not connected');
+
+    await renderBar({ connection: { kind: 'connected' } }, host);
+    expect(trigger?.getAttribute('aria-label')).toBe(name);
+    expect(description()).toBe('Connected');
+    expect(host.querySelector('[role="status"]')?.textContent).toBe('Connected');
+  });
+
   it('shows a failed connection while details are closed', async () => {
     const host = await renderBar({
       connection: { kind: 'failed', error: 'Failed to open serial port.' },
@@ -169,33 +185,43 @@ describe('compact machine connection', () => {
   });
 });
 
+let mountedRoot: Root | null = null;
+
 async function renderBar(
   overrides: Partial<ComponentProps<typeof ConnectionBar>>,
+  rerenderInto?: HTMLDivElement,
 ): Promise<HTMLDivElement> {
+  if (rerenderInto !== undefined && mountedRoot !== null) {
+    const root = mountedRoot;
+    await act(async () => root.render(bar(overrides)));
+    return rerenderInto;
+  }
   const host = document.createElement('div');
   document.body.appendChild(host);
-  let root: Root | null = null;
-  await act(async () => {
-    root = createRoot(host);
-    root.render(
-      <ConnectionBar
-        layout="compact"
-        machineName="Creality Falcon A1 Pro (vendor command set)"
-        connection={{ kind: 'disconnected' }}
-        machineNoun="laser"
-        onConnect={() => undefined}
-        onDisconnect={() => undefined}
-        onForget={() => undefined}
-        disabled={false}
-        {...overrides}
-      />,
-    );
-  });
+  const root = createRoot(host);
+  mountedRoot = root;
+  await act(async () => root.render(bar(overrides)));
   cleanup = async () => {
-    if (root !== null) await act(async () => root?.unmount());
+    await act(async () => root.unmount());
     host.remove();
+    mountedRoot = null;
   };
   return host;
+}
+
+function bar(overrides: Partial<ComponentProps<typeof ConnectionBar>>): JSX.Element {
+  return (
+    <ConnectionBar
+      machineName="Creality Falcon A1 Pro (vendor command set)"
+      connection={{ kind: 'disconnected' }}
+      machineNoun="laser"
+      onConnect={() => undefined}
+      onDisconnect={() => undefined}
+      onForget={() => undefined}
+      disabled={false}
+      {...overrides}
+    />
+  );
 }
 
 function machineTrigger(host: HTMLElement): HTMLButtonElement | null {

@@ -1,0 +1,163 @@
+{
+  "sector": 17,
+  "categories": [
+    {
+      "id": "17.1",
+      "summary": "Two targets from one codebase: a web PWA on any Chromium browser (Chrome/Edge/Brave/Arc, needs WebSerial) and a Windows-only Electron .exe (nsis x64). macOS/Linux desktop deliberately out of MVP (ADR-007); those users get the web app. No dedicated tablet/mobile UI. One shared web adapter drives both targets, so behavior is identical by construction.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "PROJECT.md:37-42 (web = any-OS Chromium + WebSerial + PWA offline; Windows Electron; macOS/Linux get the web app)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "electron-builder.yml:17-22,33-37 (only win nsis x64 target; mac/Linux targets commented out per ADR-007)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md:123 (ADR-007 Windows-only desktop; web covers macOS and Linux)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/main.tsx:23-27 (single webAdapter for both targets; only id stamped 'electron')"
+        },
+        {
+          "tag": "CODE",
+          "cite": "PROJECT.md:311 (CI on ubuntu-latest only; Windows .exe build:desktop + E2E are release-manual, not in CI)"
+        }
+      ],
+      "notVerified": "No packaged Windows .exe was built, opened, or run by anyone (release-manual). No macOS/Linux, tablet, or touch UI verified to exist. WebSerial availability on mobile/tablet Chromium not confirmed. CI never exercises the Windows target between release tags, so platform drift is uncaught (full-sweep S14-F8)."
+    },
+    {
+      "id": "17.2",
+      "summary": "Web is an installable, fully-offline PWA: workbox precaches all assets (6MB ceiling), registerType 'prompt' never auto-reloads mid-burn. Update banner is suppressed while a job streams and 'Later' persists per __APP_VERSION__ (repeat-nag bug fixed); SW/update path is gated web-only (ELE-06). Desktop updates via a pinned electron-updater feed (install-on-quit, never mid-burn) but ships unsigned with no code-signature verification.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "vite.config.ts:25-46 (VitePWA prompt + injectRegister false; workbox globPatterns, 6MB cap; standalone offline manifest)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/PwaUpdatePrompt.tsx:6-11,68-96 (banner hidden while jobActive; 'Later' persisted keyed to __APP_VERSION__; updatefound re-arms)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/PwaUpdatePromptGate.tsx:17-21 (mounts PwaUpdatePrompt only on web; desktop id 'electron' gated off — ELE-06, fixes audit A.2.6)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "electron/auto-update.ts:37-47 (packaged-only, autoDownload + autoInstallOnAppQuit, never quitAndInstall)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "electron-builder.yml:44-46 (generic feed pinned to https://dl.kerfdesk.com/desktop); DECISIONS.md:3545 ADR-060, :3973 ADR-024 (unsigned in v1, no signature check)"
+        }
+      ],
+      "notVerified": "Packaged-Electron update (install-on-quit), and whether Chromium actually refuses SW registration on the app:// scheme, were never run — inferred from config/code. The unsigned-update tamper window (consolidated A.2.1, CONFIRMED) is proven from config only, not exploited. Real offline install/update on a device not exercised."
+    },
+    {
+      "id": "17.3",
+      "summary": "Layered refuse-before-freeze budgets (4M-px/64MB raster cap, 100k/20k compile-complexity gates, 2048-px decode cap, oversized-line refusal) plus Web Workers for trace/convert (30s timeouts + bounded inline fallbacks) and batched/decimated canvas strokes. Two audited hot loops were fixed since the audit (Cnc3D grid PRF-01, preview 250ms recompile PRF-03); the streamer O(N^2), App-root re-render storm, and uncached raster compile remain.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/core/raster/raster-budget.ts (4M px / 64MB cap); src/core/job/preparation-complexity.ts:17-27 (100k/20k gates); src/core/controllers/grbl/streamer.ts:158-169 (oversized-line refusal)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/trace/trace-worker.ts + src/ui/trace/use-trace-worker-client.ts (trace pipeline in worker, 30s timeout, crash-retire + inline fallback)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/Cnc3DPane.tsx:32-38 (PRF-01 fixed via useOutputScope); src/ui/workspace/use-preview-toolpath.ts:29-53 (PRF-03 fixed: keyed on resolved placement, no blanking)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/core/controllers/grbl/streamer.ts:194-215 (queued.slice(1) per line still O(N^2) over a job — S13-F4 unfixed)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/use-shortcuts.ts:45 (App-root subscribes to fresh currentOutputScope object — S13-F3 re-render storm unfixed); src/core/job/compile-job-raster.ts (no WeakMap cache — S13-F5 unfixed)"
+        }
+      ],
+      "notVerified": "No runtime profiling of any kind by anyone (read-only, no dev server / no hardware): all frame-rate, compile-duration, and memory-growth claims are static call-path analysis. Perceptual quality of the 120k-segment decimated display not checked. Production-scale big-SVG / big-raster / many-object behavior not measured."
+    },
+    {
+      "id": "17.4",
+      "summary": "A React ErrorBoundary swaps in a local, network-free crash screen (copy-diagnostic + retry) and window-level global error/rejection handlers catch the rest; 30s autosave to a per-window localStorage slot with a boot restore prompt; a fingerprint-verified job checkpoint recompiles-and-compares to resume after a crash. Corrupt slots are discarded so startup can't brick. Known seam bugs: phantom restore prompts and a selective-job resume dead-end.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/common/ErrorBoundary.tsx:28-53,55-113 (crash screen, Try again, local-only diagnostic, no network); src/ui/app/App.tsx:36-47 (recovery + autosave + global error handlers + checkpoint all mounted)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/autosave.ts:1-29,147-160 (30s localStorage autosave loop, pauses during streaming); consolidated A.1 'what's great' (corrupt slot discarded once, boot cannot crash)"
+        },
+        {
+          "tag": "HW-CLAIMED",
+          "cite": "src/core/recovery/job-checkpoint.ts:1-32 + DECISIONS.md:5500 ADR-118 (fingerprint-gated resume; real crash+resume on a machine is CLAIMED, not verified)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/app/file-actions.ts:253-255 + src/ui/state/autosave.ts:95-102 (restored slot never cleared -> phantom 'Restore?' — consolidated A.1.2 CONFIRMED)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/laser/start-job-flow.ts:95-108 (crash resume dead-ends with wrong 'project was edited' for selective/placed jobs — consolidated A.1.3 CONFIRMED; scope/placement not persisted)"
+        }
+      ],
+      "notVerified": "Hardware crash + resume is CLAIMED (ADR-118 itself). Real force-kill and localStorage quota-exhaustion autosave behavior not exercised. Electron-side localStorage persistence config not read (renderer path only). A.1.2/A.1.3 are static verdicts, not reproduced in a running app this pass."
+    },
+    {
+      "id": "17.5",
+      "summary": "The .lf2 save/load is a strictly validated, Result-typed trust boundary with real DoS caps (1e6mm coordinate cap, 1e5 scale cap, 256M-px raster cap, luma cross-field checks) and a dedicated security test corpus; malformed files degrade rather than crash. But schema is still v1 with an EMPTY migrator registry: additive-only means an older build silently drops unknown blocks on downgrade, and the machine/CNC block escapes shape-validation (accepts +Infinity).",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/io/project/project-shape-primitives.ts:1,49 (MAX_COORDINATE_MAGNITUDE_MM=1_000_000, finite-required); src/io/project/project-shape-validator.ts:49,283 (MAX_RASTER_SOURCE_PIXELS=256_000_000)"
+        },
+        {
+          "tag": "TEST",
+          "cite": "src/io/project/project-security-validation.test.ts (DoS / corrupt-fixture / integer-bomb corpus, per consolidated A.1)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/project/migrations.ts:25 (MIGRATORS empty) + src/core/scene/project.ts:8 (PROJECT_SCHEMA_VERSION=1) — version never bumps, so downgrade to an older build silently drops unknown blocks (consolidated A.1.7)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/io/project/deserialize-project.ts:297-303 (positive/nonNeg helpers accept +Infinity) + project-shape-validator has no 'machine' key — +Infinity rides into machine block (consolidated A.1.4, verified PARTIAL: safeZMm hard-blocks at save; feeds/spindle are finite-guarded)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "DECISIONS.md additive-no-bump policy (:527,:683,:2741,:4660); autosave shipped with no ADR and F-C3 still a WORKFLOW stub (consolidated A.1.5)"
+        }
+      ],
+      "notVerified": "No committed corpus of real historical .lf2 files (one per shipped phase) loaded in CI — 'every version loads' is proven only by synthetic per-feature fixtures. Downgrade data-loss is inferred from current normalizers, not run against an actual older build. Whether GRBL rejects the +Infinity-derived line was not tested."
+    },
+    {
+      "id": "17.6",
+      "summary": "Memory discipline is deliberate: interaction-scoped undo capped at HISTORY_DEPTH immutable, structurally-shared Project references, console/serial transcript capped 200/500, and a WeakMap-keyed display-decimation cache. Caps exist but no footprint was ever measured. Known leaks: the raster-preview canvas cache grows unbounded across setting changes (a static ~800MB worst case), autosave is bounded by the ~5MB localStorage quota, and the three.js chunk is ~704KB.",
+      "evidence": [
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/store-actions.ts:127 (undoStack ...slice(-HISTORY_DEPTH), structural sharing); src/ui/state/laser-store-helpers.ts:17 (LOG_MAX=200); src/ui/state/laser-transcript.ts:4 (TRANSCRIPT_MAX=500)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/workspace/draw-raster-preview.ts:40,70-72,108 (previewCanvasCache keyed by all burn settings but pruned only by live dataUrl -> unbounded settings-variant growth, S13-F6)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "src/ui/state/autosave.ts:10 (~5MB localStorage cap; photo-heavy projects fail quota so they lose crash recovery, S13-F8)"
+        },
+        {
+          "tag": "CODE",
+          "cite": "vite.config.ts:64-71 (three.js relief-preview chunk ~704KB minified; 750KB documented budget)"
+        }
+      ],
+      "notVerified": "No memory or CPU measurement at typical or heavy load by anyone (read-only, no dev server / no hardware). Real footprint of the capped undo stack on large projects not measured (structural sharing verified in code only). The ~800MB raster-cache figure is a static worst-case estimate, not observed."
+    }
+  ]
+}

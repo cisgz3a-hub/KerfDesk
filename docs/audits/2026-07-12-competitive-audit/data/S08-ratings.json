@@ -1,0 +1,519 @@
+{
+  "sector": 8,
+  "reportPath": "docs/audits/2026-07-12-competitive-audit/sectors/08-preview-simulation.md",
+  "ratings": [
+    {
+      "cat": "8.1",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "PERC",
+      "note": "Preview=Save=Start pipeline (ADR-040), parity test, PERC ink-mask diffs re-run green; scope narrow (32px synthetic fill/cross-hatch), canvas pixels undiffed"
+    },
+    {
+      "cat": "8.1",
+      "product": "LightBurn",
+      "score": 9,
+      "star": false,
+      "tag": "COMM",
+      "note": "Docs claim accurate simulation built from the planned job; community treats preview as ground truth for cut order"
+    },
+    {
+      "cat": "8.1",
+      "product": "MillMage",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Vendor claims accurate representation of what is sent; dual shaded-stock/wireframe panel; no independent verification (young product)"
+    },
+    {
+      "cat": "8.1",
+      "product": "LaserGRBL",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Static engraving preview of loaded G-code plus live position cross; render-vs-emitted fidelity undocumented (absence INF-flagged)"
+    },
+    {
+      "cat": "8.1",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Expected-processing-effect preview, moving vs processing paths, material-aware result rendering; vendor claim only"
+    },
+    {
+      "cat": "8.1",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Simulate shows 'the exact toolpaths', live-updating blue/red; vendor claim, no independent fidelity verification"
+    },
+    {
+      "cat": "8.1",
+      "product": "Carbide Create",
+      "score": 4,
+      "star": false,
+      "tag": "COMM",
+      "note": "3D toolpath representation, but community reports blank sim pages, unrendered small pockets, view divergence"
+    },
+    {
+      "cat": "8.1",
+      "product": "VCarve",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Removal drawn as previewed, tool to scale, per-toolpath previewed flags; docs-level fidelity claim"
+    },
+    {
+      "cat": "8.1",
+      "product": "gSender",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Visualizer renders the loaded G-code file, i.e. the actual stream sent; path lines only, no result render"
+    },
+    {
+      "cat": "8.2",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "Scrub, play/pause, 3 speeds, pass stepper, external .nc playback; but distance-compressed fixed 60/30/10s wall time (S4-F3), no per-command step"
+    },
+    {
+      "cat": "8.2",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Reference: time slider, 1/10x-40x actual-speed animation, zoom/pan, Start Here resume from scrub position"
+    },
+    {
+      "cat": "8.2",
+      "product": "MillMage",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Same engine as LightBurn: time slider, play, 1/10x-40x speed; Start-Here resume not documented"
+    },
+    {
+      "cat": "8.2",
+      "product": "LaserGRBL",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No pre-run simulation playback; only static preview plus live execution controls"
+    },
+    {
+      "cat": "8.2",
+      "product": "XCS",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Play/pause, speed gears x0.1-x40, draggable progress bar, extreme zoom; matches LightBurn's control set on paper"
+    },
+    {
+      "cat": "8.2",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Play, pause, drag-anywhere scrub slider; no documented playback-speed multiplier"
+    },
+    {
+      "cat": "8.2",
+      "product": "Carbide Create",
+      "score": 4,
+      "star": false,
+      "tag": "COMM",
+      "note": "Animated sim shipped as risky rewrite; community still requests fast-forward and arbitrary-start scrubbing"
+    },
+    {
+      "cat": "8.2",
+      "product": "VCarve",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Run, Single Step, Run to Retract with tool animated to scale; step-based, no scrub-anywhere timeline"
+    },
+    {
+      "cat": "8.2",
+      "product": "gSender",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "No pre-run simulation playback; visualizer animates only the live job"
+    },
+    {
+      "cat": "8.3",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Real grbl physics planner, M-30 fix verified; but zero machine validation, raster ETA ignores bidirectional (S4-F5), placement ignored (S4-F6), no elapsed/remaining (S4-F8)"
+    },
+    {
+      "cat": "8.3",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "COMM",
+      "note": "Defaults can drift badly (45min est vs 70min actual) but controller-synced simulation settings make estimates close"
+    },
+    {
+      "cat": "8.3",
+      "product": "MillMage",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Cut/rapid/total estimated time shown; accuracy vs real runs unknown, no community data"
+    },
+    {
+      "cat": "8.3",
+      "product": "LaserGRBL",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Crude pre-run estimate (ignores acceleration) plus in-run projection 'very accurate after just a few minutes'"
+    },
+    {
+      "cat": "8.3",
+      "product": "XCS",
+      "score": 4,
+      "star": false,
+      "tag": "COMM",
+      "note": "Estimated duration shown in Preview and Check page; community complaints of inaccuracy across XCS/Studio era"
+    },
+    {
+      "cat": "8.3",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Estimate recalculated on every settings tweak; accuracy vs real runs unknown, no independent consensus"
+    },
+    {
+      "cat": "8.3",
+      "product": "Carbide Create",
+      "score": 3,
+      "star": false,
+      "tag": "COMM",
+      "note": "Community consensus poor: ~30-40% under actual, wildly inconsistent across CC/CM/Fusion, recurring complaints"
+    },
+    {
+      "cat": "8.3",
+      "product": "VCarve",
+      "score": 6,
+      "star": false,
+      "tag": "COMM",
+      "note": "Raw estimates ignore acceleration; accurate only after user-calibrated Scale Factor (1.1-1.5x vector, 3-4x 3D)"
+    },
+    {
+      "cat": "8.3",
+      "product": "gSender",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "In-run remaining time, line counter, running timer documented; pre-run accuracy unknown"
+    },
+    {
+      "cat": "8.4",
+      "product": "KerfDesk",
+      "score": 5,
+      "star": false,
+      "tag": "CODE",
+      "note": "Dashed travels with toggle; WYSIWYG raster grayscale tracks emitted S; but drawCut ignores color - no vector shade-by-power, un-ADR'd divergence (S4-F2)"
+    },
+    {
+      "cat": "8.4",
+      "product": "LightBurn",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Reference: Shade According to Power grayscale, Invert for dark materials, traversal-move toggle, direction via playback"
+    },
+    {
+      "cat": "8.4",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "CNC equivalent: color-coded cut/travel/Z moves, tool-location marker, operation order on timeline"
+    },
+    {
+      "cat": "8.4",
+      "product": "LaserGRBL",
+      "score": 3,
+      "star": false,
+      "tag": "OFF",
+      "note": "Raster appearance preview only; no travel display, vector power shading, or direction indicators documented"
+    },
+    {
+      "cat": "8.4",
+      "product": "XCS",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "Moving vs processing path split with trajectory toggle; material-aware result render; no per-move power shading"
+    },
+    {
+      "cat": "8.4",
+      "product": "Easel",
+      "score": 5,
+      "star": false,
+      "tag": "OFF",
+      "note": "Red rapids vs blue cutting passes; no depth/feed shading or direction arrows documented"
+    },
+    {
+      "cat": "8.4",
+      "product": "Carbide Create",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "3D path rendering over stock; travel-vs-cut coloring and direction vocabulary undocumented"
+    },
+    {
+      "cat": "8.4",
+      "product": "VCarve",
+      "score": 8,
+      "star": false,
+      "tag": "OFF",
+      "note": "Machined-area coloring by material/fill/per-toolpath, tool animated to scale, lithophane backlight; strongest CNC visualization"
+    },
+    {
+      "cat": "8.4",
+      "product": "gSender",
+      "score": 4,
+      "star": false,
+      "tag": "OFF",
+      "note": "Execution-state coloring (planned blue/current yellow/past grey); no power or feed shading"
+    },
+    {
+      "cat": "8.5",
+      "product": "KerfDesk",
+      "score": 7,
+      "star": false,
+      "tag": "PERC",
+      "note": "Scrub-coupled removal grid, PERC-verified V-carve depth vs analytic groove, .nc re-import IoU parity; 2.5D flat-rect only, rendering never inspected"
+    },
+    {
+      "cat": "8.5",
+      "product": "LightBurn",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser-only; 2D cut/travel preview, no stock model exists"
+    },
+    {
+      "cat": "8.5",
+      "product": "MillMage",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "3D stock sim with wood/metal/painted textures alongside wireframe; removal accuracy not yet community-verified"
+    },
+    {
+      "cat": "8.5",
+      "product": "LaserGRBL",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser-only GRBL sender, no stock simulation"
+    },
+    {
+      "cat": "8.5",
+      "product": "XCS",
+      "score": -2,
+      "star": false,
+      "tag": "OFF",
+      "note": "N/R - laser ecosystem, no router CAM surface"
+    },
+    {
+      "cat": "8.5",
+      "product": "Easel",
+      "score": 6,
+      "star": false,
+      "tag": "OFF",
+      "note": "3D result rendering (Detailed/HD Preview incl. 3D carvings) but Simulate playback animates path lines only"
+    },
+    {
+      "cat": "8.5",
+      "product": "Carbide Create",
+      "score": 6,
+      "star": false,
+      "tag": "COMM",
+      "note": "Animated material removal shipped, but community-reported blank pages and unrendered small pockets"
+    },
+    {
+      "cat": "8.5",
+      "product": "VCarve",
+      "score": 10,
+      "star": false,
+      "tag": "OFF",
+      "note": "Sector ceiling: animated removal, material/custom textures, lithophane backlit mode, both-sides preview, save image"
+    },
+    {
+      "cat": "8.5",
+      "product": "gSender",
+      "score": 0,
+      "star": false,
+      "tag": "OFF",
+      "note": "CNC sender with 3D path-line visualizer but no stock or removal rendering; scored 0 not N/R (CNC audience)"
+    },
+    {
+      "cat": "8.6",
+      "product": "KerfDesk",
+      "score": 6,
+      "star": false,
+      "tag": "CODE",
+      "note": "100k segment gate, 120k stride sampling with banner, cancellable rebuilds, two hot loops verifiably closed; zero production-scale measurement"
+    },
+    {
+      "cat": "8.6",
+      "product": "LightBurn",
+      "score": 8,
+      "star": false,
+      "tag": "COMM",
+      "note": "Users routinely preview multi-hour 400-DPI rasters; no perf modes but no community scaling-complaint consensus"
+    },
+    {
+      "cat": "8.6",
+      "product": "MillMage",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "U - no official statements or community reports on production-scale preview behavior; young product"
+    },
+    {
+      "cat": "8.6",
+      "product": "LaserGRBL",
+      "score": -1,
+      "star": false,
+      "tag": "INF",
+      "note": "U - lightweight positioning marketed but no preview-scale evidence either way"
+    },
+    {
+      "cat": "8.6",
+      "product": "XCS",
+      "score": -1,
+      "star": false,
+      "tag": "OFF",
+      "note": "U - lossless-zoom claim exists but no evidence on production-scale playback/render behavior in V1.7.x"
+    },
+    {
+      "cat": "8.6",
+      "product": "Easel",
+      "score": -1,
+      "star": false,
+      "tag": "OFF",
+      "note": "U - browser-based, HD Preview raises fidelity; no independent large-project performance data"
+    },
+    {
+      "cat": "8.6",
+      "product": "Carbide Create",
+      "score": 3,
+      "star": false,
+      "tag": "COMM",
+      "note": "Rendering rewrite vendor-flagged risky; community-reported blank simulations and camera/zoom misbehavior - known weak spot"
+    },
+    {
+      "cat": "8.6",
+      "product": "VCarve",
+      "score": 7,
+      "star": false,
+      "tag": "OFF",
+      "note": "Simulation-quality options trade speed vs detail; no scale-complaint consensus found; docs-level only"
+    },
+    {
+      "cat": "8.6",
+      "product": "gSender",
+      "score": 9,
+      "star": false,
+      "tag": "OFF",
+      "note": "Best-documented scaling story: three-preset Lightweight Mode (full/pre-rendered SVG/off) explicitly for large files and weak hardware"
+    }
+  ],
+  "wins": [
+    {
+      "cat": "8.2",
+      "vs": "LaserGRBL",
+      "delta": 6,
+      "claim": "KerfDesk ships a full pre-run simulator (scrub, play/pause, speeds, pass stepper, external .nc playback) where LaserGRBL documents no simulation playback at all."
+    },
+    {
+      "cat": "8.2",
+      "vs": "gSender",
+      "delta": 6,
+      "claim": "gSender's visualizer animates only the live job, so KerfDesk's scrubber/speed/step preview simulator has no counterpart there."
+    },
+    {
+      "cat": "8.1",
+      "vs": "Carbide Create",
+      "delta": 3,
+      "claim": "KerfDesk's preview is parity-tested against the emitted job and perceptually mask-verified, while Carbide Create's community reports blank simulation pages and unrendered small pockets."
+    },
+    {
+      "cat": "8.5",
+      "vs": "Carbide Create",
+      "delta": 1,
+      "claim": "A scrub-coupled removal grid with perceptually verified V-carve depth math and .nc re-import parity edges Carbide Create's defect-prone animated sim."
+    },
+    {
+      "cat": "8.5",
+      "vs": "Easel",
+      "delta": 1,
+      "claim": "KerfDesk simulates step-through material removal coupled to the scrubber, while Easel's Simulate playback animates path lines only with a static 3D result render."
+    }
+  ],
+  "gaps": [
+    {
+      "cat": "8.4",
+      "vs": "LightBurn",
+      "delta": -5,
+      "claim": "No vector shade-by-power at all - drawCut ignores layer color so 10% and 90% power look identical, an un-ADR'd divergence from the LightBurn baseline ADR-028 itself records (5.6 severity bump)."
+    },
+    {
+      "cat": "8.2",
+      "vs": "LightBurn",
+      "delta": -4,
+      "claim": "Playback is distance-compressed over fixed 60/30/10s wall durations instead of LightBurn's 1/10x-40x actual-speed animation with Start-Here resume; no per-command step-through."
+    },
+    {
+      "cat": "8.3",
+      "vs": "LightBurn",
+      "delta": -3,
+      "claim": "The physics estimator has never been validated against a real machine and carries three open defects (bidirectional ignored, placement ignored, no elapsed/remaining) vs LightBurn's controller-synced estimates."
+    },
+    {
+      "cat": "8.5",
+      "vs": "VCarve",
+      "delta": -3,
+      "claim": "KerfDesk's 2.5D flat-rect heightfield with no textures, undercuts, or visual inspection trails VCarve's textured, animated, both-sides simulation ceiling."
+    },
+    {
+      "cat": "8.6",
+      "vs": "gSender",
+      "delta": -3,
+      "claim": "No user-facing performance modes and zero production-scale measurement vs gSender's documented three-preset Lightweight Mode built for large files."
+    },
+    {
+      "cat": "8.1",
+      "vs": "LightBurn",
+      "delta": -2,
+      "claim": "KerfDesk's perceptual proof covers only 32px synthetic fill/cross-hatch cases while LightBurn's preview is community-trusted ground truth at production scale."
+    }
+  ],
+  "notVerified": [
+    "8.1: on-canvas rendered pixels never diffed against a screenshot or LightBurn; PERC covers 32px synthetic fill/cross-hatch only; line-mode, raster dither alignment, rotary (ADR-127), and Y-flip registration have no perceptual proof; no maintainer visual pass for the preview",
+    "8.2: no live-app run - animation smoothness, scrubber feel, and head-marker behavior unobserved (read-only audit, collaboration rule 4)",
+    "8.3: estimate accuracy vs a real burn entirely unknown - zero hardware timing measurements exist in the tree (hardware ledger CLAIMED throughout); planner verified on paper and unit tests only",
+    "8.4: raster grayscale as composited on canvas has no perceptual proof (the dither itself does); no LightBurn side-by-side; direction arrowheads not found and not claimed either way",
+    "8.5: the three.js 3D rendering never screenshot or visually inspected - grid math perceptually proven, rendered scene is not; simulation vs an actual cut unproven",
+    "8.6: no profiling or live measurement at production scale; budget constants design-asserted; P1-d trusted from the 07-11 fix-verification doc, not re-profiled",
+    "Competitor U cells (research debt): MillMage, LaserGRBL, XCS, Easel at 8.6 - no production-scale performance evidence found either way",
+    "Competitor 8.1 fidelity claims are vendor [OFF] for MillMage, XCS, Easel, VCarve, gSender - no hands-on verification; LaserGRBL 8.1/8.4 rest partly on [INF] absence and cannot anchor headline conclusions",
+    "MillMage 8.5 removal-sim depth accuracy unverified; LightBurn/LaserGRBL/XCS 8.5 N/R determinations rest on official docs only, no hands-on confirmation"
+  ]
+}

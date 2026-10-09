@@ -15,6 +15,10 @@ import {
   findLineBufferOverflow,
   lineBufferOverflowMessage,
 } from '../../core/controllers/grbl/line-buffer-limit';
+import {
+  findFirstUnencodableSendableLine,
+  unencodableLineMessage,
+} from '../../core/controllers/grbl/sendable-line-scan';
 import { findFluidncNonExecutableLines } from '../../core/controllers/fluidnc/fluidnc-line-limit';
 import type { ControllerDriver } from '../../core/controllers';
 import type { ControllerKind } from '../../core/devices';
@@ -67,6 +71,10 @@ export function assertGcodeFitsController(
       `G-code line ${oversized.lineNumber} is ${oversized.bytes} bytes — longer than the ` +
         `controller's ${oversized.limit}-byte RX buffer; it can never be sent. Job not started.`,
     );
+  }
+  const unencodable = findFirstUnencodableSendableLine(gcode);
+  if (unencodable !== null) {
+    throw new Error(`${unencodableLineMessage(unencodable)} Job not started.`);
   }
   // PROJECT.md non-negotiable 21, refusal (a): stock GRBL and grblHAL answer a
   // line past their line buffer with error:11 and never run it, so the job

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, type DeviceProfile } from '../devices';
 import { findLaserOnTravelIssues } from '../invariants';
 import type { Job } from '../job';
-import { smoothiewareStrategy } from './smoothieware-strategy';
+import { rescaleSWords, smoothiewareStrategy } from './smoothieware-strategy';
 import { selectOutputStrategy } from './select-output-strategy';
 
 const JOB: Job = {
@@ -51,6 +51,21 @@ describe('smoothiewareStrategy', () => {
   it('scales to integer S when the profile max is large', () => {
     const out = smoothiewareStrategy.emit(JOB, { ...SMOOTHIE_DEVICE, maxPowerS: 100 });
     expect(out).toContain('S50');
+  });
+
+  it('rescales S words in G-code but leaves comment text unchanged', () => {
+    const body = [
+      'G1 X1 S500 ; requested S1000 max',
+      '; header S255 note',
+      'G1 X2 (keep S900 here) S250',
+      'G0 X0 S0',
+    ].join('\n');
+    expect(rescaleSWords(body, 1).split('\n')).toEqual([
+      'G1 X1 S0.500 ; requested S1000 max',
+      '; header S255 note',
+      'G1 X2 (keep S900 here) S0.250',
+      'G0 X0 S0',
+    ]);
   });
 
   it('is deterministic (non-negotiable #5)', () => {
