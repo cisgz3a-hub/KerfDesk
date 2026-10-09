@@ -1,12 +1,9 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "e34ad795e1e6d8dad256d106e41e9b3a8f335331",
+  "sinceSourceSha": "67d109ffd84c833ea80f6fd4e49cd00214837f36",
   "highlights": [
-    "Repeated Save and Save As requests to the same file through different paths preserve the newest captured document.",
-    "CNC relief masks respect whole cell footprints, varying-width rail profiles stay aligned and tapered inlays preserve overlapping text joins. Sketches retain diagonals and withhold results that cannot reopen.",
-    "Selected CNC output ignores unused projection dependencies and retains Frame after unrelated edits. G-code preview preserves active retraces and 3D depth, corrects timing and picking, and restores its background after graphics recovery.",
-    "Artwork exports preserve thin and flattened curves under scaling, rotation and mirroring, within the requested precision of supported vector formats.",
-    "Licence checkout rejects malformed requests before saving payment intent. Desktop Phone connections bound complete reply frames and report oversize responses cleanly.",
-    "First Connect opens Machine Setup for an unconfigured machine. Desktop upgrade checks verify saved CNC setups and optimisation settings against the installed writer. Build tools include available security patches."
+    "G-code preview preserves active retraces and 3D depth, corrects playback timing and picking, and keeps partial strokes and future paths visually distinct.",
+    "G-code preview restores its background after graphics recovery.",
+    "Home, Auto-focus and Set origin stay beside the jog pad, with machine setup links available for an unconfigured workspace."
   ]
 }
