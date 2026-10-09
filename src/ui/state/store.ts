@@ -123,7 +123,11 @@ import {
   sceneActions,
   viewActions,
 } from './store-actions';
-import { saveTrackingActions, type MarkLoadedOptions } from './store-save-tracking-actions';
+import {
+  saveTrackingActions,
+  type MarkLoadedOptions,
+  type ProjectSaveRestoration,
+} from './store-save-tracking-actions';
 import { variableDataActions, type VariableDataActions } from './variable-data-actions';
 import { arrayActions, type ArrayActions } from './array-actions';
 import { nestActions, type NestActions } from './nest-actions';
@@ -381,6 +385,7 @@ export type AppState = PartGeneratorActions &
       expectedProjectDocumentEpoch: number,
       expectedProjectSavedRequestEpoch: number,
       target: SaveTarget,
+      restoration?: ProjectSaveRestoration,
     ) => Promise<boolean>;
     readonly markLoaded: (filename: string, options?: MarkLoadedOptions) => void;
   };

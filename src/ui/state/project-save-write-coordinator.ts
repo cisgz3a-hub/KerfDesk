@@ -4,6 +4,15 @@ import { compareSaveDestinations } from './project-save-write-coordinator-identi
 export { saveTargetsShareDestination } from './project-save-write-coordinator-identity';
 
 type SaveContents = Parameters<SaveTarget['write']>[0];
+export type ProjectSaveOwnReplayResult =
+  | { readonly kind: 'restored' }
+  | { readonly kind: 'failed'; readonly error: unknown }
+  | { readonly kind: 'cancelled' };
+
+type RestoreFailureFeedback = (
+  error: unknown,
+  ownReplay?: Promise<ProjectSaveOwnReplayResult>,
+) => void | Promise<void>;
 
 type SelectedWriteStatus = {
   selectedPending: boolean;
@@ -20,7 +29,7 @@ type SelectedProjectWrite = {
   readonly selected: Promise<void>;
   readonly selectedSettled: Promise<void>;
   readonly status: SelectedWriteStatus;
-  readonly onRestoreFailure?: (error: unknown) => void | Promise<void>;
+  readonly onRestoreFailure?: RestoreFailureFeedback;
   group: DestinationWriteGroup;
 };
 
@@ -35,7 +44,7 @@ export type ProjectSaveWriteOwner = {
   readonly write: (
     target: SaveTarget,
     contents: SaveContents,
-    onRestoreFailure?: (error: unknown) => void | Promise<void>,
+    onRestoreFailure?: RestoreFailureFeedback,
   ) => Promise<void>;
   readonly release: () => void;
 };
@@ -84,7 +93,7 @@ class ProjectSaveWriteCoordinatorState {
     requestEpoch: number,
     target: SaveTarget,
     contents: SaveContents,
-    onRestoreFailure?: (error: unknown) => void | Promise<void>,
+    onRestoreFailure?: RestoreFailureFeedback,
   ): Promise<void> {
     // This invocation intentionally precedes every identity comparison. Picker
     // equality can be slow; it never delays any destination the operator chose.
@@ -238,6 +247,10 @@ type ReplayResult = {
   readonly index: number;
 };
 type FailedReplay = ReplayResult & { readonly error: unknown };
+type PendingOwnerRestoration = {
+  readonly completed: Promise<ProjectSaveOwnReplayResult>;
+  readonly settle: (result: ProjectSaveOwnReplayResult) => void;
+};
 
 async function repairCapturedWrites(group: DestinationWriteGroup): Promise<void> {
   // Let successful selected-write owners publish before a repair failure asks
@@ -251,23 +264,40 @@ async function repairCapturedWrites(group: DestinationWriteGroup): Promise<void>
   const failures: FailedReplay[] = [];
   const restored: ReplayResult[] = [];
   const notifiedOwners = new Set<number>();
+  const pendingRestorations = new Map<number, PendingOwnerRestoration>();
   // The earliest chosen write already ran. Replay the later snapshots in
   // request order: aliases finish newest, distinct files keep their own bytes.
   for (const [index, operation] of writes.entries()) {
     if (!isCurrentGroup(group)) {
       // Supersession cancels the remaining own replays, not completed failures.
-      reportAffectedSaveOwners(group, failures, restored, [], notifiedOwners);
+      for (const id of pendingRestorations.keys())
+        settleOwnerRestoration(pendingRestorations, notifiedOwners, id, { kind: 'cancelled' });
+      reportAffectedSaveOwners(group, failures, restored, [], notifiedOwners, pendingRestorations);
       return;
     }
     try {
       await operation.target.write(operation.contents);
       restored.push({ operation, index });
+      settleOwnerRestoration(pendingRestorations, notifiedOwners, operation.id, {
+        kind: isCurrentGroup(group) ? 'restored' : 'cancelled',
+      });
     } catch (error) {
       failures.push({ operation, index, error });
-      reportAffectedSaveOwners(group, failures, restored, writes.slice(index + 1), notifiedOwners);
+      settleOwnerRestoration(pendingRestorations, notifiedOwners, operation.id, {
+        kind: 'failed',
+        error,
+      });
+      reportAffectedSaveOwners(
+        group,
+        failures,
+        restored,
+        writes.slice(index + 1),
+        notifiedOwners,
+        pendingRestorations,
+      );
     }
   }
-  reportAffectedSaveOwners(group, failures, restored, [], notifiedOwners);
+  reportAffectedSaveOwners(group, failures, restored, [], notifiedOwners, pendingRestorations);
 }
 
 function reportAffectedSaveOwners(
@@ -276,14 +306,14 @@ function reportAffectedSaveOwners(
   restored: ReadonlyArray<ReplayResult>,
   pending: ReadonlyArray<SelectedProjectWrite>,
   notifiedOwners: Set<number>,
+  pendingRestorations: Map<number, PendingOwnerRestoration>,
 ): void {
   // A failed later selection does not replace a successful handoff. A throwing
   // write may already have changed an unknown alias, so notify each potentially
   // affected successful owner. Its saved-epoch/document guards decide ownership,
   // even if a newer pending selection has superseded this repair group.
   for (const owner of group.members) {
-    if (!owner.status.selectedSucceeded || notifiedOwners.has(owner.id) || pending.includes(owner))
-      continue;
+    if (!owner.status.selectedSucceeded || notifiedOwners.has(owner.id)) continue;
     const failure = [...failures]
       .reverse()
       .find(
@@ -297,14 +327,38 @@ function reportAffectedSaveOwners(
                   Object.is(successful.operation.contents, owner.contents))),
           ),
       );
-    // Owners whose own replay is ahead wait for its result. Already-final owners
-    // are notified promptly, independently of other replays or feedback handlers.
-    if (failure) {
+    if (!failure) continue;
+    if (pending.includes(owner)) {
+      if (!pendingRestorations.has(owner.id)) {
+        let settle = (_result: ProjectSaveOwnReplayResult): void => undefined;
+        const completed = new Promise<ProjectSaveOwnReplayResult>((resolve) => {
+          settle = resolve;
+        });
+        pendingRestorations.set(owner.id, { completed, settle });
+        // Arm recovery now: another file's replay may never settle. Only this
+        // owner's own successful replay can release that temporary uncertainty.
+        void reportRestoreFailure(owner, failure.error, completed);
+      }
+    } else {
       notifiedOwners.add(owner.id);
       void reportRestoreFailure(owner, failure.error);
     }
   }
 }
+
+function settleOwnerRestoration(
+  pending: Map<number, PendingOwnerRestoration>,
+  notifiedOwners: Set<number>,
+  id: number,
+  result: ProjectSaveOwnReplayResult,
+): void {
+  const restoration = pending.get(id);
+  if (!restoration) return;
+  pending.delete(id);
+  if (result.kind !== 'restored') notifiedOwners.add(id);
+  restoration.settle(result);
+}
+
 function compareWriteOrder(left: SelectedProjectWrite, right: SelectedProjectWrite): number {
   return left.requestEpoch - right.requestEpoch || left.id - right.id;
 }
@@ -322,9 +376,13 @@ function latestWrite(operations: ReadonlySet<SelectedProjectWrite>): SelectedPro
   );
 }
 
-async function reportRestoreFailure(owner: SelectedProjectWrite, error: unknown): Promise<void> {
+async function reportRestoreFailure(
+  owner: SelectedProjectWrite,
+  error: unknown,
+  ownReplay?: Promise<ProjectSaveOwnReplayResult>,
+): Promise<void> {
   try {
-    await owner.onRestoreFailure?.(error);
+    await owner.onRestoreFailure?.(error, ownReplay);
   } catch {
     // Feedback failure must not reject another Save or poison future repairs.
   }

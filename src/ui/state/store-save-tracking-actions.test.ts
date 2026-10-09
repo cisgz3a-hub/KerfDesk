@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SaveTarget } from '../../platform/types';
 import { useStore } from './store';
 import { resetStore, svgObj } from './test-helpers';
@@ -94,4 +94,57 @@ describe('saveTrackingActions (F-A11)', () => {
       projectSavedRequestEpoch: null,
     });
   });
+});
+
+function restorationGate() {
+  let resolve = (_restored: boolean): void => undefined;
+  const completed = new Promise<boolean>((complete) => {
+    resolve = complete;
+  });
+  return { completed, resolve };
+}
+
+it('does not let a temporary successful restoration clear a newer final uncertainty', async () => {
+  resetStore();
+  const target = markCurrentProjectSaved('saved.lf2');
+  const state = useStore.getState();
+  const gate = restorationGate();
+  const onRestored = vi.fn();
+  await state.markProjectSaveUncertain(state.projectDocumentEpoch, 0, target, {
+    expectedProject: state.project,
+    completed: gate.completed,
+    onRestored,
+  });
+  await state.markProjectSaveUncertain(state.projectDocumentEpoch, 0, target);
+  gate.resolve(true);
+  await gate.completed;
+  await Promise.resolve();
+  expect(useStore.getState().dirty).toBe(true);
+  expect(onRestored).not.toHaveBeenCalled();
+});
+
+it('retires an older delayed identity result after a newer final uncertainty', async () => {
+  resetStore();
+  const target = markCurrentProjectSaved('saved.lf2');
+  const state = useStore.getState();
+  let resolveIdentity = (_result: 'same'): void => undefined;
+  const identity = new Promise<'same'>((resolve) => {
+    resolveIdentity = resolve;
+  });
+  const alias: SaveTarget = {
+    displayName: 'alias.lf2',
+    compareDestination: () => identity,
+    write: async () => undefined,
+  };
+  const onRestored = vi.fn();
+  const older = state.markProjectSaveUncertain(state.projectDocumentEpoch, 0, alias, {
+    expectedProject: state.project,
+    completed: Promise.resolve(true),
+    onRestored,
+  });
+  await state.markProjectSaveUncertain(state.projectDocumentEpoch, 0, target);
+  resolveIdentity('same');
+  await expect(older).resolves.toBe(false);
+  expect(useStore.getState().dirty).toBe(true);
+  expect(onRestored).not.toHaveBeenCalled();
 });

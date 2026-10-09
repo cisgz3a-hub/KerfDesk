@@ -1358,9 +1358,12 @@ the completed physical Frame is the spatial source of truth.
   marks an affected handoff unsaved promptly once its final restoration fails. Notifications check
   each saved owner independently; unrelated later replays and older feedback handlers cannot delay
   them. A newer Save that is still pending cannot silence a completed restoration failure, even
-  when it cancels the affected owner's remaining restoration. A newer owner's own replay can still
-  succeed without becoming unsaved. Once a handoff is uncertain, save it again; a different carrier's
-  later replay does not automatically clear it.
+  when it cancels the affected owner's remaining restoration. An affected owner whose own replay is
+  still queued becomes temporarily unsaved immediately, keeping recovery and close protection active
+  even if another file's replay stalls. Only that owner's successful own replay can clear this
+  temporary state, and only while the captured project, document, saved owner and latest uncertainty
+  still match. Newer edits stay unsaved. A final failed or cancelled restoration requires Save again;
+  a different carrier's later replay does not automatically clear it.
   A replacement document or a genuinely newer successful handoff cannot be dirtied by that callback.
 
 #### Edge — save in web context

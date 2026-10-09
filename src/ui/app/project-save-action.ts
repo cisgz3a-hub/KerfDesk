@@ -2,7 +2,10 @@ import type { Project } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { jobAwareConfirm } from '../state/job-aware-dialogs';
 import type { AppState } from '../state/store';
-import type { ProjectSaveWriteOwner } from '../state/project-save-write-coordinator';
+import type {
+  ProjectSaveWriteOwner,
+  ProjectSaveOwnReplayResult,
+} from '../state/project-save-write-coordinator';
 import { errorMessage } from './file-action-formatters';
 import { requestPersistentStorageOnce } from './persistent-storage-request';
 import {
@@ -17,6 +20,7 @@ import { rememberRecentProject } from '../recent-projects/recent-project-record'
 import { prepareProjectSave } from './prepare-project-save';
 import { projectSaveNeedsWorker } from './project-save-size';
 import { exportLargeProjectRecovery } from './large-project-recovery';
+import { clearAutosaveAfterFileHandoff } from './autosave-file-cleanup';
 
 export type SaveProjectCtx = Omit<ProjectSaveOwner, 'projectSaveRequestEpoch'> & {
   readonly platform: PlatformAdapter;
@@ -43,8 +47,8 @@ export async function handleSaveProject(
     if (prepared.kind === 'invalid')
       return await handleInvalidProject(ctx, owner, writeOwner, prepared.reason);
     try {
-      await writeOwner.write(prepared.target, prepared.json, (error) =>
-        reportProjectSaveRestoreFailure(owner, prepared.target, error),
+      await writeOwner.write(prepared.target, prepared.json, (error, ownReplay) =>
+        reportProjectSaveRestoreFailure(owner, prepared.target, error, ownReplay),
       );
       const outcome = completeProjectSave(owner, prepared.target, prepared.reuseTarget);
       rememberSavedProject(ctx.platform, prepared.target, outcome);
@@ -77,18 +81,39 @@ async function reportProjectSaveRestoreFailure(
   owner: ProjectSaveOwner,
   target: SaveTarget,
   error: unknown,
+  ownReplay?: Promise<ProjectSaveOwnReplayResult>,
 ): Promise<void> {
-  if (
-    !(await owner.markProjectSaveUncertain(
+  let failure = error;
+  const markUncertain = () =>
+    owner.markProjectSaveUncertain(
       owner.projectDocumentEpoch,
       owner.projectSaveRequestEpoch,
       target,
-    ))
-  ) {
-    return;
+    );
+  const marked =
+    ownReplay === undefined
+      ? await markUncertain()
+      : await owner.markProjectSaveUncertain(
+          owner.projectDocumentEpoch,
+          owner.projectSaveRequestEpoch,
+          target,
+          {
+            expectedProject: owner.expectedProject,
+            completed: ownReplay.then((result) => result.kind === 'restored'),
+            onRestored: () => clearAutosaveAfterFileHandoff(owner.pushToast),
+          },
+        );
+  if (!marked) return;
+  if (ownReplay !== undefined) {
+    const result = await ownReplay;
+    if (result.kind === 'restored') return;
+    if (result.kind === 'failed') failure = result.error;
+    // Supersession and own-replay failure are final for this restoration. Check
+    // the saved owner again before emitting feedback or touching a newer handoff.
+    if (!(await markUncertain())) return;
   }
   owner.pushToast(
-    `Could not restore the newest project bytes to ${target.displayName}: ${errorMessage(error)}. ` +
+    `Could not restore the newest project bytes to ${target.displayName}: ${errorMessage(failure)}. ` +
       'The project is unsaved; save it again.',
     'error',
   );
@@ -127,19 +152,21 @@ async function offerSalvageExport(
     pushToast: ctx.pushToast,
     isCurrent: () => staleProjectSaveOutcome(owner) === null,
     writeTarget: (target, contents) =>
-      writeOwner.write(target, contents, (error) =>
-        reportRecoveryRestoreFailure(owner, target, error),
+      writeOwner.write(target, contents, (error, ownReplay) =>
+        reportRecoveryRestoreFailure(owner, target, error, ownReplay),
       ),
   };
   if (projectSaveNeedsWorker(ctx.project)) await exportLargeProjectRecovery(ctx, owner, salvage);
   else await handleSalvageExportProject(salvage);
 }
 
-function reportRecoveryRestoreFailure(
+async function reportRecoveryRestoreFailure(
   owner: ProjectSaveOwner,
   target: SaveTarget,
   error: unknown,
-): void {
+  ownReplay?: Promise<ProjectSaveOwnReplayResult>,
+): Promise<void> {
+  if (ownReplay !== undefined && (await ownReplay).kind === 'restored') return;
   if (owner.getProjectDocumentEpoch() !== owner.projectDocumentEpoch) return;
   owner.pushToast(
     `Could not restore the newest recovery bytes to ${target.displayName}: ${errorMessage(error)}. ` +
