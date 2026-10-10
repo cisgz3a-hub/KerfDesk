@@ -33,7 +33,9 @@ async function boundedJson(response) {
       throw new Error('Exact sandbox version JSON unavailable.');
     }
   } finally {
-    await reader.cancel().catch(() => {});
+    await reader.cancel().catch(() => {
+      // Cleanup must not replace the original validation failure.
+    });
   }
 }
 
