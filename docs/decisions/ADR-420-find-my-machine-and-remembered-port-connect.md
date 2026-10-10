@@ -173,6 +173,23 @@ These actions do not launch or reset a setup dialog. No
 controller setting is written by opening setup or connecting, and the existing
 draft Save, explicit firmware-write consent and Frame/Start contracts remain.
 
+#### Amendment 4 - Laser / CNC in the toolbar; honest Machine Setup exits (2026-10-10)
+
+The maintainer asked for the Laser / CNC switch to move into the connection toolbar, wider and
+easier to use, and left the remaining Machine Setup choices to this change. The switch now leads
+the toolbar row, before the machine name, as two equal segments with a sliding highlight. Its
+job lock, capability and controller warnings, and `Machine type` group semantics are unchanged.
+Below 1240 px the machine group takes its own full-width row; on phones the switch spans its own
+line. The Artwork panel heading no longer carries it.
+
+Amendment 1's shortcut keeps its place and primary emphasis but is labelled **Review setup**, as
+on Essentials: it opens the review, and only **Save machine setup** saves. Escape and a new header
+close button close an unchanged draft at once and ask before discarding an edited one (**Keep
+editing**, focused, or **Discard changes**); **Cancel without saving** stays immediate. An edited
+draft means an operator change Save would apply: device, machine or CNC values, the chosen heads,
+queued firmware writes or the staged CNC job plan. A new machine's automatic fill from its
+controller alone does not ask, since the next Connect repeats it; nor does an edit put back.
+
 #### Existing consequences
 
 - On Windows, and for adapters with a USB serial number elsewhere, a machine set up once connects

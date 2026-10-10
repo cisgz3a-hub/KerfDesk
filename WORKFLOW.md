@@ -3109,10 +3109,14 @@ record is per machine profile and Laser/CNC head. Only **Save machine setup**
 completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
 Configured profiles connect directly. Automatic connections and recovery Reconnect
 keep their existing behavior and do not open setup (ADR-420 Amendment 3).
-The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
-profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
-**Check essentials** remains available to edit values first. Neither selecting the shortcut nor
-saving an ordinary software profile disconnects the controller.
+The Machine stage keeps a primary **Review setup** shortcut beside **Check essentials** (ADR-420
+Amendment 4). After choosing a profile, **Review setup** opens the final review directly; only
+**Save machine setup** applies it. **Check essentials** remains available to edit values first.
+Neither selecting the shortcut nor saving an ordinary software profile disconnects the controller.
+**Cancel without saving** closes at once. Escape and the header close button close at once unless
+the operator changed the draft (a new machine's automatic fill alone does not count); then they
+first ask **Discard your changes to this setup?** with **Keep editing** (focused, and Escape
+again) or **Discard changes**.
 
 1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
