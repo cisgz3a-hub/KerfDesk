@@ -7,6 +7,15 @@ import {
   supportsBrowserPurchase,
 } from './desktop-browser-order.mjs';
 
+// Opens Help > Licence in an installed KerfDesk for Windows. It carries no data.
+export const LICENCE_LINK = 'kerfdesk://licence';
+
+/** KerfDesk Pro runs on Windows; a phone or tablet only shows and copies the key. */
+function onWindows(window) {
+  const platform = window.navigator.userAgentData?.platform ?? window.navigator.userAgent ?? '';
+  return /Windows/iu.test(platform) && window.navigator.userAgentData?.mobile !== true;
+}
+
 const PENDING =
   'Payment is not confirmed yet. Check payment again in a moment. Do not start another purchase.';
 const RECOVERY =
@@ -41,6 +50,7 @@ class BrowserPurchasePage {
     );
     this.element('purchase-refresh').addEventListener('click', () => void this.refresh());
     this.element('licence-copy').addEventListener('click', () => void this.copyKey());
+    this.element('licence-open-app').addEventListener('click', () => void this.openApp());
     await this.refresh();
   }
 
@@ -169,23 +179,44 @@ class BrowserPurchasePage {
     const field = this.element('licence-key');
     field.value = key;
     this.element('licence-result').hidden = false;
+    const openApp = this.element('licence-open-app');
+    openApp.hidden = !onWindows(this.window);
     this.status(
-      'Payment confirmed. Save your licence key, then enter it in Help → Licence in KerfDesk for Windows.',
+      openApp.hidden
+        ? 'Payment confirmed. Copy your licence key, then activate it in KerfDesk on your Windows computer.'
+        : 'Payment confirmed. Choose Copy key & open KerfDesk to activate it on this computer.',
     );
-    field.focus();
+    (openApp.hidden ? field : openApp).focus();
   }
 
   async copyKey() {
-    if (this.key === null) return;
+    if (this.key === null) return false;
     try {
       await this.window.navigator.clipboard.writeText(this.key);
       this.element('licence-copy-status').textContent = 'Licence key copied.';
+      return true;
     } catch {
       const field = this.element('licence-key');
       field.focus();
       field.select();
       this.element('licence-copy-status').textContent = 'Select and copy the licence key above.';
+      return false;
     }
+  }
+
+  /**
+   * Copies the key, then follows kerfdesk://licence, which opens KerfDesk on
+   * Help > Licence with the key filled in (ADR-576). The link carries no key.
+   */
+  async openApp() {
+    if (!(await this.copyKey())) return;
+    this.element('licence-copy-status').textContent =
+      'Licence key copied. Opening KerfDesk… If nothing opens, start KerfDesk, open Help → Licence and choose Paste key. Older versions open it without filling in the key.';
+    this.navigate(LICENCE_LINK);
+  }
+
+  navigate(url) {
+    this.window.location.href = url;
   }
 
   render() {

@@ -170,10 +170,14 @@ async function showManualDownload(document, links, fetchRequest, options, keys) 
   document.getElementById('commercial-asset').textContent = installer.name;
   document.getElementById('commercial-hash').textContent = `SHA-256: ${installer.sha256}`;
   document.getElementById('commercial-status').textContent =
-    `KerfDesk ${release.version} · Released ${release.publishedAt.slice(0, 10)} · Unsigned installer · Manual updates · Download metadata signature verified.`;
+    `KerfDesk ${release.version} · ${megabytes(installer.bytes)} · Released ${release.publishedAt.slice(0, 10)} · Unsigned installer · Manual updates · Download metadata signature verified.`;
   document.getElementById('commercial-installation').textContent =
-    'This commercial installer is not Windows code-signed. Windows may show an unknown publisher warning. The download metadata is verified separately; it does not remove that warning. KerfDesk 1.0.1 and later notify you about eligible updates. Choose Download update, then Install when I close KerfDesk; the installer opens only after you close the app normally. Version 1.0.0 must first be updated using a verified installer from this page. This app never downloads or installs unsigned updates without your approval.';
+    'KerfDesk tells you when an update is ready. Choose Download update, then Install when I close KerfDesk: the installer opens only after you close KerfDesk yourself, never during a job. KerfDesk never downloads or installs unsigned updates without your approval. The download details are signature-checked, but this installer is not Windows code-signed yet, so Windows may warn about an unknown publisher.';
   return true;
+}
+
+function megabytes(bytes) {
+  return `${Math.round(bytes / 1_000_000)} MB`;
 }
 
 function windowsInstaller(release) {

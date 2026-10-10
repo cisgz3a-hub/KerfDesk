@@ -241,9 +241,48 @@ test('browser purchase is saved before payment, then only server claim can revea
   f.window.document.getElementById('licence-copy').click();
   await Promise.resolve();
   assert.deepEqual(copied, [paid.licenseKey]);
+  // JSDOM reports no Windows platform: a phone or tablet only copies the key.
+  assert.equal(f.window.document.getElementById('licence-open-app').hidden, true);
   assert.equal(
     requests.some(({ url }) => /activate|trial/u.test(url)),
     false,
+  );
+  f.window.close();
+});
+
+test('on Windows, Copy key & open KerfDesk copies the key, then follows the data-free licence link', async () => {
+  const f = browserPage();
+  Object.defineProperty(f.window.navigator, 'userAgent', {
+    value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/141',
+  });
+  const copied = [];
+  Object.defineProperty(f.window.navigator, 'clipboard', {
+    value: { writeText: async (key) => copied.push(key) },
+  });
+  let fulfilled = false;
+  const purchase = await startCheckoutPage(f.window, async (url) => {
+    if (url.endsWith('/config')) return response(configuration);
+    if (url.endsWith('/checkout')) return response(order);
+    return fulfilled ? response(paid) : pendingResponse();
+  });
+  const navigated = [];
+  purchase.navigate = (url) => navigated.push(url);
+  await clickBrowser(f.window, 'purchase-open');
+  fulfilled = true;
+  await clickBrowser(f.window, 'purchase-check');
+  const open = f.window.document.getElementById('licence-open-app');
+  assert.equal(open.hidden, false);
+  assert.equal(f.window.document.activeElement, open);
+  const page = await import('../public/desktop-browser-purchase.mjs');
+  assert.equal(page.LICENCE_LINK, 'kerfdesk://licence');
+  assert.equal(page.LICENCE_LINK.includes(paid.licenseKey), false);
+  open.click();
+  for (let tries = 0; tries < 50 && navigated.length === 0; tries++) await Promise.resolve();
+  assert.deepEqual(copied, [paid.licenseKey]);
+  assert.deepEqual(navigated, ['kerfdesk://licence']);
+  assert.match(
+    f.window.document.getElementById('licence-copy-status').textContent,
+    /Opening KerfDesk.*Paste key/su,
   );
   f.window.close();
 });
