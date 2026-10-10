@@ -11,6 +11,7 @@ import type { GcodeSourceLineIndex } from './gcode-source-line-index';
 import { InspectorSourcePane } from './InspectorSourcePane';
 import { InspectorTimeline } from './InspectorTimeline';
 import { InspectorViewerHeader } from './InspectorViewerHeader';
+import { InspectorPreviewStock } from './InspectorPreviewStock';
 import { InspectorViewport } from './InspectorViewport';
 import { secondsAtPick } from './pick-readout';
 import { secondsAtLine, stepMoveSeconds, trailStartSegment } from './playhead';
@@ -46,7 +47,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
   const bodyRef = useRef<HTMLDivElement | null>(null);
   const fullWindow = useFullWindow(bodyRef);
   const session = useInspectorSession(props.model, props.analysis, props.source);
-  const scene = useInspectorScene(props.model, session, props.source);
+  const scene = useInspectorScene(props.model, session, props.source, props.variant === 'preview');
   const { canvasRef, handleRef, state, reason, camera } = scene;
   const { playhead, liveMode, live } = session;
   const { selectedLine, locateLine, locateMove } = useLocators(props.model, session);
@@ -93,7 +94,7 @@ export function InspectorView(props: InspectorViewProps): JSX.Element {
           transport={liveMode ? undefined : keyTransport(props.model, session)}
         >
           {props.variant === 'preview' ? (
-            <PreviewLens model={props.model} session={session} />
+            <PreviewOverlays {...{ session, scene }} model={props.model} />
           ) : null}
         </InspectorViewport>
         <SessionTimeline session={session} />
@@ -153,6 +154,19 @@ function keyTransport(model: InspectorRenderModel, session: Session) {
     toStart: (): void => playback.setRouteMm(0),
     toEnd: (): void => playback.setRouteMm(time.motionSeconds),
   };
+}
+
+function PreviewOverlays(props: {
+  readonly model: InspectorRenderModel;
+  readonly session: Session;
+  readonly scene: { readonly stock: CarvedStock };
+}): JSX.Element {
+  return (
+    <>
+      <PreviewLens model={props.model} session={props.session} />
+      <InspectorPreviewStock stock={props.scene.stock} />
+    </>
+  );
 }
 
 function PreviewLens(props: {
@@ -247,6 +261,7 @@ function useInspectorScene(
   model: InspectorRenderModel,
   session: Session,
   source: GcodeInspectionSource | undefined,
+  preview: boolean,
 ) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const { handleRef, state, reason } = useViewer3dScene(canvasRef, model);
@@ -257,6 +272,8 @@ function useInspectorScene(
     sections: session.sections,
     source,
     target: stockTarget(model, session),
+    // ADR-580: the canvas view shows a relief job as the carving it makes.
+    stockInitiallyShown: preview && (source?.design?.reliefs.length ?? 0) > 0,
   });
   const { playhead, liveMode, live } = session;
   const trailing = !liveMode && session.trailSeconds > 0;

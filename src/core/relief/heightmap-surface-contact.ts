@@ -33,10 +33,6 @@
 // mask-excluded area; excluded cells keep their separate whole-cell envelope.
 
 import { partialCellCenter, partialGridHasPartialCell } from '../grid';
-import { taperedBallEnvelope } from '../cnc-tapered-ball';
-// Deep imports: the legacy core/cnc barrel is frozen by the export ratchet.
-import { vcarveIncludedAngleDeg } from '../cnc/vcarve-angle';
-import { conicalRadialEnvelope } from '../cnc/radial-envelope';
 import type { ToolKernel } from '../sim';
 import type { Heightmap } from './heightmap';
 import {
@@ -55,11 +51,13 @@ import {
   readInt,
   sortByBoundDescending,
 } from './heightmap-surface-contact-element';
-import { type ContactProfile, PRUNE_TOLERANCE_MM } from './heightmap-surface-contact-geometry';
+import { PRUNE_TOLERANCE_MM } from './heightmap-surface-contact-geometry';
+import { contactProfileFor } from './heightmap-surface-contact-law';
+import { createMeshSurfaceContactField } from './heightmap-mesh-contact';
+import type { SurfaceContactField } from './heightmap-surface-contact-types';
 import {
   collectMoveElements,
   type MoveElements,
-  type MovePoint,
   sampleAtOrBefore,
 } from './heightmap-surface-contact-move';
 import {
@@ -68,40 +66,7 @@ import {
   supportingLine,
 } from './heightmap-surface-contact-tables';
 
-const FALLBACK_V_TIP_ANGLE_DEG = 60;
-
-/** Exact contact heights for one heightmap and one cutter envelope. */
-export type SurfaceContactField = {
-  /**
-   * The highest tip depth at which the cutter centred on sample (cx, cy)
-   * touches the piecewise-linear surface, or `lowerBound` when no triangle
-   * requires more. Never lower than `lowerBound`.
-   */
-  readonly constraint: (cx: number, cy: number, lowerBound: number) => number;
-  /**
-   * The same contact for a cutter centred anywhere, (x, y) in map mm: waterline
-   * finishing places its vertices between samples (ADR-423).
-   */
-  readonly constraintAtPoint: (x: number, y: number, lowerBound: number) => number;
-  /**
-   * Whether a cutter centred at (x, y) may stand with its tip at z: its
-   * contact there is at most z + slackMm. It stops at the first element found
-   * to lift the tip higher, so a "no" costs less than a height (ADR-423).
-   */
-  readonly clearsAtPoint: (x: number, y: number, z: number, slackMm: number) => boolean;
-  /**
-   * The contact that can matter along the straight move from `from` to `to`:
-   * null when nothing can lift the tip more than `toleranceMm` above the move
-   * anywhere on it, else constraintAtPoint over only the elements that might,
-   * exact wherever the contact rises further above the move. The answer holds
-   * until the next call (ADR-421 Amendment 1).
-   */
-  readonly alongMove: (
-    from: MovePoint,
-    to: MovePoint,
-    toleranceMm: number,
-  ) => ((x: number, y: number, lowerBound: number) => number) | null;
-};
+export type { SurfaceContactField } from './heightmap-surface-contact-types';
 
 type Contact = ElementContact & {
   // Highest included corner of the element whose top-left sample is (i, j),
@@ -127,8 +92,23 @@ type Contact = ElementContact & {
   readonly move: MoveElements;
 };
 
-/** Precompute the triangulation bounds for one map and cutter envelope. */
+/**
+ * The exact contact field for one map and cutter envelope: against the mesh's
+ * own triangles when the map carries them (ADR-580), else against the
+ * triangulated samples.
+ */
 export function createSurfaceContactField(
+  map: Heightmap,
+  kernel: ToolKernel,
+): SurfaceContactField | null {
+  if (map.exactSurface !== undefined) {
+    return createMeshSurfaceContactField(map, map.exactSurface, kernel);
+  }
+  return createGridSurfaceContactField(map, kernel);
+}
+
+/** Precompute the triangulation bounds for one map and cutter envelope. */
+function createGridSurfaceContactField(
   map: Heightmap,
   kernel: ToolKernel,
 ): SurfaceContactField | null {
@@ -157,7 +137,7 @@ export function createSurfaceContactField(
     radiusSquared: radiusMm * radiusMm,
     span,
     dz,
-    profile: profileFor(kernel),
+    profile: contactProfileFor(kernel),
     regularNearDz: regularNearDzTable(kernel.mmPerCell, span, radiusMm, dz),
     ...regularSupportTables(kernel.mmPerCell, span, radiusMm, dz),
     regularSide: side,
@@ -181,40 +161,6 @@ export function createSurfaceContactField(
     alongMove: (from, to, toleranceMm) =>
       collectMoveElements(contact, from, to, toleranceMm) === 0 ? null : amongKept,
   };
-}
-
-function profileFor(kernel: ToolKernel): ContactProfile {
-  const tool = kernel.tool;
-  const growth = kernel.horizontalGrowthMm;
-  switch (tool.kind) {
-    case 'end-mill':
-      return { kind: 'flat' };
-    case 'ball-nose':
-      return growth === 0 ? { kind: 'ball', ball: kernel.radiusMm } : { kind: 'search' };
-    case 'v-bit':
-    case 'engraving': {
-      const envelope = conicalRadialEnvelope(
-        tool,
-        vcarveIncludedAngleDeg(tool) ?? FALLBACK_V_TIP_ANGLE_DEG,
-      );
-      if (envelope === null) return { kind: 'flat' };
-      return { kind: 'cone', land: envelope.tipRadiusMm + growth, slope: 1 / envelope.tanHalf };
-    }
-    case 'tapered-ball-nose': {
-      const envelope = taperedBallEnvelope(tool);
-      if (envelope === null) return { kind: 'flat' };
-      return growth === 0
-        ? {
-            kind: 'tapered',
-            ball: envelope.ballRadiusMm,
-            tangentRadius: envelope.tangentRadiusMm,
-            slope: 1 / envelope.tanHalf,
-          }
-        : { kind: 'search' };
-    }
-    default:
-      return { kind: 'search' };
-  }
 }
 
 function elementTops(map: Heightmap): Float32Array {

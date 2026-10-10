@@ -8,12 +8,13 @@
 // leaves them at stock height.
 //
 // Sampling: 'center' (the default, for previews) reads each cell at its centre.
-// Relief CAM asks for 'footprint-max' (ADR-412 Amendment 1): each cell holds the
-// mesh's highest point over its whole footprint, as a depth map's CAM cell
-// holds the highest of its pixels, so no raised detail narrower than a cell
-// drops out between centres. Under 'top' a cell whose centre no triangle
-// covers still stays at stock height, so the CAM map is never below the
-// preview map anywhere.
+// Relief CAM asks for 'exact-mesh' (ADR-580): the cells are read at their
+// centres too, and the map carries the mesh's triangles in its own frame, so
+// the cutter is solved against the model itself rather than the samples
+// (heightmap-mesh-contact.ts). 'footprint-max' (ADR-412 Amendment 1) holds each
+// cell at the mesh's highest point over its whole footprint, a conservative
+// bound that relief CAM used before ADR-580; under 'top' a cell whose centre no
+// triangle covers still stays at stock height.
 //
 // Pure and deterministic: triangles in file order, max-Z accumulation is
 // order-independent, indexed loops only.
@@ -24,20 +25,28 @@ import {
   type PartialCellAxis,
   type PartialCellGrid,
 } from '../grid';
-import { DEFAULT_HEIGHTMAP_CELL_MM, heightmapCellSize, type Heightmap } from './heightmap';
+import {
+  DEFAULT_HEIGHTMAP_CELL_MM,
+  heightmapCellSize,
+  type Heightmap,
+  type HeightmapExactSurface,
+} from './heightmap';
 import { meshBounds, FLOATS_PER_TRIANGLE, type TriangleMesh } from './triangle-mesh';
 import { rasterizeTriangleFootprintMaxZ } from './triangle-footprint-raster';
 import { rasterizeTriangleMaxZ, type RasterTarget } from './triangle-raster';
 
-/** How a cell reads the mesh: at its centre, or its highest point over the whole cell. */
-export type MeshSampling = 'center' | 'footprint-max';
+/**
+ * How a cell reads the mesh: at its centre, its highest point over the whole
+ * cell, or at its centre with the exact triangles attached for relief CAM.
+ */
+export type MeshSampling = 'center' | 'footprint-max' | 'exact-mesh';
 
 export type MeshHeightmapOptions = {
   readonly targetWidthMm: number;
   readonly reliefDepthMm: number;
   readonly mmPerCell?: number;
   readonly emptyCells?: 'floor' | 'top';
-  /** Relief CAM passes 'footprint-max'; previews keep the 'center' default. */
+  /** Relief CAM passes 'exact-mesh'; previews keep the 'center' default. */
   readonly sampling?: MeshSampling;
   /** Positive XY scale applied before rasterization into square physical-mm cells. */
   readonly targetScaleX?: number;
@@ -95,33 +104,81 @@ export function meshToHeightmap(
   const gridResult = meshGrid(widthMm, heightMm, options.mmPerCell ?? DEFAULT_HEIGHTMAP_CELL_MM);
   if (gridResult.kind === 'error') return gridResult;
   const { grid } = gridResult;
-  const cellCount = grid.widthCells * grid.heightCells;
-
-  const maxZ = allocateFloat32(runtime, cellCount);
-  if (maxZ === null) {
-    return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
-  }
-  maxZ.fill(Number.NEGATIVE_INFINITY);
-  const target: RasterTarget = { ...grid, maxZ };
   const placement: MeshPlacement = {
     bounds,
     cellsPerModelX: cellsPerModelUnit(grid, 'x', xExtent),
     cellsPerModelY: cellsPerModelUnit(grid, 'y', yExtent),
     zRasterMode,
   };
-  rasterizeMesh(target, mesh, placement, options.sampling);
-  const depth = allocateFloat32(runtime, cellCount);
-  if (depth === null) {
+  const sampled = sampleMesh(mesh, grid, placement, options, runtime);
+  if (sampled === null) {
     return { kind: 'error', reason: 'Relief mesh heightmap does not fit in this runtime.' };
   }
+  return { kind: 'ok', heightmap: { ...grid, ...sampled }, widthMm, heightMm };
+}
+
+// The cells' depths, and for 'exact-mesh' the triangles beside them; null when
+// either does not fit in memory.
+function sampleMesh(
+  mesh: TriangleMesh,
+  grid: PartialCellGrid,
+  placement: MeshPlacement,
+  options: MeshHeightmapOptions,
+  runtime: MeshHeightmapRuntime,
+): Pick<Heightmap, 'depth' | 'exactSurface'> | null {
+  const cellCount = grid.widthCells * grid.heightCells;
+  const maxZ = allocateFloat32(runtime, cellCount);
+  if (maxZ === null) return null;
+  maxZ.fill(Number.NEGATIVE_INFINITY);
+  const target: RasterTarget = { ...grid, maxZ };
+  const exact = options.sampling === 'exact-mesh';
+  rasterizeMesh(target, mesh, placement, exact ? 'center' : options.sampling);
+  const depth = allocateFloat32(runtime, cellCount);
+  if (depth === null) return null;
   keepCenterBackground(target, depth, mesh, placement, options);
-  normalizeDepths(maxZ, depth, bounds, options, zRasterMode);
-  return {
-    kind: 'ok',
-    heightmap: { ...grid, depth },
-    widthMm,
-    heightMm,
-  };
+  const exactSurface = exact ? exactMeshSurface(mesh, placement, grid, maxZ, options) : undefined;
+  if (exactSurface === null) return null;
+  normalizeDepths(maxZ, depth, placement.bounds, options, placement.zRasterMode);
+  return exactSurface === undefined ? { depth } : { depth, exactSurface };
+}
+
+// The mesh in the map's own frame, mapped exactly as the rasterizer maps it:
+// x and y through the nominal cell frame into millimetres, z through the same
+// depth normalization the samples take. Null when it does not fit in memory.
+function exactMeshSurface(
+  mesh: TriangleMesh,
+  placement: MeshPlacement,
+  grid: PartialCellGrid,
+  centreMaxZ: Float32Array,
+  options: MeshHeightmapOptions,
+): HeightmapExactSurface | null {
+  const p = mesh.positions;
+  const vertices = Math.floor(p.length / FLOATS_PER_TRIANGLE) * 3;
+  let triangles: Float64Array;
+  try {
+    triangles = new Float64Array(vertices * 3);
+  } catch (error) {
+    if (isRangeError(error)) return null;
+    throw error;
+  }
+  const { bounds, cellsPerModelX, cellsPerModelY, zRasterMode } = placement;
+  const zExtent = bounds.maxZ - bounds.minZ;
+  const scale = zExtent < MIN_EXTENT ? 0 : options.reliefDepthMm / zExtent;
+  const xMm = cellsPerModelX * grid.mmPerCell;
+  const yMm = cellsPerModelY * grid.mmPerCell;
+  for (let v = 0; v < vertices; v += 1) {
+    const at = v * 3;
+    triangles[at] = ((p[at] ?? 0) - bounds.minX) * xMm;
+    triangles[at + 1] = ((p[at + 1] ?? 0) - bounds.minY) * yMm;
+    const z = rasterZ(p[at + 2] ?? 0, bounds, zRasterMode);
+    triangles[at + 2] = normalizedDepth(z, 0, scale, options.reliefDepthMm, bounds, zRasterMode);
+  }
+  if (options.emptyCells !== 'top') return { triangles };
+  const uncoveredTop = new Uint8Array(centreMaxZ.length);
+  for (let i = 0; i < centreMaxZ.length; i += 1) {
+    if (centreMaxZ[i] === Number.NEGATIVE_INFINITY) uncoveredTop[i] = 1;
+  }
+  return { triangles, uncoveredTop };
 }
 
 type MeshGridResult =

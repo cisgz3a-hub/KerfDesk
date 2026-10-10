@@ -129,7 +129,9 @@ export type GcodeMetadata = {
 // CNC audit: authored relief footprints, ruled rail sections, sketch diagonals
 // and tapered-inlay nonzero joins now produce the corrected geometry.
 // ADR-576 plans V-carve only with modelled conical cutters.
-export const EMITTER_REVISION = 'vcarve-conical-cutters-20261010-v19';
+// ADR-580 solves STL relief cutters against the mesh's own triangles and finishes
+// an STL relief with raster + waterline unless the operation chooses otherwise.
+export const EMITTER_REVISION = 'relief-exact-mesh-contact-20261010-v20';
 
 // Machine-specific assumption lines (ADR-103 defect fix): router exports
 // previously carried the laser-worded `$32=1 (laser mode)` banner. The S

@@ -135,17 +135,50 @@ describe('computeCncRemovalGrid', () => {
   it('discloses the interactive preview cell budget without changing the bounded grid', () => {
     const wideMachine: CncMachineConfig = {
       ...MACHINE,
-      stock: { ...STOCK, widthMm: 300 },
+      stock: { ...STOCK, widthMm: 400 },
     };
-    const grid = computeCncRemovalGrid(DEVICE, wideMachine, sceneToolpath(TWO_BIT_SCENE), 1);
+    // A job spanning 300 mm of the sheet: the grid frames the cut (ADR-580),
+    // and 300 mm still needs more than the per-axis cell budget allows.
+    const wideScene: Scene = {
+      ...TWO_BIT_SCENE,
+      objects: [
+        squareObject('pocket-square', '#222222', S0.x + 10, S0.y + 10, 30),
+        squareObject('vee-square', '#dc2626', S0.x + 280, VEE_Y, VEE_SIZE),
+      ],
+    };
+    const grid = computeCncRemovalGrid(DEVICE, wideMachine, sceneToolpath(wideScene), 1);
 
-    expect(grid?.resolution).toEqual({
-      requestedMmPerCell: 0.2,
-      effectiveMmPerCell: 0.3,
-      reason: 'interactive-preview-cell-budget',
-    });
+    expect(grid?.resolution.requestedMmPerCell).toBe(0.2);
+    expect(grid?.resolution.reason).toBe('interactive-preview-cell-budget');
+    expect(grid?.resolution.effectiveMmPerCell).toBeCloseTo((grid?.widthMm ?? 0) / 1_000, 12);
     expect(grid?.widthCells).toBe(1_000);
   });
+
+  it(
+    'frames the cut, not the whole sheet, and keeps the frame while scrubbing (ADR-580)',
+    () => {
+      const sheet: CncMachineConfig = {
+        ...MACHINE,
+        stock: { ...STOCK, widthMm: 400, heightMm: 400 },
+      };
+      const toolpath = sceneToolpath(TWO_BIT_SCENE);
+      const whole = computeCncRemovalGrid(DEVICE, sheet, toolpath, 1);
+      const part = computeCncRemovalGrid(DEVICE, sheet, toolpath, 0.3);
+      if (whole === null || part === null) throw new Error('expected grids');
+      // The pocket and the v-carve square span S0 + 10 .. S0 + 85 in X. The
+      // frame adds the widest bit's radius and 2 mm round the tool-centre paths,
+      // so every cut edge lies at least 2 mm inside it.
+      const pocketCentre = S0.x + 10 + 6.35 / 2;
+      expect(whole.originX).toBeCloseTo(pocketCentre - (6.35 / 2 + 2), 6);
+      expect(whole.originX + whole.widthMm).toBeGreaterThanOrEqual(S0.x + 85 + 2);
+      expect(whole.widthMm).toBeLessThan(100);
+      expect(whole.mmPerCell).toBe(0.2);
+      expect(part.originX).toBe(whole.originX);
+      expect(part.widthMm).toBe(whole.widthMm);
+      expect(probeDepth(whole, S0.x + 25, S0.y + 25)).toBeCloseTo(-4, 1);
+    },
+    ciBudgetMs(30_000, 120_000),
+  );
 
   it(
     'shades a two-bit job with each section its own bit',

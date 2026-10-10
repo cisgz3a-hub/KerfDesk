@@ -28,6 +28,9 @@ import { ReliefRecordedSourceDetails } from './ReliefRecordedSourceDetails';
 import { ReliefResolvedAspectDisclosure } from './ReliefResolvedAspectDisclosure';
 import { SelectedReliefFieldGeometry } from './SelectedReliefFieldGeometry';
 import { ReliefSourceMeaning } from './ReliefSourceMeaning';
+import { proportionalReliefPatch, ReliefProportionControls } from './ReliefProportionControls';
+import { ReliefTwoSidedSplit } from './ReliefTwoSidedSplit';
+import type { ReliefParamPatch } from '../state/relief-param-actions';
 
 const VERTICES_PER_TRIANGLE_FLOATS = 9;
 
@@ -54,8 +57,28 @@ export function SelectedReliefProperties(): JSX.Element | null {
     s.project.machine?.kind === 'cnc' ? s.project.machine.stock.thicknessMm : 0,
   );
   const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
-  const [viewerOpen, setViewerOpen] = useState(false);
   if (relief === null) return null;
+  return (
+    <ReliefProperties
+      key={`${projectDocumentEpoch}:${relief.id}`}
+      {...{ relief, stockThicknessMm, projectDocumentEpoch }}
+    />
+  );
+}
+
+// Drafts and view state belong to this selected object in this document.
+function ReliefProperties({
+  relief,
+  stockThicknessMm,
+  projectDocumentEpoch,
+}: {
+  readonly relief: ReliefObject;
+  readonly stockThicknessMm: number;
+  readonly projectDocumentEpoch: number;
+}): JSX.Element {
+  // ADR-580: an STL relief keeps its proportions unless the operator unlocks them.
+  const [proportionsLocked, setProportionsLocked] = useState(true);
+  const locked = isMeshRelief(relief) && proportionsLocked;
   const physical = reliefPhysicalDimensions(relief);
   const widthSourceMm = reliefPropertyWidthSourceMm(relief);
   const widthMm = reliefPropertyWidthMm(relief, physical.targetScaleX);
@@ -67,21 +90,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
       </p>
       <ReliefSourceDisclosure relief={relief} />
       <ReliefGeometryDisclosures relief={relief} />
-      <button
-        type="button"
-        onClick={() => setViewerOpen(true)}
-        title="Open the real-time 3D view of this relief (ADR-102)."
-        style={viewerButtonStyle}
-      >
-        View 3D…
-      </button>
-      {viewerOpen ? (
-        <Relief3DViewerDialog
-          relief={relief}
-          stockThicknessMm={stockThicknessMm}
-          onClose={() => setViewerOpen(false)}
-        />
-      ) : null}
+      <ReliefViewerLaunch relief={relief} stockThicknessMm={stockThicknessMm} />
       <ReliefNumberField
         key={`${projectDocumentEpoch}:${relief.id}:width`}
         relief={relief}
@@ -91,6 +100,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
         step={1}
         title={reliefPlanningWidthTitle(relief)}
         commitKey="targetWidthMm"
+        patchFor={(value) => proportionalReliefPatch(relief, 'targetWidthMm', value, locked)}
       />
       <ReliefPlanningWidthDisclosure relief={relief} widthMm={widthMm} />
       <ReliefNumberField
@@ -101,25 +111,65 @@ export function SelectedReliefProperties(): JSX.Element | null {
         step={0.5}
         title="Total relief depth: the source's numeric range maps to [-depth, 0] below the stock top."
         commitKey="reliefDepthMm"
+        patchFor={(value) => proportionalReliefPatch(relief, 'reliefDepthMm', value, locked)}
       />
       {isMeshRelief(relief) ? (
-        <BackgroundSelect relief={relief} />
-      ) : (
         <>
-          <PolaritySelect relief={relief} />
-          <ReliefGammaControl key={`${projectDocumentEpoch}:${relief.id}:gamma`} relief={relief} />
-          <ReliefInputLevelsControl
-            key={`${projectDocumentEpoch}:${relief.id}:input-levels`}
+          <ReliefProportionControls
             relief={relief}
+            targetScaleX={physical.targetScaleX}
+            locked={proportionsLocked}
+            onLockedChange={setProportionsLocked}
           />
-          <ReliefMaskThresholdControl
-            key={`${projectDocumentEpoch}:${relief.id}:mask-threshold`}
-            relief={relief}
-          />
-          <ReliefMaskOutsideMeaningControl relief={relief} />
+          <BackgroundSelect relief={relief} />
+          <ReliefTwoSidedSplit relief={relief} />
         </>
+      ) : (
+        <HeightfieldReliefControls relief={relief} epoch={projectDocumentEpoch} />
       )}
     </section>
+  );
+}
+
+function ReliefViewerLaunch(props: {
+  readonly relief: ReliefObject;
+  readonly stockThicknessMm: number;
+}): JSX.Element {
+  const [viewerOpen, setViewerOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setViewerOpen(true)}
+        title="Open the real-time 3D view of this relief (ADR-102)."
+        style={viewerButtonStyle}
+      >
+        View 3D…
+      </button>
+      {viewerOpen ? (
+        <Relief3DViewerDialog
+          relief={props.relief}
+          stockThicknessMm={props.stockThicknessMm}
+          onClose={() => setViewerOpen(false)}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function HeightfieldReliefControls(props: {
+  readonly relief: HeightfieldReliefObject;
+  readonly epoch: number;
+}): JSX.Element {
+  const { relief, epoch } = props;
+  return (
+    <>
+      <PolaritySelect relief={relief} />
+      <ReliefGammaControl key={`${epoch}:${relief.id}:gamma`} relief={relief} />
+      <ReliefInputLevelsControl key={`${epoch}:${relief.id}:input-levels`} relief={relief} />
+      <ReliefMaskThresholdControl key={`${epoch}:${relief.id}:mask-threshold`} relief={relief} />
+      <ReliefMaskOutsideMeaningControl relief={relief} />
+    </>
   );
 }
 
@@ -192,6 +242,7 @@ function ReliefNumberField(props: {
   readonly step: number;
   readonly title: string;
   readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
+  readonly patchFor?: (value: number) => ReliefParamPatch;
 }): JSX.Element {
   // A scale change remounts the input so cleanup cancels a pending commit
   // parsed under the old authored-to-physical mapping.
@@ -206,13 +257,15 @@ function ReliefNumberInput(props: {
   readonly step: number;
   readonly title: string;
   readonly commitKey: 'targetWidthMm' | 'reliefDepthMm';
+  readonly patchFor?: (value: number) => ReliefParamPatch;
 }): JSX.Element {
   const setReliefParams = useStore((s) => s.setReliefParams);
   const scale = props.scale ?? 1;
   const canonicalDisplay = formatReliefValue(props.value * scale);
   const debounced = useDebouncedCommit<number>({
     value: props.value,
-    commit: (value) => setReliefParams(props.relief.id, { [props.commitKey]: value }),
+    commit: (value) =>
+      setReliefParams(props.relief.id, props.patchFor?.(value) ?? { [props.commitKey]: value }),
     reconcileKey: scale,
     parse: (input) => {
       // Preserve the exact authored value when the untouched canonical display

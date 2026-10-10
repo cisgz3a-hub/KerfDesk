@@ -26,7 +26,7 @@
 
 import type { CncPass } from '../job';
 import type { CncTool } from '../scene';
-import type { Heightmap } from './heightmap';
+import type { Heightmap, HeightmapExactSurface } from './heightmap';
 import { createSurfaceContactField } from './heightmap-surface-contact';
 import { dilateHeightmapByTool } from './heightmap-tool-offset';
 import { checkedAgainstContact } from './relief-finishing-contact';
@@ -52,6 +52,19 @@ export const RELIEF_STEEP_ANGLE_DEG = 45;
 const WATERLINE_LINK_DIAMETERS = 2;
 
 const STEEP_ANGLE_RAD = (RELIEF_STEEP_ANGLE_DEG * Math.PI) / 180;
+
+/**
+ * The strategy a relief finishes with: the layer's explicit choice, else
+ * (ADR-580) raster + waterline for an STL model, whose sides are often steep
+ * enough for a raster alone to leave the roughing allowance on them, and the
+ * raster for a height map.
+ */
+export function reliefFinishStrategyFor(
+  setting: ReliefFinishStrategy | undefined,
+  sourceKind: 'legacy-mesh' | 'heightfield-v1',
+): ReliefFinishStrategy {
+  return setting ?? (sourceKind === 'legacy-mesh' ? 'raster-waterline' : 'raster');
+}
 
 /** The raster's row spacing: the scallop's, closer under 'raster-waterline'. */
 export function reliefFinishRowSpacingMm(
@@ -147,7 +160,7 @@ function withoutMask(map: Heightmap): Heightmap {
 }
 
 export function transposeHeightmap(map: Heightmap): Heightmap {
-  const { inclusion, ...rest } = map;
+  const { inclusion, exactSurface, ...rest } = map;
   return {
     ...rest,
     widthCells: map.heightCells,
@@ -158,7 +171,28 @@ export function transposeHeightmap(map: Heightmap): Heightmap {
     ...(inclusion === undefined
       ? {}
       : { inclusion: transposeCells(inclusion, map.widthCells, map.heightCells) }),
+    ...(exactSurface === undefined
+      ? {}
+      : { exactSurface: transposeSurface(exactSurface, map.widthCells, map.heightCells) }),
   };
+}
+
+// The exact triangles with x and y swapped (ADR-580), and a 'top'
+// background's cells transposed with the map's.
+function transposeSurface(
+  surface: HeightmapExactSurface,
+  widthCells: number,
+  heightCells: number,
+): HeightmapExactSurface {
+  const triangles = surface.triangles.slice();
+  for (let at = 0; at + 1 < triangles.length; at += 3) {
+    triangles[at] = surface.triangles[at + 1] ?? 0;
+    triangles[at + 1] = surface.triangles[at] ?? 0;
+  }
+  const uncoveredTop = surface.uncoveredTop;
+  return uncoveredTop === undefined
+    ? { triangles }
+    : { triangles, uncoveredTop: transposeCells(uncoveredTop, widthCells, heightCells) };
 }
 
 function transposeCells<T extends Float32Array | Uint8Array>(

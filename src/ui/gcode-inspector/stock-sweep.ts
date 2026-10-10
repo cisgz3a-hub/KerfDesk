@@ -10,8 +10,7 @@
 // distance from the move), or, for an end mill on a slope, to the lowest
 // height along the part of the move within the bit's radius. A sloped move of
 // a ball or V bit, as in a relief or a V-carving, is stamped at every cell
-// along it, with the bit's tip over the nearest cell centre, which is exact
-// to half a cell.
+// along it, with the bit's tip where the move puts it.
 
 import type { RemovalGrid } from '../../core/sim/removal-grid';
 import type { ToolKernel } from '../../core/sim/tool-kernels';
@@ -127,7 +126,11 @@ function stampAlong(
   }
 }
 
-// The bit's footprint with its tip over the nearest cell centre.
+// The bit's footprint with its tip where the move puts it (ADR-580): each
+// cell takes the cutting surface at its centre's true distance from the tip.
+// Snapping the tip to the nearest cell centre moved the bit up to half a cell,
+// which beside a vertical wall cut into it, and the design compare read that
+// as the carving cut too deep.
 function stampTip(
   grid: RemovalGrid,
   kernel: ToolKernel,
@@ -136,19 +139,24 @@ function stampTip(
   z: number,
   rows: SweptRows,
 ): void {
-  const column = Math.floor((x - grid.originX) / grid.mmPerCell);
-  const row = Math.floor((y - grid.originY) / grid.mmPerCell);
-  for (const offset of kernel.offsets) {
-    const atColumn = column + offset.dx;
-    const atRow = row + offset.dy;
-    if (atColumn < 0 || atRow < 0 || atColumn >= grid.widthCells || atRow >= grid.heightCells) {
-      continue;
+  const span = cellSpan(grid, { x, y, z }, { x, y, z }, kernel.radiusMm);
+  if (span === null) return;
+  const cell = grid.mmPerCell;
+  const radiusSquared = kernel.radiusMm * kernel.radiusMm;
+  for (let row = span.firstRow; row <= span.lastRow; row += 1) {
+    const dy = grid.originY + (row + 0.5) * cell - y;
+    for (let column = span.firstColumn; column <= span.lastColumn; column += 1) {
+      const dx = grid.originX + (column + 0.5) * cell - x;
+      const distanceSquared = dx * dx + dy * dy;
+      if (distanceSquared > radiusSquared) continue;
+      cut(
+        grid,
+        row * grid.widthCells + column,
+        z + kernel.surfaceDzAtRadius(Math.sqrt(distanceSquared)),
+      );
     }
-    cut(grid, atRow * grid.widthCells + atColumn, z + offset.dz);
   }
-  widen(rows, row - kernel.radiusCells, row + kernel.radiusCells);
-  rows.first = Math.max(0, rows.first);
-  rows.last = Math.min(grid.heightCells - 1, rows.last);
+  widen(rows, span.firstRow, span.lastRow);
 }
 
 function cut(grid: RemovalGrid, index: number, depth: number): void {
