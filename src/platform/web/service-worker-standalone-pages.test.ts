@@ -54,6 +54,9 @@ describe('standalone checkout, download, support and legal pages under the servi
     '/terms/index.html',
     '/terms/?version=1',
     '/refunds/index.html?version=2',
+    '/safety',
+    '/safety/',
+    '/safety/index.html',
   ])('excludes %s from the workspace fallback', (page) => {
     expect(deniedFromAppShell(page)).toBe(true);
     expect(answeredByAppShell(page)).toBe(false);
@@ -74,6 +77,7 @@ describe('standalone checkout, download, support and legal pages under the servi
     '/refunds-help',
     '/terms-help',
     '/privacy-tools',
+    '/safety-tips',
   ])('does not deny the unrelated path %s by a partial name match', (page) => {
     expect(deniedFromAppShell(page)).toBe(false);
   });
@@ -87,6 +91,7 @@ describe('standalone checkout, download, support and legal pages under the servi
         'privacy/**',
         'pricing/**',
         'refunds/**',
+        'safety/**',
         'terms/**',
         'desktop-*.{mjs,json,css}',
       ]),

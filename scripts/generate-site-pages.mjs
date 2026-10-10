@@ -9,7 +9,7 @@ import { commerce } from '../website/commerce.config.mjs';
 import { commerceErrors } from '../website/lib/commerce.mjs';
 import { site } from '../website/site.config.mjs';
 import { renderAppPrivacyDocument } from '../website/lib/layout.mjs';
-import { paymentInformationPages } from '../website/pages/payment-information.mjs';
+import { appSafetyPage, paymentInformationPages } from '../website/pages/payment-information.mjs';
 import { appPrivacyFiles } from './generate-privacy-page.mjs';
 import { paymentLegalDraftPages } from '../website/pages/payment-legal-drafts.mjs';
 import { LEGAL_DRAFT_STYLES, legalDraftPage } from '../website/lib/legal-draft-layout.mjs';
@@ -115,7 +115,7 @@ export async function buildPublicInformationFiles({ root = REPO_ROOT, store = co
     contentSecurityPolicy:
       "default-src 'none'; style-src 'self'; img-src 'self'; font-src 'self'; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'",
   };
-  for (const page of paymentInformationPages) {
+  for (const page of [...paymentInformationPages, appSafetyPage]) {
     const html = renderAppPrivacyDocument(page, page.render(ctx), ctx);
     if (/\[PLACEHOLDER|data-policy-state="draft"|not published or in force/i.test(html))
       throw new Error('Unfinished legal content cannot enter public information: ' + page.path);

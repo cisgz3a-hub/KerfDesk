@@ -21,6 +21,6 @@ export const POLICY_COMMAND_HELP: Readonly<Record<PolicyCommandId, CommandHelpTo
   },
   'help.refunds': {
     family: 'help',
-    tooltip: 'Read the refund promise for Pro licences and optional update purchases.',
+    tooltip: 'Read the refund policy for Pro licences and optional update purchases.',
   },
 };

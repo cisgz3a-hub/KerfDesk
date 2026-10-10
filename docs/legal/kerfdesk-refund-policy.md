@@ -8,7 +8,7 @@ Paid checkout remains closed. This review draft describes the proposed policy an
 
 ## In short
 
-- You can get a full refund until the end of the 14th day after the day you buy. You do not need to give a reason, and this applies even after you have activated and used Pro. The only exception is clear evidence of abuse.
+- You can ask for a refund until the end of the 14th day after the day you buy. We consider each request case by case and may decline it. Purchases made before 10 October 2026 keep the earlier promise of a full refund within 14 days, with no reason needed (ADR-578).
 - After that, we still refund where the law gives you a refund, if you were charged twice or charged the wrong amount, or if we cannot give you a licence that works.
 - A refund ends the licence, or cancels the extra year of updates, whichever was refunded.
 - This policy adds to your legal rights. It never reduces them.
@@ -19,7 +19,7 @@ Our order process is conducted by our online reseller Paddle.com. Paddle.com is 
 
 In practice, Paddle takes your payment, sends your receipt, charges any tax and pays every refund. Your receipt names the Paddle company that sold to you: Paddle.com Inc. in the United States, Paddle.com (Canada) Ltd in Canada, or Paddle.com Market Limited everywhere else. We, KerfDesk, make and license the software, and we help you use KerfDesk and get your licence working. You can send a refund request to us or to Paddle.
 
-Paddle’s Buyer Terms (https://www.paddle.com/legal/buyer-terms) and Paddle’s Refund Policy (https://www.paddle.com/legal/refund-policy) also apply to your purchase. This policy is our own promise, and it adds to Paddle’s. Paddle’s Refund Policy says that where a supplier gives you more rights, the highest level of rights applies.
+Paddle’s Buyer Terms (https://www.paddle.com/legal/buyer-terms) and Paddle’s Refund Policy (https://www.paddle.com/legal/refund-policy) also apply to your purchase. This policy sits alongside Paddle’s. Paddle’s Refund Policy says that where a supplier or the law gives you more rights, the highest level of rights applies.
 
 ## Try before you buy
 
@@ -32,15 +32,15 @@ A licensed Windows build can provide every Pro feature free for 30 days before y
 
 Please use the trial to check that KerfDesk works with your machine and suits your work before you buy.
 
-## Refund within 14 days, no reason needed
+## Refund requests within 14 days
 
-You can get a full refund of a Pro licence, or of an update extension (the extra year of updates that the app calls **Renew updates**), if you ask by the end of the 14th day after the day you bought it.
+You can ask for a refund of a Pro licence, or of an update extension (the extra year of updates that the app calls **Renew updates**), by the end of the 14th day after the day you bought it.
 
-- You do not need to give a reason.
-- This applies even after you have downloaded, activated and used Pro.
-- Nothing is taken off your refund for fees.
+- We consider each request case by case and may decline it. We may take into account whether you used the free trial, how Pro has been used, the reason you give and any evidence of abuse (see “Fair use”).
+- A refund we choose to give does not commit us to give one for a similar request.
+- When we approve a refund, nothing is taken off it for fees.
 
-The only exception is clear evidence of abuse (see “Fair use”).
+A purchase made before 10 October 2026 keeps the earlier promise: a full refund if you asked within 14 days, with no reason needed, even after using Pro.
 
 ## After 14 days
 
@@ -62,7 +62,7 @@ The best way to use this policy is to email us at support@kerfdesk.com. We check
 
 Never send us your licence key or card details. We do not need them. Keep the receipt Paddle emails you: it has the details we need.
 
-You can also ask Paddle directly. Use the support link in your Paddle receipt, or go to https://paddle.net and choose **Request refund**. Paddle decides these requests under its own Refund Policy. If Paddle turns down a refund that this policy promises, email us and we will tell Paddle to make it.
+You can also ask Paddle directly. Use the support link in your Paddle receipt, or go to https://paddle.net and choose **Request refund**. Paddle decides these requests under its own Refund Policy. If Paddle turns down a refund that this policy or the law requires, email us and we will tell Paddle to make it.
 
 If you are a consumer in the EU, you can also withdraw from your purchase during the first 14 days with the withdrawal option in Paddle’s customer portal, where Paddle offers it for your purchase. Open the portal from the link in your confirmation email (for example **Manage transaction**), or at https://paddle.net, then choose the withdrawal option (for example **Request withdrawal**). If you are a consumer in the UK, ask Paddle in one of the ways above.
 
@@ -93,17 +93,17 @@ If you dispute a payment, Paddle handles the dispute with your bank. If Paddle r
 
 ## Fair use
 
-We may refuse a refund under this policy if there is clear evidence of abuse, for example buying and refunding licences again and again. This never limits a refund that the law gives you, such as the rights to cancel and the rights for faulty software described below.
+We refuse refund requests where there is clear evidence of abuse, for example buying and refunding licences again and again. Neither this nor our case-by-case review ever limits a refund that the law gives you, such as the rights to cancel and the rights for faulty software described below, or the refunds listed under “After 14 days”.
 
 ## Your legal rights
 
-This policy adds to your rights under the law where you live. It never reduces them. Our 14-day refund is our own promise. In some places it overlaps with a legal right. Where the law gives you more, you get more.
+This policy adds to your rights under the law where you live. It never reduces them. Our case-by-case review of refund requests comes on top of these rights. Where the law gives you more, you get more.
 
 ### If you are a consumer in South Africa
 
 Under the Consumer Protection Act (CPA), consumers include individuals, and organisations whose assets and yearly turnover are both below R2 million. A licence to use software counts as goods under the CPA.
 
-- **Cooling-off.** If you are an individual buying for your own use, section 44 of the Electronic Communications and Transactions Act may also let you cancel within 7 days, without a reason and without penalty. That section has exceptions, for example for computer software you have “unsealed”, so it may not apply to your purchase. Where it applies, you must get a full refund within 30 days of cancelling. Our 14-day refund covers this right. If your licence reaches you late, we still give you at least 7 days from the day it reaches you.
+- **Cooling-off.** If you are an individual buying for your own use, section 44 of the Electronic Communications and Transactions Act may also let you cancel within 7 days, without a reason and without penalty. That section has exceptions, for example for computer software you have “unsealed”, so it may not apply to your purchase. Where it applies, you must get a full refund within 30 days of cancelling. Where it applies, we honour it in full. If your licence reaches you late, we still give you at least 7 days from the day it reaches you.
 - **Defects.** You may return what you bought within six months after you receive it if it is defective, is not of good quality or in good working order, is not reasonably suitable for what such software is generally used for, or does not stay usable for a reasonable time (CPA sections 55 and 56). It does not matter whether the problem could have been spotted before you bought. You choose whether we fix it, replace it or refund what you paid. If a fix fails within three months, you get a replacement or a refund. Returning software costs you nothing: tell us, and deactivate it.
 - **A purpose you told us about.** If you told us before you bought that you needed KerfDesk for a particular purpose, for example a particular machine or controller, and within 10 business days after you receive your licence it proves unsuitable for that purpose, you may be able to return it for a refund (CPA section 20).
 
@@ -111,14 +111,14 @@ You can use these rights with us or with Paddle.
 
 ### If you are a consumer in the EEA or the UK
 
-- **Right to cancel.** You have a legal right to cancel within 14 days after the day you buy, without giving a reason. Paddle, as the seller, handles it (see “How to ask for a refund”) and must refund you within 14 days of your request. This legal right ends once you start downloading or using what you bought, if at checkout you asked to get it straight away and accepted that you would lose the right. (In the EU, the seller must also have confirmed this to you in writing, for example by email.) Our 14-day refund does not end that way. It still applies after you have activated and used Pro.
+- **Right to cancel.** You have a legal right to cancel within 14 days after the day you buy, without giving a reason. Paddle, as the seller, handles it (see “How to ask for a refund”) and must refund you within 14 days of your request. This legal right ends once you start downloading or using what you bought, if at checkout you asked to get it straight away and accepted that you would lose the right. (In the EU, the seller must also have confirmed this to you in writing, for example by email.) After that, you can still ask for a refund within 14 days, and we consider it case by case.
 - **Faults.** If what you bought is faulty or not as described, you have a legal right to have it put right free of charge, within a reasonable time and without significant inconvenience. If that is impossible, is not done in time or does not fix the fault, you may get a price reduction instead. In the UK the reduction can be up to the full price. In the EEA you may instead end the contract and get a refund, unless the fault is minor, and you need not wait for a repair if the fault is serious. In the EEA, the seller is responsible for faults that show up within at least two years after you received what you bought. In the UK you can usually bring a claim for up to six years (five in Scotland).
 
 You can raise these rights with us or with Paddle.
 
 ### Everywhere else, including the United States
 
-Our 14-day refund is our own promise. The law where you live may give you other rights, for example if KerfDesk is faulty. This policy does not limit them.
+We consider refund requests within 14 days case by case. The law where you live may give you other rights, for example if KerfDesk is faulty. This policy does not limit them.
 
 ## Complaints
 

@@ -220,11 +220,13 @@ function faq(commerce, plan, site) {
       question: 'What about refunds?',
       answer: commerce.salesOpen
         ? html`<p>
-            Request a full refund within 14 calendar days after purchase, including after activating
-            and using Pro. This also covers an optional update year. See the
+            Please try every Pro tool free for 30 days before you buy. You can request a refund
+            within 14 calendar days after purchase; each request is considered case by case and may
+            be declined. Your statutory rights, and refunds for duplicate charges or an undelivered
+            licence, always apply. See the
             <a href="${commerce.refundPolicyUrl}">Refund Policy</a>.
           </p>`
-        : 'Read the published Refund Policy for the promise that will apply to a future purchase.',
+        : 'Read the published Refund Policy for the terms that will apply to a future purchase.',
     },
     {
       id: 'your-copy',
