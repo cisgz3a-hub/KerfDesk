@@ -4,6 +4,7 @@
   min-height: 0;
   font-size: var(--lf-text-md);
   line-height: 1.4;
+  scrollbar-width: thin;
 }
 
 .lf-machine-rail > * {
@@ -11,35 +12,32 @@
   min-width: 0;
 }
 
-/* The primary controls and lower machine tools own separate scrollers so
-   opening Console or History does not move the jog pad out of view. */
+/* Ordinary positioning controls have no separate scroller. Opening Console or
+   other lower tools leaves the entire jog cluster in place. */
 .lf-rail.lf-machine-rail {
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-/* Jog stays above the machine tools instead of following their scroll. The
-   upper group can still scroll when focus/Z controls or recovery notices make
-   it taller, leaving room to reach the lower tools in a short window. */
 .lf-machine-primary-controls,
 .lf-machine-details {
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
-  scrollbar-gutter: stable;
 }
 
 .lf-machine-rail > .lf-machine-primary-controls {
-  flex: 0 1 auto;
-  max-height: 70%;
+  flex: 0 0 auto;
 }
 
 .lf-machine-rail > .lf-machine-details {
   flex: 1 1 100px;
   min-height: min(60px, 25%);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
 }
 
 .lf-machine-primary-controls > *,
@@ -52,10 +50,6 @@
    full rail scroller. Heading, jog/focus and lower tools stay reachable while
    the sibling Frame/Start dock keeps the available window space. */
 @container machine-rail-body (max-height: 192px) {
-  .lf-rail.lf-machine-rail {
-    overflow-y: auto;
-  }
-
   .lf-machine-rail > .lf-machine-primary-controls,
   .lf-machine-rail > .lf-machine-details {
     flex: 0 0 auto;
@@ -82,8 +76,10 @@
 }
 
 .lf-jog-panel {
-  padding-top: 6px;
-  border-top: 1px solid var(--lf-border);
+  padding: 8px;
+  border: 1px solid var(--lf-border);
+  border-radius: 10px;
+  background: var(--lf-bg-0);
 }
 
 .lf-jog-panel select {
@@ -91,19 +87,49 @@
   min-width: 0;
 }
 
+.lf-focus-jog-header > strong {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .lf-jog-controls--machine-actions > :first-child {
   align-self: start;
 }
 
 .lf-jog-controls--machine-actions > .lf-btn {
-  min-height: 28px;
-  padding: 3px 5px;
+  align-self: start;
+  min-height: 36px;
+  padding: 3px 6px;
   font-size: 12px;
   line-height: 1.2;
 }
 
-.lf-jog-home {
-  grid-area: home;
+.lf-jog-center > .lf-jog-home {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--lf-accent-fg);
+  background: var(--lf-tint-accent);
+  border-color: var(--lf-accent);
+}
+
+.lf-jog-center > .lf-jog-home:disabled {
+  color: var(--lf-text-faint);
+  background: var(--lf-bg-1);
+  border-color: var(--lf-border);
+}
+
+.lf-jog-home-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .lf-jog-autofocus {
@@ -114,7 +140,7 @@
   grid-area: origin;
 }
 
-.lf-manual-air--compact > :last-child {
+.lf-manual-air--compact > .lf-manual-air-caption {
   grid-column: 1 / -1;
 }
 
@@ -181,5 +207,15 @@
   .lf-machine-primary-controls,
   .lf-machine-details {
     gap: 8px;
+  }
+}
+
+@container machine-rail-body (max-width: 280px) {
+  .lf-machine-rail {
+    padding-inline: 6px;
+  }
+
+  .lf-jog-panel {
+    padding-inline: 4px;
   }
 }

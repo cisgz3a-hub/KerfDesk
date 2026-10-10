@@ -120,7 +120,11 @@ function AirAssistControl(props: {
       <span style={props.compact ? compactAirAssistStateStyle : airAssistStateStyle}>
         {props.enabled ? 'ON' : 'OFF'}
       </span>
-      <span style={airAssistCommandStyle}>{controlCaption(props.readiness, props.command)}</span>
+      {!props.compact || props.readiness !== 'ready' ? (
+        <span className="lf-manual-air-caption" style={airAssistCommandStyle}>
+          {controlCaption(props.readiness, props.command)}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -283,12 +287,13 @@ const airAssistTitleStyle: React.CSSProperties = {
   lineHeight: 1.15,
 };
 const compactAirAssistStyle: React.CSSProperties = {
-  minHeight: 40,
-  padding: '4px 5px',
+  minHeight: 36,
+  alignSelf: 'start',
+  padding: '3px 6px',
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr) auto',
   columnGap: 4,
-  rowGap: 2,
+  rowGap: 1,
 };
 const airAssistStateStyle: React.CSSProperties = {
   fontSize: 14,
