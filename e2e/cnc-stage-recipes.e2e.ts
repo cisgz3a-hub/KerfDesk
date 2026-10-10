@@ -23,7 +23,10 @@ test('independent wall finish values survive UI editing, compilation and save/re
     name: 'Artwork / Operations panel',
     exact: true,
   });
-  await panel.getByRole('button', { name: 'CNC', exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Machine type', exact: true })
+    .getByRole('button', { name: 'CNC', exact: true })
+    .click();
   await panel.getByRole('combobox', { name: /^Cut type for/ }).selectOption('profile-outside');
   await number(panel, /^Cut depth for/, '3');
   await number(panel, /^Feed for/, '900');

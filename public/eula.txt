@@ -21,14 +21,29 @@ Copyright (c) 2026 Johann Stolk. All rights reserved.
 
 2. MACHINE SAFETY — READ CAREFULLY. The Software generates toolpaths
    and streams commands to laser cutters, CNC routers, and similar
-   machinery that can cause fire, serious injury, and property damage.
+   machinery that can cause fire, permanent eye injury, serious injury,
+   death, and property damage. Some lasers emit light you cannot see.
    You are solely responsible for safe operation, including: never
-   leaving a running machine unattended; verifying every job (preview,
-   simulation, or air run) before cutting real material; correct
-   machine configuration, work holding, and emergency-stop access; and
+   leaving a running machine unattended, and watching it directly (a
+   camera, phone, or remote connection is not supervision); verifying
+   every job (preview, simulation, or air run) before cutting real
+   material; not directing the machine to ignite flammable material;
+   not letting untrained people or unsupervised children use it;
+   switching it off when it is not in use; eye protection rated for
+   your laser, ventilation, and fume and dust extraction; keeping a
+   suitable fire extinguisher within reach; correct machine
+   configuration, work holding, and emergency-stop access; and
    following the machine manufacturer's instructions and applicable
-   safety regulations. The Software's previews, simulations, and
-   preflight checks are aids, not guarantees of safe output.
+   safety regulations.
+
+   The Software does not make or control your machine's safety
+   features. Interlocks, enclosures, thermal shutdown, fire detection,
+   and emergency stops are part of the machine. The Software's Abort and
+   other stop controls are software commands that depend on your
+   computer, connection, and controller; they are not emergency stops.
+   Its previews, simulations, and preflight checks are aids, not
+   guarantees of safe output. Read the safety notes at
+   https://kerfdesk.com/safety/ before running a job.
 
 3. NO WARRANTY. THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE",
    WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
@@ -41,6 +56,13 @@ Copyright (c) 2026 Johann Stolk. All rights reserved.
    DAMAGES, OR OTHER LIABILITY — INCLUDING INJURY, FIRE, DAMAGE TO
    MACHINES OR MATERIALS, OR LOST PROFITS — ARISING FROM, OUT OF, OR IN
    CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+   Some jurisdictions do not allow the exclusion of implied warranties
+   or the limitation of certain liability, so sections 3 and 4 apply
+   only to the extent the law permits. They do not exclude liability
+   for fraud, gross negligence, or death or personal injury caused by
+   negligence where the law forbids it, and they do not remove
+   mandatory consumer rights.
 
 5. THIRD-PARTY COMPONENTS. The Software bundles third-party components
    under their own licenses; see the accompanying

@@ -20,6 +20,11 @@ const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: st
   { value: 'center', label: 'Center' },
 ];
 
+/** The origin corner as the Origin select names it ("Front left"). */
+export function originLabel(origin: Origin): string {
+  return ORIGIN_OPTIONS.find((option) => option.value === origin)?.label ?? origin;
+}
+
 type DeviceRowsProps = {
   readonly device: DeviceProfile;
   readonly update: (patch: Partial<DeviceProfile>) => void;

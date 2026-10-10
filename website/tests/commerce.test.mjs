@@ -199,6 +199,8 @@ describe('commerce configuration', () => {
     assert.match(text, /does not activate it or use a licence seat/);
     assert.match(text, /Do not pay again/);
     assert.match(text, /within 14 calendar days after purchase/);
+    assert.match(text, /considered case by case and may be declined/);
+    assert.match(text, /statutory rights/);
     assert.doesNotMatch(text, /isn’t released yet|nothing can be bought today/);
     assert.match(html, /href="\/terms\/"/);
     assert.match(html, /href="\/refunds\/"/);

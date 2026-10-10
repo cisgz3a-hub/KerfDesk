@@ -127,7 +127,7 @@ export default defineConfig({
         ],
         // Optional lesson pictures must never join the install-time app download.
         // Keep Workbox's default node_modules exclusion when adding our own.
-        // The standalone checkout, download, phone setup, support, privacy, pricing, Terms and refund pages, and the modules
+        // The standalone checkout, download, phone setup, support, privacy, pricing, Terms, refund and safety pages, and the modules
         // and key sets they load, always come from the network (ADR-523): a
         // cached copy could show an outdated price, trust anchor, release or
         // support contact or privacy notice.
@@ -142,6 +142,7 @@ export default defineConfig({
           'privacy/**',
           'pricing/**',
           'refunds/**',
+          'safety/**',
           'terms/**',
           'desktop-*.{mjs,json,css}',
         ],
@@ -149,7 +150,7 @@ export default defineConfig({
         // the app-shell fallback would otherwise answer them with the workspace.
         navigateFallbackDenylist: [
           /^[/](?:buy|download|phone|support)(?:[.]html)?(?:[?#]|$)/,
-          /^[/](?:privacy|pricing|refunds|terms)(?:[/]|[?#]|$)/,
+          /^[/](?:privacy|pricing|refunds|safety|terms)(?:[/]|[?#]|$)/,
         ],
         // The plugin's navigateFallback answers a navigation the precache
         // cannot with index.html. Only the entry at the deploy root, with or

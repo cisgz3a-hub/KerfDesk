@@ -104,7 +104,7 @@ export function refundsCommand(): AppCommand {
     'help.refunds',
     'help',
     'Refund Policy',
-    'Read the refund promise for Pro licences and optional update purchases',
+    'Read the refund policy for Pro licences and optional update purchases',
     () => openExternalUrl(REFUNDS_URL),
   );
 }

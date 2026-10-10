@@ -44,8 +44,8 @@ export function DeviceSetupProfilePicker({ state, dispatch }: DeviceSetupStepPro
         <div>
           <h4>Start with a machine profile</h4>
           <p>
-            Choose a profile, then Review &amp; save to apply it. Use Check essentials to adjust the
-            settings first.
+            Choose a profile, then Review setup to check and save it. Use Check essentials to adjust
+            the settings first.
           </p>
         </div>
         <input

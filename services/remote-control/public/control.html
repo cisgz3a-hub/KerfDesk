@@ -85,6 +85,10 @@
             Machine control can move the head, Frame and start jobs. Approve it separately on the
             PC.
           </p>
+          <p class="safety-note">
+            Use machine control only while you are at the machine and can see it. Watching on a
+            phone is not supervision.
+          </p>
           <button type="submit">Request PC approval</button>
         </form>
         <p class="muted" id="pair-status" role="status" aria-live="polite">
@@ -548,6 +552,10 @@
           </section>
           <section class="card">
             <h2>Frame, review and start</h2>
+            <p class="safety-note">
+              Stay at the machine while it moves. Watching on a phone is not supervision, and Abort
+              here is a software stop, not an emergency stop.
+            </p>
             <p id="machine-frame-state" class="muted">Frame status unavailable.</p>
             <div class="machine-job-actions">
               <button id="machine-frame" type="button">Frame job</button

@@ -1,26 +1,54 @@
-/* The Laser / CNC switch in the Artwork panel heading. It must not look like
- * the Settings / Run order / Materials tabs under it: those are copper text on
- * an underline, so the chosen mode here is a solid copper fill with white text
- * on a sunken track, and each mode carries its own icon. */
+/* The Laser / CNC switch at the start of the machine toolbar. Two equal
+ * segments sit on a sunken track; a copper-tinted, copper-outlined thumb (the
+ * selected style of Machine Setup's type cards) slides under the chosen mode,
+ * so the control reads as one two-way switch and Connect beside it stays the
+ * row's only solid copper action. Each mode carries its own icon. Its height
+ * matches the machine name button beside it. */
 
 .lf-machine-mode {
-  display: flex;
+  --lf-machine-mode-pad: 3px;
+  --lf-machine-mode-gap: 2px;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(96px, 1fr));
+  gap: var(--lf-machine-mode-gap);
   flex-shrink: 0;
-  gap: 2px;
-  padding: 3px;
+  padding: var(--lf-machine-mode-pad);
   border: 1px solid var(--lf-border);
   border-radius: var(--lf-radius-lg);
   background: var(--lf-bg-2);
+  isolation: isolate;
+}
+
+.lf-machine-mode::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  top: var(--lf-machine-mode-pad);
+  bottom: var(--lf-machine-mode-pad);
+  left: var(--lf-machine-mode-pad);
+  width: calc((100% - 2 * var(--lf-machine-mode-pad) - var(--lf-machine-mode-gap)) / 2);
+  box-sizing: border-box;
+  border: 1px solid var(--lf-accent);
+  border-radius: var(--lf-radius-md);
+  background: var(--lf-tint-accent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
+  transition: transform 160ms ease;
+}
+
+.lf-machine-mode[data-mode='cnc']::before {
+  transform: translateX(calc(100% + var(--lf-machine-mode-gap)));
 }
 
 .lf-machine-mode__choice {
   position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  min-height: 30px;
-  padding: 4px 9px;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 14px;
   border: 0;
   border-radius: var(--lf-radius-md);
   background: transparent;
@@ -28,10 +56,11 @@
   font: inherit;
   font-size: var(--lf-text-sm);
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     background-color 80ms,
-    color 80ms;
+    color 160ms;
 }
 
 .lf-machine-mode__choice svg {
@@ -44,8 +73,7 @@
 }
 
 .lf-machine-mode__choice[aria-pressed='true'] {
-  background: var(--lf-accent);
-  color: var(--lf-on-fill);
+  color: var(--lf-accent-fg);
   cursor: default;
 }
 
@@ -60,10 +88,10 @@
 .lf-machine-mode__choice[data-capability-warning='true']::after {
   content: '';
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 7px;
-  height: 7px;
+  top: 3px;
+  right: 3px;
+  width: 8px;
+  height: 8px;
   box-sizing: border-box;
   border: 1.5px solid var(--lf-bg-2);
   border-radius: 50%;
@@ -71,7 +99,7 @@
 }
 
 .lf-machine-mode__choice[aria-pressed='true'][data-capability-warning='true']::after {
-  border-color: var(--lf-on-fill);
+  border-color: var(--lf-tint-accent);
 }
 
 .lf-machine-mode__choice:focus-visible {
@@ -79,19 +107,22 @@
   outline-offset: 1px;
 }
 
-/* A narrow Artwork rail (it opens at 300 px and drags down to 240 px) keeps
- * the heading on one row by dropping the icons. */
-@container lf-artwork-heading (max-width: 270px) {
+@media (prefers-reduced-motion: reduce) {
+  .lf-machine-mode::before,
+  .lf-machine-mode__choice {
+    transition: none;
+  }
+}
+
+/* A narrow window keeps the toolbar row at its 32 px controls' height. */
+@media (max-width: 700px) {
   .lf-machine-mode {
-    padding: 2px;
+    --lf-machine-mode-pad: 2px;
+    grid-template-columns: repeat(2, minmax(72px, 1fr));
   }
 
   .lf-machine-mode__choice {
-    padding: 4px 7px;
-    font-size: 13px;
-  }
-
-  .lf-machine-mode__choice svg {
-    display: none;
+    min-height: 26px;
+    padding: 2px 8px;
   }
 }

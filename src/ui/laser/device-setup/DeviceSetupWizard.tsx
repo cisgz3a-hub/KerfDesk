@@ -1,6 +1,6 @@
 // One draft across Machine, Essentials and Review. Existing recovery targets
 // open the relevant section, and only Save changes the project.
-import { useEffect, useReducer, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { ControllerKind, DeviceProfile } from '../../../core/devices';
 import { LASER_MACHINE_CONFIG, type MachineKind } from '../../../core/scene';
 import { Dialog } from '../../kit';
@@ -17,9 +17,10 @@ import {
   deviceSetupReducer,
   initDeviceSetup,
   type DeviceSetupAction,
+  type DeviceSetupState,
   type DeviceSetupStep,
 } from './device-setup-flow';
-import { useCncStartupWizardDraft } from './cnc-startup-wizard-draft';
+import { useCncStartupWizardDraft, type CncStartupWizardDraft } from './cnc-startup-wizard-draft';
 import type { DeviceSetupHighlight, MachineSetupTarget } from './machine-setup-dialog-store';
 import type { MachineSetupConnection } from './machine-setup-connection';
 import { useMachineSetupSave } from './use-machine-setup-save';
@@ -83,6 +84,8 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
   });
   const automatic = useControllerAutoFill(state, dispatch, newMachine);
   const cncSetup = useCncStartupWizardDraft(project.scene.layers, libraryCustomTools);
+  const edits = useOperatorEdits(state, cncSetup, dispatch);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   useMachineSetupTargetFocus(props.target, state.step);
   const save = useMachineSetupSave({
     state,
@@ -92,28 +95,81 @@ function DeviceSetupWizardDraft(props: DeviceSetupWizardProps): JSX.Element {
     onClose: props.onClose,
     onConfigured: props.onConfigured,
   });
+  // Escape and the header close button ask before an edited draft is lost;
+  // Escape again keeps editing. Cancel without saving stays immediate.
+  const requestClose = (): void => {
+    if (save.saving) return;
+    if (confirmingDiscard) setConfirmingDiscard(false);
+    else if (edits.edited()) setConfirmingDiscard(true);
+    else props.onClose();
+  };
   return (
     <Dialog
       title={state.machineKind === 'cnc' ? 'CNC Machine Setup' : 'Machine Setup'}
       size="xl"
       panelClassName="lf-setup-dialog"
-      onClose={save.saving ? () => undefined : props.onClose}
+      onClose={requestClose}
     >
       <DeviceSetupShell
         state={state}
-        dispatch={dispatch}
+        dispatch={edits.dispatch}
         highlight={props.highlight}
         layers={project.scene.layers}
         cncSetup={cncSetup}
         automatic={automatic}
         connection={props.connection}
         onClose={props.onClose}
+        onRequestClose={requestClose}
+        confirmingDiscard={confirmingDiscard}
+        onKeepEditing={() => setConfirmingDiscard(false)}
         onSave={save.onSave}
         saving={save.saving}
         firmwareWriteCount={save.firmwareWriteCount}
       />
     </Dialog>
   );
+}
+
+const NAVIGATION_ACTIONS: ReadonlySet<DeviceSetupAction['kind']> = new Set(['next', 'back', 'go']);
+
+// Whether closing would lose the operator's own edits (ADR-420 Amendment 4).
+// The controller's automatic fill and detected-value sync use the raw
+// dispatch: a new machine's fill repeats on the next Connect, so it alone
+// does not ask. An edit put back the way it opened does not ask either.
+function useOperatorEdits(
+  state: DeviceSetupState,
+  cnc: CncStartupWizardDraft,
+  dispatch: React.Dispatch<DeviceSetupAction>,
+): { readonly dispatch: React.Dispatch<DeviceSetupAction>; readonly edited: () => boolean } {
+  const [opened] = useState(() => ({ setup: draftKey(state), cnc: cncPlanKey(cnc) }));
+  const touched = useRef(false);
+  const operatorDispatch = useCallback(
+    (action: DeviceSetupAction) => {
+      if (!NAVIGATION_ACTIONS.has(action.kind)) touched.current = true;
+      dispatch(action);
+    },
+    [dispatch],
+  );
+  const edited = (): boolean =>
+    (touched.current && draftKey(state) !== opened.setup) || cncPlanKey(cnc) !== opened.cnc;
+  return { dispatch: operatorDispatch, edited };
+}
+
+// Everything Save would apply from the setup draft.
+function draftKey(state: DeviceSetupState): string {
+  return JSON.stringify([
+    state.draft,
+    state.draftMachine,
+    state.cncDraft,
+    state.cncSetupDraft,
+    state.machineKinds,
+    state.machineKind,
+    state.queuedFirmwareWriteIds,
+  ]);
+}
+
+function cncPlanKey(cnc: CncStartupWizardDraft): string {
+  return JSON.stringify([cnc.operationDrafts, cnc.customTools, cnc.materialApplyRequested]);
 }
 
 function useDetectedSetupSync(

@@ -23,6 +23,7 @@ import { shot } from '../lib/screens.mjs';
 import {
   BEFORE_EVERY_JOB,
   CANNOT_KNOW,
+  IF_A_FIRE,
   TEST_STATUS,
   WHAT_IT_CHECKS,
   WHILE_IT_RUNS,
@@ -37,9 +38,14 @@ function responsibilities() {
           KerfDesk prepares toolpaths and sends commands to your laser or router. It is provided “as
           is”, with no warranty. You use it, and run your machine, at your own risk.
         </p>
+        <p>
+          KerfDesk doesn’t make your machine and doesn’t control its safety features, such as
+          interlocks, thermal shutdown, fire detection and the emergency stop.
+        </p>
         <p>That makes you responsible for:</p>
         <ul>
-          <li>never leaving a running machine unattended;</li>
+          <li>never leaving a running machine unattended, and watching it in person;</li>
+          <li>keeping untrained people and children away from it;</li>
           <li>checking every job before it cuts real material;</li>
           <li>
             setting up your machine correctly, holding the work securely and keeping the emergency
@@ -102,6 +108,17 @@ function whileItRuns() {
     eyebrow: 'While it runs',
     title: 'Stay close and stay protected',
     content: featureGrid(WHILE_IT_RUNS, { columns: 2 }),
+  });
+}
+
+function fireSection() {
+  return section({
+    id: 'fire',
+    tone: 'alt',
+    eyebrow: 'If a fire starts',
+    title: 'Act in the first seconds',
+    lead: 'A flare-up is easy to stop when it starts and can destroy a machine within minutes. That is why you stay with it.',
+    content: steps(IF_A_FIRE),
   });
 }
 
@@ -272,7 +289,7 @@ export const page = {
         button('#abort', 'About the Abort button', { variant: 'secondary' }),
       ),
     })}
-    ${responsibilities()} ${beforeEveryJob(ctx)} ${whileItRuns()} ${abortSection()}
+    ${responsibilities()} ${beforeEveryJob(ctx)} ${whileItRuns()} ${fireSection()} ${abortSection()}
     ${laserModeSection()} ${checksSection()} ${testedSection()} ${reportSection(site)}
     ${ctaBand({
       title: 'More safety help in the app',

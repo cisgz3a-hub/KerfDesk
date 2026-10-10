@@ -189,15 +189,18 @@ describe('website copy', () => {
     );
   });
 
-  // Published Supplier Terms and the refund promise are accessible before any
+  // Published Supplier Terms and the refund policy are accessible before any
   // purchase, without opening checkout or replacing a supplied app notice.
-  it('publishes unchanged purchase rights and the refund promise for the authorised launch', () => {
+  // ADR-578: case-by-case refunds that keep statutory rights and the v1.1 promise.
+  it('publishes purchase rights and the case-by-case refund policy for the authorised launch', () => {
     const refunds = pageText('refunds/index.html');
     const terms = pageText('terms/index.html');
     assert.doesNotMatch(refunds, /Paid checkout is closed|nothing can be bought today/);
-    assert.match(refunds, /Version 1\.1\. Published: 7 October 2026/);
-    assert.match(refunds, /We promise a full refund if you request it within 14 calendar days/);
-    assert.match(refunds, /after activating and using Pro/);
+    assert.match(refunds, /Version 1\.2\. Published: 10 October 2026/);
+    assert.match(refunds, /case-by-case basis and may decline it/);
+    assert.match(refunds, /statutory right to withdraw from or cancel the purchase/);
+    assert.match(refunds, /keeps the refund promise of version 1\.1/);
+    assert.match(terms, /case-by-case basis and may decline it/);
     assert.match(terms, /purchase provisions apply when you buy/);
     assert.match(terms, /computer, phone or tablet/);
     assert.match(terms, /Check payment/);
