@@ -90,6 +90,12 @@ export function sandboxConfiguredPlacement(value, legacyMode) {
     return undefined;
   }
   assert.ok(object(value), fail);
+  // The settings endpoint also represents disabled placement as an empty object.
+  // Do not infer this from analysis-only data or a conflicting legacy mode.
+  if (Object.keys(value).length === 0) {
+    assert.ok(legacyMode === undefined || legacyMode === 'off', fail);
+    return undefined;
+  }
   const configuration = Object.fromEntries(
     Object.entries(value).filter(([key]) => !analysisFields.includes(key)),
   );

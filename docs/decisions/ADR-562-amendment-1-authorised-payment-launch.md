@@ -91,3 +91,39 @@ and sandbox upload metadata. Unknown or malformed forms still refuse before
 upload. Bounded diagnostics report only fixed field presence/types, known enums
 and equality results; they never publish target values, timestamps or unknown
 property names. This changes representation comparison, not placement behaviour.
+
+On 2026-10-10, protected run 38047635585 observed settings `placement: {}`
+and omitted placement in the exact active version; the dashboard showed Default.
+The operator refused before mutation. A genuinely empty settings object is also
+normalised to disabled placement when the legacy mode is absent or off. An
+analysis-only object or conflicting legacy mode remains unqualified. This
+observed provider representation shares the existing fingerprint and omitted
+upload configuration; it does not enable Smart Placement or change runtime.
+
+On 2026-10-10, the owner explicitly approved guarded latest inheritance for the
+Sandbox restoration. Cloudflare's standard script Versions endpoint rejects
+an exact UUID in an inherit binding; it resolves only the latest uploaded
+version, which may differ from the active version. The restoration now requires
+the original active version to be latest in an unfiltered version listing and
+rechecks that unchanged bounded history immediately before upload. It retains
+strict binding inheritance and existing assets, then checks the acknowledged
+inactive candidate's adjacent version number, unique operation tag and preserved
+history before and immediately before activation, alongside code, resource,
+settings and active-version attestation. A detected intervening upload refuses
+activation. A lost upload acknowledgement never authorises activation.
+
+These separate reads and writes cannot provide an atomic source pin or prove
+opaque secret byte equality. Number adjacency and retained history provide
+inferred provenance only; receipts state those limits. The approval changes only
+the Sandbox restoration inheritance method. The shared payment-flag operator
+and production code replacement authority are unchanged.
+
+Reference: [Cloudflare inherit binding errors (10057)](https://developers.cloudflare.com/workers/observability/errors/#inherit-binding-errors-10057).
+
+Candidate code qualification uses the beta read-only exact-version endpoint with
+`include=modules`. It requires the returned full UUID, one canonical base64
+module, matching entrypoint and module type, and the immutable retained SHA.
+This avoids the previously observed ambiguity of `/content/v2?version=...`;
+active bytes from that endpoint cannot qualify a different inactive candidate.
+The upload and activation endpoints are unchanged. The beta read is not a beta
+deployment or permission to replace production code.
