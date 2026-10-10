@@ -130,6 +130,18 @@ function syntheticDesktop(desktop, commands, suppliedOperations) {
     },
   };
 }
+async function closeBrowser(browser) {
+  if (!browser) return;
+  for (const context of browser.contexts()) {
+    // Browser close does not await route callbacks. Keep Miniflare and the
+    // synthetic desktop alive until their outstanding dispatches have settled.
+    // Closing pages stops polling before removing the catch-all local relay.
+    for (const page of context.pages()) await page.close();
+    await context.unrouteAll({ behavior: 'wait' });
+  }
+  await browser.close();
+}
+
 async function browserPage(worker, cookies = [], callbackOrigin = null, receipts = []) {
   const browser = await chromium.launch({
     ...(process.env.KERFDESK_TEST_BROWSER === 'chromium' ? {} : { channel: 'chrome' }),
@@ -307,7 +319,7 @@ test(
       await page.locator('#pair-card').waitFor({ state: 'visible' });
       assert.equal(await page.locator('#workspace-area').isHidden(), true);
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(desktop?.socket);
       await worker.dispose();
     }
@@ -373,7 +385,7 @@ test(
         ],
       );
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(desktop?.socket);
       await worker.dispose();
     }
@@ -425,7 +437,7 @@ test(
       });
       await page.locator('#workspace-area').waitFor({ state: 'visible' });
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(desktop?.socket);
       await worker.dispose();
     }
@@ -532,7 +544,7 @@ for (const pairedOnStartup of [true, false])
         );
       } finally {
         workspaceDelay?.release();
-        await browser?.close();
+        await closeBrowser(browser);
         closeSocket(desktop?.socket);
         await worker.dispose();
       }
@@ -615,7 +627,7 @@ for (const failure of ['offline PC', 'workspace error', 'second session error'])
           false,
         );
       } finally {
-        await browser?.close();
+        await closeBrowser(browser);
         closeSocket(desktop?.socket);
         await worker.dispose();
       }
@@ -717,7 +729,7 @@ test(
       );
     } finally {
       workspaceDelay?.release();
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(previous?.socket);
       closeSocket(replacement?.socket);
       await worker.dispose();
@@ -796,7 +808,7 @@ test(
       );
     } finally {
       workspaceDelay?.release();
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(previous?.socket);
       closeSocket(replacement?.socket);
       await worker.dispose();
@@ -884,7 +896,7 @@ test(
         false,
       );
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(desktop?.socket);
       await worker.dispose();
     }
@@ -1004,7 +1016,7 @@ test(
       assert.equal(await selection.inputValue(), '');
       assert.equal(await page.getByRole('button', { name: 'Apply settings' }).isDisabled(), true);
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(desktop?.socket);
       await worker.dispose();
     }
@@ -1082,7 +1094,7 @@ test(
       assert.equal(callback.searchParams.get('ownerSecret'), null);
       assert.equal(callback.searchParams.get('access_token'), null);
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       await new Promise((resolve) => callbackServer.close(resolve));
       closeSocket(desktop?.socket);
       await worker.dispose();
@@ -1150,7 +1162,7 @@ for (const pairedOnStartup of [true, false])
         );
       } finally {
         workspaceDelay?.release();
-        await browser?.close();
+        await closeBrowser(browser);
         closeSocket(desktop?.socket);
         await worker.dispose();
       }
@@ -1182,9 +1194,70 @@ test(
       assert.equal(await loaded.page.locator('#readonly-note').isVisible(), true);
       assert.equal(new URL(loaded.page.url()).origin, ORIGIN);
     } finally {
-      await browser?.close();
+      await closeBrowser(browser);
       closeSocket(desktop?.socket);
       await worker.dispose();
+    }
+  },
+);
+
+test(
+  'mobile browser cleanup drains an outstanding worker route before disconnecting',
+  { timeout: 15_000 },
+  async () => {
+    const started = Promise.withResolvers();
+    const release = Promise.withResolvers();
+    const teardownStarted = Promise.withResolvers();
+    let pending = 0;
+    let pendingAtDisconnect = null;
+    const worker = {
+      async dispatchFetch() {
+        pending += 1;
+        started.resolve();
+        await release.promise;
+        pending -= 1;
+        return new Response('<!doctype html><title>Worker response</title>', {
+          headers: { 'Content-Type': 'text/html' },
+        });
+      },
+    };
+    const { browser, context, page } = await browserPage(worker);
+    const unrouteAll = context.unrouteAll.bind(context);
+    context.unrouteAll = (options) => {
+      const draining = unrouteAll(options);
+      teardownStarted.resolve();
+      return draining;
+    };
+    browser.once('disconnected', () => {
+      pendingAtDisconnect = pending;
+      teardownStarted.resolve();
+    });
+    const navigation = page.goto(`${ORIGIN}/teardown-witness`).then(
+      () => null,
+      (error) => error,
+    );
+    try {
+      await started.promise;
+      const closing = closeBrowser(browser);
+      // Release only once cleanup either starts draining or prematurely disconnects.
+      // No timing delay or transport retry determines which lifecycle wins.
+      await teardownStarted.promise;
+      release.resolve();
+      await closing;
+      assert.equal(
+        pendingAtDisconnect,
+        0,
+        'browser disconnected while a worker dispatch was pending',
+      );
+      assert.match(
+        (await navigation)?.message ?? '',
+        /net::ERR_ABORTED|Target page, context or browser has been closed/,
+        'closing the page cancels its navigation while its worker dispatch still drains',
+      );
+    } finally {
+      release.resolve();
+      await navigation;
+      await closeBrowser(browser);
     }
   },
 );
