@@ -48,7 +48,10 @@ export function DeviceSetupMachineCapability({
               {kind === 'cnc' ? 'CNC' : 'Laser'}
             </label>
           ))}
-          <p>Match the installed toolhead. Changing this choice does not power it on.</p>
+          <p>
+            Match the installed toolhead. Changing this choice does not power it on. After saving,
+            switch heads with Laser / CNC in the machine toolbar.
+          </p>
         </fieldset>
       ) : null}
     </div>

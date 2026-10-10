@@ -264,6 +264,38 @@
   cursor: default;
 }
 
+/* A laptop-height dialog keeps the whole sidebar in view rather than giving it
+ * a second scrollbar beside the content's: tighter spacing first, then the
+ * bed diagram goes (Work area and Origin stay listed beneath it). */
+@media (max-height: 920px) and (min-width: 761px) {
+  .lf-setup-sidebar {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+  .lf-setup-stepper {
+    gap: 4px;
+  }
+  .lf-setup-stepper button {
+    padding: 9px 8px;
+  }
+  .lf-setup-summary {
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+  .lf-setup-bed-preview {
+    max-width: 150px;
+    margin-inline: auto;
+  }
+  .lf-setup-summary dl {
+    margin-bottom: 10px;
+  }
+}
+@media (max-height: 840px) and (min-width: 761px) {
+  .lf-setup-bed-preview {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .lf-dialog.lf-setup-dialog {
     width: calc(100vw - 16px);

@@ -17,7 +17,7 @@ export function DeviceSetupSummary({ state }: { readonly state: DeviceSetupState
         ? 'Connected'
         : connection === 'connecting'
           ? 'Connecting…'
-          : 'Offline setup';
+          : 'Not connected';
   return (
     <section className="lf-setup-summary" aria-label="Current setup summary">
       <span className="lf-setup-eyebrow">Your machine</span>

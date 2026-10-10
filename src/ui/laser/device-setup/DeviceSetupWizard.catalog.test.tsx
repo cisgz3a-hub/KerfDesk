@@ -79,6 +79,24 @@ describe('DeviceSetupWizard catalog', () => {
     }
   });
 
+  it('moves focus to the machine type when the operator sets up without connecting', async () => {
+    const view = await renderWizard();
+    try {
+      const offline = button(view.host, 'Set up without connecting');
+      await act(async () => {
+        offline.focus();
+        offline.click();
+      });
+      expect(offline.isConnected).toBe(false);
+      expect(view.host.textContent).toContain('Setting up without connecting');
+      expect(document.activeElement).toBe(
+        view.host.querySelector('input[name="machine-capability"]:checked'),
+      );
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('selects a profile from anywhere on its card, while profile details stay neutral', async () => {
     const view = await renderWizard();
     try {
