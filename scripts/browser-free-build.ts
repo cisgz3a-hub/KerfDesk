@@ -28,7 +28,8 @@ export const PRO_BUILD_ENTRIES: Readonly<Record<string, readonly string[]>> = {
     'runVCarveMedialRegionTask',
     'finalizeVCarveMedialWork',
   ],
-  'src/core/cnc/vcarve-ladder.ts': ['vcarvePasses', 'vcarveLadderPasses'],
+  // The retired offset-ring ladder is test support only. The production
+  // medial and worker entries above retain the browser-Free boundary.
   // Relief machining retains its existing boundary after the stage-module split.
   'src/core/cnc/compile-cnc-relief.ts': ['appendReliefPasses', 'reliefLadderFor'],
   'src/core/cnc/compile-cnc-relief-finishing.ts': ['reliefFinishingGroup', 'finishRelief'],

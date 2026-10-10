@@ -39,3 +39,10 @@ advances because compiled output changes for these selections.
 **Verification.** Unit tests cover end-mill, ball-nose and tapered-ball-nose depth resolution,
 an angleless engraving bit, the clearing stage and the retained ladder reference. Preflight and
 panel tests use a real V-bit where they test V-carve behaviour. No hardware was operated.
+
+**Build and empty-geometry qualification.** The retired ladder remains test support only;
+the browser-Free build manifest lists the production medial and region-worker entries and
+no longer reads the removed ladder module. Direct browser/desktop bundle regressions cover
+those boundaries. Angle validation uses the same even-odd normalization as the medial
+planner: hairline filled regions still require a real angle, while cancelled or zero-area
+contours cannot make an unused angleless V-bit refuse other executable layers.

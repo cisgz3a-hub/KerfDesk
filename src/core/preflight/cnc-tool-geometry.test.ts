@@ -128,6 +128,41 @@ describe('invalid CNC tool geometry preflight', () => {
     });
   });
 
+  it('does not refuse an angleless V-bit when even-odd source contours cancel completely', () => {
+    expect(
+      preflight(
+        [vcarveLayer('cancelled-v-carve')],
+        [rectangle('first', VCARVE_COLOR, 20), rectangle('second', VCARVE_COLOR, 20)],
+      ),
+    ).toEqual({ ok: true, issues: [] });
+  });
+
+  it('does not refuse an angleless V-bit for a closed zero-area contour', () => {
+    const line: SceneObject = {
+      id: 'degenerate',
+      kind: 'imported-svg',
+      source: 'degenerate.svg',
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 0 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: VCARVE_COLOR,
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+                { x: 20, y: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(preflight([vcarveLayer('zero-area')], [line])).toEqual({ ok: true, issues: [] });
+  });
+
   // ADR-285: the medial planner carves a hairline region as well as a wide one,
   // so an angleless V-bit changes output however narrow the artwork is.
   it('refuses an angleless V-bit on artwork narrower than the former ring pitch', () => {

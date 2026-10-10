@@ -3,6 +3,7 @@ import { vcarveClearanceToolpaths, vcarveHasFlatFloor } from '../cnc/vcarve-clea
 import { zPassCount } from '../cnc/depth-passes';
 import { isValidCncTipAngleDeg } from '../cnc-tip-angle';
 import type { DeviceProfile } from '../devices';
+import { normalizeClosedPolylineTreeEvenOddChecked } from '../geometry/polygon-difference';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   layerCncTool,
@@ -40,7 +41,7 @@ export function findInvalidCncToolGeometry(
     if (invalidClearTool !== null) issues.push(invalidClearTool);
     const tool = layerCncTool(config, settings);
     if (tool.kind !== 'v-bit' || isValidCncTipAngleDeg(tool.tipAngleDeg)) continue;
-    if (!invalidAngleCanChangeOutput(settings)) continue;
+    if (!invalidAngleCanChangeOutput(contours, settings)) continue;
     issues.push({
       code: 'cnc-tool-geometry-invalid',
       message:
@@ -157,8 +158,14 @@ function contributingContours(
   );
 }
 
-// The medial planner (ADR-285) carves every closed contributing region, however
-// narrow, so any positive requested depth needs the bit's real angle.
-function invalidAngleCanChangeOutput(settings: CncLayerSettings): boolean {
-  return settings.depthMm > 0;
+// The medial planner (ADR-285) can carve a filled region below the former
+// ring pitch. Match its normalization so cancelling or zero-area contours do
+// not let an unused angleless bit refuse other executable output.
+function invalidAngleCanChangeOutput(
+  contours: ReadonlyArray<Polyline>,
+  settings: CncLayerSettings,
+): boolean {
+  if (!(settings.depthMm > 0)) return false;
+  const normalized = normalizeClosedPolylineTreeEvenOddChecked(contours);
+  return normalized.kind === 'ok' && normalized.value.length > 0;
 }
