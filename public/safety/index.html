@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Safety and responsible use — KerfDesk</title>
+    <meta
+      name="description"
+      content="Machine safety for KerfDesk: checks before every job, staying with the machine, fire response, laser and CNC hazards."
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src &#39;none&#39;; style-src &#39;self&#39;; img-src &#39;self&#39;; font-src &#39;self&#39;; script-src &#39;none&#39;; connect-src &#39;none&#39;; object-src &#39;none&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;"
+    />
+    <link rel="canonical" href="https://kerfdesk.com/safety/" />
+
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#161412" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="stylesheet" href="/privacy/assets/site.08af655ec7.css" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="KerfDesk" />
+    <meta property="og:title" content="Safety and responsible use — KerfDesk" />
+    <meta
+      property="og:description"
+      content="Machine safety for KerfDesk: checks before every job, staying with the machine, fire response, laser and CNC hazards."
+    />
+    <meta property="og:url" content="https://kerfdesk.com/safety/" />
+    <meta
+      property="og:image"
+      content="https://kerfdesk.com/privacy/assets/social-card.ed667b4921.png"
+    />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <div class="wrap site-header__inner">
+        <a class="brand" href="https://kerfdesk.com">
+          <img src="/favicon.svg" alt="" width="28" height="28" />
+          <span>Kerf<span class="brand__accent">Desk</span></span>
+        </a>
+        <nav class="site-nav" aria-label="Main">
+          <ul>
+            <li><a href="https://kerfdesk.com/download.html">Download</a></li>
+            <li><a href="https://kerfdesk.com/support.html">Support</a></li>
+          </ul>
+        </nav>
+        <a class="btn btn--primary btn--sm site-header__cta" href="https://kerfdesk.com"
+          >Open the app</a
+        >
+        <details class="menu">
+          <summary>Menu</summary>
+          <nav aria-label="Main menu">
+            <ul>
+              <li><a href="https://kerfdesk.com/download.html">Download</a></li>
+              <li><a href="https://kerfdesk.com/support.html">Support</a></li>
+            </ul>
+          </nav>
+        </details>
+      </div>
+    </header>
+    <main id="main">
+      <section class="page-hero">
+        <div class="wrap">
+          <h1>Safety &amp; responsible use</h1>
+        </div>
+      </section>
+      <section class="section">
+        <div class="wrap wrap--narrow">
+          <div class="prose">
+            <p>
+              <strong>Read this before you run any job.</strong> KerfDesk prepares toolpaths and
+              sends<br />commands to **laser cutters and CNC routers — machines that can cause
+              fire,<br />permanent eye injury, toxic fumes, serious cuts, and flying debris.** You
+              are<br />responsible for operating your machine safely. KerfDesk is a tool that
+              generates<br />instructions; it cannot see your workshop, your material, or your
+              machine, and<br />it <strong>cannot guarantee a safe result.</strong>
+            </p>
+            <h2 id="use-at-your-own-risk">Use at your own risk</h2>
+            <p>
+              The software is provided <strong>&quot;as is,&quot; without any warranty.</strong> You
+              use it, and<br />operate your machine, <strong>entirely at your own risk.</strong> To
+              the maximum extent<br />permitted by law, the authors and copyright holders are **not
+              liable for any<br />injury, death, fire, or damage to property, machines, or
+              materials** arising<br />from use of the software. Nothing in the software removes
+              your responsibility to<br />operate your equipment safely and in accordance with the
+              machine manufacturer's<br />instructions and the laws and regulations where you live.
+            </p>
+            <h2 id="before-every-job">Before every job</h2>
+            <ul>
+              <li>
+                <strong>Verify the output before you cut.</strong> Use the preview, the simulation,
+                or an &quot;air&quot; run (job run with the tool clear of the material) to confirm
+                the path, depth, and travel are what you expect. Generated G-code can be
+                geometrically wrong and still run.
+              </li>
+              <li>
+                <strong>Know where your machine's physical emergency stop is</strong> and how to cut
+                power. Software commands can be lost — a USB disconnect, a crash, or a firmware
+                buffer already full means the machine may keep moving after you click Stop.
+                <strong
+                  >Only the physical E-stop / power switch is guaranteed to stop the
+                  machine.</strong
+                >
+              </li>
+              <li>
+                <strong>Never leave a running machine unattended.</strong> Watching it through a
+                camera, a phone or a remote connection is <strong>not</strong> supervision. Stay at
+                the machine.
+              </li>
+              <li>
+                <strong>No untrained users or unsupervised children</strong>, and switch the machine
+                off when it is not in use.
+              </li>
+              <li>
+                <strong>Keep a fire extinguisher within reach</strong> (a CO₂ or dry-chemical
+                extinguisher; water is not appropriate for electrical fires) and a fire blanket,
+                placed so you can reach them without leaning over the machine.
+              </li>
+            </ul>
+            <h2 id="your-machine-s-safety-features">Your machine's safety features</h2>
+            <p>
+              KerfDesk does not make your machine and does not control its safety features.<br />Interlocks,
+              enclosures, thermal shutdown, fire detection and emergency stops are<br />part of the
+              machine. Keep them working, never defeat them, and follow your<br />machine maker's
+              instructions.
+            </p>
+            <h2 id="if-a-fire-starts">If a fire starts</h2>
+            <ol>
+              <li>
+                <strong>Stop the job and turn off air assist.</strong> Stopping the beam and the air
+                stops feeding energy and oxygen to the flame, and is often enough for a small
+                flare-up. Use the machine's physical stop if the software does not respond.
+              </li>
+              <li>
+                <strong>Small flame on the material:</strong> a spray of water from a spray bottle
+                (never on electrical parts), a fire blanket or your extinguisher.
+              </li>
+              <li>
+                <strong>If it keeps burning or spreads:</strong> use the extinguisher. If you cannot
+                put it out quickly, leave, close the door if you can, and call emergency services.
+              </li>
+            </ol>
+            <p>Read how to use your extinguisher and fire blanket before you need them.</p>
+            <h2 id="laser-cutters-and-engravers">Laser cutters and engravers</h2>
+            <ul>
+              <li>
+                <strong>Protect your eyes.</strong> Laser light — direct or reflected — can cause
+                permanent eye damage in a fraction of a second. Wear
+                <strong>safety glasses rated for your laser's wavelength</strong>, even if the
+                machine has an enclosure, and never look at the beam or defeat safety interlocks.
+                Some lasers, including CO₂, fibre and infrared diode lasers, emit light you cannot
+                see.
+              </li>
+              <li>
+                <strong>Ventilate and extract fumes.</strong> Cutting and engraving produce smoke
+                and fumes that can be harmful. Use fume extraction or work in a well-ventilated
+                area. <strong>Never run a laser in a closed room.</strong>
+              </li>
+              <li>
+                <strong>Never cut PVC, vinyl, or other chlorine-containing plastics.</strong> They
+                release <strong>chlorine gas and hydrogen chloride</strong> — toxic to you and
+                corrosive to your machine. Also avoid fiberglass, ABS, polycarbonate, and any
+                material whose composition you do not know.
+                <strong>If you are not sure what a material is, do not cut it.</strong>
+              </li>
+              <li>
+                <strong>Fire is the biggest risk.</strong> Keep the bed clear of scrap and debris,
+                keep the machine clean, and stay with the machine the whole time it runs.
+              </li>
+            </ul>
+            <h2 id="cnc-routers-and-mills">CNC routers and mills</h2>
+            <ul>
+              <li>
+                <strong>Wear PPE:</strong> safety glasses, hearing protection, closed-toe shoes, and
+                a dust mask appropriate to the material.
+              </li>
+              <li>
+                <strong>No loose clothing, gloves, jewelry, or loose hair</strong> near a spinning
+                tool — they can be caught and pull you in. Roll up sleeves and tie back hair.
+              </li>
+              <li>
+                <strong>Clamp the workpiece securely.</strong> A part that shifts or comes loose can
+                break the bit and be thrown at high speed.
+              </li>
+              <li>
+                <strong>Extract dust.</strong> Wood and composite dust is a respiratory hazard, and
+                some dust is combustible. Use dust collection and ventilation.
+              </li>
+              <li>
+                <strong>Keep hands clear of the tool</strong> while the spindle is running, and let
+                the spindle stop before reaching in.
+              </li>
+            </ul>
+            <h2 id="materials-and-local-rules">Materials and local rules</h2>
+            <p>
+              You are responsible for knowing that a material is safe to cut or engrave, for<br />the
+              fumes and dust it produces, and for complying with local fire, electrical,<br />ventilation,
+              and safety regulations. When in doubt, consult the material's<br />safety data sheet
+              (SDS) and your machine manufacturer's guidance.
+            </p>
+            <hr />
+            <p>
+              This safety information is also summarized in the app under **Help → Safety &amp;<br />liability**,
+              and the licence terms are in the accompanying License &amp; Safety Notice.
+            </p>
+          </div>
+        </div>
+      </section>
+      <section class="section" id="seller">
+        <div class="wrap wrap--narrow">
+          <div class="section__head">
+            <h2>Software and licence contact</h2>
+          </div>
+          <div class="prose">
+            <p>
+              KerfDesk is made and licensed by Johannes Stephanus Stolk, a sole proprietor trading
+              as KerfDesk, in South Africa.
+            </p>
+            <p>
+              For software and licence help, email
+              <a href="mailto:support@kerfdesk.com">support@kerfdesk.com</a>. Email is our primary
+              support route.
+            </p>
+            <p>
+              The proprietor is not VAT-registered. Paddle is the chosen authorised reseller and
+              merchant of record for purchases. Purchase availability is shown on the KerfDesk
+              purchase page; applicable taxes and the total are shown before payment.
+            </p>
+            <nav aria-label="Payment information">
+              <a href="/pricing/">Pricing</a> · <a href="/terms/">Software terms</a> ·
+              <a href="/refunds/">Refund Policy</a> · <a href="/privacy/">Privacy</a>
+            </nav>
+          </div>
+        </div>
+      </section>
+    </main>
+    <footer class="site-footer">
+      <div class="wrap site-footer__legal">
+        <p>
+          © 2026 Johann Stolk. <a href="/eula.txt">Free app licence</a> ·
+          <a href="/terms/">Software terms</a> · <a href="/refunds/">Refund Policy</a> ·
+          <a href="/privacy/">Privacy</a> ·
+          <a href="https://kerfdesk.com/third-party-notices.txt">Third-party notices</a> ·
+          <a href="/privacy/lucide-license.txt">Icon licence</a>
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>

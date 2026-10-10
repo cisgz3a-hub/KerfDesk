@@ -27,16 +27,40 @@ instructions and the laws and regulations where you live.
   Software commands can be lost — a USB disconnect, a crash, or a firmware buffer
   already full means the machine may keep moving after you click Stop. **Only the
   physical E-stop / power switch is guaranteed to stop the machine.**
-- **Never leave a running machine unattended.**
+- **Never leave a running machine unattended.** Watching it through a camera,
+  a phone or a remote connection is **not** supervision. Stay at the machine.
+- **No untrained users or unsupervised children**, and switch the machine off
+  when it is not in use.
 - **Keep a fire extinguisher within reach** (a CO₂ or dry-chemical extinguisher;
-  water is not appropriate for electrical fires).
+  water is not appropriate for electrical fires) and a fire blanket, placed so you
+  can reach them without leaning over the machine.
+
+## Your machine's safety features
+
+KerfDesk does not make your machine and does not control its safety features.
+Interlocks, enclosures, thermal shutdown, fire detection and emergency stops are
+part of the machine. Keep them working, never defeat them, and follow your
+machine maker's instructions.
+
+## If a fire starts
+
+1. **Stop the job and turn off air assist.** Stopping the beam and the air stops
+   feeding energy and oxygen to the flame, and is often enough for a small
+   flare-up. Use the machine's physical stop if the software does not respond.
+2. **Small flame on the material:** a spray of water from a spray bottle (never
+   on electrical parts), a fire blanket or your extinguisher.
+3. **If it keeps burning or spreads:** use the extinguisher. If you cannot put it
+   out quickly, leave, close the door if you can, and call emergency services.
+
+Read how to use your extinguisher and fire blanket before you need them.
 
 ## Laser cutters and engravers
 
 - **Protect your eyes.** Laser light — direct or reflected — can cause permanent
   eye damage in a fraction of a second. Wear **safety glasses rated for your
   laser's wavelength**, even if the machine has an enclosure, and never look at
-  the beam or defeat safety interlocks.
+  the beam or defeat safety interlocks. Some lasers, including CO₂, fibre and
+  infrared diode lasers, emit light you cannot see.
 - **Ventilate and extract fumes.** Cutting and engraving produce smoke and fumes
   that can be harmful. Use fume extraction or work in a well-ventilated area.
   **Never run a laser in a closed room.**

@@ -19,7 +19,7 @@ This summary helps you find your way. The numbered sections below are the terms.
 - **Free** has no time limit and no device limit, for personal or business work. It includes all machine control.
 - **Pro**, once on sale, comes with the KerfDesk desktop app for Windows. It costs US$49.50 once, plus any tax, and includes one year of updates. You may keep using Pro, with no time limit, in every version released during your update period. Another year of updates costs US$20. Nothing renews automatically.
 - You can use Pro on **3 devices at a time**, and move it between devices up to 6 times in any 30 days.
-- You can **try every Pro tool free for 30 days** on each Windows installation, with no card. You can get a **full refund within 14 days** of buying, even after you have used Pro.
+- You can **try every Pro tool free for 30 days** on each Windows installation, with no card. You can **ask for a refund within 14 days** of buying; we consider each request case by case, and your legal rights always apply.
 - Paddle.com sells Pro to you as our reseller and merchant of record.
 - A licence never blocks machine control and never stops a running job.
 - **Lasers and CNC machines can start fires and cause blindness, burns, cuts and death. KerfDesk is not a safety device, and its stop buttons are not emergency stops. You must operate your machine safely (section 2).**
@@ -210,9 +210,9 @@ In practice, Paddle handles questions about orders, payments, receipts, invoices
 
 ## 11. Refunds
 
-**11.1 14 days, no reason needed.** You can get a full refund of a Pro licence or an update extension if you ask within 14 days of buying it, that is, by the end of the 14th day after the day you buy. You do not need to give a reason. This applies even if you have already activated or used Pro.
+**11.1 Requests within 14 days.** You can ask for a refund of a Pro licence or an update extension within 14 days of buying it, that is, by the end of the 14th day after the day you buy. We consider each request case by case and may decline it, taking into account, for example, whether you used the free trial, how Pro has been used and the reason you give. A purchase made before 10 October 2026 keeps the earlier promise of a full refund within 14 days with no reason needed, even after use.
 
-**11.2 How to ask.** Email support@kerfdesk.com with your order number or Paddle receipt, or use the link in your Paddle receipt or https://paddle.net. We cannot pay refunds ourselves: Paddle, as the seller, pays every refund. When you ask us, we ask Paddle to refund you. Paddle normally returns the money to the payment method you used, within 14 days of approving the refund. How long it then takes to reach you depends on your bank. If Paddle turns down a refund that this section promises, tell us, and we will ask Paddle again. Paddle may also give refunds under its own Refund Policy.
+**11.2 How to ask.** Email support@kerfdesk.com with your order number or Paddle receipt, or use the link in your Paddle receipt or https://paddle.net. We cannot pay refunds ourselves: Paddle, as the seller, pays every refund. When you ask us, we ask Paddle to refund you. Paddle normally returns the money to the payment method you used, within 14 days of approving the refund. How long it then takes to reach you depends on your bank. If Paddle turns down a refund that this section or the law requires, tell us, and we will ask Paddle again. Paddle may also give refunds under its own Refund Policy.
 
 **11.3 After 14 days.** We do not refund because you changed your mind after 14 days. You can try every Pro tool free for 30 days before you buy, so please use the trial to check that KerfDesk suits your machine and your work. After 14 days we still refund:
 
@@ -224,12 +224,12 @@ In practice, Paddle handles questions about orders, payments, receipts, invoices
 
 **11.5 Payment disputes.** If something is wrong with a payment, please contact us or Paddle before you dispute it with your bank or card issuer. It is usually faster. If Paddle reasonably believes a dispute is fraud or an abuse, for example a claim that you never received a licence you are using, we may suspend your licence while Paddle reviews it, which locks Pro on each device after its next online check, without stopping machine control or a running job. If the payment stands, we restore the licence; you may then need to enter your licence key again on each device, and we will send it to you if you no longer have it. If the payment is reversed, the licence ends as if it had been refunded.
 
-**11.6 Fair use.** We may refuse a refund under section 11.1 where there is clear evidence of abuse, such as repeatedly buying and refunding licences. This never limits a refund that the law requires.
+**11.6 Fair use.** We refuse requests under section 11.1 where there is clear evidence of abuse, such as repeatedly buying and refunding licences. Section 11.1 never limits a refund that the law requires or that section 11.3 lists.
 
 **11.7 Your legal rights.** This section adds to the rights the law gives you. It does not reduce them.
 
-- **Consumers in the EU and the UK** have a legal right to cancel within 14 days. You can use it by telling us or Paddle (https://paddle.net, also linked from your receipt); in the EU, Paddle’s customer portal also has a withdrawal button. Under the law, that right can end once you start using Pro, if you agreed to this at checkout. Our refund in section 11.1 still applies.
-- **Consumers in South Africa** may cancel an online purchase within 7 days after receiving it under section 44 of the Electronic Communications and Transactions Act, where that section applies. Our 14-day refund covers that right; if your licence reaches you late, you still have the full 7 days after you receive it. Section 16.2 explains your rights if Pro has a defect.
+- **Consumers in the EU and the UK** have a legal right to cancel within 14 days. You can use it by telling us or Paddle (https://paddle.net, also linked from your receipt); in the EU, Paddle’s customer portal also has a withdrawal button. Under the law, that right can end once you start using Pro, if you agreed to this at checkout. You can still ask under section 11.1.
+- **Consumers in South Africa** may cancel an online purchase within 7 days after receiving it under section 44 of the Electronic Communications and Transactions Act, where that section applies. Where it applies, we honour it in full; if your licence reaches you late, you still have the full 7 days after you receive it. Section 16.2 explains your rights if Pro has a defect.
 
 ## 12. Updates, changes and availability
 
@@ -302,7 +302,7 @@ Nothing in this section limits what the law or an open-source licence allows you
 
 **16.2 If you are a consumer in South Africa:**
 
-- **Quality.** Under the Consumer Protection Act, Pro must be reasonably suitable for its usual purposes, of good quality, in good working order and free of defects (section 55). If Pro has a defect, you may, within six months after you receive it, tell us, stop using it and choose whether we fix it, replace it or refund what you paid (section 56). If the defect is still there within three months after a fix, or a new defect appears, we must replace Pro or refund what you paid. These rights are in addition to our 14-day refund.
+- **Quality.** Under the Consumer Protection Act, Pro must be reasonably suitable for its usual purposes, of good quality, in good working order and free of defects (section 55). If Pro has a defect, you may, within six months after you receive it, tell us, stop using it and choose whether we fix it, replace it or refund what you paid (section 56). If the defect is still there within three months after a fix, or a new defect appears, we must replace Pro or refund what you paid. These rights are in addition to section 11.
 - **Harm caused by KerfDesk.** Nothing in these terms limits a claim under section 61 of the Consumer Protection Act for harm, including death, injury, illness and loss of or damage to property, caused by unsafe goods, a defect or hazard, or inadequate instructions or warnings.
 - **Our limits.** Sections 15.3 and 15.4 apply to you only as far as the Consumer Protection Act allows, and never to a claim under section 61, to loss caused by our gross negligence, or to death or personal injury caused by any act or omission of ours.
 - **Cooling-off.** Section 11.7 explains your cooling-off right. The consumer protections of the Electronic Communications and Transactions Act apply whatever law governs these terms.

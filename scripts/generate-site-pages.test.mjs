@@ -140,9 +140,10 @@ test('publication content readiness stays separate from statutory, live-sales an
 
 test('finished public policy sources reject gaps and undated review content', () => {
   assert.deepEqual(
-    publicPolicySourceErrors('# Terms\n\nVersion 1.1. Published: 7 October 2026.'),
+    publicPolicySourceErrors('# Terms\n\nVersion 1.2. Published: 10 October 2026.'),
     [],
   );
+  assert.ok(publicPolicySourceErrors('# Terms\n\nVersion 1.1. Published: 7 October 2026.').length);
   assert.ok(publicPolicySourceErrors('# Terms\n\n[PLACEHOLDER: date]').length);
   assert.ok(publicPolicySourceErrors('# Terms\n\nDraft for review.').length);
 });
@@ -164,16 +165,26 @@ test('published purchase policies contain confirmed parties and preserve supplie
     );
     assert.doesNotMatch(html, /<(?:script|form|iframe)\b/i);
   }
+  const refunds = files.get('refunds/index.html').toString().replace(/\s+/g, ' ');
   assert.match(
-    files.get('refunds/index.html').toString().replace(/\s+/g, ' '),
-    /We promise a full refund if you request it within 14 calendar days after purchase/,
+    refunds,
+    /We consider each refund request on a case-by-case basis and may decline it/,
   );
+  assert.match(refunds, /Rights that always apply/);
+  assert.match(refunds, /keeps the refund promise of version 1\.1/);
+  assert.doesNotMatch(refunds, /We promise a full refund if you request it/);
   assert.match(
     files.get('privacy/index.html').toString().replace(/\s+/g, ' '),
     /Share artwork previews and text/,
   );
+  // ADR-578: the guide the licence notice and in-app safety text link is served by the app origin.
+  const safety = files.get('safety/index.html').toString().replace(/\s+/g, ' ');
+  assert.match(safety, /Never leave a running machine unattended/);
+  assert.match(safety, /If a fire starts/);
+  assert.match(safety, /does not control its safety features/);
   const terms = files.get('terms/index.html').toString().replace(/\s+/g, ' ');
-  assert.match(terms, /Version 1\.1\. Published: 7 October 2026/);
+  assert.match(terms, /Version 1\.2\. Published: 10 October 2026/);
+  assert.match(terms, /do not control its safety features/);
   assert.match(terms, /purchase provisions apply when you buy/);
   assert.match(terms, /Paddle is the authorised reseller and merchant of record/);
   assert.match(terms, /(?:do|does) not replace an installed notice/);

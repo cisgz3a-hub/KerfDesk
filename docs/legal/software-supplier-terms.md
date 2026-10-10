@@ -1,6 +1,6 @@
 # KerfDesk Software and Supplier Terms
 
-Version 1.1. Published: 7 October 2026.
+Version 1.2. Published: 10 October 2026.
 
 These are our published software and Supplier Terms. The purchase provisions apply when you buy KerfDesk Pro through Paddle. Purchase availability is shown on the KerfDesk purchase page. Publishing these terms does not itself enable a purchase or a trial.
 
@@ -10,7 +10,7 @@ KerfDesk is made and licensed by **Johannes Stephanus Stolk**, a sole proprietor
 
 **Paddle is the authorised reseller and merchant of record for a purchase through Paddle.** You buy the product from Paddle; we provide the software, licence and software support. Paddle’s Buyer Terms govern your purchase from Paddle. These Supplier Terms govern the additional Pro rights we provide. The Paddle entity named during checkout and on your receipt is the seller of that transaction. Paddle’s identity or contact address is not our proprietor’s identity or address.
 
-Read [Paddle’s Buyer Terms](https://www.paddle.com/legal/buyer-terms), [Paddle’s Refund Policy](https://www.paddle.com/legal/refund-policy) and [Paddle’s Privacy Policy](https://www.paddle.com/legal/privacy). Our [Refund Policy](https://kerfdesk.com/refunds/) gives the additional refund promise in section 6.
+Read [Paddle’s Buyer Terms](https://www.paddle.com/legal/buyer-terms), [Paddle’s Refund Policy](https://www.paddle.com/legal/refund-policy) and [Paddle’s Privacy Policy](https://www.paddle.com/legal/privacy). Our [Refund Policy](https://kerfdesk.com/refunds/) explains how we consider refund requests (section 6).
 
 ## 2. Existing app licences and Free
 
@@ -36,9 +36,9 @@ A licence never gates Frame, Start, output, Save G-code or a running job. When t
 
 Use the app only in ways permitted by its supplied licence and these additional Pro rights. Do not resell or redistribute the software, provide it as a hosted service for others, bypass licence checks, or copy, modify, decompile or reverse engineer it beyond what is necessary to install and use it or what the law permits. You keep your rights in your own designs and generated work.
 
-**Lasers and CNC machines can cause fire, serious injury, death and property damage.** Review each job and use Frame for the exact reviewed job before Start. Check your machine’s setup, material, work holding, ventilation, eye protection and physical emergency stop. Follow your machine maker’s instructions and applicable safety requirements. Stay with a running machine.
+**Lasers and CNC machines can cause fire, serious injury, death and property damage.** Review each job and use Frame for the exact reviewed job before Start. Check your machine’s setup, material, work holding, ventilation, eye protection and physical emergency stop. Follow your machine maker’s instructions and applicable safety requirements. Stay with a running machine and watch it directly; a camera, phone or remote connection is not supervision. Do not let untrained people or unsupervised children use it, and switch it off when it is not in use. Some lasers emit light you cannot see.
 
-KerfDesk’s previews, simulations and checks are aids, not guarantees of correct or safe output. Abort and other software stop controls depend on your computer, connection and controller; they are not emergency stops. Use the machine’s physical emergency stop or cut its power in an emergency. Nothing in these terms adds a machine-control or output licence gate.
+We do not make your machine and do not control its safety features. Interlocks, enclosures, thermal shutdown, fire detection and emergency stops are part of the machine, not of KerfDesk. KerfDesk’s previews, simulations and checks are aids, not guarantees of correct or safe output. Abort and other software stop controls depend on your computer, connection and controller; they are not emergency stops. Use the machine’s physical emergency stop or cut its power in an emergency. Read the [safety notes](https://kerfdesk.com/safety/) before running a job. Nothing in these terms adds a machine-control or output licence gate.
 
 ## 5. Payment, delivery and support
 
@@ -50,9 +50,9 @@ We will help with software and licence problems. If a purchase cannot be deliver
 
 ## 6. Refunds and payment reversals
 
-For a Pro or optional update purchase, **we promise a full refund if you request it within 14 calendar days after purchase**, even after activating or using Pro. No reason is required. Clear evidence of fraud or refund abuse may be refused to the extent the law allows. This promise adds to Paddle’s policy; it does not reduce statutory rights.
+Please use the free 30-day trial to check KerfDesk with your machine before you buy. For a Pro or optional update purchase made on or after 10 October 2026, you may request a refund within 14 calendar days after purchase. **We consider each request on a case-by-case basis and may decline it.** A purchase made before 10 October 2026 keeps the 14-day full-refund promise of version 1.1 of our Refund Policy.
 
-Duplicate or incorrect charges, an undelivered or unusable licence and any applicable legal remedies remain covered after that period. Read the [Refund Policy](https://kerfdesk.com/refunds/) for the request process and effect on licence rights. If these Supplier Terms and our Refund Policy differ, the provision that gives you greater rights applies.
+Statutory withdrawal and cancellation rights, duplicate or incorrect charges, an undelivered or unusable licence and any other applicable legal remedies remain available whatever we decide, including after 14 days. Read the [Refund Policy](https://kerfdesk.com/refunds/) for the request process and effect on licence rights. If these Supplier Terms and our Refund Policy differ, the provision that gives you greater rights applies.
 
 If an initial Pro purchase is refunded or its payment is reversed, Pro rights from that purchase end. Free and rights from other valid purchases remain. A refund of an update extension does not revoke the base Pro licence. A licence or refund action does not stop a running job.
 
@@ -64,17 +64,17 @@ Ordinary app use does not require an account. Optional remote access requires yo
 
 ## 8. Availability, responsibility and your legal rights
 
-We will provide the paid rights and refund promise described here. Software can contain faults, and services or connections can fail. We do not promise uninterrupted operation, compatibility with every machine or file, or that a particular job will be safe or successful. Keep backups and check output before using it on a machine.
+We will provide the paid rights and refund terms described here. Software can contain faults, and services or connections can fail. We do not promise uninterrupted operation, compatibility with every machine or file, or that a particular job will be safe or successful. Keep backups and check output before using it on a machine.
 
 To the extent the law permits, warranties and liability for the installed software are governed by its supplied licence notice. These Supplier Terms do not remove your mandatory consumer rights or remedies. Nothing here excludes liability where the law forbids it, including for fraud, gross negligence, or death or personal injury caused by our negligence. An existing notice cannot override a right that mandatory law gives you.
 
 South African law governs our additional Supplier Terms where permitted. You retain mandatory protections and any right to bring a claim in your own courts that the law where you live gives you. There is no mandatory arbitration or waiver of statutory complaint routes in these terms. Paddle’s separate contract has its own governing-law and dispute provisions.
 
-Email support@kerfdesk.com with a complaint about the software or our refund promise. You may also contact the consumer or privacy authority applicable to you. Payments and purchases from Paddle can be raised with [Paddle buyer support](https://paddle.net).
+Email support@kerfdesk.com with a complaint about the software or a refund decision. You may also contact the consumer or privacy authority applicable to you. Payments and purchases from Paddle can be raised with [Paddle buyer support](https://paddle.net).
 
 ## 9. Changes and your copy
 
-The published version supplied at the time of a purchase governs the Pro rights and refund promise for that purchase, unless a later version gives you greater rights. We will not remove already acquired covered-version rights by changing these terms. Existing app releases retain their supplied licences.
+The published version supplied at the time of a purchase governs the Pro rights and refund terms for that purchase, unless a later version gives you greater rights. We will not remove already acquired covered-version rights by changing these terms. Existing app releases retain their supplied licences.
 
 We may update these website terms for later purchases, features or legal requirements. The version and date above identify this text. You can save or print the page. Ask support@kerfdesk.com for the version that applied to your purchase.
 

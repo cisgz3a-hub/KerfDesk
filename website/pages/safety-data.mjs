@@ -30,7 +30,23 @@ export const BEFORE_EVERY_JOB = [
   },
   {
     title: 'Have an extinguisher ready',
-    body: 'Keep a CO₂ or dry-chemical fire extinguisher within reach. Water is not right for electrical fires.',
+    body: 'Keep a CO₂ or dry-chemical fire extinguisher and a fire blanket where you can reach them without leaning over the machine. Water is not right for electrical fires. Read how to use them before you need them.',
+  },
+];
+
+// Numbered steps for "If a fire starts".
+export const IF_A_FIRE = [
+  {
+    title: 'Stop the beam and the air',
+    body: 'Stop the job and turn off air assist. That stops feeding energy and oxygen to the flame, and is often enough for a small flare-up. If the software doesn’t respond, use the machine’s physical stop.',
+  },
+  {
+    title: 'Put out a small flame',
+    body: 'For a small flame on the material, use a spray of water from a spray bottle (never on electrical parts), a fire blanket or your extinguisher.',
+  },
+  {
+    title: 'Get out if it spreads',
+    body: 'If it keeps burning or spreads into the machine, use the extinguisher. If you can’t put it out quickly, leave, close the door if you can and call emergency services.',
   },
 ];
 
@@ -39,7 +55,17 @@ export const WHILE_IT_RUNS = [
   {
     icon: 'eye',
     title: 'Stay with the machine',
-    body: 'Never leave a running machine unattended. With a laser, fire is the biggest risk, so keep the bed clear of scrap and the machine clean.',
+    body: 'Never leave a running machine unattended. Watching on a camera, a phone or a remote connection is not supervision: a fire can grow out of control in minutes. With a laser, fire is the biggest risk, so keep the bed clear of scrap and the machine clean.',
+  },
+  {
+    icon: 'users',
+    title: 'Trained people only',
+    body: 'Don’t let untrained people or unsupervised children run the machine. Switch it off when it isn’t in use.',
+  },
+  {
+    icon: 'shield',
+    title: 'Your machine’s own safety features',
+    body: 'KerfDesk doesn’t make your machine and doesn’t control its safety features. Interlocks, enclosures, thermal shutdown, fire detection and emergency stops are part of the machine. Keep them working and never defeat them.',
   },
   {
     icon: 'wind',
@@ -49,7 +75,7 @@ export const WHILE_IT_RUNS = [
   {
     icon: 'glasses',
     title: 'Protect your eyes and ears',
-    body: 'Wear glasses rated for your laser’s wavelength, even with an enclosure, and never look at the beam or defeat an interlock. At a router, wear safety glasses, hearing protection, closed-toe shoes and a dust mask.',
+    body: 'Wear glasses rated for your laser’s wavelength, even with an enclosure, and never look at the beam or defeat an interlock. CO₂, fibre and infrared lasers emit light you can’t see. At a router, wear safety glasses, hearing protection, closed-toe shoes and a dust mask.',
   },
   {
     icon: 'hand',
