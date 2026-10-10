@@ -16,6 +16,7 @@ import { publicConfiguration } from './public-config.mjs';
 
 export class LicenseAuthority {
   constructor(ctx, env) {
+    this.ctx = ctx;
     this.env = env;
     this.records = new SqliteRecords(ctx.storage);
     this.crypto = null;
@@ -34,7 +35,10 @@ export class LicenseAuthority {
         throw new Error('Configuration unavailable');
       });
       const authority = new LicensingAuthority(this.records, await this.crypto);
-      return authorityRequest(request, this.env, authority);
+      return authorityRequest(request, this.env, authority, {
+        // Work that follows an answer, such as the licence key email.
+        waitUntil: (promise) => this.ctx.waitUntil?.(promise),
+      });
     } catch (error) {
       return failure(error);
     }

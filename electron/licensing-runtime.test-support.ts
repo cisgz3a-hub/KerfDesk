@@ -13,6 +13,10 @@ export const NOW = Date.parse('2026-09-28T00:00:00.000Z');
 export const device = createHash('sha256').update('test-device').digest('base64url');
 export const token = Buffer.alloc(32, 7).toString('base64url');
 export const checkoutUrl = `https://kerfdesk.com/buy.html?_ptxn=txn_${'a'.repeat(26)}`;
+const realKey = (fill: string) => `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${fill.repeat(43)}`;
+export const TEST_KEY = realKey('t');
+export const WRONG_KEY = realKey('w');
+export const OTHER_KEY = realKey('o');
 
 export function envelope(value: unknown, release = false) {
   const payload = Buffer.from(JSON.stringify(value));

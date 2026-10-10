@@ -24,7 +24,13 @@
     // pins its public half. A deploy deletes plain-text variables set only in the
     // dashboard, so it lives here.
     "SIGNING_KEY_ID": "entitlement-2026-09",
+    // Email each buyer their licence key after payment (ADR-579). Switch on only after
+    // kerfdesk.com is onboarded to Cloudflare Email Sending and the Paddle API key has
+    // customer.read; until then nothing is sent and purchases work as before.
+    "LICENCE_EMAIL_ENABLED": "false",
+    "LICENCE_EMAIL_FROM": "licences@kerfdesk.com",
   },
+  "send_email": [{ "name": "EMAIL", "allowed_sender_addresses": ["licences@kerfdesk.com"] }],
   "durable_objects": {
     "bindings": [{ "name": "LICENSE_AUTHORITY", "class_name": "LicenseAuthority" }],
   },
