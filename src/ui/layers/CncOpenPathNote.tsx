@@ -10,9 +10,8 @@
 // Text only — informs, never gates (rule 7). Every cut type stays selectable
 // for every layer, and nothing about Frame or Start changes.
 //
-// Same 300 ms debounce as CncThinDetailNote (the panel's F-A7 cadence): the
-// check collects the layer's polylines, so it runs once the scene settles
-// rather than on every store commit.
+// The panel's 300 ms F-A7 debounce cadence: the check collects the layer's
+// polylines, so it runs once the scene settles rather than on every store commit.
 
 import { useEffect, useState } from 'react';
 // Deep imports: core/cnc's barrel is a ratcheted over-cap legacy barrel
