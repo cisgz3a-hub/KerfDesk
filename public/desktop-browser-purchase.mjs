@@ -206,7 +206,7 @@ class BrowserPurchasePage {
 
   /**
    * Copies the key, then follows kerfdesk://licence, which opens KerfDesk on
-   * Help > Licence with the key filled in (ADR-576). The link carries no key.
+   * Help > Licence with the key filled in (ADR-578). The link carries no key.
    */
   async openApp() {
     if (!(await this.copyKey())) return;

@@ -246,6 +246,23 @@ function licensing(site, appPrivacy) {
       digest, projects, designs, machine details or jobs, and do not activate a phone or use a
       computer seat. Requests use no cookies. Clearing browser storage can remove the information
       needed to recover an unfinished purchase.
+    </p>
+    <h3>Your licence key by email</h3>
+    <p>
+      Once Paddle confirms a purchase, the licensing service can email your licence key to the
+      address you gave Paddle. It asks Paddle for that address only to send this one email, sends it
+      through Cloudflare's email service from licences@kerfdesk.com, and does not store, log or
+      reuse it; the order records only whether the email was sent. Renewals send no key email. This
+      is prepared but not yet switched on; until it is, Paddle's receipt is the only email a
+      purchase sends.
+    </p>
+    <h3>Pasting your licence key</h3>
+    <p>
+      The desktop app reads your clipboard only when you choose Paste key in Help &gt; Licence, or
+      when the purchase page's Copy key &amp; open KerfDesk opens it. It takes only a KerfDesk
+      licence key from the clipboard and ignores everything else. The key leaves your computer only
+      when you choose Activate licence. The kerfdesk://licence link that opens the app carries no
+      key or other data.
     </p>`;
 }
 
@@ -342,7 +359,7 @@ export const page = {
     'KerfDesk needs no account for ordinary use. Read about updates, licensing, downloads, optional AI, remote access and machine connections.',
   render: ({ site, appPrivacy = false }) =>
     html`${pageHero({
-      eyebrow: html`Last updated <time datetime="2026-10-07">October 7, 2026</time>`,
+      eyebrow: html`Last updated <time datetime="2026-10-10">October 10, 2026</time>`,
       title: 'Privacy',
       lead: appPrivacy
         ? 'KerfDesk doesn’t track you. This notice covers this privacy page and the KerfDesk app: what each one sends over the network, and what stays on your computer.'

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { LicenceAdapter } from '../../platform/types';
 import { LICENCE_SETTINGS_EVENT } from './edition';
 
-/** The main process's data-free signal that a kerfdesk://licence link arrived (ADR-576). */
+/** The main process's data-free signal that a kerfdesk://licence link arrived (ADR-578). */
 export const LICENCE_LINK_EVENT = 'kerfdesk:licence-link';
 
 /**

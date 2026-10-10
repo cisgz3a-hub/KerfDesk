@@ -169,10 +169,12 @@ async function showManualDownload(document, links, fetchRequest, options, keys) 
   for (const link of links) link.hidden = false;
   document.getElementById('commercial-asset').textContent = installer.name;
   document.getElementById('commercial-hash').textContent = `SHA-256: ${installer.sha256}`;
+  const signed = release.codeSigning === 'authenticode';
   document.getElementById('commercial-status').textContent =
-    `KerfDesk ${release.version} · ${megabytes(installer.bytes)} · Released ${release.publishedAt.slice(0, 10)} · Unsigned installer · Manual updates · Download metadata signature verified.`;
-  document.getElementById('commercial-installation').textContent =
-    'KerfDesk tells you when an update is ready. Choose Download update, then Install when I close KerfDesk: the installer opens only after you close KerfDesk yourself, never during a job. KerfDesk never downloads or installs unsigned updates without your approval. The download details are signature-checked, but this installer is not Windows code-signed yet, so Windows may warn about an unknown publisher.';
+    `KerfDesk ${release.version} · ${megabytes(installer.bytes)} · Released ${release.publishedAt.slice(0, 10)} · ${signed ? 'Code-signed installer' : 'Unsigned installer · Manual updates'} · Download metadata signature verified.`;
+  document.getElementById('commercial-installation').textContent = signed
+    ? 'This installer is Windows code-signed. If Windows reports an unknown publisher, do not run it; download it again from this page. After installing, KerfDesk updates itself and installs updates only after you close it, never during a job.'
+    : 'KerfDesk tells you when an update is ready. Choose Download update, then Install when I close KerfDesk: the installer opens only after you close KerfDesk yourself, never during a job. KerfDesk never downloads or installs unsigned updates without your approval. The download details are signature-checked, but this installer is not Windows code-signed yet, so Windows may warn about an unknown publisher.';
   return true;
 }
 

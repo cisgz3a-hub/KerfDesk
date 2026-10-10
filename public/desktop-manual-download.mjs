@@ -49,7 +49,10 @@ export function validateManualDownload(value, now = Date.now()) {
       value.product === 'kerfdesk-desktop' &&
       value.kind === 'manual-download' &&
       value.channel === 'stable' &&
-      value.codeSigning === 'unsigned' &&
+      // 'authenticode' lets the first Windows code-signed release reach installed
+      // unsigned copies through this lane once; that release then updates itself
+      // through the signed lane (ADR-578).
+      ['unsigned', 'authenticode'].includes(value.codeSigning) &&
       value.updates === 'manual',
     'payload identity',
   );

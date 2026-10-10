@@ -152,6 +152,16 @@ describe('authenticated manual desktop updates', () => {
       'https://dl.kerfdesk.com/desktop/commercial-manual/releases/1.0.1/KerfDesk-1.0.1-windows-x64-setup.exe',
     );
   });
+  it('offers a code-signed hand-off release to an unsigned copy, and still refuses unknown labels', async () => {
+    const h = await harness();
+    h.setManifest(envelope({ ...release(), codeSigning: 'authenticode' }));
+    await h.download();
+    expect(h.updates.status()).toMatchObject({ state: 'ready', version: '1.0.1' });
+    const other = await harness();
+    other.setManifest(envelope({ ...release(), codeSigning: 'signed' }));
+    await other.discover();
+    expect(other.updates.status().state).toBe('failed');
+  });
   it.each(['arm', 'quit'])('rejects a staged installer changed before %s', async (phase) => {
     const h = await harness();
     await h.download();

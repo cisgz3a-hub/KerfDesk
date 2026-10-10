@@ -7,6 +7,7 @@ import { createCheckout } from './checkout.mjs';
 import { reconcileCheckout } from './checkout-reconciliation.mjs';
 import { paddleVerifier } from './paddle.mjs';
 import { receivePayment } from './payment-rejections.mjs';
+import { emailLicenceKey } from './licence-email.mjs';
 import { claimOrder, prepareOrder } from './payments.mjs';
 import { ROUTE } from './routes.mjs';
 import { parseBody, readBody, requireValue, ServiceError } from './validation.mjs';
@@ -57,13 +58,20 @@ const OPERATIONS = {
     createCheckout(authority, env, body, fetcher),
 };
 
-async function paymentWebhook(request, env, authority) {
+async function paymentWebhook(request, env, authority, options) {
   const verifier = paddleVerifier(env);
   const raw = await readBody(request, 131_072);
   const event = await verifier(request.headers, raw, authority.now());
   requireValue(event, 401, 'invalid_payment_signature');
   if (event.ignored) return { received: true, ignored: true };
-  return receivePayment(authority, event);
+  const result = await receivePayment(authority, event);
+  // Paddle needs its answer within five seconds; the key email follows the answer.
+  const email = emailLicenceKey(authority, env, event, result, options.fetcher).catch(
+    () => undefined,
+  );
+  if (options.waitUntil) options.waitUntil(email);
+  else await email;
+  return result;
 }
 
 export async function authorityRequest(request, env, authority, options = {}) {
@@ -80,7 +88,7 @@ export async function authorityRequest(request, env, authority, options = {}) {
       admin = await adminCredential(request.headers.get('authorization'), env);
       requireValue(admin, 401, 'invalid_credentials');
     }
-    if (path === ROUTE.webhook) return json(await paymentWebhook(request, env, authority));
+    if (path === ROUTE.webhook) return json(await paymentWebhook(request, env, authority, options));
     body = parseBody(await readBody(request));
     if (browser) browserPurchaseBody(path, body);
     requireValue(Object.hasOwn(OPERATIONS, path), 404, 'not_found');
