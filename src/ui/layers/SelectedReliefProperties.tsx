@@ -57,9 +57,27 @@ export function SelectedReliefProperties(): JSX.Element | null {
     s.project.machine?.kind === 'cnc' ? s.project.machine.stock.thicknessMm : 0,
   );
   const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
+  if (relief === null) return null;
+  return (
+    <ReliefProperties
+      key={`${projectDocumentEpoch}:${relief.id}`}
+      {...{ relief, stockThicknessMm, projectDocumentEpoch }}
+    />
+  );
+}
+
+// Drafts and view state belong to this selected object in this document.
+function ReliefProperties({
+  relief,
+  stockThicknessMm,
+  projectDocumentEpoch,
+}: {
+  readonly relief: ReliefObject;
+  readonly stockThicknessMm: number;
+  readonly projectDocumentEpoch: number;
+}): JSX.Element {
   // ADR-579: an STL relief keeps its proportions unless the operator unlocks them.
   const [proportionsLocked, setProportionsLocked] = useState(true);
-  if (relief === null) return null;
   const locked = isMeshRelief(relief) && proportionsLocked;
   const physical = reliefPhysicalDimensions(relief);
   const widthSourceMm = reliefPropertyWidthSourceMm(relief);
