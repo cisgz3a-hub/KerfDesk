@@ -114,13 +114,15 @@
   }
 }
 
-/* A phone-width window keeps both modes on the toolbar row. */
+/* A narrow window keeps the toolbar row at its 32 px controls' height. */
 @media (max-width: 700px) {
   .lf-machine-mode {
+    --lf-machine-mode-pad: 2px;
     grid-template-columns: repeat(2, minmax(72px, 1fr));
   }
 
   .lf-machine-mode__choice {
-    padding: 3px 8px;
+    min-height: 26px;
+    padding: 2px 8px;
   }
 }
