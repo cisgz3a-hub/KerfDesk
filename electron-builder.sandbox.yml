@@ -22,6 +22,7 @@ files:
   - public/desktop-commercial-catalog.mjs
   - public/desktop-release-keys.json
   - public/desktop-sandbox-contract.mjs
+  - public/licence-key-text.mjs
   - '!**/node_modules/**/*'
   - '**/node_modules/{electron-updater,builder-util-runtime,debug,ms,sax,fs-extra,graceful-fs,jsonfile,universalify,js-yaml,argparse,lazy-val,lodash.escaperegexp,lodash.isequal,semver,tiny-typed-emitter,ws,zod}/**/*'
 extraResources:

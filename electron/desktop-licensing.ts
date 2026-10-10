@@ -63,8 +63,6 @@ type Options = {
   readonly updater: CommercialUpdater;
   readonly canInstallManualUpdate?: () => boolean;
   readonly requestManualUpdateClose?: RequestUpdateClose;
-  /** Whether a window shows KerfDesk's own renderer, before signalling it a kerfdesk:// link. */
-  readonly isTrustedRenderer?: (url: string) => boolean;
 };
 
 export function createDesktopLicensing(options: Options) {
@@ -86,17 +84,7 @@ export function createDesktopLicensing(options: Options) {
     fetch: (url, init) => net.fetch(url, init),
     ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
   });
-  const licenceLink = installLicenceLink(app, {
-    enabled:
-      config.channel === 'commercial' &&
-      config.sandbox !== true &&
-      options.packaged &&
-      process.platform === 'win32',
-    argv: process.argv,
-    readClipboard: () => clipboard.readText(),
-    primaryWindow: () => BrowserWindow.getAllWindows()[0],
-    isTrustedRenderer: options.isTrustedRenderer ?? (() => false),
-  });
+  const licenceLink = desktopLicenceLink(config, options.packaged);
   const rings = createUpdateRingStore(options.userDataPath);
   const manual = desktopManualUpdates(config, {
     ...options,
@@ -162,6 +150,29 @@ export function createDesktopLicensing(options: Options) {
         runtime.isReleaseEligibleCached(pendingUpdate.envelope, pendingUpdate.version);
     },
   };
+}
+
+/** kerfdesk://licence for a packaged, non-sandbox commercial Windows build only (ADR-578). */
+function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
+  return installLicenceLink(app, {
+    enabled:
+      config.channel === 'commercial' &&
+      config.sandbox !== true &&
+      packaged &&
+      process.platform === 'win32',
+    argv: process.argv,
+    readClipboard: () => clipboard.readText(),
+    primaryWindow: () => BrowserWindow.getAllWindows()[0],
+    // A packaged build only ever shows its own app://app renderer.
+    isTrustedRenderer: (url) => {
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'app:' && parsed.host === 'app';
+      } catch {
+        return false;
+      }
+    },
+  });
 }
 
 function announceManualUpdate(version: string): void {

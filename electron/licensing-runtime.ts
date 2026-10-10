@@ -27,7 +27,7 @@ import {
   openPurchasePage,
 } from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
-import { findLicenceKey, looksLikePartialLicenceKey } from '../public/licence-key-text.mjs';
+import { findLicenceKey } from '../public/licence-key-text.mjs';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
 import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
@@ -279,9 +279,10 @@ class LicensingService {
   readonly status = () => this.safe(this.readStatus);
   readonly activate = (licenseKey: string) =>
     this.safe(() => {
-      // Accept the key inside whatever was pasted; a non-KD1 value keeps the plain rule.
+      // Accept the key inside whatever was pasted; anything else keeps the plain rule
+      // and the service decides. The form, not this, warns about a partial key.
       const key = findLicenceKey(licenseKey) ?? licenseKey.trim();
-      if (!validLicenceKey(key) || looksLikePartialLicenceKey(licenseKey))
+      if (!validLicenceKey(key))
         return Promise.resolve(this.summary('activation-required', null, MESSAGES.invalidKey));
       return this.acquire('activate', key);
     }, true);

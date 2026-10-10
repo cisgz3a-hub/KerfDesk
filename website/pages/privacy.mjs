@@ -251,7 +251,7 @@ function licensing(site, appPrivacy) {
     <p>
       Once Paddle confirms a purchase, the licensing service can email your licence key to the
       address you gave Paddle. It asks Paddle for that address only to send this one email, sends it
-      through Cloudflare's email service from licences@kerfdesk.com, and does not store, log or
+      through Cloudflare's email service from a kerfdesk.com address, and does not store, log or
       reuse it; the order records only whether the email was sent. Renewals send no key email. This
       is prepared but not yet switched on; until it is, Paddle's receipt is the only email a
       purchase sends.

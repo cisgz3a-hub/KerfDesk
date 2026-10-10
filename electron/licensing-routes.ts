@@ -15,7 +15,7 @@ export type RequestUpdateClose = (cancelInstall: () => void) => void;
 /** Licence-key entry helpers a commercial desktop build supplies. */
 export type LicenceEntry = {
   /** Help > Licence > Paste key reads the clipboard through this. */
-  readonly readClipboard?: (() => string) | undefined;
+  readonly readClipboard?: (() => string | Promise<string>) | undefined;
   /** kerfdesk://licence (licence-link.ts), consumed once by the renderer. */
   readonly licenceLink?: LicenceLink | null | undefined;
 };
@@ -45,12 +45,11 @@ export function withLicensingRoutes(
     )
       return updateRoute(action, request, updates, requestUpdateClose);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
-    if (action === 'licence-link' && request.method === 'GET')
-      return entry.licenceLink === undefined ? missing() : response(entry.licenceLink.consume());
+    if (action === 'licence-link' || action === 'clipboard-key')
+      return entryRoute(action, request, entry);
     if (!jsonPost(request)) return missing();
     const body = await readBody(request);
     if (!record(body)) return response({ error: 'invalid_request' }, 400);
-    if (action === 'clipboard-key') return clipboardKey(body, entry.readClipboard);
     return dispatch(action, body, runtime);
   };
 }
@@ -186,20 +185,36 @@ async function devices(
   );
 }
 
+/** kerfdesk://licence (GET, answered once) and Paste key (empty JSON POST). */
+async function entryRoute(
+  action: 'licence-link' | 'clipboard-key',
+  request: Request,
+  entry: LicenceEntry,
+): Promise<Response> {
+  if (action === 'licence-link')
+    return request.method === 'GET' && entry.licenceLink
+      ? response(await entry.licenceLink.consume())
+      : missing();
+  if (!jsonPost(request)) return missing();
+  const body = await readBody(request);
+  if (!record(body)) return response({ error: 'invalid_request' }, 400);
+  return clipboardKey(body, entry.readClipboard);
+}
+
 /**
  * Help > Licence > Paste key. The renderer may not read the clipboard (ADR-482), so
  * the main process reads it only on that explicit click and returns the KerfDesk key
  * it contains, or null: other clipboard text never reaches the renderer.
  */
-function clipboardKey(
+async function clipboardKey(
   body: Record<string, unknown>,
-  readClipboard: (() => string) | undefined,
-): Response {
+  readClipboard: (() => string | Promise<string>) | undefined,
+): Promise<Response> {
   if (readClipboard === undefined) return missing();
   if (Object.keys(body).length !== 0) return response({ error: 'invalid_request' }, 400);
   let text = '';
   try {
-    text = readClipboard();
+    text = await readClipboard();
   } catch {
     text = '';
   }

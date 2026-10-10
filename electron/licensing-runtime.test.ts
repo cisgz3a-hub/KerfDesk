@@ -629,11 +629,15 @@ describe('activating with a pasted key', () => {
     ).toMatchObject({ state: 'ready', licenseKey: KEY });
     expect(JSON.parse(String(h.fetch.mock.calls[0]?.[1].body)).licenseKey).toBe(KEY);
   });
-  it('explains a partial key without contacting the service', async () => {
+  it('explains an unusable entry locally, and leaves any other key for the service to judge', async () => {
     const h = harness();
-    const result = await h.runtime.activate(KEY.slice(0, 60));
-    expect(result.message).toContain('not a whole KerfDesk licence key');
+    expect((await h.runtime.activate('short')).message).toContain(
+      'not a whole KerfDesk licence key',
+    );
     expect(h.fetch).not.toHaveBeenCalled();
+    // A partial or older-format key is sent unchanged; only the service can refuse a key.
+    await h.runtime.activate(KEY.slice(0, 60));
+    expect(JSON.parse(String(h.fetch.mock.calls[0]?.[1].body)).licenseKey).toBe(KEY.slice(0, 60));
   });
 });
 

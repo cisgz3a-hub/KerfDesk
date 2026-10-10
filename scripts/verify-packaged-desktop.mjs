@@ -33,6 +33,7 @@ const REQUIRED_ENTRIES = [
   'public/desktop-update-notes.mjs',
   'public/desktop-release-keys.json',
   'public/desktop-sandbox-contract.mjs',
+  'public/licence-key-text.mjs',
 ];
 
 export function readFuseWire(executable) {

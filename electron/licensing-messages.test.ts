@@ -31,6 +31,9 @@ const NEVER_SENT_TO_DEVICES = new Set([
   'order_not_found',
   // Only the admin API's customer deletion refuses a licence that is still active.
   'license_not_revoked',
+  // Key-email outcomes recorded on an order for support (licence-email.mjs).
+  'no_address',
+  'send_failed',
   // Only the authenticated admin reconciliation route can return these.
   'order_not_pending',
   'reconciliation_unavailable',

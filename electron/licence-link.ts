@@ -8,9 +8,23 @@
 // the panel the main process reads the clipboard once and hands the renderer only
 // a KerfDesk key it finds there, which still needs the owner's Activate click.
 
-import type { App, BrowserWindow } from 'electron';
 import { findLicenceKey } from '../public/licence-key-text.mjs';
-import { revealPrimaryWindow } from './single-instance-policy.js';
+import { revealPrimaryWindow, type PrimaryWindowTarget } from './single-instance-policy.js';
+
+// Structural slices of Electron's App and BrowserWindow. Importing 'electron' here
+// would pull its global DOM augmentations into the renderer type check, which
+// reaches this file through licensing-routes.ts.
+type LinkApp = {
+  setAsDefaultProtocolClient(protocol: string): boolean;
+  on(event: 'second-instance', listener: (event: unknown, argv: string[]) => void): unknown;
+};
+type LinkWindow = PrimaryWindowTarget & {
+  isDestroyed(): boolean;
+  readonly webContents: {
+    getURL(): string;
+    executeJavaScript(code: string): Promise<unknown>;
+  };
+};
 
 export const LICENCE_LINK_SCHEME = 'kerfdesk';
 /** Fixed, data-free signal; the renderer then asks the licence-link route itself. */
@@ -18,7 +32,7 @@ export const LICENCE_LINK_SIGNAL =
   "window.dispatchEvent(new CustomEvent('kerfdesk:licence-link')); undefined";
 
 export type LicenceLinkAnswer = { readonly open: boolean; readonly licenseKey: string | null };
-export type LicenceLink = { readonly consume: () => LicenceLinkAnswer };
+export type LicenceLink = { readonly consume: () => Promise<LicenceLinkAnswer> };
 
 export function isLicenceLink(value: unknown): boolean {
   if (typeof value !== 'string' || value.length > 64) return false;
@@ -47,8 +61,8 @@ type Options = {
   /** Registration and handling only for a packaged, non-sandbox commercial Windows build. */
   readonly enabled: boolean;
   readonly argv: ReadonlyArray<string>;
-  readonly readClipboard: () => string;
-  readonly primaryWindow: () => BrowserWindow | undefined;
+  readonly readClipboard: () => string | Promise<string>;
+  readonly primaryWindow: () => LinkWindow | undefined;
   readonly isTrustedRenderer: (url: string) => boolean;
 };
 
@@ -57,7 +71,7 @@ type Options = {
  * second launch, was given. `consume` answers once per link, so a reload never
  * reopens the panel.
  */
-export function installLicenceLink(app: App, options: Options): LicenceLink | null {
+export function installLicenceLink(app: LinkApp, options: Options): LicenceLink | null {
   if (!options.enabled) return null;
   try {
     app.setAsDefaultProtocolClient(LICENCE_LINK_SCHEME);
@@ -76,12 +90,12 @@ export function installLicenceLink(app: App, options: Options): LicenceLink | nu
     contents.executeJavaScript(LICENCE_LINK_SIGNAL).catch(() => undefined);
   });
   return {
-    consume: () => {
+    consume: async () => {
       if (!pending) return { open: false, licenseKey: null };
       pending = false;
       let text = '';
       try {
-        text = options.readClipboard();
+        text = await options.readClipboard();
       } catch {
         text = '';
       }

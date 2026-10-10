@@ -51,31 +51,31 @@ describe('the kerfdesk://licence link', () => {
     expect(licenceLinkInArgv(['KerfDesk.exe', 'sign.lf2'])).toBe(false);
   });
 
-  it('registers the scheme and opens the panel once, with only a KerfDesk key from the clipboard', () => {
+  it('registers the scheme and opens the panel once, with only a KerfDesk key from the clipboard', async () => {
     const { app } = fakeApp();
     let clipboard = `Licence key: ${KEY}`;
     const link = installLicenceLink(app as never, {
       enabled: true,
       argv: ['KerfDesk.exe', 'kerfdesk://licence'],
-      readClipboard: () => clipboard,
+      readClipboard: async () => clipboard,
       primaryWindow: () => undefined,
       isTrustedRenderer: () => true,
     });
     expect(app.setAsDefaultProtocolClient).toHaveBeenCalledExactlyOnceWith('kerfdesk');
-    expect(link?.consume()).toEqual({ open: true, licenseKey: KEY });
-    expect(link?.consume()).toEqual({ open: false, licenseKey: null });
+    expect(await link?.consume()).toEqual({ open: true, licenseKey: KEY });
+    expect(await link?.consume()).toEqual({ open: false, licenseKey: null });
     clipboard = 'not a key';
     const plain = installLicenceLink(app as never, {
       enabled: true,
       argv: ['KerfDesk.exe', 'kerfdesk://licence'],
-      readClipboard: () => clipboard,
+      readClipboard: async () => clipboard,
       primaryWindow: () => undefined,
       isTrustedRenderer: () => true,
     });
-    expect(plain?.consume()).toEqual({ open: true, licenseKey: null });
+    expect(await plain?.consume()).toEqual({ open: true, licenseKey: null });
   });
 
-  it('raises the running window and signals it, without data, when a second launch carries the link', () => {
+  it('raises the running window and signals it, without data, when a second launch carries the link', async () => {
     const { app, listeners } = fakeApp();
     const window = fakeWindow();
     const link = installLicenceLink(app as never, {
@@ -85,7 +85,7 @@ describe('the kerfdesk://licence link', () => {
       primaryWindow: () => window as never,
       isTrustedRenderer: (url) => url.startsWith('app://'),
     });
-    expect(link?.consume().open).toBe(false);
+    expect((await link?.consume())?.open).toBe(false);
     listeners.get('second-instance')?.({}, ['KerfDesk.exe', 'sign.lf2'], 'C:\\');
     expect(window.webContents.executeJavaScript).not.toHaveBeenCalled();
     listeners.get('second-instance')?.({}, ['KerfDesk.exe', 'kerfdesk://licence'], 'C:\\');
@@ -94,7 +94,7 @@ describe('the kerfdesk://licence link', () => {
       LICENCE_LINK_SIGNAL,
     );
     expect(LICENCE_LINK_SIGNAL).not.toContain('KD1');
-    expect(link?.consume()).toEqual({ open: true, licenseKey: KEY });
+    expect(await link?.consume()).toEqual({ open: true, licenseKey: KEY });
   });
 
   it('does nothing in builds that do not take a licence link', () => {
