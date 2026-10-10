@@ -8,6 +8,7 @@ import {
   fixtureTag,
   nextVersion,
   unrelatedVersion,
+  originalNumber,
   code,
   token,
   settings,
@@ -18,6 +19,117 @@ import {
 } from './refresh-sandbox-test-fixtures.mjs';
 const kinds = (adapter) => adapter.mutations.map(({ kind }) => kind);
 const binding = (version, name) => version.resources.bindings.find((item) => item.name === name);
+
+test('an initially newer inactive upload refuses restoration before every operator upload', async (t) => {
+  attestFixture(t);
+  for (const retainedBundle of [undefined, gzipSync(code).toString('base64')]) {
+    const adapter = harness({ initialLatestVersion: unrelatedVersion });
+    await assert.rejects(run(adapter, { retainedBundle }), (error) => {
+      const receipt = error.receipt;
+      assert.equal(receipt.failure.stage, 'sandbox-inheritance-baseline-verification');
+      assert.equal(receipt.stagingAttempted, false);
+      assert.equal(receipt.deploymentAttempted, false);
+      assert.equal(receipt.mutated, false);
+      assert.equal(receipt.inheritance.inferredProvenance, false);
+      assert.equal(receipt.inheritance.atomicSourcePin, false);
+      assert.ok(!JSON.stringify(receipt).includes(token));
+      return true;
+    });
+    assert.deepEqual(kinds(adapter), []);
+    assert.deepEqual(adapter.externalUploads, [unrelatedVersion]);
+    assert.equal(adapter.latest(), unrelatedVersion);
+    assert.equal(adapter.version(), originalVersion);
+  }
+});
+
+test('a concurrent inactive upload at the preupload boundary refuses while active UUID is unchanged', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ inactiveUploadAtLatestRead: 2 });
+  await assert.rejects(run(adapter), (error) => {
+    const receipt = error.receipt;
+    assert.equal(receipt.failure.stage, 'sandbox-inheritance-pre-upload-verification');
+    assert.equal(receipt.stagingAttempted, false);
+    assert.equal(receipt.deploymentAttempted, false);
+    assert.equal(receipt.inheritance.inferredProvenance, false);
+    assert.equal(receipt.mutated, false);
+    return true;
+  });
+  assert.equal(adapter.latestReads(), 2);
+  assert.deepEqual(kinds(adapter), []);
+  assert.deepEqual(adapter.externalUploads, [unrelatedVersion]);
+  assert.equal(adapter.latest(), unrelatedVersion);
+  assert.equal(adapter.version(), originalVersion);
+});
+
+test('candidate number and retained history mismatches prevent every activation', async (t) => {
+  attestFixture(t);
+  for (const options of [
+    { stagedVersionNumber: originalNumber + 2 },
+    {
+      stagedResourceChange: (version) => {
+        version.number = originalNumber + 2;
+      },
+    },
+    {
+      latestListChange: (items, readIndex) => {
+        if (readIndex === 3) items[1].id = unrelatedVersion;
+      },
+    },
+    {
+      latestListChange: (items, readIndex) => {
+        if (readIndex === 3) items[1].annotations = { 'workers/tag': token };
+      },
+    },
+    { inactiveUploadAtLatestRead: 3 },
+  ]) {
+    const adapter = harness(options);
+    await assert.rejects(run(adapter), (error) => {
+      const receipt = error.receipt;
+      assert.equal(receipt.failure.stage, 'sandbox-inheritance-staged-verification');
+      assert.equal(receipt.stagingAttempted, true);
+      assert.equal(receipt.uploadResponseReceived, true);
+      assert.equal(receipt.stagedVersionVerified, false);
+      assert.equal(receipt.inheritance.inferredProvenance, false);
+      assert.equal(receipt.deploymentAttempted, false);
+      assert.equal(receipt.recovery.rollbackAttempted, false);
+      assert.equal(receipt.recovery.closedVerified, true);
+      assert.equal(receipt.mutated, false);
+      assert.ok(!JSON.stringify(receipt).includes(token));
+      return true;
+    });
+    assert.deepEqual(kinds(adapter), ['stage']);
+    assert.equal(adapter.version(), originalVersion);
+  }
+});
+
+test('an inactive upload after candidate code verification prevents activation and stays untouched', async (t) => {
+  attestFixture(t);
+  const adapter = harness({ inactiveUploadAtLatestRead: 4 });
+  await assert.rejects(run(adapter), (error) => {
+    const receipt = error.receipt;
+    assert.equal(receipt.failure.stage, 'sandbox-inheritance-pre-activation-verification');
+    assert.equal(receipt.stagedVersionVerified, true);
+    assert.equal(receipt.inheritance.inferredProvenance, true);
+    assert.equal(receipt.inheritance.lastVerifiedStage, 'sandbox-inheritance-staged-verification');
+    assert.equal(receipt.inheritance.atomicSourcePin, false);
+    assert.equal(receipt.inheritance.opaqueSecretEqualityProven, false);
+    assert.equal(receipt.deploymentAttempted, false);
+    assert.equal(receipt.recovery.rollbackAttempted, false);
+    assert.equal(receipt.recovery.closedVerified, true);
+    return true;
+  });
+  const finalPageIndex = adapter.calls.findLastIndex(({ url }) => url.endsWith('/versions'));
+  assert.ok(
+    adapter.calls
+      .slice(0, finalPageIndex)
+      .some(({ url }) => url.includes('/content/v2?version=' + nextVersion)),
+  );
+  assert.equal(adapter.latestReads(), 4);
+  assert.deepEqual(kinds(adapter), ['stage']);
+  assert.deepEqual(adapter.externalUploads, [unrelatedVersion]);
+  assert.equal(adapter.latest(), unrelatedVersion);
+  assert.equal(adapter.version(), originalVersion);
+});
 
 test('documented targeted aliases share fingerprints, snapshots and exact upload metadata', () => {
   for (const field of ['region', 'host', 'hostname']) {
@@ -204,15 +316,19 @@ test('inactive staged candidate failing protections, class state or exact bytes 
   }
 });
 
-test('lost upload ACK records an attested inactive candidate but never auto-activates', async (t) => {
+test('lost upload ACK records inactive readback evidence without qualifying or activating the candidate', async (t) => {
   attestFixture(t);
   for (const loseUploadBeforeApply of [false, true]) {
     const adapter = harness({ loseUploadResponse: true, loseUploadBeforeApply });
     await assert.rejects(run(adapter), (error) => {
       assert.equal(error.receipt.failure.stage, 'sandbox-code-upload');
       assert.equal(error.receipt.uploadResponseReceived, false);
-      assert.equal(error.receipt.stagedVersionVerified, !loseUploadBeforeApply);
+      assert.equal(error.receipt.stagedVersionVerified, false);
       assert.equal(error.receipt.stagedVersion, loseUploadBeforeApply ? null : nextVersion);
+      assert.equal(error.receipt.inheritance.inferredProvenance, false);
+      assert.equal(error.receipt.inheritance.atomicSourcePin, false);
+      assert.equal(error.receipt.inheritance.opaqueSecretEqualityProven, false);
+      assert.equal(error.receipt.recovery.stagingReadBackVerified === true, !loseUploadBeforeApply);
       assert.equal(error.receipt.deploymentAttempted, false);
       assert.equal(error.receipt.recovery.rollbackAttempted, false);
       assert.equal(error.receipt.recovery.closedVerified, true);
@@ -220,6 +336,7 @@ test('lost upload ACK records an attested inactive candidate but never auto-acti
       return true;
     });
     assert.deepEqual(kinds(adapter), ['stage']);
+    assert.equal(adapter.latestReads(), 2);
     assert.equal(adapter.version(), originalVersion);
   }
 });
@@ -267,7 +384,7 @@ test('lost activation ACK distinguishes applied and unapplied deployments withou
   }
 });
 
-test('staged activation preserves authority data, opaque secrets, rates and public token by strict UUID inheritance', async (t) => {
+test('staged activation preserves fixture bindings and records inferred latest provenance without atomic or opaque-secret proof', async (t) => {
   attestFixture(t);
   const value = settings(),
     publicToken = 'test_' + 'A1b'.repeat(9);
@@ -286,13 +403,30 @@ test('staged activation preserves authority data, opaque secrets, rates and publ
   assert.equal(receipt.deploymentResponseReceived, true);
   assert.equal(receipt.mutated, true);
   assert.equal(receipt.flag, 'false');
+  assert.deepEqual(receipt.inheritance, {
+    mode: 'guarded-latest',
+    inferredProvenance: true,
+    atomicSourcePin: false,
+    opaqueSecretEqualityProven: false,
+    originalVersion,
+    candidateVersion: nextVersion,
+    originalNumber,
+    candidateNumber: originalNumber + 1,
+    retainedHistoryRows: 2,
+    lastVerifiedStage: 'sandbox-inheritance-pre-activation-verification',
+  });
+  assert.equal(adapter.latestReads(), 4);
   assert.deepEqual(adapter.authorityState, state);
   for (const item of value.bindings) assert.deepEqual(adapter.binding(item.name), item);
   const metadata = adapter.mutations[0].payload;
   assert.equal(metadata.keep_assets, true);
   assert.equal(metadata.migrations, undefined);
   assert.equal(metadata.assets, undefined);
-  assert.ok(!JSON.stringify(metadata).includes('latest'));
+  assert.ok(
+    metadata.bindings
+      .filter(({ name }) => name !== 'PAYMENTS_ENABLED')
+      .every(({ type, version_id }) => type === 'inherit' && version_id === 'latest'),
+  );
   const activationIndex = adapter.calls.findIndex(
     ({ url, method }) => url.endsWith('/deployments') && method === 'POST',
   );
@@ -357,7 +491,7 @@ test('successful restoration preserves unknown binding inheritance while redacti
     {
       name: privateName,
       type: 'inherit',
-      version_id: originalVersion,
+      version_id: 'latest',
     },
   );
   assert.deepEqual(kinds(adapter), ['stage', 'activate']);

@@ -6,6 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { flagMetadata } from './apply-payment-settings.mjs';
 import {
   SANDBOX_ORIGIN,
   GOOD_VERSION_PREFIX,
@@ -30,7 +31,7 @@ import {
   run,
 } from './refresh-sandbox-test-fixtures.mjs';
 
-test('upload metadata inherits every current binding and asset, without migrations or historic settings', () => {
+test('sandbox upload inherits guarded latest bindings and assets without changing shared flag metadata', () => {
   const value = settings();
   const metadata = sandboxUploadMetadata(value, originalVersion, 'worker.js', fixtureTag);
   assert.equal(metadata.keep_assets, true);
@@ -40,17 +41,23 @@ test('upload metadata inherits every current binding and asset, without migratio
   assert.equal(metadata.annotations['workers/tag'], fixtureTag);
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'LICENSE_AUTHORITY'),
-    { name: 'LICENSE_AUTHORITY', type: 'inherit', version_id: originalVersion },
+    { name: 'LICENSE_AUTHORITY', type: 'inherit', version_id: 'latest' },
   );
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'ASSETS'),
-    { name: 'ASSETS', type: 'inherit', version_id: originalVersion },
+    { name: 'ASSETS', type: 'inherit', version_id: 'latest' },
   );
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'SIGNING_PRIVATE_JWK'),
-    { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: originalVersion },
+    { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: 'latest' },
   );
   assert.ok(!JSON.stringify(metadata).includes(goodVersion));
+  assert.deepEqual(
+    flagMetadata(value, originalVersion, 'false').bindings.find(
+      ({ name }) => name === 'SIGNING_PRIVATE_JWK',
+    ),
+    { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: originalVersion },
+  );
 });
 test('wrong environment, enabled checkout, namespace, class or missing assets stop before mutation', async () => {
   for (const mutate of [
@@ -454,7 +461,7 @@ test('refresh and lost-ACK readback preserve an existing public sandbox token by
       {
         name: binding.name,
         type: 'inherit',
-        version_id: originalVersion,
+        version_id: 'latest',
       },
     );
     assert.equal(adapter.mutations.length, 2);
@@ -583,7 +590,7 @@ test('upload HTTP400 diagnostics survive staged readback without activating an a
       assert.equal(receipt.recovery.closedVerified, true);
       assert.equal(receipt.recovery.rollbackAttempted, false);
       assert.equal(receipt.deploymentAttempted, false);
-      assert.equal(receipt.stagedVersionVerified, uploadErrorAfterApply);
+      assert.equal(receipt.stagedVersionVerified, false);
       assert.equal(receipt.mutated, false);
       assert.equal(receipt.apiFailure.stage, 'sandbox-code-upload');
       assert.equal(receipt.apiFailure.httpStatus, 400);

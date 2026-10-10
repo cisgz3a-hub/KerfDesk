@@ -14,6 +14,12 @@ import {
   sandboxSettingsFingerprint as fingerprint,
 } from './sandbox-restoration-guards.mjs';
 import { readCloudflareFailure } from './cloudflare-error-diagnostics.mjs';
+import {
+  captureUnfilteredPage,
+  pinLatestOriginal,
+  requireUnchangedPreuploadPage,
+  attestAcknowledgedCandidate,
+} from './sandbox-latest-inheritance.mjs';
 
 export const SANDBOX_WORKER = 'kerfdesk-desktop-licensing-sandbox';
 export const SANDBOX_ORIGIN = 'https://kerfdesk-desktop-licensing-sandbox.cisgz3a.workers.dev';
@@ -63,6 +69,11 @@ export function sandboxUploadMetadata(settings, activeVersion, entrypoint, opera
   const metadata = flagMetadata(sandboxUploadSettings(settings), activeVersion, 'false');
   return {
     ...metadata,
+    // Standard script uploads accept only latest. The Sandbox-only caller checks
+    // latest against the original before upload and candidate provenance before activation.
+    bindings: metadata.bindings.map((binding) =>
+      binding.type === 'inherit' ? { ...binding, version_id: 'latest' } : binding,
+    ),
     ...(settings.tags !== undefined ? { tags: settings.tags } : {}),
     main_module: entrypoint,
     keep_assets: true,
@@ -99,6 +110,9 @@ export async function refreshSandboxScript(
   let currentVersion;
   let before;
   let beforeVersionResources;
+  let beforeVersionInfo;
+  let inheritancePin;
+  let inheritanceEvidence;
   let versionResourceFailure;
   let stagedVersionVerified = false;
   let deploymentAttempted = false;
@@ -194,6 +208,29 @@ export async function refreshSandboxScript(
   };
   const readVersionResources = async (version, label) =>
     attestResources(await api('/versions/' + version, {}, label + '-get'), version, label);
+  const latestPage = async (label) => {
+    const requestedPath = '/versions';
+    const result = await api(requestedPath, {}, label + '-get');
+    setStage(label);
+    return captureUnfilteredPage({ requestedPath, result });
+  };
+  const verifyCandidateInheritance = async (label) => {
+    const afterPage = await latestPage(label);
+    const candidateInfo = await api('/versions/' + operationVersion, {}, label + '-detail-get');
+    const active = await activeVersion();
+    setStage(label);
+    inheritanceEvidence = {
+      ...attestAcknowledgedCandidate({
+        pin: inheritancePin,
+        afterPage,
+        uploadAcknowledged: uploadResponseReceived,
+        uploadId: operationVersion,
+        candidateInfo,
+        activeVersion: active,
+      }),
+      lastVerifiedStage: label,
+    };
+  };
   const verifyCandidate = async () => {
     const info = await verifyOperationVersion(operationVersion);
     attestResources(info, operationVersion, 'sandbox-staged-resource-verification');
@@ -205,7 +242,9 @@ export async function refreshSandboxScript(
     setStage('sandbox-staged-content-verification');
     for (const key of ['entrypoint', 'filename', 'mimeType'])
       assert.equal(restored[key], module[key], 'Sandbox staged module identity changed.');
-    stagedVersionVerified = true;
+    // Lost-ack discovery can attest resources for the receipt, never qualify activation.
+    stagedVersionVerified =
+      uploadResponseReceived && inheritanceEvidence?.inferredProvenance === true;
   };
   const readSettings = () => api('/settings', {}, 'sandbox-settings-get');
   const readModule = async (version, label, expectedRawDescriptor) => {
@@ -314,6 +353,13 @@ export async function refreshSandboxScript(
     version: currentVersion ?? null,
     mutationAttempted,
     uploadResponseReceived,
+    inheritance: {
+      mode: 'guarded-latest',
+      inferredProvenance: false,
+      atomicSourcePin: false,
+      opaqueSecretEqualityProven: false,
+      ...(inheritanceEvidence ?? {}),
+    },
     stagingAttempted: mutationAttempted,
     stagedVersion: operationVersion ?? null,
     stagedVersionVerified,
@@ -375,7 +421,13 @@ export async function refreshSandboxScript(
     initialClosedVerified = true;
     await publicConfig();
     originalBuy = await buyHtml();
-    beforeVersionResources = await readVersionResources(
+    beforeVersionInfo = await api(
+      '/versions/' + originalVersion,
+      {},
+      'sandbox-original-resource-verification-get',
+    );
+    beforeVersionResources = attestResources(
+      beforeVersionInfo,
       originalVersion,
       'sandbox-original-resource-verification',
     );
@@ -389,6 +441,10 @@ export async function refreshSandboxScript(
       assert.ok(uuid.test(candidates[0]), 'Attested sandbox version requires a full UUID.');
       sourceVersion = candidates[0];
       module = await readModule(sourceVersion, 'sandbox-attested-content-get');
+    }
+    if (originalVersion !== sourceVersion) {
+      const page = await latestPage('sandbox-inheritance-baseline-verification');
+      inheritancePin = pinLatestOriginal(page, originalVersion, beforeVersionInfo, operationTag);
     }
     const boundary = await activeVersion();
     setStage('sandbox-pre-mutation-version-check');
@@ -414,6 +470,11 @@ export async function refreshSandboxScript(
         new Blob([module.bytes], { type: module.mimeType }),
         module.filename,
       );
+      const preuploadPage = await latestPage('sandbox-inheritance-pre-upload-verification');
+      requireUnchangedPreuploadPage(inheritancePin, preuploadPage);
+      const latestBoundary = await activeVersion();
+      setStage('sandbox-final-pre-upload-version-check');
+      assert.equal(latestBoundary, originalVersion, 'Sandbox deployment changed before upload.');
       mutationAttempted = true;
       const uploaded = await api(
         '/versions?bindings_inherit=strict',
@@ -424,6 +485,7 @@ export async function refreshSandboxScript(
       setStage('sandbox-staged-version-identity');
       assert.ok(uuid.test(uploaded?.id), 'Sandbox staged version unavailable.');
       operationVersion = uploaded.id;
+      await verifyCandidateInheritance('sandbox-inheritance-staged-verification');
       await verifyCandidate();
       await verifySettings();
       const activationBoundary = await activeVersion();
@@ -434,6 +496,7 @@ export async function refreshSandboxScript(
         'Sandbox deployment changed before activation.',
       );
       await verifySettings();
+      await verifyCandidateInheritance('sandbox-inheritance-pre-activation-verification');
       const finalBoundary = await activeVersion();
       setStage('sandbox-final-pre-deployment-version-check');
       assert.equal(
