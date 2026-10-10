@@ -1,4 +1,5 @@
 import { useLaserStore } from '../../state/laser-store';
+import { originLabel } from '../DeviceProfileFields';
 import type { DeviceSetupState } from './device-setup-flow';
 import { machineSetupControllerGuide } from './machine-setup-controller-guide';
 
@@ -30,7 +31,7 @@ export function DeviceSetupSummary({ state }: { readonly state: DeviceSetupState
           {state.draft.bedWidth} × {state.draft.bedHeight} mm
         </dd>
         <dt>Origin</dt>
-        <dd>{state.draft.origin.replaceAll('-', ' ')}</dd>
+        <dd>{originLabel(state.draft.origin)}</dd>
         <dt>Controller</dt>
         <dd>{guide.label}</dd>
       </dl>

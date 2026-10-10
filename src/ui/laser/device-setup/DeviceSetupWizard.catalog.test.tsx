@@ -79,6 +79,21 @@ describe('DeviceSetupWizard catalog', () => {
     }
   });
 
+  it('reviews the draft in the names its editors use, not stored identifiers', async () => {
+    const view = await renderWizard();
+    try {
+      await act(async () => button(view.host, 'Review setup').click());
+      expect(view.host.textContent).toContain('Step 3 of 3');
+      const review = view.host.querySelector('.lf-setup-content')?.textContent ?? '';
+      expect(review).toContain('Front left');
+      expect(review).toContain('Buffered receive window, ');
+      expect(review).not.toMatch(/front-left|char-counted|grbl-dynamic/);
+      expect(view.host.querySelector('.lf-setup-summary')?.textContent).toContain('Front left');
+    } finally {
+      await view.unmount();
+    }
+  });
+
   it('moves focus to the machine type when the operator sets up without connecting', async () => {
     const view = await renderWizard();
     try {

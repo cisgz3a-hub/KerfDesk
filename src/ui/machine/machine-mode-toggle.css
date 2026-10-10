@@ -1,7 +1,9 @@
 /* The Laser / CNC switch at the start of the machine toolbar. Two equal
- * segments sit on a sunken track; a solid copper thumb slides under the chosen
- * mode so the control reads as one two-way switch, and each mode carries its
- * own icon. Its height matches the machine name button beside it. */
+ * segments sit on a sunken track; a copper-tinted, copper-outlined thumb (the
+ * selected style of Machine Setup's type cards) slides under the chosen mode,
+ * so the control reads as one two-way switch and Connect beside it stays the
+ * row's only solid copper action. Each mode carries its own icon. Its height
+ * matches the machine name button beside it. */
 
 .lf-machine-mode {
   --lf-machine-mode-pad: 3px;
@@ -26,9 +28,11 @@
   bottom: var(--lf-machine-mode-pad);
   left: var(--lf-machine-mode-pad);
   width: calc((100% - 2 * var(--lf-machine-mode-pad) - var(--lf-machine-mode-gap)) / 2);
+  box-sizing: border-box;
+  border: 1px solid var(--lf-accent);
   border-radius: var(--lf-radius-md);
-  background: var(--lf-accent);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  background: var(--lf-tint-accent);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 12%);
   transition: transform 160ms ease;
 }
 
@@ -69,7 +73,7 @@
 }
 
 .lf-machine-mode__choice[aria-pressed='true'] {
-  color: var(--lf-on-fill);
+  color: var(--lf-accent-fg);
   cursor: default;
 }
 
@@ -86,8 +90,8 @@
   position: absolute;
   top: 3px;
   right: 3px;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   box-sizing: border-box;
   border: 1.5px solid var(--lf-bg-2);
   border-radius: 50%;
@@ -95,7 +99,7 @@
 }
 
 .lf-machine-mode__choice[aria-pressed='true'][data-capability-warning='true']::after {
-  border-color: var(--lf-on-fill);
+  border-color: var(--lf-tint-accent);
 }
 
 .lf-machine-mode__choice:focus-visible {

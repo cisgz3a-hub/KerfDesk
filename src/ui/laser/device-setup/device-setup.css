@@ -229,9 +229,6 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
-.lf-setup-summary dd:nth-of-type(2) {
-  text-transform: capitalize;
-}
 .lf-setup-connection {
   display: flex;
   gap: 6px;
