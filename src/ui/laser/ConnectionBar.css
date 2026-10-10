@@ -81,6 +81,16 @@
   min-width: 0;
 }
 
+/* The Laser / CNC switch leads the row, set apart from the machine it talks to. */
+.lf-connection-leading {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-right: 8px;
+  margin-right: 2px;
+  border-right: 1px solid var(--lf-border);
+}
+
 .lf-connection-compact-row > .lf-btn {
   flex-shrink: 0;
   min-height: 32px;

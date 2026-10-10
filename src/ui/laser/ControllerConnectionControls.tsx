@@ -4,6 +4,7 @@ import type { MachineKind } from '../../core/scene';
 import { usePlatform } from '../app/platform-context';
 import { connectOptionsForDevice } from '../commands/connect-options';
 import { machineNoun } from '../machine/machine-labels';
+import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
@@ -75,6 +76,7 @@ export function ControllerConnectionControls(props: Props): JSX.Element {
       <ConnectionHints supportsSerial={supportsSerial} isFileOnlyProfile={isFileOnlyProfile} />
       <ConnectionBar
         machineName={machineName}
+        mode={<MachineModeToggle />}
         machine={<ConnectedMachineProfile />}
         details={<MachineDetailsContent />}
         setup={<DeviceSetupControls />}

@@ -80,7 +80,10 @@ test('CNC refinements remain reachable, editable and saved behind their disclosu
 }) => {
   await page.setViewportSize({ width: 1024, height: 600 });
   const panel = await openBasicProject(page);
-  await panel.getByRole('button', { name: 'CNC', exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Machine type', exact: true })
+    .getByRole('button', { name: 'CNC', exact: true })
+    .click();
   await panel.getByRole('combobox', { name: /^Cut type for/ }).selectOption('profile-outside');
   await setNumber(panel, /^Cut depth for/, '2.5');
   await setNumber(panel, /^Feed for/, '1200');
@@ -134,7 +137,10 @@ test('direct CNC material and bit choices persist without changing machine defau
 }) => {
   await page.setViewportSize({ width: 1536, height: 864 });
   const panel = await openBasicProject(page);
-  await panel.getByRole('button', { name: 'CNC', exact: true }).click();
+  await page
+    .getByRole('group', { name: 'Machine type', exact: true })
+    .getByRole('button', { name: 'CNC', exact: true })
+    .click();
   await panel.getByRole('combobox', { name: /^Cut type for/ }).selectOption('pocket');
   const baseline = await saveProject(page, kerfdesk);
   expect(baseline.project.machine).toMatchObject({ kind: 'cnc' });
@@ -226,7 +232,10 @@ for (const viewport of [
       await choosePanelView(panel, 'Run order');
       await assertControlBounds(page, panel);
       await panel.getByRole('button', { name: 'Edit settings', exact: true }).click();
-      await panel.getByRole('button', { name: 'CNC', exact: true }).click();
+      await page
+        .getByRole('group', { name: 'Machine type', exact: true })
+        .getByRole('button', { name: 'CNC', exact: true })
+        .click();
       await panel.getByRole('combobox', { name: /^Cut type for/ }).selectOption('profile-outside');
       for (const title of [/^Holding tabs/, /^Wall finish/, /^Entry & travel/, /^Saved feeds/]) {
         await openSection(panel, title);

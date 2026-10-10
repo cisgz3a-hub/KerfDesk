@@ -3109,10 +3109,14 @@ record is per machine profile and Laser/CNC head. Only **Save machine setup**
 completes it; Cancel or an unsuccessful connection leaves the next Connect eligible.
 Configured profiles connect directly. Automatic connections and recovery Reconnect
 keep their existing behavior and do not open setup (ADR-420 Amendment 3).
-The Machine stage keeps **Review & save** visible beside **Check essentials**. After choosing a
-profile, **Review & save** opens the final review directly; **Save machine setup** applies it.
-**Check essentials** remains available to edit values first. Neither selecting the shortcut nor
-saving an ordinary software profile disconnects the controller.
+The Machine stage keeps a primary **Review setup** shortcut beside **Check essentials** (ADR-420
+Amendment 4). After choosing a profile, **Review setup** opens the final review directly; only
+**Save machine setup** applies it. **Check essentials** remains available to edit values first.
+Neither selecting the shortcut nor saving an ordinary software profile disconnects the controller.
+**Cancel without saving** closes at once. Escape and the header close button close at once unless
+the operator changed the draft (a new machine's automatic fill alone does not count); then they
+first ask **Discard your changes to this setup?** with **Keep editing** (focused, and Escape
+again) or **Discard changes**.
 
 1. **Machine** — **Find my machine** opens the stage (ADR-420). It connects with the draft's
    controller, baud and streaming choice, reusing the remembered port as the rail's Connect does,
@@ -4637,7 +4641,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 ### F-CNC1. Switch to CNC mode and configure the machine
 
 #### Success
-1. User clicks **CNC** on the machine-mode toggle atop the Cuts/Layers panel.
+1. User clicks **CNC** on the Laser / CNC switch at the start of the machine toolbar, beside the
+   connection controls.
 2. No bottom Material & Bit card appears. **Machine > Machine Setup > Essentials** owns machine
    limits and **CNC job setup** material/default bit/stock. Its Tool Plan and Artwork's **Tool &
    material** edit the same per-operation material and cutter assignments.
@@ -8096,6 +8101,12 @@ Selecting **Download update** immediately shows that the request is starting. Th
 2. Unsaved work gets the usual Save, Don't Save or Cancel question. Cancel or a failed save keeps KerfDesk open. The close rechecks the current document and machine state after saving and before unload.
 3. An update close waits for active jobs, Fire, owned machine work, pending Frame/Job Review, observed external motion or spindle-on state. It never sends Abort or forces an unavailable window closed. Finish work and choose the action again; there is no delayed automatic close.
 4. Only approved actual closure can launch the reverified installer. Windows shutdown, close failure, changed owners or bad update verification do not authorise execution. The installer remains interactive and unsigned, and may show Windows publisher warnings.
+
+#### Success - update prompt on the canvas (ADR-561 Amendment 5)
+
+1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The status bar button and Help → Check for Updates remain.
+2. After **Update**, the card shows download progress (**Hide** keeps downloading in the background). Once verified it shows **Update ready to install** with **Install now** (the explicit install-and-close action above), **When I close** (install on a normal close) and **Not now**. Downloading never installs by itself.
+3. The card does not appear, and hides, while a job, Fire, owned or external motion, MPG, a modal dialog or the updates panel owns the window; it returns once that ends. A failure after the user acted in the card is reported there with **Details**, which opens Help → Check for Updates.
 
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.

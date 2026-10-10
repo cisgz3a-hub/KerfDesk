@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { LicenceAdapter } from '../../platform/types';
+import { useCommercialUpdateStore } from '../state/commercial-update-store';
 import { useToastStore } from '../state/toast-store';
 import { LICENCE_SETTINGS_EVENT } from './edition';
 import { panelOverlay, useDismissOnEscape } from './panel-overlay';
@@ -8,8 +9,8 @@ import { UpdatesPanel } from './UpdatesPanel';
 import { useCommercialUpdateStatus } from './use-commercial-update-status';
 
 /**
- * Keeps the desktop app's update status for the status bar, and answers Help >
- * Check for Updates with the updates panel (ADR-547).
+ * Keeps the desktop app's update status for the status bar and the canvas
+ * prompt, and answers Help > Check for Updates with the updates panel (ADR-547).
  */
 export function CommercialUpdates({
   client,
@@ -23,6 +24,18 @@ export function CommercialUpdates({
   const [open, setOpen] = useState(false);
   const show = useCallback(() => setOpen(true), []);
   const close = useCallback(() => setOpen(false), []);
+  const setControls = useCommercialUpdateStore((state) => state.setControls);
+  useEffect(() => {
+    setControls({
+      busy,
+      feedback,
+      panelOpen: open,
+      download: client.downloadUpdate === undefined ? undefined : download,
+      installOnQuit: client.installUpdateOnQuit === undefined ? undefined : installOnQuit,
+      installAndClose: client.installUpdateAndClose === undefined ? undefined : installAndClose,
+    });
+  }, [busy, client, download, feedback, installAndClose, installOnQuit, open, setControls]);
+  useEffect(() => () => setControls(null), [setControls]);
   useEffect(() => {
     window.addEventListener(CHECK_UPDATES_EVENT, show);
     // The licence panel opens in the same place, so one replaces the other.
