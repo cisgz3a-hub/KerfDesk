@@ -5,18 +5,19 @@
 
 import type { MachineKind } from '../../core/scene';
 
-// Lower-case noun for mid-sentence copy ("connect to your laser controller").
+// Mid-sentence noun ("connect to your laser controller"). CNC mode says
+// "CNC", the name the Laser / CNC switch uses (ADR-101 amendment 2026-10-10).
 export function machineNoun(kind: MachineKind): string {
-  return kind === 'cnc' ? 'router' : 'laser';
+  return kind === 'cnc' ? 'CNC' : 'laser';
 }
 
 // Right-rail heading and the menu family label.
 export function machineDisplayName(kind: MachineKind): string {
-  return kind === 'cnc' ? 'Router' : 'Laser';
+  return kind === 'cnc' ? 'CNC' : 'Laser';
 }
 
 export function machineControlsLabel(kind: MachineKind): string {
-  return kind === 'cnc' ? 'Router controls' : 'Laser controls';
+  return kind === 'cnc' ? 'CNC controls' : 'Laser controls';
 }
 
 // "burn" is laser jargon; a router cuts.

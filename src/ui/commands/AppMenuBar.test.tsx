@@ -135,7 +135,7 @@ describe('AppMenuBar', () => {
 
     const cnc = await renderMenu(laserFamily, 'cnc');
     try {
-      expect(summaries(cnc.host)).toContain('Router');
+      expect(summaries(cnc.host)).toContain('CNC');
       expect(summaries(cnc.host)).not.toContain('Laser');
     } finally {
       await act(async () => cnc.root.unmount());

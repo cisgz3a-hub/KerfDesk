@@ -15,7 +15,7 @@ import type { Tutorial } from './tutorial-types';
 
 // The visible menu-bar labels (AppMenuBar.familyLabel). The 'laser' family's
 // label follows the machine kind, so both nouns are legal first segments.
-const MENU_LABELS = ['File', 'Edit', 'Tools', 'Arrange', 'Laser', 'Router', 'Window', 'Help'];
+const MENU_LABELS = ['File', 'Edit', 'Tools', 'Arrange', 'Laser', 'CNC', 'Window', 'Help'];
 
 // Surfaces that are not menus but legitimately open a location string.
 // Anything else starting a "X → Y" path is very likely a menu that moved.
@@ -105,7 +105,7 @@ describe('lesson fidelity against the shipped app', () => {
     // Every machine-independent family the dialog actually renders.
     const families = shortcutFamilies('laser')
       .map((entry) => entry.family)
-      .filter((family) => family !== 'Laser' && family !== 'Router');
+      .filter((family) => family !== 'Laser' && family !== 'CNC');
     expect(families.filter((family) => !prose.includes(family))).toEqual([]);
     // The job keys are the reason the last group matters; they were missing
     // while the lesson still claimed to list the dialog's groups.

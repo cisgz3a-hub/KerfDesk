@@ -5,6 +5,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { JobInterruptionKind } from '../../core/recovery';
+import { machineNoun } from '../machine/machine-labels';
 import { useStore } from '../state';
 import { jobAwareAlert, jobAwareConfirm } from '../state/job-aware-dialogs';
 import { useLaserStore } from '../state/laser-store';
@@ -54,8 +55,8 @@ export function CheckpointResumeBanner(props: {
           <strong>Interrupted job saved</strong>
           <span style={summaryDetailStyle}>
             {' '}
-            · {capsule.artifact.machineKind === 'cnc' ? 'router' : 'laser'} · {capsule.ackedLines}{' '}
-            of {capsule.sendableLines} lines acknowledged
+            · {machineNoun(capsule.artifact.machineKind)} · {capsule.ackedLines} of{' '}
+            {capsule.sendableLines} lines acknowledged
           </span>
         </summary>
         <RecoveryDescription capsule={capsule} claimActive={claimActive} />
@@ -213,7 +214,7 @@ function RecoveryDescription({
   return (
     <div role="status">
       <p style={textStyle}>
-        Saved {capsule.artifact.machineKind === 'cnc' ? 'router' : 'laser'} run
+        Saved {machineNoun(capsule.artifact.machineKind)} run
         {startedAt === null ? '' : ` from ${startedAt}`}. It is isolated from the current canvas,
         project, profile, controller settings, origins, and ordinary Start.
       </p>

@@ -141,7 +141,7 @@ baseTest(
       'true',
     );
     await page.getByRole('tab', { name: 'Machine' }).click();
-    await expect(page.getByLabel('Router controls')).toBeVisible();
+    await expect(page.getByLabel('CNC controls')).toBeVisible();
   },
 );
 
@@ -202,7 +202,7 @@ baseTest(
     await dialog.getByRole('button', { name: 'Review setup', exact: true }).click();
     await dialog.getByRole('button', { name: 'Save CNC machine setup', exact: true }).click();
 
-    const router = page.getByLabel('Router controls', { exact: true });
+    const router = page.getByLabel('CNC controls', { exact: true });
     await expect(router).toBeVisible();
     await expandMachineMaintenance(page);
     await router

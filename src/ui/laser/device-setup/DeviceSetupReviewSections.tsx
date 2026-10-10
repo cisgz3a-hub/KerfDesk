@@ -82,6 +82,18 @@ function connectionRows(
   ];
 }
 
+// The names the Essentials selects show, not the stored identifiers.
+const AIR_OUTPUT_LABELS: Readonly<Record<string, string>> = {
+  none: 'Disabled',
+  M8: 'M8 flood coolant',
+  M7: 'M7 mist coolant',
+};
+const COOLANT_LABELS: Readonly<Record<string, string>> = {
+  off: 'Off',
+  mist: 'Mist (M7)',
+  flood: 'Flood (M8)',
+};
+
 // The names Connection options shows, not the stored identifiers.
 function dialectLabel(draft: DeviceProfile): string {
   const id = draft.gcodeDialect.dialectId;
@@ -121,7 +133,7 @@ function laserRows(state: DeviceSetupStepProps['state']): ReviewRows {
     ],
     ['Power range', `${state.draft.minPowerS}–${state.draft.maxPowerS} S`],
     ['Laser mode', state.draft.laserModeEnabled ? 'Expected on' : 'Off'],
-    ['Air output', state.draft.airAssistCommand],
+    ['Air output', AIR_OUTPUT_LABELS[state.draft.airAssistCommand] ?? state.draft.airAssistCommand],
     ['After a job', laserFinishSummary(state.draft)],
     [
       'Low-power Fire',
@@ -140,7 +152,7 @@ function cncRows(state: DeviceSetupStepProps['state']): ReviewRows {
     ['Safe Z', `${params.safeZMm} mm`],
     ['Park height', `${Math.max(params.safeZMm, params.parkZMm ?? params.safeZMm)} mm`],
     ['Spindle', `${params.spindleMaxRpm} RPM; ${params.spindleSpinupSec} s dwell`],
-    ['Coolant', params.coolant ?? 'off'],
+    ['Coolant', COOLANT_LABELS[params.coolant ?? 'off'] ?? params.coolant ?? 'Off'],
     [
       'Park (bed position)',
       params.parkXMm === undefined && params.parkYMm === undefined
@@ -173,10 +185,7 @@ function safetyRows(state: DeviceSetupStepProps['state']): ReviewRows {
   if (deviceSetupSupportsMachineKind(state, 'laser')) {
     rows.push(
       ['Rotary', state.draft.rotary?.enabled === true ? 'Enabled' : 'Disabled'],
-      [
-        'Camera',
-        state.draft.cameraModel === undefined ? 'Calibration pending / unchanged' : 'Calibrated',
-      ],
+      ['Camera', state.draft.cameraModel === undefined ? 'Calibration pending' : 'Calibrated'],
     );
   }
   return rows;

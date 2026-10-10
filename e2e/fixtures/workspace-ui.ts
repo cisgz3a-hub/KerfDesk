@@ -32,7 +32,7 @@ export function machineJogAction(
 /** CNC utilities remain behind their own disclosure below the ordinary actions. */
 export async function expandMachineMaintenance(page: Page): Promise<void> {
   const summary = page
-    .getByLabel('Router controls', { exact: true })
+    .getByLabel('CNC controls', { exact: true })
     .locator('summary')
     .filter({ hasText: /^Machine maintenance$/ });
   if ((await summary.locator('..').getAttribute('open')) === null) await summary.click();

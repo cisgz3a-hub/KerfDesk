@@ -50,7 +50,7 @@ export function MachineModeToggle(): JSX.Element {
       <SegButton
         label="CNC"
         icon="cnc"
-        title="CNC router mode: layers carry cut type, depth, and feeds; G-code drives the spindle and Z axis."
+        title="CNC mode: layers carry cut type, depth, and feeds; G-code drives the spindle and Z axis."
         active={kind === 'cnc'}
         locked={jobActive}
         warning={machineModeWarning(device, 'cnc')}

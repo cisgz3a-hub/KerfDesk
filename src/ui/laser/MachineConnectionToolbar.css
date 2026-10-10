@@ -90,11 +90,16 @@
   }
 
   /* One 32 px row: the compact Laser / CNC switch, then the machine name with
-     its status inline, Connect, Machine Setup and the menu. */
+     its status inline, Connect, Machine Setup and the menu. The name is
+     capped (its tooltip keeps it whole) so a long one cannot wrap the row. */
   .lf-machine-toolbar .lf-connection-machine-summary {
     display: flex;
     align-items: center;
     gap: 6px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-name {
+    max-width: 96px;
   }
 
   .lf-machine-toolbar .lf-connection-machine-status {
@@ -109,9 +114,27 @@
 }
 
 @media (max-width: 590px) {
-  /* That row needs about 575 px. Narrower, a full-width switch takes its own
-     line and the name stacks over its status, so the rest shares the line
-     below instead of leaving Connect alone on a third. */
+  /* The inline row needs about 575 px. Narrower, the name stacks over its
+     status and is capped (the full name stays in its tooltip), which keeps
+     the whole group on one row down to about 530 px even connected. */
+  .lf-machine-toolbar .lf-connection-compact-row {
+    gap: 5px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-summary {
+    display: grid;
+    gap: 1px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-name {
+    max-width: 112px;
+  }
+}
+
+@media (max-width: 530px) {
+  /* A phone cannot hold that row: a full-width switch takes its own line and
+     the machine, Connect, Machine Setup and the menu share the line below
+     instead of leaving Connect or the menu alone on a third. */
   .lf-machine-toolbar {
     padding-bottom: 4px;
   }
@@ -126,20 +149,18 @@
   .lf-machine-toolbar .lf-connection-leading > .lf-machine-mode {
     flex: 1;
   }
-
-  .lf-machine-toolbar .lf-connection-machine-summary {
-    display: grid;
-    gap: 1px;
-  }
 }
 
 @media (max-width: 360px) {
-  /* Keep the menu on the machine line of the narrowest phones. */
   .lf-machine-toolbar .lf-connection-compact-row {
     gap: 4px;
   }
 
   .lf-machine-toolbar .lf-connection-machine-name {
-    max-width: 96px;
+    max-width: 72px;
+  }
+
+  .lf-machine-toolbar .lf-connection-compact-row > .lf-btn {
+    padding-inline: 8px;
   }
 }

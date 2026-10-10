@@ -293,7 +293,7 @@ describe('Toolbar shortcut hint (audit M27/A.5)', () => {
 
       const hint = host.querySelector('button[aria-label="Keyboard Shortcuts"]');
       const title = hint?.getAttribute('title') ?? '';
-      expect(title).toContain('Router: Ctrl+Enter');
+      expect(title).toContain('CNC: Ctrl+Enter');
       expect(title).not.toContain('Laser:');
     } finally {
       if (root !== null) await act(async () => root?.unmount());

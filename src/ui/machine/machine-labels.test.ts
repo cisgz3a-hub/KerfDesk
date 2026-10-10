@@ -14,10 +14,10 @@ describe('machine-labels (ADR-101 §7)', () => {
     expect(jobTimeNoun('laser')).toBe('burn');
   });
 
-  it('swaps to router copy in CNC mode', () => {
-    expect(machineNoun('cnc')).toBe('router');
-    expect(machineDisplayName('cnc')).toBe('Router');
-    expect(machineControlsLabel('cnc')).toBe('Router controls');
+  it('names CNC mode "CNC", as the Laser / CNC switch does', () => {
+    expect(machineNoun('cnc')).toBe('CNC');
+    expect(machineDisplayName('cnc')).toBe('CNC');
+    expect(machineControlsLabel('cnc')).toBe('CNC controls');
     expect(jobTimeNoun('cnc')).toBe('cut');
   });
 });

@@ -4899,6 +4899,16 @@ boundary, and that the existing worker-unavailable fallback remains valid. Warni
 tests cover both durable relief source variants, output-disabled operations, CNC
 mode, and the shared Job Review aggregation path.
 
+### Amendment 2026-10-10 — CNC mode is labelled "CNC", not "Router"
+
+The maintainer asked for one name for the mode. §7's machine-aware chrome now
+says **CNC** wherever it said Router: the menu family, the right-rail heading,
+the controls region (`CNC controls`), the shortcut hint (`CNC: Ctrl+Enter`),
+connection copy ("Connect to your CNC controller") and the interrupted-run
+summary, matching the Laser / CNC switch (ADR-420 Amendment 4). Prose about
+the physical machine or its bits ("CNC routers", "router bits") is unchanged,
+as are internal keys.
+
 ## ADR-102 — three.js for the 3D relief viewer (explicit ADR-098 §2 override)
 
 **Status:** Accepted; §2 import location amended by ADR-255 (adds `src/ui/viewer3d/`)

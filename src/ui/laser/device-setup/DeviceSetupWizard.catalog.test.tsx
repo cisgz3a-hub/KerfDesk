@@ -87,7 +87,8 @@ describe('DeviceSetupWizard catalog', () => {
       const review = view.host.querySelector('.lf-setup-content')?.textContent ?? '';
       expect(review).toContain('Front left');
       expect(review).toContain('Buffered receive window, ');
-      expect(review).not.toMatch(/front-left|char-counted|grbl-dynamic/);
+      expect(review).toContain('Air outputDisabled');
+      expect(review).not.toMatch(/front-left|char-counted|grbl-dynamic|Air outputnone/);
       expect(view.host.querySelector('.lf-setup-summary')?.textContent).toContain('Front left');
     } finally {
       await view.unmount();

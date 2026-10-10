@@ -5771,7 +5771,7 @@ and lifts the command's CNC-only gate.)*
 ### F-CNC20. Probe work zero with a touch plate — Phase H.11 (ADR-103 G2)
 
 #### Success
-1. Router controls → "Probe (touch plate)": pick Z-only (stock top) or
+1. CNC controls → "Probe (touch plate)": pick Z-only (stock top) or
    XYZ corner (plus which corner). Plate thickness, max travel, and (for
    XYZ) bit diameter are editable; bit diameter prefills from the
    machine's active bit. Run is enabled only when connected and Idle.

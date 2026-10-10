@@ -212,7 +212,7 @@ test('short dark workspace keeps the tool rail scrollable and machine modes acce
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'CNC', exact: true }).click();
   await page.getByRole('tab', { name: 'Machine', exact: true }).click();
-  await expect(page.getByLabel('Router controls', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('CNC controls', { exact: true })).toBeVisible();
   await expectWithinViewport(page, page.getByRole('region', { name: 'Job actions' }));
   await expectNoPageOverflow(page);
 });

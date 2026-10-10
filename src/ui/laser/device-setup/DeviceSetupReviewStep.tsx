@@ -29,7 +29,7 @@ export function DeviceSetupReviewStep({
     <section className="lf-setup-review">
       <SoftwareStatus issues={issues} />
       {state.machineKind === 'cnc' ? (
-        <p>
+        <p className="lf-setup-review-note">
           Machining setup: <strong>{state.cncSetupDraft.name}</strong> · G54 · stock top Z0 ·{' '}
           {state.cncSetupDraft.fixtures.length} fixture envelopes
         </p>
