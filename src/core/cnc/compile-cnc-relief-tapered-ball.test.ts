@@ -49,7 +49,7 @@ function compile(tool: CncTool = TBN) {
     cnc: {
       ...DEFAULT_CNC_LAYER_SETTINGS,
       cutType: 'engrave' as const,
-      // Raster row spacing is the subject; Automatic (ADR-578) adds waterline.
+      // Raster row spacing is the subject; Automatic (ADR-579) adds waterline.
       reliefFinishStrategy: 'raster' as const,
       reliefFinishToolId: tool.id,
     },

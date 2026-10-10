@@ -1,4 +1,4 @@
-## ADR-578 - STL reliefs carve the model itself, at its own size, from both sides (2026-10-10)
+## ADR-579 - STL reliefs carve the model itself, at its own size, from both sides (2026-10-10)
 
 **Status:** Accepted. | **Date:** 2026-10-10
 

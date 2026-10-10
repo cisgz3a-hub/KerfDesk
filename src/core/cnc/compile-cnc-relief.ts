@@ -8,7 +8,7 @@ import type { ReliefFinishedFlats } from '../relief/relief-flat-finish';
 //
 // Per relief on the layer: rebuild the heightmap from the embedded mesh
 // (coarsened to tool-diameter/8 cells for roughing, with the mesh's own
-// triangles attached for exact cutter contact, ADR-578), apply XY scale before
+// triangles attached for exact cutter contact, ADR-579), apply XY scale before
 // physical cutter dilation and spacing, then map every vertex through only
 // the residual mirror/rotation/translation and the device origin. Cutter
 // geometry therefore stays in machine millimetres under uniform and
@@ -163,7 +163,7 @@ function reliefLadderFor(
     targetScaleX: machineSpace.targetScaleX,
     targetScaleY: machineSpace.targetScaleY,
     mmPerCell: tool.diameterMm / ROUGHING_CELL_TOOL_FRACTION,
-    // ADR-578: the cutter meets the STL's own triangles, so a detail narrower
+    // ADR-579: the cutter meets the STL's own triangles, so a detail narrower
     // than a cell still lifts the tip and a slope keeps no extra stock.
     sampling: 'exact-mesh',
   });

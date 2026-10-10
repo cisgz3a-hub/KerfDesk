@@ -1,4 +1,4 @@
-// Keeping an STL relief's proportions (ADR-578). With "Keep proportions" on, a
+// Keeping an STL relief's proportions (ADR-579). With "Keep proportions" on, a
 // Width edit scales Depth by the same factor and a Depth edit scales Width, in
 // one undo step, so a 3D model is resized rather than stretched. "Use model
 // proportions" sets Depth from the placed width and the model's own height to

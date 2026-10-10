@@ -3,7 +3,7 @@ import type { MovePoint } from './heightmap-surface-contact-move';
 /**
  * Exact contact heights for one heightmap and one cutter envelope: against the
  * piecewise-linear surface through its samples (ADR-412) or, for a mesh relief,
- * against the mesh's own triangles (ADR-578).
+ * against the mesh's own triangles (ADR-579).
  */
 export type SurfaceContactField = {
   /**

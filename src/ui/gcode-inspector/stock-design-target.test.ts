@@ -121,7 +121,7 @@ describe('the carving against the design (ADR-487)', () => {
   });
 });
 
-describe('walls in the design (ADR-578)', () => {
+describe('walls in the design (ADR-579)', () => {
   // A 10 mm plate 4 mm below a ridge at the stock top: the ridge spans
   // x 4 to 6 with vertical sides, as an STL models it.
   function ridge(): ReliefObject {

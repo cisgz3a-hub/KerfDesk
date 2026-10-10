@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { describeStlImportSize, stlImportSize } from './stl-import-size';
 
-// ADR-578: an STL comes in at its own millimetres, every axis at one scale.
+// ADR-579: an STL comes in at its own millimetres, every axis at one scale.
 
 const bounds = (x: number, y: number, z: number) => ({
   minX: -x / 2,

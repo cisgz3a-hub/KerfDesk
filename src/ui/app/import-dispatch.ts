@@ -327,7 +327,7 @@ async function dispatchOneFile(
 }
 
 // The bed an STL is fitted to and the stock its height is compared with
-// (ADR-578), read when the file arrives.
+// (ADR-579), read when the file arrives.
 function currentStlImportTarget(): StlImportTarget {
   const { project } = useStore.getState();
   const machine = project.machine;

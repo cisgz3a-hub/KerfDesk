@@ -94,7 +94,7 @@ type Contact = ElementContact & {
 
 /**
  * The exact contact field for one map and cutter envelope: against the mesh's
- * own triangles when the map carries them (ADR-578), else against the
+ * own triangles when the map carries them (ADR-579), else against the
  * triangulated samples.
  */
 export function createSurfaceContactField(

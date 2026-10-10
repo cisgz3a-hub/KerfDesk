@@ -1,4 +1,4 @@
-// The cutter law every exact-contact solver shares (ADR-412, ADR-578): the
+// The cutter law every exact-contact solver shares (ADR-412, ADR-579): the
 // kernel's radius with a rounding allowance, its surface law clamped at that
 // radius, and the closed-form profile that tells the facet and edge solvers in
 // heightmap-surface-contact-geometry.ts where a maximum can lie.

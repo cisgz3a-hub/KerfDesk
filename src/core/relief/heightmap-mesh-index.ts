@@ -1,4 +1,4 @@
-// A uniform bin grid over a mesh relief's triangles (ADR-578). Each bin lists
+// A uniform bin grid over a mesh relief's triangles (ADR-579). Each bin lists
 // the triangles whose plan box overlaps it, highest first, so a contact query
 // stops reading a bin as soon as its next triangle stands no higher than the
 // best tip found so far: the tip is the cutter's lowest point, so a triangle

@@ -1,4 +1,4 @@
-// The carved stock's switches on the canvas's G-code 3D view (ADR-578). The
+// The carved stock's switches on the canvas's G-code 3D view (ADR-579). The
 // full Inspector keeps them in its readouts (ADR-487); the canvas view has
 // none, so they sit in a compact panel over the view instead, and a program
 // that carves a relief starts with its carved stock shown.

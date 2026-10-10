@@ -1,4 +1,4 @@
-// The size an imported STL lands at (ADR-578). An STL carries millimetres by
+// The size an imported STL lands at (ADR-579). An STL carries millimetres by
 // convention, so the model comes in at its own size with every axis at one
 // scale: a 3D model keeps its proportions, and its height becomes the relief
 // depth. Two cases are scaled, uniformly and disclosed:

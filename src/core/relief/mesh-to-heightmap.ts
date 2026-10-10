@@ -8,12 +8,12 @@
 // leaves them at stock height.
 //
 // Sampling: 'center' (the default, for previews) reads each cell at its centre.
-// Relief CAM asks for 'exact-mesh' (ADR-578): the cells are read at their
+// Relief CAM asks for 'exact-mesh' (ADR-579): the cells are read at their
 // centres too, and the map carries the mesh's triangles in its own frame, so
 // the cutter is solved against the model itself rather than the samples
 // (heightmap-mesh-contact.ts). 'footprint-max' (ADR-412 Amendment 1) holds each
 // cell at the mesh's highest point over its whole footprint, a conservative
-// bound that relief CAM used before ADR-578; under 'top' a cell whose centre no
+// bound that relief CAM used before ADR-579; under 'top' a cell whose centre no
 // triangle covers still stays at stock height.
 //
 // Pure and deterministic: triangles in file order, max-Z accumulation is

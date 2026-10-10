@@ -1,5 +1,5 @@
 // splitReliefForTwoSides — turn one STL relief into the side A (top) and side
-// B (bottom) reliefs of a two-sided carve, in one undo step (ADR-578). The two
+// B (bottom) reliefs of a two-sided carve, in one undo step (ADR-579). The two
 // reliefs replace the original where it stood, keep its operations, and are
 // assigned to the project's two-sided setup (ADR-573), which is switched on
 // with its ordinary defaults when it was off. Flip axis, side B origin and

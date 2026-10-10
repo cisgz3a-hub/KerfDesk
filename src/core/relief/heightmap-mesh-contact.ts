@@ -1,4 +1,4 @@
-// Exact cutter contact with a mesh relief's own triangles (ADR-578).
+// Exact cutter contact with a mesh relief's own triangles (ADR-579).
 //
 // The sampled map of an STL is only an approximation of the model: read at
 // cell centres it misses detail between them, and read at each cell's highest

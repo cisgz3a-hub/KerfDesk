@@ -4946,7 +4946,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    progress toast names the current phase and Escape cancels the request.
 2. The mesh lands as a relief object at its own size, read as millimetres:
    its width and height as modelled and its own height as the relief depth,
-   so a 3D model keeps its proportions (ADR-578), background carved away
+   so a 3D model keeps its proportions (ADR-579), background carved away
    ('floor'), on a wood-brown layer created automatically. The toast reports
    the triangle count and the size. A model larger than the bed is scaled on
    every axis alike to fit, a model under 1 mm across (not modelled in
@@ -4958,7 +4958,7 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 2a. Relief properties keep an STL's proportions: with **Keep proportions** on
    (the default) a Width edit scales Depth by the same factor and a Depth
    edit scales Width, in one undo step; **Use model proportions** sets Depth
-   from the placed width and the model's own height ratio (ADR-578).
+   from the placed width and the model's own height ratio (ADR-579).
 2b. **Two-sided carving** (CNC projects) replaces the STL relief with a side A
    relief (the top, down to the split height) and a side B relief (the
    bottom, seen from below, down to the split less the holding web), centred
@@ -5558,7 +5558,7 @@ and lifts the command's CNC-only gate.)*
    land at the requested spacing; the whole-row stride still rounds down so it
    never overshoots it (ADR-421). For an STL relief the tip meets the mesh's
    own triangles, so neither a detail between samples nor a slope is misread
-   (ADR-578). For a height map this qualifies finishing
+   (ADR-579). For a height map this qualifies finishing
    vertices against the piecewise-linear surface and the planar cusp, not
    subcell detail or true along-surface scallop (ADR-292/294/412). Every move
    between vertices, of every strategy, is then checked against the exact
@@ -5582,7 +5582,7 @@ and lifts the command's CNC-only gate.)*
    FOR this pass); finishing consumes it down to the true surface.
 5. Raster direction runs the rows along X (default) or along Y (ADR-423).
 6. Finish strategy **Automatic** (unset) is Raster + waterline for an STL
-   relief and Raster for a height map (ADR-578); choosing Automatic removes
+   relief and Raster for a height map (ADR-579); choosing Automatic removes
    an explicit choice. Raster + waterline narrows the rows to cos 45° of the
    scallop's spacing and adds waterline passes wherever the tip surface
    slopes 45° or more, levels sin 45° of that spacing apart, so passes are
@@ -5923,7 +5923,7 @@ and lifts the command's CNC-only gate.)*
 4. The grid (and the 2D cut shading) covers the stock the whole job cuts,
    plus the widest bit's radius and 2 mm, not the whole sheet, so a small
    relief on a large sheet gets fine cells; the frame stays put while
-   scrubbing (ADR-578).
+   scrubbing (ADR-579).
 
 #### Error — no WebGL
 1. The dialog opens with "3D view unavailable: <reason>" instead of
@@ -8650,7 +8650,7 @@ validation must be supervised without cutting load.
 5. A CNC program that cuts below Z0 shows a compact **Stock** panel with the
    Inspector's carved-stock switches (ADR-487), and a program carving a relief
    starts with its carved stock shown, so the canvas shows the carving
-   itself (ADR-578).
+   itself (ADR-579).
 
 #### Success — follow playback or a running program
 

@@ -354,7 +354,7 @@ export type AppState = PartGeneratorActions &
     readonly setLayerDefaults: (layerDefaults: LayerDefaultsState) => void;
     readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
     readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
-    /** ADR-578: replace an STL relief with its side A and side B reliefs. */
+    /** ADR-579: replace an STL relief with its side A and side B reliefs. */
     readonly splitReliefForTwoSides: (
       id: string,
       request: ReliefTwoSidedRequest,

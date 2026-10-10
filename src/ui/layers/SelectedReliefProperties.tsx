@@ -57,7 +57,7 @@ export function SelectedReliefProperties(): JSX.Element | null {
     s.project.machine?.kind === 'cnc' ? s.project.machine.stock.thicknessMm : 0,
   );
   const projectDocumentEpoch = useStore((s) => s.projectDocumentEpoch);
-  // ADR-578: an STL relief keeps its proportions unless the operator unlocks them.
+  // ADR-579: an STL relief keeps its proportions unless the operator unlocks them.
   const [proportionsLocked, setProportionsLocked] = useState(true);
   if (relief === null) return null;
   const locked = isMeshRelief(relief) && proportionsLocked;

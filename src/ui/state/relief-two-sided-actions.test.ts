@@ -12,7 +12,7 @@ import { TWO_SIDED_FRAME_MM } from '../../core/relief/relief-two-sided-split';
 import { useStore } from './store';
 import { resetStore } from './test-helpers';
 
-// ADR-578: splitting an STL relief for two-sided carving replaces it with a
+// ADR-579: splitting an STL relief for two-sided carving replaces it with a
 // side A and a side B relief in one undo step and assigns them to the sides.
 
 // An octahedron 20 mm across and 10 mm tall, in millimetres.

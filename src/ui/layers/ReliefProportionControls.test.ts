@@ -4,7 +4,7 @@ import type { MeshReliefObject } from '../../core/scene/relief';
 import { meshBounds } from '../../core/relief';
 import { modelProportionDepthMm, proportionalReliefPatch } from './ReliefProportionControls';
 
-// ADR-578: an STL relief's Width and Depth move together while proportions
+// ADR-579: an STL relief's Width and Depth move together while proportions
 // are kept, and "Use model proportions" restores the model's own ratio.
 
 const relief = { targetWidthMm: 100, reliefDepthMm: 5 };

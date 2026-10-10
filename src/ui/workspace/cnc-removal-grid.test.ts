@@ -137,7 +137,7 @@ describe('computeCncRemovalGrid', () => {
       ...MACHINE,
       stock: { ...STOCK, widthMm: 400 },
     };
-    // A job spanning 300 mm of the sheet: the grid frames the cut (ADR-578),
+    // A job spanning 300 mm of the sheet: the grid frames the cut (ADR-579),
     // and 300 mm still needs more than the per-axis cell budget allows.
     const wideScene: Scene = {
       ...TWO_BIT_SCENE,
@@ -155,7 +155,7 @@ describe('computeCncRemovalGrid', () => {
   });
 
   it(
-    'frames the cut, not the whole sheet, and keeps the frame while scrubbing (ADR-578)',
+    'frames the cut, not the whole sheet, and keeps the frame while scrubbing (ADR-579)',
     () => {
       const sheet: CncMachineConfig = {
         ...MACHINE,

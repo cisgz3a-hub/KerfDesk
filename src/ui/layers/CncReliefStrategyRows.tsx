@@ -96,7 +96,7 @@ function ReliefRoughingRows(props: ReliefRowsProps): JSX.Element {
 }
 
 // Whether steep walls get waterline passes, and which way the raster runs.
-// Unset is Automatic (ADR-578): raster + waterline for an STL model, raster
+// Unset is Automatic (ADR-579): raster + waterline for an STL model, raster
 // for a height map.
 function ReliefFinishRows(props: ReliefRowsProps): JSX.Element {
   const { layer, settings, onCommit } = props;

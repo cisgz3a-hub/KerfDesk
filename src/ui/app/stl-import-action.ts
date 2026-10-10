@@ -1,7 +1,7 @@
 // importStlFiles — drag-and-drop STL → ReliefObject (Phase H.4, ADR-098).
 // Relief geometry persists in either machine mode; every import discloses that
 // CNC alone produces its output. Imports land at the model's own size with its
-// proportions kept, its height as the relief depth (ADR-578, stl-import-size.ts),
+// proportions kept, its height as the relief depth (ADR-579, stl-import-size.ts),
 // background carved away, on a dedicated relief layer color; width/depth/
 // background are edited afterwards in the Relief properties panel.
 
