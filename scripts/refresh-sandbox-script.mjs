@@ -4,16 +4,18 @@ import crypto from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { ACCOUNT, flagMetadata, guardedSettings } from './apply-payment-settings.mjs';
+import { ACCOUNT } from './apply-payment-settings.mjs';
+import { guardSandboxRefresh, sandboxUploadForm } from './sandbox-restoration-metadata.mjs';
+export { guardSandboxRefresh, sandboxUploadMetadata } from './sandbox-restoration-metadata.mjs';
 import { readRetainedSandboxBundle } from './retained-sandbox-bundle.mjs';
 import {
   attestSandboxVersion,
   readAttestedSandboxModule,
-  sandboxUploadSettings,
   sandboxReceiptBindingName,
   sandboxSettingsFingerprint as fingerprint,
 } from './sandbox-restoration-guards.mjs';
 import { readCloudflareFailure } from './cloudflare-error-diagnostics.mjs';
+import { readSandboxVersionContent } from './sandbox-version-content.mjs';
 import {
   captureUnfilteredPage,
   pinLatestOriginal,
@@ -26,64 +28,8 @@ export const SANDBOX_ORIGIN = 'https://kerfdesk-desktop-licensing-sandbox.cisgz3
 export const GOOD_VERSION_PREFIX = '202ea7dc';
 export const GOOD_CODE_SHA256 = 'ea76d1d65cccbee7445551da56236dce6cea00a2503f144185093b5b46912907';
 const namespace = 'b5b0cb9d97f4404582f884ff2b1a6ba8';
-const target = {
-  environment: 'sandbox',
-  signing: 'sandbox-20260929',
-  authority: 'SandboxLicenseAuthority',
-};
 const hash = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
-export function guardSandboxRefresh(settings) {
-  assert.equal(
-    guardedSettings(settings, target),
-    'false',
-    'Sandbox checkout must already be closed.',
-  );
-  assert.ok(
-    settings.bindings.some(
-      ({ name, type }) => name === 'ASSETS' && ['service', 'assets'].includes(type),
-    ),
-    'Existing asset binding unavailable.',
-  );
-  assert.ok(
-    typeof settings.compatibility_date === 'string' && settings.compatibility_date.length,
-    'Current compatibility date unavailable.',
-  );
-  assert.ok(
-    Array.isArray(settings.compatibility_flags),
-    'Current compatibility flags unavailable.',
-  );
-}
-
-export function sandboxUploadMetadata(settings, activeVersion, entrypoint, operationTag) {
-  guardSandboxRefresh(settings);
-  assert.ok(
-    typeof entrypoint === 'string' && entrypoint.trim() && entrypoint !== 'metadata',
-    'Module entrypoint unavailable.',
-  );
-  assert.ok(
-    typeof operationTag === 'string' &&
-      /^kerfdesk-sandbox-refresh-[0-9a-f-]{36}$/u.test(operationTag),
-    'Sandbox refresh operation tag unavailable.',
-  );
-  const metadata = flagMetadata(sandboxUploadSettings(settings), activeVersion, 'false');
-  return {
-    ...metadata,
-    // Standard script uploads accept only latest. The Sandbox-only caller checks
-    // latest against the original before upload and candidate provenance before activation.
-    bindings: metadata.bindings.map((binding) =>
-      binding.type === 'inherit' ? { ...binding, version_id: 'latest' } : binding,
-    ),
-    ...(settings.tags !== undefined ? { tags: settings.tags } : {}),
-    main_module: entrypoint,
-    keep_assets: true,
-    annotations: {
-      'workers/tag': operationTag,
-      'workers/message':
-        'Restore attested sandbox health dispatcher; preserve existing authority and closed checkout',
-    },
-  };
-}
 
 export const readSandboxModule = (response, format, expectedRawDescriptor) =>
   readAttestedSandboxModule(response, GOOD_CODE_SHA256, format, expectedRawDescriptor);
@@ -97,6 +43,7 @@ export async function refreshSandboxScript(
     ACCOUNT +
     '/workers/scripts/' +
     SANDBOX_WORKER;
+  const versionBase = base.replace('/workers/scripts/', '/workers/workers/') + '/versions';
   const started = Date.now();
   const operationTag = 'kerfdesk-sandbox-refresh-' + crypto.randomUUID();
   let operationVersion;
@@ -133,9 +80,9 @@ export async function refreshSandboxScript(
     assert.ok(remaining > 0, 'Operator verification time budget exhausted.');
     return AbortSignal.timeout(Math.min(60000, remaining));
   };
-  const request = async (suffix, init, label) => {
+  const request = async (suffix, init, label, apiBase = base) => {
     setStage(label);
-    const response = await fetcher(base + suffix, {
+    const response = await fetcher(apiBase + suffix, {
       ...init,
       headers: { Authorization: 'Bearer ' + token, ...init?.headers },
       redirect: 'error',
@@ -250,8 +197,10 @@ export async function refreshSandboxScript(
   const readModule = async (version, label, expectedRawDescriptor) => {
     const format = {};
     try {
-      return await readSandboxModule(
-        await request('/content/v2?version=' + version, {}, label),
+      return await readSandboxVersionContent(
+        await request('/' + version + '?include=modules', {}, label, versionBase),
+        version,
+        GOOD_CODE_SHA256,
         format,
         expectedRawDescriptor,
       );
@@ -458,18 +407,7 @@ export async function refreshSandboxScript(
       'Sandbox deployment changed after settings read.',
     );
     if (originalVersion !== sourceVersion) {
-      const form = new FormData();
-      form.set(
-        'metadata',
-        JSON.stringify(
-          sandboxUploadMetadata(before, originalVersion, module.entrypoint, operationTag),
-        ),
-      );
-      form.set(
-        module.entrypoint,
-        new Blob([module.bytes], { type: module.mimeType }),
-        module.filename,
-      );
+      const form = sandboxUploadForm(before, originalVersion, module, operationTag);
       const preuploadPage = await latestPage('sandbox-inheritance-pre-upload-verification');
       requireUnchangedPreuploadPage(inheritancePin, preuploadPage);
       const latestBoundary = await activeVersion();

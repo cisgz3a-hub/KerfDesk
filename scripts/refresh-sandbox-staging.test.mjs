@@ -122,7 +122,11 @@ test('an inactive upload after candidate code verification prevents activation a
   assert.ok(
     adapter.calls
       .slice(0, finalPageIndex)
-      .some(({ url }) => url.includes('/content/v2?version=' + nextVersion)),
+      .some(
+        ({ url }) =>
+          url.includes('/workers/workers/') &&
+          url.endsWith('/versions/' + nextVersion + '?include=modules'),
+      ),
   );
   assert.equal(adapter.latestReads(), 4);
   assert.deepEqual(kinds(adapter), ['stage']);
@@ -294,7 +298,12 @@ test('inactive staged candidate failing protections, class state or exact bytes 
       },
     },
     { stagedCode: Buffer.concat([code, Buffer.from('\n')]) },
-    { readbackRaw: true, readbackRawHeader: token },
+    {
+      stagedBetaChange: (version) => {
+        version.main_module = token;
+        version.modules[0].name = token;
+      },
+    },
     { uploadOwnership: 'missing' },
     { uploadOwnership: 'wrong-id' },
   ]) {
@@ -433,7 +442,11 @@ test('staged activation preserves fixture bindings and records inferred latest p
   assert.ok(
     adapter.calls
       .slice(0, activationIndex)
-      .some(({ url }) => url.includes('/content/v2?version=' + nextVersion)),
+      .some(
+        ({ url }) =>
+          url.includes('/workers/workers/') &&
+          url.endsWith('/versions/' + nextVersion + '?include=modules'),
+      ),
   );
   assert.ok(
     adapter.calls

@@ -138,10 +138,14 @@ export function harness({
   sourceBytes = code,
   sourceExtra = false,
   sourceRaw = false,
-  expectedUploadName = sourceRaw ? 'sandbox-worker.js' : 'worker.js',
+  expectedUploadName = 'worker.js',
   sourceRawType = 'application/javascript',
   sourceRawHeader,
   sourceResponse,
+  sourceBetaChange,
+  stagedBetaChange,
+  originalBetaChange,
+  standardContentReturnsActive = false,
   readbackRaw = false,
   readbackRawHeader = null,
   loseUploadResponse = false,
@@ -233,6 +237,38 @@ export function harness({
           ? new Response(token, { status: failedSettingsStatus })
           : ok(value);
       }
+      if (
+        endpoint.pathname.includes('/workers/workers/') &&
+        endpoint.pathname.includes('/versions/')
+      ) {
+        assert.equal(init.method ?? 'GET', 'GET');
+        assert.equal(endpoint.search, '?include=modules');
+        const selected = endpoint.pathname.split('/').at(-1);
+        assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
+        const record = records.get(selected) ?? { bytes: sourceBytes, name: 'worker.js' };
+        const result = {
+          id: selected,
+          number: history.find((item) => item.id === selected)?.number ?? originalNumber - 1,
+          main_module: record.name,
+          modules: [
+            {
+              name: record.name,
+              content_type: 'application/javascript+module',
+              content_base64: record.bytes.toString('base64'),
+            },
+          ],
+        };
+        if (selected === goodVersion && sourceExtra)
+          result.modules.push({
+            name: 'extra.js',
+            content_type: 'application/javascript+module',
+            content_base64: Buffer.from('export {};').toString('base64'),
+          });
+        if (selected === originalId && originalBetaChange) originalBetaChange(result);
+        if (selected === goodVersion && sourceBetaChange) sourceBetaChange(result);
+        if (selected === nextVersion && stagedBetaChange) stagedBetaChange(result);
+        return ok(result);
+      }
       if (endpoint.pathname.includes('/versions/')) {
         const selected = endpoint.pathname.split('/').at(-1);
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
@@ -292,6 +328,12 @@ export function harness({
       if (endpoint.pathname.endsWith('/content/v2')) {
         const selected = endpoint.searchParams.get('version');
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
+        // The standard endpoint can ignore the requested UUID and serve active code.
+        // Exact-version operator verification must never depend on this response.
+        if (standardContentReturnsActive) {
+          const active = records.get(version);
+          return content({ bytes: active.bytes, entrypoint: active.name, filename: active.name });
+        }
         if (selected === goodVersion && sourceResponse) return sourceResponse();
         const record = records.get(selected) ?? { bytes: sourceBytes, name: 'worker.js' };
         if (selected === nextVersion && readbackRaw)

@@ -119,3 +119,11 @@ the Sandbox restoration inheritance method. The shared payment-flag operator
 and production code replacement authority are unchanged.
 
 Reference: [Cloudflare inherit binding errors (10057)](https://developers.cloudflare.com/workers/observability/errors/#inherit-binding-errors-10057).
+
+Candidate code qualification uses the beta read-only exact-version endpoint with
+`include=modules`. It requires the returned full UUID, one canonical base64
+module, matching entrypoint and module type, and the immutable retained SHA.
+This avoids the previously observed ambiguity of `/content/v2?version=...`;
+active bytes from that endpoint cannot qualify a different inactive candidate.
+The upload and activation endpoints are unchanged. The beta read is not a beta
+deployment or permission to replace production code.
