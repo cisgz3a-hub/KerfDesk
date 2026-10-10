@@ -82,9 +82,8 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
         }
       }}
       onBlur={(event) => {
-        if (props.closeOnTab !== false) return;
-        const next = event.relatedTarget;
-        if (!(next instanceof Node) || !event.currentTarget.contains(next)) props.onClose();
+        if (props.closeOnTab === false && focusLeftPopover(event, anchorRef.current))
+          props.onClose();
       }}
       onKeyDown={(event) => {
         if (event.key === 'Escape' || (event.key === 'Tab' && props.closeOnTab !== false)) {
@@ -100,6 +99,16 @@ export function AnchoredPopover(props: PopoverProps): JSX.Element {
       {props.children}
     </div>,
     props.portalHost ?? document.body,
+  );
+}
+
+function focusLeftPopover(
+  event: React.FocusEvent<HTMLDivElement>,
+  anchor: HTMLElement | null,
+): boolean {
+  const next = event.relatedTarget;
+  return (
+    !(next instanceof Node) || (!event.currentTarget.contains(next) && !anchor?.contains(next))
   );
 }
 

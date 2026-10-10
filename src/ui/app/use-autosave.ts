@@ -8,7 +8,7 @@
 //     interval snapshot because unload cannot await IndexedDB.
 //   Stops scheduling on unmount; the browser releases session ownership.
 //
-// Recovery is offered by AutosaveRecoveryBanner without blocking startup.
+// Recovery is offered by AutosaveRecoveryControl without blocking startup.
 // Restoring keeps a durable copy until the first manual save (M15).
 
 import { useEffect } from 'react';
