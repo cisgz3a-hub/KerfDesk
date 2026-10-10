@@ -1,4 +1,4 @@
-## ADR-575 - Buy Pro opens the purchase page, and licence owners free their own seats (2026-10-09)
+## ADR-577 - Buy Pro opens the purchase page, and licence owners free their own seats (2026-10-09)
 
 **Status:** Accepted by the owner's instruction ("the button should open buy page directly") |
 **Date:** 2026-10-09 | **Amends:** ADR-524 Amendment 2 (how a purchase starts), ADR-523 Amendment 2
@@ -29,10 +29,12 @@ the key's owner those routes exactly for this.
    activation credentials, the saved order and Check payment. A device that already holds a saved
    purchase order keeps Check payment, Reopen checkout and Forget this order until it is claimed or
    forgotten, so no paid order is stranded by this change.
-3. **A refusal before the provider is contacted leaves no intent.** When the service refuses a
-   checkout before it calls Paddle (checkout closed, or a renewal key it does not accept), it created
-   no order, and the app drops the saved request ID instead of showing a pending order. Ambiguous
-   answers (`checkout_pending`) keep the intent, as before.
+3. **Only a fresh refused intent is dropped.** If the first request for a newly created intent
+   is refused before any provider call (checkout closed, or a renewal key the service does not
+   accept), the app drops that new intent instead of showing a pending order. An inherited intent
+   keeps its request ID even after a later refusal: an earlier answer may have been lost after the
+   server created a payable order, and these checks precede the service's prior-order lookup.
+   Ambiguous answers (`checkout_pending`) also keep the intent.
 4. **Manage devices.** Help > Licence lists the seats the saved or typed licence key holds, through
    `POST /v1/licenses/activations`, and frees one through `POST /v1/licenses/deactivate` after a
    confirming second click. Nothing changes on the calling device until its next licence check; the
@@ -50,3 +52,10 @@ the key's owner those routes exactly for this.
 - Pricing and buy-page copy already say "Buy in this browser or from Help > Licence in the Windows
   app", which remains true.
 - The support note on three active devices now points customers to Manage devices first.
+
+Repair qualification (2026-10-10): device rows and confirmation belong to an exact
+saved/typed key and adapter session; stale answers cannot overwrite a new session.
+Free/invalid builds reject device management before reading saved credentials.
+A confirmed removal remains confirmed if the follow-up list cannot be refreshed.
+Failed browser opening points to the same sandbox or production purchase page
+that was requested. Regression tests cover these ownership and recovery paths.

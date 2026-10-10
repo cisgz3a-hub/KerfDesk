@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   LicenceAdapter,
   LicenceDevice,
@@ -10,7 +10,7 @@ import { licenceButtons, licenceMuted } from './LicenceControls';
 type Props = {
   readonly client: LicenceAdapter;
   readonly status: LicenceStatus | null;
-  /** The key typed into the activation form, used when no key is saved yet. */
+  /** The activation draft, used when no key is saved yet. */
   readonly typedKey: string;
   readonly busy: boolean;
 };
@@ -20,12 +20,12 @@ const REQUEST_FAILED = 'This request could not be completed. Please try again.';
 const SEATS =
   'Each computer counts as one of the licence’s three seats. Remove a computer you no longer use so another can activate. This computer keeps Pro until its next licence check if you remove it here; prefer Deactivate this device for that.';
 
-/** The key the panel manages with: the saved one, or else what is typed (undefined means saved). */
-function managedKey(status: LicenceStatus | null, typedKey: string): string | undefined | null {
-  if (status === null || status.state === 'unavailable') return null;
-  if (status.licenseKey !== null) return undefined;
-  const typed = typedKey.trim();
-  return typed.length >= 8 ? typed : null;
+/** Bind every list and removal to the exact saved or typed key that produced its rows. */
+function managedKey(status: LicenceStatus | null, typedKey: string): string | null {
+  if (status === null || status.channel !== 'commercial' || status.state === 'unavailable')
+    return null;
+  const key = (status.licenseKey ?? typedKey).trim();
+  return key.length >= 8 && key.length <= 256 && !/[\r\n\0]/.test(key) ? key : null;
 }
 
 function deviceClient(client: LicenceAdapter): DeviceClient | null {
@@ -41,28 +41,65 @@ function deviceClient(client: LicenceAdapter): DeviceClient | null {
  * Removing a seat changes nothing on this device until its next licence check.
  */
 export function LicenceDevicesPanel({ client, status, typedKey, busy }: Props): JSX.Element | null {
+  const key = managedKey(status, typedKey);
+  const { devices, releaseDevice } = client;
+  const [context, setContext] = useState({ key, client, devices, releaseDevice, epoch: 0 });
+  // Remount the session before committing new ownership, including adapter changes.
+  // Old promises then belong to an unmounted session and cannot overwrite its successor.
+  if (
+    context.key !== key ||
+    context.client !== client ||
+    context.devices !== devices ||
+    context.releaseDevice !== releaseDevice
+  ) {
+    setContext({ key, client, devices, releaseDevice, epoch: context.epoch + 1 });
+    return null;
+  }
+  const adapter = deviceClient(client);
+  return key === null || adapter === null ? null : (
+    <DevicesSession key={context.epoch} adapter={adapter} licenseKey={key} busy={busy} />
+  );
+}
+
+function DevicesSession({
+  adapter,
+  licenseKey,
+  busy,
+}: {
+  readonly adapter: DeviceClient;
+  readonly licenseKey: string;
+  readonly busy: boolean;
+}): JSX.Element {
   const [open, setOpen] = useState(false);
   const [working, setWorking] = useState(false);
   const [confirm, setConfirm] = useState<string | null>(null);
   const [result, setResult] = useState<LicenceDevices | null>(null);
-  const key = managedKey(status, typedKey);
-  const adapter = deviceClient(client);
-  if (key === null || adapter === null) return null;
+  const mounted = useRef(true);
+  const pending = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const run = async (work: () => Promise<LicenceDevices>): Promise<void> => {
-    if (working) return;
+    if (pending.current || busy) return;
+    pending.current = true;
     setWorking(true);
     setConfirm(null);
     try {
-      setResult(await work());
+      const answer = await work();
+      if (mounted.current) setResult(answer);
     } catch {
-      setResult({ devices: null, message: REQUEST_FAILED });
+      if (mounted.current) setResult({ devices: null, message: REQUEST_FAILED });
     } finally {
-      setWorking(false);
+      pending.current = false;
+      if (mounted.current) setWorking(false);
     }
   };
   const remove = (activationId: string): void => {
     if (confirm !== activationId) setConfirm(activationId);
-    else void run(() => adapter.releaseDevice(activationId, key));
+    else void run(() => adapter.releaseDevice(activationId, licenseKey));
   };
   return (
     <div style={{ marginTop: 18 }}>
@@ -71,7 +108,7 @@ export function LicenceDevicesPanel({ client, status, typedKey, busy }: Props): 
         disabled={busy || working}
         onList={() => {
           setOpen(true);
-          void run(() => adapter.devices(key));
+          void run(() => adapter.devices(licenseKey));
         }}
         onHide={() => {
           setOpen(false);

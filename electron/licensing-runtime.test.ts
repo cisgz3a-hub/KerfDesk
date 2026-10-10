@@ -480,6 +480,23 @@ describe('Buy Pro opens the purchase page', () => {
   });
 });
 
+it('keeps sandbox purchase recovery on the sandbox page if the browser cannot open', async () => {
+  const h = harness();
+  const runtime = createLicensingRuntime({
+    ...h.options,
+    config: { ...h.options.config, sandbox: true } as LicensingConfig,
+    openPurchasePage: async () => {
+      throw new Error('browser unavailable');
+    },
+  });
+  const result = await runtime.openPurchasePage();
+  expect(result.message).toContain(
+    'https://kerfdesk-desktop-licensing-sandbox.cisgz3a.workers.dev/buy.html',
+  );
+  expect(result.message).not.toContain('https://kerfdesk.com');
+  expect(h.fetch).not.toHaveBeenCalled();
+});
+
 describe('main-owned payment proof', () => {
   it('persists the idempotency key and order proof before opening only the approved checkout page', async () => {
     const h = harness();
@@ -581,6 +598,57 @@ describe('main-owned payment proof', () => {
     expect(h.saved()?.payment).toBeUndefined();
     expect(h.openCheckout).not.toHaveBeenCalled();
   });
+  it.each([
+    ['purchase', 'payment_provider_not_configured'],
+    ['renewal', 'payment_provider_not_configured'],
+    ['renewal', 'invalid_credentials'],
+    ['renewal', 'license_revoked'],
+    ['renewal', 'activation_inactive'],
+  ] as const)(
+    'retains a lost %s answer through a later %s refusal and restart',
+    async (operation, code) => {
+      const h = harness();
+      let serverRequest: Record<string, unknown> | undefined;
+      h.fetch.mockImplementationOnce(async (_url, init) => {
+        // The provider/server accepted the order, but the response was lost.
+        serverRequest = JSON.parse(String(init.body)) as Record<string, unknown>;
+        throw new TypeError('response lost after order creation');
+      });
+      await h.runtime.checkout(operation, 'KD1.synthetic-key');
+      const original = structuredClone(h.saved()?.payment);
+      expect(original?.requestId).toBe(serverRequest?.requestId);
+      expect(original?.order).toBeUndefined();
+      h.fetch.mockResolvedValueOnce(Response.json({ error: { code } }, { status: 503 }));
+      const restarted = createLicensingRuntime(h.options);
+      expect(await restarted.checkout(operation, 'KD1.synthetic-key')).toMatchObject({
+        paymentPending: true,
+        paymentOrderId: null,
+      });
+      expect(h.saved()?.payment).toEqual(original);
+      h.fetch.mockResolvedValueOnce(
+        Response.json({
+          orderId: 'accepted-order',
+          claimToken: token,
+          checkoutUrl,
+          amount: operation === 'purchase' ? 4950 : 2000,
+          currency: 'USD',
+        }),
+      );
+      expect(await restarted.checkout('purchase')).toMatchObject({
+        paymentPending: true,
+        paymentOrderId: 'accepted-order',
+      });
+      expect(
+        h.fetch.mock.calls.slice(0, 3).map(([, init]) => JSON.parse(String(init.body))),
+      ).toEqual([serverRequest, serverRequest, serverRequest]);
+      h.fetch.mockResolvedValueOnce(Response.json({ licenseKey: 'KD1.synthetic-key' }));
+      h.fetch.mockResolvedValueOnce(grant());
+      expect(await restarted.claimPayment()).toMatchObject({
+        edition: 'pro',
+        paymentPending: false,
+      });
+    },
+  );
   it('keeps a saved order when the provider is later switched off, so the payment can still be claimed', async () => {
     const h = harness();
     h.fetch.mockResolvedValueOnce(
@@ -629,6 +697,23 @@ describe('main-owned payment proof', () => {
     expect(await h.runtime.claimPayment()).toMatchObject({ paymentPending: true, tier: 'trial' });
     expect(h.saved()?.payment).toBeDefined();
   });
+});
+
+describe('device-management channel boundaries', () => {
+  it.each(['free', 'invalid'] as const)(
+    'never reads saved credentials or sends requests in %s builds',
+    async (channel) => {
+      const h = harness(saved());
+      const runtime = createLicensingRuntime({ ...h.options, config: { channel } });
+      expect(await runtime.devices('KD1.synthetic-key')).toMatchObject({ devices: null });
+      expect(await runtime.releaseDevice('activation-1', 'KD1.synthetic-key')).toMatchObject({
+        devices: null,
+      });
+      expect(h.store.read).not.toHaveBeenCalled();
+      expect(h.store.write).not.toHaveBeenCalled();
+      expect(h.fetch).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('managing the licence’s devices', () => {

@@ -246,7 +246,7 @@ it('lets the key’s owner see and free the licence’s seats (Manage devices)',
   };
   await show({ ...adapter, devices, releaseDevice }, paid);
   await act(async () => button('Manage devices').click());
-  expect(devices).toHaveBeenCalledExactlyOnceWith(undefined);
+  expect(devices).toHaveBeenCalledExactlyOnceWith(paid.licenseKey);
   expect(host.textContent).toContain('Old laptop');
   const remove = () =>
     [...host.querySelectorAll('li')]
@@ -256,7 +256,7 @@ it('lets the key’s owner see and free the licence’s seats (Manage devices)',
   expect(releaseDevice).not.toHaveBeenCalled();
   expect(remove()?.textContent).toBe('Yes, remove it');
   await act(async () => remove()?.click());
-  expect(releaseDevice).toHaveBeenCalledExactlyOnceWith('act-2', undefined);
+  expect(releaseDevice).toHaveBeenCalledExactlyOnceWith('act-2', paid.licenseKey);
   expect(host.textContent).not.toContain('Old laptop');
   expect(host.textContent).toContain('seat is free for another device');
 });

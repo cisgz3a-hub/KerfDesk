@@ -352,7 +352,7 @@ class LicensingService {
         };
       } catch (error) {
         const stored = (await this.options.store.read()) ?? saved;
-        const forgotten = dropUnpayable(stored, error);
+        const forgotten = dropUnpayable(stored, error, saved);
         if (forgotten !== stored) await this.write(forgotten, device);
         return { ...this.evaluate(forgotten, device), message: checkoutFailureMessage(error) };
       }
@@ -405,7 +405,7 @@ class LicensingService {
   readonly releaseDevice = (activationId: string, licenseKey?: string) =>
     this.manageDevices({ licenseKey, activationId });
   private readonly manageDevices = (input: DeviceInput) =>
-    this.serial(() => manageLicenceDevices(this.options.store, this.request, input));
+    this.serial(() => manageLicenceDevices(this.config, this.options.store, this.request, input));
   readonly isReleaseEligible = (releaseEnvelope: unknown, expectedVersion: string) =>
     this.serial(async () => {
       if (this.config.channel !== 'commercial') return false;

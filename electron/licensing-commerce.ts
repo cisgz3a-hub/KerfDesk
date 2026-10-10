@@ -27,11 +27,10 @@ type RenewalIdentity = {
 const CHECKOUT_PAGE = 'https://kerfdesk.com/buy.html?_ptxn=';
 
 /**
- * Checkout refusals the service gives before it contacts the payment provider,
- * so no order and nothing payable exist for the saved request ID. A saved intent
- * without an order is then forgotten: keeping it would show a "pending order"
- * with no order number and hide the trial and purchase actions until the user
- * found Forget this order. Ambiguous answers (checkout_pending) keep the intent.
+ * A refusal before the first provider call can clear a newly created intent.
+ * An inherited intent may have an order whose earlier response was lost: the
+ * service checks configuration and renewal credentials before its prior-order
+ * lookup, so these error codes cannot disprove that order on a retry.
  */
 const UNPAYABLE_CHECKOUT_CODES: ReadonlySet<string> = new Set([
   'payment_provider_not_configured',
@@ -42,9 +41,14 @@ const UNPAYABLE_CHECKOUT_CODES: ReadonlySet<string> = new Set([
   'activation_inactive',
 ]);
 
-/** The record without an intent the service refused before any provider call; otherwise the same record. */
-export function dropUnpayable(saved: LicenceRecord, error: unknown): LicenceRecord {
+/** Clears only a fresh intent refused before any provider call in this attempt. */
+export function dropUnpayable(
+  saved: LicenceRecord,
+  error: unknown,
+  beforeRequest: LicenceRecord,
+): LicenceRecord {
   if (
+    beforeRequest.payment !== undefined ||
     !(error instanceof LicenceServiceError) ||
     !UNPAYABLE_CHECKOUT_CODES.has(error.code) ||
     saved.payment === undefined ||
@@ -67,8 +71,6 @@ export function purchasePageUrl(sandbox = false): string {
 
 export const PURCHASE_PAGE_OPENED =
   'The KerfDesk purchase page opened in your browser. After paying, copy the licence key it shows and enter it here under Licence key.';
-const PURCHASE_PAGE_FAILED =
-  'The purchase page could not be opened. Visit https://kerfdesk.com/buy in your browser, then enter your licence key here.';
 
 export async function openPurchasePage(
   opener: { readonly openPurchasePage?: (url: string) => Promise<void> },
@@ -81,12 +83,16 @@ export async function openPurchasePage(
     status.tier === 'developer'
   )
     return status;
+  const page = purchasePageUrl(config.sandbox === true);
   try {
     if (opener.openPurchasePage === undefined) throw new Error('Purchase page unavailable');
-    await opener.openPurchasePage(purchasePageUrl(config.sandbox === true));
+    await opener.openPurchasePage(page);
     return { ...status, message: PURCHASE_PAGE_OPENED };
   } catch {
-    return { ...status, message: PURCHASE_PAGE_FAILED };
+    return {
+      ...status,
+      message: `The purchase page could not be opened. Visit ${page} in your browser, then enter your licence key here.`,
+    };
   }
 }
 

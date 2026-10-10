@@ -1,3 +1,4 @@
+import type { LicensingConfig } from './licensing-config.js';
 import { LicenceServiceError } from './licensing-http.js';
 import { errorMessage } from './licensing-messages.js';
 import { validLicenceKey, type LicensingStore } from './licensing-store.js';
@@ -22,6 +23,7 @@ export type LicenceDevices = {
 
 const ID = /^[A-Za-z0-9_-]{1,160}$/;
 export const DEVICE_MESSAGES = {
+  unsupported: 'Device management is unavailable in this build.',
   noKey: 'Enter your licence key to see the computers it is active on.',
   removed: 'That computer was removed from the licence. Its seat is free for another device.',
   unreadable:
@@ -95,10 +97,13 @@ export type DeviceInput = {
 };
 const NO_DEVICE_KEY: LicenceDevices = { devices: null, message: DEVICE_MESSAGES.noKey };
 export async function manageLicenceDevices(
+  config: LicensingConfig,
   store: LicensingStore,
   request: Request,
   input: DeviceInput,
 ): Promise<LicenceDevices> {
+  if (config.channel !== 'commercial')
+    return { devices: null, message: DEVICE_MESSAGES.unsupported };
   let saved: string | undefined;
   try {
     saved = (await store.read())?.licenseKey;
@@ -127,5 +132,11 @@ export async function releaseLicenceDevice(
     return deviceFailure(error);
   }
   const listed = await listLicenceDevices(request, licenseKey);
-  return listed.devices === null ? listed : { ...listed, message: DEVICE_MESSAGES.removed };
+  return {
+    ...listed,
+    message:
+      listed.devices === null
+        ? `${DEVICE_MESSAGES.removed} The device list could not be refreshed. ${listed.message ?? ''}`.trim()
+        : DEVICE_MESSAGES.removed,
+  };
 }

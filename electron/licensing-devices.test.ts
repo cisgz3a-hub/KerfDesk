@@ -82,6 +82,17 @@ describe('freeing a seat', () => {
       { licenseKey: KEY, activationId: 'act-2' },
     ]);
   });
+  it('confirms a successful removal even when refreshing the device list fails', async () => {
+    const request = vi.fn(async (path: string) => {
+      if (path === '/v1/licenses/deactivate') return { deactivated: true };
+      throw new TypeError('list refresh failed');
+    });
+    const result = await releaseLicenceDevice(request, KEY, 'act-2');
+    expect(result.devices).toBeNull();
+    expect(result.message).toContain(DEVICE_MESSAGES.removed);
+    expect(result.message).toContain('refresh');
+    expect(request).toHaveBeenCalledTimes(2);
+  });
   it('explains a release the service refuses and never claims the seat was freed', async () => {
     const request = vi.fn(async () => {
       throw new LicenceServiceError('release_limit_reached');
