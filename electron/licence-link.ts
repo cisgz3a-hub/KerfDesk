@@ -1,4 +1,4 @@
-// kerfdesk://licence opens Help > Licence (ADR-578). The purchase page's
+// kerfdesk://licence opens Help > Licence (ADR-579). The purchase page's
 // "Copy key & open KerfDesk" copies the key, then follows this link, so a buyer
 // lands on the licence panel with the key already filled in.
 //

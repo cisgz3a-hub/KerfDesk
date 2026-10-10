@@ -152,7 +152,7 @@ export function createDesktopLicensing(options: Options) {
   };
 }
 
-/** kerfdesk://licence for a packaged, non-sandbox commercial Windows build only (ADR-578). */
+/** kerfdesk://licence for a packaged, non-sandbox commercial Windows build only (ADR-579). */
 function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
   return installLicenceLink(app, {
     enabled:

@@ -85,7 +85,7 @@ requirement; public unsigned distribution would need a separately reviewed lane.
 macOS commercial signing/notarization and signed update qualification remain a
 separate launch prerequisite; no macOS auto-update claim is made here.
 
-### Moving customers from unsigned to signed Windows releases (ADR-578)
+### Moving customers from unsigned to signed Windows releases (ADR-579)
 
 Installed unsigned copies only ever read `desktop/commercial-manual/latest.json`;
 the signed release train never writes it. Switching to signed releases without a
@@ -95,7 +95,7 @@ hand-off would leave every current customer on their last unsigned version.
    "Switching it on" under the weekly release train below.
 2. Before the last unsigned release, make sure installed copies accept
    `codeSigning: "authenticode"` in the manual manifest: every release from the
-   ADR-578 change on does. Publish at least one unsigned release containing it.
+   ADR-579 change on does. Publish at least one unsigned release containing it.
 3. Publish the first signed installer to the manual lane as well, with
    `codeSigning: "authenticode"` (`scripts/manual-commercial-manifest.mjs` still
    writes only `"unsigned"`; extend it then). Unsigned copies offer it through

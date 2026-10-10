@@ -1,4 +1,4 @@
-## ADR-578 - Easier download and licence activation (2026-10-10)
+## ADR-579 - Easier download and licence activation (2026-10-10)
 
 **Status:** Accepted by the owner's instruction to make downloading and inserting a licence easier
 ("All three, this PR": the open-KerfDesk link, emailing the key and code-signing wiring) | **Date:**

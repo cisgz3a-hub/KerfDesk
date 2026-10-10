@@ -1,6 +1,6 @@
 /* global AbortSignal, URL, fetch */
 // Emails a buyer their licence key once Paddle's signed webhook has fulfilled the
-// purchase (ADR-578), so a key survives a closed tab or a cleared browser.
+// purchase (ADR-579), so a key survives a closed tab or a cleared browser.
 //
 // The buyer's address comes from Paddle (GET /customers/{id}) only at send time. It
 // is never stored, logged or audited; the order records only whether sending

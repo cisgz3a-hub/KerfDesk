@@ -51,7 +51,7 @@ export function validateManualDownload(value, now = Date.now()) {
       value.channel === 'stable' &&
       // 'authenticode' lets the first Windows code-signed release reach installed
       // unsigned copies through this lane once; that release then updates itself
-      // through the signed lane (ADR-578).
+      // through the signed lane (ADR-579).
       ['unsigned', 'authenticode'].includes(value.codeSigning) &&
       value.updates === 'manual',
     'payload identity',
