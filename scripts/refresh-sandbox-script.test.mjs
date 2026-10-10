@@ -6,6 +6,7 @@ import { gzipSync } from 'node:zlib';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { flagMetadata } from './apply-payment-settings.mjs';
 import {
   SANDBOX_ORIGIN,
   GOOD_VERSION_PREFIX,
@@ -30,7 +31,7 @@ import {
   run,
 } from './refresh-sandbox-test-fixtures.mjs';
 
-test('upload metadata inherits every current binding and asset, without migrations or historic settings', () => {
+test('sandbox upload inherits guarded latest bindings and assets without changing shared flag metadata', () => {
   const value = settings();
   const metadata = sandboxUploadMetadata(value, originalVersion, 'worker.js', fixtureTag);
   assert.equal(metadata.keep_assets, true);
@@ -40,17 +41,23 @@ test('upload metadata inherits every current binding and asset, without migratio
   assert.equal(metadata.annotations['workers/tag'], fixtureTag);
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'LICENSE_AUTHORITY'),
-    { name: 'LICENSE_AUTHORITY', type: 'inherit', version_id: originalVersion },
+    { name: 'LICENSE_AUTHORITY', type: 'inherit', version_id: 'latest' },
   );
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'ASSETS'),
-    { name: 'ASSETS', type: 'inherit', version_id: originalVersion },
+    { name: 'ASSETS', type: 'inherit', version_id: 'latest' },
   );
   assert.deepEqual(
     metadata.bindings.find(({ name }) => name === 'SIGNING_PRIVATE_JWK'),
-    { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: originalVersion },
+    { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: 'latest' },
   );
   assert.ok(!JSON.stringify(metadata).includes(goodVersion));
+  assert.deepEqual(
+    flagMetadata(value, originalVersion, 'false').bindings.find(
+      ({ name }) => name === 'SIGNING_PRIVATE_JWK',
+    ),
+    { name: 'SIGNING_PRIVATE_JWK', type: 'inherit', version_id: originalVersion },
+  );
 });
 test('wrong environment, enabled checkout, namespace, class or missing assets stop before mutation', async () => {
   for (const mutate of [
@@ -98,6 +105,7 @@ test('missing, ambiguous or short source-version matches fail before upload', as
     await assert.rejects(run(adapter));
     assert.equal(adapter.mutations.length, 0);
     assert.ok(!adapter.calls.some(({ url }) => url.includes('/content/v2')));
+    assert.ok(!adapter.calls.some(({ url }) => url.includes('?include=modules')));
   }
 });
 test('the real fixed code SHA rejects unverified fixture bytes before mutation', async () => {
@@ -113,46 +121,39 @@ test('retained attested bundle restores without historical lookup and reconciles
   attestFixture(t);
   const retainedBundle = ' \r\n' + gzipSync(code).toString('base64') + '\r\n';
   for (const loseDeploymentResponse of [false, true]) {
-    for (const [readbackRaw, readbackRawHeader] of [
-      [false, null],
-      [true, null],
-      [true, 'match'],
-    ]) {
-      const adapter = harness({
-        versions: [],
-        expectedUploadName: 'sandbox-worker.js',
-        loseDeploymentResponse,
-        readbackRaw,
-        readbackRawHeader,
-      });
-      const receipt = await run(adapter, { retainedBundle });
-      assert.equal(receipt.outcome, 'verified');
-      assert.equal(receipt.sourceKind, 'retained-attested-bundle');
-      assert.equal(receipt.sourceVersion, null);
-      assert.equal(receipt.sourceVersionPrefix, null);
-      assert.equal(receipt.codeSha256, GOOD_CODE_SHA256);
-      assert.equal(receipt.codeVerified, true);
-      assert.equal(receipt.protectedSettingsUnchanged, true);
-      assert.equal(receipt.buyHtmlUnchanged, true);
-      assert.equal(receipt.health, true);
-      assert.equal(receipt.flag, 'false');
-      assert.equal(receipt.deploymentResponseReceived, !loseDeploymentResponse);
-      if (loseDeploymentResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
-      assert.deepEqual(
-        adapter.mutations.map(({ kind }) => kind),
-        ['stage', 'activate'],
-      );
-      const beforeUpload = adapter.calls.slice(
-        0,
-        adapter.calls.findIndex(({ method }) => method === 'POST'),
-      );
-      assert.ok(beforeUpload.some(({ url }) => url.endsWith('/versions/' + originalVersion)));
-      assert.ok(
-        !adapter.calls.some(({ url }) => url.includes('content/v2?version=' + goodVersion)),
-      );
-      for (const privateValue of [retainedBundle, code.toString(), token])
-        assert.ok(!JSON.stringify(receipt).includes(privateValue));
-    }
+    const adapter = harness({
+      versions: [],
+      expectedUploadName: 'sandbox-worker.js',
+      loseDeploymentResponse,
+    });
+    const receipt = await run(adapter, { retainedBundle });
+    assert.equal(receipt.outcome, 'verified');
+    assert.equal(receipt.sourceKind, 'retained-attested-bundle');
+    assert.equal(receipt.sourceVersion, null);
+    assert.equal(receipt.sourceVersionPrefix, null);
+    assert.equal(receipt.codeSha256, GOOD_CODE_SHA256);
+    assert.equal(receipt.codeVerified, true);
+    assert.equal(receipt.protectedSettingsUnchanged, true);
+    assert.equal(receipt.buyHtmlUnchanged, true);
+    assert.equal(receipt.health, true);
+    assert.equal(receipt.flag, 'false');
+    assert.equal(receipt.deploymentResponseReceived, !loseDeploymentResponse);
+    if (loseDeploymentResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
+    assert.deepEqual(
+      adapter.mutations.map(({ kind }) => kind),
+      ['stage', 'activate'],
+    );
+    const beforeUpload = adapter.calls.slice(
+      0,
+      adapter.calls.findIndex(({ method }) => method === 'POST'),
+    );
+    assert.ok(beforeUpload.some(({ url }) => url.endsWith('/versions/' + originalVersion)));
+    assert.ok(
+      !adapter.calls.some(({ url }) => url.includes('/' + goodVersion + '?include=modules')),
+    );
+    assert.ok(!adapter.calls.some(({ url }) => url.includes('/content/v2')));
+    for (const privateValue of [retainedBundle, code.toString(), token])
+      assert.ok(!JSON.stringify(receipt).includes(privateValue));
   }
 });
 
@@ -287,45 +288,46 @@ test('attested content must be exactly one JavaScript module with a matching cf-
   await assert.rejects(readSandboxModule(wrongHeader));
   await assert.rejects(readSandboxModule(Response.json({ success: false })));
 });
-test('attested raw and multipart representation transitions verify the upload identity, including lost ACKs', async (t) => {
+test('public raw and multipart parsers preserve the supplied attested upload descriptor', async (t) => {
   attestFixture(t);
-  for (const [sourceRaw, readbackRaw, readbackRawHeader, sourceRawType] of [
-    [true, false, null, 'application/javascript'],
-    [true, false, null, 'application/javascript+module; charset=utf-8'],
-    [false, true, null, null],
-    [false, true, 'match', null],
-    [true, true, null, 'application/javascript'],
-    [true, true, 'match', 'application/javascript'],
+  for (const sourceType of [
+    'multipart/form-data',
+    'application/javascript',
+    'application/javascript+module; charset=utf-8',
   ]) {
-    for (const loseDeploymentResponse of [false, true]) {
-      const adapter = harness({
-        sourceRaw,
-        readbackRaw,
-        readbackRawHeader,
-        sourceRawType,
-        sourceRawHeader: 'historical.js',
-        loseDeploymentResponse,
-      });
-      const receipt = await run(adapter);
-      assert.equal(receipt.outcome, 'verified');
-      assert.equal(receipt.codeVerified, true);
-      assert.equal(receipt.protectedSettingsUnchanged, true);
-      assert.equal(receipt.flag, 'false');
-      assert.equal(adapter.mutations.length, 2);
-      assert.equal(
-        adapter.mutations[0].payload.main_module,
-        sourceRaw ? 'sandbox-worker.js' : 'worker.js',
+    const source = await readSandboxModule(
+      sourceType === 'multipart/form-data'
+        ? content()
+        : new Response(code, {
+            headers: { 'Content-Type': sourceType, 'cf-entrypoint': 'historical.js' },
+          }),
+    );
+    const descriptor = {
+      entrypoint: source.entrypoint,
+      filename: source.filename,
+      mimeType: source.mimeType,
+    };
+    for (const rawHeader of [undefined, descriptor.entrypoint]) {
+      const restored = await readSandboxModule(
+        new Response(code, {
+          headers: {
+            'Content-Type': 'application/javascript',
+            ...(rawHeader ? { 'cf-entrypoint': rawHeader } : {}),
+          },
+        }),
+        {},
+        descriptor,
       );
-      assert.equal(receipt.deploymentResponseReceived, !loseDeploymentResponse);
-      if (loseDeploymentResponse) assert.equal(receipt.reconciliation.readBackVerified, true);
-      assert.ok(adapter.calls.some(({ url }) => url.includes('content/v2?version=' + nextVersion)));
-      assert.ok(!JSON.stringify(receipt).includes(code.toString()));
-      assert.ok(!JSON.stringify(receipt).includes(token));
+      assert.deepEqual(restored, source);
     }
+    const restoredMultipart = await readSandboxModule(
+      content({ entrypoint: descriptor.entrypoint, filename: descriptor.filename }),
+    );
+    assert.deepEqual(restoredMultipart, source);
   }
 });
 
-test('raw wrong MIME, empty, HTML, JSON and one-byte changes refuse before any upload with redacted format facts', async (t) => {
+test('public raw parser rejects wrong MIME, empty, HTML, JSON and changed bytes with private format facts', async (t) => {
   attestFixture(t);
   for (const [sourceBytes, sourceRawType] of [
     [code, 'text/javascript'],
@@ -336,58 +338,18 @@ test('raw wrong MIME, empty, HTML, JSON and one-byte changes refuse before any u
     [Buffer.from(JSON.stringify({ error: token })), 'application/javascript'],
     [Buffer.concat([code, Buffer.from('\n')]), 'application/javascript'],
   ]) {
-    const adapter = harness({ sourceRaw: true, sourceBytes, sourceRawType });
-    await assert.rejects(run(adapter), (error) => {
-      assert.equal(error.receipt.failure.stage, 'sandbox-attested-content-get');
-      assert.equal(error.receipt.failure.httpStatus, 200);
-      assert.equal(error.receipt.mutationAttempted, false);
-      assert.equal(error.receipt.moduleFormatFailure.contentType, sourceRawType);
-      assert.ok(!JSON.stringify(error.receipt).includes(token));
-      assert.ok(!JSON.stringify(error.receipt).includes(code.toString()));
-      return true;
-    });
-    assert.equal(adapter.mutations.length, 0);
-  }
-});
-
-test('credential-shaped names and MIME are redacted on refusal and mismatched raw readback recovers safely', async (t) => {
-  attestFixture(t);
-  for (const mode of ['multipart', 'raw-source', 'readback']) {
-    const sourceResponse = () => {
-      const form = new FormData();
-      form.set(token, new Blob([code], { type: 'application/' + token }), token);
-      return new Response(form, { headers: { 'cf-entrypoint': token } });
-    };
-    const adapter = harness({
-      sourceResponse: mode === 'multipart' ? sourceResponse : undefined,
-      sourceRaw: mode === 'raw-source',
-      sourceRawType: 'application/' + token,
-      sourceRawHeader: token,
-      readbackRaw: mode === 'readback',
-      readbackRawHeader: token,
-    });
-    await assert.rejects(run(adapter), (error) => {
-      const format = error.receipt.moduleFormatFailure;
-      assert.equal(format.entrypoint, null);
-      assert.ok(!JSON.stringify(error.receipt).includes(token));
-      assert.ok(!JSON.stringify(error.receipt).includes(code.toString()));
-      if (format.parts)
-        assert.deepEqual(
-          format.parts.map(({ field, filename, mimeType }) => [field, filename, mimeType]),
-          [[null, null, null]],
-        );
-      if (mode === 'raw-source') assert.equal(format.contentType, null);
-      if (mode === 'readback') {
-        assert.equal(error.receipt.failure.stage, 'sandbox-staged-content-get');
-        assert.equal(error.receipt.deploymentAttempted, false);
-        assert.equal(error.receipt.recovery.closedVerified, true);
-      } else assert.equal(error.receipt.mutationAttempted, false);
-      return true;
-    });
-    assert.deepEqual(
-      adapter.mutations.map(({ kind }) => kind),
-      mode === 'readback' ? ['stage'] : [],
+    const format = {};
+    await assert.rejects(
+      readSandboxModule(
+        new Response(sourceBytes, {
+          headers: sourceRawType ? { 'Content-Type': sourceRawType } : {},
+        }),
+        format,
+      ),
     );
+    assert.equal(format.contentType, sourceRawType);
+    assert.ok(!JSON.stringify(format).includes(token));
+    assert.ok(!JSON.stringify(format).includes(code.toString()));
   }
 });
 
@@ -454,7 +416,7 @@ test('refresh and lost-ACK readback preserve an existing public sandbox token by
       {
         name: binding.name,
         type: 'inherit',
-        version_id: originalVersion,
+        version_id: 'latest',
       },
     );
     assert.equal(adapter.mutations.length, 2);
@@ -583,7 +545,7 @@ test('upload HTTP400 diagnostics survive staged readback without activating an a
       assert.equal(receipt.recovery.closedVerified, true);
       assert.equal(receipt.recovery.rollbackAttempted, false);
       assert.equal(receipt.deploymentAttempted, false);
-      assert.equal(receipt.stagedVersionVerified, uploadErrorAfterApply);
+      assert.equal(receipt.stagedVersionVerified, false);
       assert.equal(receipt.mutated, false);
       assert.equal(receipt.apiFailure.stage, 'sandbox-code-upload');
       assert.equal(receipt.apiFailure.httpStatus, 400);

@@ -339,7 +339,7 @@ test('upload metadata strips only analysis while preserving placement, bindings 
       {
         name: item.name,
         type: 'inherit',
-        version_id: originalVersion,
+        version_id: 'latest',
       },
     );
   assert.deepEqual(metadata.observability, value.observability);
