@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserLocalStorage } from '../state/browser-local-storage';
 import { useLaserStore } from '../state/laser-store';
-import { isActiveJobStatus } from '../state/laser-store-helpers';
 import { usePendingProProjectStore } from '../state/pending-pro-project';
 import { useUiStore } from '../state/ui-store';
-import { unownedControllerMotion } from '../state/unowned-controller-motion';
 import { DesktopWelcomeDialog } from './DesktopWelcomeDialog';
+import { machineWorkActive } from './machine-work-active';
 
 export const BROWSER_WELCOME_KEY = 'kerfdesk.browser-welcome.v1';
 
@@ -30,15 +29,7 @@ export function BrowserDesktopWelcome({
   const closing = useRef(false);
   const modalDepth = useUiStore((state) => state.modalDepth);
   const preservedProject = usePendingProProjectStore((state) => state.pending !== null);
-  const busy = useLaserStore(
-    (state) =>
-      isActiveJobStatus(state.streamer?.status ?? null) ||
-      state.motionOperation !== null ||
-      state.controllerOperation !== null ||
-      state.fireActive ||
-      state.mpgActive === true ||
-      unownedControllerMotion(state) !== null,
-  );
+  const busy = useLaserStore(machineWorkActive);
   const close = useCallback(() => {
     if (closing.current) return;
     closing.current = true;

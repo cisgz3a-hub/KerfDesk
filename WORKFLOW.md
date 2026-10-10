@@ -8097,6 +8097,12 @@ Selecting **Download update** immediately shows that the request is starting. Th
 3. An update close waits for active jobs, Fire, owned machine work, pending Frame/Job Review, observed external motion or spindle-on state. It never sends Abort or forces an unavailable window closed. Finish work and choose the action again; there is no delayed automatic close.
 4. Only approved actual closure can launch the reverified installer. Windows shutdown, close failure, changed owners or bad update verification do not authorise execution. The installer remains interactive and unsigned, and may show Windows publisher warnings.
 
+#### Success - update prompt on the canvas (ADR-561 Amendment 5)
+
+1. When a manual update is offered, a non-modal **Update available** card appears at the top centre of the canvas with the new version and up to three improvement notes. **Update** starts the same download as **Download update**; **Not now** clears the card until KerfDesk next starts. The status bar button and Help → Check for Updates remain.
+2. After **Update**, the card shows download progress (**Hide** keeps downloading in the background). Once verified it shows **Update ready to install** with **Install now** (the explicit install-and-close action above), **When I close** (install on a normal close) and **Not now**. Downloading never installs by itself.
+3. The card does not appear, and hides, while a job, Fire, owned or external motion, MPG, a modal dialog or the updates panel owns the window; it returns once that ends. A failure after the user acted in the card is reported there with **Details**, which opens Help → Check for Updates.
+
 1. On each packaged unsigned Preview launch, KerfDesk makes at most one anonymous
    metadata request to `https://dl.kerfdesk.com/desktop/previews/latest.json`.
    Main verifies the signed envelope against its packaged Preview public keys and

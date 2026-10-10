@@ -10,6 +10,7 @@ import { CommandShell } from '../commands';
 import { CanvasGcodeView, CanvasViewSwitch } from '../gcode-inspector';
 import { useCanvasViewStore } from '../state/canvas-view-store';
 import { useEdition } from '../licensing/edition';
+import { UpdatePrompt } from '../licensing/UpdatePrompt';
 import { LiveMotionBar, useJobShortcuts } from '../laser';
 import { MachineSetupDialogHost } from '../laser/device-setup';
 import { BoardCapturePanel } from '../laser/board-capture';
@@ -165,6 +166,7 @@ function CanvasArea(): JSX.Element {
       <BoardCapturePanel />
       {!showGcode ? <CncStockCanvasHud /> : null}
       <MachineSetupBanner />
+      <UpdatePrompt />
     </>
   );
   return (

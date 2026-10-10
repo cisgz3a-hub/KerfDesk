@@ -1,5 +1,6 @@
-// The desktop status bar announces offered and downloaded versions without a
-// pop-up. It opens Help > Check for Updates and never closes the app itself.
+// The desktop status bar announces offered and downloaded versions; the canvas
+// UpdatePrompt offers the same actions once per stage. It opens Help > Check
+// for Updates and never closes the app itself.
 
 import type { CommercialUpdateStatus } from '../../platform/types';
 import { useCommercialUpdateStore } from '../state/commercial-update-store';
