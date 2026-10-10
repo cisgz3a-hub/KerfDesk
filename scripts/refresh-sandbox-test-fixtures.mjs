@@ -11,6 +11,7 @@ export const originalVersion = '11111111-1111-4111-8111-111111111111';
 export const goodVersion = '202ea7dc-1111-4111-8111-111111111111';
 export const nextVersion = '22222222-2222-4222-8222-222222222222';
 export const unrelatedVersion = '33333333-3333-4333-8333-333333333333';
+export const originalNumber = 3;
 export const fixtureTag = 'kerfdesk-sandbox-refresh-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 export const code = Buffer.from(
   'export class SandboxLicenseAuthority {}; export default {fetch() {return new Response("ok");}};',
@@ -137,10 +138,14 @@ export function harness({
   sourceBytes = code,
   sourceExtra = false,
   sourceRaw = false,
-  expectedUploadName = sourceRaw ? 'sandbox-worker.js' : 'worker.js',
+  expectedUploadName = 'worker.js',
   sourceRawType = 'application/javascript',
   sourceRawHeader,
   sourceResponse,
+  sourceBetaChange,
+  stagedBetaChange,
+  originalBetaChange,
+  standardContentReturnsActive = false,
   readbackRaw = false,
   readbackRawHeader = null,
   loseUploadResponse = false,
@@ -153,6 +158,10 @@ export function harness({
   postChange,
   originalResourceChange,
   stagedResourceChange,
+  initialLatestVersion,
+  inactiveUploadAtLatestRead,
+  latestListChange,
+  stagedVersionNumber,
   stagedCode = code,
   badHealth = false,
   changedBuy = false,
@@ -165,6 +174,7 @@ export function harness({
   const originalId = version;
   let reads = 0,
     settingsReads = 0,
+    latestReads = 0,
     healthFailures = 0;
   let uploadedTag, staged;
   let activated = false;
@@ -178,6 +188,26 @@ export function harness({
       },
     ],
   ]);
+  const history = [
+    { id: originalId, number: originalNumber },
+    ...versions
+      .filter(({ id }) => id !== originalId)
+      .map((item, index) => ({ number: Math.max(1, originalNumber - index - 1), ...item })),
+  ];
+  const externalUploads = [];
+  const uploadInactive = (id) => {
+    assert.ok(!history.some((item) => item.id === id), 'Fixture inactive upload must be new.');
+    const number = Math.max(...history.map((item) => item.number)) + 1;
+    history.unshift({ id, number, annotations: { 'workers/tag': 'unrelated-operator' } });
+    records.set(id, {
+      value: structuredClone(original),
+      bytes: Buffer.from('unrelated inactive upload'),
+      name: 'worker.js',
+    });
+    externalUploads.push(id);
+  };
+  if (initialLatestVersion && initialLatestVersion !== originalId)
+    uploadInactive(initialLatestVersion);
   const calls = [],
     mutations = [];
   const authorityState = {
@@ -207,6 +237,38 @@ export function harness({
           ? new Response(token, { status: failedSettingsStatus })
           : ok(value);
       }
+      if (
+        endpoint.pathname.includes('/workers/workers/') &&
+        endpoint.pathname.includes('/versions/')
+      ) {
+        assert.equal(init.method ?? 'GET', 'GET');
+        assert.equal(endpoint.search, '?include=modules');
+        const selected = endpoint.pathname.split('/').at(-1);
+        assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
+        const record = records.get(selected) ?? { bytes: sourceBytes, name: 'worker.js' };
+        const result = {
+          id: selected,
+          number: history.find((item) => item.id === selected)?.number ?? originalNumber - 1,
+          main_module: record.name,
+          modules: [
+            {
+              name: record.name,
+              content_type: 'application/javascript+module',
+              content_base64: record.bytes.toString('base64'),
+            },
+          ],
+        };
+        if (selected === goodVersion && sourceExtra)
+          result.modules.push({
+            name: 'extra.js',
+            content_type: 'application/javascript+module',
+            content_base64: Buffer.from('export {};').toString('base64'),
+          });
+        if (selected === originalId && originalBetaChange) originalBetaChange(result);
+        if (selected === goodVersion && sourceBetaChange) sourceBetaChange(result);
+        if (selected === nextVersion && stagedBetaChange) stagedBetaChange(result);
+        return ok(result);
+      }
       if (endpoint.pathname.includes('/versions/')) {
         const selected = endpoint.pathname.split('/').at(-1);
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
@@ -223,7 +285,7 @@ export function harness({
         const selectedValue = selected === nextVersion ? staged.value : original;
         const result = {
           id: selected === nextVersion && ownership === 'wrong-id' ? unrelatedVersion : selected,
-          number: 3,
+          number: history.find((item) => item.id === selected)?.number ?? originalNumber - 1,
           metadata: { source: 'api', created_on: '2026-10-08T00:00:00Z' },
           annotations,
           resources: versionResources(selectedValue),
@@ -242,11 +304,21 @@ export function harness({
         return ok(result);
       }
       if (endpoint.pathname.endsWith('/versions') && init.method !== 'POST') {
+        if (!endpoint.searchParams.has('deployable')) {
+          for (const key of endpoint.searchParams.keys())
+            assert.ok(['page', 'per_page'].includes(key));
+          assert.equal(endpoint.searchParams.get('page') ?? '1', '1');
+          latestReads += 1;
+          if (inactiveUploadAtLatestRead === latestReads) uploadInactive(unrelatedVersion);
+          const items = structuredClone(history.slice(0, 10));
+          if (latestListChange) latestListChange(items, latestReads);
+          return ok({ items });
+        }
         assert.equal(endpoint.search, '?deployable=true');
         return ok({
           items: [
             ...versions,
-            ...(staged ? [{ id: nextVersion, annotations: { 'workers/tag': uploadedTag } }] : []),
+            ...(staged ? [structuredClone(history.find((item) => item.id === nextVersion))] : []),
             ...(duplicateOperationTag && staged
               ? [{ id: unrelatedVersion, annotations: { 'workers/tag': uploadedTag } }]
               : []),
@@ -256,6 +328,12 @@ export function harness({
       if (endpoint.pathname.endsWith('/content/v2')) {
         const selected = endpoint.searchParams.get('version');
         assert.ok([goodVersion, originalVersion, nextVersion, unrelatedVersion].includes(selected));
+        // The standard endpoint can ignore the requested UUID and serve active code.
+        // Exact-version operator verification must never depend on this response.
+        if (standardContentReturnsActive) {
+          const active = records.get(version);
+          return content({ bytes: active.bytes, entrypoint: active.name, filename: active.name });
+        }
         if (selected === goodVersion && sourceResponse) return sourceResponse();
         const record = records.get(selected) ?? { bytes: sourceBytes, name: 'worker.js' };
         if (selected === nextVersion && readbackRaw)
@@ -340,7 +418,7 @@ export function harness({
             binding,
             binding.name === 'PAYMENTS_ENABLED'
               ? { name: 'PAYMENTS_ENABLED', type: 'plain_text', text: 'false' }
-              : { name: binding.name, type: 'inherit', version_id: originalId },
+              : { name: binding.name, type: 'inherit', version_id: 'latest' },
           );
         assert.deepEqual(payload.observability, original.observability);
         assert.deepEqual(payload.tags, original.tags);
@@ -357,6 +435,11 @@ export function harness({
             : new Response(token, { status: 403 });
         staged = { value: structuredClone(original), bytes: stagedCode, name: payload.main_module };
         records.set(nextVersion, staged);
+        history.unshift({
+          id: nextVersion,
+          number: stagedVersionNumber ?? Math.max(...history.map((item) => item.number)) + 1,
+          annotations: { 'workers/tag': uploadedTag },
+        });
         if (concurrentAfterStage) version = unrelatedVersion;
         if (loseUploadResponse) throw new Error('Ambiguous staged response ' + token);
         if (uploadErrorAfterApply) return Response.json(uploadErrorBody, { status: 400 });
@@ -389,6 +472,9 @@ export function harness({
     mutations,
     flag: () => value.bindings.find(({ name }) => name === 'PAYMENTS_ENABLED').text,
     version: () => version,
+    latest: () => history[0].id,
+    latestReads: () => latestReads,
+    externalUploads,
     binding: (name) => structuredClone(value.bindings.find((binding) => binding.name === name)),
     authorityState,
   };
