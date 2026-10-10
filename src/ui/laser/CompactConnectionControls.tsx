@@ -8,6 +8,8 @@ type Props = {
   readonly statusDot: ReactNode;
   readonly machine?: ReactNode;
   readonly details?: ReactNode;
+  /** Rendered before the machine name, such as the Laser / CNC switch. */
+  readonly leading?: ReactNode;
   readonly children: ReactNode;
 };
 
@@ -37,6 +39,9 @@ export function CompactConnectionControls(props: Props): JSX.Element {
           if (event.target instanceof Node && !triggerRef.current?.contains(event.target)) close();
         }}
       >
+        {props.leading === undefined ? null : (
+          <div className="lf-connection-leading">{props.leading}</div>
+        )}
         <button
           ref={triggerRef}
           id={triggerId}

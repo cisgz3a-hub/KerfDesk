@@ -297,7 +297,7 @@ async function expectConnected(toolbar: Locator): Promise<void> {
 }
 
 async function saveSetup(setup: Locator): Promise<void> {
-  await setup.getByRole('button', { name: 'Review & save', exact: true }).click();
+  await setup.getByRole('button', { name: 'Review setup', exact: true }).click();
   await expect(setup).toContainText('Step 3 of 3');
   await setup.getByRole('button', { name: 'Save machine setup', exact: true }).click();
   await expect(setup).toHaveCount(0);

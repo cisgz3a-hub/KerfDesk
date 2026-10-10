@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { machineKindOf, type Layer } from '../../core/scene';
 import { CollapsedRail } from '../common';
 import { Icon, IconButton } from '../kit';
-import { MachineModeToggle } from '../machine/MachineModeToggle';
 import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { ArtworkPanelTabs } from './ArtworkPanelTabs';
@@ -42,7 +41,6 @@ export function CutsLayersPanel(): JSX.Element {
     >
       <header className="lf-artwork-panel-heading">
         <h2>Artwork</h2>
-        <MachineModeToggle />
         <IconButton
           icon="chevron-right"
           size="sm"

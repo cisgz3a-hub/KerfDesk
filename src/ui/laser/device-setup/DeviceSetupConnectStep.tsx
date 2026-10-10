@@ -153,12 +153,28 @@ function StartActions(props: {
       </Button>
       {props.failed ? <ChoosePort model={model} /> : null}
       {props.phase.kind === 'idle' ? (
-        <Button variant="ghost" onClick={() => props.onOffline(true)}>
+        <Button
+          onClick={(event) => {
+            focusMachineType(event.currentTarget);
+            props.onOffline(true);
+          }}
+          title="Choose the machine type and a profile below without connecting."
+        >
           Set up without connecting
         </Button>
       ) : null}
     </div>
   );
+}
+
+// The button leaves with the idle phase, so focus moves to the next choice
+// (the machine type) instead of falling back to the document.
+function focusMachineType(from: HTMLElement): void {
+  const types = from
+    .closest('.lf-setup-stack')
+    ?.querySelector<HTMLElement>('.lf-setup-machine-types');
+  types?.querySelector<HTMLInputElement>('input:checked')?.focus({ preventScroll: true });
+  types?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
 }
 
 function FoundActions({ model }: { readonly model: FindMachineModel }): JSX.Element {

@@ -47,6 +47,8 @@ type Props = {
   readonly machine?: ReactNode;
   /** The Machine Setup entry, beside the primary action. */
   readonly setup?: ReactNode;
+  /** The Laser / CNC switch, first in the row. */
+  readonly mode?: ReactNode;
 };
 
 export function ConnectionBar(props: Props): JSX.Element {
@@ -63,6 +65,7 @@ export function ConnectionBar(props: Props): JSX.Element {
         statusDot={<StatusDot connection={connection} />}
         machine={props.machine}
         details={props.details}
+        leading={props.mode}
       >
         <PrimaryAction {...props} />
         {props.setup}
