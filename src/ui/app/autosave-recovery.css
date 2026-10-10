@@ -1,0 +1,29 @@
+.lf-autosave-recovery__trigger {
+  gap: 5px;
+  padding: 1px 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: inherit;
+}
+
+.lf-autosave-recovery__panel {
+  width: 280px;
+  padding: 12px;
+}
+
+.lf-autosave-recovery__panel p {
+  margin: 6px 0 12px;
+  color: var(--lf-text-muted);
+  line-height: 1.5;
+}
+
+.lf-autosave-recovery__actions {
+  display: flex;
+  gap: 6px;
+}
+
+@media (max-width: 600px) {
+  .lf-autosave-recovery__trigger span {
+    display: none;
+  }
+}
