@@ -1,6 +1,12 @@
 import { Fragment } from 'react';
 import { cncFramingFeedMmPerMin, cncMaxFeedMmPerMin } from '../../../core/cnc/cnc-head-feeds';
+import {
+  GRBL_GCODE_DIALECTS,
+  MARLIN_GCODE_DIALECTS,
+  type DeviceProfile,
+} from '../../../core/devices';
 import { Button } from '../../kit';
+import { originLabel } from '../DeviceProfileFields';
 import type { DeviceSetupStepProps } from './device-setup-flow';
 import { deviceSetupSupportsMachineKind } from './device-setup-flow';
 import type { FirmwareDiff } from './device-setup-firmware-diff';
@@ -70,15 +76,23 @@ function connectionRows(
     ['Profile', state.draft.name],
     ['Controller', `${guide.label} (${guide.transportLabel})`],
     ['Baud', serial ? String(state.draft.baudRate ?? guide.defaultBaudRate) : 'Not used'],
-    ['Output', serial ? state.draft.gcodeDialect.dialectId : 'Ruida .rd file'],
-    [
-      'Streaming',
-      serial
-        ? `${state.draft.streamingMode}${state.draft.streamingMode === 'char-counted' ? `, ${state.draft.rxBufferBytes} bytes` : ''}`
-        : 'Not used',
-    ],
+    ['Output', serial ? dialectLabel(state.draft) : 'Ruida .rd file'],
+    ['Streaming', serial ? streamingLabel(state.draft) : 'Not used'],
     ['Firmware after save', firmwareSummary(firmwareWrites)],
   ];
+}
+
+// The names Connection options shows, not the stored identifiers.
+function dialectLabel(draft: DeviceProfile): string {
+  const id = draft.gcodeDialect.dialectId;
+  const dialect = [...GRBL_GCODE_DIALECTS, ...MARLIN_GCODE_DIALECTS].find((item) => item.id === id);
+  return dialect?.label ?? id;
+}
+
+function streamingLabel(draft: DeviceProfile): string {
+  return draft.streamingMode === 'char-counted'
+    ? `Buffered receive window, ${draft.rxBufferBytes} bytes`
+    : 'One acknowledged line at a time';
 }
 
 function workspaceRows(state: DeviceSetupStepProps['state']): ReviewRows {
@@ -88,11 +102,11 @@ function workspaceRows(state: DeviceSetupStepProps['state']): ReviewRows {
   );
   return [
     ['Work area', `${state.draft.bedWidth} × ${state.draft.bedHeight} mm`],
-    ['Origin', state.draft.origin],
+    ['Origin', originLabel(state.draft.origin)],
     [
       'Homing',
       state.draft.homing.enabled
-        ? `${guide.homeCommand?.split(/\r?\n/).join(' then ') ?? 'Enabled'}; recorded home: ${state.draft.homing.direction} (direction set by controller)`
+        ? `${guide.homeCommand?.split(/\r?\n/).join(' then ') ?? 'Enabled'}; recorded home: ${originLabel(state.draft.homing.direction).toLowerCase()} (direction set by controller)`
         : 'Disabled',
     ],
   ];

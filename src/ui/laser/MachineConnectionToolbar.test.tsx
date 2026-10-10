@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FALCON_A1_PRO_GRBLHAL_PROFILE } from '../../core/devices/falcon-profiles';
 import { FALCON_A1_PRO_INFRARED_2W_MODULE } from '../../core/devices/laser-modules';
+import { machineKindOf } from '../../core/scene';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { PlatformProvider } from '../app/platform-context';
 import { useStore } from '../state';
@@ -118,6 +119,27 @@ describe('machine toolbar', () => {
       if (savedSetup === null) localStorage.removeItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY);
       else localStorage.setItem(DEVICE_SETUP_CONFIGURED_STORAGE_KEY, savedSetup);
     }
+  });
+
+  it('leads the connection row with the Laser / CNC switch and changes the project mode', async () => {
+    await act(async () => {
+      root.render(
+        <PlatformProvider adapter={platform}>
+          <MachineConnectionToolbar />
+        </PlatformProvider>,
+      );
+    });
+    const row = host.querySelector('.lf-connection-compact-row');
+    const group = row?.firstElementChild?.querySelector(
+      '[role="group"][aria-label="Machine type"]',
+    );
+    if (!(group instanceof HTMLElement)) throw new Error('Machine type switch missing from row');
+    expect(group.dataset['mode']).toBe('laser');
+    const cnc = [...group.querySelectorAll('button')].find((b) => b.textContent === 'CNC');
+    await act(async () => cnc?.click());
+    expect(machineKindOf(useStore.getState().project.machine)).toBe('cnc');
+    expect(group.dataset['mode']).toBe('cnc');
+    expect(cnc?.getAttribute('aria-pressed')).toBe('true');
   });
 
   it('opens Machine Setup from the compact top bar', async () => {

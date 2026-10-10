@@ -49,7 +49,10 @@
   flex-shrink: 0;
 }
 
-@media (max-width: 1100px) {
+/* The transforms and the machine group (Laser / CNC, machine, Connect) share
+   one row only from about 1240 px; narrower, the machine group takes its own
+   full-width row below a divider instead of wrapping loose. */
+@media (max-width: 1240px) {
   .lf-workspace-topbar > .lf-numeric-edits {
     flex-basis: 100%;
   }
@@ -86,6 +89,8 @@
     padding: 0 8px;
   }
 
+  /* One 32 px row: the compact Laser / CNC switch, then the machine name with
+     its status inline, Connect, Machine Setup and the menu. */
   .lf-machine-toolbar .lf-connection-machine-summary {
     display: flex;
     align-items: center;
@@ -100,5 +105,41 @@
   .lf-machine-toolbar .lf-connection-card-more {
     width: 32px;
     min-width: 32px;
+  }
+}
+
+@media (max-width: 590px) {
+  /* That row needs about 575 px. Narrower, a full-width switch takes its own
+     line and the name stacks over its status, so the rest shares the line
+     below instead of leaving Connect alone on a third. */
+  .lf-machine-toolbar {
+    padding-bottom: 4px;
+  }
+
+  .lf-machine-toolbar .lf-connection-leading {
+    flex-basis: 100%;
+    padding-right: 0;
+    margin-right: 0;
+    border-right: 0;
+  }
+
+  .lf-machine-toolbar .lf-connection-leading > .lf-machine-mode {
+    flex: 1;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-summary {
+    display: grid;
+    gap: 1px;
+  }
+}
+
+@media (max-width: 360px) {
+  /* Keep the menu on the machine line of the narrowest phones. */
+  .lf-machine-toolbar .lf-connection-compact-row {
+    gap: 4px;
+  }
+
+  .lf-machine-toolbar .lf-connection-machine-name {
+    max-width: 96px;
   }
 }

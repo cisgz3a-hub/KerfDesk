@@ -39,6 +39,10 @@ const STAGES: Record<
 
 type ShellProps = DeviceSetupStagesProps & {
   readonly onClose: () => void;
+  /** Escape and the header close button: asks first when the draft changed. */
+  readonly onRequestClose: () => void;
+  readonly confirmingDiscard: boolean;
+  readonly onKeepEditing: () => void;
   readonly onSave: () => void;
   readonly saving: boolean;
   readonly firmwareWriteCount: number;
@@ -83,8 +87,49 @@ export function DeviceSetupShell(props: ShellProps): JSX.Element {
           </fieldset>
         </div>
       </div>
-      <SetupActions {...props} />
+      {props.confirmingDiscard ? <DiscardConfirm {...props} /> : <SetupActions {...props} />}
+      {/* Last in the DOM so the dialog still opens on its first setup control;
+          positioned at the header's right edge. */}
+      <button
+        type="button"
+        className="lf-btn lf-btn--ghost lf-setup-close"
+        aria-label="Close Machine Setup"
+        title="Close Machine Setup. If you changed anything, you are asked before it is discarded."
+        disabled={props.saving}
+        onClick={props.onRequestClose}
+      >
+        <Icon name="close" size={16} />
+      </button>
     </>
+  );
+}
+
+function DiscardConfirm(props: ShellProps): JSX.Element {
+  const actions = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    actions.current?.querySelector('button')?.focus();
+    return () => {
+      if (previous?.isConnected === true) previous.focus();
+    };
+  }, []);
+  return (
+    <footer className="lf-setup-footer" data-confirming="discard">
+      <p role="alert" className="lf-setup-discard-message">
+        <strong>Discard your changes to this setup?</strong>
+        <span>Nothing has been saved to the project yet.</span>
+      </p>
+      <div ref={actions}>
+        <DialogActions>
+          <Button variant="primary" onClick={props.onKeepEditing}>
+            Keep editing
+          </Button>
+          <Button variant="danger" onClick={props.onClose}>
+            Discard changes
+          </Button>
+        </DialogActions>
+      </div>
+    </footer>
   );
 }
 
@@ -168,9 +213,9 @@ function SetupActions(props: ShellProps): JSX.Element {
             variant="primary"
             onClick={() => props.dispatch({ kind: 'go', step: 'review' })}
             disabled={props.saving}
-            title="Review your selected profile and save the machine setup."
+            title="Go straight to the review of your selected profile. Nothing is saved until you press Save there."
           >
-            Review &amp; save <Icon name="arrow-right" />
+            Review setup <Icon name="arrow-right" />
           </Button>
         ) : null}
       </DialogActions>

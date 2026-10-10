@@ -12,10 +12,60 @@
   border-color: var(--lf-border);
 }
 
+/* The close button is last in the DOM, so the dialog still opens on its
+ * first setup control, and is ordered into the title row. A notice host the
+ * toast layer inserts at order -1 then stacks above that row, never under
+ * the button. */
+.lf-setup-dialog {
+  --lf-setup-title-height: 62px;
+  --lf-setup-close-inset: 14px;
+}
+
 .lf-setup-dialog > :first-child {
-  padding: 18px 24px;
+  order: 1;
+  display: flex;
+  align-items: center;
+  height: var(--lf-setup-title-height);
+  padding: 0 64px 0 24px;
+  box-sizing: border-box;
   border-bottom: 1px solid var(--lf-border);
   flex-shrink: 0;
+}
+
+.lf-setup-dialog > .lf-setup-layout {
+  order: 2;
+}
+
+.lf-setup-dialog > .lf-setup-footer {
+  order: 3;
+}
+
+.lf-setup-close.lf-btn {
+  order: 1;
+  align-self: flex-end;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  margin: calc(var(--lf-setup-close-inset) - var(--lf-setup-title-height)) 16px
+    var(--lf-setup-close-inset) 0;
+  padding: 0;
+}
+
+.lf-setup-footer[data-confirming='discard'] {
+  background: var(--lf-tint-warning);
+}
+
+.lf-setup-discard-message {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  font-size: 12px;
+}
+
+.lf-setup-discard-message span {
+  color: var(--lf-text-muted);
 }
 
 .lf-setup-layout {
@@ -179,9 +229,6 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
-.lf-setup-summary dd:nth-of-type(2) {
-  text-transform: capitalize;
-}
 .lf-setup-connection {
   display: flex;
   gap: 6px;
@@ -264,6 +311,38 @@
   cursor: default;
 }
 
+/* A laptop-height dialog keeps the whole sidebar in view rather than giving it
+ * a second scrollbar beside the content's: tighter spacing first, then the
+ * bed diagram goes (Work area and Origin stay listed beneath it). */
+@media (max-height: 920px) and (min-width: 761px) {
+  .lf-setup-sidebar {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
+  .lf-setup-stepper {
+    gap: 4px;
+  }
+  .lf-setup-stepper button {
+    padding: 9px 8px;
+  }
+  .lf-setup-summary {
+    margin-top: 16px;
+    padding-top: 14px;
+  }
+  .lf-setup-bed-preview {
+    max-width: 150px;
+    margin-inline: auto;
+  }
+  .lf-setup-summary dl {
+    margin-bottom: 10px;
+  }
+}
+@media (max-height: 840px) and (min-width: 761px) {
+  .lf-setup-bed-preview {
+    display: none;
+  }
+}
+
 @media (max-width: 760px) {
   .lf-dialog.lf-setup-dialog {
     width: calc(100vw - 16px);
@@ -322,8 +401,15 @@
   .lf-setup-content {
     padding: 18px 14px;
   }
+  .lf-setup-dialog {
+    --lf-setup-title-height: 52px;
+    --lf-setup-close-inset: 9px;
+  }
   .lf-setup-dialog > :first-child {
-    padding: 14px;
+    padding: 0 56px 0 14px;
+  }
+  .lf-setup-close.lf-btn {
+    margin-right: 10px;
   }
   .lf-setup-footer {
     flex-wrap: wrap;
