@@ -58,7 +58,13 @@ export function ProFeatureDialog({
         </p>
       )}
       {showKey ? (
-        <LicenceActivationForm value={key} setValue={setKey} busy={busy} submit={activate} />
+        <LicenceActivationForm
+          value={key}
+          setValue={setKey}
+          busy={busy}
+          submit={activate}
+          client={client}
+        />
       ) : null}
       <DialogActions>
         {status === null ? null : (

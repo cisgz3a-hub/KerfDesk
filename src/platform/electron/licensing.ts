@@ -6,6 +6,7 @@ import type {
   LicenceDevices,
   LicenceStatus,
 } from '../types';
+import { findLicenceKey } from '../../../public/licence-key-text.mjs';
 import { boundedUpdateRequest } from './update-request';
 import { validUpdateProgress } from './update-progress';
 
@@ -58,6 +59,13 @@ function validRights(status: LicenceStatus): boolean {
         Number.isSafeInteger(status.trialExpiresInMs) &&
         status.trialExpiresInMs >= 0))
   );
+}
+
+export function parseClipboardKey(value: unknown): string | null {
+  const key = (value as { licenseKey?: unknown } | null)?.licenseKey;
+  if (key === null) return null;
+  if (typeof key !== 'string' || findLicenceKey(key) !== key) throw new Error('Invalid key.');
+  return key;
 }
 
 export function parseLicenceDevices(value: unknown): LicenceDevices {
@@ -229,6 +237,11 @@ export function createDesktopLicenceAdapter(
   return {
     status: () => request('status'),
     activate: (licenseKey) => request('activate', { licenseKey }),
+    clipboardKey: async () => parseClipboardKey(await send('clipboard-key', {})),
+    licenceLink: async () => {
+      const value = (await send('licence-link')) as { open?: unknown } | null;
+      return { open: value?.open === true, licenseKey: parseClipboardKey(value) };
+    },
     devices: async (licenseKey) =>
       parseLicenceDevices(await send('devices', licenseKey === undefined ? {} : { licenseKey })),
     releaseDevice: async (activationId, licenseKey) =>

@@ -27,6 +27,7 @@ import {
   openPurchasePage,
 } from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
+import { findLicenceKey, looksLikePartialLicenceKey } from '../public/licence-key-text.mjs';
 import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
 import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
@@ -278,11 +279,10 @@ class LicensingService {
   readonly status = () => this.safe(this.readStatus);
   readonly activate = (licenseKey: string) =>
     this.safe(() => {
-      const key = licenseKey.trim();
-      if (!validLicenceKey(key))
-        return Promise.resolve(
-          this.summary('activation-required', null, 'Enter a valid licence key.'),
-        );
+      // Accept the key inside whatever was pasted; a non-KD1 value keeps the plain rule.
+      const key = findLicenceKey(licenseKey) ?? licenseKey.trim();
+      if (!validLicenceKey(key) || looksLikePartialLicenceKey(licenseKey))
+        return Promise.resolve(this.summary('activation-required', null, MESSAGES.invalidKey));
       return this.acquire('activate', key);
     }, true);
   readonly startTrial = () => this.safe(() => this.acquire('trial'), true);

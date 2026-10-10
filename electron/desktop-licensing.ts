@@ -1,4 +1,5 @@
-import { app, net, Notification, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, clipboard, net, Notification, safeStorage, shell } from 'electron';
+import { installLicenceLink } from './licence-link.js';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
 import { isLicenceCheckoutUrl, purchasePageUrl } from './licensing-commerce.js';
 import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
@@ -62,6 +63,8 @@ type Options = {
   readonly updater: CommercialUpdater;
   readonly canInstallManualUpdate?: () => boolean;
   readonly requestManualUpdateClose?: RequestUpdateClose;
+  /** Whether a window shows KerfDesk's own renderer, before signalling it a kerfdesk:// link. */
+  readonly isTrustedRenderer?: (url: string) => boolean;
 };
 
 export function createDesktopLicensing(options: Options) {
@@ -82,6 +85,17 @@ export function createDesktopLicensing(options: Options) {
     deviceName: DEVICE_NAMES[process.platform] ?? 'KerfDesk device',
     fetch: (url, init) => net.fetch(url, init),
     ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
+  });
+  const licenceLink = installLicenceLink(app, {
+    enabled:
+      config.channel === 'commercial' &&
+      config.sandbox !== true &&
+      options.packaged &&
+      process.platform === 'win32',
+    argv: process.argv,
+    readClipboard: () => clipboard.readText(),
+    primaryWindow: () => BrowserWindow.getAllWindows()[0],
+    isTrustedRenderer: options.isTrustedRenderer ?? (() => false),
   });
   const rings = createUpdateRingStore(options.userDataPath);
   const manual = desktopManualUpdates(config, {
@@ -118,6 +132,9 @@ export function createDesktopLicensing(options: Options) {
         earlyUpdates,
         updates,
         manual === null ? undefined : options.requestManualUpdateClose,
+        config.channel === 'commercial'
+          ? { readClipboard: () => clipboard.readText(), licenceLink }
+          : {},
       ),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then

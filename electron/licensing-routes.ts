@@ -2,6 +2,8 @@ import { trustedAppRequest } from './app-route-guard.js';
 import type { LicensingRuntime } from './licensing-runtime.js';
 import { isLicenceCheckoutOperation } from './licensing-commerce.js';
 import { validActivationId } from './licensing-devices.js';
+import { findLicenceKey } from '../public/licence-key-text.mjs';
+import type { LicenceLink } from './licence-link.js';
 import { record } from './licensing-verification.js';
 import type { EarlyUpdates } from './update-ring-store.js';
 import type { DesktopUpdates } from './update-status.js';
@@ -10,6 +12,13 @@ const PREFIX = '/api/licensing/';
 const HEADERS = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 export type ProtocolHandler = (request: Request) => Promise<Response>;
 export type RequestUpdateClose = (cancelInstall: () => void) => void;
+/** Licence-key entry helpers a commercial desktop build supplies. */
+export type LicenceEntry = {
+  /** Help > Licence > Paste key reads the clipboard through this. */
+  readonly readClipboard?: (() => string) | undefined;
+  /** kerfdesk://licence (licence-link.ts), consumed once by the renderer. */
+  readonly licenceLink?: LicenceLink | null | undefined;
+};
 
 export function withLicensingRoutes(
   fallback: ProtocolHandler,
@@ -17,6 +26,7 @@ export function withLicensingRoutes(
   earlyUpdates?: EarlyUpdates,
   updates?: DesktopUpdates,
   requestUpdateClose?: RequestUpdateClose,
+  entry: LicenceEntry = {},
 ): ProtocolHandler {
   return async (request) => {
     const url = new URL(request.url);
@@ -35,9 +45,12 @@ export function withLicensingRoutes(
     )
       return updateRoute(action, request, updates, requestUpdateClose);
     if (action === 'status' && request.method === 'GET') return response(await runtime.status());
+    if (action === 'licence-link' && request.method === 'GET')
+      return entry.licenceLink === undefined ? missing() : response(entry.licenceLink.consume());
     if (!jsonPost(request)) return missing();
     const body = await readBody(request);
     if (!record(body)) return response({ error: 'invalid_request' }, 400);
+    if (action === 'clipboard-key') return clipboardKey(body, entry.readClipboard);
     return dispatch(action, body, runtime);
   };
 }
@@ -171,6 +184,26 @@ async function devices(
       ? await runtime.devices(licenseKey)
       : await runtime.releaseDevice(body.activationId as string, licenseKey),
   );
+}
+
+/**
+ * Help > Licence > Paste key. The renderer may not read the clipboard (ADR-482), so
+ * the main process reads it only on that explicit click and returns the KerfDesk key
+ * it contains, or null: other clipboard text never reaches the renderer.
+ */
+function clipboardKey(
+  body: Record<string, unknown>,
+  readClipboard: (() => string) | undefined,
+): Response {
+  if (readClipboard === undefined) return missing();
+  if (Object.keys(body).length !== 0) return response({ error: 'invalid_request' }, 400);
+  let text = '';
+  try {
+    text = readClipboard();
+  } catch {
+    text = '';
+  }
+  return response({ licenseKey: findLicenceKey(text) });
 }
 
 async function readBody(request: Request): Promise<unknown> {

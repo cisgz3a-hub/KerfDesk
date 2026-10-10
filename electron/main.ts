@@ -529,6 +529,7 @@ if (HAS_SINGLE_INSTANCE_LOCK && REFUSED_DEBUG_SWITCH === null)
         updater: autoUpdater,
         canInstallManualUpdate: manualCloseApproval.canInstall,
         requestManualUpdateClose: manualCloseApproval.request,
+        isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
       });
       prepareLicenceQuit = licence.prepareQuit;
       const startup = createDesktopBackgroundStartup(licence, autoUpdater, {
