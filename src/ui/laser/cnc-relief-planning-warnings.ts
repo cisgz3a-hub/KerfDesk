@@ -7,7 +7,10 @@ import { reliefProjectionOrderWarnings } from './cnc-relief-projection-order-war
 import { DEFAULT_RELIEF_SCALLOP_MM, MAX_HEIGHTMAP_CELLS } from '../../core/relief';
 // Deep imports: core/relief's barrel is a ratcheted over-cap legacy barrel.
 import { reliefScallopBallRadiusMm } from '../../core/relief/relief-finishing';
-import { reliefFinishRowSpacingMm } from '../../core/relief/relief-finishing-strategy';
+import {
+  reliefFinishRowSpacingMm,
+  reliefFinishStrategyFor,
+} from '../../core/relief/relief-finishing-strategy';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   sceneObjectUsesOperation,
@@ -270,7 +273,7 @@ function sourceReliefScallopWarnings(project: Project): ReadonlyArray<string> {
               reliefFinishRowSpacingMm(
                 finishTool,
                 scallopMm,
-                settings.reliefFinishStrategy ?? 'raster',
+                reliefFinishStrategyFor(settings.reliefFinishStrategy, object.reliefSource.kind),
               ),
             ),
           ]

@@ -4939,12 +4939,29 @@ explicitly marked below; the remaining controls and user-facing flows are planne
    "solid" is detected by its length signature). Reading, parsing, and
    the coarse relief-preparation probe run in the import worker; the
    progress toast names the current phase and Escape cancels the request.
-2. The mesh lands as a relief object at 100 mm wide (height by aspect),
-   5 mm relief depth, background carved away ('floor'), on a wood-brown
-   layer created automatically. Toast reports the triangle count; a relief
-   larger than the bed is scaled down to fit, with a warning (F-A3). The
-   worker transfers its typed mesh into the live object without expanding
-   it into a boxed number array on the UI thread.
+2. The mesh lands as a relief object at its own size, read as millimetres:
+   its width and height as modelled and its own height as the relief depth,
+   so a 3D model keeps its proportions (ADR-578), background carved away
+   ('floor'), on a wood-brown layer created automatically. The toast reports
+   the triangle count and the size. A model larger than the bed is scaled on
+   every axis alike to fit, a model under 1 mm across (not modelled in
+   millimetres) is scaled alike to 100 mm wide, a flat model takes a 5 mm
+   depth, and a model taller than the stock is reported without rescaling;
+   each case is said in a notice. The worker transfers its typed mesh into
+   the live object without expanding it into a boxed number array on the UI
+   thread.
+2a. Relief properties keep an STL's proportions: with **Keep proportions** on
+   (the default) a Width edit scales Depth by the same factor and a Depth
+   edit scales Width, in one undo step; **Use model proportions** sets Depth
+   from the placed width and the model's own height ratio (ADR-578).
+2b. **Two-sided carving** (CNC projects) replaces the STL relief with a side A
+   relief (the top, down to the split height) and a side B relief (the
+   bottom, seen from below, down to the split less the holding web), centred
+   in the stock with a 1 mm stock-face frame round a margin, assigned to the
+   two-sided setup (ADR-573), which is switched on if it was off. Carve side
+   A, flip the stock as Machine Setup's Two-sided machining says, set Z0 on
+   the new top, make side B active and carve it. Stock thinner than the
+   model is planned as stock as thick as the model, and the result says so.
 3. The mesh keeps its CAD top-view orientation: +Y in the STL is the top of
    the canvas, so raised text reads the right way round (ADR-414). Meshes
    already saved in projects keep the orientation they were saved with.
@@ -5534,7 +5551,9 @@ and lifts the command's CNC-only gate.)*
    0.05 mm and 40% of diameter. The grid cell divides that resolved spacing
    into whole rows no coarser than a tenth of the contact diameter, so rows
    land at the requested spacing; the whole-row stride still rounds down so it
-   never overshoots it (ADR-421). This qualifies finishing
+   never overshoots it (ADR-421). For an STL relief the tip meets the mesh's
+   own triangles, so neither a detail between samples nor a slope is misread
+   (ADR-578). For a height map this qualifies finishing
    vertices against the piecewise-linear surface and the planar cusp, not
    subcell detail or true along-surface scallop (ADR-292/294/412). Every move
    between vertices, of every strategy, is then checked against the exact
@@ -5557,7 +5576,9 @@ and lifts the command's CNC-only gate.)*
 4. Roughing leaves the layer's Rough allowance (0.5 mm unless set; it exists
    FOR this pass); finishing consumes it down to the true surface.
 5. Raster direction runs the rows along X (default) or along Y (ADR-423).
-6. Finish strategy Raster + waterline narrows the rows to cos 45° of the
+6. Finish strategy **Automatic** (unset) is Raster + waterline for an STL
+   relief and Raster for a height map (ADR-578); choosing Automatic removes
+   an explicit choice. Raster + waterline narrows the rows to cos 45° of the
    scallop's spacing and adds waterline passes wherever the tip surface
    slopes 45° or more, levels sin 45° of that spacing apart, so passes are
    never further apart along the surface than the scallop's spacing. Each
@@ -5894,6 +5915,10 @@ and lifts the command's CNC-only gate.)*
    zooms; depth is true to scale.
 3. The display grid downsamples to ~360 cells across, keeping the
    deepest value per block so narrow slots stay visible.
+4. The grid (and the 2D cut shading) covers the stock the whole job cuts,
+   plus the widest bit's radius and 2 mm, not the whole sheet, so a small
+   relief on a large sheet gets fine cells; the frame stays put while
+   scrubbing (ADR-578).
 
 #### Error — no WebGL
 1. The dialog opens with "3D view unavailable: <reason>" instead of
@@ -8611,6 +8636,10 @@ validation must be supervised without cutting load.
    is the point. The view only reads — it never writes, streams, or advances
    variable text.
 4. Choosing **Design** returns to the canvas with the artwork untouched.
+5. A CNC program that cuts below Z0 shows a compact **Stock** panel with the
+   Inspector's carved-stock switches (ADR-487), and a program carving a relief
+   starts with its carved stock shown, so the canvas shows the carving
+   itself (ADR-578).
 
 #### Success — follow playback or a running program
 

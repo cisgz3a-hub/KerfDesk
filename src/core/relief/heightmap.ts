@@ -17,6 +17,20 @@ export type Heightmap = {
   // Optional binary material domain. 1 = included, 0 = deliberately omitted.
   // Absent means every cell is included (legacy mesh and unmasked fields).
   readonly inclusion?: Uint8Array;
+  // The exact surface behind a mesh-sourced CAM map (ADR-578). When present,
+  // relief CAM solves the cutter against these triangles instead of the
+  // piecewise-linear surface through the samples.
+  readonly exactSurface?: HeightmapExactSurface;
+};
+
+/** Triangles of a mesh relief in its map's own frame (ADR-578). */
+export type HeightmapExactSurface = {
+  // Nine values per triangle: x and y in mm from the map's min corner (y
+  // down, as the cells run), z the depth in mm (0 = stock top, negative in).
+  readonly triangles: Float64Array;
+  // Background kept at the stock top ('top'): 1 where no triangle covers a
+  // cell's centre. Such a cell stands as a whole-cell block at the stock top.
+  readonly uncoveredTop?: Uint8Array;
 };
 
 export const DEFAULT_HEIGHTMAP_CELL_MM = 0.2;

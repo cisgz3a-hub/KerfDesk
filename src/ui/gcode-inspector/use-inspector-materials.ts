@@ -20,6 +20,8 @@ export function useInspectorMaterials(options: {
   readonly source: GcodeInspectionSource | undefined;
   /** Where playback has got; the whole program when it is not playing. */
   readonly target: StockTarget;
+  /** Start with the carved stock shown (ADR-578). */
+  readonly stockInitiallyShown?: boolean;
 }): { readonly stock: CarvedStock; readonly burn: LaserBurn } {
   const { handleRef, state, model, source, target } = options;
   const machineKind = source?.machineKind;
@@ -31,6 +33,7 @@ export function useInspectorMaterials(options: {
     machineKind,
     design: source?.design,
     target,
+    initiallyShown: options.stockInitiallyShown === true,
   });
   const burn = useLaserBurn({ handleRef, state, model, machineKind, laser: source?.laser, target });
   const hidden = stock.hidesToolpath || burn.hidesToolpath;

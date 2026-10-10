@@ -1,8 +1,9 @@
-// ADR-412 Amendment 1 through the real compiler: an STL (legacy-mesh) relief is
-// planned from a map whose cells hold the highest point of the mesh over each
-// cell, so a raised rib narrower than a planning cell, standing between two
-// cell centres, is still there for the planner. Before, roughing cut straight
-// through such a rib and finishing ran over it at floor height.
+// ADR-412 Amendment 1 and ADR-578 through the real compiler: a raised rib
+// narrower than a planning cell, standing between two cell centres, is still
+// there for the planner. Centre sampling alone cut straight through such a rib
+// and ran the finishing ball over it at floor height; the cutter now meets the
+// STL's own triangles (ADR-578), as the highest-point cells of Amendment 1 did
+// before it.
 
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_DEVICE_PROFILE, toMachineCoords } from '../devices';
@@ -85,6 +86,9 @@ function compile(relief: MeshReliefObject, cnc: Partial<CncLayerSettings>) {
           depthPerPassMm: 2,
           stepoverPercent: 40,
           finishAllowanceMm: ALLOWANCE_MM,
+          // The raster's own cell grid is the premise; ADR-578's Automatic
+          // would add waterline passes and pack the rows closer for an STL.
+          reliefFinishStrategy: 'raster',
           ...cnc,
         },
       },
@@ -103,6 +107,14 @@ function centresOnRib(job: ReturnType<typeof compile>, stage: string, rib: Rect)
     if (centre >= rib.x0 && centre <= rib.x1) count += 1;
   }
   return count;
+}
+
+function finishingCellMm(job: ReturnType<typeof compile>): number {
+  const plan = job.cncCompilation?.reliefPlans?.find(
+    (candidate) => candidate.stage === 'finishing',
+  );
+  if (plan === undefined) throw new Error('no finishing plan');
+  return plan.cellSizeMm;
 }
 
 function groupPasses(job: ReturnType<typeof compile>, cutType: string): ReadonlyArray<CncPass> {
@@ -201,11 +213,16 @@ describe('relief CAM reads an STL rib narrower than a cell', () => {
     const box = machineRect(rib);
 
     // Centre sampling ran the ball through the rib at floor height (-1.59 mm);
-    // the ball now rides over it, touching its top within the finishing
-    // path's contact tolerance (-0.0002 mm measured).
+    // the ball now rides over it on the exact contact (-0.0022 mm measured).
+    // The finishing check holds its tolerance at every quarter-cell check
+    // (relief-finishing-contact.ts); between two checks the straight move can
+    // sag under the ball centre's circular path over the rib's edge by that
+    // chord's sagitta.
     const clearance = worst(groupPasses(job, 'relief-finish'), (p) =>
       ballClearanceMm(p, box, ball.diameterMm / 2),
     );
-    expect(clearance).toBeGreaterThanOrEqual(-FINISHING_CONTACT_TOLERANCE_MM);
+    const chordMm = finishingCellMm(job) / 4;
+    const sagittaMm = (chordMm * chordMm) / (8 * (ball.diameterMm / 2));
+    expect(clearance).toBeGreaterThanOrEqual(-(FINISHING_CONTACT_TOLERANCE_MM + sagittaMm));
   });
 });

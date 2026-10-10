@@ -91,9 +91,11 @@ describe('sweeping a bit along a move (ADR-487)', () => {
   it('stamps a V bit down a slope at every cell, cutting nothing above the top', () => {
     const on = grid();
     sweep(on, tool('v-bit', 6, 90), [0, 0, 0.5], [10, 0, -1.5]);
-    expect(depthAt(on, 10, 0)).toBeCloseTo(-1.5, 1);
-    // A 90 degree V: 1 mm off the line cuts 1 mm shallower.
-    expect(depthAt(on, 10, 1)).toBeCloseTo(-0.5, 1);
+    // Each cell takes the cone at its centre's true distance from the tip
+    // (ADR-578): a 90 degree V cuts that distance shallower than the tip.
+    // The cell read at (10, 0) is centred at (10.05, 0.05).
+    expect(depthAt(on, 10, 0)).toBeCloseTo(-1.5 + Math.hypot(0.05, 0.05), 5);
+    expect(depthAt(on, 10, 1)).toBeCloseTo(-1.5 + Math.hypot(0.05, 1.05), 5);
     expect(depthAt(on, 1, 0)).toBe(0);
   });
 

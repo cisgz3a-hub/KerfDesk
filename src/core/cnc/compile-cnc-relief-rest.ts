@@ -2,7 +2,11 @@ import { reliefCutterBudgetError } from '../relief/relief-cutter-budget';
 import { toMachineCoords, type DeviceProfile } from '../devices';
 import type { CncGroup, CncPass } from '../job';
 import type { CncReliefPlanningEvidence } from '../job/job';
-import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
+import {
+  reliefFinishingPlan,
+  reliefFinishRowSpacingMm,
+  reliefFinishStrategyFor,
+} from '../relief/relief-finishing-strategy';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
   reliefMaterializationFailure,
@@ -104,7 +108,10 @@ function restForRelief(
       record.relief.source,
       'Relief rest finishing requires a positive finite scallop and a finite nonnegative residual threshold.',
     );
-  const strategy = settings.reliefFinishStrategy ?? 'raster';
+  const strategy = reliefFinishStrategyFor(
+    settings.reliefFinishStrategy,
+    record.relief.reliefSource.kind,
+  );
   const rowSpacingMm = reliefFinishRowSpacingMm(tool, scallopMm, strategy);
   const space = reliefMachineSpaceGeometry(record.relief);
   const result = reliefObjectToHeightmap(record.relief, {
@@ -113,7 +120,7 @@ function restForRelief(
     targetScaleX: space.targetScaleX,
     targetScaleY: space.targetScaleY,
     mmPerCell: finishingCellSizeMm(rowSpacingMm, tool),
-    sampling: 'footprint-max',
+    sampling: 'exact-mesh',
   });
   if (result.kind === 'error')
     return reliefMaterializationFailure(record.relief.source, result.reason);

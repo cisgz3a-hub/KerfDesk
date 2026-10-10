@@ -1,8 +1,9 @@
 // importStlFiles — drag-and-drop STL → ReliefObject (Phase H.4, ADR-098).
 // Relief geometry persists in either machine mode; every import discloses that
-// CNC alone produces its output. Imports land at a default size (100 mm wide
-// × 5 mm deep, background carved away) on a dedicated relief layer color;
-// width/depth/background are edited afterwards in the Relief properties panel.
+// CNC alone produces its output. Imports land at the model's own size with its
+// proportions kept, its height as the relief depth (ADR-578, stl-import-size.ts),
+// background carved away, on a dedicated relief layer color; width/depth/
+// background are edited afterwards in the Relief properties panel.
 
 import {
   DEFAULT_RELIEF_LAYER_COLOR,
@@ -20,11 +21,18 @@ import {
 } from '../import/stl-import-preparation';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
+import { meshBounds } from '../../core/relief';
 import { describeImportBedFit } from './import-bed-fit-notice';
 import { importSourceSizeAdvisory, mainThreadImportFallbackAdvisory } from './import-size-advisory';
 import { createImportWorkerControls, isImportCancellation } from './import-worker-controls';
 import { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 import { claimImportSuccessIndex } from './import-success-index';
+import {
+  describeStlImportSize,
+  stlImportSize,
+  type StlImportSize,
+  type StlImportTarget,
+} from './stl-import-size';
 
 export { DEFAULT_RELIEF_DEPTH_MM, DEFAULT_RELIEF_WIDTH_MM } from './relief-import-defaults';
 // Coarse probe cell — only validates the mesh and derives the aspect ratio.
@@ -41,6 +49,8 @@ type StlImportContext = {
   readonly importObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome | undefined;
   readonly pushToast: (message: string, variant?: ToastVariant) => void;
   readonly nextSuccessIndex?: () => number;
+  /** The bed and stock the import is sized against; absent sizes to the model alone. */
+  readonly target?: () => StlImportTarget | null;
 };
 
 export function isStlFile(file: File): boolean {
@@ -64,24 +74,15 @@ export async function importStlFiles(
       const pending = parseStlOffThread(file, STL_PREPARATION_OPTIONS, controls.options);
       const prepared =
         pending === null ? await prepareStlOnMainThread(file, ctx.pushToast) : await pending;
-      const relief = reliefFromPreparedStl(prepared, file.name);
-      if (typeof relief === 'string') {
-        ctx.pushToast(`${file.name}: ${relief}`, 'error');
+      const target = ctx.target?.() ?? null;
+      const sized = reliefFromPreparedStl(prepared, file.name, target);
+      if (typeof sized === 'string') {
+        ctx.pushToast(`${file.name}: ${sized}`, 'error');
         continue;
       }
-      const triangles = relief.reliefSource.meshPositions.length / 9;
-      const denseAdvisory = denseMeshAdvisory(file.name, triangles);
-      if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
       const claimed = claimImportSuccessIndex(ctx.nextSuccessIndex, successIdx);
       successIdx = claimed.nextLocalIndex;
-      const outcome = ctx.importObject(relief, claimed.batchIndex);
-      ctx.pushToast(
-        `Imported relief "${file.name}" (${triangles} triangles) at ` +
-          `${DEFAULT_RELIEF_WIDTH_MM} mm wide × ${DEFAULT_RELIEF_DEPTH_MM} mm deep.${CNC_OUTPUT_NOTE}`,
-        'success',
-      );
-      const fitNotice = describeImportBedFit(file.name, outcome);
-      if (fitNotice !== null) ctx.pushToast(fitNotice.message, fitNotice.variant);
+      placeImportedRelief(ctx, file.name, sized, target, claimed.batchIndex);
     } catch (err) {
       ctx.pushToast(
         isImportCancellation(err)
@@ -93,6 +94,29 @@ export async function importStlFiles(
       controls.dispose();
     }
   }
+}
+
+function placeImportedRelief(
+  ctx: StlImportContext,
+  name: string,
+  sized: { readonly relief: MeshReliefObject; readonly size: StlImportSize },
+  target: StlImportTarget | null,
+  batchIndex: number | undefined,
+): void {
+  const { relief, size } = sized;
+  const triangles = relief.reliefSource.meshPositions.length / 9;
+  const denseAdvisory = denseMeshAdvisory(name, triangles);
+  if (denseAdvisory !== null) ctx.pushToast(denseAdvisory, 'warning');
+  const outcome = ctx.importObject(relief, batchIndex);
+  const described = describeStlImportSize(size, target);
+  ctx.pushToast(
+    `Imported relief "${name}" (${triangles} triangles) at ` +
+      `${described.sizeText}.${CNC_OUTPUT_NOTE}`,
+    'success',
+  );
+  if (described.notice !== null) ctx.pushToast(`${name}: ${described.notice}`, 'warning');
+  const fitNotice = describeImportBedFit(name, outcome);
+  if (fitNotice !== null) ctx.pushToast(fitNotice.message, fitNotice.variant);
 }
 
 async function prepareStlOnMainThread(
@@ -115,25 +139,32 @@ function denseMeshAdvisory(name: string, triangles: number): string | null {
   );
 }
 
-// Returns the ReliefObject, or a human-readable rejection reason.
+// Returns the ReliefObject at its import size, or a human-readable rejection reason.
 function reliefFromPreparedStl(
   prepared: PreparedStlImportResult,
   source: string,
-): MeshReliefObject | string {
+  target: StlImportTarget | null,
+): { readonly relief: MeshReliefObject; readonly size: StlImportSize } | string {
   if (prepared.kind === 'error') return prepared.reason;
+  const bounds = meshBounds({ positions: prepared.positions });
+  if (bounds === null) return 'Mesh has no triangles.';
+  const size = stlImportSize(bounds, target);
   return {
-    kind: 'relief',
-    id: crypto.randomUUID(),
-    source,
-    targetWidthMm: DEFAULT_RELIEF_WIDTH_MM,
-    reliefDepthMm: DEFAULT_RELIEF_DEPTH_MM,
-    reliefSource: {
-      kind: 'legacy-mesh',
-      meshPositions: prepared.positions,
-      emptyCells: 'floor',
+    size,
+    relief: {
+      kind: 'relief',
+      id: crypto.randomUUID(),
+      source,
+      targetWidthMm: size.targetWidthMm,
+      reliefDepthMm: size.reliefDepthMm,
+      reliefSource: {
+        kind: 'legacy-mesh',
+        meshPositions: prepared.positions,
+        emptyCells: 'floor',
+      },
+      color: DEFAULT_RELIEF_LAYER_COLOR,
+      bounds: { minX: 0, minY: 0, maxX: size.targetWidthMm, maxY: size.heightMm },
+      transform: IDENTITY_TRANSFORM,
     },
-    color: DEFAULT_RELIEF_LAYER_COLOR,
-    bounds: { minX: 0, minY: 0, maxX: prepared.widthMm, maxY: prepared.heightMm },
-    transform: IDENTITY_TRANSFORM,
   };
 }

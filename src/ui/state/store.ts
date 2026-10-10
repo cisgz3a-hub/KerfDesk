@@ -49,6 +49,11 @@ import {
   type RasterImageAdjustmentPatch,
 } from './raster-adjustment-actions';
 import { reliefParamActions, type ReliefParamPatch } from './relief-param-actions';
+import {
+  reliefTwoSidedActions,
+  type ReliefTwoSidedRequest,
+  type ReliefTwoSidedResult,
+} from './relief-two-sided-actions';
 import { externalGcodeActions, type ExternalGcodePreview } from './external-gcode-actions';
 import { cncLibraryActions, type CncLibrarySlice } from './cnc-library-actions';
 import {
@@ -349,6 +354,11 @@ export type AppState = PartGeneratorActions &
     readonly setLayerDefaults: (layerDefaults: LayerDefaultsState) => void;
     readonly setRasterImageAdjustments: (id: string, patch: RasterImageAdjustmentPatch) => void;
     readonly setReliefParams: (id: string, patch: ReliefParamPatch) => void;
+    /** ADR-578: replace an STL relief with its side A and side B reliefs. */
+    readonly splitReliefForTwoSides: (
+      id: string,
+      request: ReliefTwoSidedRequest,
+    ) => ReliefTwoSidedResult;
     readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
     readonly replaceDeviceProfile: (profile: DeviceProfile) => void;
     readonly undo: () => void;
@@ -400,6 +410,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...breakApartActions(proOperationMutationSetter(set, get)),
     ...rasterAdjustmentActions(set),
     ...reliefParamActions(set),
+    ...reliefTwoSidedActions(set),
     ...reliefAuthoringActions(set, get),
     ...constrainedSketchActions(set, get),
     ...partGeneratorActions(set, get),
