@@ -122,12 +122,14 @@ keeps Pro whatever the clock says.
 
 The customer deactivates a computer they still use from Help > Licence >
 Deactivate this device. If that computer is gone (failed disk, sold, reinstalled
-Windows), the operator can free the seat with the customer's licence key:
-`POST /v1/licenses/activations` lists the active seats (each is labelled only
-`Windows computer` with its activation date), and `POST /v1/licenses/deactivate`
-frees one. Confirm which seat with the customer by activation date. The customer
-never has to send the key in a ticket if they can do this on a working computer
-instead.
+Windows), the customer frees its seat themselves from Help > Licence > **Manage
+devices** on any computer, with their saved or typed licence key: the list shows
+each seat (labelled only `Windows computer` with its activation date) with a
+Remove action that asks once to confirm. The same two service routes serve the
+operator when the customer cannot: `POST /v1/licenses/activations` lists the
+active seats and `POST /v1/licenses/deactivate` frees one. Confirm which seat
+with the customer by activation date. The customer never has to send the key in
+a ticket if they can do this on a working computer instead.
 
 ### Deactivation says "retry deactivation to free its seat"
 
@@ -326,8 +328,6 @@ Deleting a trial frees that Windows installation to start a new 30-day trial.
 
 ## Known gaps to close before scale
 
-- No self-service remote seat management: customers can only deactivate the
-  computer they are using.
 - A customer who forgets an order that was in fact paid needs support to look up
   its licence; the app warns before forgetting and shows the order number.
 - Records are deleted only on request. Nothing yet deletes deactivated devices

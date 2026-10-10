@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
-import { PRO_PRICE_LABEL, RENEWAL_PRICE_LABEL } from './pro-features';
+import { purchaseLabel, purchaseTitle, startPurchase } from './purchase-action';
 
 type ActionProps = {
   readonly client: LicenceAdapter;
@@ -233,7 +233,6 @@ function PendingPaymentActions({
 }
 
 function PurchaseAction({ client, status, busy, run }: ActionProps): JSX.Element {
-  const renewal = status?.tier === 'paid';
   const unavailable =
     status === null || status.state === 'unavailable' || status.deactivationPending;
   return (
@@ -242,10 +241,10 @@ function PurchaseAction({ client, status, busy, run }: ActionProps): JSX.Element
         type="button"
         className="lf-btn"
         disabled={busy || unavailable}
-        onClick={() => void run(() => client.checkout(renewal ? 'renewal' : 'purchase'))}
-        title={renewal ? 'Buy another year of updates' : 'Buy a KerfDesk Pro licence'}
+        onClick={() => void run(() => startPurchase(client, status))}
+        title={purchaseTitle(status)}
       >
-        {renewal ? `Renew updates · ${RENEWAL_PRICE_LABEL}` : `Buy Pro · ${PRO_PRICE_LABEL}`}
+        {purchaseLabel(status)}
       </button>
     </div>
   );

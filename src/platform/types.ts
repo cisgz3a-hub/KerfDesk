@@ -37,9 +37,26 @@ export type LicenceStatus = {
   readonly message: string | null;
 };
 
+/** One computer a licence key is active on (Help > Licence > Manage devices). */
+export type LicenceDevice = {
+  readonly activationId: string;
+  readonly deviceName: string;
+  /** Unix seconds when that computer activated. */
+  readonly createdAt: number;
+};
+export type LicenceDevices = {
+  /** Null when the list could not be read; `message` then says why. */
+  readonly devices: readonly LicenceDevice[] | null;
+  readonly message: string | null;
+};
+
 export type LicenceAdapter = {
   readonly status: () => Promise<LicenceStatus>;
   readonly activate: (licenseKey: string) => Promise<LicenceStatus>;
+  /** The computers the saved key, or the key given, is active on. */
+  readonly devices?: (licenseKey?: string) => Promise<LicenceDevices>;
+  /** Frees another computer's seat with the key; never touches this device's saved licence. */
+  readonly releaseDevice?: (activationId: string, licenseKey?: string) => Promise<LicenceDevices>;
   readonly startTrial: () => Promise<LicenceStatus>;
   readonly refresh: () => Promise<LicenceStatus>;
   readonly deactivate: () => Promise<LicenceStatus>;
@@ -50,6 +67,8 @@ export type LicenceAdapter = {
   ) => Promise<LicenceStatus>;
   readonly claimPayment: () => Promise<LicenceStatus>;
   readonly discardPayment: () => Promise<LicenceStatus>;
+  /** Buy Pro: opens the purchase page in the browser; the buyer then enters the key here. */
+  readonly openPurchasePage?: () => Promise<LicenceStatus>;
   readonly earlyUpdates: () => Promise<EarlyUpdates>;
   readonly setEarlyUpdates: (enabled: boolean) => Promise<EarlyUpdates>;
   /** Where this device's own updates stand (ADR-547). */

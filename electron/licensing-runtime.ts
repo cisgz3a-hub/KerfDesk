@@ -20,15 +20,21 @@ import {
   REVOKED,
   staleOrderMessage,
 } from './licensing-messages.js';
-import { prepareLicenceCheckout, claimLicencePayment } from './licensing-commerce.js';
+import {
+  prepareLicenceCheckout,
+  claimLicencePayment,
+  dropUnpayable,
+  openPurchasePage,
+} from './licensing-commerce.js';
 import { LicensingUpdateCache } from './licensing-update-cache.js';
+import { manageLicenceDevices, type DeviceInput } from './licensing-devices.js';
 import { TrialSessionClock, withTrialBudget } from './licensing-trial-clock.js';
 import { clockErrorMessage, LicenceClockError, nextClockMark } from './licensing-clock.js';
 import {
   activationBody,
   grantedRecord,
   grantRequest,
-  requireActivationBody,
+  renewalIdentity,
   verifyGrant,
   type GrantAction,
   type VerifiedGrant,
@@ -48,6 +54,7 @@ type RuntimeOptions = {
   readonly deviceName: string;
   readonly fetch: (url: string, init: RequestInit) => Promise<Response>;
   readonly openCheckout?: (url: string) => Promise<void>;
+  readonly openPurchasePage?: (url: string) => Promise<void>;
   readonly now?: () => number;
 };
 
@@ -307,6 +314,9 @@ class LicensingService {
       if (this.config.channel !== 'commercial') return this.readStatus();
       return resetSavedLicence(this.access(), this.options.store);
     }, true);
+  /** Buy Pro: the purchase page itself, in the browser; nothing is saved here. */
+  readonly openPurchasePage = () =>
+    this.safe(async () => openPurchasePage(this.options, this.config, await this.readStatus()));
   readonly checkout = (operation: 'purchase' | 'renewal', licenseKey?: string) =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
@@ -334,19 +344,19 @@ class LicensingService {
           operation,
           licenseKey,
           true,
-          this.renewalIdentity(operation, saved, device),
+          renewalIdentity(this.config, operation, saved, device),
         );
         return {
           ...this.evaluate((await this.options.store.read()) ?? saved, device),
           message: MESSAGES.checkoutOpened,
         };
       } catch (error) {
-        return {
-          ...this.evaluate((await this.options.store.read()) ?? saved, device),
-          message: checkoutFailureMessage(error),
-        };
+        const stored = (await this.options.store.read()) ?? saved;
+        const forgotten = dropUnpayable(stored, error, saved);
+        if (forgotten !== stored) await this.write(forgotten, device);
+        return { ...this.evaluate(forgotten, device), message: checkoutFailureMessage(error) };
       }
-    });
+    }, true);
   readonly claimPayment = () =>
     this.safe(async () => {
       if (this.config.channel !== 'commercial') return this.readStatus();
@@ -391,6 +401,11 @@ class LicensingService {
       await this.write(withoutPayment, device);
       return { ...this.evaluate(withoutPayment, device), message: MESSAGES.orderForgotten };
     }, true);
+  readonly devices = (licenseKey?: string) => this.manageDevices({ licenseKey });
+  readonly releaseDevice = (activationId: string, licenseKey?: string) =>
+    this.manageDevices({ licenseKey, activationId });
+  private readonly manageDevices = (input: DeviceInput) =>
+    this.serial(() => manageLicenceDevices(this.config, this.options.store, this.request, input));
   readonly isReleaseEligible = (releaseEnvelope: unknown, expectedVersion: string) =>
     this.serial(async () => {
       if (this.config.channel !== 'commercial') return false;
@@ -416,10 +431,6 @@ class LicensingService {
     this.config.channel === 'commercial' &&
     this.proLatched &&
     (this.trialClock === null || this.trialNow() < this.trialClock.expiresAt);
-  private readonly renewalIdentity = (operation: string, saved: LicenceRecord, device: string) =>
-    operation === 'renewal' && saved.credential !== undefined
-      ? requireActivationBody(this.config, saved.credential, device)
-      : undefined;
 }
 
 export type LicensingRuntime = ReturnType<typeof createLicensingRuntime>;

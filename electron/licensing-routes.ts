@@ -1,6 +1,7 @@
 import { trustedAppRequest } from './app-route-guard.js';
 import type { LicensingRuntime } from './licensing-runtime.js';
 import { isLicenceCheckoutOperation } from './licensing-commerce.js';
+import { validActivationId } from './licensing-devices.js';
 import { record } from './licensing-verification.js';
 import type { EarlyUpdates } from './update-ring-store.js';
 import type { DesktopUpdates } from './update-status.js';
@@ -123,6 +124,7 @@ async function dispatch(
       ? response(await runtime.activate(body.licenseKey))
       : response({ error: 'invalid_request' }, 400);
   if (action === 'checkout') return checkout(body, runtime);
+  if (action === 'devices' || action === 'release-device') return devices(action, body, runtime);
   if (Object.keys(body).length !== 0) return response({ error: 'invalid_request' }, 400);
   const actions = {
     trial: runtime.startTrial,
@@ -130,6 +132,7 @@ async function dispatch(
     deactivate: runtime.deactivate,
     reset: runtime.resetStore,
     'claim-payment': runtime.claimPayment,
+    'open-purchase-page': runtime.openPurchasePage,
     'discard-payment': runtime.discardPayment,
   };
   return Object.hasOwn(actions, action)
@@ -147,6 +150,27 @@ async function checkout(
   )
     return response({ error: 'invalid_request' }, 400);
   return response(await runtime.checkout(body.operation, body.licenseKey as string | undefined));
+}
+
+/** Help > Licence > Manage devices: list the key's seats, or free one of them. */
+async function devices(
+  action: 'devices' | 'release-device',
+  body: Record<string, unknown>,
+  runtime: LicensingRuntime,
+): Promise<Response> {
+  const allowed = action === 'devices' ? ['licenseKey'] : ['licenseKey', 'activationId'];
+  if (
+    Object.keys(body).some((key) => !allowed.includes(key)) ||
+    (body.licenseKey !== undefined && typeof body.licenseKey !== 'string') ||
+    (action === 'release-device' && !validActivationId(body.activationId))
+  )
+    return response({ error: 'invalid_request' }, 400);
+  const licenseKey = body.licenseKey as string | undefined;
+  return response(
+    action === 'devices'
+      ? await runtime.devices(licenseKey)
+      : await runtime.releaseDevice(body.activationId as string, licenseKey),
+  );
 }
 
 async function readBody(request: Request): Promise<unknown> {

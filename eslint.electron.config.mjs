@@ -9,7 +9,7 @@ const COMPLEXITY_LIMIT = 12;
 
 export default tseslint.config(
   {
-    ignores: ['dist-electron/**', 'electron/**/*.test.ts'],
+    ignores: ['dist-electron/**', 'electron/**/*.test.ts', 'electron/**/*.test-support.ts'],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,

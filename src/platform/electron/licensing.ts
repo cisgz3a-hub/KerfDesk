@@ -1,4 +1,11 @@
-import type { CommercialUpdateStatus, EarlyUpdates, LicenceAdapter, LicenceStatus } from '../types';
+import type {
+  CommercialUpdateStatus,
+  EarlyUpdates,
+  LicenceAdapter,
+  LicenceDevice,
+  LicenceDevices,
+  LicenceStatus,
+} from '../types';
 import { boundedUpdateRequest } from './update-request';
 import { validUpdateProgress } from './update-progress';
 
@@ -51,6 +58,35 @@ function validRights(status: LicenceStatus): boolean {
         Number.isSafeInteger(status.trialExpiresInMs) &&
         status.trialExpiresInMs >= 0))
   );
+}
+
+export function parseLicenceDevices(value: unknown): LicenceDevices {
+  if (typeof value !== 'object' || value === null) throw new Error('Invalid device list.');
+  const result = value as LicenceDevices;
+  if (!nullableText(result.message, 1000)) throw new Error('Invalid device list.');
+  if (result.devices === null) return { devices: null, message: result.message };
+  if (!Array.isArray(result.devices) || result.devices.length > 16)
+    throw new Error('Invalid device list.');
+  const devices = result.devices.map((device: unknown): LicenceDevice => {
+    const item = device as LicenceDevice;
+    if (
+      typeof device !== 'object' ||
+      device === null ||
+      typeof item.activationId !== 'string' ||
+      !/^[A-Za-z0-9_-]{1,160}$/.test(item.activationId) ||
+      typeof item.deviceName !== 'string' ||
+      item.deviceName.length > 80 ||
+      !Number.isSafeInteger(item.createdAt) ||
+      item.createdAt < 0
+    )
+      throw new Error('Invalid device list.');
+    return {
+      activationId: item.activationId,
+      deviceName: item.deviceName,
+      createdAt: item.createdAt,
+    };
+  });
+  return { devices, message: result.message };
 }
 
 export function parseEarlyUpdates(value: unknown): EarlyUpdates {
@@ -193,6 +229,15 @@ export function createDesktopLicenceAdapter(
   return {
     status: () => request('status'),
     activate: (licenseKey) => request('activate', { licenseKey }),
+    devices: async (licenseKey) =>
+      parseLicenceDevices(await send('devices', licenseKey === undefined ? {} : { licenseKey })),
+    releaseDevice: async (activationId, licenseKey) =>
+      parseLicenceDevices(
+        await send('release-device', {
+          activationId,
+          ...(licenseKey === undefined ? {} : { licenseKey }),
+        }),
+      ),
     startTrial: () => request('trial', {}),
     refresh: () => request('refresh', {}),
     deactivate: () => request('deactivate', {}),
@@ -201,6 +246,7 @@ export function createDesktopLicenceAdapter(
       request('checkout', { operation, ...(licenseKey === undefined ? {} : { licenseKey }) }),
     claimPayment: () => request('claim-payment', {}),
     discardPayment: () => request('discard-payment', {}),
+    openPurchasePage: () => request('open-purchase-page', {}),
     earlyUpdates: async () => parseEarlyUpdates(await send('early-updates')),
     setEarlyUpdates: async (enabled) => parseEarlyUpdates(await send('early-updates', { enabled })),
     updateStatus: () => update('update-status'),

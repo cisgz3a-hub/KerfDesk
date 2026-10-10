@@ -1,6 +1,6 @@
 import { app, net, Notification, safeStorage, shell } from 'electron';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
-import { isLicenceCheckoutUrl } from './licensing-commerce.js';
+import { isLicenceCheckoutUrl, purchasePageUrl } from './licensing-commerce.js';
 import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
 import {
   withLicensingRoutes,
@@ -39,6 +39,20 @@ function announceDownloadedUpdate(version: string): void {
     }).show();
 }
 
+/** The only two pages licensing ever opens in the browser: a saved checkout, and the purchase page. */
+function browserOpeners(sandbox: boolean) {
+  return {
+    openCheckout: async (url: string) => {
+      if (!isLicenceCheckoutUrl(url, sandbox)) throw new Error('Invalid checkout destination');
+      await shell.openExternal(url);
+    },
+    openPurchasePage: async (url: string) => {
+      if (url !== purchasePageUrl(sandbox)) throw new Error('Invalid purchase page');
+      await shell.openExternal(url);
+    },
+  };
+}
+
 type Options = {
   readonly appPath: string;
   readonly userDataPath: string;
@@ -67,12 +81,7 @@ export function createDesktopLicensing(options: Options) {
     deviceId: rememberDeviceId(() => licensingDeviceId()),
     deviceName: DEVICE_NAMES[process.platform] ?? 'KerfDesk device',
     fetch: (url, init) => net.fetch(url, init),
-    openCheckout: async (url) => {
-      if (!isLicenceCheckoutUrl(url, config.channel === 'commercial' && config.sandbox === true)) {
-        throw new Error('Invalid checkout destination');
-      }
-      await shell.openExternal(url);
-    },
+    ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
   });
   const rings = createUpdateRingStore(options.userDataPath);
   const manual = desktopManualUpdates(config, {
