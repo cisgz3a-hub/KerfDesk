@@ -91,3 +91,11 @@ and sandbox upload metadata. Unknown or malformed forms still refuse before
 upload. Bounded diagnostics report only fixed field presence/types, known enums
 and equality results; they never publish target values, timestamps or unknown
 property names. This changes representation comparison, not placement behaviour.
+
+On 2026-10-10, protected run 38047635585 observed settings `placement: {}`
+and omitted placement in the exact active version; the dashboard showed Default.
+The operator refused before mutation. A genuinely empty settings object is also
+normalised to disabled placement when the legacy mode is absent or off. An
+analysis-only object or conflicting legacy mode remains unqualified. This
+observed provider representation shares the existing fingerprint and omitted
+upload configuration; it does not enable Smart Placement or change runtime.
