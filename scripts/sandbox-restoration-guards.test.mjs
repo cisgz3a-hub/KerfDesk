@@ -202,6 +202,53 @@ test('modern configured placement keeps Wrangler precedence over the deprecated 
   }
 });
 
+test('empty disabled placement settings match an omitted exact-version placement', () => {
+  const value = settings();
+  const fingerprint = sandboxSettingsFingerprint(value);
+  value.placement = {};
+  const version = info(value);
+  delete version.resources.script.placement;
+  const diagnostic = {};
+  assert.doesNotThrow(() => attestSandboxVersion(version, originalVersion, value, diagnostic));
+  assert.equal(diagnostic.valuesEqual.placement, true);
+  assert.equal(sandboxSettingsFingerprint(value), fingerprint);
+  assert.equal(sandboxConfiguredPlacement({}), undefined);
+  assert.equal(sandboxConfiguredPlacement({}, 'off'), undefined);
+  for (const legacyMode of ['smart', 'targeted', token]) {
+    assert.throws(() => sandboxConfiguredPlacement({}, legacyMode));
+  }
+  for (const placement of [{ mode: 'smart' }, { region: token }]) {
+    version.resources.script.placement = placement;
+    assert.throws(() => attestSandboxVersion(version, originalVersion, value));
+  }
+});
+
+test('restoration preserves observed empty off placement through staging and activation', async (t) => {
+  attestFixture(t);
+  const value = settings();
+  value.placement = {};
+  const adapter = harness({
+    initialSettings: value,
+    originalResourceChange: (version) => {
+      delete version.resources.script.placement;
+    },
+    stagedResourceChange: (version) => {
+      delete version.resources.script.placement;
+    },
+  });
+  const receipt = await run(adapter);
+  assert.equal(receipt.outcome, 'verified');
+  assert.equal(receipt.flag, 'false');
+  assert.equal(receipt.stagedVersionVerified, true);
+  assert.equal(receipt.protectedSettingsUnchanged, true);
+  assert.deepEqual(
+    adapter.mutations.map(({ kind }) => kind),
+    ['stage', 'activate'],
+  );
+  assert.equal(Object.hasOwn(adapter.mutations[0].payload, 'placement'), false);
+  assert.equal(adapter.mutations[0].payload.keep_assets, true);
+});
+
 test('every configured mode, hint and target remains exact through fingerprints and candidate snapshots', () => {
   for (const [placement, changed, field] of [
     [{ mode: 'smart' }, { mode: 'off' }, 'mode'],
@@ -240,7 +287,6 @@ test('every configured mode, hint and target remains exact through fingerprints 
 
 test('unknown and malformed placement configuration refuses even when both responses match', () => {
   for (const placement of [
-    {},
     { status: 'SUCCESS' },
     { last_analyzed_at: token },
     { mode: token },
