@@ -1,7 +1,8 @@
-// MachineModeToggle — segmented Laser | CNC switch in the Artwork panel
-// heading. Sets project.machine; the compile/emit pipeline, layer cards, and
-// jog panel all follow this choice. The chosen mode is a solid copper fill so
-// it never reads as one of the Settings / Run order / Materials tabs below it.
+// MachineModeToggle — segmented Laser | CNC switch at the start of the machine
+// toolbar, beside the connection controls. Sets project.machine; the
+// compile/emit pipeline, layer cards, and jog panel all follow this choice.
+// The chosen mode is a solid copper thumb that slides between two equal
+// segments, so it reads as a two-way switch rather than a pair of buttons.
 
 import { selectControllerDriver } from '../../core/controllers';
 import { deviceSupportsMachineKind, type DeviceProfile } from '../../core/devices/device-profile';
@@ -36,7 +37,7 @@ export function MachineModeToggle(): JSX.Element {
     if (warning !== null) pushToast(warning, 'warning');
   };
   return (
-    <div role="group" aria-label="Machine type" className="lf-machine-mode">
+    <div role="group" aria-label="Machine type" className="lf-machine-mode" data-mode={kind}>
       <SegButton
         label="Laser"
         icon="laser"
@@ -99,7 +100,7 @@ function SegButton(props: {
       title={title}
       className="lf-machine-mode__choice"
     >
-      <Icon name={props.icon} size={15} />
+      <Icon name={props.icon} size={16} />
       <span>{props.label}</span>
     </button>
   );

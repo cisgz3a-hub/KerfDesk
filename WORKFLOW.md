@@ -4637,7 +4637,8 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 ### F-CNC1. Switch to CNC mode and configure the machine
 
 #### Success
-1. User clicks **CNC** on the machine-mode toggle atop the Cuts/Layers panel.
+1. User clicks **CNC** on the Laser / CNC switch at the start of the machine toolbar, beside the
+   connection controls.
 2. No bottom Material & Bit card appears. **Machine > Machine Setup > Essentials** owns machine
    limits and **CNC job setup** material/default bit/stock. Its Tool Plan and Artwork's **Tool &
    material** edit the same per-operation material and cutter assignments.

@@ -11,8 +11,6 @@
 }
 
 .lf-artwork-panel-heading {
-  /* The Laser / CNC switch sizes itself against this row (machine-mode-toggle.css). */
-  container: lf-artwork-heading / inline-size;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
