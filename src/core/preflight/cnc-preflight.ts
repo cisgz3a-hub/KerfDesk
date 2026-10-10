@@ -274,13 +274,15 @@ function appendCncLayerIssues(
   // H.3: v-carve depth math is driven by the bit's included angle — a flat end
   // mill would gouge full-width trenches at the commanded depths. H.7: the
   // layer's own bit (falling back to the machine bit) is what matters.
+  // ADR-576: such a layer plans no V-carve motion; this names why.
   const layerTool = layerCncTool(config, settings);
   if (settings.cutType === 'v-carve' && !isVCarveToolCompatible(layerTool)) {
     issues.push({
       code: 'cnc-settings-invalid',
       message:
         `Layer ${layer.id}: V-carve requires a V-bit or angled engraving bit; the layer's bit ` +
-        `("${layerTool.name}") is not one. Pick a compatible bit in Startup Setup > Tool Plan.`,
+        `("${layerTool.name}") is not one, so this layer produces no V-carve toolpath. ` +
+        'Pick a compatible bit in Startup Setup > Tool Plan.',
     });
   }
 }

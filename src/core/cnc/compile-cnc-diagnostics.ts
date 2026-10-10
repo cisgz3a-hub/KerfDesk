@@ -12,6 +12,7 @@ import {
   vcarveClearanceGroupForLayer,
   xyToolpathsForCutType,
 } from './compile-cnc-job';
+import { isVCarveToolCompatible } from './vcarve-tool-compatibility';
 
 // Output layers whose vector geometry exists but cannot produce any toolpath.
 export function findDroppedCncLayers(
@@ -31,7 +32,7 @@ export function findDroppedCncLayers(
       continue;
     const polylines = collectLayerPolylines(scene.objects, layer, device);
     if (polylines.length === 0) continue;
-    if (settings.cutType === 'inlay-pair') continue;
+    if (hasOwnEmptyLayerNotice(settings, config)) continue;
     if (compiledJob !== undefined) {
       dropped.push(layer.id);
       continue;
@@ -42,6 +43,16 @@ export function findDroppedCncLayers(
     if (clearance === null && group === null) dropped.push(layer.id);
   }
   return dropped;
+}
+
+// The V-carve bit-compatibility warning already names a layer whose bit plans
+// no V-carve (ADR-576).
+function hasOwnEmptyLayerNotice(
+  settings: typeof DEFAULT_CNC_LAYER_SETTINGS,
+  config: CncMachineConfig,
+): boolean {
+  if (settings.cutType === 'inlay-pair') return true;
+  return settings.cutType === 'v-carve' && !isVCarveToolCompatible(layerCncTool(config, settings));
 }
 
 function compiledVectorLayerHasPaths(

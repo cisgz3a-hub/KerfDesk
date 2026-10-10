@@ -5020,9 +5020,10 @@ explicitly marked below; the remaining controls and user-facing flows are planne
 #### Error — active bit is not a compatible angled cutter
 1. The read-only Artwork reference and Start-time Job Review identify the mismatch and direct the
    operator to **Startup Setup > Tool Plan** for a V-bit or angled engraving bit.
-   It is an ordinary Save/Frame/Start warning, not a gate. Output remains
-   available for compatibility and can use the legacy 60-degree wrong-kind
-   fallback, so the operator is told to select a compatible angled cutter.
+   It is an ordinary Save/Frame/Start warning, not a gate. That layer produces
+   no V-carve toolpath: an end mill, ball nose, tapered ball nose or a cutter
+   with no modelled angle has no conical flank for the depth law, so KerfDesk
+   no longer plans it as a 60-degree cone (ADR-576). Other layers still run.
 2. A selected V-bit with a missing, non-finite, or out-of-range included angle
    cannot produce the requested V-carve depth math. Save and Start stop before
    compilation and tell the operator to edit or replace the bit; no silent

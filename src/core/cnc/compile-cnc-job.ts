@@ -53,7 +53,7 @@ import {
   type CncCompilationTaskResult,
   type PreparedCncCompilationArtifact,
 } from './cnc-compilation-artifact';
-import type { VCarveLadder } from './vcarve-ladder';
+import type { VCarveLadder } from './vcarve-plan';
 import { passesForCncLayerWithEvidence } from './compile-cnc-layer-passes';
 import { machineFrameHandedness } from './machine-frame-handedness';
 import { applyProfileLeadPasses } from './profile-lead-passes';

@@ -51,11 +51,16 @@ describe('vcarveEffectiveDepthMm', () => {
     },
   );
 
-  it('preserves the legacy non-V-bit angle fallback', () => {
-    expect(vcarveEffectiveDepthMm(tool({ kind: 'end-mill' }, false), 10)).toBeCloseTo(
-      3 / Math.tan(Math.PI / 6),
-      12,
-    );
+  it.each(['end-mill', 'ball-nose', 'tapered-ball-nose'] as const)(
+    'resolves no V-carve depth for a %s, which has no conical flank (ADR-576)',
+    (kind) => {
+      expect(vcarveEffectiveDepthMm(tool({ kind }, false), 10)).toBeNull();
+      expect(vcarveEffectiveDepthMm(tool({ kind, tipAngleDeg: 90 }), 10)).toBeNull();
+    },
+  );
+
+  it('resolves no V-carve depth for an engraving bit without a modelled angle', () => {
+    expect(vcarveEffectiveDepthMm(tool({ kind: 'engraving' }, false), 10)).toBeNull();
   });
 
   it.each([0, -1, Number.NaN])('keeps the requested depth for diameter %s', (diameterMm) => {

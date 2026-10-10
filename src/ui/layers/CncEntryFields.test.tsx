@@ -232,8 +232,9 @@ describe('Entry & travel summary on other operations', () => {
     {
       name: 'a V-carve',
       settings: { cutType: 'v-carve', vCarveRampEntryDeg: 3 },
-      badge: 'Ramp 3°',
+      badge: 'Profile entry',
     },
+    { name: 'a fresh V-carve', settings: { cutType: 'v-carve' }, badge: 'Profile entry' },
   ])('keeps the summary of $name', async ({ settings, withRelief, badge }) => {
     await install(settings, withRelief);
 

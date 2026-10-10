@@ -10,7 +10,7 @@ import type {
 import { DEFAULT_CNC_LAYER_SETTINGS, type Scene } from '../scene';
 import type { CncCompilationEvidence } from './cnc-compilation-artifact';
 import type { CncOpenContourOmissions } from './cnc-open-contour-omissions';
-import type { VCarveLadder } from './vcarve-ladder';
+import type { VCarveLadder } from './vcarve-plan';
 
 export function offsetDiagnosticsForStatus(
   layerId: string,

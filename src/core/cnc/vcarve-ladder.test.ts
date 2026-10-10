@@ -4,7 +4,7 @@ import { pointInPolygon } from '../geometry';
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { zPassDepths } from './depth-passes';
-import { vcarveLadderPasses, vcarvePasses, vcarveResolutionMm } from './vcarve-ladder';
+import { vcarveLadderPasses, vcarvePasses, vcarveResolutionMm } from './vcarve-ladder.test-support';
 
 const VBIT_90: CncTool = {
   id: 'v90',
@@ -317,7 +317,7 @@ describe('vcarvePasses', () => {
     },
   );
 
-  it('preserves the advisory-only legacy output for a non-V-bit selection', () => {
+  it('plans no V-carve motion for a non-V-bit selection (ADR-576)', () => {
     const wrongKind: CncTool = {
       id: 'end-mill',
       name: '3 mm end mill',
@@ -330,8 +330,8 @@ describe('vcarvePasses', () => {
         maxDepthMm: 2,
         depthPerPassMm: 1,
         resolutionMm: 0.5,
-      }).length,
-    ).toBeGreaterThan(0);
+      }),
+    ).toEqual([]);
   });
 
   it('property: depths always in [−maxDepth, 0) and byte-deterministic (100 seeds)', () => {

@@ -116,7 +116,7 @@ describe('invalid CNC tool geometry preflight', () => {
     expect(preflight([{ ...layer, output: false }], [object])).toEqual({ ok: true, issues: [] });
   });
 
-  it('does not let an unused or too-narrow single-stage V-carve block output', () => {
+  it('does not let an unused V-carve block output', () => {
     const validColor = '#00ff00';
     const validLayer = createLayer({ id: 'valid', color: validColor });
     const unusedVCarve = vcarveLayer('unused-v-carve');
@@ -126,9 +126,49 @@ describe('invalid CNC tool geometry preflight', () => {
       ok: true,
       issues: [],
     });
-    expect(preflight([unusedVCarve], [rectangle('too-narrow-v-carve', VCARVE_COLOR, 0.1)])).toEqual(
-      { ok: true, issues: [] },
-    );
+  });
+
+  it('does not refuse an angleless V-bit when even-odd source contours cancel completely', () => {
+    expect(
+      preflight(
+        [vcarveLayer('cancelled-v-carve')],
+        [rectangle('first', VCARVE_COLOR, 20), rectangle('second', VCARVE_COLOR, 20)],
+      ),
+    ).toEqual({ ok: true, issues: [] });
+  });
+
+  it('does not refuse an angleless V-bit for a closed zero-area contour', () => {
+    const line: SceneObject = {
+      id: 'degenerate',
+      kind: 'imported-svg',
+      source: 'degenerate.svg',
+      bounds: { minX: 0, minY: 0, maxX: 20, maxY: 0 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: VCARVE_COLOR,
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+                { x: 20, y: 0 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(preflight([vcarveLayer('zero-area')], [line])).toEqual({ ok: true, issues: [] });
+  });
+
+  // ADR-285: the medial planner carves a hairline region as well as a wide one,
+  // so an angleless V-bit changes output however narrow the artwork is.
+  it('refuses an angleless V-bit on artwork narrower than the former ring pitch', () => {
+    expect(
+      preflight([vcarveLayer('narrow-v-carve')], [rectangle('narrow', VCARVE_COLOR, 0.1)]),
+    ).toMatchObject({ ok: false, issues: [{ code: 'cnc-tool-geometry-invalid' }] });
   });
 
   it('does not mistake invalid pass depth or diameter for proof that no pass can emit', () => {

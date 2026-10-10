@@ -34,20 +34,20 @@
 import { buildOffsetLadder } from '../geometry/offset-ladder';
 import { normalizeClosedPolylinesEvenOddChecked } from '../geometry/polygon-difference';
 import type { CncPass } from '../job';
-import type { CncTool, Polyline } from '../scene';
-import type { VCarveSourceBoundaryCoverage } from './vcarve-source-boundary-coverage';
+import type { Polyline } from '../scene';
+import type { VCarveLadder, VCarveOptions } from './vcarve-plan';
 import { zPassDepths } from './depth-passes';
 import { vcarveIncludedAngleDeg } from './vcarve-angle';
-import { isVCarvableContour } from './vcarve-carvable-contours';
+import { isVCarvableContour } from './vcarve-carvable-contours.test-support';
 import {
   detailPath3dPlan,
   sourceBoundarySegments,
   type BoundarySegment,
   type DetailDepthLaw,
 } from './vcarve-detail-depth';
-import { orderDetailBySliver } from './vcarve-detail-order';
+import { orderDetailBySliver } from './vcarve-detail-order.test-support';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
-import { planVCarveRampEntry } from './vcarve-entry';
+import { planVCarveRampEntry } from './vcarve-entry.test-support';
 import {
   buildVCarveRegionLayout,
   vcarveRegionBucketsWithLayout,
@@ -57,7 +57,7 @@ import {
   THIN_DETAIL_RESOLUTION_MM,
   vcarveThinDetailRings,
   type ThinDetailRings,
-} from './vcarve-thin-detail';
+} from './vcarve-thin-detail.test-support';
 
 const MIN_RESOLUTION_MM = 0.1;
 // Two clipper quanta (OFFSET_PRECISION_DECIMALS = 3 → 0.001 mm grid): the
@@ -69,38 +69,6 @@ const MAX_VCARVE_RINGS = 8192;
 const THIN_DETAIL_RAMP_FALLBACK =
   'V-carve ramp entry applies to the ring ladder; the thin-detail passes keep their ' +
   'stepped entry so their variable-depth profile survives.';
-
-export type VCarveOptions = {
-  readonly tool: CncTool;
-  readonly maxDepthMm: number;
-  readonly depthPerPassMm: number;
-  readonly resolutionMm: number; // 0 = auto
-  // Opt-in maximum along-contour entry angle. Absent preserves the legacy
-  // stepped-plunge program for saved jobs whose cutter entry data is unknown.
-  readonly rampAngleDeg?: number;
-};
-
-export type VCarveLadder = {
-  readonly sourceBoundaryCoverage?: VCarveSourceBoundaryCoverage;
-  readonly passes: ReadonlyArray<CncPass>;
-  // True when the ring ladder stopped on an offset-engine failure rather than
-  // on reaching the medial axis: the carve is shallower and narrower than the
-  // artwork asks for. Reported to Job Review, never a refusal (rule 7).
-  readonly offsetFailed: boolean;
-  // A configured ramp that could not be planned and therefore used the legacy
-  // stepped entry. Reported to Job Review, never a refusal (rule 7).
-  readonly entryIssue: string | null;
-  // True when some artwork is thinner than even the fine detail pitch can
-  // carve (< 2 × THIN_DETAIL_RESOLUTION_MM wide): that material stays uncut.
-  // Also Job Review material, never a refusal (rule 7).
-  readonly thinResidual: boolean;
-  // True when planning could not represent all requested material/profile at
-  // valid settings: a ladder hit its ring budget, the depth-clamp footprint
-  // demands a pitch finer than the coverage floor, or XYZ emission precision
-  // cannot retain the certified detail-depth tolerance. Reported as the
-  // pass-limit advisory, never a refusal (rule 7).
-  readonly passLimited: boolean;
-};
 
 type VCarveRing = {
   // δ ladder rings keep their pitch depth; detail rings carry the junction

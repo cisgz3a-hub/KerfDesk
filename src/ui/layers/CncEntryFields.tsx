@@ -53,8 +53,9 @@ function entryBadge(settings: CncLayerSettings, hasReliefObjects: boolean): stri
 // (ADR-424). An adaptive pocket names its helix, and the angle only as the
 // reliefs' entry (ADR-481 Amendment 1).
 function entrySummary(settings: CncLayerSettings, hasReliefObjects: boolean): string {
-  const ramp =
-    (settings.cutType === 'v-carve' ? settings.vCarveRampEntryDeg : settings.rampEntryDeg) ?? 0;
+  // V-carve enters along its variable-depth profile (ADR-285 §6).
+  if (settings.cutType === 'v-carve') return 'Profile entry';
+  const ramp = settings.rampEntryDeg ?? 0;
   if (settings.cutType === 'pocket' && settings.pocketStrategy === 'adaptive') {
     if (!hasReliefObjects) return 'Adaptive helix';
     return ramp > 0 ? `Adaptive helix · Relief ramp ${ramp}°` : 'Adaptive helix · Relief plunge';

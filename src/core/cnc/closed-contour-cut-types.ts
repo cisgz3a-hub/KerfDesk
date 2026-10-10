@@ -9,8 +9,7 @@
 // nothing to work with and the layer silently contributes no toolpath.
 //
 // The rule lives here rather than inside each operation so the design-time
-// note in the layers panel and the compiler cannot drift apart, the same
-// reason vcarve-carvable-contours.ts exists.
+// note in the layers panel and the compiler cannot drift apart.
 //
 // This is a fact about output, not a policy: nothing here blocks, gates or
 // refuses a cut type. It exists so the operator can be TOLD (rule 7).

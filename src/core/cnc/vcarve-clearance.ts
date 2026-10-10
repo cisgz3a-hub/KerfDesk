@@ -12,7 +12,7 @@ import { insetContoursChecked } from '../geometry/offset-ladder';
 import type { CncTool, Polyline } from '../scene';
 import { hasFinitePoints } from './profile-paths';
 import { pocketRingToolpaths, type PocketToolpaths } from './pocket-paths';
-import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { vcarvePlanningAngleDeg } from './vcarve-angle';
 import { conicalRadialEnvelope, radialEnvelopeFootprintMm } from './radial-envelope';
 
 const MIN_CLOSED_POINTS = 3;
@@ -68,7 +68,7 @@ function vcarveClearanceFloor(
   polylines: ReadonlyArray<Polyline>,
   options: VCarveFloorOptions,
 ): { readonly contours: ReadonlyArray<Polyline>; readonly offsetFailed: boolean } {
-  const tipAngleDeg = vcarveIncludedAngleDeg(options.vBit);
+  const tipAngleDeg = vcarvePlanningAngleDeg(options.vBit);
   if (tipAngleDeg === null) return NO_FLOOR;
   if (!(options.maxDepthMm > 0)) return NO_FLOOR;
   const envelope = conicalRadialEnvelope(options.vBit, tipAngleDeg);

@@ -5,7 +5,7 @@ import { scanModalMotionLine, type GcodeMotionMode } from '../gcode/modal-motion
 import { applyJobOriginOffset, type CncGroup } from '../job';
 import { cncGrblStrategy } from '../output';
 import type { Polyline } from '../scene';
-import { planVCarveRampEntry } from './vcarve-entry';
+import { planVCarveRampEntry } from './vcarve-entry.test-support';
 
 function square(sizeMm: number): Polyline {
   return {

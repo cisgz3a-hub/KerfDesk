@@ -1,5 +1,5 @@
 import type { CncLayerSettings, CncTool } from '../scene';
-import type { VCarveOptions } from './vcarve-ladder';
+import type { VCarveOptions } from './vcarve-plan';
 
 /** The one mapping from persisted layer settings to medial-planner inputs. */
 export function vcarveMedialOptionsForLayer(

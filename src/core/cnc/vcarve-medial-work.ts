@@ -3,12 +3,12 @@ import { isValidCncTipDiameterMm } from '../cnc-tip-diameter';
 import type { CncPass } from '../job';
 import type { Polyline, Vec2 } from '../scene';
 import { hasFinitePoints } from './profile-paths';
-import { vcarveIncludedAngleDeg } from './vcarve-angle';
+import { vcarvePlanningAngleDeg } from './vcarve-angle';
 import { EMIT_COORDINATE_QUANTUM_MM } from './vcarve-detail-geometry';
 import type { DetailDepthLaw } from './vcarve-detail-depth';
 import { vcarveEffectiveDepthMm } from './vcarve-depth';
 import { conicalRadialEnvelope, radialEnvelopeRemovalRadiusMm } from './radial-envelope';
-import type { VCarveLadder, VCarveOptions } from './vcarve-ladder';
+import type { VCarveLadder, VCarveOptions } from './vcarve-plan';
 import {
   planUnrankedVCarveMedialRegion,
   type VCarveMedialRegionGeometryPlan,
@@ -182,7 +182,7 @@ function validClosedSource(polylines: ReadonlyArray<Polyline>): ReadonlyArray<Po
 }
 
 function vcarveGeometry(options: VCarveOptions): DetailDepthLaw | null {
-  const tipAngleDeg = vcarveIncludedAngleDeg(options.tool);
+  const tipAngleDeg = vcarvePlanningAngleDeg(options.tool);
   if (tipAngleDeg === null) return null;
   const envelope = conicalRadialEnvelope(options.tool, tipAngleDeg);
   const maxDepthMm = vcarveEffectiveDepthMm(options.tool, options.maxDepthMm);

@@ -9,7 +9,7 @@ import { planTaperedInlayPair } from './tapered-inlay';
 import { taperedInlayPlugDepth } from './tapered-inlay-settings';
 import { vcarveMedialPasses } from './vcarve-medial';
 import type { StraightInlayGroupsCompilation } from './inlay-pair-operation';
-import type { VCarveLadder } from './vcarve-ladder';
+import type { VCarveLadder } from './vcarve-plan';
 
 export type TaperedInlayOperation = {
   readonly femaleSettings: CncLayerSettings;
