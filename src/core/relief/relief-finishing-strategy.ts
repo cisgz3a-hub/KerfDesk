@@ -55,7 +55,7 @@ const STEEP_ANGLE_RAD = (RELIEF_STEEP_ANGLE_DEG * Math.PI) / 180;
 
 /**
  * The strategy a relief finishes with: the layer's explicit choice, else
- * (ADR-579) raster + waterline for an STL model, whose sides are often steep
+ * (ADR-580) raster + waterline for an STL model, whose sides are often steep
  * enough for a raster alone to leave the roughing allowance on them, and the
  * raster for a height map.
  */
@@ -177,7 +177,7 @@ export function transposeHeightmap(map: Heightmap): Heightmap {
   };
 }
 
-// The exact triangles with x and y swapped (ADR-579), and a 'top'
+// The exact triangles with x and y swapped (ADR-580), and a 'top'
 // background's cells transposed with the map's.
 function transposeSurface(
   surface: HeightmapExactSurface,

@@ -6,7 +6,7 @@ import type { Heightmap, HeightmapExactSurface } from './heightmap';
 import { createSurfaceContactField } from './heightmap-surface-contact';
 import { oracleContact, type Surface } from './heightmap-surface-contact-oracle.test-support';
 
-// ADR-579: the exact cutter contact with a mesh relief's own triangles, checked
+// ADR-580: the exact cutter contact with a mesh relief's own triangles, checked
 // against the independent search oracle on random triangle soups, plus known
 // answers, the stock-top background and the per-move element selection.
 

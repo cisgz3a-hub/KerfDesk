@@ -1,4 +1,4 @@
-// Splitting an STL relief for two-sided carving (ADR-579).
+// Splitting an STL relief for two-sided carving (ADR-580).
 //
 // A 3-axis router reaches a model from one side only, so a fully 3D part is
 // carved in two setups: side A from the top, then the stock is flipped and

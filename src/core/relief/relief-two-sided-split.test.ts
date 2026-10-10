@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { meshToHeightmap } from './mesh-to-heightmap';
 import { splitReliefForTwoSides, TWO_SIDED_FRAME_MM } from './relief-two-sided-split';
 
-// ADR-579: a sphere split for two-sided carving. Each side's relief, read the
+// ADR-580: a sphere split for two-sided carving. Each side's relief, read the
 // way relief CAM reads it, must be the sphere's own top or bottom surface at
 // the depth its stock face puts it, down to that side's floor, with the frame
 // at the face and the two floors one web apart.

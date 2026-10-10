@@ -65,7 +65,7 @@ export function computeCncRemovalGrid(
 const CUT_FRAME_MARGIN_MM = 2;
 
 /**
- * ADR-579: the grid covers the part of the stock the whole job cuts, plus the
+ * ADR-580: the grid covers the part of the stock the whole job cuts, plus the
  * widest bit and a margin, not the whole sheet. A 60 mm relief on a 400 mm
  * sheet then gets the fine cells it needs instead of the sheet's budget-sized
  * ones, in the 2D shading and in Cut 3D alike. The frame is the whole job's,

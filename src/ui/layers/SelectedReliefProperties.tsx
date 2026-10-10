@@ -76,7 +76,7 @@ function ReliefProperties({
   readonly stockThicknessMm: number;
   readonly projectDocumentEpoch: number;
 }): JSX.Element {
-  // ADR-579: an STL relief keeps its proportions unless the operator unlocks them.
+  // ADR-580: an STL relief keeps its proportions unless the operator unlocks them.
   const [proportionsLocked, setProportionsLocked] = useState(true);
   const locked = isMeshRelief(relief) && proportionsLocked;
   const physical = reliefPhysicalDimensions(relief);

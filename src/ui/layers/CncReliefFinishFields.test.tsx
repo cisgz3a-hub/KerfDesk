@@ -65,7 +65,7 @@ describe('ReliefLayerRows', () => {
       // Unset, relief roughing leaves 0.5 mm.
       expect(allowance.value).toBe('0.5');
       const strategy = select(host, 'Relief finish strategy for #ff0000');
-      // Unset is Automatic (ADR-579): waterline for an STL, raster for a height map.
+      // Unset is Automatic (ADR-580): waterline for an STL, raster for a height map.
       expect(strategy.value).toBe('automatic');
       const axis = select(host, 'Relief raster direction for #ff0000');
       expect(axis.value).toBe('x');
@@ -84,7 +84,7 @@ describe('ReliefLayerRows', () => {
     }
   });
 
-  it('returns an explicit finish strategy to Automatic by removing it (ADR-579)', async () => {
+  it('returns an explicit finish strategy to Automatic by removing it (ADR-580)', async () => {
     const onCommitSettings = vi.fn();
     const settings: CncLayerSettings = {
       ...DEFAULT_CNC_LAYER_SETTINGS,

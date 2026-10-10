@@ -1,4 +1,4 @@
-// ADR-579 through the real compiler: an STL relief is planned against its own
+// ADR-580 through the real compiler: an STL relief is planned against its own
 // triangles, so the finishing ball rides a slope exactly where the slope is,
 // with no grid error, and Automatic finishes an STL with waterline passes.
 
@@ -105,7 +105,7 @@ function finishingPlan(job: ReturnType<typeof compile>) {
   return plan;
 }
 
-describe('an STL relief is finished against its own triangles (ADR-579)', () => {
+describe('an STL relief is finished against its own triangles (ADR-580)', () => {
   it('the ball rides a slope at the exact ball-on-plane height', () => {
     const job = compile(rampRelief(), { reliefFinishStrategy: 'raster' });
     const group = job.groups.find((g) => g.kind === 'cnc' && g.cutType === 'relief-finish');

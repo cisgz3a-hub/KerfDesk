@@ -129,7 +129,7 @@ export type GcodeMetadata = {
 // CNC audit: authored relief footprints, ruled rail sections, sketch diagonals
 // and tapered-inlay nonzero joins now produce the corrected geometry.
 // ADR-576 plans V-carve only with modelled conical cutters.
-// ADR-579 solves STL relief cutters against the mesh's own triangles and finishes
+// ADR-580 solves STL relief cutters against the mesh's own triangles and finishes
 // an STL relief with raster + waterline unless the operation chooses otherwise.
 export const EMITTER_REVISION = 'relief-exact-mesh-contact-20261010-v20';
 

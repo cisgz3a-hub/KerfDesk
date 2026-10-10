@@ -1,4 +1,4 @@
-// "Two-sided carving" for an STL relief (ADR-579): split it into a side A
+// "Two-sided carving" for an STL relief (ADR-580): split it into a side A
 // (top) and side B (bottom) relief for the two-sided setup (ADR-573), so a
 // model that needs both faces carved can be cut in two setups with a flip.
 

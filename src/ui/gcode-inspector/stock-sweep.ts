@@ -126,7 +126,7 @@ function stampAlong(
   }
 }
 
-// The bit's footprint with its tip where the move puts it (ADR-579): each
+// The bit's footprint with its tip where the move puts it (ADR-580): each
 // cell takes the cutting surface at its centre's true distance from the tip.
 // Snapping the tip to the nearest cell centre moved the bit up to half a cell,
 // which beside a vertical wall cut into it, and the design compare read that

@@ -1,8 +1,8 @@
-// ADR-412 Amendment 1 and ADR-579 through the real compiler: a raised rib
+// ADR-412 Amendment 1 and ADR-580 through the real compiler: a raised rib
 // narrower than a planning cell, standing between two cell centres, is still
 // there for the planner. Centre sampling alone cut straight through such a rib
 // and ran the finishing ball over it at floor height; the cutter now meets the
-// STL's own triangles (ADR-579), as the highest-point cells of Amendment 1 did
+// STL's own triangles (ADR-580), as the highest-point cells of Amendment 1 did
 // before it.
 
 import { describe, expect, it } from 'vitest';
@@ -86,7 +86,7 @@ function compile(relief: MeshReliefObject, cnc: Partial<CncLayerSettings>) {
           depthPerPassMm: 2,
           stepoverPercent: 40,
           finishAllowanceMm: ALLOWANCE_MM,
-          // The raster's own cell grid is the premise; ADR-579's Automatic
+          // The raster's own cell grid is the premise; ADR-580's Automatic
           // would add waterline passes and pack the rows closer for an STL.
           reliefFinishStrategy: 'raster',
           ...cnc,

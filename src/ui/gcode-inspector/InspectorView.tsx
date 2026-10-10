@@ -272,7 +272,7 @@ function useInspectorScene(
     sections: session.sections,
     source,
     target: stockTarget(model, session),
-    // ADR-579: the canvas view shows a relief job as the carving it makes.
+    // ADR-580: the canvas view shows a relief job as the carving it makes.
     stockInitiallyShown: preview && (source?.design?.reliefs.length ?? 0) > 0,
   });
   const { playhead, liveMode, live } = session;

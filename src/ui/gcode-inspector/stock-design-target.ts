@@ -81,7 +81,7 @@ function sampleRelief(
 }
 
 // Steeper than this between two neighbouring samples, the design holds a wall
-// (ADR-579): an STL's vertical side, say. The depth at a point between them
+// (ADR-580): an STL's vertical side, say. The depth at a point between them
 // could be either side's, so the cell is not compared rather than given a
 // depth part-way up the wall; interpolated, a carving that follows the wall's
 // foot exactly read as cut metres too deep.

@@ -68,7 +68,7 @@ type CarvedStockOptions = {
   readonly design: GcodeInspectionDesign | undefined;
   /** Where playback has got; the whole program when it is not playing. */
   readonly target: StockTarget;
-  /** Start with the stock shown (the canvas view of a relief job, ADR-579). */
+  /** Start with the stock shown (the canvas view of a relief job, ADR-580). */
   readonly initiallyShown?: boolean;
 };
 
