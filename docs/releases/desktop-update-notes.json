@@ -5,7 +5,7 @@
     "Desktop updates now appear above the canvas, with separate choices to download and install. Licence keys are easier to paste, and the purchase page can open licence settings in KerfDesk.",
     "The Laser/CNC switch is in the machine toolbar. Positioning actions stay beside the jog controls, and Machine Setup has clearer review, focus and discard choices.",
     "Create artwork now provides clearer sketch and part workflows, accessible project sheets and editable relief tools. Older relief projects retain their composition settings.",
-    "V-carving uses modelled conical cutters and handles empty geometry before output. Tracing uses nearby grey evidence to resolve ambiguous joins.",
+    "STL reliefs keep model proportions, finish against the mesh and support two-sided setups with carved-stock previews. V-carving uses modelled conical cutters and catches empty geometry before output.",
     "Checkout recovery and licence device ownership are more reliable. Saved-document recovery is preserved, unsendable output is caught before Start, and Abort can be retried after an unconfirmed reset.",
     "Updated safety guidance explains direct supervision, machine safety features and fire response. Refund Policy 1.2 considers new requests case by case while preserving existing promises and mandatory rights."
   ]
