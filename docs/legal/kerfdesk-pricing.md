@@ -48,7 +48,7 @@ Renew an existing paid licence from Help > Licence in Windows. If payment is int
 
 ## Refunds and support
 
-The proposed policy offers a full refund within 14 days, including after activation/use, subject to fair use and any greater statutory rights. Duplicate/wrong charges, undelivered/unusable licences and applicable legal rights remain covered later. Read the draft Terms and Refund Policy; this draft enables no payments.
+Refund requests within 14 days are considered case by case and may be declined (ADR-578); purchases before 10 October 2026 keep the earlier full-refund promise. Duplicate/wrong charges, undelivered/unusable licences and applicable legal rights remain covered later. Read the draft Terms and Refund Policy; this draft enables no payments.
 
 Email support@kerfdesk.com for software/licence help and refund requests. Paddle handles payments, receipts, tax and refund processing at https://paddle.net. A refunded licence ends. Deactivate it on your devices and stop using its Pro tools; a computer kept offline may retain saved access until it reconnects. The Refund Policy explains this limitation.
 

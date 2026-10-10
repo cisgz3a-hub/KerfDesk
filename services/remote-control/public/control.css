@@ -333,6 +333,16 @@ textarea {
   font-size: 14px;
   box-shadow: 0 8px 28px #050c1380;
 }
+.safety-note {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border: 1px solid #b08a3e;
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: #3a3220;
+  color: #ffe9bf;
+  font-size: 14px;
+}
 .notice[data-kind='error'] {
   background: #442832;
   border-color: #a8667b;

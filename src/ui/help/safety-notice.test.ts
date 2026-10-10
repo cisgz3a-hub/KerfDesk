@@ -29,7 +29,20 @@ describe('SAFETY_NOTICE_TEXT', () => {
     expect(SAFETY_NOTICE_TEXT).toMatch(/dust/i);
   });
 
-  it('points to the full guide', () => {
-    expect(SAFETY_NOTICE_TEXT).toContain('docs/safety.md');
+  it('says remote viewing is not supervision and how to respond to a fire', () => {
+    expect(SAFETY_NOTICE_TEXT).toMatch(/NOT supervision/);
+    expect(SAFETY_NOTICE_TEXT).toMatch(/air assist/i);
+    expect(SAFETY_NOTICE_TEXT).toMatch(/fire blanket/i);
+  });
+
+  it("says the machine's own safety features are outside KerfDesk", () => {
+    expect(SAFETY_NOTICE_TEXT).toMatch(/does not make or control your machine's safety features/);
+    expect(SAFETY_NOTICE_TEXT).toMatch(/untrained/i);
+  });
+
+  // docs/safety.md is a repository path users cannot open; link the published guide.
+  it('points to the published full guide', () => {
+    expect(SAFETY_NOTICE_TEXT).toContain('https://kerfdesk.com/safety/');
+    expect(SAFETY_NOTICE_TEXT).not.toContain('docs/safety.md');
   });
 });

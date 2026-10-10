@@ -75,6 +75,16 @@ export const page = {
             or use a licence seat, and existing Pro tool rules still apply.
           </p>`,
         })}
+        ${callout({
+          tone: 'safety',
+          title: 'Remote control is not supervision',
+          body: html`<p>
+            Use machine control only while you are at the machine and can see it. Watching through a
+            phone or camera is not supervision: a laser fire can grow out of control in minutes, and
+            the phone’s Abort is a software stop, not an emergency stop.
+            <a href="/safety/">Read the safety notes</a>.
+          </p>`,
+        })}
         <p>
           <a href="${site.phoneSetupUrl}#mcp">See MCP setup</a> for a client that supports
           authenticated remote MCP servers. ChatGPT custom connections depend on your plan,
