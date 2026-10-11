@@ -521,5 +521,23 @@
     "group": "console-coordinate-effects",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-finding.json",
     "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-author.json"
+  },
+  {
+    "id": "B05-CI-ESLINT-001",
+    "priority": 2,
+    "title": "Repository lint exhausts its configured heap during full CI checks",
+    "originPr": null,
+    "discoveredDuringPr": 1161,
+    "trigger": "Full ESLint process crosses its 5120 MiB V8 heap cap on current source; three hosted jobs exited 134 without code diagnostics, with an intervening unchanged-head retry passing.",
+    "impact": "Required CI cannot reliably verify repair and tracking PRs. The repair runs sequential fresh processes with the same complete file coverage, rules and TypeScript configuration; custom CLI arguments retain the original single-process behavior.",
+    "attribution": "Operational audit follow-up observed while verifying batch05; no unsupported historical introduction or product-code fault is assigned.",
+    "group": "gcode-comment-realtime-bytes",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-ci-direct.log",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json",
+    "affectedPrs": [
+      1161,
+      1162,
+      1163
+    ]
   }
 ]

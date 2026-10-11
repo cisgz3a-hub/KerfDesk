@@ -252,7 +252,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diff
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
+Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
 
 Trigger: G92 X0 T2 or G92.1 G49
 
@@ -266,7 +266,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair e
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
+Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
 
 Trigger: G092 Z0 or G 92 Z0
 
@@ -278,9 +278,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair e
 
 ## B05-C-REALTIME-COMMENTS: Saved G-code comments preserve GRBL realtime command bytes
 
-Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-failed.
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-pending.
 
-Recorded CI: failed at commit 72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca.
+Recorded CI: pending at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
 
 Trigger: Profile name Shop!~ exported with ordinary build metadata; a sender transmits comments verbatim.
 
@@ -294,7 +294,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-c.json. Repair e
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
+Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
 
 Trigger: Known activeWcs G54, then Console selects G55 using G055, G 55, G55X0, G55 (G54), or G55 ; G54.
 
@@ -308,7 +308,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-wcs-finding.j
 
 Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
 
-Recorded CI: pending at commit 05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a.
+Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
 
 Trigger: Send accepted GRBL T2.5, T+002.5 or T 2 . 5, alone or combined with G92 X0.
 
@@ -317,3 +317,17 @@ Impact: Accepted numeric tool identity changes preserve work-Z proof and referen
 Historical origin: #94. Original PR94 tool regex admits integer T words only; the first batch05 lexical normalization still retained that restriction.
 
 Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-finding.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-author.json.
+
+## B05-CI-ESLINT-001: Repository lint exhausts its configured heap during full CI checks
+
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-pending.
+
+Recorded CI: pending at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
+
+Trigger: Full ESLint process crosses its 5120 MiB V8 heap cap on current source; three hosted jobs exited 134 without code diagnostics, with an intervening unchanged-head retry passing.
+
+Impact: Required CI cannot reliably verify repair and tracking PRs. The repair runs sequential fresh processes with the same complete file coverage, rules and TypeScript configuration; custom CLI arguments retain the original single-process behavior.
+
+Historical origin: See attribution. Operational audit follow-up observed while verifying batch05; no unsupported historical introduction or product-code fault is assigned.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-ci-direct.log. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json.

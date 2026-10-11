@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 56 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation; 1 no-current-defect-confirmed; 1 historical-limitations-already-fixed; 1 superseded-contract; 1 not-reproduced; 1 evidence-limit; 1 superseded; 1 retained-under-canonical-setting; 1 already-fixed.
+These 57 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation; 1 no-current-defect-confirmed; 1 historical-limitations-already-fixed; 1 superseded-contract; 1 not-reproduced; 1 evidence-limit; 1 superseded; 1 retained-under-canonical-setting; 1 already-fixed; 1 retained-validation-limitation.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -451,3 +451,11 @@ Disposition: **already-fixed**. Historical PRs: [#10](https://github.com/cisgz3a
 b813865131 shared sanitizer; existing newline controls and independent body/preflight parity pass. Distinct ASCII realtime defect remains.
 
 Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-057: Existing TypeScript cycle-detection validation limitation
+
+Disposition: **retained-validation-limitation**. Historical PRs: .
+
+A TypeScript import/no-cycle fixture was missed by the unchanged default extension mapping both before and after the lint memory repair. Type-aware diagnostics and exact eligible-file union remain equivalent. A fixture-only resolver mapping detects cross-partition cycles. This does not establish a product runtime defect or a historical introduction; investigate separately without claiming default TypeScript cycle qualification.
+
+Local audit evidence: batch-05/lint-memory-author.json, batch-05/lint-memory-peer-review.json.

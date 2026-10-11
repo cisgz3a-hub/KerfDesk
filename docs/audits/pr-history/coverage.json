@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T12:46:13.062Z",
+  "inventoryRefreshedAt": "2026-10-11T14:30:52.413Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -10,7 +10,7 @@
   "counts": {
     "full-diff": 62,
     "partial": 50,
-    "not-started": 1045
+    "not-started": 1047
   },
   "prs": [
     {
@@ -34,7 +34,10 @@
           "coverage": "partial",
           "report": "dependencies-tooling.json",
           "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-          "reviewedFiles": ["package-lock.json", "package.json"],
+          "reviewedFiles": [
+            "package-lock.json",
+            "package.json"
+          ],
           "remaining": [],
           "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
         },
@@ -42,7 +45,10 @@
         "reviewedAt": "2026-10-11T10:11:55.750Z",
         "reviewer": "/root/ledger_0900",
         "scope": "Dev-tool upgrades and all esbuild/CLI graph changes; declared concurrently Node >=22 conflicts with historical Node 20 tooling.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "changedFileCount": 2,
         "remaining": [],
         "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
@@ -66,7 +72,10 @@
         "coverage": "full-diff",
         "report": "dependencies-tooling.json",
         "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "remaining": [],
         "limitations": "Full patch inspection is not a review of upstream package implementations or proof that the historical app builds."
       }
@@ -92,7 +101,10 @@
           "coverage": "partial",
           "report": "dependencies-tooling.json",
           "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-          "reviewedFiles": ["package-lock.json", "package.json"],
+          "reviewedFiles": [
+            "package-lock.json",
+            "package.json"
+          ],
           "remaining": [],
           "limitations": "Major dependency version and removed transitives examined; application call-site API compatibility at the rejected historical head not qualified."
         },
@@ -100,7 +112,10 @@
         "reviewedAt": "2026-10-11T10:11:55.750Z",
         "reviewer": "/root/ledger_0900",
         "scope": "OpenType 2 direct/lock declarations and removed now-unused transitive entries; no manifest defect established.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "changedFileCount": 2,
         "remaining": [],
         "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
@@ -127,7 +142,10 @@
           "coverage": "partial",
           "report": "dependencies-tooling.json",
           "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-          "reviewedFiles": ["package-lock.json", "package.json"],
+          "reviewedFiles": [
+            "package-lock.json",
+            "package.json"
+          ],
           "remaining": [],
           "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
         },
@@ -135,7 +153,10 @@
         "reviewedAt": "2026-10-11T10:11:55.750Z",
         "reviewer": "/root/ledger_0900",
         "scope": "Licence checker upgrade, complete Arborist/npmcli/signature/cache graph and removed legacy reader entries; declared Node >=24 conflicts with actual historical Node 20 license workflow.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "changedFileCount": 2,
         "remaining": [],
         "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
@@ -159,7 +180,10 @@
         "coverage": "full-diff",
         "report": "dependencies-tooling.json",
         "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "remaining": [],
         "limitations": "Full patch inspection is not a review of upstream package implementations or proof that the historical app builds."
       }
@@ -185,7 +209,10 @@
           "coverage": "partial",
           "report": "dependencies-tooling.json",
           "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-          "reviewedFiles": ["package-lock.json", "package.json"],
+          "reviewedFiles": [
+            "package-lock.json",
+            "package.json"
+          ],
           "remaining": [],
           "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
         },
@@ -193,7 +220,10 @@
         "reviewedAt": "2026-10-11T10:11:55.750Z",
         "reviewer": "/root/ledger_0900",
         "scope": "Vite/Rolldown platform and WASM graph; PostCSS resolved below Vite declared range by explicit unchanged root override, without a reproduced runtime defect.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "changedFileCount": 2,
         "remaining": [],
         "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
@@ -217,7 +247,10 @@
         "coverage": "full-diff",
         "report": "dependencies-tooling.json",
         "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "remaining": [],
         "limitations": "Full patch inspection is not a review of upstream package implementations or proof that the historical app builds."
       }
@@ -240,7 +273,10 @@
         "coverage": "full-diff",
         "report": "dependencies-tooling.json",
         "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "remaining": [],
         "limitations": "Full patch inspection is not a review of upstream package implementations or proof that the historical app builds."
       }
@@ -263,7 +299,10 @@
         "coverage": "full-diff",
         "report": "dependencies-tooling.json",
         "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
-        "reviewedFiles": ["package-lock.json", "package.json"],
+        "reviewedFiles": [
+          "package-lock.json",
+          "package.json"
+        ],
         "remaining": [],
         "limitations": "Full patch inspection is not a review of upstream package implementations or proof that the historical app builds."
       }
@@ -289,128 +328,174 @@
         "reviewedFilesAcrossBothPrs": [
           {
             "path": "src/io/svg/parse-svg.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full introducing diff",
             "current": "partial: traversal, paint visibility, geometry accumulation"
           },
           {
             "path": "src/io/svg/svg-presentation.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "descendant extracted from historical parse-svg.ts",
             "current": "full"
           },
           {
             "path": "src/io/svg/shape-to-polylines.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full changed hunks",
             "current": "full"
           },
           {
             "path": "src/io/svg/sanitize.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full historical source",
             "current": "not audited independently"
           },
           {
             "path": "src/io/project/deserialize-project.ts",
-            "prs": [10, 11],
+            "prs": [
+              10,
+              11
+            ],
             "historical": "full changed hunks",
             "current": "partial normalization and validation entry points"
           },
           {
             "path": "src/io/project/project-shape-validator.ts",
-            "prs": [10, 11],
+            "prs": [
+              10,
+              11
+            ],
             "historical": "Complete introduction/change hunks for #10 and #11 read in batch-04; prior inventory-only scope superseded for these historical hunks.",
             "current": "Partial: prior scene/object/transform review plus batch-04 numeric/device/workspace/layer/optimization/power persistence slice; modern optional-feature helper internals remain outside scope."
           },
           {
             "path": "src/io/project/normalize-scene-object.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "descendant inspection",
             "current": "full"
           },
           {
             "path": "src/ui/state/autosave.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full changed hunks",
             "current": "full compatibility surface; durable storage not fully reviewed"
           },
           {
             "path": "src/core/scene/scene.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "full changed hunks",
             "current": "not independently fully reviewed"
           },
           {
             "path": "src/core/material-library/material-library.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "full",
             "current": "full"
           },
           {
             "path": "src/io/material-library/material-library-io.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "partial: schema, merge, parse and preset validation",
             "current": "full module; imported helper modules not fully reviewed"
           },
           {
             "path": "src/ui/app/material-library-file-actions.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "full",
             "current": "full"
           },
           {
             "path": "src/ui/state/material-library-actions.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "selected assignment and saved-state lineage",
             "current": "full"
           },
           {
             "path": "src/ui/state/layer-actions.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "inventory",
             "current": "partial: assignment, creation, deletion and clipboard entry points"
           },
           {
             "path": "src/core/job/interval-test-grid.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "partial generation entry and defaults",
             "current": "full"
           },
           {
             "path": "src/core/job/material-test-grid.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "partial generation entry and defaults",
             "current": "full module; extracted axes/layout dependencies not independently fully reviewed"
           },
           {
             "path": "src/ui/layers/MaterialLibraryPanel.tsx",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "partial call-site tracing only"
           },
           {
             "path": "src/ui/material-library/SavedLibrariesDialog.tsx",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "partial export/import caller tracing"
           },
           {
             "path": "src/ui/material-library/use-material-experiment-editor.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "full call-site tracing"
           },
           {
             "path": "src/ui/app/use-material-library-persistence.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "partial: persistence subscription and dirty-flag independence"
           },
           {
             "path": "src/ui/state/laser-recipe-seeding.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "full source tracing, no independent generator audit"
           },
           {
             "path": "src/ui/layers/material-binding-status.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "full"
           }
         ],
@@ -495,128 +580,174 @@
         "reviewedFilesAcrossBothPrs": [
           {
             "path": "src/io/svg/parse-svg.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full introducing diff",
             "current": "partial: traversal, paint visibility, geometry accumulation"
           },
           {
             "path": "src/io/svg/svg-presentation.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "descendant extracted from historical parse-svg.ts",
             "current": "full"
           },
           {
             "path": "src/io/svg/shape-to-polylines.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full changed hunks",
             "current": "full"
           },
           {
             "path": "src/io/svg/sanitize.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full historical source",
             "current": "not audited independently"
           },
           {
             "path": "src/io/project/deserialize-project.ts",
-            "prs": [10, 11],
+            "prs": [
+              10,
+              11
+            ],
             "historical": "full changed hunks",
             "current": "partial normalization and validation entry points"
           },
           {
             "path": "src/io/project/project-shape-validator.ts",
-            "prs": [10, 11],
+            "prs": [
+              10,
+              11
+            ],
             "historical": "Complete introduction/change hunks for #10 and #11 read in batch-04; prior inventory-only scope superseded for these historical hunks.",
             "current": "Partial: prior scene/object/transform review plus batch-04 numeric/device/workspace/layer/optimization/power persistence slice; modern optional-feature helper internals remain outside scope."
           },
           {
             "path": "src/io/project/normalize-scene-object.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "descendant inspection",
             "current": "full"
           },
           {
             "path": "src/ui/state/autosave.ts",
-            "prs": [10],
+            "prs": [
+              10
+            ],
             "historical": "full changed hunks",
             "current": "full compatibility surface; durable storage not fully reviewed"
           },
           {
             "path": "src/core/scene/scene.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "full changed hunks",
             "current": "not independently fully reviewed"
           },
           {
             "path": "src/core/material-library/material-library.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "full",
             "current": "full"
           },
           {
             "path": "src/io/material-library/material-library-io.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "partial: schema, merge, parse and preset validation",
             "current": "full module; imported helper modules not fully reviewed"
           },
           {
             "path": "src/ui/app/material-library-file-actions.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "full",
             "current": "full"
           },
           {
             "path": "src/ui/state/material-library-actions.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "selected assignment and saved-state lineage",
             "current": "full"
           },
           {
             "path": "src/ui/state/layer-actions.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "inventory",
             "current": "partial: assignment, creation, deletion and clipboard entry points"
           },
           {
             "path": "src/core/job/interval-test-grid.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "partial generation entry and defaults",
             "current": "full"
           },
           {
             "path": "src/core/job/material-test-grid.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "historical": "partial generation entry and defaults",
             "current": "full module; extracted axes/layout dependencies not independently fully reviewed"
           },
           {
             "path": "src/ui/layers/MaterialLibraryPanel.tsx",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "partial call-site tracing only"
           },
           {
             "path": "src/ui/material-library/SavedLibrariesDialog.tsx",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "partial export/import caller tracing"
           },
           {
             "path": "src/ui/material-library/use-material-experiment-editor.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "full call-site tracing"
           },
           {
             "path": "src/ui/app/use-material-library-persistence.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "partial: persistence subscription and dirty-flag independence"
           },
           {
             "path": "src/ui/state/laser-recipe-seeding.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "full source tracing, no independent generator audit"
           },
           {
             "path": "src/ui/layers/material-binding-status.ts",
-            "prs": [11],
+            "prs": [
+              11
+            ],
             "current": "full"
           }
         ],
@@ -1197,7 +1328,9 @@
         "coverage": "full-diff",
         "report": "dependencies-tooling.json",
         "scope": "Full 138-line documentation diff. Historical claims are dated evidence, not current product guarantees.",
-        "reviewedFiles": ["audit/reports/docs-vs-build-gap-audit-2026-06-29.md"],
+        "reviewedFiles": [
+          "audit/reports/docs-vs-build-gap-audit-2026-06-29.md"
+        ],
         "remaining": [],
         "limitations": "Focused tests use current main, not the original merged commit."
       }
@@ -1272,7 +1405,10 @@
           "report": "root-coverage.json",
           "scope": "All production setup button/dialog/help changes and current consolidated entry",
           "changedFileCount": 7,
-          "remaining": ["Historical test changes not all read", "Native UI qualification"]
+          "remaining": [
+            "Historical test changes not all read",
+            "Native UI qualification"
+          ]
         },
         "reviewedHead": "768312938da4b20f400168b239d013374d45db8f",
         "reviewedAt": "2026-10-11T10:11:55.750Z",
@@ -1360,7 +1496,10 @@
         "report": "root-coverage.json",
         "scope": "Original banner integration, current recovery banner, claim expiry and auto-open",
         "changedFileCount": 18,
-        "remaining": ["Complete recovery execution and archival pipeline", "Hardware"]
+        "remaining": [
+          "Complete recovery execution and archival pipeline",
+          "Hardware"
+        ]
       }
     },
     {
@@ -1430,7 +1569,10 @@
         "report": "root-coverage.json",
         "scope": "Production/configuration diff and documentation-removal classification",
         "changedFileCount": 261,
-        "remaining": ["Deleted historical reports", "Legal/provenance qualification"]
+        "remaining": [
+          "Deleted historical reports",
+          "Legal/provenance qualification"
+        ]
       }
     },
     {
@@ -1449,7 +1591,9 @@
       "base": "45870f4be4c005259bac320c853515ca804937f5",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/camera-canvas-arcs.json"],
+        "reports": [
+          "batch-02/camera-canvas-arcs.json"
+        ],
         "slices": [
           {
             "report": "batch-02/camera-canvas-arcs.json",
@@ -1499,7 +1643,9 @@
       "base": "c00751009b7e6a8063e9f4c8cdfa81519c99415e",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/camera-canvas-arcs.json"],
+        "reports": [
+          "batch-02/camera-canvas-arcs.json"
+        ],
         "slices": [
           {
             "report": "batch-02/camera-canvas-arcs.json",
@@ -1592,7 +1738,9 @@
       "base": "00f7e01074c0e740db4b7524a5523e43ea285705",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/camera-canvas-arcs.json"],
+        "reports": [
+          "batch-02/camera-canvas-arcs.json"
+        ],
         "slices": [
           {
             "report": "batch-02/camera-canvas-arcs.json",
@@ -1749,7 +1897,9 @@
       "base": "90d06e5064e67c2a5ad0c7df3dfb2ea80f13dcf9",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -1761,7 +1911,9 @@
               "audit/reports/machine-profile-auto-detect-audit-2026-07-07.md"
             ],
             "scope": "Document-only classification and sampled claims; no executable code.",
-            "gaps": ["Historical audit/comparator assertions not independently requalified."]
+            "gaps": [
+              "Historical audit/comparator assertions not independently requalified."
+            ]
           }
         ]
       }
@@ -1782,7 +1934,9 @@
       "base": "64197366ded5c5d62053d66b789b44455d888bbd",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/trace.json"],
+        "reports": [
+          "batch-02/trace.json"
+        ],
         "slices": [
           {
             "report": "batch-02/trace.json",
@@ -1842,7 +1996,9 @@
       "base": "f8adea950bcf54e5fea36db76a93db0531381a4d",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -1878,7 +2034,9 @@
       "base": "330dacb32fb9ca6748dff1ddffa9aabeb90914c9",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/camera-canvas-arcs.json"],
+        "reports": [
+          "batch-02/camera-canvas-arcs.json"
+        ],
         "slices": [
           {
             "report": "batch-02/camera-canvas-arcs.json",
@@ -1940,13 +2098,17 @@
       "base": "e5db0e46bfffe04565b255641c70b87d37e2f207",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
             "number": 38,
             "coverage": "full-diff",
-            "reviewedFiles": ["DECISIONS.md"],
+            "reviewedFiles": [
+              "DECISIONS.md"
+            ],
             "scope": "Closed unmerged ADR-numbering proposal. No shipped code.",
             "gaps": []
           }
@@ -1969,7 +2131,9 @@
       "base": "e5db0e46bfffe04565b255641c70b87d37e2f207",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/camera-canvas-arcs.json"],
+        "reports": [
+          "batch-02/camera-canvas-arcs.json"
+        ],
         "slices": [
           {
             "report": "batch-02/camera-canvas-arcs.json",
@@ -2034,15 +2198,21 @@
       "base": "4a31641a14122a1b7c201395a7d6d15aefb3a848",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
             "number": 40,
             "coverage": "partial",
-            "reviewedFiles": ["README.md"],
+            "reviewedFiles": [
+              "README.md"
+            ],
             "scope": "Documentation expansion; sampled source comparisons. Historical MIT/browser-first marketing is not current product state.",
-            "gaps": ["Competitor assertions and every user-flow claim not requalified."]
+            "gaps": [
+              "Competitor assertions and every user-flow claim not requalified."
+            ]
           }
         ]
       }
@@ -2063,7 +2233,9 @@
       "base": "4a31641a14122a1b7c201395a7d6d15aefb3a848",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2082,7 +2254,9 @@
               "vite.config.ts"
             ],
             "scope": "All four historical patches; deferred prompt lifecycle, cleanup and toolbar mounting; current branding and focused toolbar suite.",
-            "gaps": ["No native Chromium installation or service-worker/offline qualification."]
+            "gaps": [
+              "No native Chromium installation or service-worker/offline qualification."
+            ]
           }
         ]
       }
@@ -2103,7 +2277,9 @@
       "base": "4a31641a14122a1b7c201395a7d6d15aefb3a848",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2160,7 +2336,9 @@
       "base": "a82295d67ca8523688d2edca69fe99e9cbe46a7c",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2228,14 +2406,22 @@
       "base": "4a31641a14122a1b7c201395a7d6d15aefb3a848",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
             "number": 44,
             "coverage": "partial",
-            "reviewedFiles": ["index.html", "src/ui/app/main.tsx"],
-            "reviewedCurrentFiles": ["src/ui/app/main.tsx", "index.html"],
+            "reviewedFiles": [
+              "index.html",
+              "src/ui/app/main.tsx"
+            ],
+            "reviewedCurrentFiles": [
+              "src/ui/app/main.tsx",
+              "index.html"
+            ],
             "scope": "Historical splash CSS/HTML and dismissal loop; current painted-canvas/crash/minimum-duration/reduced-motion handling.",
             "gaps": [
               "Binary public/splash.jpg not visually inspected.",
@@ -2262,7 +2448,9 @@
       "base": "bf4a2f39db928d2fc5b1fa174b793d54b4a64f06",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2312,7 +2500,9 @@
       "base": "4e2affb178cda21e796fb414d92ae19dd2032468",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2334,7 +2524,9 @@
               "src/ui/laser/board-capture/BoardCapturePanel.test.tsx"
             ],
             "scope": "All historical patches; remove/reset in both shapes and current locked-session controls and actual removal mutation; current panel regressions.",
-            "gaps": ["No native UI/hardware qualification."]
+            "gaps": [
+              "No native UI/hardware qualification."
+            ]
           }
         ]
       }
@@ -2355,7 +2547,9 @@
       "base": "4a31641a14122a1b7c201395a7d6d15aefb3a848",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2396,7 +2590,9 @@
       "base": "d0d84c01ae8bafa5350a2012a145c205ea9c9f08",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2455,7 +2651,9 @@
       "base": "40bd8194acb6480caa435d499cf87b0fda089dcf",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/board-rotary-planner.json"],
+        "reports": [
+          "batch-02/board-rotary-planner.json"
+        ],
         "slices": [
           {
             "report": "batch-02/board-rotary-planner.json",
@@ -2855,7 +3053,9 @@
       "base": "a88e2dd3b2784e5962e374bbe6bf60d2d22b796e",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/trace.json"],
+        "reports": [
+          "batch-02/trace.json"
+        ],
         "slices": [
           {
             "report": "batch-02/trace.json",
@@ -2916,7 +3116,9 @@
       "base": "bf7e7a34f9945e555f8056a8b93f6742bce62ed9",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -2934,7 +3136,9 @@
               "src/platform/electron/release-desktop-workflow-gate.test.ts"
             ],
             "scope": "Action-major upgrade and gate test change; current workflows pin action SHAs. Selected current policy tests pass.",
-            "gaps": ["No upstream action implementation audit or new hosted workflow run."]
+            "gaps": [
+              "No upstream action implementation audit or new hosted workflow run."
+            ]
           }
         ]
       }
@@ -2955,7 +3159,9 @@
       "base": "836ffd6c8d4ee458aa5883dd68db7be3478df8ab",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/trace.json"],
+        "reports": [
+          "batch-02/trace.json"
+        ],
         "slices": [
           {
             "report": "batch-02/trace.json",
@@ -3022,7 +3228,9 @@
       "base": "3e4530748ad9b266f5a21904f033f68e2c0014bb",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -3067,7 +3275,9 @@
       "base": "58f362bbab39a252e5def89ff6bb0a3e394f31eb",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -3078,7 +3288,9 @@
               "src/platform/electron/release-desktop-workflow-gate.test.ts"
             ],
             "scope": "LF checkout rule and guard; current binary/external-fixture exceptions inspected.",
-            "gaps": ["No new Windows installer build."]
+            "gaps": [
+              "No new Windows installer build."
+            ]
           }
         ]
       }
@@ -3099,7 +3311,9 @@
       "base": "e3fb1903c871a1f80213a6389e93af8ce60fc6a2",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -3142,7 +3356,9 @@
       "base": "6b3dcf89de90afc1ee58ebd89f0b06753f5dc39c",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -3186,7 +3402,10 @@
       "base": "ad6c124fa1f64a3fb97045e79622f0e982492ba0",
       "review": {
         "coverage": "partial",
-        "reports": ["batch-02/trace.json", "batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/trace.json",
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/trace.json",
@@ -3283,7 +3502,9 @@
       "base": "6b3dcf89de90afc1ee58ebd89f0b06753f5dc39c",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -3301,7 +3522,9 @@
               "src/ui/layers/use-debounced-commit.ts"
             ],
             "scope": "Core CNC cut fields remain directly reachable in the current reorganized UI; mounted current UI tests pass.",
-            "gaps": ["No native rendered visual or hardware validation."]
+            "gaps": [
+              "No native rendered visual or hardware validation."
+            ]
           }
         ]
       }
@@ -3322,7 +3545,9 @@
       "base": "fc10110f81adc5d903d2875ca39f2ec7c1139ebd",
       "review": {
         "coverage": "full-diff",
-        "reports": ["batch-02/root-coverage.json"],
+        "reports": [
+          "batch-02/root-coverage.json"
+        ],
         "slices": [
           {
             "report": "batch-02/root-coverage.json",
@@ -3349,7 +3574,9 @@
               "src/core/cnc/coolant-fields.ts"
             ],
             "scope": "Machine coolant propagation, on/off command ordering and persistence. Missing tool-change stop/restart in original feature is fixed in current transitions and covered by modal/coolant tests.",
-            "gaps": ["No physical coolant/relay, spindle or controller qualification."]
+            "gaps": [
+              "No physical coolant/relay, spindle or controller qualification."
+            ]
           }
         ]
       }
@@ -3530,7 +3757,9 @@
           "src/ui/laser/LaserWindow.tsx",
           "DECISIONS.md"
         ],
-        "gaps": ["Complete current shell and native viewport/focus behavior not qualified."],
+        "gaps": [
+          "Complete current shell and native viewport/focus behavior not qualified."
+        ],
         "state": "closed",
         "mergedAt": "2026-07-13T03:32:10Z",
         "mergeCommit": "ad6c124fa1f64a3fb97045e79622f0e982492ba0",
@@ -3609,7 +3838,9 @@
           "src/ui/laser/LaserWindow.tsx",
           "src/ui/laser/LaserWindow.console-disclosure.test.tsx"
         ],
-        "gaps": ["Controller command behavior outside disclosure scope; no hardware use."],
+        "gaps": [
+          "Controller command behavior outside disclosure scope; no hardware use."
+        ],
         "state": "closed",
         "mergedAt": null,
         "mergeCommit": null,
@@ -3643,7 +3874,9 @@
           "src/ui/laser/device-setup/DeviceSetupControls.tsx",
           "src/ui/laser/LaserWindow.device-setup.test.tsx"
         ],
-        "gaps": ["Wizard calibration/hardware operations outside entry-point scope."],
+        "gaps": [
+          "Wizard calibration/hardware operations outside entry-point scope."
+        ],
         "state": "closed",
         "mergedAt": null,
         "mergeCommit": null,
@@ -3756,7 +3989,10 @@
           "pnpm-lock.yaml",
           "tsconfig.json"
         ],
-        "reviewedCurrentFiles": [".github/workflows/e2e.yml", "playwright.config.ts"],
+        "reviewedCurrentFiles": [
+          ".github/workflows/e2e.yml",
+          "playwright.config.ts"
+        ],
         "gaps": [
           "Current workflow only partially read; browser tests and hosted Actions not executed."
         ],
@@ -25404,15 +25640,15 @@
       "number": 1153,
       "title": "Add endpoint Extend with tangent preview and Undo",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1153",
-      "state": "open",
-      "draft": true,
+      "state": "closed",
+      "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T10:49:24Z",
-      "updated_at": "2026-10-11T12:45:07Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "6b75d716bc902123a5a1a23836bb08bda0f57fa4",
-      "head": "f18bc5981e1d2a8f78362103ff6fb2083e55fb57",
+      "updated_at": "2026-10-11T14:14:14Z",
+      "closed_at": "2026-10-11T14:14:14Z",
+      "merged_at": "2026-10-11T14:14:14Z",
+      "merge_commit_sha": "504c43bc17bc968276be459e4c9c099c5feb5dcd",
+      "head": "39cea0af4cee305ffbd89fc4019954cd08efc7f8",
       "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "review": {
         "coverage": "not-started",
@@ -25431,7 +25667,12 @@
                 "report": null,
                 "previousReview": {
                   "coverage": "not-started",
-                  "report": null
+                  "report": null,
+                  "previousReview": {
+                    "coverage": "not-started",
+                    "report": null
+                  },
+                  "reason": "Open PR head changed since the recorded review"
                 },
                 "reason": "Open PR head changed since the recorded review"
               },
@@ -25448,22 +25689,27 @@
       "number": 1154,
       "title": "Prepare desktop release notes from the verified 1.0.15 baseline",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1154",
-      "state": "open",
+      "state": "closed",
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T10:56:49Z",
-      "updated_at": "2026-10-11T12:46:10Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "ecd93af123ba5c0f2ad2f510daddf51f53b9b9f3",
-      "head": "53d80c01ded2f236a27588616a9d21566ae091f1",
+      "updated_at": "2026-10-11T14:15:05Z",
+      "closed_at": "2026-10-11T14:15:05Z",
+      "merged_at": "2026-10-11T14:15:05Z",
+      "merge_commit_sha": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "head": "e375950f80cab3208a6c2ecf04f40279a1058588",
       "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
       "review": {
         "coverage": "not-started",
         "report": null,
         "previousReview": {
           "coverage": "not-started",
-          "report": null
+          "report": null,
+          "previousReview": {
+            "coverage": "not-started",
+            "report": null
+          },
+          "reason": "Open PR head changed since the recorded review"
         },
         "reason": "Open PR head changed since the recorded review"
       }
@@ -25519,10 +25765,10 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:25:49Z",
-      "updated_at": "2026-10-11T12:26:27Z",
+      "updated_at": "2026-10-11T13:15:39Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "b3c681f5da7f328e32c777eea6d23ce5b9f30d5b",
+      "merge_commit_sha": null,
       "head": "b9e7f9182f06e9bef3a4c2867b01374dd54871eb",
       "base": "50f86d378894f9efb97fb0fc9ddc93438246e523",
       "review": {
@@ -25543,12 +25789,12 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:38:41Z",
-      "updated_at": "2026-10-11T12:38:59Z",
+      "updated_at": "2026-10-11T14:29:05Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "f966f26fd2d91e89b21489edd21006239eaeda5f",
-      "head": "352da8328a451af989ff01bb0856b7eed82db719",
-      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "merge_commit_sha": "31a18723fd7511b775d19fd90bf09ed734155363",
+      "head": "6c376775925695e8ec6d01fcec62bf0327e7dcf9",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
         "coverage": "not-started",
         "report": null,
@@ -25557,7 +25803,17 @@
           "report": null,
           "previousReview": {
             "coverage": "not-started",
-            "report": null
+            "report": null,
+            "previousReview": {
+              "coverage": "not-started",
+              "report": null,
+              "previousReview": {
+                "coverage": "not-started",
+                "report": null
+              },
+              "reason": "Open PR head changed since the recorded review"
+            },
+            "reason": "Open PR head changed since the recorded review"
           },
           "reason": "Open PR head changed since the recorded review"
         },
@@ -25591,15 +25847,20 @@
       "draft": true,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:55:00Z",
-      "updated_at": "2026-10-11T12:02:49Z",
+      "updated_at": "2026-10-11T14:04:12Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "cb8116ec3bec929fa287b1c37310ab0bbe1fbf95",
-      "head": "9991d2d7c1269e10d3ba6ddb205e6d02196ce447",
-      "base": "95b8e0fbbff6a8d54b7a652c29a164994bfcc701",
+      "merge_commit_sha": "95d72fbd90e9df11c040cd745bcb3fc9df420138",
+      "head": "10409d66069b8cee76fe4c676496e48fb8956288",
+      "base": "39cea0af4cee305ffbd89fc4019954cd08efc7f8",
       "review": {
         "coverage": "not-started",
-        "report": null
+        "report": null,
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        },
+        "reason": "Open PR head changed since the recorded review"
       }
     },
     {
@@ -25610,23 +25871,47 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:30:38Z",
-      "updated_at": "2026-10-11T12:40:55Z",
+      "updated_at": "2026-10-11T14:27:15Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "8d4662c734349247bff6e02159af9c61e25edd5d",
-      "head": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
-      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "merge_commit_sha": "ee502f7e54ba22af24e60f0fcc8ca37b73138705",
+      "head": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
         "coverage": "full-diff",
-        "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-        "report": "docs/audits/2026-10-11-pr-history/batch-05/comment-peer-review.json",
+        "scope": "Complete product and shared CI repair manifest independently reviewed; all published blobs match reviewed source50c. CI remains separate.",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-comment-published-review.json",
         "reviewer": "/root/batch05_a",
-        "reviewedHead": "72dbd3b37bcd125f14dd221cbc51d5ebbe5edbca",
-        "reviewedFiles": ["src/core/gcode-comments.ts", "src/core/gcode-comments.test.ts"],
+        "reviewedHead": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
+        "reviewedFiles": [
+          "package.json",
+          "scripts/run-eslint.mjs",
+          "scripts/run-eslint.test.mjs",
+          "src/core/gcode-comments.test.ts",
+          "src/core/gcode-comments.ts"
+        ],
         "remaining": [],
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
-        "repairGroup": "gcode-comment-realtime-bytes"
-      }
+        "repairGroup": "gcode-comment-realtime-bytes",
+        "changedFileCount": 5
+      },
+      "reviewHistory": [
+        {
+          "coverage": "full-diff",
+          "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
+          "report": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-published-review.json",
+          "reviewer": "/root/batch05_a",
+          "reviewedHead": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
+          "reviewedFiles": [
+            "src/core/gcode-comments.ts",
+            "src/core/gcode-comments.test.ts"
+          ],
+          "remaining": [],
+          "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
+          "repairGroup": "gcode-comment-realtime-bytes",
+          "note": "Superseded product-only review receipt; current full manifest includes shared CI repair"
+        }
+      ]
     },
     {
       "number": 1162,
@@ -25636,29 +25921,53 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:33:59Z",
-      "updated_at": "2026-10-11T12:40:38Z",
+      "updated_at": "2026-10-11T14:29:52Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "0e2694efa609190dd2c2e52a5185fd6ab4b0b5b6",
-      "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
-      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "merge_commit_sha": "c08634d94f67f6673d3d032026e0379a985d47e8",
+      "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
         "coverage": "full-diff",
-        "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-        "report": "docs/audits/2026-10-11-pr-history/batch-05/console-independent-review.json",
-        "reviewer": "/root/batch05_c",
-        "reviewedHead": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+        "scope": "Complete product and shared CI repair manifest independently reviewed; all published blobs match reviewed source50c. CI remains separate.",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-console-published-review.json",
+        "reviewer": "/root/batch05_a",
+        "reviewedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
         "reviewedFiles": [
-          "src/core/controllers/console-state-effect.ts",
+          "package.json",
+          "scripts/run-eslint.mjs",
+          "scripts/run-eslint.test.mjs",
           "src/core/controllers/console-state-effect.test.ts",
-          "src/ui/state/frame-wcs-selection.ts",
+          "src/core/controllers/console-state-effect.ts",
           "src/ui/state/frame-wcs-selection.test.ts",
+          "src/ui/state/frame-wcs-selection.ts",
           "src/ui/state/laser-store-console.test.ts"
         ],
         "remaining": [],
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
-        "repairGroup": "console-coordinate-effects"
-      }
+        "repairGroup": "console-coordinate-effects",
+        "changedFileCount": 8
+      },
+      "reviewHistory": [
+        {
+          "coverage": "full-diff",
+          "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
+          "report": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-console-published-review.json",
+          "reviewer": "/root/batch05_c",
+          "reviewedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+          "reviewedFiles": [
+            "src/core/controllers/console-state-effect.ts",
+            "src/core/controllers/console-state-effect.test.ts",
+            "src/ui/state/frame-wcs-selection.ts",
+            "src/ui/state/frame-wcs-selection.test.ts",
+            "src/ui/state/laser-store-console.test.ts"
+          ],
+          "remaining": [],
+          "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
+          "repairGroup": "console-coordinate-effects",
+          "note": "Superseded product-only review receipt; current full manifest includes shared CI repair"
+        }
+      ]
     },
     {
       "number": 1163,
@@ -25668,17 +25977,17 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:42:53Z",
-      "updated_at": "2026-10-11T12:43:03Z",
+      "updated_at": "2026-10-11T14:25:16Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "519b1f91ad303a67b18a3849377aa98cc6ced14a",
-      "head": "0710628dd0f9ee3edd3cca45cda04be4e918e9f6",
-      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "merge_commit_sha": "6abae0120264b0f1dc0dd431158ac0425b898f85",
+      "head": "9302b995626e9a98bdc74e5b08aa9e3679ab0794",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
         "coverage": "full-diff",
-        "report": "docs/audits/2026-10-11-pr-history/publication/batch05-ledger-published-review.json",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-ledger-published-review.json",
         "reviewer": "/root/batch05_a",
-        "reviewedHead": "0710628dd0f9ee3edd3cca45cda04be4e918e9f6",
+        "reviewedHead": "9302b995626e9a98bdc74e5b08aa9e3679ab0794",
         "reviewedFiles": [
           "docs/audits/pr-history/DISPOSITIONS.md",
           "docs/audits/pr-history/FINDINGS.md",
@@ -25706,13 +26015,56 @@
         "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
       },
       "ciSnapshot": {
-        "head": "0710628dd0f9ee3edd3cca45cda04be4e918e9f6",
-        "status": "pending",
-        "checkedAt": "2026-10-11T12:59:18.456Z",
+        "head": "9302b995626e9a98bdc74e5b08aa9e3679ab0794",
+        "status": "failed",
+        "checkedAt": "2026-10-11T14:57:00.927Z",
         "matchesInventoriedHead": true,
-        "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-        "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+        "absentRequired": [
+          "Chrome UX smoke"
+        ],
+        "unmetRequired": [
+          "Lint, typecheck, license, test, build",
+          "Chrome UX smoke"
+        ],
         "source": "state.json:ledgerCi"
+      }
+    },
+    {
+      "number": 1164,
+      "title": "Fix Remote release blockers in jog cancellation and command ownership",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1164",
+      "state": "closed",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T12:54:20Z",
+      "updated_at": "2026-10-11T13:57:29Z",
+      "closed_at": "2026-10-11T13:57:29Z",
+      "merged_at": "2026-10-11T13:57:28Z",
+      "merge_commit_sha": "f7190457ec531e06f3e70ce7d19a3b0c92848406",
+      "head": "8942873e01e9838dc7b9a6cbe4211f80567f26aa",
+      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "review": {
+        "coverage": "not-started",
+        "report": null
+      }
+    },
+    {
+      "number": 1165,
+      "title": "Preserve curve geometry when closing paths",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1165",
+      "state": "open",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T13:43:12Z",
+      "updated_at": "2026-10-11T13:47:38Z",
+      "closed_at": null,
+      "merged_at": null,
+      "merge_commit_sha": "86c0bdad42e214607fef668de5d78e534d97d8ea",
+      "head": "3c05e63b1f55a7b7e73fc2017cb6fc1da7ae053c",
+      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "review": {
+        "coverage": "not-started",
+        "report": null
       }
     }
   ]
