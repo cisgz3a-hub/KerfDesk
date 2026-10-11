@@ -7,6 +7,7 @@ import {
   registrationJigArtworkInstances,
   registrationJigCopyId,
   registrationJigCopyIdentity,
+  registrationJigPartId,
 } from './registration-jig-artwork';
 import { createRegistrationLayer } from './registration-layer';
 
@@ -17,6 +18,15 @@ describe('registration jig artwork identity', () => {
       sourceId: 'source: one/%',
       boxId: 'box: two/%',
     });
+  });
+
+  it('round-trips a detached part without treating its unique key as part of the outline', () => {
+    const id = registrationJigPartId('source: one/%', 'box: two/%', 'part: three/%');
+    expect(registrationJigCopyIdentity(id)).toEqual({
+      sourceId: 'source: one/%',
+      boxId: 'box: two/%',
+    });
+    expect(registrationJigCopyIdentity('registration-jig-part:source:box:%broken')).toBeNull();
   });
 
   it('groups a multi-object layout by physical outline order', () => {

@@ -5,6 +5,7 @@ import { useUiStore } from '../state/ui-store';
 import type { DragState } from './drag-state';
 import { isStationaryRightPanClick } from './pan-drag';
 import { canvasMouseToScene, type ViewState } from './view-transform';
+import { selectTracePartForContextMenu } from './trace-part-tool';
 
 export function openContextBarForRightClick(args: {
   readonly drag: Extract<DragState, { kind: 'pan' }>;
@@ -17,9 +18,13 @@ export function openContextBarForRightClick(args: {
   if (useStore.getState().previewMode) return;
   const isRelease = args.e.type === 'mouseup' || args.e.type === 'pointerup';
   if (!isRelease || !isStationaryRightPanClick(args.drag, args.e)) return;
-  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
-  const hitId = point === null ? null : hitTest(args.project.scene, point);
-  args.selectObject(hitId);
+  if (useUiStore.getState().toolMode.kind === 'trace-parts') {
+    if (!selectTracePartForContextMenu(args)) return;
+  } else {
+    const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+    const hitId = point === null ? null : hitTest(args.project.scene, point);
+    args.selectObject(hitId);
+  }
   const current = useStore.getState();
   const hasSelection = current.selectedObjectId !== null || current.additionalSelectedIds.size > 0;
   useUiStore.getState().openWorkspaceContextBar({

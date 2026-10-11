@@ -14,9 +14,9 @@ import { fitSelectionToRegion } from '../../core/scene/fit-selection-to-region';
 import {
   registrationJigArtworkInstances,
   registrationJigCopyId,
-  registrationJigCopyPrefix,
   registrationJigGroupCopyId,
   registrationJigGroupCopyPrefix,
+  registrationJigReplacedArtworkIds,
 } from '../../core/scene/registration-jig-artwork';
 import {
   buildSelectionTransformEdit,
@@ -24,6 +24,8 @@ import {
 } from '../../core/scene/selection-transform';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
+import { removeObjectIdsFromGroups } from './scene-group-actions';
+import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
 
 const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
 
@@ -103,15 +105,21 @@ export function applyCenterArtworkInRegistrationJigSet(
     );
   }
 
-  const copyPrefixes = selected.map((object) => registrationJigCopyPrefix(object.id));
+  const replacedIds = registrationJigReplacedArtworkIds(
+    state.project.scene,
+    new Set(selected.map((object) => object.id)),
+  );
   const copiedGroupPrefixes = completeSelectedGroups(state.project.scene, selected).map((group) =>
     registrationJigGroupCopyPrefix(group.id),
   );
   let scene: Scene = {
     ...state.project.scene,
     objects: state.project.scene.objects
-      .filter((object) => !copyPrefixes.some((prefix) => object.id.startsWith(prefix)))
+      .filter((object) => !replacedIds.has(object.id))
       .map((object) => movedById.get(object.id) ?? object),
+    ...(state.project.scene.artworkOrder === undefined
+      ? {}
+      : { artworkOrder: state.project.scene.artworkOrder.filter((id) => !replacedIds.has(id)) }),
     groups: [
       ...(state.project.scene.groups ?? []).filter(
         (group) => !copiedGroupPrefixes.some((prefix) => group.id.startsWith(prefix)),
@@ -120,6 +128,11 @@ export function applyCenterArtworkInRegistrationJigSet(
     ],
   };
   for (const copy of copies) scene = addObject(scene, copy);
+  const liveIds = new Set(scene.objects.map((object) => object.id));
+  const removedIds = new Set([...replacedIds].filter((id) => !liveIds.has(id)));
+  const repaired = repairDanglingObjectDependencies(removeObjectIdsFromGroups(scene, removedIds));
+  scene = repaired.scene;
+  reportDependencyRepairs(repaired);
   const [selectedObjectId, ...additionalSelectedIds] = selectionIds;
   return {
     project: { ...state.project, scene },

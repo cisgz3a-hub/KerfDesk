@@ -6,6 +6,7 @@ import {
   type Bounds,
   type ColoredPath,
   type CurveSubpath,
+  type Layer,
   type Polyline,
   type Scene,
   type TracedImage,
@@ -48,7 +49,7 @@ export function hitTracePart(
     const object = scene.objects[index];
     if (object?.kind !== 'traced-image' || object.locked === true) continue;
     if (!sceneLayerVisibility.hasObject(object, visibility)) continue;
-    const hit = hitObjectPart(object, point, HIT_RADIUS_PX * pxToMm, (path) => {
+    const hit = hitObjectPart(object, point, HIT_RADIUS_PX * pxToMm, scene.layers, (path) => {
       const { visible, operation } = sceneLayerVisibility.resolvePath(object, path, visibility);
       if (!visible) return 'hidden';
       // Match object-display: only an effective Fill operation paints an
@@ -68,6 +69,7 @@ function hitObjectPart(
   object: TracedImage,
   point: Vec2,
   radius: number,
+  layers: ReadonlyArray<Layer>,
   resolvePaint: (path: ColoredPath) => PathHitPaint,
 ): TracePartHit | null {
   const local = localPoint(object, point);
@@ -81,7 +83,6 @@ function hitObjectPart(
   );
   const tolerance = displayCurveToleranceMm((objectScale * HIT_RADIUS_PX) / radius);
   let nearest: NearestHit | null = null;
-  let filled: TracePartHit | null = null;
   // Paths paint in source order: a later colour is topmost at an overlap.
   for (let pathIndex = object.paths.length - 1; pathIndex >= 0; pathIndex -= 1) {
     const path = object.paths[pathIndex];
@@ -93,11 +94,13 @@ function hitObjectPart(
       { object, lines, local, point, padding, radius, pathIndex, tolerance },
       nearest,
     );
-    if (paint === 'fill' && nearest === null && filled === null) {
-      filled = filledPart(object, pathIndex, path, lines, local, tolerance);
+    if (paint === 'fill') {
+      const filled = filledPart(object, pathIndex, path, lines, local, tolerance, layers);
+      // This painted region hides every lower path, including nearer edges.
+      if (filled !== null) return nearest?.hit ?? filled;
     }
   }
-  return nearest?.hit ?? filled;
+  return nearest?.hit ?? null;
 }
 
 function nearestEdge(
@@ -133,6 +136,7 @@ function filledPart(
   lines: ReadonlyArray<IndexedLine>,
   point: Vec2,
   tolerance: number,
+  layers: ReadonlyArray<Layer>,
 ): TracePartHit | null {
   // Most clicks are on an edge. Only group the path for an interior hit; this
   // never constructs one scene object per contour of a large image.
@@ -145,7 +149,7 @@ function filledPart(
   // strokes can cancel one another after their operation changes to Fill.
   const total = windings.reduce((sum, winding) => sum + winding, 0);
   if (path.fillRule === 'nonzero' ? total === 0 : Math.abs(total) % 2 === 0) return null;
-  for (const group of tracePartGroups(object, pathIndex)) {
+  for (const group of tracePartGroups(object, pathIndex, layers)) {
     const winding = group.reduce((sum, index) => sum + (windings[index] ?? 0), 0);
     const inside = path.fillRule === 'nonzero' ? winding !== 0 : Math.abs(winding) % 2 === 1;
     const subpathIndex = group[0];

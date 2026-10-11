@@ -427,7 +427,8 @@ destination and cannot overwrite the template source.
 1. After tracing, click **Edit trace parts** in the canvas hint or the left tool strip.
    Double-clicking a trace with Select also opens this tool.
 2. Click or drag the line or filled shape you want to change. Only that part separates from the
-   rest of the trace. A filled shape keeps its holes; a Centerline stroke moves independently.
+   rest of the trace. A filled shape keeps its holes; a Centerline stroke moves independently
+   unless a Fill operation uses its enclosed shapes. Right-click picks a part for its context menu.
 3. Shift-click to select several parts. Drag them together, use the transform handles to resize
    or rotate, arrow keys to nudge, or Delete to remove them. Existing duplication and numeric
    position controls work on the picked parts.
@@ -439,8 +440,9 @@ destination and cannot overwrite the template source.
    available when you deliberately want every shape separated.
 
 Pick the visible edge of a line-only trace or a trace in wireframe view. Filled parts can also
-be picked through their interior. If a trace is used as an image mask or a text-path guide,
-release that dependency before separating its parts; the tool explains this without changing
+be picked through their interior. If a trace is used as an image mask, a text-path guide, or a
+linked relief boundary, mask or rail, release that dependency before separating its parts;
+the tool explains this without changing
 the linked artwork.
 
 ### F-A5a. Join curve endpoints

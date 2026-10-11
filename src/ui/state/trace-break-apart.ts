@@ -1,15 +1,16 @@
-import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
+import { tracePartGroups } from '../../core/trace/trace-part-groups';
 import {
   DEFAULT_MACHINE_CURVE_TOLERANCE_MM,
   flattenCurveSubpath,
   type CncTabAnchor,
   type ColoredPath,
   type CurveSubpath,
+  type Layer,
   type Polyline,
   type TracedImage,
 } from '../../core/scene';
 import { subsetSubpathNesting } from '../../core/scene/subpath-nesting';
-import { groupSubpathsByOuterShape, subpathCount } from '../../core/geometry/outer-shape-groups';
+import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
 
 // ADR-406: Break Apart on a trace yields one object per outer shape, each
@@ -34,8 +35,9 @@ export function canBreakApartTrace(object: TracedImage): boolean {
 export function splitTracedImage(
   object: TracedImage,
   uniqueId: (index: number) => string,
+  layers: ReadonlyArray<Layer> = [],
 ): ReadonlyArray<TracedImage> {
-  const pieces = pieceGeometries(object);
+  const pieces = pieceGeometries(object, layers);
   if (pieces.length <= 1) return [];
   // The source raster stays in the scene; pieces no longer re-trace from it.
   const { traceSourceId: _detached, ...detached } = object;
@@ -54,19 +56,12 @@ export function splitTracedImage(
   }));
 }
 
-function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
-  // Centerline traces are strokes: a closed stroke inside another is a
-  // separate mark, not a hole. Edge Detection output is filled closed contours
-  // like filled-contours (edge-trace.ts), so its holes group with their outer.
-  // Line + fill (ADR-454) holds both: strokes split per stroke, outlines
-  // group with their holes.
+function pieceGeometries(
+  object: TracedImage,
+  layers: ReadonlyArray<Layer>,
+): ReadonlyArray<PieceGeometry> {
   return object.paths.flatMap((path, pathIndex) => {
-    const strokes =
-      object.traceMode === 'centerline' ||
-      (object.traceMode === 'hybrid' && isHybridStrokePath(path));
-    const groups = strokes
-      ? Array.from({ length: subpathCount(path) }, (_, index) => [index])
-      : groupSubpathsByOuterShape(path);
+    const groups = tracePartGroups(object, pathIndex, layers);
     return groups.map((subpathIndices) => ({
       path: tracePathSubset(path, subpathIndices),
       pathIndex,

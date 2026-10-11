@@ -1,11 +1,13 @@
 import { canonicalArtworkOrder } from '../../core/artwork-order';
+import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
 import { designNodeOrder } from '../../core/scene/design-hierarchy-order';
-import { sceneLayerVisibility, type Scene, type TracedImage } from '../../core/scene';
+import { sceneLayerVisibility, type Project, type Scene, type TracedImage } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { sceneLimitOverrun } from './scene-copy-room';
 import { scopedSelectionProjectPatch } from './project-job-setup';
 import { detachTracePartGeometry, isSingleTracePart } from './trace-part-geometry';
+import { tracePartObjectId } from './trace-part-jig-identity';
 import { useToastStore } from './toast-store';
 
 export type TracePartActions = {
@@ -35,8 +37,14 @@ export function tracePartActions(set: TracePartSet): TracePartActions {
           if (object === null || path === undefined) return state;
           const layers = sceneLayerVisibility.lookup(state.project.scene.layers);
           if (!sceneLayerVisibility.resolvePath(object, path, layers).visible) return state;
-          const partId = uniquePartId(state.project.scene, objectId);
-          const split = detachTracePartGeometry(object, pathIndex, subpathIndex, partId);
+          const partId = tracePartObjectId(state.project.scene, objectId);
+          const split = detachTracePartGeometry(
+            object,
+            pathIndex,
+            subpathIndex,
+            partId,
+            state.project.scene.layers,
+          );
           if (split === null) return state;
           if (split.remainder === null) {
             selectedId = objectId;
@@ -53,7 +61,7 @@ export function tracePartActions(set: TracePartSet): TracePartActions {
           if (warning !== null) return state;
           selectedId = partId;
           return {
-            project: { ...state.project, scene },
+            project: withPartSideMembership({ ...state.project, scene }, objectId, partId),
             ...(state.pendingUndo === null
               ? {
                   undoStack: pushUndo(state.project, state.undoStack, 'Separate trace part'),
@@ -90,17 +98,49 @@ function dependencyWarning(scene: Scene, id: string): string | null {
   const guide = scene.objects.some(
     (object) => object.kind === 'text' && object.pathText?.guideObjectId === id,
   );
-  if (!mask && !guide) return null;
-  // The retained ID would otherwise silently narrow a live mask or guide.
+  const relief = scene.objects.some(
+    (object) =>
+      object.kind === 'relief' &&
+      'reliefAuthoring' in object &&
+      object.reliefAuthoring !== undefined &&
+      reliefAuthoringLinkIds(object.reliefAuthoring).includes(id),
+  );
+  if (!mask && !guide && !relief) return null;
+  // The retained ID would otherwise silently narrow a live mask, guide or relief source.
   // Releasing those relationships must be an explicit edit, even when hidden.
-  const uses = [mask ? 'an image mask' : null, guide ? 'a text guide' : null].filter(Boolean);
+  const uses = [
+    mask ? 'an image mask' : null,
+    guide ? 'a text guide' : null,
+    relief ? 'a linked relief source' : null,
+  ].filter(Boolean);
   const steps = [
     mask
       ? 'Apply Crop Image to each masked image to keep its appearance, or use Remove Image Mask.'
       : null,
     guide ? "Turn off Path text in each linked text object's editor." : null,
+    relief
+      ? 'Remove its linked use in the relief editor, or duplicate the trace and edit the copy.'
+      : null,
   ].filter(Boolean);
   return `This trace is used as ${uses.join(' and ')}. Before separating its parts: ${steps.join(' ')}`;
+}
+
+function withPartSideMembership(project: Project, sourceId: string, partId: string): Project {
+  const setup = project.cncSetup;
+  const sides = setup?.twoSided;
+  if (setup === undefined || sides === undefined) return project;
+  const expand = (ids: readonly string[]): readonly string[] =>
+    ids.includes(sourceId) && !ids.includes(partId)
+      ? ids.flatMap((id) => (id === sourceId ? [id, partId] : [id]))
+      : ids;
+  const sideAObjectIds = expand(sides.sideAObjectIds);
+  const sideBObjectIds = expand(sides.sideBObjectIds);
+  if (sideAObjectIds === sides.sideAObjectIds && sideBObjectIds === sides.sideBObjectIds)
+    return project;
+  return {
+    ...project,
+    cncSetup: { ...setup, twoSided: { ...sides, sideAObjectIds, sideBObjectIds } },
+  };
 }
 
 function replaceWithPart(scene: Scene, remainder: TracedImage, part: TracedImage): Scene {
@@ -128,15 +168,6 @@ function replaceWithPart(scene: Scene, remainder: TracedImage, part: TracedImage
   };
 }
 
-function uniquePartId(scene: Scene, sourceId: string): string {
-  const ids = new Set(scene.objects.map((object) => object.id));
-  for (let index = 1; index <= ids.size + 1; index += 1) {
-    const id = `${sourceId}__part_${index}`;
-    if (!ids.has(id)) return id;
-  }
-  return `${sourceId}__part_${crypto.randomUUID()}`;
-}
-
 function directPartSelection(
   state: AppState,
   id: string | null,
@@ -149,7 +180,7 @@ function directPartSelection(
         ...state.additionalSelectedIds,
       ].filter((candidate) => {
         const object = editableTrace(state.project.scene, candidate);
-        return object !== null && isSingleTracePart(object);
+        return object !== null && isSingleTracePart(object, state.project.scene.layers);
       })
     : [];
   const ids =

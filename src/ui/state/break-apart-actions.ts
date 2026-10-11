@@ -4,6 +4,7 @@ import {
   type Bounds,
   type ColoredPath,
   type ImportedSvg,
+  type Layer,
   type Project,
   type SceneObject,
 } from '../../core/scene';
@@ -75,7 +76,11 @@ function breakApartSelectionMutation(
     );
     return state;
   }
-  const replacement = buildReplacementObjects(state.project.scene.objects, selected);
+  const replacement = buildReplacementObjects(
+    state.project.scene.objects,
+    selected,
+    state.project.scene.layers,
+  );
   report(() => reportSingleShapeTraces(replacement.singleShapeTraces));
   if (!replacement.changed) return state;
   const [primary, ...additional] = replacement.newSelectionIds;
@@ -132,6 +137,7 @@ type Replacement = {
 function buildReplacementObjects(
   objects: ReadonlyArray<SceneObject>,
   selectedIds: ReadonlySet<string>,
+  layers: ReadonlyArray<Layer>,
 ): Replacement {
   const out: SceneObject[] = [];
   const newSelectionIds: string[] = [];
@@ -139,7 +145,9 @@ function buildReplacementObjects(
   const allocatePartId = partIdAllocator(objects);
   let singleShapeTraces = 0;
   for (const object of objects) {
-    const parts = selectedIds.has(object.id) ? splitSelectedObject(object, allocatePartId) : null;
+    const parts = selectedIds.has(object.id)
+      ? splitSelectedObject(object, allocatePartId, layers)
+      : null;
     if (parts === null || parts.length === 0) {
       if (parts !== null && object.kind === 'traced-image') singleShapeTraces += 1;
       out.push(object);
@@ -180,10 +188,11 @@ function partIdAllocator(objects: ReadonlyArray<SceneObject>): PartIdAllocator {
 function splitSelectedObject(
   object: SceneObject,
   allocatePartId: PartIdAllocator,
+  layers: ReadonlyArray<Layer>,
 ): ReadonlyArray<SceneObject> | null {
   if (object.kind === 'traced-image') {
     return canBreakApartTrace(object)
-      ? splitTracedImage(object, (index) => allocatePartId(object.id, index))
+      ? splitTracedImage(object, (index) => allocatePartId(object.id, index), layers)
       : null;
   }
   return canBreakApart(object) ? splitImportedSvg(object, allocatePartId) : null;

@@ -1,25 +1,19 @@
-import { act, useCallback, useRef } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyTransform, createLayer, IDENTITY_TRANSFORM, type Vec2 } from '../../core/scene';
+import { cleanupTracePartHarness, pointer, renderHarness } from './trace-part-drag-test-harness';
+import { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { applyTransform, createLayer, IDENTITY_TRANSFORM } from '../../core/scene';
 import { focusDesignHierarchy } from '../state/design-hierarchy-store';
 import { resetStore } from '../state/test-helpers';
+import { dependentText } from '../state/testing/scene-clipboard-fixtures';
 import { useStore } from '../state/store';
 import { useUiStore } from '../state/ui-store';
 import { DEFAULT_SNAP_SETTINGS } from './snap-settings';
 import { activateTracePartTool } from './trace-part-tool';
 import { expectTransform, getTrace, loadTrace, selectedTrace } from './trace-part-test-fixtures';
-import { useDragMove } from './use-workspace-drag';
-import { useTracePartSelection } from './use-trace-part-selection';
-import { computeView } from './view-transform';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
-
-const CANVAS_SIZE = 1000;
-const VIEW = { zoomFactor: 1, panX: 0, panY: 0 };
-const roots: Root[] = [];
 
 beforeEach(() => {
   resetStore();
@@ -30,15 +24,11 @@ beforeEach(() => {
     snapSettings: { ...DEFAULT_SNAP_SETTINGS, enabled: false },
     snapMarker: null,
     snapGuides: [],
+    workspaceContextBar: null,
   });
 });
 
-afterEach(async () => {
-  await act(async () => {
-    for (const root of roots.splice(0)) root.unmount();
-  });
-  document.body.innerHTML = '';
-});
+afterEach(cleanupTracePartHarness);
 
 describe('trace-part dragging through the workspace pointer pipeline', () => {
   it('separates and moves the picked contour while keeping every other contour unchanged, in one Undo', async () => {
@@ -157,6 +147,77 @@ describe('trace-part dragging through the workspace pointer pipeline', () => {
     expect(useStore.getState().additionalSelectedIds.size).toBe(0);
     expect(useStore.getState().project).toBe(before);
     expect(useStore.getState().undoStack).toHaveLength(history);
+  });
+
+  it.each([false, true])(
+    'does not add selection-only part clicks to Undo with selected-artwork output (Shift: %s)',
+    async (shiftKey) => {
+      loadTrace();
+      const canvas = await renderHarness();
+      await pointer(canvas, 'pointerdown', { x: 30, y: 55 });
+      await pointer(canvas, 'pointerup', { x: 30, y: 55 });
+      const partId = selectedTrace().id;
+      await act(async () => {
+        useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true });
+        useStore.getState().selectTracePart(null);
+      });
+      const before = useStore.getState();
+      await pointer(canvas, 'pointerdown', { x: 30, y: 55 }, { shiftKey });
+      await pointer(canvas, 'pointerup', { x: 30, y: 55 }, { shiftKey });
+      expect(selectedTrace().id).toBe(partId);
+      expect(useStore.getState().project.scene).toBe(before.project.scene);
+      expect(useStore.getState().project.jobSetup?.outputScope?.selectedObjectIds).toEqual([
+        partId,
+      ]);
+      expect(useStore.getState().undoStack).toBe(before.undoStack);
+      expect(useStore.getState().pendingUndo).toBeNull();
+      if (shiftKey) {
+        await pointer(canvas, 'pointerdown', { x: 30, y: 55 }, { shiftKey });
+        await pointer(canvas, 'pointerup', { x: 30, y: 55 }, { shiftKey });
+        expect(useStore.getState().selectedObjectId).toBeNull();
+        expect(useStore.getState().undoStack).toBe(before.undoStack);
+      }
+    },
+  );
+
+  it('right-clicks a compound trace part with a usable part selection and context menu', async () => {
+    loadTrace();
+    const original = useStore.getState().project;
+    const canvas = await renderHarness(true);
+    await pointer(canvas, 'pointerdown', { x: 30, y: 55 }, { button: 2 });
+    await pointer(canvas, 'pointerup', { x: 30, y: 55 }, { button: 2 });
+    expect(selectedTrace().id).not.toBe('trace');
+    expect(selectedTrace().paths[0]?.polylines).toHaveLength(1);
+    expect(getTrace('trace').paths[0]?.polylines).toHaveLength(2);
+    expect(useUiStore.getState().workspaceContextBar?.context).toBe('workspace-selection');
+    expect(useStore.getState().undoStack).toEqual([original]);
+    const history = useStore.getState().undoStack;
+    await pointer(canvas, 'pointerdown', { x: 30, y: 55 }, { button: 2 });
+    await pointer(canvas, 'pointerup', { x: 30, y: 55 }, { button: 2 });
+    expect(useStore.getState().undoStack).toBe(history);
+    expect(useUiStore.getState().workspaceContextBar?.context).toBe('workspace-selection');
+  });
+
+  it('leaves selected-artwork scope unchanged when a right-click split has a live dependency', async () => {
+    loadTrace();
+    useStore.setState((state) => ({
+      project: {
+        ...state.project,
+        scene: {
+          ...state.project.scene,
+          objects: [...state.project.scene.objects, dependentText('label', 'trace')],
+        },
+      },
+    }));
+    useStore.getState().setOutputScopeSettings({ cutSelectedGraphics: true });
+    const before = useStore.getState();
+    const canvas = await renderHarness(true);
+    await pointer(canvas, 'pointerdown', { x: 30, y: 55 }, { button: 2 });
+    await pointer(canvas, 'pointerup', { x: 30, y: 55 }, { button: 2 });
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
+    expect(useStore.getState().pendingUndo).toBeNull();
+    expect(useUiStore.getState().workspaceContextBar).toBeNull();
   });
 
   it.each([2, 3])(
@@ -325,62 +386,3 @@ describe('trace-part dragging through the workspace pointer pipeline', () => {
     expect(useStore.getState().selectedObjectId).toBeNull();
   });
 });
-
-function DragHarness(): JSX.Element {
-  const project = useStore((state) => state.project);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const setCanvasRef = useCallback((canvas: HTMLCanvasElement | null) => {
-    canvasRef.current = canvas;
-    if (canvas === null) return;
-    canvas.getBoundingClientRect = () =>
-      ({ left: 0, top: 0, width: CANVAS_SIZE, height: CANVAS_SIZE }) as DOMRect;
-    canvas.setPointerCapture = vi.fn();
-    canvas.releasePointerCapture = vi.fn();
-    canvas.hasPointerCapture = () => true;
-  }, []);
-  const { handlers } = useDragMove(canvasRef, project, false, VIEW);
-  return <canvas ref={setCanvasRef} width={CANVAS_SIZE} height={CANVAS_SIZE} {...handlers} />;
-}
-
-function SelectionGuard(): null {
-  const active = useUiStore((state) => state.toolMode.kind === 'trace-parts');
-  useTracePartSelection(active);
-  return null;
-}
-
-async function renderHarness(guardSelection = false): Promise<HTMLCanvasElement> {
-  const host = document.createElement('div');
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  roots.push(root);
-  await act(async () =>
-    root.render(
-      <>
-        <DragHarness />
-        {guardSelection ? <SelectionGuard /> : null}
-      </>,
-    ),
-  );
-  const canvas = host.querySelector('canvas');
-  if (canvas === null) throw new Error('canvas missing');
-  return canvas;
-}
-
-async function pointer(
-  canvas: HTMLCanvasElement,
-  type: 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel' | 'lostpointercapture',
-  point: Vec2,
-  modifiers: { readonly shiftKey?: boolean } = {},
-): Promise<void> {
-  const device = useStore.getState().project.device;
-  const view = computeView(CANVAS_SIZE, CANVAS_SIZE, device.bedWidth, device.bedHeight, VIEW);
-  const event = new MouseEvent(type, {
-    bubbles: true,
-    button: 0,
-    clientX: view.offsetX + point.x * view.scale,
-    clientY: view.offsetY + point.y * view.scale,
-    ...modifiers,
-  });
-  Object.defineProperty(event, 'pointerId', { value: 3 });
-  await act(async () => canvas.dispatchEvent(event));
-}

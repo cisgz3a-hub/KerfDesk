@@ -19,13 +19,15 @@ direct selection, isolation, node editing, and hole-preserving splitting in esta
   the whole-object selection so its handles cannot intercept the first part pick.
 - Clicking a traced edge or filled shape separates only the selected part from the remainder.
   A filled outer keeps its holes using the ADR-406 shape grouping. Centerline strokes, including
-  the stroke paths in hybrid traces, separate individually. This is geometric selection, not
-  recognition of semantic subjects inside a connected drawing.
+  the stroke paths in hybrid traces, separate individually unless a bound effective Fill
+  operation needs their holes preserved. This is geometric selection, not recognition of semantic
+  subjects inside a connected drawing.
 - Keep the remainder under its original ID and create at most one additional scene object per
   pick. Both remain traced images with their original transforms, paint, operations, canonical
   curves, committed compatibility chords, pixel dimensions and applicable tab anchors. Preserve
-  subpath nesting, group membership, artwork order and design tree order. The source raster stays
-  in the project; partial traces drop their re-trace link because re-tracing would recreate the
+  subpath nesting, group membership, artwork order, design tree order, CNC side assignments and
+  registration-jig instance membership. The source raster stays in the project; partial traces
+  drop their re-trace link because re-tracing would recreate the
   entire original picture.
 - Test edges with a six-screen-pixel tolerance and nearest-edge selection within a trace. Cache
   immutable path bounds and shape groups; reject bounding-box misses before examining segments.
@@ -33,19 +35,23 @@ direct selection, isolation, node editing, and hole-preserving splitting in esta
   caching their recent scale buckets so edited curves stay selectable at high zoom.
   Filled interiors respect holes and the path fill rule. Interior picking follows the effective
   canvas paint: line operations, orphan paths and wireframe view require an edge hit. Locked and
-  hidden paths cannot be picked.
+  hidden paths cannot be picked. A topmost fill occludes hidden edges in lower paths.
   Respect the current group-editing scope, but select a picked part directly rather than expanding
   its parent group.
 - Drag immediately to move the part; Shift-click toggles multiple parts. Reuse ordinary transform
   handles, snapping, nudging, deletion, duplication, and node editing on the selected parts.
-  Done or Escape returns to Select. A portion of one connected contour is reshaped with Edit nodes.
+  Right-click also picks an individual part for its context menu. Done or Escape returns to Select.
+  A portion of one connected contour is reshaped with Edit nodes.
 - Snapshot before extraction so separation and movement commit as one undo step. Escape,
   pointer cancellation and lost capture restore the original unsplit project. A selection-only
-  click can itself separate a part and is undoable. Respect existing project object limits.
-- Refuse a split while the trace is a live image mask or text-path guide, with guidance to release
-  the dependency first. Retaining its ID only on the remainder would silently narrow the mask or
-  guide. Keep the complete project and history unchanged in that case, including for hidden or
-  locked dependents. Selecting an already separate single part requires no split.
+  click can itself separate a part and is undoable. Selecting an already separated part creates
+  no history entry, including with Selected artwork output enabled. Respect existing project
+  object limits.
+- Refuse a split while the trace is a live image mask, text-path guide, or retained relief vector
+  link, with guidance to release the dependency first. Retaining its ID only on the remainder
+  would silently narrow the mask or guide or rematerialize the relief. Keep the complete project
+  and history unchanged in that case, including for hidden or locked dependents. Selecting an
+  already separate single part requires no split.
 
 ## Consequences and verification
 

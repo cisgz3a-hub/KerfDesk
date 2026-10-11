@@ -52,7 +52,7 @@ export function beginTracePartDrag(args: TracePartDragArgs): DragState | null {
     if (!args.e.shiftKey) state.selectTracePart(null);
     return null;
   }
-  state.beginInteraction();
+  const extracting = beginPartExtraction(scene, hit.objectId);
   retainSelectedParts(selectedObjects, args.project.scene);
   const id = state.detachTracePart(hit.objectId, hit.pathIndex, hit.subpathIndex);
   if (id === null) {
@@ -62,9 +62,12 @@ export function beginTracePartDrag(args: TracePartDragArgs): DragState | null {
   const alreadySelected = selectedObjects.some((object) => object.id === id);
   if (args.e.shiftKey || !alreadySelected) state.selectTracePart(id, { toggle: args.e.shiftKey });
   if (args.e.shiftKey) {
-    state.endInteraction();
+    if (extracting) state.endInteraction();
     return null;
   }
+  // Selecting existing artwork can persist the output-scope IDs. Capture the
+  // drag after that selection so only extraction or movement enters history.
+  if (!extracting) state.beginInteraction();
   const next = useStore.getState();
   const object = next.project.scene.objects.find((candidate) => candidate.id === id);
   if (object === undefined) {
@@ -87,6 +90,43 @@ export function beginTracePartDrag(args: TracePartDragArgs): DragState | null {
   };
 }
 
+export function selectTracePartForContextMenu(
+  args: Pick<TracePartDragArgs, 'e' | 'ref' | 'project' | 'viewState'>,
+): boolean {
+  const state = useStore.getState();
+  const point = canvasMouseToScene(args.e, args.ref.current, args.project, args.viewState);
+  const scene = focusedScene(args.project.scene, state.projectDocumentEpoch);
+  const hit =
+    point === null
+      ? null
+      : hitTracePart(
+          scene,
+          point,
+          pxToMmForCanvas(args.ref.current, args.project, args.viewState),
+          useUiStore.getState().wireframeView,
+        );
+  if (hit === null) {
+    state.selectTracePart(null);
+    return true;
+  }
+  const extracting = beginPartExtraction(scene, hit.objectId);
+  const id = state.detachTracePart(hit.objectId, hit.pathIndex, hit.subpathIndex);
+  if (id === null) {
+    if (extracting) state.cancelInteraction();
+    return false;
+  }
+  state.selectTracePart(id);
+  if (extracting) state.endInteraction();
+  return true;
+}
+
+function beginPartExtraction(scene: Scene, objectId: string): boolean {
+  const object = scene.objects.find((candidate) => candidate.id === objectId);
+  const extracting = object !== undefined && !isSingleTracePart(object, scene.layers);
+  if (extracting) useStore.getState().beginInteraction();
+  return extracting;
+}
+
 function selectedPartHandle(
   args: TracePartDragArgs,
   selectedObjects: ReadonlyArray<SceneObject>,
@@ -98,7 +138,7 @@ function selectedPartHandle(
     !selectedObjects.every(
       (object) =>
         object.locked !== true &&
-        isSingleTracePart(object) &&
+        isSingleTracePart(object, args.project.scene.layers) &&
         sceneObjectHasVisibleLayer(args.project.scene, object),
     )
   )
@@ -118,7 +158,7 @@ function retainSelectedParts(objects: ReadonlyArray<SceneObject>, scene: Scene):
   const parts = objects.filter(
     (object) =>
       object.locked !== true &&
-      isSingleTracePart(object) &&
+      isSingleTracePart(object, scene.layers) &&
       sceneObjectHasVisibleLayer(scene, object),
   );
   if (parts.length === objects.length) return;

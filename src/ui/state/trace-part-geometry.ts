@@ -1,40 +1,9 @@
-import type { CncTabAnchor, ColoredPath, SceneObject, TracedImage } from '../../core/scene';
-import { groupSubpathsByOuterShape, subpathCount } from '../../core/geometry/outer-shape-groups';
-import { isHybridStrokePath } from '../../core/trace/hybrid/hybrid-paths';
+import type { CncTabAnchor, ColoredPath, Layer, TracedImage } from '../../core/scene';
+import { subpathCount } from '../../core/geometry/outer-shape-groups';
 import { boundsFromColoredPaths } from '../../core/trace/trace-bounds';
+import { tracePartGroups } from '../../core/trace/trace-part-groups';
 import { tracePathSubset } from './trace-break-apart';
-
-type PartGroups = ReadonlyArray<ReadonlyArray<number>>;
-const fillGroupCache = new WeakMap<ColoredPath, PartGroups>();
-const strokeGroupCache = new WeakMap<ColoredPath, PartGroups>();
-
-/** Filled shapes carry their holes; centerline and hybrid strokes stand alone. */
-export function tracePartGroups(object: TracedImage, pathIndex: number): PartGroups {
-  const path = object.paths[pathIndex];
-  if (path === undefined) return [];
-  const strokes =
-    object.traceMode === 'centerline' ||
-    (object.traceMode === 'hybrid' && isHybridStrokePath(path));
-  const cache = strokes ? strokeGroupCache : fillGroupCache;
-  const cached = cache.get(path);
-  if (cached !== undefined) return cached;
-  const groups = strokes
-    ? Array.from({ length: subpathCount(path) }, (_, index) => [index])
-    : groupSubpathsByOuterShape(path);
-  cache.set(path, groups);
-  return groups;
-}
-
-/** A whole compact remainder must not become a part through Select All or restored selection. */
-export function isSingleTracePart(object: SceneObject): object is TracedImage {
-  if (object.kind !== 'traced-image') return false;
-  let count = 0;
-  for (let pathIndex = 0; pathIndex < object.paths.length; pathIndex += 1) {
-    count += tracePartGroups(object, pathIndex).length;
-    if (count > 1) return false;
-  }
-  return count === 1;
-}
+export { tracePartGroups, isSingleTracePart } from '../../core/trace/trace-part-groups';
 
 type PathSubset = {
   readonly pathIndex: number;
@@ -54,10 +23,13 @@ export function detachTracePartGeometry(
   pathIndex: number,
   subpathIndex: number,
   partId: string,
+  layers: ReadonlyArray<Layer> = [],
 ): DetachedTracePart | null {
   if (!Number.isInteger(pathIndex) || !Number.isInteger(subpathIndex)) return null;
   const path = object.paths[pathIndex];
-  const indices = tracePartGroups(object, pathIndex).find((group) => group.includes(subpathIndex));
+  const indices = tracePartGroups(object, pathIndex, layers).find((group) =>
+    group.includes(subpathIndex),
+  );
   if (path === undefined || indices === undefined) return null;
   const selected = new Set(indices);
   const remainder = remainderSubsets(object, pathIndex, selected);
