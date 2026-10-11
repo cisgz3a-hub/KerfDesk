@@ -1,0 +1,333 @@
+# Historical findings and dispositions
+
+These 41 records were reconciled from the first three historical audit batches. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 9 rejected candidate; 7 documented limitation.
+
+A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
+
+## DISP-001: React and react-dom versions differ in the rejected lockfile
+
+Disposition: **closed-unmerged proposal**. Historical PRs: [#9](https://github.com/cisgz3a-hub/KerfDesk/pull/9).
+
+The proposal resolved React 19.2.6 and react-dom 19.2.4. It never merged; the audit baseline resolved both to 18.3.1. This was source-confirmed against React's version requirement, not an executed historical installation.
+
+Local audit evidence: dependencies-tooling.md, dependencies-tooling.json.
+
+## DISP-002: Local SVG use references could recurse through ancestor or mutual cycles
+
+Disposition: **resolved before audit**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10).
+
+The baseline parser tracks active references and limits expansion/depth; current structure tests cover circular references and bounded fan-out. Historical source was inspected, but an old packaged app was not run.
+
+Local audit evidence: foundation.md, foundation.json.
+
+## DISP-003: Unstyled SVG shapes lost their default black fill
+
+Disposition: **resolved before audit**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10).
+
+Baseline visibleFill restores black paint for shapes while keeping lines unfilled. Existing stylesheet tests compare unstyled geometry with explicit black fill.
+
+Local audit evidence: foundation.md, foundation.json.
+
+## DISP-004: An SVG child could not restore visible visibility below a hidden ancestor
+
+Disposition: **resolved before audit**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10).
+
+The baseline separates inherited visibility from hiddenSubtree used for display/group opacity. Existing structure tests cover the distinction.
+
+Local audit evidence: foundation.md, foundation.json.
+
+## DISP-005: Asynchronous material-library export can clear a later dirty marker
+
+Disposition: **rejected candidate**. Historical PRs: [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+The saved callback race was observed in source, but baseline persistence independently saves document changes and the report found no production consumer of this marker beyond state plumbing. No user-visible loss was demonstrated; the race was not proved harmless in all future uses.
+
+Local audit evidence: foundation.md.
+
+## DISP-006: Legacy-library migration removed the old slot after a failed destination write
+
+Disposition: **resolved before audit**. Historical PRs: [#14](https://github.com/cisgz3a-hub/KerfDesk/pull/14).
+
+Baseline migration requires successful collection persistence and exact readback before removing the legacy slot. Both quota-failure and mismatched-readback regressions passed; historical behaviour was source-derived.
+
+Local audit evidence: early-ui-materials.md, early-ui-materials.json.
+
+## DISP-007: Desktop keep-awake requests were silently denied
+
+Disposition: **resolved before audit**. Historical PRs: [#15](https://github.com/cisgz3a-hub/KerfDesk/pull/15).
+
+The baseline Electron policy permits screen-wake-lock and the hook emits a single visible notice on denial/missing support. Six hook tests passed; native OS sleep behaviour was not exercised.
+
+Local audit evidence: early-ui-materials.md, early-ui-materials.json.
+
+## DISP-008: Unsigned packaged builds could automatically install mutable-feed updates
+
+Disposition: **resolved before audit**. Historical PRs: [#17](https://github.com/cisgz3a-hub/KerfDesk/pull/17).
+
+Baseline auto-update requires a trusted channel before enabling automatic download/install. The report identifies fcdd00212764b348e25e56bd441117d142e3b310 and ADR-135; the later #54 review confirms that trust separation. No native installer/provider exercise was performed.
+
+Local audit evidence: dependencies-tooling.md, dependencies-tooling.json, batch-02/root-coverage.json.
+
+## DISP-009: Malformed-image guard returns the original invalid input
+
+Disposition: **rejected candidate**. Historical PRs: [#18](https://github.com/cisgz3a-hub/KerfDesk/pull/18).
+
+The guard's return behaviour was inspected, but the audit did not establish a user-reachable failure through the full trace pipeline. Permissive canvas stubs do not establish rendered correctness, so this is an unproved lead rather than a clean bill of health.
+
+Local audit evidence: dependencies-tooling.md.
+
+## DISP-010: Camera bridge accepted requests without an Origin header
+
+Disposition: **resolved before audit**. Historical PRs: [#19](https://github.com/cisgz3a-hub/KerfDesk/pull/19).
+
+The baseline rejects missing Origin and validates Host before dispatch. The report attributes the missing-Origin repair to fea8880717aed7bfc57b5f7484b759c99db9f3f4; current policy tests passed without contacting a camera.
+
+Local audit evidence: dependencies-tooling.md, dependencies-tooling.json.
+
+## DISP-011: Surfacing row/pass caps still imply full product materialisation
+
+Disposition: **rejected candidate**. Historical PRs: [#22](https://github.com/cisgz3a-hub/KerfDesk/pull/22).
+
+The report notes that the historical emitter materialised the rows-by-passes product, but baseline output is replayable and streamed. No current failure was confirmed; the report does not provide a historical memory-exhaustion runtime reproduction.
+
+Local audit evidence: controller-raster.md.
+
+## DISP-012: Surfacing shallow depth was forced up to 0.05 mm
+
+Disposition: **resolved before audit**. Historical PRs: [#22](https://github.com/cisgz3a-hub/KerfDesk/pull/22).
+
+The report's baseline comparison says shallow-depth handling preserves the requested depth instead of the historical 0.05 mm floor. This is a source/test disposition, with no material-cut evidence or repair commit identified there.
+
+Local audit evidence: controller-raster.md.
+
+## DISP-013: Historical GRBL write/ACK ordering and zero-coordinate jog faults
+
+Disposition: **resolved before audit**. Historical PRs: [#26](https://github.com/cisgz3a-hub/KerfDesk/pull/26).
+
+The report says baseline untracked-ACK/safe-write reservation and command/status paths address those historical issues. This is a grouped report-level summary: exact original triggers and repair commits were not itemised, and the whole controller state graph was not audited.
+
+Local audit evidence: controller-raster.md.
+
+## DISP-014: West multi-selection resize handle used the eastward formula
+
+Disposition: **resolved before audit**. Historical PRs: [#32](https://github.com/cisgz3a-hub/KerfDesk/pull/32).
+
+The baseline uses x:west instead of historical x:east and has all-handle regressions. The report identifies c18e6af18 / #494 as the repair.
+
+Local audit evidence: batch-02/camera-canvas-arcs.md, batch-02/camera-canvas-arcs.json.
+
+## DISP-015: HTTP camera image size was checked only after buffering the full body
+
+Disposition: **resolved before audit**. Historical PRs: [#33](https://github.com/cisgz3a-hub/KerfDesk/pull/33).
+
+Baseline camera-frame-body.ts bounds and cancels the stream while reading instead of awaiting response.arrayBuffer before checking 8 MiB. The report identifies the later #792 / 7d4b82812 change.
+
+Local audit evidence: batch-02/camera-canvas-arcs.md, batch-02/camera-canvas-arcs.json.
+
+## DISP-016: RTSP single-frame capture settled before stdout closed
+
+Disposition: **resolved before audit**. Historical PRs: [#33](https://github.com/cisgz3a-hub/KerfDesk/pull/33).
+
+Baseline capture waits for child close rather than exit and releases the slot at that point; existing RTSP stream tests passed. This is separate from the preview URL defect repaired during this audit.
+
+Local audit evidence: batch-02/camera-canvas-arcs.md, batch-02/camera-canvas-arcs.json.
+
+## DISP-017: Broad internal arc-radius tolerance permits malformed arcs
+
+Disposition: **rejected candidate**. Historical PRs: [#39](https://github.com/cisgz3a-hub/KerfDesk/pull/39).
+
+The 0.127 mm internal radius tolerance was investigated, but no reachable UI/caller case with an arbitrary malformed payload was established. It was not promoted without a production trigger/reproduction; no controller execution was performed.
+
+Local audit evidence: batch-02/camera-canvas-arcs.md, batch-02/camera-canvas-arcs.json.
+
+## DISP-018: Fit discarded nonuniform resized proportions
+
+Disposition: **resolved before audit**. Historical PRs: [#42](https://github.com/cisgz3a-hub/KerfDesk/pull/42).
+
+The original helper replaced both scales with one absolute scale. Baseline code multiplies existing scales uniformly; the report identifies #723 / 0580260ba and passing proportional-fit/store-Undo tests.
+
+Local audit evidence: batch-02/board-rotary-planner.md, batch-02/board-rotary-planner.json.
+
+## DISP-019: Fit/array does not support zero-width or zero-height line artwork
+
+Disposition: **documented limitation**. Historical PRs: [#42](https://github.com/cisgz3a-hub/KerfDesk/pull/42).
+
+The baseline helper tests explicitly record this unsupported geometry. The audit did not classify it as a newly confirmed defect or establish a broader geometry failure.
+
+Local audit evidence: batch-02/board-rotary-planner.json.
+
+## DISP-020: Circle-board fit used the bounding square
+
+Disposition: **resolved before audit**. Historical PRs: [#43](https://github.com/cisgz3a-hub/KerfDesk/pull/43).
+
+This began as an explicit initial limitation. #45 installs diameter/sqrt(2) inscribed-square fitting, used by both baseline Fit and Array paths; current tests passed. This is separate from the later #304 correction/Undo ownership defect.
+
+Local audit evidence: batch-02/board-rotary-planner.md, batch-02/board-rotary-planner.json.
+
+## DISP-021: Legacy rotary raster refusal and surface-calibrated roller-only mapping
+
+Disposition: **documented limitation**. Historical PRs: [#48](https://github.com/cisgz3a-hub/KerfDesk/pull/48).
+
+These historical design limits were superseded before the audit: ADR-315 permits producible rotary raster G-code and ADR-373 adds measured roller diameter. They are not current requirements or new bug repairs, and must not be restored on the strength of old documentation.
+
+Local audit evidence: batch-02/board-rotary-planner.md, batch-02/board-rotary-planner.json.
+
+## DISP-022: Rotary surface speed and dose vary with motion direction
+
+Disposition: **documented limitation**. Historical PRs: [#48](https://github.com/cisgz3a-hub/KerfDesk/pull/48).
+
+ADR-501 explicitly defines surface speed using emitted feed times the surface/machine path-length ratio. Baseline group speed is machine feed; the report checked the numerical examples and did not treat direction-dependent dose as a contract violation.
+
+Local audit evidence: batch-02/board-rotary-planner.md, batch-02/board-rotary-planner.json.
+
+## DISP-023: Ruida layer minimum and maximum power are equal
+
+Disposition: **documented limitation**. Historical PRs: [#49](https://github.com/cisgz3a-hub/KerfDesk/pull/49).
+
+#49 explicitly accepts Min==Max; baseline part records derive both from group.power. A self-generated byte golden proves stability only, not physical acceptance or reference-application equivalence.
+
+Local audit evidence: batch-02/board-rotary-planner.md, batch-02/board-rotary-planner.json.
+
+## DISP-024: Legacy homography alignment and Labs gating treated as current camera requirements
+
+Disposition: **rejected candidate**. Historical PRs: [#50](https://github.com/cisgz3a-hub/KerfDesk/pull/50), [#87](https://github.com/cisgz3a-hub/KerfDesk/pull/87).
+
+ADR-440 deleted the old homography/checkerboard/marker modules and Camera alignment v2 switch. Baseline overlay/trace uses the saved lens/pose model, and Print and Cut checks draft targets and coordinate ownership. The old modules/gates do not establish a current defect; the replacement solver and physical optical accuracy were not fully audited.
+
+Local audit evidence: batch-02/camera-canvas-arcs.md, batch-02/camera-canvas-arcs.json, batch-03/root-coverage.md, batch-03/root-coverage.json.
+
+## DISP-025: Sub-pixel contour interpolation averaged varying thresholds
+
+Disposition: **resolved before audit**. Historical PRs: [#51](https://github.com/cisgz3a-hub/KerfDesk/pull/51).
+
+Baseline contour-boundary.ts interpolates luma-minus-threshold residuals, locating their zero rather than averaging local thresholds. The report identifies repair 2613ff0deb884e8d3935f74df335e45997aafdd3. This is distinct from the closing-fairing seam repaired during this audit.
+
+Local audit evidence: batch-02/trace.md, batch-02/trace.json.
+
+## DISP-026: Momentary Fire cleared uncertain state early and emitted incorrect modal/power commands
+
+Disposition: **resolved before audit**. Historical PRs: [#57](https://github.com/cisgz3a-hub/KerfDesk/pull/57).
+
+Historical code cleared its latch before off-write success, used bare M3 and rounded fractional S upward. Baseline code preserves uncertain-on state, emits modal G1/F and floors the power share. The report groups these related corrections; no hardware proof is claimed.
+
+Local audit evidence: batch-02/root-coverage.json.
+
+## DISP-027: Quick-nest duplicate free rectangles cause an invalid or lost layout
+
+Disposition: **rejected candidate**. Historical PRs: [#58](https://github.com/cisgz3a-hub/KerfDesk/pull/58).
+
+The recorded deterministic search covered 100,000 one-item obstacle cases without reproducing the duplicate-free-rectangle hypothesis. That bounded negative result does not prove general nesting optimality or correctness.
+
+Local audit evidence: batch-02/root-coverage.json, batch-02/README.md.
+
+## DISP-028: Preview/worker cache retention causes a production-lifetime failure
+
+Disposition: **rejected candidate**. Historical PRs: [#58](https://github.com/cisgz3a-hub/KerfDesk/pull/58).
+
+The report explicitly withheld an actionable cache-retention finding because production-lifetime proof was missing. It records no confirmed user-visible failure; this is insufficient evidence, not a demonstrated resolution.
+
+Local audit evidence: batch-02/root-coverage.json.
+
+## DISP-029: Manual CNC tool change failed to stop and restart coolant
+
+Disposition: **resolved before audit**. Historical PRs: [#60](https://github.com/cisgz3a-hub/KerfDesk/pull/60).
+
+Baseline cnc-grbl-transitions handles coolant stop/restart, with modal/coolant tests. The report contrasts it with the original omission; physical relay, spindle and controller behaviour were not qualified.
+
+Local audit evidence: batch-02/root-coverage.json.
+
+## DISP-030: Retract-first raw-line CNC recovery remains executable
+
+Disposition: **rejected candidate**. Historical PRs: [#61](https://github.com/cisgz3a-hub/KerfDesk/pull/61).
+
+#82 removed/disabled that path: baseline buildResumeProgram rejects machineKind=cnc before parsing. ADR-215 introduced a distinct sealed semantic pass-boundary recovery job. Removed preamble concerns are not a current-code finding, and the newer recovery pipeline was only partly reviewed.
+
+Local audit evidence: batch-03/machine-transactions.md, batch-03/machine-transactions.json.
+
+## DISP-031: Finish-only narrow features disappeared or bypassed the depth ladder
+
+Disposition: **resolved before audit**. Historical PRs: [#62](https://github.com/cisgz3a-hub/KerfDesk/pull/62).
+
+Baseline finish-allowance coverage/compiler routing follows ADR-140 Amendment 1: finish-only layers survive empty roughing and step down. The report records five ladder and four coverage tests passing.
+
+Local audit evidence: batch-03/cnc-geometry.md, batch-03/cnc-geometry.json.
+
+## DISP-032: A collapsed machine rail during a job violates the old forced-open policy
+
+Disposition: **rejected candidate**. Historical PRs: [#63](https://github.com/cisgz3a-hub/KerfDesk/pull/63).
+
+ADR-139 amendments/ADR-207 permit independent rail visibility with live controls elsewhere. The old force-visible policy is superseded, so restoring it is not justified as a current repair. The full modern shell/native focus behaviour was not qualified.
+
+Local audit evidence: batch-03/workspace-ux.md, batch-03/workspace-ux.json.
+
+## DISP-033: Variable sequence wrap and transient range edits violated integer bounds
+
+Disposition: **resolved before audit**. Historical PRs: [#72](https://github.com/cisgz3a-hub/KerfDesk/pull/72).
+
+Baseline bounded wrap uses BigInt for exact safe-integer arithmetic; range controls use DraftNumberInput and clamp sequence-end enabling. These prior corrections are separate from B03-VAR-001's unsafe current-value Counter, which was a new audit finding.
+
+Local audit evidence: batch-03/root-coverage.json, batch-03/root-coverage.md.
+
+## DISP-034: Outline nesting can lose a valid arrangement above its work threshold
+
+Disposition: **documented limitation**. Historical PRs: [#73](https://github.com/cisgz3a-hub/KerfDesk/pull/73).
+
+The real store/worker fails for 33 complementary triangles despite a validated layout in 170 by 10 mm; 32 fit. ADR-151 explicitly switches to rectangular fallback above 32 items or 250,000 point-weighted work. The reviewed worker wording says no complete valid arrangement was found, not that one is impossible. Two reviewers accepted this as a bounded heuristic limit.
+
+Local audit evidence: batch-03/root-coverage.md, batch-03/root-coverage.json, batch-03/README.md, batch-03/cnc-geometry.md.
+
+## DISP-035: Full-circle GRBL helix emission was ambiguous
+
+Disposition: **resolved before audit**. Historical PRs: [#74](https://github.com/cisgz3a-hub/KerfDesk/pull/74).
+
+Baseline cnc-grbl-helical.ts emits two half-circle arcs per revolution. The report inspected #898 / 91c1adefa02c9f24231c7a909f2a97de0c0fd2e7 as the correction, without repeating controller execution. This is separate from the concave-containment defect repaired during this audit.
+
+Local audit evidence: batch-03/cnc-geometry.md, batch-03/cnc-geometry.json.
+
+## DISP-036: Original rest-machining diameter model does not simulate actual swept stock
+
+Disposition: **documented limitation**. Historical PRs: [#75](https://github.com/cisgz3a-hub/KerfDesk/pull/75).
+
+The report treats ADR-153's diameter-based reachable-stock model as its stated original scope, not a physical stock-simulation promise. Later swept-stock simulation and physical residual-stock measurement were outside this review; no current failure was reproduced from this limitation.
+
+Local audit evidence: batch-03/cnc-geometry.md, batch-03/cnc-geometry.json.
+
+## DISP-037: Straight-inlay inside corners interfered
+
+Disposition: **resolved before audit**. Historical PRs: [#78](https://github.com/cisgz3a-hub/KerfDesk/pull/78).
+
+Baseline inlay-pair.ts performs closing then opening (+r, -2r, +r) before splitting fit allowance. The report identifies #898 / 91c1adefa02c9f24231c7a909f2a97de0c0fd2e7 and passing geometry/compile tests; no physical fit claim was made.
+
+Local audit evidence: batch-03/cnc-geometry.md, batch-03/cnc-geometry.json.
+
+## DISP-038: Saving rejected valid manual-tab arrays larger than 512 anchors
+
+Disposition: **resolved before audit**. Historical PRs: [#79](https://github.com/cisgz3a-hub/KerfDesk/pull/79).
+
+Baseline structural validation has no anchor-count cap, so the reported 140-contour by four-anchor example is no longer rejected by length. The correction is 160ca336dbfe04cd589daab292a179219f5242bc; this differs from the explicit-operation-binding tab defect repaired during this audit.
+
+Local audit evidence: batch-03/cnc-geometry.md, batch-03/cnc-geometry.json.
+
+## DISP-039: Preview playback uses uniform pacing within a motion category
+
+Disposition: **documented limitation**. Historical PRs: [#80](https://github.com/cisgz3a-hub/KerfDesk/pull/80).
+
+Historical acceptance explicitly permits category-weighted approximate playback rather than exact controller-segment replay. The audit did not establish a violated promise from uniform within-category timing. This differs from WUX-001's unrelated-project timing ownership defect.
+
+Local audit evidence: batch-03/workspace-ux.md, batch-03/workspace-ux.json.
+
+## DISP-040: Hold-jog cleanup cancelled presses on rerender and ignored cancellation capability
+
+Disposition: **resolved before audit**. Historical PRs: [#83](https://github.com/cisgz3a-hub/KerfDesk/pull/83).
+
+Baseline useHoldJog uses stable callbacks, argsRef and holdEnabled. The report identifies ebbaf3dd1 / #169 and 95a3ea800 as intervening repairs and records the ten-case JogPad suite passing; physical jog cancellation was not qualified.
+
+Local audit evidence: batch-03/machine-transactions.md, batch-03/machine-transactions.json.
+
+## DISP-041: Origin completion could update state after controller-session ownership changed
+
+Disposition: **resolved before audit**. Historical PRs: [#88](https://github.com/cisgz3a-hub/KerfDesk/pull/88).
+
+Baseline runOriginTransaction binds controller session, write epoch and operation identity, applying only owned success/failure patches. The origin suite passed. This prior session-ownership repair is distinct from later #110 tool ownership defect MTX-001 found in this audit.
+
+Local audit evidence: batch-03/machine-transactions.md, batch-03/machine-transactions.json.
