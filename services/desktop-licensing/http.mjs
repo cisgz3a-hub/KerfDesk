@@ -59,7 +59,7 @@ const OPERATIONS = {
 };
 
 async function paymentWebhook(request, env, authority, options) {
-  const verifier = paddleVerifier(env);
+  const verifier = paddleVerifier(env, (orderId) => authority.records.get(`order:${orderId}`));
   const raw = await readBody(request, 131_072);
   const event = await verifier(request.headers, raw, authority.now());
   requireValue(event, 401, 'invalid_payment_signature');

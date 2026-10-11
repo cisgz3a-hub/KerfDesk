@@ -36,7 +36,7 @@ export async function reconcileCheckout(authority, env, body, admin, fetcher = f
     409,
     'payment_mismatch',
   );
-  validatePaddleTransaction(data, config, order.operation);
+  validatePaddleTransaction(data, config, order.operation, order);
   requireValue(data.items[0].price.id === order.priceId, 409, 'payment_mismatch');
   const checkoutUrl = checkoutLink(data, config);
   return authority.records.transaction((tx) => {
