@@ -1,4 +1,5 @@
 import { pointInPolygon } from '../geometry';
+import { segmentContainedInPolygon } from '../geometry/segment-contained-in-polygon';
 import type { CncHelicalContourPass, CncPass } from '../job';
 import type { CncHelixEntrySettings, Polyline, Vec2 } from '../scene';
 
@@ -81,8 +82,12 @@ function largestRing(toolpaths: ReadonlyArray<Polyline>): Polyline | null {
 
 function toolpathInsideBoundary(toolpath: Polyline, boundary: Polyline): boolean {
   if (toolpath === boundary) return true;
-  const probe = polygonCentroid(toolpath.points) ?? toolpath.points[0];
-  return probe !== undefined && pointInPolygon(probe, boundary.points);
+  // A concave ring's centroid may lie outside it. Even contained vertices do
+  // not prove containment: an edge can cross a notch between its endpoints.
+  return toolpath.points.every((point, index) => {
+    const next = toolpath.points[(index + 1) % toolpath.points.length];
+    return next !== undefined && segmentContainedInPolygon(point, next, boundary.points);
+  });
 }
 
 type EntryCircle = {
@@ -207,23 +212,6 @@ function reorderClosedRing(
   start: Vec2,
 ): ReadonlyArray<Vec2> {
   return [start, ...points.slice(edgeIndex + 1), ...points.slice(0, edgeIndex + 1), start];
-}
-
-function polygonCentroid(points: ReadonlyArray<Vec2>): Vec2 | null {
-  let twiceArea = 0;
-  let x = 0;
-  let y = 0;
-  for (let index = 0; index < points.length; index += 1) {
-    const current = points[index];
-    const next = points[(index + 1) % points.length];
-    if (current === undefined || next === undefined) continue;
-    const cross = current.x * next.y - next.x * current.y;
-    twiceArea += cross;
-    x += (current.x + next.x) * cross;
-    y += (current.y + next.y) * cross;
-  }
-  if (!Number.isFinite(twiceArea) || Math.abs(twiceArea) <= EPSILON) return null;
-  return { x: x / (3 * twiceArea), y: y / (3 * twiceArea) };
 }
 
 function signedArea(points: ReadonlyArray<Vec2>): number {
