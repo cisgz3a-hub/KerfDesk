@@ -201,14 +201,9 @@ function NodeAction(props: {
 }
 
 function isActive(current: ToolMode, tool: ToolMode): boolean {
-  if (current.kind === 'select') return tool.kind === 'select';
-  if (current.kind === 'trace-parts') return tool.kind === 'trace-parts';
-  if (current.kind === 'text') return tool.kind === 'text';
-  if (current.kind === 'node') return tool.kind === 'node';
-  if (current.kind === 'measure') return tool.kind === 'measure';
-  if (current.kind === 'position-laser') return tool.kind === 'position-laser';
+  if (current.kind === 'draw') return tool.kind === 'draw' && tool.shape === current.shape;
   if (current.kind === 'cnc-tabs' || current.kind === 'laser-tabs') return false;
   if (current.kind === 'trim-shapes' || current.kind === 'extend-shapes') return false;
   if (current.kind === 'warp-deform') return false;
-  return tool.kind === 'draw' && tool.shape === current.shape;
+  return tool.kind === current.kind;
 }

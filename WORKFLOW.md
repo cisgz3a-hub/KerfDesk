@@ -422,7 +422,7 @@ destination and cannot overwrite the template source.
 
 ---
 
-### Edit individual trace parts (ADR-586)
+### Edit individual trace parts (ADR-587)
 
 1. After tracing, click **Edit trace parts** in the canvas hint or the left tool strip.
    Double-clicking a trace with Select also opens this tool.
