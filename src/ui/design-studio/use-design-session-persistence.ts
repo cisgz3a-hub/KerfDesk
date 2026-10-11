@@ -12,6 +12,7 @@ import { useStore } from '../state';
 import { sessionSketch } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 import { writePersistedSession } from './design-session-storage';
+import { designRecoveryOwner } from './design-recovery-owner';
 
 // Long enough that a drag coalesces into a single write, short enough that a
 // reload moments after drawing still finds the shape.
@@ -29,7 +30,9 @@ export function useDesignSessionPersistence(): void {
       if (state.documentEpoch !== useStore.getState().projectDocumentEpoch) return;
       const session = state.session ?? state.stash;
       if (session === null) return;
+      const projectOwner = designRecoveryOwner(useStore.getState().project);
       writePersistedSession({
+        ...(projectOwner === undefined ? {} : { projectOwner }),
         sketch: sessionSketch(session),
         activeLayerId: session.activeLayerId,
         surface3d: session.surface3d,

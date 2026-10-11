@@ -1,4 +1,6 @@
 import type { StudioDocument } from '../../core/scene/studio-document';
+import type { Project } from '../../core/scene';
+import { projectWithStudioDocument } from '../state/studio-document-actions';
 import { registerProjectSaveCheckpoint } from '../app/project-save-checkpoint';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { useStore } from '../state/store';
@@ -134,6 +136,7 @@ export function acceptStudioDocument(
   sessionId: string,
   document: StudioDocument,
   epoch: number,
+  commitArtwork?: (project: Project) => void,
 ): boolean {
   const binding = bindings.get(document.id);
   if (useStore.getState().projectDocumentEpoch !== epoch) return false;
@@ -144,7 +147,9 @@ export function acceptStudioDocument(
   )
     throw new Error('The native document no longer belongs to this project editor session.');
   ensureProjectRevision(document.id, binding);
-  if (!useStore.getState().upsertStudioDocument(document, epoch)) return false;
+  if (commitArtwork !== undefined)
+    commitArtwork(projectWithStudioDocument(useStore.getState().project, document));
+  else if (!useStore.getState().upsertStudioDocument(document, epoch)) return false;
   binding.saved = useStore
     .getState()
     .project.studioDocuments?.find((entry) => entry.id === document.id);

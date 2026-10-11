@@ -18,6 +18,7 @@ export function validatePhotoEditorDocument(
   path: string,
   pixelWidth: number,
   pixelHeight: number,
+  scanPixels = true,
 ): string | null {
   if (value === undefined) return null;
   if (!isObject(value)) return `missing or invalid \`${path}\``;
@@ -36,7 +37,7 @@ export function validatePhotoEditorDocument(
   const layerBytes = pixelWidth * pixelHeight * 4;
   if (layerBytes * layers.length > MAX_PHOTO_EDITOR_DOCUMENT_BYTES)
     return `invalid \`${path}\`: decoded layers exceed ${MAX_PHOTO_EDITOR_DOCUMENT_BYTES} bytes`;
-  return validateLayers(layers, value['activeLayerId'], layerBytes, path);
+  return validateLayers(layers, value['activeLayerId'], layerBytes, path, scanPixels);
 }
 
 function validateLayers(
@@ -44,12 +45,13 @@ function validateLayers(
   activeLayerId: unknown,
   layerBytes: number,
   path: string,
+  scanPixels: boolean,
 ): string | null {
   const ids = new Set<string>();
   for (const [index, layer] of layers.entries()) {
     const layerPath = `${path}.layers[${index}]`;
     if (!isObject(layer)) return `invalid \`${layerPath}\``;
-    const error = validateLayer(layer, layerBytes, layerPath);
+    const error = validateLayer(layer, layerBytes, layerPath, scanPixels);
     if (error !== null) return error;
     const id = layer['id'] as string;
     if (ids.has(id)) return `invalid \`${layerPath}.id\`: duplicate layer id`;
@@ -60,7 +62,12 @@ function validateLayers(
     : `invalid \`${path}.activeLayerId\`: missing layer`;
 }
 
-function validateLayer(layer: Record<string, unknown>, bytes: number, path: string): string | null {
+function validateLayer(
+  layer: Record<string, unknown>,
+  bytes: number,
+  path: string,
+  scanPixels: boolean,
+): string | null {
   const opacity = layer['opacity'];
   const id = layer['id'];
   return firstError([
@@ -71,12 +78,17 @@ function validateLayer(layer: Record<string, unknown>, bytes: number, path: stri
       ? null
       : `invalid \`${path}.opacity\``,
     requireLiteral(layer, `${path}.blend`, PHOTO_EDITOR_BLENDS),
-    validRgbaBase64(layer['rgbaBase64'], bytes) ? null : `invalid \`${path}.rgbaBase64\``,
+    validRgbaBase64(layer['rgbaBase64'], bytes, scanPixels)
+      ? null
+      : `invalid \`${path}.rgbaBase64\``,
   ]);
 }
 
-function validRgbaBase64(value: unknown, bytes: number): boolean {
+function validRgbaBase64(value: unknown, bytes: number, scanPixels: boolean): boolean {
   if (typeof value !== 'string' || value.length !== 4 * Math.ceil(bytes / 3)) return false;
+  // Interactive decoding validates canonical pixels in yielding slices.
+  // File admission keeps the default full scan before accepting a document.
+  if (!scanPixels) return true;
   const padding = (3 - (bytes % 3)) % 3;
   const end = value.length - padding;
   let lastDigit = 0;

@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as validator from '../../io/project/project-studio-document-validator';
 import { studioDocument } from '../../io/project/studio-document.test-fixture';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { createAutosaveProjectSnapshot } from './autosave-project-snapshot';
@@ -6,7 +7,20 @@ import { resetStore } from './test-helpers';
 import { useStore } from './store';
 
 beforeEach(resetStore);
+afterEach(() => vi.restoreAllMocks());
 describe('project-owned native studio documents', () => {
+  it('accepts unchanged checkpoints before scanning source or parsing inactive sheets', () => {
+    const initial = studioDocument();
+    useStore.getState().upsertStudioDocument(initial, 0);
+    const check = vi.spyOn(validator, 'validateProjectStudioDocuments');
+    const before = useStore.getState();
+    expect(before.upsertStudioDocument({ ...initial, revision: 'next-checkpoint' }, 0)).toBe(true);
+    expect(check).not.toHaveBeenCalled();
+    expect(useStore.getState().project).toBe(before.project);
+    expect(useStore.getState().undoStack).toBe(before.undoStack);
+    before.upsertStudioDocument({ ...initial, title: 'Changed title' }, 0);
+    expect(check).toHaveBeenCalledTimes(1);
+  });
   it('upserts one stable identity, tracks dirty/history and restores native revisions on Undo', () => {
     const initial = studioDocument();
     expect(useStore.getState().upsertStudioDocument(initial, 0)).toBe(true);

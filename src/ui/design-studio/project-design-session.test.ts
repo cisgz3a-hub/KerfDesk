@@ -9,8 +9,13 @@ import { useStore } from '../state';
 import { resetStore } from '../state/test-helpers';
 import { sessionSketch } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
-import { clearPersistedSession, writePersistedSession } from './design-session-storage';
+import {
+  clearPersistedSession,
+  readPersistedSession,
+  writePersistedSession,
+} from './design-session-storage';
 import { restoreProjectDesignSession } from './project-design-session';
+import { designRecoveryOwner } from './design-recovery-owner';
 
 const sketch: Sketch = {
   layers: [DEFAULT_DESIGN_LAYER],
@@ -54,6 +59,92 @@ beforeEach(() => {
 });
 
 describe('project-owned vector source', () => {
+  it('keeps the existing recovery allowance for large drawings with a bounded owner digest', () => {
+    const sketch: Sketch = {
+      entities: [
+        {
+          id: 'guide-path',
+          kind: 'path',
+          construction: true,
+          closed: false,
+          points: Array.from({ length: 60_000 }, (_, index) => ({ x: index, y: index })),
+        },
+      ],
+    };
+    const applied = applyDesignSketch({ project: createProject(), undoStack: [] }, sketch, [
+      'unused',
+    ])!;
+    const owner = designRecoveryOwner(applied.project)!;
+    expect(owner).toMatch(/^sha256:[a-f0-9]{64}$/);
+    writePersistedSession({
+      projectOwner: owner,
+      sketch,
+      activeLayerId: DEFAULT_DESIGN_LAYER.id,
+      surface3d: false,
+      applied: null,
+      dirtySinceApply: true,
+    });
+    expect(readPersistedSession()?.sketch).toEqual(sketch);
+    expect(readPersistedSession()?.projectOwner).toBe(owner);
+  });
+  it('recovers unapplied work only for the exact saved project authoring revision', () => {
+    const project = appliedProject();
+    const draft = {
+      ...sketch,
+      entities: [
+        ...sketch.entities,
+        { id: 'draft-line', kind: 'line' as const, start: { x: 0, y: 0 }, end: { x: 15, y: 15 } },
+      ],
+    };
+    const session = restoreProjectDesignSession(project);
+    writePersistedSession({
+      projectOwner: designRecoveryOwner(project)!,
+      sketch: draft,
+      activeLayerId: session.activeLayerId,
+      surface3d: false,
+      applied: session.applied,
+      dirtySinceApply: true,
+    });
+    const reopened = deserializeProject(serializeProject(project));
+    if (reopened.kind !== 'ok') throw new Error('roundtrip failed');
+    expect(designRecoveryOwner(reopened.project)).toBe(designRecoveryOwner(project));
+    useStore.setState({ project: reopened.project, projectDocumentEpoch: 1 });
+    useDesignStudioStore.getState().openStudio();
+    expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(draft);
+    expect(useDesignStudioStore.getState().session!.dirtySinceApply).toBe(true);
+    expect(useDesignStudioStore.getState().session!.history.past).toHaveLength(0);
+
+    const changed = {
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: project.scene.objects.map((object) => ({
+          ...object,
+          transform: { ...object.transform, x: 100 },
+        })),
+      },
+    };
+    useStore.setState({ project: changed, projectDocumentEpoch: 2 });
+    expect(
+      sessionSketch(useDesignStudioStore.getState().session!).entities.some(
+        (entity) => entity.id === 'draft-line',
+      ),
+    ).toBe(false);
+    useStore.setState({ project: createProject(), projectDocumentEpoch: 0 });
+    expect(sessionSketch(useDesignStudioStore.getState().session!).entities).toHaveLength(0);
+  });
+
+  it('does not match independently created same-shape artwork with different persisted IDs', () => {
+    const project = appliedProject();
+    const other = {
+      ...project,
+      scene: {
+        ...project.scene,
+        objects: project.scene.objects.map((object) => ({ ...object, id: `${object.id}-other` })),
+      },
+    };
+    expect(designRecoveryOwner(other)).not.toBe(designRecoveryOwner(project));
+  });
   it('survives actual file serialization, fresh store/profile restoration, and replacement Apply', () => {
     const reopened = deserializeProject(serializeProject(appliedProject()));
     if (reopened.kind !== 'ok') throw new Error(JSON.stringify(reopened));

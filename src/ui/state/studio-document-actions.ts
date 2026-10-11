@@ -1,4 +1,5 @@
 import type { StudioDocument } from '../../core/scene/studio-document';
+import type { Project } from '../../core/scene';
 import { validateProjectStudioDocuments } from '../../io/project/project-studio-document-validator';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
@@ -18,18 +19,9 @@ export function studioDocumentActions(set: Set): StudioDocumentActions {
       let applied = false;
       set((state) => {
         if (state.projectDocumentEpoch !== expectedEpoch) return {};
-        const documents = state.project.studioDocuments ?? [];
-        const previous = documents.find((entry) => entry.id === document.id);
-        const saved = { ...document };
-        const studioDocuments =
-          previous === undefined
-            ? [...documents, saved]
-            : documents.map((entry) => (entry.id === saved.id ? saved : entry));
-        const project = { ...state.project, studioDocuments };
-        const error = validateProjectStudioDocuments(project);
-        if (error !== null) throw new Error(error);
+        const project = projectWithStudioDocument(state.project, document);
         applied = true;
-        if (previous !== undefined && sameDocument(previous, saved)) return {};
+        if (project === state.project) return {};
         return {
           project,
           undoStack: pushUndo(state.project, state.undoStack, 'Save studio document'),
@@ -40,6 +32,22 @@ export function studioDocumentActions(set: Set): StudioDocumentActions {
       return applied;
     },
   };
+}
+
+/** Validate the complete candidate before any source or artwork can be committed. */
+export function projectWithStudioDocument(project: Project, document: StudioDocument): Project {
+  const documents = project.studioDocuments ?? [];
+  const previous = documents.find((entry) => entry.id === document.id);
+  if (previous !== undefined && sameDocument(previous, document)) return project;
+  const saved = { ...document };
+  const studioDocuments =
+    previous === undefined
+      ? [...documents, saved]
+      : documents.map((entry) => (entry.id === saved.id ? saved : entry));
+  const next = { ...project, studioDocuments };
+  const error = validateProjectStudioDocuments(next);
+  if (error !== null) throw new Error(error);
+  return next;
 }
 
 function sameDocument(left: StudioDocument, right: StudioDocument): boolean {

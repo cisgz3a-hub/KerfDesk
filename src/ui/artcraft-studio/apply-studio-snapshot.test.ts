@@ -1,4 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as studioValidator from '../../io/project/project-studio-document-validator';
+import { studioDocument } from '../../io/project/studio-document.test-fixture';
+import {
+  bindStudioSession,
+  disposeStudioProjectBridge,
+  getStudioBinding,
+} from './studio-project-bridge';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
@@ -31,8 +38,82 @@ beforeEach(() => {
     actions.importSvgFragment!({ source, bounds: object.bounds, objects: [object] });
   });
 });
+afterEach(() => {
+  disposeStudioProjectBridge();
+  vi.restoreAllMocks();
+});
 
 describe('desktop editor artwork handoff', () => {
+  it('commits frozen native source and artwork in one notification and one Undo step', async () => {
+    const native = studioDocument();
+    const session = {
+      id: snapshot.id,
+      documentId: native.id,
+      editor: snapshot.editor,
+      title: 'Artwork',
+      running: true,
+    };
+    bindStudioSession(session, 0);
+    const before = useStore.getState().project;
+    const observed: (typeof before)[] = [];
+    const stop = useStore.subscribe((state) => {
+      observed.push(state.project);
+    });
+    await applyStudioSnapshot({ ...snapshot, nativeDocument: native }, 0);
+    stop();
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.studioDocuments).toEqual([native]);
+    expect(observed[0]?.scene.objects).toHaveLength(1);
+    expect(useStore.getState().undoStack).toEqual([before]);
+    expect(getStudioBinding(native.id)).toEqual(session);
+    useStore.getState().undo();
+    expect(useStore.getState().project).toBe(before);
+  });
+
+  it('leaves artwork, selection, dirty and history untouched when frozen source exceeds admission', async () => {
+    const native = studioDocument();
+    useStore.getState().upsertStudioDocument(native, 0);
+    bindStudioSession(
+      {
+        id: snapshot.id,
+        documentId: native.id,
+        editor: snapshot.editor,
+        title: 'Artwork',
+        running: true,
+      },
+      0,
+    );
+    const before = useStore.getState();
+    vi.spyOn(studioValidator, 'validateProjectStudioDocuments').mockReturnValue(
+      'Project studio documents exceed the 64 MiB native-source budget',
+    );
+    await expect(
+      applyStudioSnapshot({ ...snapshot, nativeDocument: { ...native, nativeBase64: 'ZGVm' } }, 0),
+    ).rejects.toThrow('64 MiB');
+    expect(useStore.getState()).toBe(before);
+    expect(getStudioBinding(native.id)?.id).toBe(snapshot.id);
+  });
+
+  it('rejects a native binding changed while artwork was being decoded without partial artwork', async () => {
+    const native = studioDocument();
+    useStore.getState().upsertStudioDocument(native, 0);
+    bindStudioSession(
+      {
+        id: snapshot.id,
+        documentId: native.id,
+        editor: snapshot.editor,
+        title: 'Artwork',
+        running: true,
+      },
+      0,
+    );
+    beforeCommit = () => useStore.getState().undo();
+    await expect(applyStudioSnapshot({ ...snapshot, nativeDocument: native }, 0)).rejects.toThrow(
+      'changed in the project',
+    );
+    expect(useStore.getState().project.scene.objects).toHaveLength(0);
+    expect(useStore.getState().project.studioDocuments).toBeUndefined();
+  });
   it('replaces an existing session instead of adding duplicates, with one undo entry per Apply', async () => {
     await applyStudioSnapshot(snapshot, 0);
     const first = useStore.getState().project.scene.objects[0]!;

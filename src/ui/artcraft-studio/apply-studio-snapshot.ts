@@ -1,10 +1,14 @@
-import type { SceneObject } from '../../core/scene';
+import type { Project, SceneObject } from '../../core/scene';
 import { dispatchImportFilesInOrder } from '../app/import-dispatch';
 import { useStore } from '../state';
-import type { ImportOutcome } from '../state/store';
+import type { AppState, ImportOutcome } from '../state/store';
+import { objectInsertActions } from '../state/object-insert-actions';
+import { imageImportActions } from '../state/import-actions';
+import { pushUndo } from '../state/undo-stack';
 import type { SvgArtworkFragment } from '../state/svg-fragment-mutation';
 import { useToastStore } from '../state/toast-store';
 import { snapshotFile, type StudioSnapshot } from './artcraft-api';
+import { acceptStudioDocument } from './studio-project-bridge';
 
 /** Re-import is explicit: normal picker imports intentionally create copies. */
 export async function applyStudioSnapshot(
@@ -24,14 +28,13 @@ export async function applyStudioSnapshot(
   let committed = false;
   const commit = (fragment: SvgArtworkFragment, raster: boolean): ImportOutcome => {
     const state = current();
-    const target = studioTarget(state.project.scene.objects, file.name);
-    const result =
-      target === undefined
-        ? raster && fragment.objects[0] !== undefined
-          ? state.importRasterImage(fragment.objects[0])
-          : state.importSvgFragment(fragment)
-        : state.reimportSvgFragment(target.id, fragment);
-    if (result === null) throw new Error('The previously applied artwork is no longer available.');
+    let result: ImportOutcome = { kind: 'added' };
+    const apply = (project: Project) => {
+      result = commitArtwork(state, project, fragment, raster);
+    };
+    if (snapshot.nativeDocument === undefined) apply(state.project);
+    else if (!acceptStudioDocument(snapshot.id, snapshot.nativeDocument, ownerEpoch, apply))
+      throw new Error('The project changed while applying its native source.');
     committed = true;
     return result;
   };
@@ -48,6 +51,43 @@ export async function applyStudioSnapshot(
   });
   current();
   if (!committed) throw new Error('No artwork was applied. Check the import notices for details.');
+}
+
+function commitArtwork(
+  state: AppState,
+  project: Project,
+  fragment: SvgArtworkFragment,
+  raster: boolean,
+): ImportOutcome {
+  // Existing import actions build a private candidate. Both source and artwork
+  // validation precede the single project commit and its single Undo entry.
+  let staged = { ...state, project };
+  const set = (patch: (state: AppState) => Partial<AppState>) => {
+    staged = { ...staged, ...patch(staged) };
+  };
+  const actions = {
+    ...objectInsertActions(set, () => staged),
+    ...imageImportActions(set, () => staged),
+  };
+  const target = studioTarget(project.scene.objects, fragment.source);
+  const result =
+    target === undefined
+      ? raster && fragment.objects[0] !== undefined
+        ? actions.importRasterImage(fragment.objects[0])
+        : actions.importSvgFragment(fragment)
+      : actions.reimportSvgFragment(target.id, fragment);
+  if (result === null) throw new Error('The previously applied artwork is no longer available.');
+  if (useStore.getState().project !== state.project)
+    throw new Error('The project changed while applying artwork.');
+  useStore.setState({
+    project: staged.project,
+    selectedObjectId: staged.selectedObjectId,
+    additionalSelectedIds: staged.additionalSelectedIds,
+    undoStack: pushUndo(state.project, state.undoStack, 'Apply studio artwork'),
+    redoStack: [],
+    dirty: true,
+  });
+  return result;
 }
 
 export function studioTarget(

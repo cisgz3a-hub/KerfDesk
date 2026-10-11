@@ -53,6 +53,7 @@ import {
   updateSessionMove,
 } from './design-session-mutations';
 import { readPersistedSession } from './design-session-storage';
+import { designRecoveryOwner } from './design-recovery-owner';
 import {
   markSessionApplied,
   redoSession,
@@ -345,16 +346,10 @@ function openedSession(state: DesignStudioState): Partial<DesignStudioState> {
     if (state.stash !== null)
       return { session: reconcileProjectDesignSession(state.stash, project) };
   }
-  const saved =
-    projectDocumentEpoch === 0 &&
-    project.scene.objects.length === 0 &&
-    project.designStudioDocument === undefined
-      ? readPersistedSession()
-      : null;
   return {
     documentEpoch: projectDocumentEpoch,
     stash: null,
-    session: saved === null ? restoreProjectDesignSession(project) : restoreDesignSession(saved),
+    session: restoredOwnedSession(project, projectDocumentEpoch),
   };
 }
 
@@ -363,9 +358,26 @@ useStore.subscribe((next, previous) => {
   useDesignStudioStore.setState((state) => ({
     documentEpoch: next.projectDocumentEpoch,
     stash: null,
-    session: state.session === null ? null : restoreProjectDesignSession(next.project),
+    session:
+      state.session === null ? null : restoredOwnedSession(next.project, next.projectDocumentEpoch),
   }));
 });
+
+function restoredOwnedSession(
+  project: ReturnType<typeof useStore.getState>['project'],
+  epoch: number,
+): DesignSession {
+  const saved = readPersistedSession();
+  const owner = designRecoveryOwner(project);
+  const matches =
+    saved !== null &&
+    (owner === undefined
+      ? epoch === 0 && saved.projectOwner === undefined
+      : saved.projectOwner === owner);
+  return matches
+    ? reconcileProjectDesignSession(restoreDesignSession(saved), project)
+    : restoreProjectDesignSession(project);
+}
 
 // Every session mutation goes through here so a closed Studio silently ignores
 // stray actions instead of resurrecting a session.

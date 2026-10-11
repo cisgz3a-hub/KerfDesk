@@ -9,7 +9,6 @@ import {
   getStudioBinding,
   unbindStudioSession,
   serializeStudioOperation,
-  acceptStudioDocument,
 } from './studio-project-bridge';
 import {
   getStudioSnapshot,
@@ -165,11 +164,6 @@ function projectActions(state: EditorState) {
           if (snapshot.id !== id) throw new Error('The editor returned a different session.');
           assertOwner(owner);
           await applyStudioSnapshot(snapshot, owner, () => state.mounted.current);
-          if (
-            snapshot.nativeDocument !== undefined &&
-            !acceptStudioDocument(id, snapshot.nativeDocument, owner)
-          )
-            throw new Error('The project changed before its editable source could be updated.');
           return 'Artwork updated in KerfDesk. Return to the old studio to review machining.';
         });
       }),
@@ -198,7 +192,7 @@ function assertDocumentVersion(id: string, hash: string): void {
 
 function useEditorOperation() {
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState('Create artwork or reopen a document from this project.');
+  const [message, setMessage] = useState('Choose a saved legacy document from this project.');
   const [error, setError] = useState(false);
   const mounted = useRef(true);
   const inFlight = useRef(false);

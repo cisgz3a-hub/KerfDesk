@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRgbaBuffer } from '../../core/image-edit/rgba-buffer';
 import { IDENTITY_TRANSFORM, type RasterImage } from '../../core/scene';
 import { createSession, revertSession } from './editor-session';
@@ -52,10 +52,11 @@ function image(): RasterImage {
 }
 
 beforeEach(() => vi.resetAllMocks());
+afterEach(() => vi.useRealTimers());
 describe('editable photo project documents', () => {
   it('restores layer pixels, hidden ink, metadata and active paint target without decoding flattened PNG', async () => {
     const original = layered();
-    const document = captureProjectDocument(original);
+    const document = await captureProjectDocument(original);
     const reopened = await openProjectPhoto({
       ...image(),
       editorDocument: JSON.parse(JSON.stringify(document)),
@@ -72,7 +73,7 @@ describe('editable photo project documents', () => {
     const original = layered();
     const reopened = await openProjectPhoto({
       ...image(),
-      editorDocument: captureProjectDocument(original),
+      editorDocument: await captureProjectDocument(original),
     });
     reopened.doc.data.fill(0);
     const resized = commitImageSize(reopened, 4, 2);
@@ -109,5 +110,61 @@ describe('editable photo project documents', () => {
     const reopened = await openProjectPhoto(image());
     expect(reopened.layers).toHaveLength(1);
     expect(reopened.doc).toBe(pixels);
+  });
+
+  it('yields between encoding chunks and still captures pixels before any yield', async () => {
+    vi.useFakeTimers();
+    const session = createSession('large', 'large.png', createRgbaBuffer(1024, 64), bounds);
+    session.doc.data.fill(127);
+    let finished = false;
+    const capture = captureProjectDocument(session).then((document) => {
+      finished = true;
+      return document;
+    });
+    session.doc.data.fill(0);
+    await vi.advanceTimersToNextTimerAsync();
+    expect(finished).toBe(false);
+    await vi.runAllTimersAsync();
+    const document = await capture;
+    const opening = openProjectPhoto({
+      ...image(),
+      pixelWidth: 1024,
+      pixelHeight: 64,
+      editorDocument: document,
+    });
+    await vi.runAllTimersAsync();
+    expect((await opening).doc.data.every((value) => value === 127)).toBe(true);
+  });
+
+  it('yields between saved-layer decoding chunks and rejects malformed later chunks', async () => {
+    const original = createSession('large', 'large.png', createRgbaBuffer(1024, 64), bounds);
+    const document = await captureProjectDocument(original);
+    vi.useFakeTimers();
+    let finished = false;
+    const pending = openProjectPhoto({
+      ...image(),
+      pixelWidth: 1024,
+      pixelHeight: 64,
+      editorDocument: document,
+    }).then((session) => {
+      finished = true;
+      return session;
+    });
+    await vi.advanceTimersToNextTimerAsync();
+    expect(finished).toBe(false);
+    await vi.runAllTimersAsync();
+    await pending;
+    const invalid = {
+      ...document,
+      layers: document.layers.map((layer) => ({
+        ...layer,
+        rgbaBase64: layer.rgbaBase64.slice(0, -4) + '!!!!',
+      })),
+    };
+    const refused = expect(
+      openProjectPhoto({ ...image(), pixelWidth: 1024, pixelHeight: 64, editorDocument: invalid }),
+    ).rejects.toThrow('pixels');
+    await vi.runAllTimersAsync();
+    await refused;
   });
 });
