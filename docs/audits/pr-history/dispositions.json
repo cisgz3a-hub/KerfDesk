@@ -501,5 +501,202 @@
     "disposition": "retained-validation-limitation",
     "currentSourceReason": "A TypeScript import/no-cycle fixture was missed by the unchanged default extension mapping both before and after the lint memory repair. Type-aware diagnostics and exact eligible-file union remain equivalent. A fixture-only resolver mapping detects cross-partition cycles. This does not establish a product runtime defect or a historical introduction; investigate separately without claiming default TypeScript cycle qualification.",
     "evidenceReports": ["batch-05/lint-memory-author.json", "batch-05/lint-memory-peer-review.json"]
+  },
+  {
+    "id": "DISP-058",
+    "title": "Zero Z completion ownership already repaired",
+    "historicalPrs": [96],
+    "disposition": "already-fixed",
+    "currentSourceReason": "Zero Z completion ownership belongs to initiating tool/reference; current source and passing regression controls verify repair. No duplicate current finding.",
+    "evidenceReports": ["batch-06/lane-a.json", "batch-06/lane-a.md"],
+    "sourceDisposition": {
+      "id": "B06-A-D1",
+      "kind": "already-fixed",
+      "discoveryPr": 96,
+      "relatedRepairPr": 1148,
+      "detail": "Zero Z completion ownership belongs to initiating tool/reference; current source and passing regression controls verify repair. No duplicate current finding."
+    }
+  },
+  {
+    "id": "DISP-059",
+    "title": "Console coordinate evidence already repaired",
+    "historicalPrs": [96],
+    "disposition": "already-fixed",
+    "currentSourceReason": "Console classification mixed/tool/fractional/padded/WCS defects already recorded and repaired; current 24 store controls passed.",
+    "evidenceReports": ["batch-06/lane-a.json", "batch-06/lane-a.md"],
+    "sourceDisposition": {
+      "id": "B06-A-D2",
+      "kind": "already-fixed",
+      "discoveryPr": 96,
+      "relatedRepairPr": 1162,
+      "actualIntroductionPr": 94,
+      "detail": "Console classification mixed/tool/fractional/padded/WCS defects already recorded and repaired; current 24 store controls passed."
+    }
+  },
+  {
+    "id": "DISP-060",
+    "title": "Historical Start restrictions superseded by Frame-first policy",
+    "historicalPrs": [96, 97, 100],
+    "disposition": "superseded-historical-policy",
+    "currentSourceReason": "Frame-first NN21/ADR565 and ADR228 govern Start. Historical readiness/rotary restrictions do not authorize new gates; ADR315 explicitly supersedes rotary Labs clauses.",
+    "evidenceReports": ["batch-06/lane-a.json", "batch-06/lane-a.md"],
+    "sourceDisposition": {
+      "id": "B06-A-D3",
+      "kind": "superseded-historical-policy",
+      "prs": [96, 97, 100],
+      "detail": "Frame-first NN21/ADR565 and ADR228 govern Start. Historical readiness/rotary restrictions do not authorize new gates; ADR315 explicitly supersedes rotary Labs clauses."
+    }
+  },
+  {
+    "id": "DISP-061",
+    "title": "PR97 decision-document normalization",
+    "historicalPrs": [97],
+    "disposition": "historical-documentation-normalization",
+    "currentSourceReason": "All899 lines counted, not collapsed out of coverage. CRLF normalization retains prior ADRs; substantive ADR144 addition is reviewed as documentation, implementation owned by laneB.",
+    "evidenceReports": ["batch-06/lane-a.json", "batch-06/lane-a.md"],
+    "sourceDisposition": {
+      "id": "B06-A-D4",
+      "kind": "historical-documentation-normalization",
+      "pr": 97,
+      "path": "DECISIONS.md",
+      "detail": "All899 lines counted, not collapsed out of coverage. CRLF normalization retains prior ADRs; substantive ADR144 addition is reviewed as documentation, implementation owned by laneB."
+    }
+  },
+  {
+    "id": "DISP-062",
+    "title": "Work-Z lifecycle and documentation review",
+    "historicalPrs": [96, 100],
+    "disposition": "no-new-current-defect",
+    "currentSourceReason": "Remaining evidence migration, lifecycle invalidations, fixture changes and dated documentation were reviewed against pinned descendants without a confirmed current defect.",
+    "evidenceReports": ["batch-06/lane-a.json", "batch-06/lane-a.md"],
+    "sourceDisposition": {
+      "id": "B06-A-D5",
+      "kind": "no-new-current-defect",
+      "prs": [96, 100],
+      "detail": "Remaining evidence migration, lifecycle invalidations, fixture changes and dated documentation were reviewed against pinned descendants without a confirmed current defect."
+    }
+  },
+  {
+    "id": "DISP-063",
+    "title": "Parametric shape editing superseded by current controls",
+    "historicalPrs": [97],
+    "disposition": "historical-behavior-superseded",
+    "currentSourceReason": "Shape fields initially edited authored local dimensions; current code reports scaled bed size and cancels pending edits on scaling/target/document changes.",
+    "evidenceReports": ["batch-06/lane-b.json", "batch-06/lane-b.md"],
+    "sourceDisposition": {
+      "id": "B06-B-D01",
+      "prs": [97],
+      "status": "historical-behavior-superseded",
+      "reason": "Shape fields initially edited authored local dimensions; current code reports scaled bed size and cancels pending edits on scaling/target/document changes.",
+      "lineage": [
+        "1933c8536ab6a796ad33d5cc13ab87d5cad5912e",
+        "40e46b114d939d8815c6b3af566157475d35cc8d",
+        "ef2f8677d",
+        "de5c47a50",
+        "a3f4da41d",
+        "68b62dc25"
+      ],
+      "newRepairRequired": false
+    }
+  },
+  {
+    "id": "DISP-064",
+    "title": "Canonical curve density policy intentionally removed",
+    "historicalPrs": [98],
+    "disposition": "historical-density-policy-superseded",
+    "currentSourceReason": "Canonical curve caps introduced in PR98 were removed intentionally by 9d11c0a3d; malformed geometry validation and structural counts remain. Do not reintroduce obsolete prediction gates.",
+    "evidenceReports": ["batch-06/lane-b.json", "batch-06/lane-b.md"],
+    "sourceDisposition": {
+      "id": "B06-B-D02",
+      "prs": [98],
+      "status": "historical-density-policy-superseded",
+      "reason": "Canonical curve caps introduced in PR98 were removed intentionally by 9d11c0a3d; malformed geometry validation and structural counts remain. Do not reintroduce obsolete prediction gates.",
+      "lineage": [
+        "4b84c2a8b85b8652a83321834de7282803714d7f",
+        "9d11c0a3dc3d3e504476c2d7ee0801c4026ee3ea"
+      ],
+      "newRepairRequired": false
+    }
+  },
+  {
+    "id": "DISP-065",
+    "title": "Variable template round-trip contract retained",
+    "historicalPrs": [99],
+    "disposition": "current-roundtrip-contract-verified",
+    "currentSourceReason": "Configured serial/CSV settings are preserved. Later Unicode and literal-brace fixes remain present; inherited tags are rejected. No new current loss reproduced.",
+    "evidenceReports": ["batch-06/lane-b.json", "batch-06/lane-b.md"],
+    "sourceDisposition": {
+      "id": "B06-B-D03",
+      "prs": [99],
+      "status": "current-roundtrip-contract-verified",
+      "reason": "Configured serial/CSV settings are preserved. Later Unicode and literal-brace fixes remain present; inherited tags are rejected. No new current loss reproduced.",
+      "lineage": ["8ee93ae4cb2baf8fd2975402473c7008d914a5e4", "971294fd7", "4938fd638"],
+      "newRepairRequired": false
+    }
+  },
+  {
+    "id": "DISP-066",
+    "title": "Unidirectional and cross-hatch cache identity retained",
+    "historicalPrs": [10, 11],
+    "disposition": "retained-historical-feature",
+    "currentSourceReason": "PR10 one-way hatching and cache-key repair; PR11 cross-hatch generation/cache identity retained.",
+    "evidenceReports": ["batch-06/lane-c.json", "batch-06/lane-c.md"],
+    "sourceDisposition": {
+      "kind": "retained-historical-feature",
+      "commits": [
+        "f1e4bee3e2d7bb305d8e6548652149e4f354153e",
+        "aef127f100d8ccc824b0ef168c79a52cdd847495"
+      ],
+      "description": "PR10 one-way hatching and cache-key repair; PR11 cross-hatch generation/cache identity retained."
+    }
+  },
+  {
+    "id": "DISP-067",
+    "title": "Legacy overscan policy distinguished from Scan Line runways",
+    "historicalPrs": [10, 11],
+    "disposition": "superseded-policy-not-new-bug",
+    "currentSourceReason": "Historical short-run overscan skipping is deliberate ADR-033 legacy behavior. Modern generic Scan Line always plans bounded feed-matched runways; current source and independent positive/negative controls distinguish both.",
+    "evidenceReports": ["batch-06/lane-c.json", "batch-06/lane-c.md"],
+    "sourceDisposition": {
+      "kind": "superseded-policy-not-new-bug",
+      "historicalCommit": "c116836e9c21ca5c43b854d3404e78c379bcb8e3",
+      "currentPolicyCommit": "e08b0828d2d8d64c2ed8ab388470d74ae7667e5e",
+      "currentPolicyPr": 487,
+      "description": "Historical short-run overscan skipping is deliberate ADR-033 legacy behavior. Modern generic Scan Line always plans bounded feed-matched runways; current source and independent positive/negative controls distinguish both."
+    }
+  },
+  {
+    "id": "DISP-068",
+    "title": "Continuous sweep grouping and bounded split motion",
+    "historicalPrs": [10, 11],
+    "disposition": "retained-and-refined-sweep-feature",
+    "currentSourceReason": "Continuous span grouping and wide-gap split retained; explicit reverse metadata and policy-owned bounded split motion are current semantics.",
+    "evidenceReports": ["batch-06/lane-c.json", "batch-06/lane-c.md"],
+    "sourceDisposition": {
+      "kind": "retained-and-refined-sweep-feature",
+      "historicalCommits": [
+        "bbccf42b6150fe1862e98b208037df9793d01815",
+        "95123711af798fb68f12e9751cc469ba7153c4f4"
+      ],
+      "descendants": [
+        "1d1b73e9037fcd621f4cbc90237ab56f74fa3138",
+        "e08b0828d2d8d64c2ed8ab388470d74ae7667e5e"
+      ],
+      "description": "Continuous span grouping and wide-gap split retained; explicit reverse metadata and policy-owned bounded split motion are current semantics."
+    }
+  },
+  {
+    "id": "DISP-069",
+    "title": "Negative-zero row key in audit probe",
+    "historicalPrs": [10, 11],
+    "disposition": "probe-oracle-error-not-product-defect",
+    "currentSourceReason": "Probe stringified near-zero scanline coordinates into separate negative-zero and positive-zero row keys. Numeric rounded row keys correctly combine the same row. All six apparent failures disappear without any product change; failed probe and source preserved.",
+    "evidenceReports": ["batch-06/lane-c.json", "batch-06/lane-c.md"],
+    "sourceDisposition": {
+      "candidate": "Angled hole rows appeared to omit right-hand material in first independent probe",
+      "disposition": "probe-oracle-error-not-product-defect",
+      "evidence": "docs/audits/2026-10-11-pr-history/batch-06/lane-c-independent-controls-negative-zero-oracle.json",
+      "reason": "Probe stringified near-zero scanline coordinates into separate negative-zero and positive-zero row keys. Numeric rounded row keys correctly combine the same row. All six apparent failures disappear without any product change; failed probe and source preserved."
+    }
   }
 ]
