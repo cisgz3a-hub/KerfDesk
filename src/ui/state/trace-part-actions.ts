@@ -1,13 +1,20 @@
 import { canonicalArtworkOrder } from '../../core/artwork-order';
 import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
 import { designNodeOrder } from '../../core/scene/design-hierarchy-order';
-import { sceneLayerVisibility, type Project, type Scene, type TracedImage } from '../../core/scene';
+import { registrationJigIdentityBudgetIssue } from '../../core/scene/registration-jig-artwork';
+import { sceneLayerVisibility, type Scene, type TracedImage } from '../../core/scene';
 import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { sceneLimitOverrun } from './scene-copy-room';
 import { scopedSelectionProjectPatch } from './project-job-setup';
 import { detachTracePartGeometry, isSingleTracePart } from './trace-part-geometry';
-import { tracePartObjectId } from './trace-part-jig-identity';
+import { tracePartObjectId, withTracePartJigIdentity } from './trace-part-jig-identity';
+import {
+  tracePartMembershipError,
+  withTracePartMembership,
+  withTracePartRecipeName,
+} from './trace-part-project-membership';
+import { captureTracePartHistory } from './trace-part-history';
 import { useToastStore } from './toast-store';
 
 export type TracePartActions = {
@@ -52,16 +59,25 @@ export function tracePartActions(set: TracePartSet): TracePartActions {
           }
           warning = dependencyWarning(state.project.scene, objectId);
           if (warning !== null) return state;
-          const scene = replaceWithPart(state.project.scene, split.remainder, split.part);
-          warning = sceneLimitOverrun(
-            state.project.scene,
-            scene,
-            'Delete some artwork before separating another part.',
+          const namedPart = withTracePartRecipeName(state.project, object, split.part);
+          const part = withTracePartJigIdentity(state.project.scene, object, namedPart);
+          const scene = replaceWithPart(state.project.scene, split.remainder, part);
+          warning = tracePartSceneError(state.project.scene, scene);
+          if (warning !== null) return state;
+          const project = withTracePartMembership(
+            { ...state.project, scene },
+            object,
+            split.remainder,
+            part,
+            pathIndex,
           );
+          warning = tracePartMembershipError(state.project, project);
           if (warning !== null) return state;
           selectedId = partId;
+          const snapshot = state.pendingUndo ?? state;
+          captureTracePartHistory(snapshot.project, partId, snapshot);
           return {
-            project: withPartSideMembership({ ...state.project, scene }, objectId, partId),
+            project,
             ...(state.pendingUndo === null
               ? {
                   undoStack: pushUndo(state.project, state.undoStack, 'Separate trace part'),
@@ -81,6 +97,13 @@ export function tracePartActions(set: TracePartSet): TracePartActions {
     selectTracePart: (id, options = {}) =>
       set((state) => directPartSelection(state, id, options.toggle === true)),
   };
+}
+
+function tracePartSceneError(before: Scene, after: Scene): string | null {
+  return (
+    sceneLimitOverrun(before, after, 'Delete some artwork before separating another part.') ??
+    registrationJigIdentityBudgetIssue(after.objects)
+  );
 }
 
 function editableTrace(scene: Scene, id: string): TracedImage | null {
@@ -123,24 +146,6 @@ function dependencyWarning(scene: Scene, id: string): string | null {
       : null,
   ].filter(Boolean);
   return `This trace is used as ${uses.join(' and ')}. Before separating its parts: ${steps.join(' ')}`;
-}
-
-function withPartSideMembership(project: Project, sourceId: string, partId: string): Project {
-  const setup = project.cncSetup;
-  const sides = setup?.twoSided;
-  if (setup === undefined || sides === undefined) return project;
-  const expand = (ids: readonly string[]): readonly string[] =>
-    ids.includes(sourceId) && !ids.includes(partId)
-      ? ids.flatMap((id) => (id === sourceId ? [id, partId] : [id]))
-      : ids;
-  const sideAObjectIds = expand(sides.sideAObjectIds);
-  const sideBObjectIds = expand(sides.sideBObjectIds);
-  if (sideAObjectIds === sides.sideAObjectIds && sideBObjectIds === sides.sideBObjectIds)
-    return project;
-  return {
-    ...project,
-    cncSetup: { ...setup, twoSided: { ...sides, sideAObjectIds, sideBObjectIds } },
-  };
 }
 
 function replaceWithPart(scene: Scene, remainder: TracedImage, part: TracedImage): Scene {

@@ -2603,7 +2603,12 @@ authorization, Frame proof, controller command, or safety boundary.
 5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
    instead of layering another set on the canvas.
 6. Reopened projects retain per-jig output order and shared-size controls because
-   the existing generated copy ids already bind each copy to its source and outline.
+   generated artwork retains its source ancestry and physical outline. Existing
+   encoded copy IDs remain readable; edited parts also carry explicit jig metadata.
+   A part fitted into the first outline stays there after its generated copies are deleted.
+7. An explicitly selected layout can include both an original and an edited generated
+   copy. Both selected objects become artwork in the first outline; each gets a distinct
+   copy in the remaining outlines. Repeating the action replaces those copies once.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 

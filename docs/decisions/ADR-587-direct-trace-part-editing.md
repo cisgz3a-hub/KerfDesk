@@ -54,11 +54,27 @@ direct selection, isolation, node editing, and hole-preserving splitting in esta
   already separate single part requires no split. Reapplying jig artwork also preserves the entire
   project when it would remove a detached descendant retained as a relief source; the linked use
   must be released explicitly before replacing that layout.
+- Persist optional `registrationJig` object metadata for edited jig artwork: its own ID,
+  physical outline ID and ordered copy/part ancestry. Keep legacy encoded IDs readable without
+  rewriting saved references. New IDs stay within the existing 200-character CNC side-reference
+  limit; deep parts and colliding generated copies use independent IDs with the same durable
+  ancestry. An ordinary duplicate with a different object ID does not inherit this membership.
+  Explicitly fitting a copied part into the first outline records that promotion, so deleting
+  its generated descendants cannot move its shared sizing or output grouping back to the old
+  outline. When both a source and its descendant are explicitly selected as one layout, retain
+  both selected objects and give their generated copies distinct IDs. Reapplying the layout
+  replaces its generated descendants once; it never adds a second object under a selected ID.
+  A split or layout that would exceed the saved ancestry budget preserves the project and
+  history unchanged and explains that a new independent source is needed. This is a project
+  serialization limit, not a machine-output or Start policy gate.
 
 ## Consequences and verification
 
-Large traces stay compact until individual parts are picked. This introduces no persisted schema
-or dependencies. Existing Break Apart remains available for intentionally separating all shapes.
+Large traces stay compact until individual parts are picked. The optional validated jig metadata
+extends the existing project format without changing its version or dependencies. Older encoded
+jig projects retain their interpretation; older readers cannot reconstruct new compact jig IDs
+or explicit promotions and should not be used to output these edited jig projects. Existing
+Break Apart remains available for intentionally separating all shapes.
 The original source raster is retained for starting a fresh trace.
 
 Verify hole/island and hybrid grouping, operation and tab metadata, exact curves and compatibility

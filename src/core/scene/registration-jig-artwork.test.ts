@@ -8,10 +8,40 @@ import {
   registrationJigCopyId,
   registrationJigCopyIdentity,
   registrationJigPartId,
+  createRegistrationJigCopyIdAllocator,
 } from './registration-jig-artwork';
 import { createRegistrationLayer } from './registration-layer';
 
 describe('registration jig artwork identity', () => {
+  it('reuses a saved long copy ID without rewriting existing references', () => {
+    const sourceId = 'source'.repeat(40);
+    const id = registrationJigCopyId(sourceId, 'box-b');
+    const allocate = createRegistrationJigCopyIdAllocator(
+      { objects: [artwork(id, 'artwork')], layers: [] },
+      new Set([sourceId]),
+    );
+    expect(id.length).toBeGreaterThan(200);
+    expect(allocate(sourceId, 'box-b')).toBe(id);
+    expect(allocate(sourceId, 'box-c').length).toBeLessThanOrEqual(200);
+  });
+
+  it('indexes existing artwork once while allocating a large copy layout', () => {
+    let reads = 0;
+    const objects = Array.from({ length: 1_000 }, (_, index) => ({
+      ...artwork(`existing-${index}`, 'artwork'),
+      get id() {
+        reads += 1;
+        return `existing-${index}`;
+      },
+    }));
+    const allocate = createRegistrationJigCopyIdAllocator({ objects, layers: [] }, new Set());
+    const indexedReads = reads;
+    const ids = Array.from({ length: 1_000 }, (_, index) => allocate('source', `box-${index}`));
+    expect(new Set(ids).size).toBe(1_000);
+    expect(reads).toBe(indexedReads);
+    expect(indexedReads).toBeLessThanOrEqual(4_000);
+  });
+
   it('round-trips arbitrary source and outline ids', () => {
     const id = registrationJigCopyId('source: one/%', 'box: two/%');
     expect(registrationJigCopyIdentity(id)).toEqual({

@@ -13,10 +13,13 @@ import {
 import { fitSelectionToRegion } from '../../core/scene/fit-selection-to-region';
 import {
   registrationJigArtworkInstances,
-  registrationJigCopyId,
+  createRegistrationJigCopyIdAllocator,
   registrationJigGroupCopyId,
   registrationJigGroupCopyPrefix,
   registrationJigReplacedArtworkIds,
+  registrationJigIdentityBudgetIssue,
+  withRegistrationJigBox,
+  withRegistrationJigChild,
 } from '../../core/scene/registration-jig-artwork';
 import {
   buildSelectionTransformEdit,
@@ -81,36 +84,23 @@ export function applyCenterArtworkInRegistrationJigSet(
   const selectionBounds = combinedBBox(fitted);
   if (selectionBounds === null) return state;
 
-  const sourceCenter = centerOf(selectionBounds);
-  const movedById = new Map<string, SceneObject>();
-  const copies: SceneObject[] = [];
-  const copiedGroups: SceneGroup[] = [];
-  const selectionIds: string[] = [];
-  for (const [boxIndex, box] of boxes.entries()) {
-    const targetCenter = centerOf(transformedBBox(box));
-    const delta = { x: targetCenter.x - sourceCenter.x, y: targetCenter.y - sourceCenter.y };
-    if (boxIndex === 0) {
-      for (const object of fitted) {
-        movedById.set(object.id, translatedObject(object, object.id, delta));
-        selectionIds.push(object.id);
-      }
-      continue;
-    }
-    const copiedIds = new Map<string, string>();
-    for (const object of fitted) {
-      const id = registrationJigCopyId(object.id, box.id);
-      copiedIds.set(object.id, id);
-      copies.push(translatedObject(object, id, delta));
-    }
-    copiedGroups.push(
-      ...cloneCompleteSelectedGroups(state.project.scene, selected, copiedIds, box.id),
-    );
-  }
+  const { movedById, copies, copiedGroups, selectionIds } = buildJigArtworkLayout(
+    state.project.scene,
+    selected,
+    fitted,
+    boxes,
+    centerOf(selectionBounds),
+  );
 
   const replacedIds = registrationJigReplacedArtworkIds(
     state.project.scene,
     new Set(selected.map((object) => object.id)),
   );
+  const metadataIssue = registrationJigIdentityBudgetIssue(copies);
+  if (metadataIssue !== null) {
+    useToastStore.getState().pushToast(metadataIssue, 'warning');
+    return state;
+  }
   if (!canReplaceJigArtwork(state.project.scene, replacedIds, copies)) return state;
   const copiedGroupPrefixes = completeSelectedGroups(state.project.scene, selected).map((group) =>
     registrationJigGroupCopyPrefix(group.id),
@@ -145,6 +135,48 @@ export function applyCenterArtworkInRegistrationJigSet(
     redoStack: [],
     dirty: true,
   };
+}
+
+function buildJigArtworkLayout(
+  scene: Scene,
+  selected: ReadonlyArray<SceneObject>,
+  fitted: ReadonlyArray<SceneObject>,
+  boxes: ReturnType<typeof findRegistrationBoxes>,
+  sourceCenter: { readonly x: number; readonly y: number },
+) {
+  const movedById = new Map<string, SceneObject>();
+  const copies: SceneObject[] = [];
+  const copiedGroups: SceneGroup[] = [];
+  const selectionIds: string[] = [];
+  const allocateCopyId = createRegistrationJigCopyIdAllocator(
+    scene,
+    new Set(selected.map((object) => object.id)),
+  );
+  for (const [boxIndex, box] of boxes.entries()) {
+    const targetCenter = centerOf(transformedBBox(box));
+    const delta = { x: targetCenter.x - sourceCenter.x, y: targetCenter.y - sourceCenter.y };
+    if (boxIndex === 0) {
+      for (const object of fitted) {
+        movedById.set(
+          object.id,
+          withRegistrationJigBox(translatedObject(object, object.id, delta), box.id),
+        );
+        selectionIds.push(object.id);
+      }
+      continue;
+    }
+    const copiedIds = new Map<string, string>();
+    for (const object of fitted) {
+      const id = allocateCopyId(object.id, box.id);
+      copiedIds.set(object.id, id);
+      copies.push(
+        withRegistrationJigChild(object, translatedObject(object, id, delta), box.id, 'copy'),
+      );
+    }
+    copiedGroups.push(...cloneCompleteSelectedGroups(scene, selected, copiedIds, box.id));
+  }
+
+  return { movedById, copies, copiedGroups, selectionIds };
 }
 
 function canReplaceJigArtwork(
