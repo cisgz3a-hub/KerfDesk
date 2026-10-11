@@ -104,11 +104,20 @@ export function registrationJigArtworkInstances(
   });
   if (copies.length === 0) return [];
   const sourceIds = new Set(copies.map(({ identity }) => identity.sourceId));
-  const layoutSourceIds = new Set(
-    copies
-      .filter(({ object }) => object.id.startsWith(REGISTRATION_JIG_COPY_PREFIX))
-      .map(({ identity }) => identity.sourceId),
-  );
+  const layoutSourceIds = new Set<string>();
+  for (const { object } of copies) {
+    // A detached part retains the copy's lineage even after its remainder is gone.
+    // Only copy links establish a first-outline source; part links keep their box.
+    let ancestorId = object.id;
+    for (;;) {
+      const identity = registrationJigCopyIdentity(ancestorId);
+      if (identity === null) break;
+      if (ancestorId.startsWith(REGISTRATION_JIG_COPY_PREFIX)) {
+        layoutSourceIds.add(identity.sourceId);
+      }
+      ancestorId = identity.sourceId;
+    }
+  }
   const explicitBoxes = new Map(copies.map(({ object, identity }) => [object.id, identity.boxId]));
   const firstBox = boxes[0];
   if (firstBox === undefined) return [];

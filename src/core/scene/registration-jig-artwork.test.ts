@@ -70,6 +70,32 @@ describe('registration jig artwork identity', () => {
       instanceSummary(scene),
     );
   });
+
+  it.each([1, 2])(
+    'keeps the original instance after %i nested parts outlive their copy',
+    (depth) => {
+      const operation = createLayer({ id: 'artwork', color: '#0000ff' });
+      const boxes = [
+        createRegistrationBox({ id: 'box-a', widthMm: 40, heightMm: 30 }),
+        createRegistrationBox({ id: 'box-b', widthMm: 40, heightMm: 30, x: 50 }),
+      ];
+      const source = artwork('source: one/%', operation.id);
+      let partId = registrationJigCopyId(source.id, 'box-b');
+      for (let index = 0; index < depth; index++) {
+        partId = registrationJigPartId(partId, 'box-b', `part-${index}`);
+      }
+      const scene: Scene = {
+        objects: [...boxes, source, { ...source, id: partId }],
+        layers: [createRegistrationLayer(), operation],
+      };
+      const expected = [
+        { boxId: 'box-a', objectIds: [source.id] },
+        { boxId: 'box-b', objectIds: [partId] },
+      ];
+      expect(instanceSummary(scene)).toEqual(expected);
+      expect(instanceSummary(JSON.parse(JSON.stringify(scene)) as Scene)).toEqual(expected);
+    },
+  );
 });
 
 function instanceSummary(scene: Scene) {
