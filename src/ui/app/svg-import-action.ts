@@ -13,6 +13,7 @@ import {
   describeImportError,
   describeImportResult,
   describeReimportOutcome,
+  describeSvgPresentationWarnings,
 } from './import-toasts';
 
 export async function importSvgFiles(
@@ -63,6 +64,9 @@ function reportSvgImport(
   if (outcome?.kind === 'replaced') {
     const toast = describeReimportOutcome(outcome);
     pushToast(toast.message, toast.variant);
+    for (const warning of describeSvgPresentationWarnings(name, result)) {
+      pushToast(warning.message, warning.variant);
+    }
     return;
   }
   for (const toast of describeImportResult(name, result)) {

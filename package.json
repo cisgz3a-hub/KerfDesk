@@ -73,6 +73,9 @@
     "build:renderer:desktop": "pnpm generate:notices && pnpm typecheck && pnpm build:bundle:desktop"
   },
   "dependencies": {
+    "@csstools/css-calc": "2.1.4",
+    "@csstools/css-parser-algorithms": "3.0.5",
+    "@csstools/css-tokenizer": "3.0.4",
     "@modelcontextprotocol/server": "2.2.0",
     "@tabler/icons": "3.43.0",
     "clipper2-ts": "2.0.1-17",

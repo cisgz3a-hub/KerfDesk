@@ -34,6 +34,15 @@ importers:
 
   .:
     dependencies:
+      '@csstools/css-calc':
+        specifier: 2.1.4
+        version: 2.1.4(@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4))(@csstools/css-tokenizer@3.0.4)
+      '@csstools/css-parser-algorithms':
+        specifier: 3.0.5
+        version: 3.0.5(@csstools/css-tokenizer@3.0.4)
+      '@csstools/css-tokenizer':
+        specifier: 3.0.4
+        version: 3.0.4
       '@modelcontextprotocol/server':
         specifier: 2.2.0
         version: 2.2.0
