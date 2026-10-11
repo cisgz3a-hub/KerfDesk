@@ -1,3 +1,9 @@
+import {
+  isTokenNode,
+  isWhiteSpaceOrCommentNode,
+  parseListOfComponentValues,
+} from '@csstools/css-parser-algorithms';
+import { isTokenDelim, isTokenIdent, tokenize } from '@csstools/css-tokenizer';
 import { svgOpacityMath } from './svg-opacity-math';
 import { hasSvgOpacityVariables } from './svg-opacity-variables';
 
@@ -5,7 +11,6 @@ import { hasSvgOpacityVariables } from './svg-opacity-variables';
 // cascade and the final attribute lookup so invalid winners cannot hide a
 // lower valid declaration. Comments separate tokens, never join them.
 const NUMBER = /^([+-]?(?:\d*\.\d+|\d+)(?:e[+-]?\d+)?)(%)?$/;
-const IMPORTANT = /!\s*important\s*$/;
 
 export function isSvgPaintOpacityProperty(name: string): boolean {
   return name === 'fill-opacity' || name === 'stroke-opacity';
@@ -31,7 +36,7 @@ export function parseSvgPaintOpacity(
   if (normalized === 'revert-layer') return 'revert-layer';
   const number = numericOpacity(normalized);
   if (number !== null) return number;
-  // Valid var()/env() values win before substitution, even if substitution later
+  // Valid var()/env()/attr() values win before substitution, even if it later
   // fails. Do not expose an older declaration when context is unavailable.
   if (hasSvgOpacityVariables(value)) return 'unresolved';
   return svgOpacityMath(value);
@@ -49,12 +54,31 @@ function numericOpacity(value: string): number | null {
 export function svgPaintOpacityDeclaration(
   raw: string,
 ): { readonly value: string; readonly important: boolean } | null {
-  // Locate declaration syntax without rewriting the expression: replacing
-  // comments with spaces would make invalid `calc(1/**/+/**/1)` valid.
-  const masked = raw
-    .replace(/\/\*[\s\S]*?(?:\*\/|$)/g, (comment) => ' '.repeat(comment.length))
-    .toLowerCase();
-  const match = IMPORTANT.exec(masked);
-  const value = (match === null ? raw : raw.slice(0, match.index)).trim();
-  return parseSvgPaintOpacity(value) === null ? null : { value, important: match !== null };
+  try {
+    return paintOpacityDeclaration(raw);
+  } catch {
+    return null;
+  }
+}
+
+function paintOpacityDeclaration(
+  raw: string,
+): { readonly value: string; readonly important: boolean } | null {
+  // CSS Syntax 3: the final two non-whitespace component values must be ! and
+  // an ident whose decoded value is important. Nested suffixes are not syntax.
+  // Slice the original expression so calc's whitespace/comments are unchanged.
+  const nodes = parseListOfComponentValues(tokenize({ css: raw })).filter(
+    (node) => !isWhiteSpaceOrCommentNode(node),
+  );
+  const bang = nodes.at(-2);
+  const ident = nodes.at(-1);
+  const important =
+    isTokenNode(bang) &&
+    isTokenDelim(bang.value) &&
+    bang.value[4].value === '!' &&
+    isTokenNode(ident) &&
+    isTokenIdent(ident.value) &&
+    ident.value[4].value.toLowerCase() === 'important';
+  const value = (important ? raw.slice(0, bang.value[2]) : raw).trim();
+  return parseSvgPaintOpacity(value) === null ? null : { value, important };
 }

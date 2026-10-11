@@ -15,6 +15,7 @@ import {
   tokenize,
   type CSSToken,
 } from '@csstools/css-tokenizer';
+import { validSvgOpacityAttrHeader } from './svg-opacity-attr';
 
 const INVALID_TOKENS = new Set([
   TokenType.BadString,
@@ -24,7 +25,7 @@ const INVALID_TOKENS = new Set([
   TokenType.CloseCurly,
 ]);
 
-/** Retain syntactically valid variable declarations until computed-value time. */
+/** Retain syntactically valid substitutions until computed-value time. */
 export function hasSvgOpacityVariables(value: string): boolean {
   try {
     return validVariableValue(parseListOfComponentValues(tokenize({ css: value })));
@@ -36,7 +37,7 @@ export function hasSvgOpacityVariables(value: string): boolean {
 function validVariableValue(nodes: ComponentValue[]): boolean {
   let found = false;
   // CSS Variables 1 sections 2.1/3 and CSS Environment Variables 1 section 3:
-  // var()/env() postpone property grammar checking.
+  // var()/env(), and CSS Values 5 attr(), postpone property grammar checking.
   // Its fallback is a declaration-value (possibly empty), not an opacity yet.
   // Substitution needs document/browser context this importer does not keep.
   const valid = (values: ComponentValue[], topLevel: boolean): boolean =>
@@ -44,7 +45,7 @@ function validVariableValue(nodes: ComponentValue[]): boolean {
       if (isTokenNode(node)) return validToken(node.value, topLevel);
       if (isFunctionNode(node)) {
         const kind = node.getName().toLowerCase();
-        if (kind !== 'var' && kind !== 'env') return valid(node.value, false);
+        if (kind !== 'var' && kind !== 'env' && kind !== 'attr') return valid(node.value, false);
         found = true;
         const args = node.value.filter((part) => !isWhiteSpaceOrCommentNode(part));
         const comma = args.findIndex(
@@ -60,7 +61,8 @@ function validVariableValue(nodes: ComponentValue[]): boolean {
   return valid(nodes, true) && found;
 }
 
-function validHeader(header: ComponentValue[], kind: 'var' | 'env'): boolean {
+function validHeader(header: ComponentValue[], kind: 'var' | 'env' | 'attr'): boolean {
+  if (kind === 'attr') return validSvgOpacityAttrHeader(header);
   const [name] = header;
   if (!isTokenNode(name) || !isTokenIdent(name.value)) return false;
   if (kind === 'var')

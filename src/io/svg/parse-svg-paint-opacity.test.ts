@@ -32,6 +32,34 @@ type CascadeCase = {
   visible: boolean;
 };
 const cascadeCases: readonly CascadeCase[] = [
+  ...[
+    String.raw`!\69mportant`,
+    String.raw`!\000069mportant`,
+    String.raw`!\69 mportant`,
+    String.raw`!impor\74 ant`,
+    String.raw`!/**/\69mportant/**/`,
+  ].map((suffix) => ({
+    name: `escaped importance preserves priority: ${suffix}`,
+    style: `OPACITY:0 ${suffix};OPACITY:1`,
+    visible: false,
+  })),
+  {
+    name: 'escaped important stylesheet overrides normal inline',
+    sheet: String.raw`.SUBJECT{OPACITY:0 !\69mportant}`,
+    style: 'OPACITY:1',
+    visible: false,
+  },
+  {
+    name: 'escaped important remains invalid in a raw presentation attribute',
+    parent: '0',
+    attribute: String.raw`1 !\69mportant`,
+    visible: false,
+  },
+  ...[String.raw`!im/**/portant`, String.raw`!\69mportantX`, "!'important'"].map((suffix) => ({
+    name: `invalid importance cannot replace lower zero: ${suffix}`,
+    style: `OPACITY:0;OPACITY:1 ${suffix}`,
+    visible: false,
+  })),
   {
     name: 'comments around the opacity property name remain valid',
     style: '/*x*/OPACITY/*x*/:0',

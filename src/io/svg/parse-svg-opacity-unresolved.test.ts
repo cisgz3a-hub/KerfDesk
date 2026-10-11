@@ -23,7 +23,7 @@ const parsers: readonly (readonly [string, Parser])[] = [
 const notes = (result: ParseSvgResult) =>
   result.notes.filter((note) => note.includes('unresolved fill or stroke opacity'));
 const warning =
-  'SVG presentation: Imported 1 SVG element(s) with unresolved fill or stroke opacity treated as fully opaque; opacity using CSS variables (custom or environment) or layout-dependent values may hide artwork that is included. Resolve these expressions in your SVG editor before importing for exact visibility.';
+  'SVG presentation: Imported 1 SVG element(s) with unresolved fill or stroke opacity treated as fully opaque; opacity using CSS variables (custom or environment), attribute substitutions, or layout-dependent values may hide artwork that is included. Resolve these expressions in your SVG editor before importing for exact visibility.';
 
 describe.each(parsers)('unresolved paint opacity through %s', (_name, parse) => {
   describe.each(['fill', 'stroke'])('%s', (paint) => {

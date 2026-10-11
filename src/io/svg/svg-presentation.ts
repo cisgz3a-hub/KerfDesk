@@ -193,7 +193,10 @@ export function svgPresentationStyles(
   el: Element,
   cascadeStyles: SvgStyleCascade,
 ): ReadonlyMap<string, string> {
-  return cascadeStyles(el, styleMap(el.getAttribute('style')));
+  return cascadeStyles(
+    el,
+    styleMap(el.getAttribute('style'), el.getAttributeNode('style')?.value ?? null),
+  );
 }
 
 // The style declaration outranks the presentation attribute. Each is tried in
@@ -203,7 +206,13 @@ function specifiedValues(
   styles: ReadonlyMap<string, string>,
   name: string,
 ): readonly (string | null)[] {
-  return [styles.get(name) ?? null, el.getAttribute(name)];
+  // linkedom XML getAttribute() re-escapes the already decoded Attr.value.
+  // CSS must consume that value once; another entity decoder would wrongly
+  // turn literal &lt; text (source &amp;lt;) into syntax.
+  const attribute = isSvgPaintOpacityProperty(name)
+    ? (el.getAttributeNode(name)?.value ?? null)
+    : el.getAttribute(name);
+  return [styles.get(name) ?? null, attribute];
 }
 
 // fill and stroke inherit: an unset, `inherit` or invalid value keeps the
@@ -250,7 +259,7 @@ function presentationValue(
   return el.getAttribute(name);
 }
 
-function styleMap(style: string | null): Map<string, string> {
+function styleMap(style: string | null, paintStyle: string | null): Map<string, string> {
   const map = new Map<string, string>();
   if (style === null) return map;
   for (const declaration of style.split(';')) {
@@ -262,7 +271,7 @@ function styleMap(style: string | null): Map<string, string> {
   }
   // Opacity declarations must be validated before duplicate names collapse,
   // including inline !important precedence and comments containing semicolons.
-  for (const [name, value] of svgInlinePaintOpacityStyles(style)) map.set(name, value);
+  for (const [name, value] of svgInlinePaintOpacityStyles(paintStyle ?? '')) map.set(name, value);
   return map;
 }
 
