@@ -1,6 +1,6 @@
 // Forward-ray contacts with canonical paths. All distances are world mm;
 // cubic roots are isolated between derivative roots so tangencies are retained.
-import { endpointArc } from '../scene/curve-path';
+import { endpointArc, type CenterArc } from '../scene/curve-path';
 import { applyTransform, type PathSegment, type Transform, type Vec2 } from '../scene';
 
 export const EXTEND_EPS_MM = 1e-7;
@@ -60,19 +60,9 @@ export function segmentRayParametricContacts(
   // Keep its finite chord instead of treating a zero-sign span as the whole ellipse.
   if (arc === null || arc.delta === 0)
     return lineContacts(origin, direction, world(from), world(segment.to));
-  const center = world(arc.center);
-  const cos = Math.cos(arc.rotationRad);
-  const sin = Math.sin(arc.rotationRad);
-  const u = minus(
-    world({ x: arc.center.x + arc.radiusX * cos, y: arc.center.y + arc.radiusX * sin }),
-    center,
-  );
-  const v = minus(
-    world({ x: arc.center.x - arc.radiusY * sin, y: arc.center.y + arc.radiusY * cos }),
-    center,
-  );
-  const determinant = cross(u, v);
-  if (determinant === 0 || !Number.isFinite(determinant)) return [];
+  const basis = rayArcBasis(arc, transform);
+  if (basis === null) return [];
+  const { center, u, v, determinant } = basis;
   const local = (p: Vec2): Vec2 => ({ x: cross(p, v) / determinant, y: cross(u, p) / determinant });
   const p = local(minus(origin, center));
   const d = local(direction);
@@ -91,6 +81,36 @@ export function segmentRayParametricContacts(
     const parameter = atEndpoint ? nearestEnd : arcParameter(unitPoint, start, arc.delta);
     return contact(distance, parameter);
   });
+}
+
+/** Whether an empty contact list is a solved miss, rather than an unsupported arc. */
+export function supportsParametricRayContacts(
+  from: Vec2,
+  segment: PathSegment,
+  transform: Transform,
+): boolean {
+  if (segment.kind !== 'elliptical-arc') return true;
+  const arc = endpointArc(from, segment);
+  return arc === null || arc.delta === 0 || rayArcBasis(arc, transform) !== null;
+}
+
+function rayArcBasis(arc: CenterArc, transform: Transform) {
+  // Rotation can leave a tiny nonzero floating determinant for a collapsed axis.
+  if (transform.scaleX === 0 || transform.scaleY === 0) return null;
+  const world = (p: Vec2): Vec2 => applyTransform(p, transform);
+  const center = world(arc.center);
+  const cos = Math.cos(arc.rotationRad);
+  const sin = Math.sin(arc.rotationRad);
+  const u = minus(
+    world({ x: arc.center.x + arc.radiusX * cos, y: arc.center.y + arc.radiusX * sin }),
+    center,
+  );
+  const v = minus(
+    world({ x: arc.center.x - arc.radiusY * sin, y: arc.center.y + arc.radiusY * cos }),
+    center,
+  );
+  const determinant = cross(u, v);
+  return determinant === 0 || !Number.isFinite(determinant) ? null : { center, u, v, determinant };
 }
 
 function lineContacts(origin: Vec2, direction: Vec2, a: Vec2, b: Vec2): ParametricRayContact[] {

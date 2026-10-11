@@ -63,6 +63,10 @@ Integration with the reviewed Extend solver retains its oriented finite-arc span
 
 The implementation remains deliberately bounded: curve/curve and self-intersections use the existing chord grid; collinear overlap and no-contact deletion semantics are unchanged. Autojoin and Shift-preserve are not added. Tests establish software geometry and history behaviour, not native LightBurn runtime parity or machine qualification.
 
+Review corrections also bound the mixed-pair search with a cached tree of canonical segment bounds. It queries only spatially overlapping candidates while retaining tangencies outside the sampled chords. A deterministic regression with 1,024 sparse line/cubic pairs in either source orientation requires fewer than 51,200 bounds checks rather than the original 1,048,576, and still finds all 1,024 exact contacts. An exhaustive overlap comparator covers mixed extents, degenerate boxes and tolerance; a long boundary remains discoverable across the tree.
+
+An arc with either object scale axis set to zero exposed a second regression: the analytic ellipse solver cannot invert that transform, but Trim suppressed its chord fallback anyway. A quarter-circle collapsed to a visible straight outline therefore lost its crossing with a perpendicular line. Both axis fixtures failed before the correction. Trim now suppresses chord contacts only when the shared solver supports that segment's transformed geometry; unsupported arcs retain chord contacts and the existing canonical-parameter refinement. Eight regressions cover both zero axes, rotation, reflection, trimming either object, retained arc geometry and exact world-space cut endpoints. This is a KerfDesk fallback correction, not new LightBurn runtime evidence.
+
 ## Evidence ledger
 
 Every numbered JSON filename is in the external `lightburn-trim` evidence directory identified above; `.normalized_result` holds the inspected result. E08/E09/E12 establish navigation/caller links, not behaviour independently. E13's slicing interpretation is supported by E16's subdivision arithmetic; retained-region and disconnected-output helper meanings remain qualified in the findings above.

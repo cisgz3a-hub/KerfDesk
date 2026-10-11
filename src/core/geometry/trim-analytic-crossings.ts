@@ -3,8 +3,13 @@
 import { applyTransform, type Bounds, type PathSegment, type Vec2 } from '../scene';
 import { curveSubpathBounds } from '../scene/curve-path';
 import { transformedBounds } from '../scene/hit-test';
-import { segmentRayParametricContacts } from './extend-ray';
-import { boundsOverlap, type TrimContour } from './trim-contours';
+import { segmentRayParametricContacts, supportsParametricRayContacts } from './extend-ray';
+import type { TrimContour } from './trim-contours';
+import {
+  createTrimBoundsIndex,
+  forEachTrimBoundsOverlap,
+  type TrimBoundsIndex,
+} from './trim-bounds-index';
 import type { TrimCrossing } from './trim-crossings';
 import { segmentPoint } from './trim-curve-split';
 
@@ -15,21 +20,24 @@ type SegmentEntry = {
   readonly segment: PathSegment;
   readonly bounds: Bounds;
 };
+type IndexedSegments = {
+  readonly lines: TrimBoundsIndex<SegmentEntry> | null;
+  readonly curves: TrimBoundsIndex<SegmentEntry> | null;
+};
 const segments = new WeakMap<TrimContour, ReadonlyArray<SegmentEntry>>();
+const indexes = new WeakMap<TrimContour, IndexedSegments>();
 
 export function collectAnalyticCrossings(
   contour: TrimContour,
   outline: TrimContour,
   found: TrimCrossing[],
 ): void {
-  const boundaries = segmentsOf(outline);
-  const lines = boundaries.filter((entry) => entry.segment.kind === 'line');
-  const curves = boundaries.filter((entry) => entry.segment.kind !== 'line');
+  const boundaries = indexesOf(outline);
   for (const source of segmentsOf(contour)) {
-    for (const boundary of source.segment.kind === 'line' ? curves : lines) {
-      if (!boundsOverlap(source.bounds, boundary.bounds, TOUCH_MM)) continue;
+    const index = source.segment.kind === 'line' ? boundaries.curves : boundaries.lines;
+    forEachTrimBoundsOverlap(index, source.bounds, TOUCH_MM, (boundary) => {
       collectPair(contour, source, outline, boundary, found);
-    }
+    });
   }
 }
 
@@ -83,12 +91,33 @@ export function analyticChordPair(
   outline: TrimContour,
   edge: number,
 ): boolean {
-  return mixedKinds(chordSegment(contour, chord), chordSegment(outline, edge));
+  const a = chordSegment(contour, chord);
+  const b = chordSegment(outline, edge);
+  return (
+    mixedKinds(a?.segment, b?.segment) && supportsSegment(contour, a) && supportsSegment(outline, b)
+  );
 }
 
-function chordSegment(contour: TrimContour, chord: number): PathSegment | undefined {
+function chordSegment(contour: TrimContour, chord: number): SegmentEntry | undefined {
   const [low, high] = contour.chordParams[chord] ?? [0, 0];
-  return contour.segments.segments[Math.floor((low + high) / 2)];
+  return segmentsOf(contour)[Math.floor((low + high) / 2)];
+}
+
+const supportedSegments = new WeakMap<TrimContour, Map<number, boolean>>();
+function supportsSegment(contour: TrimContour, entry: SegmentEntry | undefined): boolean {
+  if (entry === undefined) return false;
+  if (entry.segment.kind !== 'elliptical-arc') return true;
+  let cached = supportedSegments.get(contour);
+  if (cached === undefined) {
+    cached = new Map();
+    supportedSegments.set(contour, cached);
+  }
+  let supported = cached.get(entry.index);
+  if (supported === undefined) {
+    supported = supportsParametricRayContacts(entry.from, entry.segment, contour.transform);
+    cached.set(entry.index, supported);
+  }
+  return supported;
 }
 
 function mixedKinds(a: PathSegment | undefined, b: PathSegment | undefined): boolean {
@@ -112,6 +141,18 @@ function segmentsOf(contour: TrimContour): ReadonlyArray<SegmentEntry> {
   });
   segments.set(contour, entries);
   return entries;
+}
+
+function indexesOf(contour: TrimContour): IndexedSegments {
+  const cached = indexes.get(contour);
+  if (cached !== undefined) return cached;
+  const entries = segmentsOf(contour);
+  const indexed = {
+    lines: createTrimBoundsIndex(entries.filter((entry) => entry.segment.kind === 'line')),
+    curves: createTrimBoundsIndex(entries.filter((entry) => entry.segment.kind !== 'line')),
+  };
+  indexes.set(contour, indexed);
+  return indexed;
 }
 
 function chordAt(contour: TrimContour, p: number): number {
