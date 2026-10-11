@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import * as segmentContainment from '../geometry/segment-contained-in-polygon';
 import { DEFAULT_CNC_LAYER_SETTINGS, type Polyline, type Vec2 } from '../scene';
 import { helicalPocketPassesBySourceRegion } from './cnc-helical-pocket-passes';
 import { planHelicalPocketPasses } from './helical-entry';
@@ -30,6 +31,27 @@ const transforms = [
 ];
 
 describe('helical pocket boundary containment', () => {
+  it('bounds full-boundary containment work for separated dense rings', () => {
+    const paths: Polyline[] = Array.from({ length: 4 }, (_, ring) => ({
+      closed: true,
+      points: Array.from({ length: 256 }, (_, index) => {
+        const angle = (index * Math.PI * 2) / 256;
+        return { x: (100 - ring * 10) * Math.cos(angle), y: (100 - ring * 10) * Math.sin(angle) };
+      }),
+    }));
+    const completeChecks = vi.spyOn(segmentContainment, 'segmentContainedInPolygon');
+    try {
+      const plan = planHelicalPocketPasses(paths, [-1], helix);
+      expect(plan.ok).toBe(true);
+      if (plan.ok) expect(plan.passes).toHaveLength(paths.length);
+      // This is a work bound, not a machine-speed threshold: distant segments
+      // must not each rescan the whole boundary. The real predicate still runs.
+      expect(completeChecks.mock.calls.length).toBeLessThanOrEqual(paths.length * 2);
+    } finally {
+      completeChecks.mockRestore();
+    }
+  });
+
   it.each(transforms)('accepts nested concave rings: $name', ({ map }) => {
     const source = mapped(concave, map);
     const paths = pocketToolpathRings([source], 2, 40);
@@ -72,6 +94,30 @@ describe('helical pocket boundary containment', () => {
       points: [...concave.points, concave.points[0]!],
     };
     const plan = planHelicalPocketPasses([concave, duplicate], [-1], helix);
+    expect(plan.ok).toBe(true);
+    if (plan.ok) expect(plan.passes).toHaveLength(2);
+  });
+
+  it('accepts tangency and an enclosing boundary appearing after its inner ring', () => {
+    const boundary: Polyline = {
+      closed: true,
+      points: [
+        { x: 0, y: 0 },
+        { x: 20, y: 0 },
+        { x: 20, y: 20 },
+        { x: 0, y: 20 },
+      ],
+    };
+    const tangent: Polyline = {
+      closed: true,
+      points: [
+        { x: 10, y: 0 },
+        { x: 15, y: 5 },
+        { x: 10, y: 10 },
+        { x: 5, y: 5 },
+      ],
+    };
+    const plan = planHelicalPocketPasses([tangent, boundary], [-1], helix);
     expect(plan.ok).toBe(true);
     if (plan.ok) expect(plan.passes).toHaveLength(2);
   });

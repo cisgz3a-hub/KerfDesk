@@ -2,6 +2,11 @@ import { pointInPolygon } from '../geometry';
 import { segmentContainedInPolygon } from '../geometry/segment-contained-in-polygon';
 import type { CncHelicalContourPass, CncPass } from '../job';
 import type { CncHelixEntrySettings, Polyline, Vec2 } from '../scene';
+import {
+  buildVCarveBoundarySegmentIndex,
+  someVCarveBoundarySegmentInBox,
+  type VCarveBoundarySegmentIndex,
+} from './vcarve-boundary-segment-index';
 
 export type HelicalEntryPlan =
   | { readonly ok: true; readonly passes: ReadonlyArray<CncPass> }
@@ -23,11 +28,17 @@ export function planHelicalPocketPasses(
     return { ok: false, reason: 'Helical entry could not identify a pocket boundary.' };
   }
   const boundarySign = Math.sign(signedArea(entryBoundary.points));
+  const boundaryIndex = buildVCarveBoundarySegmentIndex(
+    entryBoundary.points.flatMap((point, index) => {
+      const next = entryBoundary.points[(index + 1) % entryBoundary.points.length];
+      return next === undefined ? [] : [{ ax: point.x, ay: point.y, bx: next.x, by: next.y }];
+    }),
+  );
   if (
     toolpaths.some(
       (toolpath) =>
         Math.sign(signedArea(toolpath.points)) !== boundarySign ||
-        !toolpathInsideBoundary(toolpath, entryBoundary),
+        !toolpathInsideBoundary(toolpath, entryBoundary, boundaryIndex),
     )
   ) {
     return {
@@ -80,14 +91,52 @@ function largestRing(toolpaths: ReadonlyArray<Polyline>): Polyline | null {
   return largest;
 }
 
-function toolpathInsideBoundary(toolpath: Polyline, boundary: Polyline): boolean {
+function toolpathInsideBoundary(
+  toolpath: Polyline,
+  boundary: Polyline,
+  index: VCarveBoundarySegmentIndex,
+): boolean {
   if (toolpath === boundary) return true;
-  // A concave ring's centroid may lie outside it. Even contained vertices do
-  // not prove containment: an edge can cross a notch between its endpoints.
-  return toolpath.points.every((point, index) => {
-    const next = toolpath.points[(index + 1) % toolpath.points.length];
-    return next !== undefined && segmentContainedInPolygon(point, next, boundary.points);
+  const first = toolpath.points[0];
+  if (first === undefined || !segmentContainedInPolygon(first, first, boundary.points))
+    return false;
+  // From a contained point a connected segment cannot leave without meeting
+  // the boundary. Skip only boxes with no possible contact; all other edges,
+  // including the closing edge and tangencies, retain the full interval test.
+  return toolpath.points.every((point, pointIndex) => {
+    const next = toolpath.points[(pointIndex + 1) % toolpath.points.length];
+    return (
+      next !== undefined &&
+      (!segmentMayContactBoundary(point, next, index) ||
+        segmentContainedInPolygon(point, next, boundary.points))
+    );
   });
+}
+
+function segmentMayContactBoundary(
+  from: Vec2,
+  to: Vec2,
+  index: VCarveBoundarySegmentIndex,
+): boolean {
+  if (index.root === null || ![from.x, from.y, to.x, to.y].every(Number.isFinite)) return true;
+  // The interval predicate's on-boundary tolerance is 1e-9 mm. This wider
+  // query padding plus coordinate roundoff can add work, never skip contact.
+  const padding = Math.max(
+    EPSILON,
+    Number.EPSILON *
+      64 *
+      Math.max(1, Math.abs(from.x), Math.abs(from.y), Math.abs(to.x), Math.abs(to.y)),
+  );
+  return someVCarveBoundarySegmentInBox(
+    index,
+    {
+      minX: Math.min(from.x, to.x) - padding,
+      minY: Math.min(from.y, to.y) - padding,
+      maxX: Math.max(from.x, to.x) + padding,
+      maxY: Math.max(from.y, to.y) + padding,
+    },
+    () => true,
+  );
 }
 
 type EntryCircle = {
