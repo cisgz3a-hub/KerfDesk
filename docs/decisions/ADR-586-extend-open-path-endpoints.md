@@ -1,4 +1,4 @@
-## ADR-582 - Extend open path endpoints
+## ADR-586 - Extend open path endpoints
 
 **Status:** Accepted. **Date:** 2026-10-11.
 
