@@ -315,6 +315,53 @@ describe('laser-store console commands', () => {
     });
   });
 
+  it.each([
+    ['T2', true],
+    ['T2.5', true],
+    ['T+002.5', true],
+    ['T 2 . 5', true],
+    ['G92 X0 T2', false],
+    ['G92 X0 T2.5', false],
+    ['G92 X0 T+002.5', false],
+    ['G92 X0 T 2 . 5', false],
+    ['G92.1 G49', false],
+    ['G092 Z0', true],
+    ['G 92 Z 0', true],
+  ])('invalidates every affected coordinate after console %s', async (command, preservesXy) => {
+    const writes: string[] = [];
+    const connection = makeConnection(
+      async (data) => {
+        writes.push(data);
+      },
+      {
+        autoRespondToStatusQuery: true,
+      },
+    );
+    await connectWith(connection);
+    useLaserStore.setState({
+      workOriginActive: true,
+      workOriginSource: 'g92',
+      workZZeroEvidence: { source: 'manual-zero', referenceEpoch: 7 },
+      workZReferenceEpoch: 7,
+      wcoCache: { x: 12, y: 34, z: 5 },
+      trustedPositionEpoch: 7,
+      framedRun: createFramedRunPermit({} as FramedRunCandidate, useLaserStore.getState()),
+    });
+
+    await useLaserStore.getState().sendConsoleCommand(command);
+
+    expect(writes).toContain(`${command}\n`);
+    expect(useLaserStore.getState()).toMatchObject({
+      workOriginActive: preservesXy,
+      workOriginSource: preservesXy ? 'g92' : 'none',
+      workZZeroEvidence: null,
+      workZReferenceEpoch: 8,
+      wcoCache: null,
+      framedRun: null,
+      trustedPositionEpoch: 8,
+    });
+  });
+
   it('blocks console commands during an active job except realtime status query', async () => {
     const writes: string[] = [];
     const connection = makeConnection(
