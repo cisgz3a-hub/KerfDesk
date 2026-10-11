@@ -45,7 +45,7 @@ describe('tutorial picture delivery', () => {
     );
     expect(options.registerType).toBe('prompt');
     expect(options.injectRegister).toBe(false);
-    // ADR-582 includes the pinned 7.4 MB offline nesting engine.
+    // ADR-591 includes the pinned 7.4 MB offline nesting engine.
     expect(options.workbox?.maximumFileSizeToCacheInBytes).toBe(8 * 1024 * 1024);
   });
 

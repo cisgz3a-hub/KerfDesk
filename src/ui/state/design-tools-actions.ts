@@ -17,6 +17,7 @@ import {
 import { shapeQueryActions, type ShapeQueryActions } from './shape-query-actions';
 import type { AppState } from './store';
 import { cutShapesActions, type CutShapesActions } from './cut-shapes-actions';
+import { extendShapesActions, type ExtendShapesActions } from './extend-shapes-actions';
 import { trimShapesActions, type TrimShapesActions } from './trim-shapes-actions';
 import { warpDeformActions, type WarpDeformActions } from './warp-deform-actions';
 
@@ -26,6 +27,7 @@ export type DesignToolsActions = ShapeQueryActions &
   ImageMaskFlattenActions &
   CopyAlongPathActions &
   TrimShapesActions &
+  ExtendShapesActions &
   CutShapesActions &
   WarpDeformActions &
   OptimizeShapesActions;
@@ -50,6 +52,7 @@ export function designToolsActions(
     ...imageMaskFlattenActions(set),
     ...copyAlongPathActions(copySet),
     ...trimShapesActions(set),
+    ...extendShapesActions(set),
     ...cutShapesActions(copySet),
     ...warpDeformActions(set),
     ...optimizeShapesActions(set),

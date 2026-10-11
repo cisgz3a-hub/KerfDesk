@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { KerfDeskMcpError } from '../mcp/backend.js';
 import {
   MCP_CONTROL_COMMANDS,
+  MCP_CONTROL_READ_COMMANDS,
+  MCP_PRIORITY_COMMANDS,
   MCP_WRITE_COMMANDS,
   type KerfDeskMcpCommand,
 } from '../mcp/input-schemas.js';
@@ -50,7 +52,10 @@ class RemoteRendererQueue {
   poll(value: string): { requests: RendererCommand[]; cancelled: string[] } {
     if (value !== this.session) throw new KerfDeskMcpError('unavailable');
     const items = [...this.pending.values()];
-    const priority = items.find((item) => !item.delivered && item.request.command === 'abort_job');
+    const priority = items.find(
+      (item) =>
+        !item.delivered && MCP_PRIORITY_COMMANDS.has(item.request.command as KerfDeskMcpCommand),
+    );
     const next =
       priority ??
       (items.some((item) => item.delivered) ? undefined : items.find((item) => !item.delivered));
@@ -82,11 +87,11 @@ class RemoteRendererQueue {
   ): Promise<Record<string, unknown>> {
     const name = command as KerfDeskMcpCommand;
     if (
-      (MCP_CONTROL_COMMANDS.has(name) && !canControl) ||
+      ((MCP_CONTROL_COMMANDS.has(name) || MCP_CONTROL_READ_COMMANDS.has(name)) && !canControl) ||
       (MCP_WRITE_COMMANDS.has(name) && !canWrite)
     )
       return Promise.reject(new KerfDeskMcpError('unavailable'));
-    if (this.session === null || this.pending.size >= (command === 'abort_job' ? 36 : 32))
+    if (this.session === null || this.pending.size >= (MCP_PRIORITY_COMMANDS.has(name) ? 36 : 32))
       return Promise.reject(new KerfDeskMcpError('unavailable'));
     if (signal?.aborted === true) return Promise.reject(new KerfDeskMcpError('cancelled'));
     const id = randomUUID();

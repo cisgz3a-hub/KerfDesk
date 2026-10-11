@@ -1,5 +1,5 @@
 // Stored composite sections from Adobe's PSD specification. Layer pixels and
-// effects are deliberately not parsed or recomposited (ADR-582).
+// effects are deliberately not parsed or recomposited (ADR-591).
 import { assertRasterSize } from '../raster-decode/decoded-raster';
 
 export type PsdHeader = {

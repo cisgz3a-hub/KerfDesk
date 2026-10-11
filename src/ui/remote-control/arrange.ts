@@ -44,6 +44,7 @@ export function prepareArrange(
   store: RemoteAppStore,
   requested: readonly string[],
   action: RemoteArrangeAction,
+  ownedUndo: AppState['pendingUndo'] = null,
 ): PreparedArrange {
   const ids = expandedArtworkGroupIds(state, requested);
   const objects = editableArtwork(state, ids);
@@ -73,7 +74,7 @@ export function prepareArrange(
     }
     state.selectObjects(ids);
     const selectedState = store.getState();
-    assertSelectionOwner(state, selectedState, ids);
+    assertSelectionOwner(state, selectedState, ids, ownedUndo);
     withUndoStepName(action === 'duplicate' ? 'Duplicate artwork' : 'Arrange artwork', () => {
       if (action === 'group') selectedState.groupSelection();
       if (action === 'ungroup') selectedState.ungroupSelection();
@@ -93,14 +94,19 @@ export function prepareArrange(
 }
 
 /** Selection listeners may open another document; never apply the following edit there. */
-function assertSelectionOwner(before: AppState, current: AppState, ids: readonly string[]): void {
+function assertSelectionOwner(
+  before: AppState,
+  current: AppState,
+  ids: readonly string[],
+  ownedUndo: AppState['pendingUndo'],
+): void {
   if (
     current.project !== before.project ||
     current.projectDocumentEpoch !== before.projectDocumentEpoch ||
     current.projectOpenRequestEpoch !== before.projectOpenRequestEpoch
   )
     throw new RemoteFault('stale_revision');
-  if (current.pendingUndo !== null) throw new RemoteFault('busy');
+  if (current.pendingUndo !== ownedUndo) throw new RemoteFault('busy');
   const selected = new Set(selectedIds(current));
   if (selected.size !== ids.length || !ids.every((id) => selected.has(id)))
     throw new RemoteFault('stale_revision');

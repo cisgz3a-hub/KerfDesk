@@ -102,6 +102,61 @@ export const mcpToolInfo: Record<KerfDeskMcpCommand, { title: string; descriptio
     description:
       'Redo one edit in the current desktop document. Read workspace history and revision first. Requires expectedRevision and UUID requestId; never affects machine execution.',
   },
+  get_workspace_scene: {
+    title: 'Read the workspace as vector geometry',
+    description:
+      'Read visible artwork as bounded vector polylines in scene millimetres with stable IDs, operation colours and group units. Requires the desktop artwork-sharing opt-in. Points are delta-encoded hundredths of a millimetre: "x,y dx,dy ...". Use this to understand layout before editing; it is not a toolpath.',
+  },
+  wait_for_change: {
+    title: 'Wait for the next workspace or machine change',
+    description:
+      'Wait up to timeoutMs (max 15000) until the workspace revision differs from sinceRevision or machine status sequence differs from sinceMachineSeq. Returns immediately when already different. Read the changed data afterwards.',
+  },
+  create_operation: {
+    title: 'Create a layer / operation',
+    description:
+      'Create a new operation (layer) with an optional #rrggbb colour, Laser mode line/fill/image and name. CNC workspaces create a CNC operation with ordinary defaults. Requires expectedRevision and UUID requestId; one Undo step.',
+  },
+  assign_artwork_to_operation: {
+    title: 'Assign artwork to an operation',
+    description:
+      'Move the listed artwork (whole groups) to operationId. Requires expectedRevision and UUID requestId. Pro-only CNC strategies need Pro on the PC.',
+  },
+  reorder_operation: {
+    title: 'Move an operation up or down',
+    description:
+      'Move operationId one place up or down in run order. Requires expectedRevision and UUID requestId.',
+  },
+  delete_operation: {
+    title: 'Delete an operation',
+    description:
+      'Delete operationId and any artwork that belongs only to it, exactly like the desktop Delete layer button. Destructive but undoable. Confirm with the user first. Requires expectedRevision and UUID requestId.',
+  },
+  apply_material_recipe: {
+    title: 'Apply a saved material recipe',
+    description:
+      "Apply one of the user's saved recipes (list_material_recipes) to operationId. Recipes are user records, not universal settings. Requires expectedRevision and UUID requestId.",
+  },
+  add_svg: {
+    title: 'Import SVG artwork',
+    description:
+      'Import SVG markup (max 180,000 characters) through the desktop SVG importer. Scripts, external references and foreign content are removed. Optional xMm/yMm place the top-left and widthMm scales uniformly. Prefer simple paths with stroke colours that map to operations. Requires expectedRevision and UUID requestId.',
+  },
+  import_file: {
+    title: 'Import a file',
+    description:
+      'Import one SVG, DXF, PNG or JPEG file supplied as base64 (max 240,000 characters) through the ordinary desktop importer, optionally placed at xMm/yMm and scaled to widthMm. Requires expectedRevision and UUID requestId.',
+  },
+  save_project: {
+    title: 'Save the project',
+    description:
+      'Save the current project to the file it was last saved to on the PC. A never-saved project returns saved:false; the user must save it once on the PC. No file paths are read or returned.',
+  },
+  apply_edits: {
+    title: 'Apply several edits as one Undo step',
+    description:
+      'Apply up to 40 ordered edits atomically: all succeed as one Undo step or none apply. Each item is {command, args} using add_text, add_rectangle, add_ellipse, add_polyline, add_svg, transform_artwork, arrange_artwork, set_selection, update_operation, create_operation, assign_artwork_to_operation or apply_material_recipe, without expectedRevision/requestId. Refer to artwork or an operation created by an earlier item as "$<index>", e.g. "$0". Requires expectedRevision and UUID requestId for the batch.',
+  },
   ...mcpMachineToolInfo,
 };
 
@@ -113,9 +168,17 @@ export function mcpToolAnnotations(command: KerfDeskMcpCommand): ToolAnnotations
     destructiveHint:
       control ||
       (!readOnly &&
-        !['set_selection', 'add_text', 'add_rectangle', 'add_ellipse', 'add_polyline'].includes(
-          command,
-        )),
+        ![
+          'set_selection',
+          'add_text',
+          'add_rectangle',
+          'add_ellipse',
+          'add_polyline',
+          'add_svg',
+          'import_file',
+          'create_operation',
+          'save_project',
+        ].includes(command)),
     idempotentHint: readOnly,
     openWorldHint: false,
   };

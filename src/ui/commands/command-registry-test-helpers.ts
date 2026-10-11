@@ -59,6 +59,8 @@ function baseCtxEditingTools(): Partial<AppCommandContext> {
     copyAlongPath: vi.fn(),
     // LBG-T04 and LBG-T08: Trim Shapes and Cut Shapes.
     trimShapesActive: false,
+    extendShapesActive: false,
+    extendShapes: vi.fn(),
     trimShapes: vi.fn(),
     cutShapes: vi.fn(),
     // LBG-T06 Warp and Deform.

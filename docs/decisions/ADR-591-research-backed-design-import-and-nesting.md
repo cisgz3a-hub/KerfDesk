@@ -1,4 +1,4 @@
-## ADR-582: Offline text shaping, Photoshop composite import and advanced nesting
+## ADR-591: Offline text shaping, Photoshop composite import and advanced nesting
 
 **Status:** Accepted implementation decision | **Date:** 2026-10-11
 

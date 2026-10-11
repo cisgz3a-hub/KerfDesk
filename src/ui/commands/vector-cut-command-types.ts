@@ -8,6 +8,8 @@ export type VectorCutCommandContext = {
   /** Turn Trim Shapes on, or off again when it is on. */
   readonly trimShapes: () => void;
   readonly cutShapes: () => void;
+  readonly extendShapesActive: boolean;
+  readonly extendShapes: () => void;
 };
 
-export type VectorCutCommandId = 'tools.trim-shapes' | 'tools.cut-shapes';
+export type VectorCutCommandId = 'tools.trim-shapes' | 'tools.cut-shapes' | 'tools.extend-shapes';

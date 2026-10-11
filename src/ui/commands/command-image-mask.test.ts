@@ -167,6 +167,8 @@ function baseCtx(overrides: Partial<AppCommandContext> = {}): AppCommandContext 
     flattenImageMask: vi.fn(),
     copyAlongPath: vi.fn(),
     trimShapesActive: false,
+    extendShapesActive: false,
+    extendShapes: vi.fn(),
     trimShapes: vi.fn(),
     cutShapes: vi.fn(),
     canWarpSelection: false,

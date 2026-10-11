@@ -29,7 +29,7 @@ Required fields:
 
 ## Adopted runtime dependencies
 
-### Offline design and import upgrades (ADR-582)
+### Offline design and import upgrades (ADR-591)
 
 - **Subject / versions:** `harfbuzzjs@1.6.3`, native HarfBuzz submodule
   `c7a7457b7385f33178e8cf87615ca077a810bbe7`; `bidi-js@1.1.0`;
@@ -50,7 +50,7 @@ Required fields:
   https://github.com/fontanf/packingsolver/actions/runs/38124619297;
   https://github.com/fontanf/packingsolver/blob/49bf6c7d9d2204f17d698ee4e5a54a4882ebabf4/extern/CMakeLists.txt;
   https://github.com/emscripten-core/emscripten/tree/6.0.11.
-- **Decision affected:** ADR-582 and ADR-017 compound licence review;
+- **Decision affected:** ADR-591 and ADR-017 compound licence review;
   `src/core/text/`, `src/io/text/`, `src/io/psd/`, `src/core/nesting/`.
 - **Evaluated:** 2026-10-11, Codex session, against current `origin/main` ef9f5435.
 - **Confidence:** high for pinned file provenance and bounded features; medium
@@ -79,7 +79,7 @@ Required fields:
   triangles from 2 to 1; simple rectangular/hole controls did not improve.
   Those native timings are not a browser speed claim. The installed HarfBuzz
   WASM is 441,359 bytes; the solver WASM is 7,446,905 bytes plus 114,322-byte adapted loader.
-  ADR-582 explicitly records the solver's offline bundle-budget exception.
+  ADR-591 explicitly records the solver's offline bundle-budget exception.
 - **Security/known limits:** `pnpm audit --prod --json` on 2026-10-11 reported
   zero advisories at every severity in the installed production npm closure.
   That result does not audit native solver code or prove absence of undisclosed

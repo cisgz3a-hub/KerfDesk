@@ -21,6 +21,9 @@ import type { RemoteControlOptions } from './types';
 import type { MachineOperation, MachineReview, MachineReviewPageRequest } from './machine-types';
 import { machineReviewPage } from './machine-review-pages';
 import { RemoteFault } from './fault';
+import { useCameraStore } from '../state/camera-store';
+import { describeLiveJobTiming } from '../state/live-job-timing';
+import { disconnectMachineBlockMessage } from './machine-actions';
 
 type Laser = ReturnType<typeof useLaserStore.getState>;
 type App = ReturnType<typeof useStore.getState>;
@@ -41,14 +44,90 @@ export function machineStatusProjection(
       xySupported: laser.capabilities.jog !== 'none',
       zSupported: laser.capabilities.jog !== 'none' && focusJogReady(app.project.device, mode),
       maxFeedMmPerMin: deviceForActiveHead(app.project.device, app.project.machine).maxFeed,
+      holdSupported: laser.capabilities.jog !== 'none' && laser.capabilities.jogCancel,
     },
     frame: {
       required: true,
       complete: framedRunReadinessIssue(currentCompletedFrame(laser), app, laser) === null,
     },
-    job: jobProjection(laser),
+    job: { ...jobProjection(laser), ...jobTiming(laser) },
+    homing: !laser.capabilities.homing
+      ? 'not_supported'
+      : laser.homingState === 'confirmed'
+        ? 'confirmed'
+        : 'unknown',
+    camera: { available: useCameraStore.getState().sourceState.kind === 'live' },
     motion: { kind: motionKind(laser) },
-    availability: availabilityProjection(app, laser, canControl),
+    availability: {
+      ...availabilityProjection(app, laser, canControl),
+      ...extendedAvailability(laser, canControl),
+    },
+  };
+}
+function jobTiming(laser: Laser): Record<string, number> {
+  const run = laser.liveCanvasRun;
+  if (run == null || run.timing === undefined || !isActiveJob(laser.streamer)) return {};
+  const now = Date.now();
+  const display = describeLiveJobTiming(run.timing, now);
+  const elapsed = (now - run.startedAtMs) / 1000;
+  const remaining = 'remainingSeconds' in display ? display.remainingSeconds : undefined;
+  return {
+    ...(finite(elapsed, 0, 31_536_000) ? { elapsedSeconds: Math.round(elapsed) } : {}),
+    ...(finite(remaining, 0, 31_536_000)
+      ? { remainingSeconds: Math.round(remaining as number) }
+      : {}),
+  };
+}
+/** The first refusal reason that applies, or available. */
+const firstReason = (...reasons: (string | null)[]) =>
+  available(reasons.find((reason) => reason !== null) ?? null);
+
+/** Shared refusal reasons for the ADR-585 actions, each null when it does not apply. */
+function actionGates(laser: Laser, canControl: boolean) {
+  const approval = canControl ? null : 'Approve machine control on the computer first.';
+  const offline =
+    laser.connection.kind === 'connected' ? null : 'Connect the machine on the computer first.';
+  const active = isActiveJob(laser.streamer);
+  return {
+    approval,
+    offline,
+    general: approval ?? offline ?? jogFrameCommandBlockMessage(laser),
+    busy:
+      active || laser.motionOperation !== null
+        ? 'Wait for the current job or motion to finish.'
+        : null,
+    streaming: active && laser.streamer?.status === 'streaming',
+    paused: laser.streamer?.status === 'paused',
+    disconnected: laser.connection.kind === 'disconnected' || laser.connection.kind === 'failed',
+  };
+}
+
+/** ADR-585 actions. Reasons are fixed strings; the desktop action rechecks every guard. */
+function extendedAvailability(laser: Laser, canControl: boolean) {
+  const gate = actionGates(laser, canControl);
+  const homing = laser.capabilities.homing ? null : 'This controller has no homing command.';
+  const cancel = laser.capabilities.jogCancel
+    ? null
+    : 'This controller cannot stop a jog early; use steps.';
+  return {
+    connect: firstReason(
+      gate.approval,
+      gate.disconnected ? null : 'The machine is already connected.',
+    ),
+    disconnect: firstReason(gate.approval, gate.offline, disconnectMachineBlockMessage(laser)),
+    home: firstReason(gate.general, gate.busy, homing),
+    origin: firstReason(gate.general, gate.busy),
+    pause: firstReason(
+      gate.approval,
+      gate.offline,
+      gate.streaming ? null : 'No running job to pause.',
+    ),
+    resume: firstReason(
+      gate.approval,
+      gate.offline,
+      gate.paused ? null : 'No paused job to resume.',
+    ),
+    hold: firstReason(gate.general, gate.busy, cancel),
   };
 }
 function connectionState(laser: Laser) {

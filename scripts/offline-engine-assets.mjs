@@ -1,4 +1,4 @@
-// Pinned native payloads sit outside pnpm's package-licence closure (ADR-582).
+// Pinned native payloads sit outside pnpm's package-licence closure (ADR-591).
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';

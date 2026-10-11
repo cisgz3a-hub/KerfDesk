@@ -338,7 +338,7 @@ Identical to the format-specific import flows except:
 - TIFF also uses the page picker, preserving the selected page's original pixels and orientation.
   Its embedded X/Y density sets size; missing density uses 254 DPI. Engraving pixels are 8-bit
   RGB over white. Unsupported encodings are reported so the file can be exported as PNG.
-- Photoshop PSD imports its saved merged image for engraving or tracing (ADR-582), preserving
+- Photoshop PSD imports its saved merged image for engraving or tracing (ADR-591), preserving
   transparency and independent X/Y density. Save an 8-bit RGB or grayscale PSD with a compatible
   merged composite, or export PNG if compression, colour mode or depth is unsupported. Layers
   remain flattened; PSB and editable Photoshop layers are outside this import route. Cancelling
@@ -3315,7 +3315,7 @@ settings and Job Review keep their existing read-only setup references.
 
 ### Other text controls
 
-- Multilingual outline text uses local shaping and bidirectional layout (ADR-582). Hebrew,
+- Multilingual outline text uses local shaping and bidirectional layout (ADR-591). Hebrew,
   Arabic, mixed-direction numbers and combining marks retain their glyph order and positioning
   through wrapping and path text. Choose or import a font containing the required characters;
   missing glyphs are still reported. No online font service is used. Existing basic Latin and

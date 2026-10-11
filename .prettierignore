@@ -8,6 +8,11 @@ pnpm-lock.yaml
 services/remote-control/pnpm-lock.yaml
 services/remote-control/worker-configuration.d.ts
 services/remote-control/public/control-scanner-decoder.js
+# Generated KerfDesk Remote bundles (services/remote-control/scripts/build-app.mjs --check).
+services/remote-control/public/app/app.js
+services/remote-control/public/app/app.css
+services/remote-control/public/app/sw.js
+electron/mcp/workspace-app-ui.ts
 src/core/text/cnc-stroke-font-data.ts
 .claude
 references

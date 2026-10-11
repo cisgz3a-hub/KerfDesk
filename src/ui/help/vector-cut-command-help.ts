@@ -3,6 +3,11 @@ import type { CommandHelpTopic } from './command-help-topics';
 
 // Trim Shapes (LBG-T04) and Cut Shapes (LBG-T08).
 export const VECTOR_CUT_COMMAND_HELP: Readonly<Record<VectorCutCommandId, CommandHelpTopic>> = {
+  'tools.extend-shapes': {
+    family: 'tools',
+    tooltip:
+      'Hover an open endpoint to preview its extension to the nearest visible boundary ahead, then click. Locked artwork can be a boundary. Curves continue with a straight tangent while keeping their original curve. Overlaps and endpoints with no boundary stay unchanged. Each extension is one Undo step. Esc ends the tool.',
+  },
   'tools.trim-shapes': {
     family: 'tools',
     tooltip:

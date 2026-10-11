@@ -18,7 +18,9 @@ import { entitiesInRectMm } from './design-hit-test';
 import { sessionSketch, withSketch, type DesignSession } from './design-session';
 
 export function setSessionTool(session: DesignSession, tool: DesignToolKind): DesignSession {
-  return session.tool === tool ? session : { ...session, tool, pointSequence: null };
+  return session.tool === tool
+    ? session
+    : { ...session, tool, pointSequence: null, extendPreview: null };
 }
 
 // The draft becomes an entity, the entity becomes one history step, and the new

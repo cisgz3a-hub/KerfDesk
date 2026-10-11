@@ -33,6 +33,7 @@ import {
   type OverlayDrawableHandle,
 } from './viewport-lines';
 import type { OverlayFrame, ViewportOverlay } from './viewport-overlay';
+import { projectSketchToViewport } from './viewport-projection';
 
 const CAMERA_FOV_DEG = 40;
 const CAMERA_NEAR_MM = 0.5;
@@ -51,6 +52,7 @@ export type DesignViewportHandle = {
   // Raw pointer offsets → sketch mm on the stock-top plane, or null when the
   // ray misses (looking at the horizon).
   readonly pointerToSceneMm: (offsetX: number, offsetY: number) => Vec2 | null;
+  readonly sceneMmToViewport: (point: Vec2) => Vec2 | null;
   // Screen pixels per millimetre at the camera target — hit radii and snap
   // tolerances keep their on-screen size from any camera.
   readonly pxPerMmAtTarget: () => number;
@@ -200,21 +202,25 @@ function buildViewportHandle(deps: HandleDeps): DesignViewportHandle {
       const sceneMm = sceneFromLocal({ x: hit.x, y: hit.y, z: 0 }, frame.originMm, frame);
       return { x: sceneMm.x, y: sceneMm.y };
     },
-    pxPerMmAtTarget: () => {
-      const width = canvas.clientWidth;
-      const height = canvas.clientHeight;
-      if (width <= 0 || height <= 0) return 1;
-      const a = controls.target.clone().project(camera);
-      const b = controls.target
-        .clone()
-        .add(new three.Vector3(1, 0, 0))
-        .project(camera);
-      const dxPx = ((b.x - a.x) * width) / 2;
-      const dyPx = ((b.y - a.y) * height) / 2;
-      const px = Math.hypot(dxPx, dyPx);
-      return px > 0.01 ? px : 1;
-    },
+    sceneMmToViewport: (point) =>
+      projectSketchToViewport(three, camera, point, frame, canvas.clientWidth, canvas.clientHeight),
+    pxPerMmAtTarget: () => targetPixelScale(deps),
   };
+}
+
+function targetPixelScale({ canvas, controls, camera, three }: HandleDeps): number {
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+  if (width <= 0 || height <= 0) return 1;
+  const a = controls.target.clone().project(camera);
+  const b = controls.target
+    .clone()
+    .add(new three.Vector3(1, 0, 0))
+    .project(camera);
+  const dxPx = ((b.x - a.x) * width) / 2;
+  const dyPx = ((b.y - a.y) * height) / 2;
+  const px = Math.hypot(dxPx, dyPx);
+  return px > 0.01 ? px : 1;
 }
 
 // Re-exported so the component can map its stored frame without repeating the
