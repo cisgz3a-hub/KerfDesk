@@ -3,7 +3,7 @@
 Date: 2026-10-11. Scope: drawing and editing only. The maintainer requested a
 LightBurn Extend investigation, an interaction brief, an interactive KerfDesk
 preview, and an independently implemented feature. The resulting product contract
-is [ADR-582](../decisions/ADR-582-extend-open-path-endpoints.md).
+is [ADR-586](../decisions/ADR-586-extend-open-path-endpoints.md).
 
 ## Evidence boundary
 
