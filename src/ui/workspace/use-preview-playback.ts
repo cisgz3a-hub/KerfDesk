@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import type { Toolpath } from '../../core/job';
 import type { LiveJobEstimate } from '../laser/live-job-estimate';
 import { useUiStore, type PreviewPlaybackSpeed } from '../state/ui-store';
+import { useStore } from '../state/store';
 import {
   buildPreviewTimeline,
   elapsedSecondsAtScrubber,
@@ -23,24 +24,21 @@ export function usePreviewPlayback(
   const playing = useUiStore((s) => s.previewPlaying);
   const playbackSpeed = useUiStore((s) => s.previewPlaybackSpeed);
   const scrubberT = useUiStore((s) => s.scrubberT);
+  const restartRevision = useUiStore((s) => s.previewRestartRevision);
   const setPreviewPlaying = useUiStore((s) => s.setPreviewPlaying);
   const setScrubberT = useUiStore((s) => s.setScrubberT);
-  const scrubberRef = useRef(scrubberT);
-  const elapsedRef = useRef(0);
-  const routeLength = toolpath?.totalLength ?? 0;
-  const hasPlayableRoute = routeLength > 0;
+  const external = useStore((s) => s.externalGcodePreview);
+  const hasPlayableRoute = (toolpath?.totalLength ?? 0) > 0;
   const timeline = useMemo(
     () =>
-      toolpath !== null && estimate.kind === 'estimated'
-        ? buildPreviewTimeline(toolpath, estimate.breakdown)
-        : null,
-    [estimate, toolpath],
+      external !== null
+        ? (external.timing?.timeline ?? null)
+        : toolpath !== null && estimate.kind === 'estimated'
+          ? buildPreviewTimeline(toolpath, estimate.breakdown)
+          : null,
+    [estimate, external, toolpath],
   );
-
-  useEffect(() => {
-    scrubberRef.current = scrubberT;
-    if (timeline !== null) elapsedRef.current = elapsedSecondsAtScrubber(timeline, scrubberT);
-  }, [scrubberT, timeline]);
+  const { scrubberRef, elapsedRef } = usePlaybackScrubber(timeline, scrubberT, restartRevision);
 
   useEffect(() => {
     if ((!previewMode || !hasPlayableRoute) && playing) setPreviewPlaying(false);
@@ -53,7 +51,8 @@ export function usePreviewPlayback(
     let lastFrameAt: number | null = null;
     const playbackRate = PLAYBACK_RATE[playbackSpeed];
 
-    if (scrubberRef.current >= 1) {
+    const completed = timeline === null || elapsedRef.current >= timeline.totalSeconds;
+    if (scrubberRef.current >= 1 && completed) {
       scrubberRef.current = 0;
       elapsedRef.current = 0;
       setScrubberT(0);
@@ -77,7 +76,7 @@ export function usePreviewPlayback(
             );
       scrubberRef.current = next;
       setScrubberT(next);
-      if (next >= 1) {
+      if (timeline === null ? next >= 1 : elapsedRef.current >= timeline.totalSeconds) {
         setPreviewPlaying(false);
         return;
       }
@@ -97,7 +96,37 @@ export function usePreviewPlayback(
     setPreviewPlaying,
     setScrubberT,
     timeline,
+    elapsedRef,
+    scrubberRef,
+    restartRevision,
   ]);
+}
+
+function usePlaybackScrubber(
+  timeline: ReturnType<typeof buildPreviewTimeline> | null,
+  scrubberT: number,
+  restartRevision: number,
+) {
+  const scrubberRef = useRef(scrubberT);
+  const elapsedRef = useRef(0);
+  const timelineRef = useRef<typeof timeline>(null);
+  const restartRef = useRef(restartRevision);
+  useEffect(() => {
+    // Dwell time cannot be recovered from stationary distance. Only re-seek
+    // for a user scrub or a new timeline, not our own animation frame writes.
+    if (restartRef.current !== restartRevision) elapsedRef.current = 0;
+    else if (
+      timeline !== null &&
+      (timelineRef.current !== timeline || scrubberRef.current !== scrubberT)
+    ) {
+      elapsedRef.current =
+        scrubberT >= 1 ? timeline.totalSeconds : elapsedSecondsAtScrubber(timeline, scrubberT);
+    }
+    scrubberRef.current = scrubberT;
+    timelineRef.current = timeline;
+    restartRef.current = restartRevision;
+  }, [scrubberT, timeline, restartRevision]);
+  return { scrubberRef, elapsedRef };
 }
 
 function fallbackDurationMs(speed: PreviewPlaybackSpeed): number {

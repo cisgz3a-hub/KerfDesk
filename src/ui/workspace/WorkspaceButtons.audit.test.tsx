@@ -253,7 +253,10 @@ describe('viewport and preview individual outcomes', () => {
   it('Play, Pause, Restart and both pass buttons change the scrubber as labelled', async () => {
     await mount(<PreviewRouteControls passBoundaries={[0.2, 0.5, 0.8]} />);
     await click('Play route preview');
-    expect(useUiStore.getState()).toMatchObject({ scrubberT: 0, previewPlaying: true });
+    // These isolated controls request Play; the mounted playback hook owns
+    // completion/replay because distance 1 can still be in a trailing dwell.
+    expect(useUiStore.getState().previewPlaying).toBe(true);
+    await act(async () => useUiStore.getState().setScrubberT(0));
     await click('Pause route preview');
     expect(useUiStore.getState().previewPlaying).toBe(false);
     await click('Jump to next pass');

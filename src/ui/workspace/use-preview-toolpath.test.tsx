@@ -85,6 +85,53 @@ afterEach(async () => {
 });
 
 describe('usePreviewToolpath', () => {
+  it('stays idle with a fresh scheduler each render, including imported owner changes', async () => {
+    let renders = 0;
+    const schedule = vi.fn((_work: () => void) => () => undefined);
+    function InactiveHarness(): null {
+      renders += 1;
+      // Bound a regression of the effect/update cycle before it can exhaust a
+      // test worker. This deliberately keeps the caller's scheduler unstable.
+      if (renders > 32) throw new Error('Inactive preview did not settle within 32 renders');
+      probe.current = usePreviewToolpath(project, false, (work) => schedule(work));
+      return null;
+    }
+
+    await act(async () => root?.render(<InactiveHarness />));
+    expect(renders).toBeLessThanOrEqual(2);
+    for (const externalGcodePreview of [
+      { name: 'first.nc', toolpath: builtToolpath },
+      { name: 'second.nc', toolpath: builtToolpath },
+      null,
+    ]) {
+      const before = renders;
+      await act(async () => useStore.setState({ externalGcodePreview }));
+      expect(renders - before).toBeLessThanOrEqual(3);
+      expect(probe.current).toBeNull();
+    }
+    expect(schedule).not.toHaveBeenCalled();
+    expect(previewMocks.buildPreviewToolpath).not.toHaveBeenCalled();
+  });
+
+  it('clears a completed route on exit and waits for a fresh build on reentry', async () => {
+    let scheduled: (() => void) | null = null;
+    const scheduleBuild: PreviewBuildScheduler = (work) => {
+      scheduled = work;
+      return () => undefined;
+    };
+
+    await renderHarness(true, scheduleBuild);
+    await act(async () => scheduled?.());
+    expect(probe.current).toBe(builtToolpath);
+    await renderHarness(false, scheduleBuild);
+    expect(probe.current).toBeNull();
+    await renderHarness(true, scheduleBuild);
+    expect(probe.current).toBeNull();
+    await act(async () => scheduled?.());
+    expect(probe.current).toBe(builtToolpath);
+    expect(previewMocks.buildPreviewToolpath).toHaveBeenCalledTimes(2);
+  });
+
   it('schedules preview preparation outside render', async () => {
     let scheduled: (() => void) | null = null;
     const scheduleBuild: PreviewBuildScheduler = (work) => {

@@ -173,20 +173,28 @@ function motionSpans(model: GcodeRenderModel, segmentCount: number): ReadonlyArr
 function synchronizationBoundaries(
   model: GcodeRenderModel,
 ): ReadonlyArray<SynchronizationBoundary> {
-  const boundaries = new Map<number, boolean>();
+  const boundaries = new Map<number, number>();
   for (const event of model.events) {
+    let isBeforeMotion: boolean;
+    if (event.kind === 'dwell') isBeforeMotion = event.isBeforeMotion === true;
     // GRBL drains the planner at M2/M30 after the block's motion (gcode.c,
     // protocol_buffer_synchronize) and then runs any lines that follow.
-    if (event.kind === 'dwell' || event.kind === 'pause' || event.kind === 'program-end') {
-      if (!boundaries.has(event.line)) boundaries.set(event.line, false);
-      continue;
-    }
-    if (event.kind !== 'synchronization') continue;
-    boundaries.set(event.line, (boundaries.get(event.line) ?? false) || event.isBeforeMotion);
+    else if (event.kind === 'pause' || event.kind === 'program-end') isBeforeMotion = false;
+    else if (event.kind === 'synchronization') isBeforeMotion = event.isBeforeMotion;
+    else continue;
+    // One block can have both G4 before motion and M0 after it. Keep both
+    // boundaries instead of allowing one event to hide the other.
+    boundaries.set(event.line, (boundaries.get(event.line) ?? 0) | (isBeforeMotion ? 1 : 2));
   }
   return [...boundaries]
-    .map(([line, isBeforeMotion]) => ({ line, isBeforeMotion }))
-    .sort((left, right) => left.line - right.line);
+    .flatMap(([line, sides]) => [
+      ...((sides & 1) === 0 ? [] : [{ line, isBeforeMotion: true }]),
+      ...((sides & 2) === 0 ? [] : [{ line, isBeforeMotion: false }]),
+    ])
+    .sort(
+      (left, right) =>
+        left.line - right.line || Number(right.isBeforeMotion) - Number(left.isBeforeMotion),
+    );
 }
 
 function segmentPrecedesBoundary(segmentLine: number, boundary: SynchronizationBoundary): boolean {

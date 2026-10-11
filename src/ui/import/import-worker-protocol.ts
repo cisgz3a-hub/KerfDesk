@@ -13,6 +13,7 @@
 
 import type { PackedDxfResult } from './packed-dxf-result';
 import type { PackedGcodeResult } from './packed-gcode-result';
+import type { GcodeInspectionContext } from '../gcode-inspector/gcode-inspection-source';
 import type { PackedHpglResult } from './packed-hpgl-result';
 import type {
   PreparedStlImportResult,
@@ -38,7 +39,12 @@ export type ImportWorkerRequest =
       readonly objectId: string;
       readonly source: string;
     }
-  | { readonly id: number; readonly kind: 'gcode'; readonly blob: Blob }
+  | {
+      readonly id: number;
+      readonly kind: 'gcode';
+      readonly blob: Blob;
+      readonly timingContext?: GcodeInspectionContext;
+    }
   | { readonly id: number; readonly kind: 'depth-map-png'; readonly blob: Blob }
   | {
       readonly id: number;
