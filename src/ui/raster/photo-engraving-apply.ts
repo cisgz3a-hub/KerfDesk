@@ -36,21 +36,28 @@ export type PhotoEngravingApply = {
 /** A delayed preview or Apply never acquires a replacement document, image or operation. */
 export function photoEngravingOwnerIsCurrent(state: AppState, owner: PhotoEngravingOwner): boolean {
   const { scene } = state.project;
-  const images = scene.objects.filter((object) => object.id === owner.image.id);
-  const operations = scene.layers.filter((operation) => operation.id === owner.operation.id);
   return (
     (state.project.machine?.kind ?? 'laser') === 'laser' &&
     state.projectDocumentEpoch === owner.projectDocumentEpoch &&
     state.selectedObjectId === owner.image.id &&
     state.additionalSelectedIds.size === 0 &&
-    images.length === 1 &&
-    images[0] === owner.image &&
-    operations.length === 1 &&
-    operations[0] === owner.operation &&
+    photoEngravingReferencesMatch(state, owner) &&
     owner.image.locked !== true &&
     owner.image.role !== 'trace-source' &&
     sceneObjectHasVisibleLayer(scene, owner.image) &&
     sceneObjectUsesOperation(owner.image, owner.operation)
+  );
+}
+
+function photoEngravingReferencesMatch(state: AppState, owner: PhotoEngravingOwner): boolean {
+  const { scene } = state.project;
+  const images = scene.objects.filter((object) => object.id === owner.image.id);
+  const operations = scene.layers.filter((operation) => operation.id === owner.operation.id);
+  return (
+    images.length === 1 &&
+    images[0] === owner.image &&
+    operations.length === 1 &&
+    operations[0] === owner.operation
   );
 }
 
