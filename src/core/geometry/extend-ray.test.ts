@@ -4,7 +4,37 @@ import { segmentRayContacts } from './extend-ray';
 
 const origin = { x: 10, y: 0 };
 const direction = { x: 1, y: 0 };
+function longBaselineContacts(y = 0) {
+  // x(t)=10000t, y(t)=(t-.3)^2+y; its minimum is between sampled vertices.
+  return segmentRayContacts(
+    { x: 0, y: 0 },
+    direction,
+    { x: 0, y: 0.09 },
+    {
+      kind: 'cubic',
+      control1: { x: 10 / 3, y: -0.11 },
+      control2: { x: 20 / 3, y: 0.09 - 0.4 + 1 / 3 },
+      to: { x: 10, y: 0.49 },
+    },
+    { ...IDENTITY_TRANSFORM, scaleX: 1000, y },
+  ).sort((a, b) => a.distance - b.distance);
+}
 describe('analytic ray contacts', () => {
+  it('returns one true cubic tangent contact along a long baseline', () => {
+    const hits = longBaselineContacts();
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.distance).toBeCloseTo(3000, 6);
+    expect(hits[0]?.overlap).toBe(false);
+  });
+  it('retains two genuine nearby roots without inventing a minimum contact', () => {
+    const hits = longBaselineContacts(-1e-8);
+    expect(hits).toHaveLength(2);
+    expect(hits[0]?.distance).toBeCloseTo(2999, 6);
+    expect(hits[1]?.distance).toBeCloseTo(3001, 6);
+  });
+  it('rejects a cubic minimum strictly above the ray by 1e-8mm', () => {
+    expect(longBaselineContacts(1e-8)).toEqual([]);
+  });
   it('finds all three cubic crossings and never extrapolates the boundary', () => {
     // x(t)=20+10t, y(t)=100(t-.2)(t-.5)(t-.8).
     const segment: PathSegment = {

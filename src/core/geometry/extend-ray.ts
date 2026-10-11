@@ -127,15 +127,22 @@ function quadraticRoots(a: number, b: number, c: number): number[] {
 
 function unitRoots(coefficients: CubicCoefficients): number[] {
   const [a, b, c] = coefficients;
+  const roundoff = Math.min(
+    EXTEND_EPS_MM,
+    32 * Number.EPSILON * coefficients.reduce((sum, value) => sum + Math.abs(value), 0),
+  );
   const cuts = [0, ...quadraticRoots(3 * a, 2 * b, c).filter((t) => t > 0 && t < 1), 1].sort(
     (x, y) => x - y,
   );
-  const roots = cuts.filter((t) => Math.abs(evaluate(coefficients, t)) <= EXTEND_EPS_MM);
+  const roots = cuts.filter((t) => atRoot(coefficients, t, roundoff));
   for (let i = 1; i < cuts.length; i++) {
     let low = cuts[i - 1] as number;
     let high = cuts[i] as number;
     let lowValue = evaluate(coefficients, low);
-    if (lowValue * evaluate(coefficients, high) >= 0) continue;
+    const highValue = evaluate(coefficients, high);
+    // A derivative root can evaluate just across zero through rounding. It is
+    // already a contact; do not invent two neighbouring roots by bisecting it.
+    if (!bracketsRoot(lowValue, highValue, roundoff)) continue;
     for (let step = 0; step < 60; step++) {
       const middle = (low + high) / 2;
       const value = evaluate(coefficients, middle);
@@ -152,4 +159,15 @@ function unitRoots(coefficients: CubicCoefficients): number[] {
     roots.push((low + high) / 2);
   }
   return roots;
+}
+
+function bracketsRoot(low: number, high: number, roundoff: number): boolean {
+  return low * high < 0 && Math.min(Math.abs(low), Math.abs(high)) > roundoff;
+}
+
+function atRoot(coefficients: CubicCoefficients, t: number, roundoff: number): boolean {
+  // Interior minima must reach numerical zero. A shallow but nonzero minimum
+  // may separate two genuine roots that are far apart in world coordinates.
+  const tolerance = t > 0 && t < 1 ? roundoff : EXTEND_EPS_MM;
+  return Math.abs(evaluate(coefficients, t)) <= tolerance;
 }
