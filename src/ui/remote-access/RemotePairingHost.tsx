@@ -81,9 +81,7 @@ function PairingRequest({ request, busy, act }: PairingRequestProps): JSX.Elemen
         />
         <span>Keep this phone signed in for 30 days (otherwise 8 hours)</span>
       </label>
-      <p>
-        Approve only a connection you are setting up. You can revoke it in Settings → Phone & MCP.
-      </p>
+      <p>Approve only a connection you are setting up. You can revoke it from Phone & MCP.</p>
       <DialogActions>
         <Button disabled={busy} onClick={() => decide(false)}>
           Reject

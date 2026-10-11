@@ -321,6 +321,27 @@ export function readPackageLicense({ depDir, license, name, rootDir = REPO_ROOT,
   if (blocks.some(({ text }) => text.length === 0)) {
     throw new Error(`empty LICENSE file found for production package ${name}@${version}`);
   }
+  if (name === 'pako') {
+    if (version !== '2.1.0' || license !== '(MIT AND Zlib)') {
+      throw new Error(`unreviewed pako licence: ${version} (${license})`);
+    }
+    // pako's root LICENSE is MIT only. Its Zlib notice lives in the source
+    // header of lib/zlib/inflate.js, outside the top-level licence scan.
+    // Extracted without changing its words from the lock-integrity-verified
+    // pako 2.1.0 archive: https://registry.npmjs.org/pako/-/pako-2.1.0.tgz
+    const file = 'scripts/license-texts/pako-2.1.0-Zlib.txt';
+    const supplement = path.join(rootDir, file);
+    if (!fs.existsSync(supplement)) throw new Error('reviewed pako supplement is missing');
+    if (
+      sha256File(supplement) !== '976b1cf2dcf7d71ad4dd7799d30da84d19323983500e4bb123d0d5414db876b3'
+    ) {
+      throw new Error('reviewed pako supplement hash changed');
+    }
+    blocks.push({
+      file: `reviewed supplement: ${file}`,
+      text: fs.readFileSync(supplement, 'utf8').trim(),
+    });
+  }
   return {
     sourceFiles: blocks.map(({ file }) => file),
     text:

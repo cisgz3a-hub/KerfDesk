@@ -135,3 +135,52 @@ test('an oversized response remains rejected when cancellation fails', async () 
   );
   await assert.rejects(store.get('desktop/latest.yml'), (error) => error === cancellationError);
 });
+
+const releasePrefix = 'desktop/commercial-manual/releases/';
+const listing = (keys, isTruncated = false, cursor) =>
+  Response.json({
+    success: true,
+    result: keys.map((key) => ({ key })),
+    result_info: { is_truncated: isTruncated, cursor },
+  });
+
+test('release history listing follows bounded provider cursors within the requested prefix', async () => {
+  const first = `${releasePrefix}1.0.0/download-manifest.json`;
+  const second = `${releasePrefix}1.1.0/download-manifest.json`;
+  const { store, calls } = await setup((url) =>
+    new URL(url).searchParams.has('cursor')
+      ? listing([second])
+      : listing([first], true, 'next+page/='),
+  );
+  assert.deepEqual(await store.list(releasePrefix), [first, second]);
+  assert.equal(calls.length, 3);
+  for (const { url, init } of calls.slice(1)) {
+    assert.equal(new URL(url).searchParams.get('prefix'), releasePrefix);
+    assert.equal(new URL(url).searchParams.get('per_page'), '1000');
+    assert.equal(init.method, 'GET');
+    assert.equal(init.redirect, 'error');
+    assert.equal(init.headers.Authorization, 'Bearer fixture-token');
+  }
+  assert.equal(new URL(calls[2].url).searchParams.get('cursor'), 'next+page/=');
+});
+
+test('history listing rejects failed or incomplete provider responses and unsafe object names', async () => {
+  for (const respond of [
+    () => new Response('denied', { status: 403 }),
+    () => Response.json({ success: false, result: [] }),
+    () => Response.json({ success: true, result: [] }),
+    () => listing([], true),
+    () => listing([], true, 'repeated'),
+    () => listing([`${releasePrefix}../secrets`]),
+    () => listing(['desktop/commercial/releases/1.0.0/file.exe']),
+    () => listing([`${releasePrefix}file.exe`, `${releasePrefix}file.exe`]),
+    () => new Response('x', { headers: { 'content-length': String(2 * 1024 * 1024 + 1) } }),
+  ]) {
+    const { store } = await setup(respond);
+    await assert.rejects(store.list(releasePrefix));
+  }
+  const { store, calls } = await setup(() => listing([]));
+  for (const prefix of ['desktop/../', 'other/', 'desktop//', 'desktop/commercial-manual'])
+    await assert.rejects(store.list(prefix), /(?:object key|prefix)/u);
+  assert.equal(calls.length, 1);
+});

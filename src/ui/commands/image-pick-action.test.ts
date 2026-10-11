@@ -36,6 +36,25 @@ function platform(): PlatformAdapter {
 beforeEach(() => vi.clearAllMocks());
 
 describe('runImagePickAction document ownership', () => {
+  it('keeps a TIFF page dialog out of an embedded studio', async () => {
+    calls.pickPlatformImageFile.mockResolvedValue(
+      new File(['tiff'], 'scan.tiff', { type: 'image/tiff' }),
+    );
+    const adapter = platform();
+    const pushToast = vi.fn();
+    const imported = await runImagePickAction({
+      platform: adapter,
+      allowPagedImport: false,
+      getProjectDocumentEpoch: () => 1,
+      importSvgObject: vi.fn(),
+      importRasterImage: vi.fn(),
+      pushToast,
+    });
+    expect(imported).toBeNull();
+    expect(calls.pickPlatformImageFile).toHaveBeenCalledWith(adapter, false);
+    expect(calls.importImageFile).not.toHaveBeenCalled();
+    expect(pushToast).toHaveBeenCalledWith(expect.stringContaining('main workspace'), 'info');
+  });
   it('silently discards a picker result after the project document is replaced', async () => {
     const picker = deferred<File | null>();
     calls.pickPlatformImageFile.mockReturnValue(picker.promise);

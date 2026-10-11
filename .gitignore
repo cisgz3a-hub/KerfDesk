@@ -81,3 +81,6 @@ references/
 /output/payment-live-setup/
 /output/payment-public-information/
 /services/desktop-licensing/output/payment-live-setup/
+
+# Local full-editor downloads and source preview
+.artcraft/

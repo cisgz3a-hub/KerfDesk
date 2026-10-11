@@ -129,7 +129,9 @@ describe('applyDesignSketch', () => {
         },
       ],
     };
-    expect(applyDesignSketch(emptySlice(), guidesOnly, ['x'])).toBeNull();
+    expect(
+      applyDesignSketch(emptySlice(), guidesOnly, ['x'])?.project.designStudioDocument?.sketch,
+    ).toEqual(guidesOnly);
   });
 
   it('stops early rather than reusing an id when fewer ids than entities are given', () => {

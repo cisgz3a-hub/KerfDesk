@@ -31,9 +31,13 @@ export type RemoteAccessStatus = {
 };
 type RemoteState = {
   readonly status: RemoteAccessStatus | null;
+  /** The renderer stopped polling; only a new session can reconnect it. */
+  readonly connectionLost: boolean;
   readonly busy: boolean;
   readonly message: string | null;
   readonly publish: (status: RemoteAccessStatus, owner?: string | null) => void;
+  readonly attaching: () => void;
+  readonly attachFailed: (message: string) => void;
   readonly disconnected: (owner: string, message: string) => void;
   readonly setMessage: (message: string | null) => void;
   readonly act: (action: string, args?: Readonly<Record<string, unknown>>) => Promise<void>;
@@ -45,13 +49,19 @@ let statusPublishedAt = 0;
 let actionSequence = 0;
 let activeAction: number | null = null;
 export const REMOTE_REVOKE_EVENT = 'kerfdesk:remote-revoke';
+export const REMOTE_DISCONNECTED_SUMMARY = 'Disconnected. Reopen the app to reconnect.';
 export function setRemoteSession(value: string | null): void {
   if (sessionId !== value) {
     statusRevision = 0;
     statusPublishedAt = 0;
     activeAction = null;
     actionSequence += 1;
-    useRemoteAccessStore.setState({ status: null, busy: false, message: null });
+    useRemoteAccessStore.setState({
+      status: null,
+      connectionLost: false,
+      busy: false,
+      message: null,
+    });
   }
   sessionId = value;
 }
@@ -267,9 +277,16 @@ export const useRemoteAccessStore = create<RemoteState>((set, get) => {
   };
   return {
     status: null,
+    connectionLost: false,
     busy: false,
     message: null,
     publish: (status, owner = sessionId) => publish(status, owner),
+    attaching: () => {
+      if (sessionId === null) set({ connectionLost: false, message: null });
+    },
+    attachFailed: (message) => {
+      if (sessionId === null) set({ connectionLost: true, busy: false, message });
+    },
     disconnected: (owner, message) => {
       if (owner !== sessionId) return;
       activeAction = null;
@@ -277,6 +294,7 @@ export const useRemoteAccessStore = create<RemoteState>((set, get) => {
       const status = get().status;
       set({
         busy: false,
+        connectionLost: true,
         message,
         ...(status === null
           ? {}

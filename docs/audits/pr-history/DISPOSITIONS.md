@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 48 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation.
+These 69 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation; 1 no-current-defect-confirmed; 1 historical-limitations-already-fixed; 1 superseded-contract; 1 not-reproduced; 1 evidence-limit; 1 superseded; 1 retained-under-canonical-setting; 3 already-fixed; 1 retained-validation-limitation; 1 superseded-historical-policy; 1 historical-documentation-normalization; 1 no-new-current-defect; 1 historical-behavior-superseded; 1 historical-density-policy-superseded; 1 current-roundtrip-contract-verified; 1 retained-historical-feature; 1 superseded-policy-not-new-bug; 1 retained-and-refined-sweep-feature; 1 probe-oracle-error-not-product-defect.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -387,3 +387,171 @@ Disposition: **closed-unmerged proposal**. Historical PRs: [#4](https://github.c
 package-lock checker.engines requires Node>=24/npm>=11; historical license-check workflow selects Node20 and runs scripts/license-check.mjs wrapper. Source-confirmed violation of declared package Node contract; no runtime crash or npm-install failure asserted. Current license-check runs pnpm-aware scripts/check-licenses.mjs and does not depend on license-checker-rseidelsohn; historical PR closed unmerged.
 
 Local audit evidence: batch-04/early-dependencies.md, batch-04/early-dependencies.json, batch-04/early-dependencies-checks.json.
+
+## DISP-049: Original checkpoint test weak baseline superseded by baseline-relative current test and expanded recovery checks; software score remains historical.
+
+Disposition: **no-current-defect-confirmed**. Historical PRs: [#91](https://github.com/cisgz3a-hub/KerfDesk/pull/91).
+
+Original checkpoint test weak baseline superseded by baseline-relative current test and expanded recovery checks; software score remains historical.
+
+Local audit evidence: batch-05/lane-a.json, batch-05/lane-a.md.
+
+## DISP-050: Atomic commit arithmetic correct under declared geometry; current geometry/ownership/G92 fixes in 06e8678f3, bb6c54fe5 and 53e6568d1. No duplicate repair.
+
+Disposition: **historical-limitations-already-fixed**. Historical PRs: [#92](https://github.com/cisgz3a-hub/KerfDesk/pull/92).
+
+Atomic commit arithmetic correct under declared geometry; current geometry/ownership/G92 fixes in 06e8678f3, bb6c54fe5 and 53e6568d1. No duplicate repair.
+
+Local audit evidence: batch-05/lane-a.json, batch-05/lane-a.md.
+
+## DISP-051: Removed 700/1100px collapse defaults and active-job rail lock intentionally replaced by tabbed layout and separate Live Motion controls; do not restore obsolete restrictions.
+
+Disposition: **superseded-contract**. Historical PRs: [#93](https://github.com/cisgz3a-hub/KerfDesk/pull/93).
+
+Removed 700/1100px collapse defaults and active-job rail lock intentionally replaced by tabbed layout and separate Live Motion controls; do not restore obsolete restrictions.
+
+Local audit evidence: batch-05/lane-b.json, batch-05/lane-b.md.
+
+## DISP-052: Indexed backing-array semantics remain coherent in current consumers; no lost/duplicated/reordered line or queue-based stall regression found.
+
+Disposition: **not-reproduced**. Historical PRs: [#95](https://github.com/cisgz3a-hub/KerfDesk/pull/95).
+
+Indexed backing-array semantics remain coherent in current consumers; no lost/duplicated/reordered line or queue-based stall regression found.
+
+Local audit evidence: batch-05/lane-b.json, batch-05/lane-b.md.
+
+## DISP-053: Historical acceptance scores and tests are dated bounded evidence, not current browser/hardware or universal performance qualification. No browser run performed in this lane.
+
+Disposition: **evidence-limit**. Historical PRs: [#93](https://github.com/cisgz3a-hub/KerfDesk/pull/93), [#95](https://github.com/cisgz3a-hub/KerfDesk/pull/95).
+
+Historical acceptance scores and tests are dated bounded evidence, not current browser/hardware or universal performance qualification. No browser run performed in this lane.
+
+Local audit evidence: batch-05/lane-b.json, batch-05/lane-b.md.
+
+## DISP-054: Historical raster budget/pass-through mismatch
+
+Disposition: **superseded**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+PR11 corrected source-grid sizing; 2be958797 removed budget refusal and current tests pass.
+
+Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-055: Historical optional optimization toggle
+
+Disposition: **retained-under-canonical-setting**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+bfef38a93 added toggle; 9721cc783 introduced richer settings. Current action/deserializer synchronize reduceTravelMoves/travelPolicy; independent exact emission controls pass.
+
+Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-056: Historical metadata newline injection
+
+Disposition: **already-fixed**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+b813865131 shared sanitizer; existing newline controls and independent body/preflight parity pass. Distinct ASCII realtime defect remains.
+
+Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-057: Existing TypeScript cycle-detection validation limitation
+
+Disposition: **retained-validation-limitation**. Historical PRs: .
+
+A TypeScript import/no-cycle fixture was missed by the unchanged default extension mapping both before and after the lint memory repair. Type-aware diagnostics and exact eligible-file union remain equivalent. A fixture-only resolver mapping detects cross-partition cycles. This does not establish a product runtime defect or a historical introduction; investigate separately without claiming default TypeScript cycle qualification.
+
+Local audit evidence: batch-05/lint-memory-author.json, batch-05/lint-memory-peer-review.json.
+
+## DISP-058: Zero Z completion ownership already repaired
+
+Disposition: **already-fixed**. Historical PRs: [#96](https://github.com/cisgz3a-hub/KerfDesk/pull/96).
+
+Zero Z completion ownership belongs to initiating tool/reference; current source and passing regression controls verify repair. No duplicate current finding.
+
+Local audit evidence: batch-06/lane-a.json, batch-06/lane-a.md.
+
+## DISP-059: Console coordinate evidence already repaired
+
+Disposition: **already-fixed**. Historical PRs: [#96](https://github.com/cisgz3a-hub/KerfDesk/pull/96).
+
+Console classification mixed/tool/fractional/padded/WCS defects already recorded and repaired; current 24 store controls passed.
+
+Local audit evidence: batch-06/lane-a.json, batch-06/lane-a.md.
+
+## DISP-060: Historical Start restrictions superseded by Frame-first policy
+
+Disposition: **superseded-historical-policy**. Historical PRs: [#96](https://github.com/cisgz3a-hub/KerfDesk/pull/96), [#97](https://github.com/cisgz3a-hub/KerfDesk/pull/97), [#100](https://github.com/cisgz3a-hub/KerfDesk/pull/100).
+
+Frame-first NN21/ADR565 and ADR228 govern Start. Historical readiness/rotary restrictions do not authorize new gates; ADR315 explicitly supersedes rotary Labs clauses.
+
+Local audit evidence: batch-06/lane-a.json, batch-06/lane-a.md.
+
+## DISP-061: PR97 decision-document normalization
+
+Disposition: **historical-documentation-normalization**. Historical PRs: [#97](https://github.com/cisgz3a-hub/KerfDesk/pull/97).
+
+All899 lines counted, not collapsed out of coverage. CRLF normalization retains prior ADRs; substantive ADR144 addition is reviewed as documentation, implementation owned by laneB.
+
+Local audit evidence: batch-06/lane-a.json, batch-06/lane-a.md.
+
+## DISP-062: Work-Z lifecycle and documentation review
+
+Disposition: **no-new-current-defect**. Historical PRs: [#96](https://github.com/cisgz3a-hub/KerfDesk/pull/96), [#100](https://github.com/cisgz3a-hub/KerfDesk/pull/100).
+
+Remaining evidence migration, lifecycle invalidations, fixture changes and dated documentation were reviewed against pinned descendants without a confirmed current defect.
+
+Local audit evidence: batch-06/lane-a.json, batch-06/lane-a.md.
+
+## DISP-063: Parametric shape editing superseded by current controls
+
+Disposition: **historical-behavior-superseded**. Historical PRs: [#97](https://github.com/cisgz3a-hub/KerfDesk/pull/97).
+
+Shape fields initially edited authored local dimensions; current code reports scaled bed size and cancels pending edits on scaling/target/document changes.
+
+Local audit evidence: batch-06/lane-b.json, batch-06/lane-b.md.
+
+## DISP-064: Canonical curve density policy intentionally removed
+
+Disposition: **historical-density-policy-superseded**. Historical PRs: [#98](https://github.com/cisgz3a-hub/KerfDesk/pull/98).
+
+Canonical curve caps introduced in PR98 were removed intentionally by 9d11c0a3d; malformed geometry validation and structural counts remain. Do not reintroduce obsolete prediction gates.
+
+Local audit evidence: batch-06/lane-b.json, batch-06/lane-b.md.
+
+## DISP-065: Variable template round-trip contract retained
+
+Disposition: **current-roundtrip-contract-verified**. Historical PRs: [#99](https://github.com/cisgz3a-hub/KerfDesk/pull/99).
+
+Configured serial/CSV settings are preserved. Later Unicode and literal-brace fixes remain present; inherited tags are rejected. No new current loss reproduced.
+
+Local audit evidence: batch-06/lane-b.json, batch-06/lane-b.md.
+
+## DISP-066: Unidirectional and cross-hatch cache identity retained
+
+Disposition: **retained-historical-feature**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+PR10 one-way hatching and cache-key repair; PR11 cross-hatch generation/cache identity retained.
+
+Local audit evidence: batch-06/lane-c.json, batch-06/lane-c.md.
+
+## DISP-067: Legacy overscan policy distinguished from Scan Line runways
+
+Disposition: **superseded-policy-not-new-bug**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+Historical short-run overscan skipping is deliberate ADR-033 legacy behavior. Modern generic Scan Line always plans bounded feed-matched runways; current source and independent positive/negative controls distinguish both.
+
+Local audit evidence: batch-06/lane-c.json, batch-06/lane-c.md.
+
+## DISP-068: Continuous sweep grouping and bounded split motion
+
+Disposition: **retained-and-refined-sweep-feature**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+Continuous span grouping and wide-gap split retained; explicit reverse metadata and policy-owned bounded split motion are current semantics.
+
+Local audit evidence: batch-06/lane-c.json, batch-06/lane-c.md.
+
+## DISP-069: Negative-zero row key in audit probe
+
+Disposition: **probe-oracle-error-not-product-defect**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+Probe stringified near-zero scanline coordinates into separate negative-zero and positive-zero row keys. Numeric rounded row keys correctly combine the same row. All six apparent failures disappear without any product change; failed probe and source preserved.
+
+Local audit evidence: batch-06/lane-c.json, batch-06/lane-c.md.

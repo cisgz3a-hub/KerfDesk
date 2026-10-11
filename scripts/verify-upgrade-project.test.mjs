@@ -64,7 +64,7 @@ test('installed project qualification matches the canonical writer schema before
 });
 
 test('current project qualification refuses historical, future and malformed schema versions', () => {
-  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 16, '14', '15', null, undefined]) {
+  for (const schemaVersion of [8, 9, 10, 11, 12, 13, 14, 15, 17, '15', '16', null, undefined]) {
     assert.throws(
       () => validateUpgradeProject(encoded({ ...fixture, schemaVersion })),
       /Expected current project schema/,
@@ -128,7 +128,7 @@ test('the known upgrade contract accepts historical retention and current migrat
 });
 
 test('known upgrade qualification keeps schema, scene and machine evidence strict', () => {
-  for (const schemaVersion of [11, 16, '12', '13', '14', '15', null, undefined]) {
+  for (const schemaVersion of [11, 17, '12', '13', '14', '15', '16', null, undefined]) {
     assert.throws(
       () =>
         validateUpgradeProject(
@@ -154,8 +154,8 @@ test('known upgrade qualification keeps schema, scene and machine evidence stric
   );
 });
 
-test('known upgrade preserves schema 13/14 saves and verifies their migration to the current writer', () => {
-  for (const schemaVersion of [13, 14]) {
+test('known upgrade preserves schema 13/14/15 saves and verifies their migration to the current writer', () => {
+  for (const schemaVersion of [13, 14, 15]) {
     const previous = { ...historicalFixture, schemaVersion };
     assert.deepEqual(validateUpgradeProject(encoded(previous), previous, knownUpgrade), previous);
     assert.deepEqual(validateUpgradeProject(encoded(fixture), previous, knownUpgrade), fixture);
@@ -182,7 +182,7 @@ test('known upgrade preserves schema 13/14 saves and verifies their migration to
 });
 
 test('the authenticated installed writer fences each phase while keeping historical sources admissible', () => {
-  for (const schemaVersion of [12, 14]) {
+  for (const schemaVersion of [12, 14, 15]) {
     const old = { ...historicalFixture, schemaVersion };
     assert.deepEqual(
       validateUpgradeProject(encoded(old), old, {

@@ -138,7 +138,7 @@ describe('free transform', () => {
     expect(
       Array.from(committed.session.doc.data.slice(destination, destination + RGBA_CHANNELS)),
     ).toEqual([10, 20, 240, PARTIAL_ALPHA]);
-    expect(committed.session.history.undoStack).toHaveLength(1);
+    expect(committed.session.history.undoStack).toHaveLength(2); // Add layer, then transform.
   });
 
   it('cancels without mutating pixels or history', () => {

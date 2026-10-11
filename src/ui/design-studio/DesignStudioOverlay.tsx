@@ -10,8 +10,9 @@
 // Studio binds its own keymap to this root div rather than to window. Esc is a
 // ladder, not a close.
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useDialogA11y } from '../common/use-dialog-a11y';
+import { isEditableShortcutTarget } from '../common/keyboard-targets';
 import { useRegisterModal } from '../common/use-register-modal';
 import { useStore } from '../state';
 import { DesignCanvas } from './DesignCanvas';
@@ -24,15 +25,31 @@ import { DesignViewport3D } from './viewport3d/DesignViewport3D';
 import { handleDesignStudioKey } from './design-shortcuts';
 import { useDesignStudioStore } from './design-studio-store';
 import { fitView } from './design-view';
+import { useDesignPhotoSelection } from './use-design-photo-selection';
+import { DesignPhotoWorkspace } from './DesignPhotoWorkspace';
+import { useImageEditorStore } from '../image-editor/image-editor-store';
+import { handleEditorKeyDown, handleEditorKeyUp } from '../image-editor/editor-shortcuts';
 
 export function DesignStudioOverlay(): JSX.Element | null {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [workspaceMode, setWorkspaceMode] = useState<'vectors' | 'photos'>('vectors');
   const session = useDesignStudioStore((state) => state.session);
   const closeStudio = useDesignStudioStore((state) => state.closeStudio);
   const setView = useDesignStudioStore((state) => state.setView);
   const workspace = useStore((state) => state.project.workspace);
+  const changeWorkspace = (mode: 'vectors' | 'photos'): void => {
+    if (mode === workspaceMode) return;
+    useImageEditorStore.getState().closeEditor();
+    setWorkspaceMode(mode);
+    rootRef.current?.focus();
+  };
+  const closeWorkspace = (): void => {
+    useImageEditorStore.getState().closeEditor();
+    closeStudio();
+  };
+  const photoActions = useDesignPhotoSelection(() => setWorkspaceMode('photos'));
   useRegisterModal();
-  useDialogA11y(rootRef, closeStudio, { closeOnEscape: false, initialFocus: 'surface' });
+  useDialogA11y(rootRef, closeWorkspace, { closeOnEscape: false, initialFocus: 'surface' });
 
   const handleFit = useCallback(() => {
     const host = rootRef.current?.querySelector('canvas')?.parentElement;
@@ -59,19 +76,107 @@ export function DesignStudioOverlay(): JSX.Element | null {
       aria-label="Design Studio"
       tabIndex={-1}
       style={overlayStyle}
-      onKeyDown={(event) => handleDesignStudioKey(event, handleFit)}
+      onKeyDown={(event) => {
+        if (workspaceMode === 'vectors') handleDesignStudioKey(event, handleFit);
+        else handlePhotoWorkspaceKey(event, () => changeWorkspace('vectors'));
+      }}
+      onKeyUp={workspaceMode === 'photos' ? handleEditorKeyUp : undefined}
     >
-      <DesignTopBar onFit={handleFit} />
-      <DesignOptionsBar />
-      <div style={bodyStyle}>
-        <DesignToolRails />
-        <div style={mainColumnStyle}>
-          {session.surface3d ? <DesignViewport3D /> : <DesignCanvas />}
-        </div>
-        <DesignSidePanel />
-      </div>
-      <DesignStatusBar />
+      <StudioNavigation mode={workspaceMode} onChange={changeWorkspace} onClose={closeWorkspace} />
+      {workspaceMode === 'photos' ? (
+        <DesignPhotoWorkspace />
+      ) : (
+        <>
+          <DesignTopBar onFit={handleFit} />
+          <DesignOptionsBar />
+          <div style={bodyStyle}>
+            <DesignToolRails />
+            <div style={mainColumnStyle}>
+              {session.surface3d ? <DesignViewport3D /> : <DesignCanvas {...photoActions} />}
+            </div>
+            <DesignSidePanel {...photoActions} />
+          </div>
+          <DesignStatusBar />
+        </>
+      )}
     </div>
+  );
+}
+
+function handlePhotoWorkspaceKey(
+  event: React.KeyboardEvent<HTMLDivElement>,
+  onBack: () => void,
+): void {
+  if (useImageEditorStore.getState().session !== null) {
+    handleEditorKeyDown(event);
+  } else if (
+    event.key === 'Escape' &&
+    !event.defaultPrevented &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !isEditableShortcutTarget(event.target)
+  ) {
+    event.preventDefault();
+    onBack();
+  }
+}
+
+function StudioNavigation({
+  mode,
+  onChange,
+  onClose,
+}: {
+  readonly mode: 'vectors' | 'photos';
+  readonly onChange: (mode: 'vectors' | 'photos') => void;
+  readonly onClose: () => void;
+}): JSX.Element {
+  return (
+    <nav className="design-workspace-nav" aria-label="Studio workspaces">
+      <button
+        type="button"
+        className="lf-btn"
+        aria-pressed={mode === 'vectors'}
+        title="Draw vector shapes and compose them with project photos"
+        onClick={() => onChange('vectors')}
+      >
+        Vectors
+      </button>
+      <button
+        type="button"
+        className="lf-btn"
+        aria-pressed={mode === 'photos'}
+        title="Import photos or edit the photos saved in this project"
+        onClick={() => onChange('photos')}
+      >
+        Photos
+      </button>
+      <span>
+        {mode === 'vectors'
+          ? 'Compose photos and vector artwork together'
+          : 'Design Studio · Edit project photos'}
+      </span>
+      {mode === 'photos' ? (
+        <button
+          type="button"
+          className="lf-btn"
+          title="Return to the photo and vector composition canvas"
+          onClick={() => onChange('vectors')}
+        >
+          Back to canvas
+        </button>
+      ) : null}
+      {mode === 'photos' ? (
+        <button
+          type="button"
+          className="lf-btn design-workspace-close"
+          title="Close Design Studio and return to the project workspace"
+          onClick={onClose}
+        >
+          Close studio
+        </button>
+      ) : null}
+    </nav>
   );
 }
 

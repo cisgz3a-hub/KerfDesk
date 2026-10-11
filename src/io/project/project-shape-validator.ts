@@ -1,7 +1,10 @@
+import { validateProjectStudioDocuments } from './project-studio-document-validator';
+import { validateDesignStudioDocument } from './project-design-studio-validator';
 import { validateRetainedVectorSources } from './project-retained-vector-source-validator';
 import { validateCncMachiningSetup } from './project-cnc-setup-validator';
 import { validateProcessRecipeApplications } from './project-process-recipe-validator';
 import { validateProductionNestDefinition } from './project-production-nest-validator';
+import { validateRegistrationJigIdentity } from './project-registration-jig-identity-validator';
 import { optionalSceneGroups } from './project-group-hierarchy-validator';
 import { validateBooleanCompound } from '../../core/scene/boolean-compound';
 import { validateDesignTreeOrder } from './project-design-tree-validator';
@@ -94,6 +97,8 @@ export function validateProjectShape(
     validateProjectVariables(raw['variables']),
     validatePrintAndCutTargets(raw['printAndCutTargets']),
     validateEmbeddedFonts(raw['embeddedFonts']),
+    validateProjectStudioDocuments(raw),
+    validateDesignStudioDocument(raw['designStudioDocument']),
     optionalString(raw, 'notes'),
     validateProjectSheets(raw['sheetBook'], validateProjectShape),
     validateProductionManifest(raw['productionManifest'], validateProjectShape),
@@ -221,6 +226,7 @@ function validateCompoundOperand(obj: unknown, path: string): string | null {
 
 function validateSharedObjectMetadata(obj: Record<string, unknown>, path: string): string | null {
   return firstError([
+    validateRegistrationJigIdentity(obj['registrationJig'], `${path}.registrationJig`),
     optionalString(obj, `${path}.name`),
     validateOperationIds(obj['operationIds'], `${path}.operationIds`),
     validateCncTabAnchors(obj['cncTabAnchors'], `${path}.cncTabAnchors`),

@@ -46,7 +46,10 @@ describe('runAdjustment', () => {
       doc.data[0] = 40;
       runAdjustment(spec.id, defaultParams(spec), doc, null, null);
       expect(doc.data.length).toBe(8 * 8 * 4);
-      for (let i = 3; i < doc.data.length; i += 4) expect(doc.data[i]).toBe(255);
+      for (let i = 3; i < doc.data.length; i += 4) {
+        const expectedAlpha = spec.id === 'remove-white-background' ? (i === 3 ? 215 : 0) : 255;
+        expect(doc.data[i]).toBe(expectedAlpha);
+      }
     }
   });
 

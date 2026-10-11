@@ -66,7 +66,8 @@ test('Image Studio stack-edge buttons stay inert and become available at the cor
   await (await toolbarCommand(page, 'Image Studio...')).click();
   const studio = page.getByRole('dialog', { name: /Image Studio/ });
   await expect(studio).toBeVisible();
-  await studio.getByRole('button', { name: 'Panels', exact: true }).click();
+  const panels = studio.getByRole('button', { name: 'Panels', exact: true });
+  if ((await panels.getAttribute('aria-pressed')) !== 'true') await panels.click();
   const layers = studio.getByRole('region', { name: 'Layers panel', exact: true });
   const up = layers.getByTitle('Move the active layer up', { exact: true });
   const down = layers.getByTitle('Move the active layer down', { exact: true });

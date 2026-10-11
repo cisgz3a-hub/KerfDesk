@@ -121,7 +121,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: [
-          '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb}',
+          '**/*.{js,mjs,css,html,svg,ico,png,json,ttf,woff,woff2,bcmap,pfb,wasm}',
           'pdf-resources/**/LICENSE*',
           'third-party-notices.txt',
         ],
@@ -182,7 +182,7 @@ export default defineConfig({
         ],
         // Some bundled chunks and font assets exceed Workbox's 2 MB default;
         // raise the ceiling so the whole app precaches for offline use.
-        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),
   ],
@@ -218,6 +218,19 @@ export default defineConfig({
           // mobile router needs it before deciding whether to load main; placing
           // it in core would eagerly fetch core and its CAM dependencies.
           if (normalized === '\0vite/preload-helper.js') return 'preload-helper';
+          if (normalized.includes('commonjsHelpers.js')) return 'vendor-runtime';
+          // Both core schemas and I/O validators use Zod. Let neither chunk
+          // absorb this dependency and introduce an artificial core/I/O cycle.
+          if (normalized.includes('/node_modules/zod/')) return 'vendor-schema';
+          if (normalized.includes('/node_modules/harfbuzzjs/')) return 'vendor-harfbuzz';
+          if (normalized.includes('/node_modules/bidi-js/')) return 'vendor-bidi';
+          if (
+            /\/src\/core\/text\/(?:text-shaping|text-bidi|text-script-runs|unicode-script)[^/]*\.ts$/.test(
+              normalized,
+            ) &&
+            !normalized.endsWith('/text-shaping-required.ts')
+          )
+            return 'text-shaping';
           if (normalized.includes('/node_modules/react')) return 'vendor-react';
           if (normalized.includes('/node_modules/zustand')) return 'vendor-state';
           if (
@@ -243,7 +256,10 @@ export default defineConfig({
     // Document workers load these dependencies only after the first import
     // request. Pre-bundle them so a cold dev server does not discover them
     // mid-test and reload the page while an import is in flight.
-    include: ['linkedom/worker', 'saxes', 'opentype.js', 'tiff'],
+    include: ['linkedom/worker', 'saxes', 'opentype.js', 'tiff', 'ag-psd'],
+    // Preserve its import.meta.url-relative WASM asset; the dependency optimiser
+    // does not copy that binary alongside its generated development chunk.
+    exclude: ['harfbuzzjs'],
     esbuildOptions: {
       // Keep dev dependency pre-bundling aligned with the production build.
       // Without this, Vite's optimizer can fall back to its lower default
@@ -258,11 +274,19 @@ export default defineConfig({
     format: 'es',
   },
   server: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
     port: 5173,
     strictPort: true,
     fs: { allow: [...fileSystemAllowList()] },
   },
   preview: {
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin',
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+    },
     port: 4173,
     strictPort: true,
   },

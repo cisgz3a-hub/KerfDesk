@@ -7,16 +7,56 @@ import {
   registrationJigArtworkInstances,
   registrationJigCopyId,
   registrationJigCopyIdentity,
+  registrationJigPartId,
+  createRegistrationJigCopyIdAllocator,
 } from './registration-jig-artwork';
 import { createRegistrationLayer } from './registration-layer';
 
 describe('registration jig artwork identity', () => {
+  it('reuses a saved long copy ID without rewriting existing references', () => {
+    const sourceId = 'source'.repeat(40);
+    const id = registrationJigCopyId(sourceId, 'box-b');
+    const allocate = createRegistrationJigCopyIdAllocator(
+      { objects: [artwork(id, 'artwork')], layers: [] },
+      new Set([sourceId]),
+    );
+    expect(id.length).toBeGreaterThan(200);
+    expect(allocate(sourceId, 'box-b')).toBe(id);
+    expect(allocate(sourceId, 'box-c').length).toBeLessThanOrEqual(200);
+  });
+
+  it('indexes existing artwork once while allocating a large copy layout', () => {
+    let reads = 0;
+    const objects = Array.from({ length: 1_000 }, (_, index) => ({
+      ...artwork(`existing-${index}`, 'artwork'),
+      get id() {
+        reads += 1;
+        return `existing-${index}`;
+      },
+    }));
+    const allocate = createRegistrationJigCopyIdAllocator({ objects, layers: [] }, new Set());
+    const indexedReads = reads;
+    const ids = Array.from({ length: 1_000 }, (_, index) => allocate('source', `box-${index}`));
+    expect(new Set(ids).size).toBe(1_000);
+    expect(reads).toBe(indexedReads);
+    expect(indexedReads).toBeLessThanOrEqual(4_000);
+  });
+
   it('round-trips arbitrary source and outline ids', () => {
     const id = registrationJigCopyId('source: one/%', 'box: two/%');
     expect(registrationJigCopyIdentity(id)).toEqual({
       sourceId: 'source: one/%',
       boxId: 'box: two/%',
     });
+  });
+
+  it('round-trips a detached part without treating its unique key as part of the outline', () => {
+    const id = registrationJigPartId('source: one/%', 'box: two/%', 'part: three/%');
+    expect(registrationJigCopyIdentity(id)).toEqual({
+      sourceId: 'source: one/%',
+      boxId: 'box: two/%',
+    });
+    expect(registrationJigCopyIdentity('registration-jig-part:source:box:%broken')).toBeNull();
   });
 
   it('groups a multi-object layout by physical outline order', () => {
@@ -60,6 +100,32 @@ describe('registration jig artwork identity', () => {
       instanceSummary(scene),
     );
   });
+
+  it.each([1, 2])(
+    'keeps the original instance after %i nested parts outlive their copy',
+    (depth) => {
+      const operation = createLayer({ id: 'artwork', color: '#0000ff' });
+      const boxes = [
+        createRegistrationBox({ id: 'box-a', widthMm: 40, heightMm: 30 }),
+        createRegistrationBox({ id: 'box-b', widthMm: 40, heightMm: 30, x: 50 }),
+      ];
+      const source = artwork('source: one/%', operation.id);
+      let partId = registrationJigCopyId(source.id, 'box-b');
+      for (let index = 0; index < depth; index++) {
+        partId = registrationJigPartId(partId, 'box-b', `part-${index}`);
+      }
+      const scene: Scene = {
+        objects: [...boxes, source, { ...source, id: partId }],
+        layers: [createRegistrationLayer(), operation],
+      };
+      const expected = [
+        { boxId: 'box-a', objectIds: [source.id] },
+        { boxId: 'box-b', objectIds: [partId] },
+      ];
+      expect(instanceSummary(scene)).toEqual(expected);
+      expect(instanceSummary(JSON.parse(JSON.stringify(scene)) as Scene)).toEqual(expected);
+    },
+  );
 });
 
 function instanceSummary(scene: Scene) {

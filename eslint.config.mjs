@@ -69,6 +69,8 @@ export default tseslint.config(
       'coverage/**',
       'node_modules/**',
       'references/**',
+      'public/vendor/**', // Byte-exact pinned upstream payloads, verified at build time.
+      'scripts/vendor/**', // Exact upstream input to the reproducible no-eval adaptation.
       // Agent worktree roots — each holds a full working copy of this repo.
       // `eslint .` must not descend into them: the `src/**` overrides below
       // (which switch off consistent-type-definitions and array-type) are

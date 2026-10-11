@@ -1,3 +1,4 @@
+import { studioDocumentActions, type StudioDocumentActions } from './studio-document-actions';
 import {
   createProject,
   DEFAULT_CNC_MACHINE_CONFIG,
@@ -36,7 +37,8 @@ type ProjectActionSet = (
 type ProjectActionGet = () => AppState;
 type InitialStateFactory = (project?: Project) => Partial<AppState>;
 
-export type ProjectActions = ProjectSheetActions &
+export type ProjectActions = StudioDocumentActions &
+  ProjectSheetActions &
   ProductionManifestActions &
   RetainedArrayActions & {
     readonly setProject: (project: Project) => ProjectMachineCapabilityLoadResult;
@@ -54,6 +56,7 @@ export function projectActions(
 ): ProjectActions {
   return {
     ...projectSheetActions(set, get),
+    ...studioDocumentActions(set),
     ...productionManifestActions(set, get),
     ...retainedArrayActions(set),
     setProject: (project) => {

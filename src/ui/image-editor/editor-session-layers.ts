@@ -14,22 +14,20 @@ import {
   setLayerProps,
   type EditorLayer,
 } from '../../core/image-layers';
-import { createEditHistory, type EditHistory, type RgbaBuffer } from '../../core/image-edit';
+import { pushHistoryEntry, type EditHistory, type RgbaBuffer } from '../../core/image-edit';
 import { redoSession, undoSession, type EditorSession } from './editor-session';
 import { compositeIdentity } from './editor-composite-identity';
+import { captureDocumentHistory } from './editor-document-history';
 
 type LayerProps = Partial<Pick<EditorLayer, 'name' | 'isVisible' | 'opacity' | 'blend'>>;
 
-// Re-derive the doc pointer after a list change. Each caller states its own
-// history policy (V2 plan A2): entries carry a layer scope, so most
-// structure ops KEEP history; only ops that replace buffer identities
-// (merge) or drop a layer (purge) touch it.
+// Every document change records the complete preceding layer stack. Restoring
+// its IDs and buffers makes earlier scoped pixel edits safe to replay again.
 function withLayers(
   session: EditorSession,
   layers: readonly EditorLayer[],
   activeLayerId: string,
-  history: EditHistory,
-  marksDirty: boolean,
+  label: string | null,
 ): EditorSession {
   const active =
     layers.find((layer) => layer.id === activeLayerId) ??
@@ -41,27 +39,22 @@ function withLayers(
     doc: active.buffer,
     layers,
     activeLayerId: active.id,
-    history,
+    history:
+      label === null
+        ? session.history
+        : pushHistoryEntry(session.history, captureDocumentHistory(session, label)),
     revision: session.revision + 1,
-    dirtySinceApply: session.dirtySinceApply || marksDirty,
+    dirtySinceApply: session.dirtySinceApply || label !== null,
     // Layer-structure changes can move ink anywhere — full recomposite.
     lastDirtyRect: null,
   };
 }
 
-/** Drop every entry recorded against a removed layer. */
-function purgeScope(history: EditHistory, scope: string): EditHistory {
-  return {
-    ...history,
-    undoStack: history.undoStack.filter((entry) => entry.scope !== scope),
-    redoStack: history.redoStack.filter((entry) => entry.scope !== scope),
-  };
-}
-
 /** Make another layer the paint target — editor undo is kept (A2). */
 export function setActiveLayer(session: EditorSession, id: string): EditorSession {
-  if (id === session.activeLayerId) return session;
-  return withLayers(session, session.layers, id, session.history, false);
+  if (id === session.activeLayerId || !session.layers.some((layer) => layer.id === id))
+    return session;
+  return withLayers(session, session.layers, id, null);
 }
 
 // If the next history step belongs to another layer, follow it there first
@@ -95,16 +88,18 @@ export function redoScoped(session: EditorSession): EditorSession {
 }
 
 export function addLayerAboveActive(session: EditorSession, newId: string): EditorSession {
+  if (session.layers.some((layer) => layer.id === newId)) return session;
   const name = `Layer ${session.layers.length}`;
   const layers = addLayerAbove(session.layers, session.activeLayerId, newId, name);
   if (layers === session.layers) return session;
-  return withLayers(session, layers, newId, session.history, true);
+  return withLayers(session, layers, newId, 'Add layer');
 }
 
 export function duplicateActiveLayer(session: EditorSession, newId: string): EditorSession {
+  if (session.layers.some((layer) => layer.id === newId)) return session;
   const layers = duplicateLayer(session.layers, session.activeLayerId, newId);
   if (layers === session.layers) return session;
-  return withLayers(session, layers, newId, session.history, true);
+  return withLayers(session, layers, newId, 'Duplicate layer');
 }
 
 /** Delete the active layer; activation falls to the layer below (or bottom). */
@@ -114,20 +109,13 @@ export function removeActiveLayer(session: EditorSession): EditorSession {
   if (layers === session.layers) return session;
   const fallback = layers[Math.max(0, at - 1)] ?? layers[0];
   if (fallback === undefined) return session;
-  // The removed layer's entries can never replay — purge exactly those.
-  return withLayers(
-    session,
-    layers,
-    fallback.id,
-    purgeScope(session.history, session.activeLayerId),
-    true,
-  );
+  return withLayers(session, layers, fallback.id, 'Delete layer');
 }
 
 export function moveActiveLayer(session: EditorSession, direction: 1 | -1): EditorSession {
   const layers = moveLayer(session.layers, session.activeLayerId, direction);
   if (layers === session.layers) return session;
-  return withLayers(session, layers, session.activeLayerId, session.history, true);
+  return withLayers(session, layers, session.activeLayerId, 'Move layer');
 }
 
 /**
@@ -142,14 +130,15 @@ export function addTextLayer(
   buffer: RgbaBuffer,
 ): EditorSession {
   if (buffer.width !== session.doc.width || buffer.height !== session.doc.height) return session;
+  if (session.layers.some((layer) => layer.id === newId)) return session;
   const layer = layerFromBuffer(newId, name, buffer);
   const at = session.layers.findIndex((candidate) => candidate.id === session.activeLayerId);
   const insertAt = at < 0 ? session.layers.length : at + 1;
   const layers = [...session.layers.slice(0, insertAt), layer, ...session.layers.slice(insertAt)];
-  return withLayers(session, layers, newId, session.history, true);
+  return withLayers(session, layers, newId, 'Add text layer');
 }
 
-/** Drag reorder: move ANY layer to an exact stack index (history kept). */
+/** Drag reorder: move ANY layer to an exact stack index. */
 export function moveLayerToIndex(
   session: EditorSession,
   id: string,
@@ -157,7 +146,7 @@ export function moveLayerToIndex(
 ): EditorSession {
   const layers = moveLayerTo(session.layers, id, stackIndex);
   if (layers === session.layers) return session;
-  return withLayers(session, layers, session.activeLayerId, session.history, true);
+  return withLayers(session, layers, session.activeLayerId, 'Move layer');
 }
 
 /** Merge the active layer into the one below; the lower layer stays active. */
@@ -167,18 +156,29 @@ export function mergeActiveLayerDown(session: EditorSession): EditorSession {
   if (lower === undefined) return session;
   const layers = mergeDown(session.layers, session.activeLayerId);
   if (layers === session.layers) return session;
-  // Merge replaces the lower buffer's identity — its old tiles (and the
-  // merged layer's) can no longer replay. Same rule as crop: clear.
-  return withLayers(session, layers, lower.id, createEditHistory(), true);
+  return withLayers(session, layers, lower.id, 'Merge layers');
 }
 
 export function setActiveLayerProps(session: EditorSession, props: LayerProps): EditorSession {
+  const active = session.layers.find((layer) => layer.id === session.activeLayerId);
+  if (
+    active === undefined ||
+    Object.entries(props).every(([key, value]) => active[key as keyof LayerProps] === value)
+  )
+    return session;
+  const labels = {
+    name: 'Rename layer',
+    isVisible: 'Layer visibility',
+    opacity: 'Layer opacity',
+    blend: 'Layer blend',
+  };
+  const keys = Object.keys(props) as (keyof LayerProps)[];
+  const first = keys[0];
   return withLayers(
     session,
     setLayerProps(session.layers, session.activeLayerId, props),
     session.activeLayerId,
-    session.history,
-    true,
+    keys.length === 1 && first !== undefined ? labels[first] : 'Layer properties',
   );
 }
 

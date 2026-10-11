@@ -11,6 +11,7 @@ import { useFramePreparationStore } from '../state/frame-preparation-store';
 import { pendingTransportWriteCount } from '../state/laser-start-queue-fence';
 import { useJobReviewStore } from '../laser/job-review/job-review-store';
 import { DesktopCloseController, type DesktopCloseReply } from './desktop-close-controller';
+import { checkpointBeforeProjectDecision } from './project-decision-checkpoint';
 
 // Reuse the existing immutable document/setup identity; no serialization or
 // hashing on close. Open/New epochs and true-to-true dirty edits change it.
@@ -130,7 +131,7 @@ export function installDesktopCloseReceiver(
     event.preventDefault();
     const request = event.detail;
     if (request.operation === 'prepare-update') {
-      void desktopCloseController.prepareForUpdate(request.requestId).then((reply) => {
+      void prepareDesktopClose(request).then((reply) => {
         if (reply.status === 'cancelled')
           useToastStore
             .getState()
@@ -141,7 +142,7 @@ export function installDesktopCloseReceiver(
         request.respond(reply);
       });
     } else if (request.operation === 'prepare') {
-      void desktopCloseController.prepare(request.requestId).then(request.respond);
+      void prepareDesktopClose(request).then(request.respond);
     } else if (request.operation === 'save') {
       void desktopCloseController.save(request.requestId, saveProject).then(request.respond);
     } else if (request.operation === 'approve') {
@@ -155,4 +156,19 @@ export function installDesktopCloseReceiver(
     target.removeEventListener('kerfdesk:desktop-close', receive);
     desktopCloseController.keepOpen();
   };
+}
+
+async function prepareDesktopClose(request: CloseRequest): Promise<DesktopCloseReply> {
+  // Begin the existing stop handshake immediately. Capturing files must never delay Fire-off/Abort.
+  const prepared =
+    request.operation === 'prepare-update'
+      ? desktopCloseController.prepareForUpdate(request.requestId)
+      : desktopCloseController.prepare(request.requestId);
+  const checkpoint = checkpointBeforeProjectDecision();
+  if (checkpoint === null) return prepared;
+  if (!(await checkpoint)) return desktopCloseController.cancel(request.requestId);
+  const reply = await prepared;
+  return reply.status === 'ready'
+    ? desktopCloseController.refreshPreparedDocument(request.requestId)
+    : reply;
 }

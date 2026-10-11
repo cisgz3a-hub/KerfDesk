@@ -9,8 +9,12 @@ import { useStore } from '../../state';
 import { DesignLayersCard } from '../layers/DesignLayersCard';
 import { designCarveSource } from './design-carve-source';
 import { useDesignPaneWidth } from './use-design-pane-width';
+import { DesignSelectionPanel } from '../DesignSelectionPanel';
+import { DesignProjectPhotoList } from '../DesignProjectPhotoList';
+import type { DesignPhotoActions } from '../design-project-photos';
+import { DesktopEditorsButton } from '../../artcraft-studio/DesktopEditorsButton';
 
-export function DesignSidePanel(): JSX.Element {
+export function DesignSidePanel(photoActions: DesignPhotoActions = {}): JSX.Element {
   const project = useStore((state) => state.project);
   const source = useMemo(() => designCarveSource(project), [project]);
   const resize = useDesignPaneWidth();
@@ -28,11 +32,31 @@ export function DesignSidePanel(): JSX.Element {
         style={handleStyle}
       />
       <div style={contentStyle}>
-        <DesignLayersCard
-          tools={source.tools}
-          activeTool={source.activeTool}
-          stockThicknessMm={source.stock.thicknessMm}
+        <DesignSelectionPanel
+          photoSelected={project.scene.objects.some(
+            (object) =>
+              object.kind === 'raster-image' && object.id === photoActions.selectedPhotoId,
+          )}
         />
+        <DesignProjectPhotoList {...photoActions} />
+        <details className="design-selection__cut-settings">
+          <summary title="Expand carve layers and cutting settings">
+            Carve layers &amp; cutting
+          </summary>
+          <DesignLayersCard
+            tools={source.tools}
+            activeTool={source.activeTool}
+            stockThicknessMm={source.stock.thicknessMm}
+          />
+        </details>
+        {(project.studioDocuments?.length ?? 0) > 0 ? (
+          <details className="design-selection__cut-settings">
+            <summary title="Access native editor documents already saved in this project">
+              Legacy editor documents
+            </summary>
+            <DesktopEditorsButton />
+          </details>
+        ) : null}
       </div>
     </aside>
   );

@@ -15,7 +15,6 @@ import {
   type TextObject,
   machineKindOf,
 } from '../../core/scene';
-import type { Sketch } from '../../core/design';
 import {
   applyInsertBoxPanels,
   type InsertablePart,
@@ -24,6 +23,8 @@ import {
 import { applyCarveSettingsToOperations, applyDesignSketch } from './design-apply-mutation';
 import { reportDependencyRepairs } from './object-delete-actions';
 import { refuseSceneLimitOverrun } from './scene-copy-room';
+import { validateDesignStudioDocument } from '../../io/project/project-design-studio-validator';
+import { useToastStore } from './toast-store';
 import { saveUndoStepName } from './undo-step-names';
 import type { DesignApplyRecord } from './design-apply-record';
 import { createRegistrationBox, createRegistrationCircle } from '../../core/shapes';
@@ -222,15 +223,24 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
 }
 
 function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
-  return (sketch: Sketch, ids: ReadonlyArray<string>, previous: DesignApplyRecord | null) => {
+  return (sketch, ids, previous, view) => {
     // The record has to reach the Studio, and a zustand setter returns nothing,
     // so it is captured here and returned once the transition has run.
     let record: DesignApplyRecord | 'refused' | null = null;
     set((state) => {
       const restoreUndoName = saveUndoStepName(state.project);
-      const next = applyDesignSketch(state, sketch, ids, previous);
+      const next = applyDesignSketch(state, sketch, ids, previous, view);
       // A sketch that contributes nothing leaves the project exactly as it was.
       if (next === null) return state;
+      const sourceError = validateDesignStudioDocument(next.project.designStudioDocument);
+      if (sourceError !== null) {
+        restoreUndoName();
+        useToastStore
+          .getState()
+          .pushToast(`The drawing could not be applied: ${sourceError}.`, 'warning');
+        record = 'refused';
+        return state;
+      }
       // A project past its limits saves but cannot be opened again (ADR-307
       // amendment 1): such an Apply is refused whole, and the Studio is told.
       if (refuseSceneLimitOverrun(state.project.scene, next.project.scene, DESIGN_FEWER)) {

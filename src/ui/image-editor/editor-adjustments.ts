@@ -5,6 +5,7 @@
 
 import type { PixelRect, RgbaBuffer } from '../../core/image-edit';
 import type { SelectionMask } from '../../core/image-select';
+import { removeWhiteBackgroundInPlace } from '../../core/image-adjust/remove-white-background';
 import {
   applyLumaLutInPlace,
   applyLutInPlace,
@@ -31,6 +32,7 @@ export type AdjustmentId =
   | 'posterize'
   | 'invert'
   | 'desaturate'
+  | 'remove-white-background'
   | 'gaussian-blur'
   | 'unsharp-mask'
   | 'high-pass'
@@ -142,6 +144,16 @@ const BY_ID: Record<AdjustmentId, AdjustmentSpec> = {
     hasHistogram: false,
     params: [{ key: 'sigma', label: 'Radius (px)', min: 0.5, max: 50, step: 0.5, defaultValue: 2 }],
   },
+  'remove-white-background': {
+    id: 'remove-white-background',
+    label: 'Remove white background',
+    menu: 'adjust',
+    shortcutHint: '',
+    hasHistogram: false,
+    params: [
+      { key: 'cleanup', label: 'Paper cleanup (%)', min: 0, max: 95, step: 1, defaultValue: 0 },
+    ],
+  },
   'unsharp-mask': {
     id: 'unsharp-mask',
     label: 'Unsharp Mask',
@@ -241,6 +253,8 @@ const RUNNERS: Record<AdjustmentId, (args: RunArgs) => void> = {
     applyLutInPlace(doc, posterizeLut(p(spec, params, 'levels')), rect, mask),
   invert: ({ doc, rect, mask }) => applyLutInPlace(doc, invertLut(), rect, mask),
   desaturate: ({ doc, rect, mask }) => applyLumaLutInPlace(doc, grayscaleLut(), rect, mask),
+  'remove-white-background': ({ spec, params, doc, rect, mask }) =>
+    removeWhiteBackgroundInPlace(doc, p(spec, params, 'cleanup'), rect, mask),
   'gaussian-blur': ({ spec, params, doc, rect, mask }) =>
     gaussianBlurInPlace(doc, p(spec, params, 'sigma'), rect, mask),
   'unsharp-mask': ({ spec, params, doc, rect, mask }) =>

@@ -9,7 +9,16 @@
 // applyLayerDefaultsToFreshLayers — the defaults pass would clobber them here.
 
 import { designEntityToSceneObject, type Sketch } from '../../core/design';
-import { entityDesignLayer, sketchLayers, type DesignLayer } from '../../core/design/layers';
+import type {
+  DesignStudioDocument,
+  DesignStudioView,
+} from '../../core/design/design-studio-document';
+import {
+  DEFAULT_DESIGN_LAYER_ID,
+  entityDesignLayer,
+  sketchLayers,
+  type DesignLayer,
+} from '../../core/design/layers';
 import {
   DEFAULT_CNC_LAYER_SETTINGS,
   addLayer,
@@ -17,6 +26,8 @@ import {
   bindSceneObjectToOperations,
   createArtworkOperation,
   operationArtworkCount,
+  nextOperationColor,
+  normalizeLayerColor,
   removeLayer,
   removeObject,
   type CncLayerSettings,
@@ -70,10 +81,17 @@ export function applyDesignSketch(
   sketch: Sketch,
   ids: ReadonlyArray<string>,
   previous: DesignApplyRecord | null = null,
+  view?: DesignStudioView,
 ): DesignApplyResult | null {
   const groups = buildLayerGroups(sketch, ids);
   const previousIds = survivingObjectIds(s.project.scene, previous);
-  if (groups.length === 0 && previousIds.size === 0) return null;
+  if (
+    groups.length === 0 &&
+    previousIds.size === 0 &&
+    sketch.entities.length === 0 &&
+    s.project.designStudioDocument === undefined
+  )
+    return null;
 
   let scene = s.project.scene;
   // Drop the previous apply's objects BEFORE inserting, so a re-apply that
@@ -98,7 +116,11 @@ export function applyDesignSketch(
   scene = repaired.scene;
   const [head, ...rest] = inserted;
   return {
-    project: { ...s.project, scene },
+    project: {
+      ...s.project,
+      scene,
+      designStudioDocument: designDocument(sketch, ids, inserted, operationIdByLayerId, view),
+    },
     dependencyRepairs: {
       repairedImageMasks: repaired.repairedImageMasks,
       repairedPathTextGuides: repaired.repairedPathTextGuides,
@@ -113,6 +135,28 @@ export function applyDesignSketch(
     undoStack: pushUndo(s.project, s.undoStack),
     redoStack: [],
     dirty: true,
+  };
+}
+
+function designDocument(
+  sketch: Sketch,
+  ids: readonly string[],
+  inserted: readonly SceneObject[],
+  operations: ReadonlyMap<string, string>,
+  view: DesignStudioView | undefined,
+): DesignStudioDocument {
+  const owned = new Set(inserted.map((object) => object.id));
+  return {
+    version: 1,
+    sketch,
+    activeLayerId: view?.activeLayerId ?? sketchLayers(sketch)[0]?.id ?? DEFAULT_DESIGN_LAYER_ID,
+    surface3d: view?.surface3d ?? false,
+    appliedObjectIds: [...owned],
+    appliedOperationsByLayer: [...operations],
+    appliedEntityObjectIds: sketch.entities.flatMap((entity, index) => {
+      const id = ids[index];
+      return id !== undefined && owned.has(id) ? [[entity.id, id] as const] : [];
+    }),
   };
 }
 
@@ -206,9 +250,9 @@ type InsertSink = {
   readonly operationIdByLayerId: Map<string, string>;
 };
 
-// The operation takes the DESIGN layer's colour rather than the palette's next
-// slot: schema v3 binds by id, so colour is presentation, and the panel, the
-// 2D strokes, and the main canvas must tell one story.
+// Prefer the design layer's colour, but operations must keep unique colours
+// for a valid saved project. Explicit schema-v3 bindings let artwork retain
+// its design colour when the operation needs a different palette slot.
 //
 // A layer that applied before REUSES its operation: recreating it would throw
 // away whatever feeds and passes the operator tuned on the main canvas and
@@ -222,23 +266,22 @@ function insertGroup(
   const anchor = group.objects[0];
   if (anchor === undefined) return scene;
   const reusedId = reusableOperationId(scene, previous, group.layer.id);
+  const color = designOperationColor(scene, group.layer.color, reusedId);
   let next = scene;
   let operationId: string;
   if (reusedId === null) {
     const created = createArtworkOperation(scene, anchor, { name: group.layer.name });
-    const operation = { ...created.operation, color: group.layer.color };
+    const operation = { ...created.operation, color };
     operationId = operation.id;
     next = addLayer(scene, operation);
   } else {
     operationId = reusedId;
-    // The design layer still owns identity: a rename or recolour in the Studio
-    // must reach the operation the artwork is already bound to.
+    // Keep operator-tuned settings; only restate the Studio-owned name and
+    // presentation colour, without colliding with unrelated operations.
     next = {
       ...scene,
       layers: scene.layers.map((layer) =>
-        layer.id === reusedId
-          ? { ...layer, name: group.layer.name, color: group.layer.color }
-          : layer,
+        layer.id === reusedId ? { ...layer, name: group.layer.name, color } : layer,
       ),
     };
   }
@@ -252,4 +295,18 @@ function insertGroup(
     next = addObject(next, bound);
   }
   return next;
+}
+
+function designOperationColor(scene: Scene, preferred: string, reusedId: string | null): string {
+  const otherOperations = scene.layers.filter((layer) => layer.id !== reusedId);
+  const occupied = new Set(otherOperations.map((layer) => normalizeLayerColor(layer.color)));
+  const desired = normalizeLayerColor(preferred);
+  if (!occupied.has(desired)) return desired;
+  const reused = scene.layers.find((layer) => layer.id === reusedId);
+  // A collision fallback stays stable on reapply, rather than consuming a new
+  // palette slot every time the operator updates their drawing.
+  if (reused !== undefined && !occupied.has(normalizeLayerColor(reused.color))) {
+    return normalizeLayerColor(reused.color);
+  }
+  return nextOperationColor(otherOperations);
 }

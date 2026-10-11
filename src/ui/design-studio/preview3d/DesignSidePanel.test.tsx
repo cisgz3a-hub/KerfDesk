@@ -17,7 +17,7 @@ beforeEach(() => {
   localStorage.clear();
   useDesignStudioStore.setState({ session: null, stash: null });
   const store = useDesignStudioStore.getState();
-  store.openStudio();
+  void store.openStudio();
   store.setTool('rect');
   store.setDraft({
     tool: 'rect',

@@ -248,15 +248,100 @@ Historical origin: See attribution. The two discovery helpers originated at orig
 
 Local evidence: docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diffs.md. Repair evidence: docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md.
 
-## Tracking record corrections
+## B05-CONSOLE-001: Combined tool and XY mutations retain stale XY origin evidence
 
-These concern the audit records and are separate from application defect counts.
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
 
-- [4240384675](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384675): Four null repair evidence references now use the canonical repair reports. Renderer has explicit fallback. Status: resolved-in-published-followup.
-- [4240384677](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384677): Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks. Status: resolved-in-published-followup.
-- [pending-ledger-review](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed queue inconsistency: the frozen snapshot awaited independent review but omitted its pending task. The next snapshot retains an explicit review token and sequences review before publication; only commit-bound approval and verified committed blobs clear the local token. Independent evidence shows the previous snapshot was reviewed; a publication bypass was not reproduced. Status: resolved-in-published-followup.
-- [tracking-coverage-ci](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity. Status: resolved-in-published-followup.
-- [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: resolved-in-published-followup.
-- [4240943303](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303): Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful. Status: resolved-in-published-followup.
-- [4241008264](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264): The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed. Status: resolved-in-published-followup.
-- [4241339123](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241339123): Confirmed ambiguous historical milestone. Preserve its exact timestamp under publicationHistory tied to tracker1151 headf7833a46; remove unscoped current-completion field. No consumer failure or gate bypass demonstrated. Independent snapshot review also scoped the superseded83bd verification timestamp, aligned the current b060 source receipt and refreshed the feedback pointer. Status: fixed-awaiting-independent-review-and-publication.
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
+
+Trigger: G92 X0 T2 or G92.1 G49
+
+Impact: Stale XY setup authority and misleading current origin state. Console already clears Frame trace/permit, so this does not demonstrate an old-permit Start bypass.
+
+Historical origin: #94. {"originalHistoricalHead":"46ec73a56ae405d344672597de4b8ada80e38276","rewrittenIntroduction":"e1c6d14e0","currentPersistence":"Tool-first ordering unchanged; later #187 adds accessory branches only."}
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
+
+## B05-CONSOLE-002: Firmware-equivalent GRBL numeric spellings preserve stale work Z
+
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
+
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
+
+Trigger: G092 Z0 or G 92 Z0
+
+Impact: After a fresh position, CNC Frame planning still considers the old stock-top reference current and builds an absolute safe-Z retract/return against a mutated Z0; Job Review work-Z advisory also sees stale proof. Current Frame permit is invalidated, so no claim of direct prior-permit reuse.
+
+Historical origin: #94. {"rewrittenIntroduction":"e1c6d14e0","currentPersistence":"Original command regex/comment replacement unchanged through #187."}
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
+
+## B05-C-REALTIME-COMMENTS: Saved G-code comments preserve GRBL realtime command bytes
+
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: merged-ci-verified.
+
+Recorded CI: passed at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
+
+Trigger: Profile name Shop!~ exported with ordinary build metadata; a sender transmits comments verbatim.
+
+Impact: Preflight succeeds and profile comment retains ! then ~; upstream GRBL RX interprets feed hold and cycle start before line/comment parsing. Unsupported Unicode becomes ?, triggering status requests. Saved files sent by an external sender preserving comment bytes. Own streamer filters full-line comments. No physical-machine qualification or hardware operation.
+
+Historical origin: #541. User-controlled profile comment exposure introduced in #541 (b813865131); unsupported Unicode fallback to '?' added in #898 (91c1adefa0). Discovered while tracing checkpoint #10 descendants, not introduced by that checkpoint.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-c.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-comment-author.json.
+
+## B05-CONSOLE-003: Console WCS spellings and comments leave a stale G54 selection
+
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
+
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
+
+Trigger: Known activeWcs G54, then Console selects G55 using G055, G 55, G55X0, G55 (G54), or G55 ; G54.
+
+Impact: The physical Frame can remain in G55 while canonical emitted execution expects G54. Existing coordinate evidence invalidation does not repair the stale activeWcs cache.
+
+Historical origin: #923. GitHub commit-to-pulls API associates rewritten introduction 5eb28354d1804f7159ef86cbe2fc7d33849d6c40 with PR923; title Controller audit 2026-09-25: fix every confirmed controller finding; merge_commit_sha eaf62efe283d036c0192e0ea009df912ece72cb9; head ab9954213b83988201a6d75ef2e2334b5841e777.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-wcs-finding.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/repair-console-author.json.
+
+## B05-CONSOLE-004: Fractional Console tool words preserve stale work-Z evidence
+
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
+
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
+
+Trigger: Send accepted GRBL T2.5, T+002.5 or T 2 . 5, alone or combined with G92 X0.
+
+Impact: Accepted numeric tool identity changes preserve work-Z proof and reference epoch, unlike equivalent canonical T2. This is inconsistent coordinate-evidence invalidation; stock GRBL only tracks the tool number, so no physical tool-motion claim is made.
+
+Historical origin: #94. Original PR94 tool regex admits integer T words only; the first batch05 lexical normalization still retained that restriction.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-finding.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-author.json.
+
+## B05-CI-ESLINT-001: Repository lint exhausts its configured heap during full CI checks
+
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: merged-ci-verified.
+
+Recorded CI: passed at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
+
+Trigger: Full ESLint process crosses its 5120 MiB V8 heap cap on current source; three hosted jobs exited 134 without code diagnostics, with an intervening unchanged-head retry passing.
+
+Impact: Required CI cannot reliably verify repair and tracking PRs. The repair runs sequential fresh processes with the same complete file coverage, rules and TypeScript configuration; custom CLI arguments retain the original single-process behavior.
+
+Historical origin: See attribution. Operational audit follow-up observed while verifying batch05; no unsupported historical introduction or product-code fault is assigned.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-ci-direct.log. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json.
+
+## B05-NOTICE-001: Generated pako notices omit the bundled Zlib attribution
+
+Repair: [#1167](https://github.com/cisgz3a-hub/KerfDesk/pull/1167). State: merged-ci-verified.
+
+Recorded CI: passed at commit 903149ab9a8ff337449c8ea81ad3e8b52c08a7d8.
+
+Trigger: Generate notices after the PSD dependency adds pako 2.1.0: the collector reads only its root MIT LICENSE and omits the Zlib attribution and conditions embedded in its source.
+
+Impact: The distributed notice text is incomplete and contradicts the documented MIT and Zlib coverage. This is a source/notice integrity defect; no deployed-artifact or legal-liability claim is made.
+
+Historical origin: #1155. Introduced by PR #1155, identified while reconciling current-main dependency changes after batch05 publication. Its wider feature scope remains unaudited.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/pako-notice-author.json.

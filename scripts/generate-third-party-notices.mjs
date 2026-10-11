@@ -7,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { offlineEngineNotices } from './offline-engine-assets.mjs';
 
 import {
   CNC_STROKE_FONTS,
@@ -162,6 +163,10 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     .join('\n\n');
   return [
     header,
+    '== Adapted source algorithms ==',
+    fs
+      .readFileSync(path.join(rootDir, 'docs/licensing/photocraft-color-to-alpha.txt'), 'utf8')
+      .trim(),
     '== Bundled fonts ==',
     ...outlineFontSections(rootDir),
     ...cncStrokeFontSections(),
@@ -171,6 +176,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     ...openClipartSections(rootDir),
     '== pnpm production dependency closure ==',
     ...dependencySections(rootDir),
+    ...offlineEngineNotices(rootDir),
     '== Electron desktop runtime package ==',
     electronSection(rootDir),
     standardTexts,

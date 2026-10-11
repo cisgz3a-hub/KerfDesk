@@ -385,6 +385,12 @@ describe('Image Studio session lifecycle', () => {
       pixelWidth: 8,
       pixelHeight: 6,
       bounds: BOUNDS,
+      editorDocument: expect.objectContaining({
+        version: 1,
+        width: 8,
+        height: 6,
+        activeLayerId: 'background',
+      }),
     });
   });
 

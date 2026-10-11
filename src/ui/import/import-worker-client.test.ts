@@ -12,6 +12,7 @@ import {
   parseStlOffThread,
   prepareDepthMapPngOffThread,
   prepareReliefHeightfieldPngOffThread,
+  preparePsdOffThread,
   resetImportWorkerForTests,
 } from './import-worker-client';
 import type { ImportWorkerRequest, ImportWorkerResponse } from './import-worker-protocol';
@@ -103,6 +104,25 @@ describe('import worker client', () => {
     latest().reply({ id, kind: 'gcode', result: { kind: 'error', reason: 'nope' } });
 
     await expect(promise).resolves.toEqual({ kind: 'error', reason: 'nope' });
+  });
+
+  it('routes PSD Blob preparation and terminates its active worker on cancellation', async () => {
+    const controller = new AbortController();
+    const source = blob();
+    const pending = preparePsdOffThread(source, { signal: controller.signal });
+    const active = latest();
+    expect(active.posted[0]).toMatchObject({ kind: 'psd', blob: source });
+    const next = parseGcodeOffThread(blob());
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(active.terminated).toBe(true);
+    const replacement = latest();
+    replacement.reply({
+      id: replacement.posted[0]?.id ?? -1,
+      kind: 'gcode',
+      result: { kind: 'error', reason: 'queue continues' },
+    });
+    await expect(next).resolves.toMatchObject({ reason: 'queue continues' });
   });
 
   it('routes an exact depth-map preparation result under its own response kind', async () => {

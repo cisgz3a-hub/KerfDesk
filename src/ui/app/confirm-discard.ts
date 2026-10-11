@@ -14,11 +14,14 @@ import { handleSaveProject, type SaveProjectOutcome } from './file-actions';
 import { projectWithCurrentJobSetup } from '../state/project-job-setup';
 import { clearAutosaveForDiscard } from './autosave-file-cleanup';
 import { createAutosaveProjectSnapshot } from '../state/autosave-project-snapshot';
+import { checkpointBeforeProjectDecision } from './project-decision-checkpoint';
 
 export async function confirmDiscardAsync(
   platform: PlatformAdapter,
   action: string,
 ): Promise<boolean> {
+  const checkpoint = checkpointBeforeProjectDecision();
+  if (checkpoint !== null && !(await checkpoint)) return false;
   const state = useStore.getState();
   if (!state.dirty) return true;
   const documentEpoch = state.projectDocumentEpoch;

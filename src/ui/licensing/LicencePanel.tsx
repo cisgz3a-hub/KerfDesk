@@ -162,7 +162,7 @@ function editionTitle(status: LicenceStatus | null): string {
 
 function offersActivation(status: LicenceStatus | null): boolean {
   if (status === null || status.deactivationPending) return false;
-  return status.tier === null || status.state !== 'ready';
+  return status.tier === null || status.tier === 'trial' || status.state !== 'ready';
 }
 
 function LicenceHeading({ onClose }: { readonly onClose: () => void }): JSX.Element {

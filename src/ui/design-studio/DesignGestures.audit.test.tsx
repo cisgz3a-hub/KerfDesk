@@ -31,7 +31,7 @@ beforeEach(() => {
     },
   );
   studio.setState({ session: null, stash: null });
-  studio.getState().openStudio();
+  void studio.getState().openStudio();
   studio.getState().setView({ panXmm: 0, panYmm: 0, pxPerMm: 1 });
   studio.getState().setTool('rect');
 });

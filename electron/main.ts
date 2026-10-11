@@ -45,6 +45,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import electronUpdater from 'electron-updater';
 import * as appMenu from './application-menu-policy.js';
+import { installDesktopArtcraftWindow, detachDesktopArtcraftWindows } from './desktop-artcraft.js';
 import { mainWindowWebPreferences } from './desktop-window-options.js';
 import {
   PACKAGED_RENDERER_URL,
@@ -82,6 +83,7 @@ import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
 import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
+import { withRendererIsolation, rendererResponsePolicyHeaders } from './renderer-isolation.js';
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
 import { createDesktopLicensing } from './desktop-licensing.js';
 import { readLicensingConfig } from './licensing-config.js';
@@ -194,7 +196,7 @@ const checkForPreviewUpdate = createPreviewUpdateCheck({
 });
 const CSP_POLICY = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
   "worker-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${CAMERA_BRIDGE_ORIGIN}`,
@@ -257,7 +259,7 @@ function makeAppProtocolHandler(distRoot: string) {
     if (rel.startsWith('..') || path.isAbsolute(rel)) {
       return new Response('Not Found', { status: 404 });
     }
-    return net.fetch(pathToFileURL(filePath).toString());
+    return withRendererIsolation(await net.fetch(pathToFileURL(filePath).toString()));
   };
 }
 
@@ -273,14 +275,10 @@ function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds
 }
 
 function installContentSecurityPolicy(ses: Session): void {
+  const csp = rendererContentSecurityPolicy(CSP_POLICY, IS_DEV_SERVER_RENDERER);
   ses.webRequest.onHeadersReceived((details, callback) => {
     callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          rendererContentSecurityPolicy(CSP_POLICY, IS_DEV_SERVER_RENDERER),
-        ],
-      },
+      responseHeaders: rendererResponsePolicyHeaders(csp, details.responseHeaders),
     });
   });
 }
@@ -368,10 +366,6 @@ function installNavigationPolicy(window: BrowserWindow): void {
   });
 }
 
-async function loadRenderer(window: BrowserWindow): Promise<void> {
-  await window.loadURL(RENDERER_RUNTIME.rendererUrl);
-}
-
 function installDevTools(window: BrowserWindow): void {
   if (LOCKED_DOWN) return;
   window.webContents.on('console-message', ({ level, message, lineNumber, sourceId }) => {
@@ -397,7 +391,9 @@ async function createWindow(): Promise<void> {
   nativeSmoke.installPackagedNativeSmoke({ app, window, config: NATIVE_SMOKE_CONFIG });
   installNavigationPolicy(window);
   installDesktopContextMenu(window);
+  installDesktopArtcraftWindow(window);
   const closeGuard = manualCloseApproval.install(window, {
+    beforeClose: detachDesktopArtcraftWindows,
     isTrustedRenderer: (url) => shouldAllowNavigation(url, TRUSTED_RENDERER_ORIGINS),
     isQuitRequested: () => quitRequested,
     cancelQuit: () => {
@@ -493,7 +489,7 @@ async function createWindow(): Promise<void> {
   // routes navigator.wakeLock.request('screen') through these handlers as
   // 'screen-wake-lock'; without the allowlist entry the request rejects and
   // keep-awake silently dies on the desktop build only.
-  await loadRenderer(window);
+  await window.loadURL(RENDERER_RUNTIME.rendererUrl);
 
   // Surface renderer console output to the main process stdout so dev runs
   // can see errors without having to open DevTools manually. Skipped in

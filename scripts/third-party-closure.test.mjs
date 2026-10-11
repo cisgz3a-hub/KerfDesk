@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,9 +23,85 @@ import {
   verifyOpenClipartAssets,
 } from './third-party-closure.mjs';
 import { verifyPackagedPreviewMetadata } from './verify-packaged-preview-metadata.mjs';
+import { OFFLINE_ENGINE_ASSETS, verifyOfflineEngineAssets } from './offline-engine-assets.mjs';
 
 const packages = collectProductionPackages();
 const electronPackage = collectElectronPackage();
+
+test('includes the pinned pako Zlib notice alongside its root MIT licence', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-pako-notice-'));
+  try {
+    fs.writeFileSync(path.join(temp, 'LICENSE'), 'MIT fixture licence');
+    const record = readPackageLicense({
+      depDir: temp,
+      license: '(MIT AND Zlib)',
+      name: 'pako',
+      version: '2.1.0',
+    });
+    assert.deepEqual(record.sourceFiles, [
+      'LICENSE',
+      'reviewed supplement: scripts/license-texts/pako-2.1.0-Zlib.txt',
+    ]);
+    assert.match(record.text, /MIT fixture licence/);
+    assert.match(record.text, /Jean-loup Gailly and Mark Adler/);
+    assert.match(record.text, /Altered source versions must be plainly marked/);
+    assert.match(record.text, /This notice may not be removed or altered/);
+    const notice = fs.readFileSync(path.join(REPO_ROOT, 'public/third-party-notices.txt'), 'utf8');
+    const section = notice.split('--- Package: pako@2.1.0')[1].split('--- Package:')[0];
+    assert.match(section, /The MIT License/);
+    assert.match(section, /Jean-loup Gailly and Mark Adler/);
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test('fails closed for missing, changed or unreviewed pako supplements', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'kerfdesk-pako-missing-'));
+  try {
+    fs.writeFileSync(path.join(temp, 'LICENSE'), 'MIT fixture licence');
+    const args = {
+      depDir: temp,
+      rootDir: temp,
+      license: '(MIT AND Zlib)',
+      name: 'pako',
+      version: '2.1.0',
+    };
+    assert.throws(() => readPackageLicense(args), /pako supplement is missing/);
+    fs.mkdirSync(path.join(temp, 'scripts/license-texts'), { recursive: true });
+    fs.writeFileSync(
+      path.join(temp, 'scripts/license-texts/pako-2.1.0-Zlib.txt'),
+      'altered notice',
+    );
+    assert.throws(() => readPackageLicense(args), /pako supplement hash changed/);
+    assert.throws(
+      () => readPackageLicense({ ...args, version: '2.1.1' }),
+      /unreviewed pako licence/,
+    );
+    assert.throws(() => readPackageLicense({ ...args, license: 'MIT' }), /unreviewed pako licence/);
+    const ordinary = readPackageLicense({ ...args, name: 'ordinary-package', license: 'MIT' });
+    assert.deepEqual(ordinary.sourceFiles, ['LICENSE']);
+    assert.equal(ordinary.text, 'MIT fixture licence');
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test('pins native engines and includes licences that npm wrapper packages omit', () => {
+  verifyOfflineEngineAssets(REPO_ROOT);
+  const notice = buildThirdPartyNotice();
+  for (const { sha256 } of OFFLINE_ENGINE_ASSETS) assert.ok(notice.includes(sha256));
+  assert.match(notice, /Old MIT/);
+  assert.match(notice, /UNICODE LICENSE V3/);
+  assert.match(notice, /packingsolver-highs/);
+  assert.match(notice, /emscripten-system-lib-libc-musl/);
+  assert.match(
+    execFileSync(process.execPath, ['scripts/prepare-packing-solver.mjs', '--check'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }),
+    /no-eval loader verified/,
+  );
+});
 
 function countMatches(text, pattern) {
   return [...text.matchAll(pattern)].length;
@@ -100,6 +177,14 @@ test('renders deterministic notices for every production package and artwork ass
   );
   assert.equal(countMatches(first, /^--- Package:/gm), packages.length + 1);
   assert.equal(countMatches(first, /^--- Artwork:/gm), 8);
+  const photoCraftNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/photocraft-color-to-alpha.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(photoCraftNotice),
+    'adapted PhotoCraft code must ship its complete notice',
+  );
   assert.match(first, /Electron package license is reproduced below/);
   assert.match(first, /artifact-level license files are explicitly bundled and required/);
   assert.match(first, /explicitly bundles the Electron and Chromium runtime license files/);

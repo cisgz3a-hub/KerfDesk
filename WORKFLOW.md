@@ -34,7 +34,7 @@
 
 ### F-REMOTE1. Phone and MCP workspace controls (ADR-564/568/569)
 
-- **Success.** The operator enables remote connections in desktop **Settings > Phone & MCP**, waits for **Ready to pair**, creates a code and chooses permissions on the PC. Viewing is the default; editing and machine control are separate unchecked choices when requested. Scan the locally generated QR code or use **Copy pairing link** to prefill the phone's computer ID and code, then request PC approval. The phone removes the private fragment and does not save its code. The link works once within the existing five-minute lifetime; a replacement code invalidates it. Manual pairing and ChatGPT server details remain available in disclosures. Paired clients open directly to the workspace. Editing clients use ordinary document actions for text, layout and Undo/Redo, with less common tools in expandable sections. A separate **Share artwork previews and text with approved phones and MCP apps** choice enables preview and existing-text reads; the UI explains AI-provider disclosure. Read-only job review reports actual warnings, bounds and timing without confirmation or execution.
+- **Success.** The operator enables remote connections from **Phone & MCP** in the main toolbar or desktop **Settings > Phone & MCP**, waits for **Ready to pair**, creates a code and chooses permissions on the PC. Viewing is the default; editing and machine control are separate unchecked choices when requested. Scan the locally generated QR code or use **Copy pairing link** to prefill the phone's computer ID and code, then request PC approval. The phone removes the private fragment and does not save its code. The link works once within the existing five-minute lifetime; a replacement code invalidates it. Manual pairing and ChatGPT server details remain available in disclosures. Paired clients open directly to the workspace. Editing clients use ordinary document actions for text, layout and Undo/Redo, with less common tools in expandable sections. A separate **Share artwork previews and text with approved phones and MCP apps** choice enables preview and existing-text reads; the UI explains AI-provider disclosure. Read-only job review reports actual warnings, bounds and timing without confirmation or execution.
 - **Navigation and sync (ADR-569 Amendment 1).** Design keeps preview, artwork selection and edits together; Machine holds the run controls; Settings contains connection details. Visible connected views refresh through bounded read-only calls and request a new shared preview when the revision changes. Hidden views pause and refresh when reopened. Focused and unsent drafts remain intact, while stale edits still need a current revision. Background refresh never retries machine actions or confirms Start. Artwork-sharing opt-out and access loss clear shared content. The matching desktop and service builds are required.
 - **Error.** A stale revision asks the client to refresh. An uncertain edit retains its request ID and arguments when retried. Permission loss, a replaced desktop session or cancellation prevents a pending edit from committing. A Pro copy returns its ordinary admission requirement without creating a deferred edit. Storage errors show a save failure and disable artwork sharing for the current session. Denied clipboard access offers the exact value for manual copying; an old clipboard result cannot mark a replacement code copied.
 - **Empty.** An empty workspace shows no artwork and no Undo/Redo actions. Sharing off explains how to enable it on the PC. Unsupported or oversized preview scenes report unavailable rather than returning a partial scene. Unavailable current preparation explains that review cannot yet be established.
@@ -324,7 +324,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 
 Identical to the format-specific import flows except:
 - Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PDF/compatible AI,
-  HPGL/PLT, PNG/JPG/BMP/GIF/TIFF, or STL input.
+  HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD, or STL input.
 - OS-native file picker (Electron) or browser file picker (web).
 - Multi-select supported in the picker.
 
@@ -338,6 +338,13 @@ Identical to the format-specific import flows except:
 - TIFF also uses the page picker, preserving the selected page's original pixels and orientation.
   Its embedded X/Y density sets size; missing density uses 254 DPI. Engraving pixels are 8-bit
   RGB over white. Unsupported encodings are reported so the file can be exported as PNG.
+- Photoshop PSD imports its saved merged image for engraving or tracing (ADR-591), preserving
+  transparency and independent X/Y density. Save an 8-bit RGB or grayscale PSD with a compatible
+  merged composite, or export PNG if compression, colour mode or depth is unsupported. Layers
+  remain flattened; PSB and editable Photoshop layers are outside this import route. Cancelling
+  or failing a decode leaves the current artwork unchanged. The PSD decoder/PNG encoder checks
+  its estimated working allocations before reading the full file; if its 512 MiB budget is
+  exceeded, resize the document or export PNG for the existing PNG import route.
 - BMP honours embedded density. GIF imports a still image of the first/default frame.
 - HPGL/PLT imports supported pen geometry at 40 plotter units/mm. Scaling needs explicit reference
   points. Unsupported drawing commands reject the file with their source location. Pen colours
@@ -421,6 +428,29 @@ destination and cannot overwrite the template source.
 3. Edit menu `Unlock All` unlocks every locked object in the project.
 
 ---
+
+### Edit individual trace parts (ADR-587)
+
+1. After tracing, click **Edit trace parts** in the canvas hint or the left tool strip.
+   Double-clicking a trace with Select also opens this tool.
+2. Click or drag the line or filled shape you want to change. Only that part separates from the
+   rest of the trace. A filled shape keeps its holes; a Centerline stroke moves independently
+   unless a Fill operation uses its enclosed shapes. Right-click picks a part for its context menu.
+3. Shift-click to select several parts. Drag them together, use the transform handles to resize
+   or rotate, arrow keys to nudge, or Delete to remove them. Existing duplication and numeric
+   position controls work on the picked parts.
+4. Use **Edit part nodes** to reshape a connected contour. This allows changes to points within
+   one connected mark, rather than moving the whole mark.
+5. One Undo restores a separation and its drag. Escape during a drag restores the original trace;
+   Done or Escape outside a drag returns to Select. The retained source image can start a fresh trace.
+6. Large traces stay together except for the parts you pick. **Arrange → Break Apart** remains
+   available when you deliberately want every shape separated.
+
+Pick the visible edge of a line-only trace or a trace in wireframe view. Filled parts can also
+be picked through their interior. If a trace is used as an image mask, a text-path guide, or a
+linked relief boundary, mask or rail, release that dependency before separating its parts;
+the tool explains this without changing
+the linked artwork.
 
 ### F-A5a. Join curve endpoints
 
@@ -1539,7 +1569,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
-- `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF or STL through the unified picker
+- `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
 #### Edit
@@ -2580,7 +2610,12 @@ authorization, Frame proof, controller command, or safety boundary.
 5. Repeating **Auto-fit + copy artwork to all N** replaces the generated copies
    instead of layering another set on the canvas.
 6. Reopened projects retain per-jig output order and shared-size controls because
-   the existing generated copy ids already bind each copy to its source and outline.
+   generated artwork retains its source ancestry and physical outline. Existing
+   encoded copy IDs remain readable; edited parts also carry explicit jig metadata.
+   A part fitted into the first outline stays there after its generated copies are deleted.
+7. An explicitly selected layout can include both an original and an edited generated
+   copy. Both selected objects become artwork in the first outline; each gets a distinct
+   copy in the remaining outlines. Repeating the action replaces those copies once.
 
 ### F-B16. Interrupted-job checkpoint and resume (ADR-118)
 
@@ -3310,6 +3345,11 @@ settings and Job Review keep their existing read-only setup references.
 
 ### Other text controls
 
+- Multilingual outline text uses local shaping and bidirectional layout (ADR-591). Hebrew,
+  Arabic, mixed-direction numbers and combining marks retain their glyph order and positioning
+  through wrapping and path text. Choose or import a font containing the required characters;
+  missing glyphs are still reported. No online font service is used. Existing basic Latin and
+  single-line engraving fonts keep their established geometry.
 - The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
   serif companion lettering. These fonts are bundled with the app, remain editable on canvas,
@@ -9061,6 +9101,17 @@ again.
    replacing the first, so re-applying never silently destroys earlier work.
 2. Construction guides are excluded from output every time; they exist to design
    against, not to cut.
+
+#### Capacity — large photos and inactive sheets
+
+An active photo can retain up to 128 MiB of editable layer pixels. Inactive
+sheets, production variants and retained-array snapshots share a separate
+50-million-character archive budget (ADR-570). Large layered photos, and large
+flattened images, can fit the active project but exceed that archive budget.
+**Add Sheet** or switching sheets then reports the archive limit and keeps the
+current artwork, editable source, selection and history unchanged. Save that
+working sheet as a separate project to retain the full-size source; reducing a
+copy's size or layer count is optional.
 
 ### F-DS9. Snap to existing geometry (DS-4)
 

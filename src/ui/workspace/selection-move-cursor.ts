@@ -45,7 +45,10 @@ export function updateSelectionMoveCursor(args: {
   const objects = args.project.scene.objects.filter((object) => selectedIds.has(object.id));
   canvas.style.cursor = selectionMoveCursor({
     isMoving: args.drag?.kind === 'move',
-    isEnabled: !args.previewMode && args.drag === null && args.toolMode.kind === 'select',
+    isEnabled:
+      !args.previewMode &&
+      args.drag === null &&
+      (args.toolMode.kind === 'select' || args.toolMode.kind === 'trace-parts'),
     objects,
     point,
     pxToMm,

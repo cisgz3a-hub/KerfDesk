@@ -12,6 +12,7 @@ import { ToolbarIcon } from './ToolbarIcon';
 import { ToolbarCommands } from './ToolbarCommands';
 import { WorkspaceLayoutSelect } from './WorkspaceLayoutSelect';
 import { TutorialButton } from '../tutorials/TutorialButton';
+import { RemoteToolbarButton } from '../remote-access/RemoteToolbarButton';
 import './Toolbar.css';
 
 export function Toolbar(props: {
@@ -25,6 +26,7 @@ export function Toolbar(props: {
       <ToolbarCommands commands={props.commands} />
       <ToolbarProjectName />
       <div className="lf-toolbar-utilities">
+        <RemoteToolbarButton />
         <ConnectionBadge />
         {/* Learn keeps its visible label: it is a destination, not a modifier,
             and the tutorial library is how a new operator finds everything the

@@ -72,7 +72,7 @@ describe('editor transform session', () => {
     expect(alphaAt(committed, 3, 1)).toBe(PARTIAL_ALPHA);
     expect(alphaAt(committed, 2, 2)).toBe(HALF_ALPHA);
     expect(alphaAt(committed, 0, 0)).toBe(0);
-    expect(committed.history.undoStack).toHaveLength(1);
+    expect(committed.history.undoStack).toHaveLength(2); // Add layer, then transform.
 
     const composite = compositeSession(committed);
     expect(composite.data[pixelBase(0, 0)]).toBe(PATTERN_GREY);

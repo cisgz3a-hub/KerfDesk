@@ -62,6 +62,7 @@ function ToolButton(props: { readonly tool: DesignToolDefinition }): JSX.Element
       }}
     >
       <DesignToolIcon kind={props.tool.kind} />
+      <span>{props.tool.label}</span>
     </button>
   );
 }
@@ -99,16 +100,19 @@ const dividerStyle: React.CSSProperties = {
 };
 
 const buttonStyle: React.CSSProperties = {
-  width: 34,
-  height: 34,
-  display: 'grid',
-  placeItems: 'center',
+  width: 108,
+  minHeight: 38,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  textAlign: 'left',
+  fontSize: 12,
   border: '1px solid transparent',
   borderRadius: 6,
   background: 'transparent',
   color: 'var(--lf-text)',
   cursor: 'pointer',
-  padding: 0,
+  padding: '6px 8px',
 };
 
 const activeStyle: React.CSSProperties = {

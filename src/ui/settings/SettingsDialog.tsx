@@ -23,6 +23,7 @@ import { SettingsMachineSection } from './SettingsMachineSection';
 import { useSettingsDialogStore, type SettingsSectionId } from './settings-dialog-store';
 import { settingsNoteStyle } from './settings-styles';
 import { RemoteAccessSection } from '../remote-access/RemoteAccessSection';
+import { isRemoteAccessRenderer } from '../remote-access/desktop-only';
 
 type SectionSpec = {
   readonly id: SettingsSectionId;
@@ -67,8 +68,7 @@ export function visibleSettingsSections(machineKind: MachineKind): ReadonlyArray
   return SETTINGS_SECTIONS.filter(
     (entry) =>
       (entry.laserOnly !== true || machineKind === 'laser') &&
-      (entry.desktopOnly !== true ||
-        (typeof location !== 'undefined' && location.protocol === 'app:')),
+      (entry.desktopOnly !== true || isRemoteAccessRenderer()),
   );
 }
 

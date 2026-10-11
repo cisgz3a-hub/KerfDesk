@@ -518,7 +518,7 @@ This ADR defines the policy that lets us adopt third-party code safely.
 2. **Its package license is in the reviewed set:** MIT, MIT-0,
    BSD-2-Clause, BSD-3-Clause, 0BSD, BSL-1.0 (the permissive Boost Software
    License), Apache-2.0, MPL-2.0, ISC, Unlicense, BlueOak-1.0.0, or
-   Python-2.0. A compound SPDX expression is permitted only when every
+   Python-2.0, or Zlib (pako review in ADR-591). A compound SPDX expression is permitted only when every
    constituent license is approved. The license is verified against the
    package's actual `LICENSE` file, not just npm metadata. OFL-1.1 and Creative
    Commons terms require separate asset/content review and are not blanket

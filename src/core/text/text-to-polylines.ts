@@ -3,36 +3,18 @@ import type { TextBoxSettings } from '../scene/text-box';
 // polylines. Outline fonts use opentype.js once their ArrayBuffer is in
 // hand; bundled CNC fonts route to their native open-stroke renderer.
 //
-// Algorithm:
-//   1. parse the font with opentype.js
-//   2. for each line of text:
-//        compute the line's pen offsets per character (kerning aware)
-//        get the path command stream for the line
-//   3. flatten path commands to polylines via De Casteljau (matches
-//      the SVG-import sampler so visual fidelity is consistent)
-//   4. handle alignment by post-translating each line's polylines
-//      so the line's bounding box aligns left/center/right within the
-//      max line width
-//
 // Returns ColoredPath[] — one entry per text color (Phase D has one).
 // Polylines are in MILLIMETRES, with the text baseline of the FIRST
 // line at y=0 and successive lines below (positive Y is "down" in the
 // scene, matching SVG-like convention; the origin transform applies
 // later as for any other SceneObject).
 //
-// Known limitation — RTL scripts (Hebrew, Arabic, N'Ko, etc.) render
-// left-to-right rather than right-to-left because opentype.js doesn't
-// run the Unicode Bidirectional Algorithm. Glyph shapes are correct,
-// only ordering is wrong. Full fix needs a UBA pass (e.g. via the
-// `bidi-js` package, MIT) and would also need Arabic shaping for joining
-// forms. Out of Phase D scope; tracked as MIT-T5 in AUDIT.md.
+// Complex text receives a prepared HarfBuzz/bidi layout from the I/O owner.
+// Basic Latin retains the established opentype layout; native stroke fonts
+// keep their independent renderer. Both outline routes share exact curves.
 //
 // Pure-core compliant: no clock, no random, no I/O.
 //
-// opentype.js is lazy-loaded via dynamic import (A6 audit fix) — the
-// ~110 KB minified weight stays out of the initial bundle. Users who
-// never open Add Text never download it. We import only types
-// statically; the runtime arrives via `await loadOpentype()`.
 
 import type * as opentype from 'opentype.js';
 import {
@@ -52,6 +34,9 @@ import { layoutTextBox, type TextBoxLayout } from './text-box-layout';
 import { finishTextBoxRender } from './text-box-render';
 import { cncStrokeTextToPolylines } from './cnc-stroke-font';
 import { missingCharacters, textForLayout } from './glyph-coverage';
+import { needsTextShaping } from './text-shaping-required';
+import type { TextShaping } from './text-shaping-types';
+import { shapedLineWidth, shapedTextGeometry } from './text-shaped-geometry';
 
 // Module surface we actually use. Lets the loader narrow the dynamic-
 // import result to something callable without a sprawling cast.
@@ -94,7 +79,11 @@ type TextRenderSharedInput = {
 
 export type TextRenderInput = TextRenderSharedInput &
   (
-    | { readonly geometry?: 'outline'; readonly fontBuffer: ArrayBuffer }
+    | {
+        readonly geometry?: 'outline';
+        readonly fontBuffer: ArrayBuffer;
+        readonly shaping?: TextShaping;
+      }
     | { readonly geometry: 'single-line'; readonly fontKey: string }
   );
 
@@ -124,23 +113,54 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
   if (input.geometry === 'single-line') return cncStrokeTextToPolylines(input);
   const ot = await loadOpentype();
   const font = ot.parse(input.fontBuffer);
-  const layout =
-    input.textBox === undefined
-      ? undefined
-      : layoutTextBox(
-          { ...input, content: textForLayout(input.content), textBox: input.textBox },
-          (line, size) => measureLineWidth(font, line, size, input.letterSpacing ?? 0),
-          (font.ascender - font.descender) / font.unitsPerEm,
-        );
+  const source = textForLayout(input.content);
+  const shaping = input.shaping;
+  validateShaping(input.fontBuffer, source, shaping);
+  const layout = outlineTextBoxLayout(input, font, shaping);
+  return renderOutlineLines(input, font, layout, shaping);
+}
+
+function validateShaping(fontBuffer: ArrayBuffer, source: string, shaping?: TextShaping): void {
+  if (shaping !== undefined && (shaping.content !== source || shaping.fontBuffer !== fontBuffer)) {
+    throw new Error('Text shaping belongs to a different text or font. Rebuild the text preview.');
+  }
+  if (needsTextShaping(source) && shaping === undefined) {
+    throw new Error('This text requires the multilingual text engine. Reload it and try again.');
+  }
+}
+
+function outlineTextBoxLayout(
+  input: TextRenderSharedInput,
+  font: opentype.Font,
+  shaping?: TextShaping,
+): TextBoxLayout | undefined {
+  return input.textBox === undefined
+    ? undefined
+    : layoutTextBox(
+        { ...input, content: textForLayout(input.content), textBox: input.textBox },
+        (line, size, start) =>
+          measureLineWidth(font, line, size, input.letterSpacing ?? 0, shaping, start),
+        (font.ascender - font.descender) / font.unitsPerEm,
+        shaping?.breakUnits,
+      );
+}
+
+function renderOutlineLines(
+  input: TextRenderSharedInput,
+  font: opentype.Font,
+  layout: TextBoxLayout | undefined,
+  shaping?: TextShaping,
+): TextRenderResult {
   const actual =
     layout === undefined ? input : { ...input, content: layout.content, sizeMm: layout.sizeMm };
   const text = textForLayout(actual.content);
   const lines = text.split('\n');
+  const starts = sourceLineStarts(lines, layout);
   const lineSpacingMm = actual.sizeMm * actual.lineHeight;
   const letterSpacing = actual.letterSpacing ?? 0;
   // Per-line widths drive alignment, so they measure the glyphs as drawn.
-  const lineWidths = lines.map((line) =>
-    measureLineWidth(font, line, actual.sizeMm, letterSpacing),
+  const lineWidths = lines.map((line, index) =>
+    measureLineWidth(font, line, actual.sizeMm, letterSpacing, shaping, starts[index] ?? 0),
   );
   const maxWidth = lineWidths.reduce((m, w) => (w > m ? w : m), 0);
   const raw: Polyline[] = [];
@@ -150,7 +170,16 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
     const lineWidth = lineWidths[i] ?? 0;
     const xOffset = alignOffset(actual.alignment, lineWidth, maxWidth);
     const yBaseline = i * lineSpacingMm;
-    const geometry = lineGeometry(font, line, actual.sizeMm, xOffset, yBaseline, letterSpacing);
+    const geometry = lineGeometry(
+      font,
+      line,
+      actual.sizeMm,
+      xOffset,
+      yBaseline,
+      letterSpacing,
+      shaping,
+      starts[i] ?? 0,
+    );
     raw.push(...geometry.polylines);
     rawCurves.push(...geometry.curves);
   }
@@ -161,7 +190,7 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
   const { polylines, curves, bounds, offset } = normalizeToOrigin(raw, rawCurves);
   // Where a zero-width line would sit is the point every line aligns to.
   const anchorX = alignOffset(actual.alignment, 0, maxWidth);
-  const missing = missingCharacters(text, outlineGlyphCoverage(font));
+  const missing = missingCharacters(text, outlineGlyphCoverage(font), true);
   const rendered: TextRenderResult = {
     paths: [{ color: actual.color, polylines, curves }],
     bounds,
@@ -173,13 +202,28 @@ export async function textToPolylines(input: TextRenderInput): Promise<TextRende
     : finishTextBoxRender(rendered, layout, input.textBox, input.alignment);
 }
 
+function sourceLineStarts(
+  lines: ReadonlyArray<string>,
+  layout?: TextBoxLayout,
+): ReadonlyArray<number> {
+  let sourceOffset = 0;
+  return (
+    layout?.sourceStarts ??
+    lines.map((line) => {
+      const start = sourceOffset;
+      sourceOffset += line.length + 1;
+      return start;
+    })
+  );
+}
+
 /** The characters of `content` an outline font has no glyph for, as its render reports them. */
 export async function outlineFontMissingCharacters(
   fontBuffer: ArrayBuffer,
   content: string,
 ): Promise<ReadonlyArray<string>> {
   const font = (await loadOpentype()).parse(fontBuffer);
-  return missingCharacters(textForLayout(content), outlineGlyphCoverage(font));
+  return missingCharacters(textForLayout(content), outlineGlyphCoverage(font), true);
 }
 
 function outlineGlyphCoverage(font: opentype.Font): (character: string) => boolean {
@@ -244,7 +288,11 @@ function measureLineWidth(
   line: string,
   sizeMm: number,
   letterSpacing: number,
+  shaping?: TextShaping,
+  start = 0,
 ): number {
+  if (shaping !== undefined)
+    return shapedLineWidth(shaping, start, line.length, sizeMm, font.unitsPerEm, letterSpacing);
   // The pen advance of the shaped glyphs, kerning included, in mm. Tracking
   // falls between glyphs, so a ligature is one glyph and the line's last
   // glyph adds no trailing gap.
@@ -277,7 +325,20 @@ function lineGeometry(
   xOffset: number,
   yBaseline: number,
   letterSpacing: number,
+  shaping?: TextShaping,
+  start = 0,
 ): TextOutlineGeometry {
+  if (shaping !== undefined)
+    return shapedTextGeometry(
+      font,
+      shaping,
+      start,
+      line.length,
+      sizeMm,
+      xOffset,
+      yBaseline,
+      letterSpacing,
+    );
   // opentype's getPath returns SVG-like commands in mm-equivalent
   // units when we pass sizeMm directly. The baseline sits at y = 0
   // by convention; we translate to (xOffset, yBaseline). The
