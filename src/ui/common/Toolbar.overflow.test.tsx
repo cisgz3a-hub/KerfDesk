@@ -25,6 +25,10 @@ describe('Toolbar overflow interactions', () => {
       enabled: false,
       disabledReason: 'Select an image first.',
     });
+    const photo = command('tools.photo-engraving', 'Photo engraving...', {
+      enabled: false,
+      disabledReason: 'Select an unlocked photo or image first.',
+    });
     const commands = [
       fresh,
       command('file.open', 'Open...'),
@@ -34,6 +38,7 @@ describe('Toolbar overflow interactions', () => {
       command('window.toggle-preview', 'Preview', { active: false }),
       command('tools.add-text', 'Text...'),
       trace,
+      photo,
       command('tools.edit-image', 'Image Studio...'),
     ];
     await render(commands);
@@ -45,21 +50,27 @@ describe('Toolbar overflow interactions', () => {
     await act(async () => button('More commands').click());
     expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
     expect(button('Trace Image...').disabled).toBe(true);
+    expect(button('Photo engraving...').disabled).toBe(true);
     expect(button('Image Studio...').closest('[role="menu"]')).not.toBeNull();
     await act(async () => button('New').click());
     expect(fresh.invoke).toHaveBeenCalledOnce();
 
     const withImage = commands.map((item) =>
-      item.id === 'tools.trace-image' ? { ...item, enabled: true } : item,
+      item.id === 'tools.trace-image' || item.id === 'tools.photo-engraving'
+        ? { ...item, enabled: true }
+        : item,
     );
     await act(async () => root?.render(<Toolbar commands={withImage} machineKind="laser" />));
     expect(host?.querySelector('button[aria-label="Trace Image..."]')).not.toBeNull();
     expect(host?.querySelector('button[aria-label="Image Studio..."]')).toBeNull();
     await act(async () => button('Trace Image...').click());
     expect(trace.invoke).toHaveBeenCalledOnce();
+    await act(async () => button('Photo engraving...').click());
+    expect(photo.invoke).toHaveBeenCalledOnce();
 
     await act(async () => root?.render(<Toolbar commands={commands} machineKind="laser" />));
     expect(host?.querySelector('button[aria-label="Trace Image..."]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Photo engraving..."]')).toBeNull();
     await act(async () => button('More commands').click());
     expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
     expect(button('Trace Image...').disabled).toBe(true);
@@ -112,6 +123,7 @@ describe('Toolbar overflow interactions', () => {
       command('file.import-image', 'Import Image...'),
       command('tools.add-text', 'Text...'),
       command('tools.trace-image', 'Trace Image...'),
+      command('tools.photo-engraving', 'Photo engraving...'),
       command('tools.edit-image', 'Image Studio...'),
       command('tools.camera', 'Camera'),
     ];
@@ -123,10 +135,12 @@ describe('Toolbar overflow interactions', () => {
     await act(async () => window.dispatchEvent(new Event('resize')));
     expect(host?.querySelector('button[aria-label="Import Image..."]')).toBeNull();
     expect(host?.querySelector('button[aria-label="Trace Image..."]')).toBeNull();
+    expect(host?.querySelector('button[aria-label="Photo engraving..."]')).toBeNull();
     await act(async () => button('More commands').click());
     expect(button('Import Image...').closest('[role="menu"]')).not.toBeNull();
     expect(button('Image Studio...').closest('[role="menu"]')).not.toBeNull();
     expect(button('Trace Image...').closest('[role="menu"]')).not.toBeNull();
+    expect(button('Photo engraving...').closest('[role="menu"]')).not.toBeNull();
     expect(document.querySelectorAll('button[data-help-id]')).toHaveLength(commands.length);
     await act(async () =>
       document.activeElement?.dispatchEvent(

@@ -3,6 +3,7 @@ import { EDITING_TOOLS_COMMAND_HELP } from './editing-tools-command-help';
 import { FILE_COMMAND_HELP } from './file-command-help';
 import { MACHINE_MOVE_COMMAND_HELP } from './machine-move-command-help';
 import { POLICY_COMMAND_HELP } from './policy-command-help';
+import { RASTER_COMMAND_HELP } from './raster-command-help';
 import { SETTINGS_COMMAND_HELP } from './settings-command-help';
 import { SUPPORT_COMMAND_HELP } from './support-command-help';
 
@@ -156,44 +157,7 @@ export const COMMAND_HELP: Readonly<Record<CommandId, CommandHelpTopic>> = {
     family: 'tools',
     tooltip: 'Enable experimental machine workflows that are still being hardware-validated.',
   },
-  'tools.adjust-image': {
-    family: 'tools',
-    tooltip: 'Tune brightness, contrast, gamma, and dithering for the selected image.',
-  },
-  'tools.edit-image': {
-    family: 'tools',
-    tooltip: 'Open the Image Studio to paint, erase, and edit selected areas of the image.',
-  },
-  'tools.apply-image-mask': {
-    family: 'tools',
-    tooltip:
-      'Use selected closed vector geometry as a non-destructive mask for the selected image.',
-  },
-  'tools.crop-image': {
-    family: 'tools',
-    tooltip: 'Bake the selected image mask into pixels and crop the image bounds.',
-  },
-  'tools.remove-image-mask': {
-    family: 'tools',
-    tooltip: 'Remove the selected image mask without changing the original image pixels.',
-  },
-  'tools.save-processed-bitmap': {
-    family: 'tools',
-    tooltip: 'Save the selected image as the processed bitmap KerfDesk will engrave.',
-  },
-  'tools.trace-image': {
-    family: 'tools',
-    tooltip: 'Trace the selected bitmap into editable vector paths.',
-  },
-  'tools.retrace-original': {
-    family: 'tools',
-    tooltip: 'Re-open Trace Image from the original raster kept behind the selected trace.',
-  },
-  'tools.multi-file-trace': {
-    family: 'tools',
-    tooltip:
-      'Trace multiple image files with one preset to standalone SVG, DXF, PDF, EPS or GeoJSON files without changing the workspace. The page is the image size or fits the artwork with a margin. Images with nothing to trace are skipped and listed.',
-  },
+  ...RASTER_COMMAND_HELP,
   'tools.convert-to-path': {
     family: 'tools',
     tooltip: 'Bake selected vector artwork into plain path geometry for node editing and welding.',

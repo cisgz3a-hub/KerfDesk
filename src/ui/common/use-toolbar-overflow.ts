@@ -12,7 +12,7 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
     'tools.box-generator',
     'tools.barcode',
   ],
-  ['tools.trace-image', 'tools.edit-image', 'tools.convert-to-bitmap'],
+  ['tools.photo-engraving', 'tools.trace-image', 'tools.edit-image', 'tools.convert-to-bitmap'],
   ['file.save-gcode'],
   ['window.toggle-preview', 'file.inspect-gcode'],
 ];
@@ -23,7 +23,7 @@ export const TOOLBAR_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
 // with the other image tools under the Tools menu.
 const PRIMARY_GROUPS: ReadonlyArray<ReadonlyArray<CommandId>> = [
   ['file.open', 'file.import', 'file.import-image', 'file.save'],
-  ['tools.trace-image'],
+  ['tools.photo-engraving', 'tools.trace-image'],
   ['window.toggle-preview'],
 ];
 const PRIMARY_IDS = PRIMARY_GROUPS.flat();
@@ -31,6 +31,7 @@ const PRIMARY_IDS = PRIMARY_GROUPS.flat();
 const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
   'file.import-image',
   'tools.trace-image',
+  'tools.photo-engraving',
   'file.open',
   'file.save',
   'window.toggle-preview',
@@ -38,15 +39,12 @@ const OVERFLOW_PRIORITY: ReadonlyArray<CommandId> = [
 ];
 
 function primaryCommandIds(commands: ReadonlyArray<AppCommand>): ReadonlyArray<CommandId> {
-  // Trace is useful beside a selected image. Image Studio stays in More.
-  const imageSelected = commands.some(
-    (command) => command.id === 'tools.trace-image' && command.enabled,
-  );
-  return PRIMARY_IDS.filter(
-    (id) =>
-      (imageSelected || id !== 'tools.trace-image') &&
-      commands.some((command) => command.id === id),
-  );
+  // Photo engraving and Trace appear for eligible images; Image Studio stays in More.
+  return PRIMARY_IDS.filter((id) => {
+    const command = commands.find((candidate) => candidate.id === id);
+    if (command === undefined) return false;
+    return id === 'tools.trace-image' || id === 'tools.photo-engraving' ? command.enabled : true;
+  });
 }
 
 export function toolbarGroups(
