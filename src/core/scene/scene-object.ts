@@ -2,10 +2,7 @@ import type { ConstrainedSketch2d } from '../sketch-constraints/constrained-sket
 import type { PartGeneratorSource } from '../parts/part-generator';
 import type { RegistrationJigIdentity } from './registration-jig-identity';
 // SceneObject â€” the discriminated union the rest of the pipeline pattern-matches
-// against. Phase A ships one variant (ImportedSvg); ADR-014 commits to adding
-// 'text' (Phase D) and 'traced-image' (Phase E) without touching code outside
-// this module's switch arms. `assertNever` enforces exhaustiveness at compile
-// time so the missing arm is the only compile error when a new variant lands.
+// against. `assertNever` makes an unhandled variant a compile-time error.
 
 import type { ColoredPath } from './colored-path';
 import type { TextBoxSettings } from './text-box';
