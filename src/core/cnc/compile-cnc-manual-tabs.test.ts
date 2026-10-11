@@ -104,4 +104,39 @@ describe('compileCncJob manual tabs', () => {
   it('projects the same manual anchors onto roughing and finishing contours', () => {
     expect(deepestTabRiseCount(scene([square('manual', 20, true)], 2))).toBe(4);
   });
+
+  it.each([
+    { binding: 'object', allowanceMm: 0 },
+    { binding: 'path', allowanceMm: 0 },
+    { binding: 'object', allowanceMm: 2 },
+    { binding: 'path', allowanceMm: 2 },
+  ])(
+    'preserves placed tabs across operation colors with $binding binding and $allowanceMm mm allowance',
+    ({ binding, allowanceMm }) => {
+      const bind = (object: ImportedSvg): ImportedSvg =>
+        binding === 'object'
+          ? { ...object, operationIds: ['L1'] }
+          : {
+              ...object,
+              operationIds: ['another-operation'],
+              paths: object.paths.map((path) => ({ ...path, operationIds: ['L1'] })),
+            };
+      const matching = scene(
+        [bind(square('manual', 20, true)), bind(square('automatic', 100, false))],
+        allowanceMm,
+      );
+      const differentColor: Scene = {
+        ...matching,
+        layers: matching.layers.map((layer) => ({ ...layer, color: '#00aa00' })),
+      };
+      expect(deepestTabRiseCount(matching)).toBe(allowanceMm === 0 ? 6 : 12);
+      const passes = (input: Scene) =>
+        compileCncJob(input, DEFAULT_DEVICE_PROFILE, DEFAULT_CNC_MACHINE_CONFIG).groups.flatMap(
+          (group) => (group.kind === 'cnc' ? group.passes : []),
+        );
+      // Compare the complete paths, so unchanged tab counts alone cannot hide
+      // a shift away from the user's chosen positions on either finish stage.
+      expect(passes(differentColor)).toEqual(passes(matching));
+    },
+  );
 });
