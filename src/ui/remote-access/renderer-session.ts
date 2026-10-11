@@ -38,6 +38,8 @@ const SHARED_ARTWORK_READS = new Set([
 /** Normal command polling; a held jog polls faster so heartbeats reach the dead-man promptly. */
 const POLL_MS = 350;
 const HOLD_POLL_MS = 80;
+// Before native attach returns an ID, a local attempt owns only its UI result.
+let latestAttachment: symbol | null = null;
 
 type RequestEnvelope = {
   id: string;
@@ -103,6 +105,7 @@ function validPoll(value: unknown): value is PollResult {
 export class RemoteRendererSession {
   private stopped = false;
   private session: string | null = null;
+  private attachment: symbol | null = null;
   private active: Active | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private work: Promise<void> = Promise.resolve();
@@ -170,20 +173,32 @@ export class RemoteRendererSession {
     return !this.stopped && this.session === owner && ownsRemoteSession(owner);
   }
   async start(): Promise<void> {
+    if (this.stopped) return;
+    const attachment = Symbol('remote-attach');
+    this.attachment = latestAttachment = attachment;
+    this.ui.attaching();
     try {
       const value = await remoteRequest('attach', {}, null);
       if (!object(value) || typeof value.sessionId !== 'string')
         throw new Error('Invalid remote session.');
-      if (this.stopped) {
+      if (!this.ownsAttachment(attachment)) {
         await remoteRequest('detach', {}, value.sessionId).catch(() => undefined);
         return;
       }
+      this.attachment = latestAttachment = null;
       this.session = value.sessionId;
       setRemoteSession(this.session);
       void this.poll();
     } catch {
-      if (!this.stopped) this.ui.setMessage('Remote access could not attach to this workspace.');
+      if (!this.ownsAttachment(attachment)) return;
+      this.attachment = latestAttachment = null;
+      this.ui.attachFailed(
+        'Remote access could not attach to this workspace. Reopen the app to reconnect.',
+      );
     }
+  }
+  private ownsAttachment(owner: symbol): boolean {
+    return !this.stopped && this.attachment === owner && latestAttachment === owner;
   }
   private async run(
     request: RequestEnvelope,
@@ -287,6 +302,8 @@ export class RemoteRendererSession {
   }
   stop(): void {
     this.stopped = true;
+    if (latestAttachment === this.attachment) latestAttachment = null;
+    this.attachment = null;
     if (this.timer !== null) clearTimeout(this.timer);
     for (const request of this.requests.values()) request.controller.abort();
     this.authorities.dispose();

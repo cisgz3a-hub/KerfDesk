@@ -4,7 +4,7 @@ Remote access connects the desktop workspace to a phone control page and standar
 
 ## Connect a phone
 
-1. In **KerfDesk on the computer**, open **Edit > Settings… > Phone & MCP** and enable **Allow approved remote connections**.
+1. In **KerfDesk on the computer**, choose **Phone & MCP** in the main toolbar and switch it **On**. The same controls are in **Edit > Settings… > Phone & MCP** as **Allow approved remote connections**. The toolbar button's dot shows the state: grey when off, amber while connecting, a green ring when ready to pair, solid green with approved connections, and pulsing copper while a connection waits for approval.
 2. Wait for **Ready to pair** (older versions say **Connected to the remote service**). Choose **Create pairing link**; older versions call this **Create pairing code**. Manual setup's **Copy code** preserves its exact letter case.
 3. Scan the displayed QR code with your phone, or use **Copy pairing link**. The one-time link fills in the computer ID and code; name the phone and request PC approval. No access is granted by opening the link. Older desktop versions and manual setup can still use **[kerfdesk.com](https://kerfdesk.com) > Phone & MCP > Connect to your PC**, the full computer ID and latest exact-case code.
 4. Approve the named connection on the computer. Viewing is the default. Select **Allow artwork and operation editing** and/or **Allow Connect, Home, Jog, Frame, Start, Pause and Abort** only if you want those requested permissions, then choose **Approve selected access**. **Keep this phone signed in for 30 days (otherwise 8 hours)** is a separate choice. All three start off.
@@ -43,7 +43,7 @@ Add this Streamable HTTP MCP URL in a client that supports authenticated remote 
 
 `https://kerfdesk-phone-control.cisgz3a.workers.dev/mcp`
 
-In desktop Settings, expand **Connect ChatGPT or another MCP app** to copy the server URL and computer ID. Use the OAuth sign-in page to enter that computer ID and a new pairing code, then approve the requested permissions on the computer. The client receives access to that computer only. The authorization page and the desktop approval both show the requested access. If clipboard access is unavailable, the desktop displays the exact value for manual copying.
+In the toolbar's **Phone & MCP** panel or desktop Settings, expand **Connect ChatGPT or another MCP app** to copy the server URL and computer ID. Use the OAuth sign-in page to enter that computer ID and a new pairing code, then approve the requested permissions on the computer. The client receives access to that computer only. The authorization page and the desktop approval both show the requested access. If clipboard access is unavailable, the desktop displays the exact value for manual copying.
 
 In ChatGPT's web settings, enable **Developer mode** under **Security and login**, then create a connection from **ChatGPT Plugins** using the MCP URL above and OAuth. Let ChatGPT discover the login addresses. Its setup defaults to `kerfdesk:read`. In **Advanced OAuth settings > Base scopes**, add `kerfdesk:edit` for artwork editing and `kerfdesk:control` for machine controls, then explicitly approve the requested choices on the PC. For machine control without artwork editing, use `kerfdesk:read kerfdesk:control`; for all three permissions, use `kerfdesk:read kerfdesk:edit kerfdesk:control`. `offline_access` is optional and requests reconnection with that approval for up to 30 days. The exact settings and availability depend on the account and workspace.
 
