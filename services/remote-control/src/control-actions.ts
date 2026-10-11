@@ -23,10 +23,21 @@ type Admission =
   | { state: 'replay'; result: Record<string, unknown> }
   | { state: 'conflict' | 'limit' | 'unavailable' };
 
-function operationKind(command: string): 'jog' | 'frame' | 'job' | 'abort' {
-  if (command === 'jog_machine') return 'jog';
-  if (command === 'frame_job') return 'frame';
-  return command === 'abort_job' ? 'abort' : 'job';
+const KINDS: Record<string, z.output<typeof mcpControlOperationSchema>['kind']> = {
+  jog_machine: 'jog',
+  frame_job: 'frame',
+  abort_job: 'abort',
+  connect_machine: 'connect',
+  disconnect_machine: 'disconnect',
+  home_machine: 'home',
+  set_work_origin: 'origin',
+  pause_job: 'pause',
+  resume_job: 'resume',
+  jog_hold_start: 'hold',
+  jog_hold_stop: 'hold',
+};
+function operationKind(command: string): z.output<typeof mcpControlOperationSchema>['kind'] {
+  return KINDS[command] ?? 'job';
 }
 const clientPrefix = (clientId: string) => `${PREFIX}${clientId}:`;
 const keyFor = (clientId: string, requestId: string) => `${clientPrefix(clientId)}${requestId}`;

@@ -1,5 +1,6 @@
 import { isJsonContentType, isLegacyRequest } from '@modelcontextprotocol/server';
 import { MAX_BYTES, parseCommand, type GrantProps } from './protocol.js';
+import { MCP_PRIORITY_COMMANDS } from '../../../electron/mcp/input-schemas.js';
 import { digest, json } from './security.js';
 
 export const rateLimited = () => json({ error: 'rate_limited' }, 429, { 'Retry-After': '60' });
@@ -10,7 +11,7 @@ export async function abortRequest(request: Request, path: string): Promise<bool
   if (!isJsonContentType(request.headers.get('Content-Type'))) return false;
   try {
     const body: unknown = await request.clone().json();
-    if (path === '/api/client/command') return parseCommand(body)?.name === 'abort_job';
+    if (path === '/api/client/command') return priorityCommand(body);
     const messages = Array.isArray(body) ? body : [body];
     return (
       messages.length > 0 &&
@@ -22,6 +23,11 @@ export async function abortRequest(request: Request, path: string): Promise<bool
   } catch {
     return false;
   }
+}
+/** Abort and held-jog stops (ADR-585) share the reserved phone lane. */
+export function priorityCommand(body: unknown): boolean {
+  const name = parseCommand(body)?.name;
+  return name !== undefined && MCP_PRIORITY_COMMANDS.has(name);
 }
 function abortToolMessage(message: unknown): boolean {
   if (typeof message !== 'object' || message === null || Array.isArray(message)) return false;
@@ -38,10 +44,18 @@ function wireId(id: unknown): boolean {
 }
 
 export async function ingressLimited(request: Request, env: Env, url: URL): Promise<boolean> {
-  if (request.method === 'GET' && url.pathname !== '/api/desktop/connect') return false;
-  const credentialRoute = ['/mcp', '/api/client/command', '/api/client/revoke'].includes(
-    url.pathname,
-  );
+  if (
+    request.method === 'GET' &&
+    url.pathname !== '/api/desktop/connect' &&
+    url.pathname !== '/api/client/socket'
+  )
+    return false;
+  const credentialRoute = [
+    '/mcp',
+    '/api/client/command',
+    '/api/client/revoke',
+    '/api/client/push',
+  ].includes(url.pathname);
   const priority = credentialRoute && (await abortRequest(request, url.pathname));
   // Public pairing/registration cannot spend approved clients' verification allowance.
   // Ordinary credential attempts cannot spend the separate, bounded Abort lane.

@@ -34,4 +34,47 @@ export const mcpMachineToolInfo = {
     description:
       'Cancel pending remote preparation and invoke the ordinary current desktop Abort. Requires separate machine-control approval and UUID requestId; no workspace revision is needed. Poll the operation and machine state afterward. This is a software Abort, not a hardware emergency stop or proof the machine is physically stopped.',
   },
+  connect_machine: {
+    title: 'Connect the selected machine',
+    description:
+      'Connect the PC to its selected machine using the connection the operator already chose on that PC. Never opens a port picker and never reports port names. Requires machine-control approval, expectedRevision and UUID requestId. Poll operationId; a refused connection means the operator must connect once on the PC.',
+  },
+  disconnect_machine: {
+    title: 'Disconnect the machine',
+    description:
+      'Disconnect the PC from its machine through the ordinary desktop action. Refused while a job or motion is active. Requires machine-control approval, expectedRevision and UUID requestId.',
+  },
+  home_machine: {
+    title: 'Home the machine',
+    description:
+      'Run the ordinary desktop Home cycle. The machine moves to its limit switches. Ask the user to confirm the work area is clear first. Requires machine-control approval, expectedRevision and UUID requestId. Poll operationId until completed or failed; never repeat a timed-out Home with a new ID.',
+  },
+  set_work_origin: {
+    title: 'Set the work origin here',
+    description:
+      'Set the work origin at the current head position using the ordinary desktop action: axes "xy" sets X/Y, "z" zeros Z where supported. No motion. Requires machine-control approval, expectedRevision and UUID requestId.',
+  },
+  pause_job: {
+    title: 'Pause the running job',
+    description:
+      'Pause the running job through the ordinary desktop pause with its controller confirmation. Requires machine-control approval and UUID requestId; no workspace revision is needed. Poll machine status for paused.',
+  },
+  resume_job: {
+    title: 'Resume the paused job',
+    description:
+      'Resume the paused job through the ordinary desktop resume. Only after the user explicitly asks; the machine moves and the tool may turn on. Requires machine-control approval and UUID requestId.',
+  },
+  jog_hold_start: {
+    title: 'Start a held jog',
+    description: 'Phone only. Begin a continuous jog that the PC stops when heartbeats stop.',
+  },
+  jog_hold_stop: {
+    title: 'Stop a held jog',
+    description: 'Phone only. Stop the continuous jog started by operationId.',
+  },
+  get_camera_snapshot: {
+    title: 'Show the machine camera',
+    description:
+      'Return one bounded JPEG still from the camera configured on the PC. Requires machine-control approval and the desktop artwork-sharing opt-in. Camera addresses and credentials are never returned. The picture is not a position or alignment guarantee.',
+  },
 } as const;

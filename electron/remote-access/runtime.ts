@@ -15,6 +15,7 @@ import {
 import type { RemoteRendererQueue } from './renderer-queue.js';
 import { RemotePairingState } from './pairing-state.js';
 import { RemoteControlLease, validControlLifetime } from './control-lease.js';
+import { RemoteLiveSignals } from './live-signals.js';
 function parseClient(value: unknown): RemoteClient | null {
   if (
     !object(value) ||
@@ -69,6 +70,7 @@ class RemoteAccessRuntime {
   private clientRevocationEpoch = 0;
   private readonly blockedClients = new Map<string, number>();
   private serial: Promise<unknown> = Promise.resolve();
+  private readonly live = new RemoteLiveSignals();
   private readonly relay: ReturnType<typeof createRemoteRelayClient>;
   constructor(
     private readonly store: RemoteCredentialStore,
@@ -127,6 +129,7 @@ class RemoteAccessRuntime {
     this.pairing.reset();
     this.controlLease.reset();
     this.clients = [];
+    this.live.connection(open);
     if (!open) {
       this.waitingClients = false;
       this.error =
@@ -157,13 +160,46 @@ class RemoteAccessRuntime {
       case 'clients.revoked':
         this.receiveRevocation(message);
         break;
+      case 'hold.beat':
+      case 'hold.release':
+        this.receiveHold(message);
+        break;
     }
+  }
+  /** ADR-585: heartbeats count only for a client that holds a live control lease. */
+  private receiveHold(message: RelayMessage): void {
+    if (!identifier(message.clientId)) return;
+    if (message.type === 'hold.release') this.live.release(message.clientId);
+    else if (
+      identifier(message.operationId) &&
+      this.canRequest(message.clientId, ['read', 'control'], true)
+    )
+      this.live.beat(message.clientId, message.operationId);
+  }
+  /** Renderer change counters: forwarded only when they differ, never carrying artwork. */
+  observe(observed: { revision: string; machineSeq: number }, events: readonly string[]): void {
+    this.live.observe(observed);
+    this.flushObservation();
+    if (!this.connected || this.clients.length === 0) return;
+    for (const kind of events) this.relay.send({ type: 'event', kind });
+  }
+  private flushObservation(): void {
+    const pending = this.live.pending();
+    if (pending === null || !this.connected || this.clients.length === 0) return;
+    if (this.relay.send({ type: 'changed', ...pending })) this.live.markSent(pending);
+  }
+  /** Drained by each renderer poll. '*' releases every hold (relay connection lost). */
+  takeHoldSignals() {
+    return this.live.take();
   }
   private receiveClients(message: RelayMessage): void {
     const checked = parseClients(message.clients);
     if (checked === null) return;
+    for (const previous of this.clients)
+      if (!checked.some((client) => client.id === previous.id)) this.live.release(previous.id);
     this.clients = checked;
     this.waitingClients = false;
+    this.flushObservation();
     this.finishClientRevocations(checked);
     if (this.controlLease.receive(message.requestId, checked)) this.listClients();
   }
@@ -213,7 +249,7 @@ class RemoteAccessRuntime {
       controlUrl:
         this.identity === null
           ? `${REMOTE_ORIGIN}/control`
-          : `${REMOTE_ORIGIN}/control?deviceId=${encodeURIComponent(this.identity.deviceId)}`,
+          : `${REMOTE_ORIGIN}/app/?deviceId=${encodeURIComponent(this.identity.deviceId)}`,
       mcpUrl: `${REMOTE_ORIGIN}/mcp`,
       pairing: pairing.pairing,
       pairingPending: pairing.pairingPending,
@@ -280,7 +316,12 @@ class RemoteAccessRuntime {
     }
     return this.status();
   }
-  decide(pairingId: string, approved: boolean, scopes: RemoteScope[]): RemoteAccessStatus {
+  decide(
+    pairingId: string,
+    approved: boolean,
+    scopes: RemoteScope[],
+    remember = false,
+  ): RemoteAccessStatus {
     const request = this.pairing.getRequest(pairingId);
     if (
       !this.connected ||
@@ -289,7 +330,7 @@ class RemoteAccessRuntime {
       !scopes.every((scope) => request.requestedScopes.includes(scope))
     )
       throw new Error('Pairing is unavailable.');
-    if (!this.relay.send({ type: 'pair.decide', pairingId, approved, scopes }))
+    if (!this.relay.send({ type: 'pair.decide', pairingId, approved, scopes, remember }))
       throw new Error('Remote access is offline.');
     this.pairing.removeRequest(pairingId);
     if (approved) this.listClients();

@@ -110,18 +110,19 @@ describe('explicit machine-control pairing permission', () => {
     const fetcher = approveFetcher();
     const host = await renderRequest(['read', 'edit', 'control']);
     const checkboxes = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
-    expect(checkboxes).toHaveLength(2);
+    // Edit, control and the ADR-583 30-day choice all start off.
+    expect(checkboxes).toHaveLength(3);
     expect(checkboxes.every((input) => !input.checked)).toBe(true);
     await clickApprove(host);
     const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
-    expect(body).toMatchObject({ approved: true, scopes: ['read'] });
+    expect(body).toMatchObject({ approved: true, scopes: ['read'], remember: false });
   });
 
   it('can grant machine control without granting artwork editing', async () => {
     const fetcher = approveFetcher();
     const host = await renderRequest(['read', 'edit', 'control']);
     const control = [...host.querySelectorAll<HTMLLabelElement>('label')]
-      .find((label) => label.textContent?.includes('Allow Jog'))
+      .find((label) => label.textContent?.includes('Allow Connect, Home, Jog'))
       ?.querySelector<HTMLInputElement>('input');
     expect(control).toBeDefined();
     await act(async () => control?.click());
@@ -130,10 +131,23 @@ describe('explicit machine-control pairing permission', () => {
     expect(body).toMatchObject({ approved: true, scopes: ['read', 'control'] });
   });
 
+  it('keeps a phone signed in for 30 days only when the PC ticks it (ADR-583)', async () => {
+    const fetcher = approveFetcher();
+    const host = await renderRequest(['read']);
+    const remember = [...host.querySelectorAll<HTMLLabelElement>('label')]
+      .find((label) => label.textContent?.includes('30 days'))
+      ?.querySelector<HTMLInputElement>('input');
+    expect(remember?.checked).toBe(false);
+    await act(async () => remember?.click());
+    await clickApprove(host);
+    const body = JSON.parse(fetcher.mock.calls[0]?.[1]?.body as string) as Record<string, unknown>;
+    expect(body).toMatchObject({ approved: true, scopes: ['read'], remember: true });
+  });
+
   it('does not offer machine control to an existing read/edit request', async () => {
     const host = await renderRequest(['read', 'edit']);
-    expect(host.textContent).not.toContain('Allow Jog, Frame, Start and Abort');
-    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(1);
+    expect(host.textContent).not.toContain('Allow Connect, Home, Jog');
+    expect(host.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
   });
 
   it('clears permission choices when the pending phone request is replaced', async () => {

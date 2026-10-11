@@ -105,7 +105,7 @@ function ManualPairingDetails({
       {phoneUrl === null ? null : (
         <p>
           <a href={phoneUrl} target="_blank" rel="noopener noreferrer">
-            Open the phone control page
+            Open KerfDesk Remote
           </a>
         </p>
       )}

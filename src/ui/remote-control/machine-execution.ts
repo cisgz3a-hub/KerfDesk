@@ -17,6 +17,14 @@ import type { BackgroundMachineAction } from './machine-owned-operation';
 import { RemoteFault } from './fault';
 import { machineReviewPresenter } from './machine-review-presenter';
 import { settledMachineMotion, settledMachineJob } from './machine-settlement';
+import {
+  executeConnect,
+  executeDisconnect,
+  executeHome,
+  executeOrigin,
+  executePauseResume,
+} from './machine-actions';
+import { executeHold } from './machine-hold';
 
 export type MachineExecutionContext = {
   readonly options: RemoteControlOptions;
@@ -32,6 +40,13 @@ export async function executeMachineOperation(
   context.assertOwned(operation);
   if (input.command === 'abort_job') return executeAbort(operation);
   if (input.command === 'jog_machine') return executeJog(input, operation, context, owner);
+  if (input.command === 'jog_hold_start') return executeHold(input, operation, context, owner);
+  if (input.command === 'connect_machine') return executeConnect(operation, context);
+  if (input.command === 'disconnect_machine') return executeDisconnect(operation);
+  if (input.command === 'home_machine') return executeHome(operation);
+  if (input.command === 'set_work_origin') return executeOrigin(input, operation);
+  if (input.command === 'pause_job' || input.command === 'resume_job')
+    return executePauseResume(input.command === 'pause_job', operation);
   operation.state = 'preparing';
   if (input.command === 'frame_job') return executeFrame(operation, owner);
   return executeReviewedJob(operation, context, owner);

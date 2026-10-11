@@ -17,6 +17,7 @@ import { device } from './relay.js';
 import { publicHandler } from './public.js';
 import { protectedHandler } from './mcp.js';
 import { ingressLimited, rateLimited } from './limits.js';
+import { APP_CSP, APP_DOCUMENT } from './app-assets.js';
 export { RemoteDevice } from './device.js';
 const provider = new OAuthProvider<Env>({
   apiRoute: '/mcp',
@@ -110,11 +111,12 @@ export default {
       request = await boundBody(request, url);
       if (await ingressLimited(request, env, url)) return safeResponse(rateLimited());
       const response = await provider.fetch(request, env, ctx);
-      const camera =
+      const html =
         request.method === 'GET' &&
-        (url.pathname === '/' || url.pathname === '/control') &&
         response.status === 200 &&
         response.headers.get('Content-Type')?.startsWith('text/html') === true;
+      const camera = html && (url.pathname === '/' || url.pathname === '/control');
+      if (html && url.pathname === APP_DOCUMENT) return safeResponse(response, true, APP_CSP);
       return safeResponse(response, camera);
     } catch (error) {
       const status = error instanceof RequestFailure ? error.status : 503;
