@@ -4,7 +4,7 @@ This list grows as the audit continues. Status is taken from the live repair led
 
 ## FND-001: SVG import drops visible children overriding inherited fill or stroke opacity
 
-Repair: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139). State: pr-open-ci-verified.
+Repair: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139). State: merged-ci-verified.
 
 Recorded CI: passed at commit 2f212738870ccdbea45e739acd05a5c0bfe389e8.
 
@@ -34,7 +34,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence
 
 ## BITMAP-01: Retain boundary outlines after pixel-coordinate rounding
 
-Repair: [#1140](https://github.com/cisgz3a-hub/KerfDesk/pull/1140). State: pr-open-ci-verified.
+Repair: [#1140](https://github.com/cisgz3a-hub/KerfDesk/pull/1140). State: merged-ci-verified.
 
 Recorded CI: passed at commit 297d3f547217c338fec8d6c6b7d77847c32cf0fc.
 
@@ -48,7 +48,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/controller-raster.md. Repair e
 
 ## EUM-01: Preserve valid imported thicknesses when opening the material editor
 
-Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
+Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: merged-ci-verified.
 
 Recorded CI: passed at commit 0e0a5f2f8f0381cb46daf097151af17499e21e27.
 
@@ -62,7 +62,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 ## EUM-02: Keep the canonical material identity during an unchanged preset edit
 
-Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
+Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: merged-ci-verified.
 
 Recorded CI: passed at commit 0e0a5f2f8f0381cb46daf097151af17499e21e27.
 
@@ -76,7 +76,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 ## EUM-03: Update operation metadata when changing a preset's process mode
 
-Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: pr-open-ci-verified.
+Repair: [#1141](https://github.com/cisgz3a-hub/KerfDesk/pull/1141). State: merged-ci-verified.
 
 Recorded CI: passed at commit 0e0a5f2f8f0381cb46daf097151af17499e21e27.
 
@@ -90,7 +90,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/early-ui-materials.md. Repair 
 
 ## CCA-001: Append camera preview cache busting outside the proxied camera URL
 
-Repair: [#1142](https://github.com/cisgz3a-hub/KerfDesk/pull/1142). State: pr-open-ci-verified.
+Repair: [#1142](https://github.com/cisgz3a-hub/KerfDesk/pull/1142). State: merged-ci-verified.
 
 Recorded CI: passed at commit 335b6e8438f2694b005c906bce761894cc479e98.
 
@@ -104,7 +104,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.js
 
 ## CCA-002: Use the grabbed selected node as the drag reference
 
-Repair: [#1143](https://github.com/cisgz3a-hub/KerfDesk/pull/1143). State: pr-open-ci-verified.
+Repair: [#1143](https://github.com/cisgz3a-hub/KerfDesk/pull/1143). State: merged-ci-verified.
 
 Recorded CI: passed at commit b8389a0f7f9318e6750a0d7482ffa127aa4f293e.
 
@@ -118,7 +118,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.js
 
 ## BRP-01: Reject a stale board correction after Undo replaces the captured outline
 
-Repair: [#1145](https://github.com/cisgz3a-hub/KerfDesk/pull/1145). State: pr-open-ci-verified.
+Repair: [#1145](https://github.com/cisgz3a-hub/KerfDesk/pull/1145). State: merged-ci-verified.
 
 Recorded CI: passed at commit 27f118da6cca51f64ec7e69b6cdd1ee1926e2084.
 
@@ -132,7 +132,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/board-rotary-planner.
 
 ## B02-TRACE-001: Close the final fairing span at its actual corner
 
-Repair: [#1144](https://github.com/cisgz3a-hub/KerfDesk/pull/1144). State: pr-open-ci-verified.
+Repair: [#1144](https://github.com/cisgz3a-hub/KerfDesk/pull/1144). State: merged-ci-verified.
 
 Recorded CI: passed at commit b0a45672e8846e58910c06db3fbf286d60ebe96e.
 
@@ -146,7 +146,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/trace.json. Repair ev
 
 ## B03-CNC-001: Use a valid containment witness for concave helical pockets
 
-Repair: [#1146](https://github.com/cisgz3a-hub/KerfDesk/pull/1146). State: pr-open-ci-verified.
+Repair: [#1146](https://github.com/cisgz3a-hub/KerfDesk/pull/1146). State: merged-ci-verified.
 
 Recorded CI: passed at commit 04545ed92f6bbf4366b99be9d22ec21a53dda4b2.
 
@@ -166,7 +166,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Re
 
 ## B03-CNC-002: Look up manual tab anchors using the source path color
 
-Repair: [#1147](https://github.com/cisgz3a-hub/KerfDesk/pull/1147). State: pr-open-ci-verified.
+Repair: [#1147](https://github.com/cisgz3a-hub/KerfDesk/pull/1147). State: merged-ci-verified.
 
 Recorded CI: passed at commit be8d56612aeb6c20131ff2c1ca8eeb00a2770307.
 
@@ -180,7 +180,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/cnc-geometry.json. Re
 
 ## MTX-001: Bind Zero Z acknowledgement to the tool that initiated it
 
-Repair: [#1148](https://github.com/cisgz3a-hub/KerfDesk/pull/1148). State: pr-open-ci-verified.
+Repair: [#1148](https://github.com/cisgz3a-hub/KerfDesk/pull/1148). State: merged-ci-verified.
 
 Recorded CI: passed at commit 4cecefc2f99271f2ec3d6a88781d659bcad2122f.
 
@@ -194,7 +194,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.
 
 ## WUX-001: Imported-program playback uses the background project timing
 
-Repair: [#1149](https://github.com/cisgz3a-hub/KerfDesk/pull/1149). State: pr-open-ci-verified.
+Repair: [#1149](https://github.com/cisgz3a-hub/KerfDesk/pull/1149). State: merged-ci-verified.
 
 Recorded CI: passed at commit 4dc690605f80ef27dac35b95e0d0371856ad19f4.
 
@@ -222,7 +222,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json. Re
 
 ## B03-VAR-001: Keep the editable current serial inside the persistence integer domain
 
-Repair: [#1150](https://github.com/cisgz3a-hub/KerfDesk/pull/1150). State: pr-open-ci-verified.
+Repair: [#1150](https://github.com/cisgz3a-hub/KerfDesk/pull/1150). State: merged-ci-verified.
 
 Recorded CI: passed at commit 5db629ff40eb51254d39695cce9bee3fdb850109.
 
@@ -236,9 +236,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json. R
 
 ## B04-DIAGNOSTIC-001: Opt-in Edge diagnostics use copied settings that differ from the app defaults they claim
 
-Repair: [#1152](https://github.com/cisgz3a-hub/KerfDesk/pull/1152). State: pr-open-ci-pending.
+Repair: [#1152](https://github.com/cisgz3a-hub/KerfDesk/pull/1152). State: merged-ci-verified.
 
-Recorded CI: pending at commit b121d97e71c17f4eed04373d68f54de925c0386d.
+Recorded CI: passed at commit b121d97e71c17f4eed04373d68f54de925c0386d.
 
 Trigger: Run the Edge smoothness or small-letter diagnostics with TRACE_AUDIT=1 and no operator override.
 
@@ -259,3 +259,4 @@ These concern the audit records and are separate from application defect counts.
 - [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: resolved-in-published-followup.
 - [4240943303](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303): Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful. Status: resolved-in-published-followup.
 - [4241008264](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264): The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed. Status: resolved-in-published-followup.
+- [4241339123](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241339123): Confirmed ambiguous historical milestone. Preserve its exact timestamp under publicationHistory tied to tracker1151 headf7833a46; remove unscoped current-completion field. No consumer failure or gate bypass demonstrated. Independent snapshot review also scoped the superseded83bd verification timestamp, aligned the current b060 source receipt and refreshed the feedback pointer. Status: fixed-awaiting-independent-review-and-publication.

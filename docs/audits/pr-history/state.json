@@ -3,16 +3,16 @@
   "repository": "cisgz3a-hub/KerfDesk",
   "startedAt": "2026-10-11T04:39:21.762Z",
   "status": "active",
-  "phase": "publication-and-ci-verification",
+  "phase": "tracking-snapshot-review",
   "integrationBranch": "codex/pr-history-audit-20261011",
-  "mainAtLastFetch": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+  "mainAtLastFetch": "50f86d378894f9efb97fb0fc9ddc93438246e523",
   "ledgerBranch": "codex/pr-audit-ledger-20261011",
   "ledgerPr": {
     "number": 1151,
     "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151",
-    "head": "586a3c40451c48592af352fda554b84b662545b8",
-    "integrationCommit": "f87141e8e9eb4cf30685c65427764faa09574409",
-    "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "head": "b060616371598d34c97dcbe26f1e13d692613171",
+    "integrationCommit": "ec9b8043a59e8976d423c253866ac6d72f227f0f",
+    "base": "50f86d378894f9efb97fb0fc9ddc93438246e523",
     "previousPublishedHeads": [
       "a0ace701f12c880bc897a8c5d48ec20ba548c045",
       "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
@@ -20,7 +20,9 @@
       "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
       "f7833a464df7307499c5aa3de4a28a4244dc8de2",
       "a05bb69051de0e076fbcca96f7b42657628ea86e",
-      "8f82dc686515fa99e146a3c1cd3479fa64670e02"
+      "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+      "586a3c40451c48592af352fda554b84b662545b8",
+      "83bd1e40a59772392ce6d148a2c2869a51050f78"
     ]
   },
   "publisherWorktree": "C:/Users/Asus/.codex/worktrees/6fd9/pr-audit-publish",
@@ -35,18 +37,17 @@
   ],
   "activeClaims": [
     {
-      "scope": "batch-04:tracking-snapshot-review",
-      "owner": "/root/live_0900",
-      "publicationOwner": "root",
-      "activity": "Independent frozen nine-file review; root retains tracking commit/push and CI ownership",
-      "claimedAt": "2026-10-11T10:29:02.783Z"
-    },
-    {
-      "scope": "batch-04:publication-and-ci",
+      "scope": "tracker1151:comment4241339123-publication",
       "owner": "root",
       "publicationOwner": "root",
-      "activity": "Verify current-head source, feedback and both required CI aggregates for repair #1152, every earlier repair, and tracking PR #1151",
-      "claimedAt": "2026-10-11T10:29:02.783Z"
+      "activity": "Retain focused commit/push and latest-head CI ownership for timestamp followup",
+      "claimedAt": "2026-10-11T11:19:28.374Z"
+    },
+    {
+      "scope": "tracker1151:timestamp-frozen-snapshot-review",
+      "owner": "/root/batch04_gate",
+      "publicationOwner": "root",
+      "activity": "Independent exact nine-file review only"
     }
   ],
   "completionCriteria": [
@@ -92,23 +93,23 @@
       "hunks": 172,
       "changedLines": 2429
     },
-    "gate": "All13 repairs and tracker current-head source, full manifests, review feedback, main reconciliation and both required CI aggregates must be verified before dispatch."
+    "gate": "Refresh exact heads, main, inventory, CI and complete feedback. Obtain current exact-byte peer feedback approval. Run independently reviewed start-batch-05-reconciled.mjs with a current config in validation-only mode, then --advance only when every source/lifecycle/followup/CI check passes. Merged repair CI retains historical base; independent merge and current-main blobs must match reviewed source.",
+    "transitionHelper": "docs/audits/2026-10-11-pr-history/start-batch-05-reconciled.mjs",
+    "transitionHelperReview": "docs/audits/2026-10-11-pr-history/publication/batch05-lifecycle-gate-peer-review.json"
   },
   "latestIntegratedVerification": "docs/audits/2026-10-11-pr-history/publication/integrated-verification.json",
   "advanceOnlyWhen": "Every repair in the current cycle has cycleVerified true: published head, complete manifest and source match independent review; all follow-ups published; current main reconciled; required CI successful. Closed-unmerged is incomplete.",
   "automationCompletionGuardUpdated": true,
-  "publicationCompletedAt": "2026-10-11T08:18:28.736Z",
-  "finalSourceHead": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+  "finalSourceHead": "50f86d378894f9efb97fb0fc9ddc93438246e523",
   "ledgerReview": {
-    "status": "approved",
-    "reviewer": "ledger_0900",
-    "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-review.md",
-    "verification": "All nine frozen files match independent approval, focused commit and complete published source tree. Continuation action consistency and ledger associations passed independent checks. Replacement-head CI remains separate.",
+    "status": "awaiting-independent-review",
+    "reviewer": "/root/live_0900",
+    "report": "docs/audits/2026-10-11-pr-history/publication/batch04-ledger-r2-peer-review.md",
+    "verification": "All nine live files, complete changed-file manifest and every published blob independently matched the frozen approval and focused commit. Hosted CI applies only to the observed current head.",
     "followUpReview": {
-      "status": "published-ci-verified",
-      "reviewer": "ledger_0900",
-      "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-review.md",
-      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-files.json"
+      "status": "awaiting-independent-review",
+      "reviewer": "/root/batch04_gate",
+      "scope": "Timestamp correction and complete nine-file current snapshot"
     },
     "approvalScope": "Frozen nine-file snapshot independently approved, focused commit matched all reviewed files; local self-receipt is separate from that committed snapshot.",
     "reviewComments": [
@@ -182,20 +183,30 @@
         "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-review-report.md",
         "resolvedByPublishedHead": "586a3c40451c48592af352fda554b84b662545b8",
         "independentSnapshotReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-review.md"
+      },
+      {
+        "id": 4241339123,
+        "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241339123",
+        "commentedHead": "b060616371598d34c97dcbe26f1e13d692613171",
+        "status": "fixed-awaiting-independent-review-and-publication",
+        "result": "Confirmed ambiguous historical milestone. Preserve its exact timestamp under publicationHistory tied to tracker1151 headf7833a46; remove unscoped current-completion field. No consumer failure or gate bypass demonstrated. Independent snapshot review also scoped the superseded83bd verification timestamp, aligned the current b060 source receipt and refreshed the feedback pointer.",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation1113-review-complete.json",
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation1113-timestamp-author.md"
       }
     ],
-    "integrationCommit": "f87141e8e9eb4cf30685c65427764faa09574409",
-    "previousReport": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md",
-    "fileManifest": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-files.json",
-    "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-commit-attestation.json",
-    "verifiedPublishedHead": "586a3c40451c48592af352fda554b84b662545b8",
+    "integrationCommit": "ec9b8043a59e8976d423c253866ac6d72f227f0f",
+    "previousReport": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-review.md",
+    "fileManifest": "docs/audits/2026-10-11-pr-history/publication/batch04-ledger-r2-peer-files.json",
+    "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/batch04-ledger-r2-commit-attestation.json",
+    "verifiedPublishedHead": "b060616371598d34c97dcbe26f1e13d692613171",
     "sourceAttestation": {
-      "reviewedCommit": "f87141e8e9eb4cf30685c65427764faa09574409",
-      "publishedHead": "586a3c40451c48592af352fda554b84b662545b8",
-      "method": "Complete nine-file ledger manifest and every file match the reviewed Git tree",
-      "checkedAt": "2026-10-11T09:23:04.124Z"
+      "reviewedCommit": "ec9b8043a59e8976d423c253866ac6d72f227f0f",
+      "publishedHead": "b060616371598d34c97dcbe26f1e13d692613171",
+      "checkedAt": "2026-10-11T11:01:23.037Z",
+      "method": "Independent live complete manifest and every published blob match the frozen reviewed Git tree",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-tracker-reconciled-published-review.json"
     },
-    "publicationVerifiedAt": "2026-10-11T09:25:47.492Z",
+    "publicationVerifiedAt": "2026-10-11T11:01:23.037Z",
     "previousApproval": {
       "status": "approved",
       "reviewer": "ledger_0900",
@@ -626,222 +637,222 @@
       "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0904-tracker-published-review.md"
     },
     "latestHostedReviewRefresh": {
-      "checkedAt": "2026-10-11T10:23:44.858Z",
-      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
-      "result": "All tracking feedback re-read; no new or edited tracking claim. This receipt precedes the next tracking publication."
+      "checkedAt": "2026-10-11T11:13:30.947Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation1113-review-complete.json",
+      "independentReview": "docs/audits/2026-10-11-pr-history/publication/continuation1113-feedback-peer-review.json",
+      "result": "All74 feedback entries read; both hosted reviews completed and timestamp finding4241339123 requires publication and CI."
     },
     "trackingHelperReview": {
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-triage.md",
-      "independentCandidateCases": 23,
-      "baselineAndAttestationCases": 14,
-      "legacyCheckerAndRendererCases": 24,
-      "scope": "Local continuation helper and README review; independent approval of the frozen nine-file snapshot remains required"
+      "checkedAt": "2026-10-11T11:11:37.394Z",
+      "report": "docs/audits/2026-10-11-pr-history/publication/continuation1104-ci-main-review.json",
+      "result": "14 independent controls passed for fetched-main ancestry in live CI helpers; merged lifecycle preserves historical exact-head CI."
     },
-    "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/continuation-0924-tracker-published-review.md"
+    "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/batch04-tracker-reconciled-published-review.md",
+    "previousPublishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/batch04-ledger-published-review.md",
+    "publishedIndependentReviewEvidence": "docs/audits/2026-10-11-pr-history/publication/batch04-tracker-reconciled-published-review.json",
+    "discussionDispositions": [
+      {
+        "id": 6105783912,
+        "status": "informational-no-review-performed",
+        "head": "b060616371598d34c97dcbe26f1e13d692613171",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-reconciled-review-complete.json",
+        "result": "Changed run metadata; automatic review skipped."
+      },
+      {
+        "id": 6105785024,
+        "status": "informational-review-completed-with-finding",
+        "head": "b060616371598d34c97dcbe26f1e13d692613171",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation1113-review-complete.json",
+        "result": "Code and security reviews completed; actionable timestamp finding4241339123 retained separately."
+      }
+    ]
   },
   "ledgerCi": {
-    "status": "passed",
-    "head": "586a3c40451c48592af352fda554b84b662545b8",
-    "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-    "checkedAt": "2026-10-11T10:24:10.764Z",
-    "absentRequired": [],
-    "unmetRequired": [],
-    "missingRequired": [],
+    "status": "pending",
+    "head": "b060616371598d34c97dcbe26f1e13d692613171",
+    "base": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+    "fetchedMain": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+    "needsMainReconciliation": false,
+    "containsFetchedMain": true,
+    "checkedAt": "2026-10-11T11:16:04.562Z",
+    "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+    "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
     "checks": [
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:28:47Z",
+        "completedAt": "2026-10-11T11:06:29Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174127/job/114436927712",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016180/job/114454055133",
         "name": "Browser test checks and production-bundle smoke",
-        "startedAt": "2026-10-11T09:23:56Z",
+        "startedAt": "2026-10-11T11:01:55Z",
         "status": "COMPLETED",
         "workflowName": "Browser smoke"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:29:24Z",
+        "completedAt": "2026-10-11T11:14:50Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783723",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047465",
         "name": "Typecheck, lint and format",
-        "startedAt": "2026-10-11T09:23:06Z",
+        "startedAt": "2026-10-11T11:09:10Z",
         "status": "COMPLETED",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:25:14Z",
+        "completedAt": "2026-10-11T11:04:06Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174212/job/114436783754",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016148/job/114454047353",
         "name": "Package, check and launch the desktop app",
-        "startedAt": "2026-10-11T09:23:06Z",
+        "startedAt": "2026-10-11T11:01:55Z",
         "status": "COMPLETED",
         "workflowName": "Desktop package check"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:23:04Z",
-        "conclusion": "SKIPPED",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174212/job/114436784276",
-        "name": "Package, install and launch the Windows desktop app",
-        "startedAt": "2026-10-11T09:23:05Z",
-        "status": "COMPLETED",
-        "workflowName": "Desktop package check"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:45:19Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174127/job/114436927897",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016180/job/114454055303",
         "name": "Chrome UX smoke (1/4)",
-        "startedAt": "2026-10-11T09:23:56Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-11T11:05:33Z",
+        "status": "IN_PROGRESS",
         "workflowName": "Browser smoke"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:25:57Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783639",
-        "name": "Policy checks and builds",
-        "startedAt": "2026-10-11T09:23:06Z",
-        "status": "COMPLETED",
-        "workflowName": "CI"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:43:14Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174127/job/114436927923",
-        "name": "Chrome UX smoke (2/4)",
-        "startedAt": "2026-10-11T09:23:56Z",
-        "status": "COMPLETED",
-        "workflowName": "Browser smoke"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:46:52Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174127/job/114436927933",
-        "name": "Chrome UX smoke (3/4)",
-        "startedAt": "2026-10-11T09:23:56Z",
-        "status": "COMPLETED",
-        "workflowName": "Browser smoke"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:44:18Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174127/job/114436928027",
-        "name": "Chrome UX smoke (4/4)",
-        "startedAt": "2026-10-11T09:23:56Z",
-        "status": "COMPLETED",
-        "workflowName": "Browser smoke"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:23:04Z",
+        "completedAt": "2026-10-11T11:00:55Z",
         "conclusion": "SKIPPED",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174212/job/114436784515",
-        "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
-        "startedAt": "2026-10-11T09:23:05Z",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016148/job/114454048556",
+        "name": "Package, install and launch the Windows desktop app",
+        "startedAt": "2026-10-11T11:00:56Z",
         "status": "COMPLETED",
         "workflowName": "Desktop package check"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:47:29Z",
+        "completedAt": "2026-10-11T11:05:31Z",
         "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174127/job/114440954870",
-        "name": "Chrome UX smoke",
-        "startedAt": "2026-10-11T09:46:55Z",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047314",
+        "name": "Policy checks and builds",
+        "startedAt": "2026-10-11T11:01:56Z",
         "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016180/job/114454055176",
+        "name": "Chrome UX smoke (2/4)",
+        "startedAt": "2026-10-11T11:01:55Z",
+        "status": "IN_PROGRESS",
         "workflowName": "Browser smoke"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:36:58Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783854",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016180/job/114454055265",
+        "name": "Chrome UX smoke (3/4)",
+        "startedAt": "2026-10-11T11:03:26Z",
+        "status": "IN_PROGRESS",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016180/job/114454055240",
+        "name": "Chrome UX smoke (4/4)",
+        "startedAt": "2026-10-11T11:01:55Z",
+        "status": "IN_PROGRESS",
+        "workflowName": "Browser smoke"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047558",
         "name": "Unit tests (1/4)",
-        "startedAt": "2026-10-11T09:23:07Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-11T11:14:51Z",
+        "status": "IN_PROGRESS",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:31:56Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783780",
+        "completedAt": "2026-10-11T11:00:55Z",
+        "conclusion": "SKIPPED",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016148/job/114454048546",
+        "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+        "startedAt": "2026-10-11T11:00:56Z",
+        "status": "COMPLETED",
+        "workflowName": "Desktop package check"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047510",
         "name": "Unit tests (2/4)",
-        "startedAt": "2026-10-11T09:23:07Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-11T11:13:39Z",
+        "status": "IN_PROGRESS",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:33:57Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783782",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047468",
         "name": "Unit tests (3/4)",
-        "startedAt": "2026-10-11T09:23:07Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-11T11:08:21Z",
+        "status": "IN_PROGRESS",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:34:11Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783775",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047513",
         "name": "Unit tests (4/4)",
-        "startedAt": "2026-10-11T09:23:06Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-11T11:08:21Z",
+        "status": "IN_PROGRESS",
         "workflowName": "CI"
       },
       {
         "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:28:14Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114436783746",
+        "completedAt": "0001-01-01T00:00:00Z",
+        "conclusion": "",
+        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38134016155/job/114454047622",
         "name": "Phone and MCP service",
-        "startedAt": "2026-10-11T09:23:07Z",
-        "status": "COMPLETED",
-        "workflowName": "CI"
-      },
-      {
-        "__typename": "CheckRun",
-        "completedAt": "2026-10-11T09:37:30Z",
-        "conclusion": "SUCCESS",
-        "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38128174173/job/114439234308",
-        "name": "Lint, typecheck, license, test, build",
-        "startedAt": "2026-10-11T09:37:00Z",
-        "status": "COMPLETED",
+        "startedAt": "2026-10-11T11:15:12Z",
+        "status": "IN_PROGRESS",
         "workflowName": "CI"
       },
       {
         "__typename": "StatusContext",
         "context": "CodeRabbit",
-        "startedAt": "2026-10-11T09:23:08Z",
+        "startedAt": "2026-10-11T11:01:00Z",
         "state": "SUCCESS",
         "targetUrl": ""
       }
     ]
   },
-  "pendingRepairPrs": [1152],
+  "pendingRepairPrs": [],
   "lastContinuationCheck": {
-    "checkedAt": "2026-10-11T10:29:02.783Z",
-    "main": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-    "phase": "publication-and-ci-verification",
+    "checkedAt": "2026-10-11T11:19:28.376Z",
+    "main": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+    "phase": "tracking-snapshot-review",
     "recordedAndLiveRepairHeadsMatch": true,
     "sourceVerification": [
-      "docs/audits/2026-10-11-pr-history/publication/continuation-0822-source-review.md",
-      "docs/audits/2026-10-11-pr-history/publication/continuation-0924-tracker-published-review.md"
+      "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+      "docs/audits/2026-10-11-pr-history/publication/batch04-tracker-reconciled-published-review.json"
     ],
-    "reviewRefresh": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
-    "cycleVerified": 12,
-    "pendingRepairs": [1152],
-    "trackingCiStatus": "passed",
-    "trackingHead": "586a3c40451c48592af352fda554b84b662545b8",
+    "reviewRefresh": "docs/audits/2026-10-11-pr-history/publication/continuation1113-review-complete.json",
+    "cycleVerified": 13,
+    "pendingRepairs": [],
+    "trackingCiStatus": "pending",
+    "trackingHead": "b060616371598d34c97dcbe26f1e13d692613171",
     "publishedFollowups": [1151],
     "rejectedReviewClaims": [4240505330, 4240648361],
     "documentedReviewLimitations": [4240569210, 4240648358],
@@ -850,10 +861,11 @@
     "nextBatchStarted": false,
     "automation": "ACTIVE; unchanged continuation retained",
     "trackingCycleVerified": false,
-    "sourceProofReuse": "docs/audits/2026-10-11-pr-history/publication/continuation-0941-source-proof-reuse.json"
+    "sourceProofReuse": "docs/audits/2026-10-11-pr-history/publication/continuation-0941-source-proof-reuse.json",
+    "unresolvedReviewComments": [4241339123]
   },
   "reviewCommentProtocol": "Read all current-head comments and compare IDs with explicit dispositions; do not infer processing from posting-time cutoffs.",
-  "nextAction": "Independently review this frozen nine-file tracking snapshot, bind approval to its focused commit and publish it to PR #1151. Then verify all repair heads, complete review-comment dispositions and both required CI aggregates for repair #1152 and the tracking PR. Keep batch-04 publication ownership until every cycle is verified; only then start the prepared next batch.",
+  "nextAction": "Independently review this frozen nine-file timestamp followup, bind approval to a focused commit, and publish to tracking PR1151. Retain comment4241339123 until publication and current-head CI are verified. Refresh all review IDs/bodies and source/main/lifecycle gates before starting batch05 with the approved reconciled transition helper.",
   "currentBatch": {
     "id": "batch-04",
     "startedAt": "2026-10-11T09:49:58.152Z",
@@ -861,7 +873,7 @@
     "main": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "prs": [1, 3, 4, 6, 10, 11, 17, 18, 24],
     "plan": "docs/audits/2026-10-11-pr-history/next-batch-plan.md",
-    "state": "repair-published-tracking-snapshot-review-and-ci-pending",
+    "state": "tracking-followup-awaiting-independent-review",
     "integrationOwner": "root",
     "coverageIntegratedAt": "2026-10-11T10:11:55.750Z",
     "reports": [
@@ -891,6 +903,28 @@
     "prepublicationLedgerCorrections": {
       "evidence": "docs/audits/2026-10-11-pr-history/batch-04/publication/batch04-frozen-expanded-checks.json",
       "result": "Independent review caught a duplicate pending-repair summary left empty and one missing raw summary reference; synchronized the list and referenced the existing complete feedback receipt before publication."
+    },
+    "externalMergeReceipt": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
+    "reconciledTrackerEvidence": "docs/audits/2026-10-11-pr-history/publication/batch04-tracker-reconciled-published-review.json"
+  },
+  "publicationHistory": [
+    {
+      "kind": "tracking-source-publication-verification",
+      "trackingPr": 1151,
+      "publishedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
+      "recordedPublicationVerifiedAt": "2026-10-11T08:18:28.736Z",
+      "sourceStateCommit": "3f6abf9cc505b3690e4ab4adc392d5c73f0b93d9",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-tracker-published-review.json",
+      "scope": "Historical source publication receipt for this exact tracking head only; not batch04 or current-head CI completion."
+    },
+    {
+      "kind": "tracking-source-publication-verification",
+      "trackingPr": 1151,
+      "publishedHead": "83bd1e40a59772392ce6d148a2c2869a51050f78",
+      "recordedPublicationVerifiedAt": "2026-10-11T10:37:14.542Z",
+      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-ledger-published-review.json",
+      "scope": "Historical source publication receipt for this exact tracking head only; not replacement-head or current CI completion.",
+      "reviewedSourceCommit": "ec9b8043a59e8976d423c253866ac6d72f227f0f"
     }
-  }
+  ]
 }
