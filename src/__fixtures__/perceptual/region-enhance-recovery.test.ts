@@ -25,7 +25,9 @@ const A_COLUMNS = [
 ];
 const LETTER_BAND_Y = { min: 655, max: 730 };
 
-function mergedAppEdgeOptions(): TraceOptions {
+// Preserve the historical counter-recovery scenario, including its 3px
+// minimum line length. These are regression inputs, not current app defaults.
+function historicalCounterRecoveryOptions(): TraceOptions {
   return {
     ...(TRACE_PRESETS['Edge Detection'] as TraceOptions),
     edgeLowThresholdRatio: 0.074,
@@ -35,13 +37,13 @@ function mergedAppEdgeOptions(): TraceOptions {
 }
 
 it(
-  'region-enhance recovers the dropped AA counter on the real logo',
+  'region-enhance preserves both AA counters and outside geometry on the real logo',
   { timeout: 120000 },
   async () => {
     const fixture = requiredArchHouseFixtureStatus();
     if (fixture.path === null) return; // fixture not present in this checkout
     const image = decodePngFile(fixture.path);
-    const options = mergedAppEdgeOptions();
+    const options = historicalCounterRecoveryOptions();
     const fullTracePaths = traceImageToEdgePaths(image, options);
 
     const enhanced = await enhanceRegionPaths({
@@ -52,8 +54,8 @@ it(
       trace: (crop, cropOptions) => Promise.resolve(traceImageToEdgePaths(crop, cropOptions)),
     });
 
-    // Both A's must now census 2 closed loops (silhouette + counter). At native
-    // resolution A3 reads 1 — that failing state is pinned by the audit harness.
+    // Both A's must retain 2 closed loops (silhouette + counter). The old Canny
+    // engine lost A3's counter at native resolution; the current engine keeps it.
     const polylines = enhanced.flatMap((p) => p.polylines);
     for (const col of A_COLUMNS) {
       const loops = polylines.filter((pl) => {
