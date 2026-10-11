@@ -66,6 +66,23 @@ function expectClose(actual: unknown, expected: unknown): void {
 }
 
 describe('quarter turn and mirror selection', () => {
+  it('transforms the same finite path vertices that materialization uses', () => {
+    const clean: SketchEntity = {
+      id: 'path',
+      kind: 'path',
+      closed: false,
+      points: [
+        { x: 100, y: 100 },
+        { x: 120, y: 110 },
+      ],
+    };
+    const recoverable = { ...clean, points: [{ x: Number.NaN, y: 0 }, ...clean.points] };
+    const selected = new Set(['rect', 'path']);
+    expect(transformSelection({ entities: [rect, recoverable] }, selected, 'rotate-right')).toEqual(
+      transformSelection({ entities: [rect, clean] }, selected, 'rotate-right'),
+    );
+  });
+
   it.each(kinds)('%s ignores non-materialized selected entities', (kind) => {
     const empty: SketchEntity[] = [
       { id: 'empty', kind: 'path', points: [], closed: false },

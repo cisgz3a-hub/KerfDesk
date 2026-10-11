@@ -18,11 +18,12 @@ export function transformSelection(
   kind: DesignTransformKind,
 ): Sketch {
   // Match materialization's admission without tessellating curves or losing exact bounds.
-  const selected = sketch.entities.filter(
-    (entity) => ids.has(entity.id) && sanitizeEntity(entity) !== null,
-  );
+  const selected = sketch.entities.flatMap((entity) => {
+    const clean = ids.has(entity.id) ? sanitizeEntity(entity) : null;
+    return clean === null ? [] : [clean];
+  });
   if (selected.length === 0) return sketch;
-  const drawableIds = new Set(selected.map((entity) => entity.id));
+  const drawable = new Map(selected.map((entity) => [entity.id, entity]));
   const boxes = selected.map(transformBounds);
   const bounds = {
     minX: Math.min(...boxes.map((box) => box.minX)),
@@ -35,8 +36,9 @@ export function transformSelection(
   const point = (at: Vec2): Vec2 => transformPoint(at, pivot, kind);
   let changed = false;
   const entities = sketch.entities.map((entity) => {
-    if (!drawableIds.has(entity.id)) return entity;
-    const next = transformEntity(entity, point, kind);
+    const source = drawable.get(entity.id);
+    if (source === undefined) return entity;
+    const next = transformEntity(source, point, kind);
     if (sameGeometry(entity, next)) return entity;
     changed = true;
     return next;
@@ -166,10 +168,13 @@ function arcBounds(entity: SketchArc): Bounds {
 function sameGeometry(a: SketchEntity, b: SketchEntity): boolean {
   const before = transformValues(a);
   const after = transformValues(b);
-  return before.every((value, index) => {
-    const next = after[index];
-    return next !== undefined && near(value, next);
-  });
+  return (
+    before.length === after.length &&
+    before.every((value, index) => {
+      const next = after[index];
+      return next !== undefined && near(value, next);
+    })
+  );
 }
 
 /** Only fields changed by these transforms; entity kind and metadata always survive. */
