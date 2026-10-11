@@ -9,7 +9,7 @@
     "attribution": null,
     "group": "svg-paint-opacity",
     "localEvidence": "docs/audits/2026-10-11-pr-history/foundation.md",
-    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-repair-report.md",
     "followUps": [
       {
         "title": "Invalid winning CSS and duplicate inline declarations discard a valid lower opacity",
@@ -34,15 +34,20 @@
       {
         "title": "Valid revert-layer incorrectly exposes lower opacity from the same cascade layer",
         "result": "Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending.",
-        "status": "published-awaiting-ci",
+        "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150",
         "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
-        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Valid CSS math opacity is rejected before cascade resolution",
         "result": "Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending.",
-        "status": "published-awaiting-ci",
+        "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155",
         "additionalCases": [
           "Compound absolute-unit products and quotients reduce without losing valid winning opacity.",
@@ -52,42 +57,96 @@
         ],
         "evidence": "docs/audits/2026-10-11-pr-history/publication/svg-math-limits.json",
         "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
-        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Valid variable-containing opacity declaration is discarded before the cascade winner is resolved",
         "result": "Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed; latest-head hosted CI is pending.",
-        "status": "published-awaiting-ci",
+        "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326",
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
         "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
-        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md"
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Valid environment opacity winner is discarded and malformed nested environment syntax survives",
-        "result": "Independently reproduced against published a4c1968. Retain syntactically valid env() winners as qualified unresolved opacity, validate nested var/env fallback syntax, and explicitly warn that custom or environment values can hide artwork imported fully opaque. Full substitution remains outside scope. Independently reviewed and published; latest-head required CI remains pending.",
-        "status": "published-awaiting-ci",
+        "result": "Independently reproduced against published a4c1968. Retain syntactically valid env() winners as qualified unresolved opacity, validate nested var/env fallback syntax, and explicitly warn that custom or environment values can hide artwork imported fully opaque. Full substitution remains outside scope. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569209",
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-reproduction.md",
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
-        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5"
+        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "key": "unsupported-scalar-argument",
         "title": "Unsupported dimension escapes validation through a scalar opacity function",
-        "result": "Independent lower-zero sign(1fr) tests exposed geometry that Chrome hides. Reject failed typed arguments except legitimate round/clamp keyword slots; preserve supported typed cancellation and scalar functions. This separately reproduced defect is distinct from the original flex-ratio interoperability claim. Independently reviewed and published; latest-head required CI remains pending.",
-        "status": "published-awaiting-ci",
+        "result": "Independent lower-zero sign(1fr) tests exposed geometry that Chrome hides. Reject failed typed arguments except legitimate round/clamp keyword slots; preserve supported typed cancellation and scalar functions. This separately reproduced defect is distinct from the original flex-ratio interoperability claim. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-fr-scalar-before.json",
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
-        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5"
+        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
+      },
+      {
+        "title": "Typed attribute opacity winners are discarded before computed-value substitution",
+        "result": "Syntactically valid typed attr() winners now use the disclosed opaque approximation instead of exposing a lower zero. Invalid syntax preserves valid lower declarations. The related real worker entity mismatch is repaired by consuming already-decoded Attr.value once for paint-opacity CSS, without a second decoder or changes to sanitization. Full attribute lookup/substitution is not claimed.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648365",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+        "additionalCases": [
+          "Actual Chrome main and source-bundled worker agree for XML-encoded typed-attribute inline CSS after the bounded Attr.value repair.",
+          "Named/numeric entity controls and double-encoded negative controls prevent unintended second decoding.",
+          "Actual Chrome DOMPurify main path passes; the separate jsdom serializer artifact remains DISP-046."
+        ],
+        "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
+      },
+      {
+        "title": "Escaped important identifiers are not recognized as declaration priority",
+        "result": "Declaration importance is recognized from final decoded delimiter/identifier tokens, including escaped important spelling, with property-value and raw-attribute validation kept separate. Independent browser and parser controls pass.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648371",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+        "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+        "latestRepairVerification": {
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       }
     ],
-    "followUpAttribution": "Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect. Environment substitution and unsupported scalar arguments were reproduced against the current repair, not attributed to PR #10. Flex-ratio compatibility is DISP-043.",
+    "followUpAttribution": "Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect. Environment substitution and unsupported scalar arguments were reproduced against the current repair, not attributed to PR #10. Flex-ratio compatibility is DISP-043. Typed attribute winners and escaped importance are confirmed follow-ups; their related worker XML entity mismatch is recorded with the attribute repair. The rollback report is rejected in DISP-045, relative sign precision is DISP-044, and the distinct jsdom sanitizer artifact is DISP-046.",
     "followUpEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
     "previousRepairReports": [
       "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md",
       "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
-      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md"
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md"
     ]
   },
   {
@@ -240,57 +299,123 @@
     "attribution": "PR80 introduced estimate-dependent playback; the displayed project estimate mismatch predates PR80 (Workspace estimate call blame 8f24e8d2d5).",
     "group": "external-program-timing",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json",
-    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md",
     "followUps": [
       {
         "title": "Incremental arc-center declarations unnecessarily disable imported timing",
-        "result": "Explicit incremental arc centers preserve the already-supported route and timing; absolute centers remain unsupported. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
-        "status": "published-awaiting-ci",
-        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096"
+        "result": "Explicit incremental arc centers preserve the already-supported route and timing; absolute centers remain unsupported. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Pausing a trailing dwell makes Play restart the entire route",
-        "result": "Play resumes remaining trailing dwell and replays only after actual timeline completion. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
-        "status": "published-awaiting-ci",
-        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100"
+        "result": "Play resumes remaining trailing dwell and replays only after actual timeline completion. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Supported exported dialect words unnecessarily disable imported timing",
-        "result": "Only represented G54, Marlin fan and Smoothieware power words pass the source-model validation and retain timing. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
-        "status": "published-awaiting-ci",
-        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105"
+        "result": "Only represented G54, Marlin fan and Smoothieware power words pass the source-model validation and retain timing. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Restart during a leading dwell retains elapsed wait time",
-        "result": "An explicit restart revision clears elapsed time even when the scrubber distance is already zero. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
-        "status": "published-awaiting-ci",
-        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108"
+        "result": "An explicit restart revision clears elapsed time even when the scrubber distance is already zero. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Same-block dwell is scheduled after motion",
-        "result": "Ordinary G4 executes before same-block motion in both planning boundaries and preview timestamps; existing cycle dwell representation is preserved. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
-        "status": "published-awaiting-ci",
-        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112"
+        "result": "Ordinary G4 executes before same-block motion in both planning boundaries and preview timestamps; existing cycle dwell representation is preserved. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "title": "Non-finite dwell publishes an infinite estimate and unfinishable playback",
-        "result": "Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
-        "status": "published-awaiting-ci",
-        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117"
+        "result": "Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4. Required CI is tracked at the current repair head.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       },
       {
         "key": "inactive-preview-render-loop",
         "title": "Clearing inactive preview repeatedly updates state with an unstable scheduler",
-        "result": "Hosted CI exhausted a test worker. The exact unfinished test injects a fresh scheduler; independent capped probes reproduce all three modes. The repair returns the existing already-empty state for the same owner, preserving real owner changes, route clearing and cancellation. The default application scheduler is stable; this is not a claim that every ordinary mount exhausts memory. Independently reviewed and published; latest-head required CI remains pending.",
-        "status": "published-awaiting-ci",
+        "result": "Hosted CI exhausted a test worker. The exact unfinished test injects a fresh scheduler; independent capped probes reproduce all three modes. The repair returns the existing already-empty state for the same owner, preserving real owner changes, route clearing and cancellation. The default application scheduler is stable; this is not a claim that every ordinary mount exhausts memory. Independently reviewed and published. Required CI is tracked at the current repair head.",
+        "status": "published",
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md",
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
-        "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e"
+        "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
+      },
+      {
+        "key": "same-block-dwell-live-progress",
+        "title": "Live ETA counts an already-completed same-block dwell",
+        "result": "A trusted midpoint after G4 P3 plus motion retained three extra seconds of remaining time. Current-line dwell progress removes the completed wait while preserving exact route boundaries, future and trailing dwells, calibration and serial time.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671071",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+        "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
+      },
+      {
+        "key": "v1-dwell-event-projection",
+        "title": "Parser-only dwell metadata violates the closed executable-plan v1 schema",
+        "result": "Assembly now creates the declared kind/line/seconds dwell shape. Original render-model events retain ordering metadata for internal timing; the v1 schema and exact executable program bytes remain unchanged.",
+        "status": "published",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671073",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+        "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+        "latestRepairVerification": {
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "ci": "pending",
+          "cycleVerified": false
+        }
       }
     ],
-    "followUpAttribution": "These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware. The inactive-clear object update was introduced by this audit repair, and is tracked as a CI follow-up rather than a new historical PR #80 defect.",
+    "followUpAttribution": "These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware. The inactive-clear object update was introduced by this audit repair, and is tracked as a CI follow-up rather than a new historical PR #80 defect. The same-block live-progress and v1 event-projection defects are descendants of this audit repair, not newly attributed historical PR #80 defects.",
     "previousRepairReports": [
-      "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md"
+      "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md"
     ]
   },
   {

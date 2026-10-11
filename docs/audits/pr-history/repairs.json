@@ -10,12 +10,14 @@
       "package.json",
       "pnpm-lock.yaml",
       "public/third-party-notices.txt",
+      "src/io/svg/parse-svg-opacity-attr.test.ts",
       "src/io/svg/parse-svg-opacity-math.test.ts",
       "src/io/svg/parse-svg-opacity-unresolved.test.ts",
       "src/io/svg/parse-svg-opacity-variables.test.ts",
       "src/io/svg/parse-svg-paint-opacity.test.ts",
       "src/io/svg/parse-svg.ts",
       "src/io/svg/svg-import-notes.ts",
+      "src/io/svg/svg-opacity-attr.ts",
       "src/io/svg/svg-opacity-math.ts",
       "src/io/svg/svg-opacity-variables.ts",
       "src/io/svg/svg-paint-opacity.ts",
@@ -28,83 +30,94 @@
     "status": "pr-open-ci-pending",
     "newRegressions": 81,
     "integrationCommit": "0947a16c9718aac146c2f7cb136c20354aa0bde6",
-    "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+    "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
     "pullRequest": {
       "number": 1139,
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139"
     },
     "localVerification": {
-      "result": "passed",
-      "testsPassed": 727,
-      "testFiles": 14,
-      "typecheck": "passed",
-      "scopedLint": "passed",
-      "changedFormatting": "passed",
-      "fileSizePolicy": "passed",
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md",
       "previousVerification": {
         "result": "passed",
-        "testsPassed": 602,
+        "testsPassed": 727,
         "testFiles": 14,
         "typecheck": "passed",
         "scopedLint": "passed",
         "changedFormatting": "passed",
         "fileSizePolicy": "passed",
-        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md",
         "previousVerification": {
           "result": "passed",
-          "testsPassed": 464,
-          "testFiles": 13,
+          "testsPassed": 602,
+          "testFiles": 14,
           "typecheck": "passed",
           "scopedLint": "passed",
           "changedFormatting": "passed",
           "fileSizePolicy": "passed",
-          "report": "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
-          "previousReports": [
-            "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md"
-          ],
-          "licenseCheck": "passed: 63 production packages, 9 allowed licences",
-          "productionBuild": "passed"
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
+          "previousVerification": {
+            "result": "passed",
+            "testsPassed": 464,
+            "testFiles": 13,
+            "typecheck": "passed",
+            "scopedLint": "passed",
+            "changedFormatting": "passed",
+            "fileSizePolicy": "passed",
+            "report": "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
+            "previousReports": [
+              "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md"
+            ],
+            "licenseCheck": "passed: 63 production packages, 9 allowed licences",
+            "productionBuild": "passed"
+          }
         }
-      }
+      },
+      "result": "passed",
+      "testsPassed": 896,
+      "testFiles": 17,
+      "typecheck": "passed with escalated real filesystem access; earlier sandbox inference errors retained as environment evidence",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "whitespace": "passed",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-repair-report.md"
     },
     "ci": {
       "status": "pending",
-      "head": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+      "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.976Z",
-      "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-      "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-      "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "checkedAt": "2026-10-11T07:54:36.561Z",
+      "absentRequired": ["Chrome UX smoke"],
+      "unmetRequired": ["Chrome UX smoke"],
+      "missingRequired": ["Chrome UX smoke"],
       "checks": [
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355242/job/114413619563",
+          "completedAt": "2026-10-11T07:42:56Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504634",
           "name": "Browser test checks and production-bundle smoke",
-          "startedAt": "2026-10-11T07:08:17Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619631",
+          "completedAt": "2026-10-11T07:46:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504623",
           "name": "Typecheck, lint and format",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T07:11:56Z",
+          "completedAt": "2026-10-11T07:40:10Z",
           "conclusion": "SUCCESS",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355218/job/114413619637",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012231/job/114418505057",
           "name": "Package, check and launch the desktop app",
-          "startedAt": "2026-10-11T07:08:18Z",
+          "startedAt": "2026-10-11T07:37:51Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
@@ -112,29 +125,29 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355242/job/114413619660",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504840",
           "name": "Chrome UX smoke (1/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
+          "startedAt": "2026-10-11T07:37:51Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T07:08:16Z",
+          "completedAt": "2026-10-11T07:37:49Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355218/job/114413620363",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012231/job/114418505848",
           "name": "Package, install and launch the Windows desktop app",
-          "startedAt": "2026-10-11T07:08:16Z",
+          "startedAt": "2026-10-11T07:37:49Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T07:10:42Z",
+          "completedAt": "2026-10-11T07:41:16Z",
           "conclusion": "SUCCESS",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619768",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504817",
           "name": "Policy checks and builds",
-          "startedAt": "2026-10-11T07:08:17Z",
+          "startedAt": "2026-10-11T07:37:51Z",
           "status": "COMPLETED",
           "workflowName": "CI"
         },
@@ -142,9 +155,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355242/job/114413619609",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504789",
           "name": "Chrome UX smoke (2/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
+          "startedAt": "2026-10-11T07:37:51Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
@@ -152,86 +165,96 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355242/job/114413619594",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504778",
           "name": "Chrome UX smoke (3/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
+          "startedAt": "2026-10-11T07:37:51Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355242/job/114413619614",
+          "completedAt": "2026-10-11T07:54:18Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012172/job/114418504842",
           "name": "Chrome UX smoke (4/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619807",
-          "name": "Unit tests (1/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
-          "workflowName": "CI"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "2026-10-11T07:08:16Z",
+          "completedAt": "2026-10-11T07:37:49Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355218/job/114413640739",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012231/job/114418505747",
           "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
-          "startedAt": "2026-10-11T07:08:24Z",
+          "startedAt": "2026-10-11T07:37:49Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619805",
+          "completedAt": "2026-10-11T07:51:24Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504860",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:49:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504799",
           "name": "Unit tests (2/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619752",
+          "completedAt": "2026-10-11T07:51:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504873",
           "name": "Unit tests (3/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619788",
+          "completedAt": "2026-10-11T07:51:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504896",
           "name": "Unit tests (4/4)",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120355176/job/114413619773",
+          "completedAt": "2026-10-11T07:42:19Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114418504814",
           "name": "Phone and MCP service",
-          "startedAt": "2026-10-11T07:08:18Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T07:37:51Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:52:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122012176/job/114420858430",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T07:51:56Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "StatusContext",
           "context": "CodeRabbit",
-          "startedAt": "2026-10-11T07:08:21Z",
+          "startedAt": "2026-10-11T07:37:54Z",
           "state": "SUCCESS",
           "targetUrl": ""
         }
@@ -239,9 +262,9 @@
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
-      "head": "447b4bc8a520a387a7d205ed073330955c6e86d5",
-      "testsPassed": 1384,
-      "testFiles": 53,
+      "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+      "testsPassed": 1535,
+      "testFiles": 54,
       "typecheck": "passed",
       "scopedLint": "passed",
       "changedFormatting": "passed",
@@ -249,125 +272,155 @@
       "licenseCheck": "passed",
       "productionBuild": "passed",
       "productionWorkerSmoke": "passed",
-      "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-worker-smoke.mjs",
-      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-5c9adae0c642-2026-10-11T07-04-35-159Z-",
-      "checkedAt": "2026-10-11T07:08:16.404Z",
-      "productionWorkerSmokeTests": 24,
-      "productionWorkerSmokeAssertions": 132,
-      "productionWorkerSmokeEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-5c9adae0c642-2026-10-11T07-04-35-159Z-worker-smoke.json",
-      "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-published-review.md"
+      "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-worker-smoke.mjs",
+      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-fe225a5a7f7d-2026-10-11T07-34-15-976Z-",
+      "checkedAt": "2026-10-11T07:37:49.668Z",
+      "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-svg-published-review.md"
     },
     "review": {
       "status": "approved",
       "reviewer": "foundation_prs",
-      "kind": "Independent seven-file environment substitution and typed scalar-function follow-up; earlier approved repairs retained",
-      "integrationCommit": "5c9adae0c6423dc27fc44620f529f98807524855",
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+      "kind": "Independent eight-file typed attribute, escaped importance and worker entity follow-up; earlier approved repairs retained",
+      "integrationCommit": "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
       "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
       "previousApproval": {
         "status": "approved",
         "reviewer": "foundation_prs",
-        "kind": "Independent complete six-file variable-opacity follow-up; earlier approved repairs retained",
-        "integrationCommit": "73db1309d8d7941e472971e2d564e8cd713774e3",
-        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+        "kind": "Independent seven-file environment substitution and typed scalar-function follow-up; earlier approved repairs retained",
+        "integrationCommit": "5c9adae0c6423dc27fc44620f529f98807524855",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
         "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
         "previousApproval": {
           "status": "approved",
           "reviewer": "foundation_prs",
-          "kind": "Independent complete sibling-authored follow-up, browser math controls and replacement warning delivery; original repair review retained",
-          "integrationCommit": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
-          "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+          "kind": "Independent complete six-file variable-opacity follow-up; earlier approved repairs retained",
+          "integrationCommit": "73db1309d8d7941e472971e2d564e8cd713774e3",
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
           "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
           "previousApproval": {
             "status": "approved",
-            "reviewer": "early_dependencies_tooling",
-            "kind": "independent source and regression review plus Chrome oracle",
-            "integrationCommit": "2a3f70bd54647524852c7f297e87d7f4f94775d0",
-            "report": "docs/audits/2026-10-11-pr-history/publication/svg-followup-peer-review.md",
+            "reviewer": "foundation_prs",
+            "kind": "Independent complete sibling-authored follow-up, browser math controls and replacement warning delivery; original repair review retained",
+            "integrationCommit": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
+            "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
             "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
-            "verifiedPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+            "previousApproval": {
+              "status": "approved",
+              "reviewer": "early_dependencies_tooling",
+              "kind": "independent source and regression review plus Chrome oracle",
+              "integrationCommit": "2a3f70bd54647524852c7f297e87d7f4f94775d0",
+              "report": "docs/audits/2026-10-11-pr-history/publication/svg-followup-peer-review.md",
+              "supersedes": "Earlier bounded review missed invalid cascade candidates; final review explicitly corrects that assessment.",
+              "verifiedPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+              "sourceAttestation": {
+                "reviewedCommit": "2a3f70bd54647524852c7f297e87d7f4f94775d0",
+                "publishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+                "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+                "checkedAt": "2026-10-11T05:18:54.249Z"
+              }
+            },
+            "fileManifest": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-files.json",
+            "verifiedPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
             "sourceAttestation": {
-              "reviewedCommit": "2a3f70bd54647524852c7f297e87d7f4f94775d0",
-              "publishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+              "reviewedCommit": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
+              "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
               "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-              "checkedAt": "2026-10-11T05:18:54.249Z"
+              "checkedAt": "2026-10-11T06:12:10.466Z"
             }
           },
-          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-files.json",
-          "verifiedPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-files.json",
+          "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-commit-attestation.json",
+          "verifiedPublishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
           "sourceAttestation": {
-            "reviewedCommit": "695484d591ba8a9265c13bbcfea7e514bd17e68c",
-            "publishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
+            "reviewedCommit": "73db1309d8d7941e472971e2d564e8cd713774e3",
+            "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
             "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-            "checkedAt": "2026-10-11T06:12:10.466Z"
+            "checkedAt": "2026-10-11T06:39:54.734Z"
           }
         },
-        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-files.json",
-        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-commit-attestation.json",
-        "verifiedPublishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-files.json",
+        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-commit-attestation.json",
+        "pendingComments": [],
+        "verifiedPublishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
         "sourceAttestation": {
-          "reviewedCommit": "73db1309d8d7941e472971e2d564e8cd713774e3",
-          "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+          "reviewedCommit": "5c9adae0c6423dc27fc44620f529f98807524855",
+          "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
           "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-          "checkedAt": "2026-10-11T06:39:54.734Z"
-        }
+          "checkedAt": "2026-10-11T07:12:19.719Z"
+        },
+        "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-published-review.md"
       },
-      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-files.json",
-      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-commit-attestation.json",
+      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-files.json",
+      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-commit-attestation.json",
       "pendingComments": [],
-      "verifiedPublishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-tracker-svg-published-review.md",
+      "verifiedPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
       "sourceAttestation": {
-        "reviewedCommit": "5c9adae0c6423dc27fc44620f529f98807524855",
-        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "reviewedCommit": "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1",
+        "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:19.719Z"
-      },
-      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-published-review.md"
+        "checkedAt": "2026-10-11T07:54:26.303Z"
+      }
     },
     "followUpCommits": [
       "2a3f70bd54647524852c7f297e87d7f4f94775d0",
       "695484d591ba8a9265c13bbcfea7e514bd17e68c",
       "73db1309d8d7941e472971e2d564e8cd713774e3",
-      "5c9adae0c6423dc27fc44620f529f98807524855"
+      "5c9adae0c6423dc27fc44620f529f98807524855",
+      "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1"
     ],
     "independentVerification": {
       "previousVerification": {
-        "testsPassed": 114,
-        "chromeOracleCases": 38,
-        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
-        "note": "Three assertions per case, through both parser routes and exact state. Variables use a qualified approximation; no browser-equality claim for these values.",
         "previousVerification": {
-          "testsPassed": 54,
-          "chromeComparisons": 366,
-          "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
-          "previousReport": "docs/audits/2026-10-11-pr-history/publication/svg-followup-peer-review.md",
-          "chromeOracleCases": 122,
-          "warningActionChecks": 10,
-          "productionWorkerBrowserChecks": 126,
-          "productionWorkerNodeChecks": 252,
-          "note": "Overlapping verification scopes are reported separately, not added to a single test total. Relative-unit approximation is explicitly qualified."
-        }
+          "testsPassed": 114,
+          "chromeOracleCases": 38,
+          "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+          "note": "Three assertions per case, through both parser routes and exact state. Variables use a qualified approximation; no browser-equality claim for these values.",
+          "previousVerification": {
+            "testsPassed": 54,
+            "chromeComparisons": 366,
+            "report": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+            "previousReport": "docs/audits/2026-10-11-pr-history/publication/svg-followup-peer-review.md",
+            "chromeOracleCases": 122,
+            "warningActionChecks": 10,
+            "productionWorkerBrowserChecks": 126,
+            "productionWorkerNodeChecks": 252,
+            "note": "Overlapping verification scopes are reported separately, not added to a single test total. Relative-unit approximation is explicitly qualified."
+          }
+        },
+        "testsPassed": 252,
+        "chromeOracleCases": 84,
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "secondOracleTestsPassed": 129,
+        "secondOracleAssertions": 354,
+        "secondOracleReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-candidate-independent.md",
+        "note": "Independent scopes overlap; counts are separate. Environment/custom-property values use a disclosed opacity-1 approximation, not browser equality."
       },
-      "testsPassed": 252,
-      "chromeOracleCases": 84,
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
-      "secondOracleTestsPassed": 129,
-      "secondOracleAssertions": 354,
-      "secondOracleReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-candidate-independent.md",
-      "note": "Independent scopes overlap; counts are separate. Environment/custom-property values use a disclosed opacity-1 approximation, not browser equality."
+      "testsPassed": 310,
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+      "actualChromeSanitizedMainCases": 119,
+      "actualChromeSourceWorkerCases": 8,
+      "additionalUnknownUnitChromeCases": 6,
+      "secondOracleTestsPassed": 101,
+      "secondOracleAssertions": 289,
+      "secondOracleReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-candidate-report.md",
+      "note": "Distinct, overlapping scopes are reported separately. One jsdom serialization artifact is excluded from the source oracle and closed by actual Chrome main-parser proof. Attribute opacity retains an explicit approximation; no full substitution parity is claimed."
     },
     "cycleVerified": false,
     "previousPublishedHeads": [
       "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
       "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
       "282b60d3c71320ad7884299d7d40924ab59c73f8",
-      "a4c1968b50ab735953b064ec65f8055aa74ced28"
+      "a4c1968b50ab735953b064ec65f8055aa74ced28",
+      "447b4bc8a520a387a7d205ed073330955c6e86d5"
     ],
     "publishedFollowUpCommits": [
       "2a3f70bd54647524852c7f297e87d7f4f94775d0",
       "695484d591ba8a9265c13bbcfea7e514bd17e68c",
       "73db1309d8d7941e472971e2d564e8cd713774e3",
-      "5c9adae0c6423dc27fc44620f529f98807524855"
+      "5c9adae0c6423dc27fc44620f529f98807524855",
+      "fe225a5a7f7d5bdfb177b6dfb28c7d3bc2b20cc1"
     ],
     "completionBlockers": ["Hosted CI is pending"],
     "reviewComments": {
@@ -453,12 +506,46 @@
           "dispositionId": "DISP-043",
           "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
           "result": "Exact ratio rendering claim not reproduced; conflicting specification/browser support retained explicitly. Separate sign(fr) defect independently repaired."
+        },
+        {
+          "id": 4240648358,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648358",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "documented-limitation",
+          "dispositionId": "DISP-044",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md"
+        },
+        {
+          "id": 4240648361,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648361",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "rejected-not-reproduced",
+          "dispositionId": "DISP-045",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md"
+        },
+        {
+          "id": 4240648365,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648365",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "resolved-in-published-followup",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8"
+        },
+        {
+          "id": 4240648371,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240648371",
+          "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "status": "resolved-in-published-followup",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
+          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8"
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     },
     "verificationTestFiles": [
@@ -473,6 +560,7 @@
       "src/io/svg/parse-svg-fill-rule.test.ts",
       "src/io/svg/parse-svg-image-opacity.test.ts",
       "src/io/svg/parse-svg-internal-entities.test.ts",
+      "src/io/svg/parse-svg-opacity-attr.test.ts",
       "src/io/svg/parse-svg-opacity-math.test.ts",
       "src/io/svg/parse-svg-opacity-unresolved.test.ts",
       "src/io/svg/parse-svg-opacity-variables.test.ts",
@@ -517,8 +605,8 @@
       "src/ui/app/use-import-drag-drop.test.tsx"
     ],
     "dependencyVerificationRequired": true,
-    "publicationDescription": "SVG import could discard visible children that override inherited fill or stroke opacity. Resolve inherited paint-opacity properties through the author cascade before deciding whether geometry is visible.\n\nReviewed follow-ups preserve valid cascade rollback, evaluate context-free typed CSS math, and retain valid variable-containing winners. Values needing custom-property or environment substitution or layout use an explicit fully opaque approximation; fresh imports and replacements warn that source-hidden artwork may be included and advise resolving expressions in an SVG editor for exact visibility. Invalid nested var/env syntax preserves lower valid declarations. Scalar functions reject unsupported numeric types even when the delegated library could reduce them to a number. Full custom-property/environment substitution, named cascade layers and browser layout remain outside this importer scope.\n\nThe reported intermediate Infinity/NaN regression did not reproduce against the pinned library and actual browser controls. The reported flex-unit ratio matches current Chrome rejection, although CSS Values4 and Grid2 differ on support; that limitation is explicit. The independently reproduced sign(fr) type escape is repaired and legitimate round/clamp keyword controls remain covered.\n\nThree previously locked MIT CSSTools packages are runtime dependencies with selected/generated notices. Independent source review covers both parser paths, syntax controls, approximation warnings and publication source identity.",
-    "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-worker-smoke.mjs",
+    "publicationDescription": "SVG import could discard visible children that override inherited fill or stroke opacity. Resolve inherited paint-opacity properties through the author cascade before deciding whether geometry is visible.\n\nReviewed follow-ups preserve valid cascade rollback, evaluate context-free typed CSS math, and retain valid variable- or attribute-containing winners. Values needing custom-property, environment or attribute substitution or layout use an explicit fully opaque approximation; fresh imports and replacements warn that source-hidden artwork may be included and advise resolving expressions in an SVG editor for exact visibility. Invalid nested var/env/attr syntax preserves lower valid declarations. Escaped important identifiers are recognized from decoded CSS tokens. Both import paths consume decoded paint-opacity attribute values exactly once, including XML-encoded typed attr syntax in the worker. Scalar functions reject unsupported numeric types even when the delegated library could reduce them to a number. Full custom-property/environment/attribute substitution, named cascade layers and browser layout remain outside this importer scope.\n\nThe reported intermediate Infinity/NaN regression did not reproduce against the pinned library and actual browser controls. The reported flex-unit ratio matches current Chrome rejection, although CSS Values4 and Grid2 differ on support; that limitation is explicit. The independently reproduced sign(fr) type escape is repaired and legitimate round/clamp keyword controls remain covered.\n\nThree previously locked MIT CSSTools packages are runtime dependencies with selected/generated notices. Independent source review covers both parser paths, syntax controls, approximation warnings and publication source identity.",
+    "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-worker-smoke.mjs",
     "isolatedVerificationHistory": [
       {
         "head": "282b60d3c71320ad7884299d7d40924ab59c73f8",
@@ -550,6 +638,25 @@
         "productionWorkerSmokeTests": 12,
         "productionWorkerSmokeEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-73db1309d8d7-2026-10-11T06-35-54-216Z-worker-smoke.json",
         "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-worker-smoke-review.md"
+      },
+      {
+        "head": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+        "testsPassed": 1384,
+        "testFiles": 53,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "licenseCheck": "passed",
+        "productionBuild": "passed",
+        "productionWorkerSmoke": "passed",
+        "productionWorkerSmokeScript": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-worker-smoke.mjs",
+        "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-5c9adae0c642-2026-10-11T07-04-35-159Z-",
+        "checkedAt": "2026-10-11T07:08:16.404Z",
+        "productionWorkerSmokeTests": 24,
+        "productionWorkerSmokeAssertions": 132,
+        "productionWorkerSmokeEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-paint-opacity-followup-5c9adae0c642-2026-10-11T07-04-35-159Z-worker-smoke.json",
+        "productionWorkerSmokeReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-published-review.md"
       }
     ]
   },
@@ -582,7 +689,7 @@
       "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -790,7 +897,7 @@
         "reviewedCommit": "620d688877958c519f3d4948c09f2804b9a77b6e",
         "publishedHead": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:19.959Z"
+        "checkedAt": "2026-10-11T07:54:26.555Z"
       }
     },
     "cycleVerified": true,
@@ -800,9 +907,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1140.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -835,7 +942,7 @@
       "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1042,7 +1149,7 @@
         "reviewedCommit": "d44779477d438f1f36fdf3aaca55e6f9fa9843be",
         "publishedHead": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:20.148Z"
+        "checkedAt": "2026-10-11T07:54:26.849Z"
       }
     },
     "cycleVerified": true,
@@ -1052,9 +1159,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1141.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -1087,7 +1194,7 @@
       "head": "335b6e8438f2694b005c906bce761894cc479e98",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1294,7 +1401,7 @@
         "reviewedCommit": "2950eaaed7019b506bad9e4756d5170187aaae07",
         "publishedHead": "335b6e8438f2694b005c906bce761894cc479e98",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:20.343Z"
+        "checkedAt": "2026-10-11T07:54:27.086Z"
       }
     },
     "cycleVerified": true,
@@ -1304,9 +1411,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1142.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -1341,7 +1448,7 @@
       "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1548,7 +1655,7 @@
         "reviewedCommit": "9b12370cdbbb4b866f990729e29b94f06eb69d93",
         "publishedHead": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:20.537Z"
+        "checkedAt": "2026-10-11T07:54:27.329Z"
       }
     },
     "cycleVerified": true,
@@ -1558,9 +1665,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1143.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -1593,7 +1700,7 @@
       "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1800,7 +1907,7 @@
         "reviewedCommit": "1a707ba87f6af1f3bd8f93c3d319f044bdf2e6eb",
         "publishedHead": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:20.728Z"
+        "checkedAt": "2026-10-11T07:54:27.632Z"
       }
     },
     "cycleVerified": true,
@@ -1810,9 +1917,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1144.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -1844,7 +1951,7 @@
       "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2051,7 +2158,7 @@
         "reviewedCommit": "9b6465c7daf8cbc4609d7439084951d7200cdf3b",
         "publishedHead": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:20.952Z"
+        "checkedAt": "2026-10-11T07:54:27.884Z"
       }
     },
     "cycleVerified": true,
@@ -2061,9 +2168,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1145.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -2095,7 +2202,7 @@
       "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2302,7 +2409,7 @@
         "reviewedCommit": "736fa82bda025ff773ede5be32f4683100e6c62a",
         "publishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:21.151Z"
+        "checkedAt": "2026-10-11T07:54:28.155Z"
       }
     },
     "previousReviews": [
@@ -2341,9 +2448,9 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -2377,7 +2484,7 @@
       "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2584,7 +2691,7 @@
         "reviewedCommit": "04790c91049360688bddfb486a44bd01786281f5",
         "publishedHead": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:21.358Z"
+        "checkedAt": "2026-10-11T07:54:28.459Z"
       }
     },
     "cycleVerified": true,
@@ -2594,9 +2701,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1147.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -2630,7 +2737,7 @@
       "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2826,7 +2933,7 @@
         "reviewedCommit": "ca04af210e1f0499bfc1e5ace953b8f694167c9c",
         "publishedHead": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:21.541Z"
+        "checkedAt": "2026-10-11T07:54:28.722Z"
       }
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
@@ -2847,9 +2954,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1148.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   },
@@ -2860,6 +2967,11 @@
     "auditBatch": 3,
     "branch": "codex/audit-external-program-timing-20261011",
     "files": [
+      "src/core/execution-plan/assemble-executable-plan.ts",
+      "src/core/execution-plan/executable-plan-schema.test.ts",
+      "src/core/execution-plan/executable-plan-types.ts",
+      "src/core/gcode-time/gcode-timing-dwell-progress.test.ts",
+      "src/core/gcode-time/gcode-timing-plan.ts",
       "src/core/gcode-time/program-dwell-order.test.ts",
       "src/core/gcode-time/program-time.ts",
       "src/core/gcode-time/program-timeline.ts",
@@ -2880,6 +2992,7 @@
       "src/ui/import/packed-gcode-result.ts",
       "src/ui/import/parse-gcode-blob.ts",
       "src/ui/state/external-gcode-actions.ts",
+      "src/ui/state/live-job-timing.test.ts",
       "src/ui/state/store.ts",
       "src/ui/state/ui-store.ts",
       "src/ui/workspace/Workspace.tsx",
@@ -2896,33 +3009,44 @@
     "status": "pr-open-ci-pending",
     "newRegressions": null,
     "integrationCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
-    "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+    "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
     "pullRequest": {
       "number": 1149,
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149"
     },
     "localVerification": {
       "previousVerification": {
+        "previousVerification": {
+          "result": "passed",
+          "scope": "17 suites/111 initial tests, affected 35 and final 27 test executions; full TypeScript, scoped lint, formatting, file-size policy and independent peer review plus three probes; execution counts overlap",
+          "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+          "followUpReport": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+          "originalReport": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-repair.md"
+        },
         "result": "passed",
-        "scope": "17 suites/111 initial tests, affected 35 and final 27 test executions; full TypeScript, scoped lint, formatting, file-size policy and independent peer review plus three probes; execution counts overlap",
-        "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
-        "followUpReport": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
-        "originalReport": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-repair.md"
+        "testsPassed": 35,
+        "testFiles": 5,
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "whitespace": "passed",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md"
       },
       "result": "passed",
-      "testsPassed": 35,
-      "testFiles": 5,
+      "testsPassed": 130,
+      "testFiles": 14,
+      "typecheck": "passed",
       "scopedLint": "passed",
       "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
       "whitespace": "passed",
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md"
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-repair.md"
     },
     "ci": {
       "status": "pending",
-      "head": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+      "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
       "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
@@ -2931,9 +3055,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533161/job/114414147751",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135682",
           "name": "Browser test checks and production-bundle smoke",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
@@ -2941,9 +3065,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148389",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135754",
           "name": "Typecheck, lint and format",
-          "startedAt": "2026-10-11T07:11:32Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "CI"
         },
@@ -2951,9 +3075,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533162/job/114414148223",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904798/job/114421135650",
           "name": "Package, check and launch the desktop app",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "Desktop package check"
         },
@@ -2961,29 +3085,29 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148569",
-          "name": "Policy checks and builds",
-          "startedAt": "2026-10-11T07:11:30Z",
-          "status": "QUEUED",
-          "workflowName": "CI"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533161/job/114414147883",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135638",
           "name": "Chrome UX smoke (1/4)",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T07:11:29Z",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135617",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T07:53:35Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533162/job/114414148921",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904798/job/114421136685",
           "name": "Package, install and launch the Windows desktop app",
-          "startedAt": "2026-10-11T07:11:30Z",
+          "startedAt": "2026-10-11T07:53:36Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
@@ -2991,9 +3115,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533161/job/114414147931",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135701",
           "name": "Chrome UX smoke (2/4)",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
@@ -3001,9 +3125,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533161/job/114414147893",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135531",
           "name": "Chrome UX smoke (3/4)",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
@@ -3011,9 +3135,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533161/job/114414147841",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904796/job/114421135588",
           "name": "Chrome UX smoke (4/4)",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "Browser smoke"
         },
@@ -3021,19 +3145,19 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148560",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135740",
           "name": "Unit tests (1/4)",
-          "startedAt": "2026-10-11T07:11:30Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "IN_PROGRESS",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T07:11:29Z",
+          "completedAt": "2026-10-11T07:53:35Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533162/job/114414149151",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904798/job/114421136434",
           "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
-          "startedAt": "2026-10-11T07:11:30Z",
+          "startedAt": "2026-10-11T07:53:35Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
@@ -3041,19 +3165,9 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148579",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421136224",
           "name": "Unit tests (2/4)",
-          "startedAt": "2026-10-11T07:11:30Z",
-          "status": "QUEUED",
-          "workflowName": "CI"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148546",
-          "name": "Unit tests (3/4)",
-          "startedAt": "2026-10-11T07:11:58Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "CI"
         },
@@ -3061,26 +3175,36 @@
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148681",
-          "name": "Unit tests (4/4)",
-          "startedAt": "2026-10-11T07:11:30Z",
-          "status": "QUEUED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135897",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "IN_PROGRESS",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
           "completedAt": "0001-01-01T00:00:00Z",
           "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38120533295/job/114414148473",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135782",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T07:53:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38122904807/job/114421135721",
           "name": "Phone and MCP service",
-          "startedAt": "2026-10-11T07:11:31Z",
+          "startedAt": "2026-10-11T07:53:37Z",
           "status": "IN_PROGRESS",
           "workflowName": "CI"
         },
         {
           "__typename": "StatusContext",
           "context": "CodeRabbit",
-          "startedAt": "2026-10-11T07:11:35Z",
+          "startedAt": "2026-10-11T07:53:40Z",
           "state": "SUCCESS",
           "targetUrl": ""
         }
@@ -3095,73 +3219,102 @@
     "review": {
       "status": "approved",
       "reviewer": "foundation_prs",
-      "kind": "Independent two-file CI render-loop reproduction and idempotence repair; earlier approved source retained",
-      "integrationCommit": "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
+      "kind": "Independent six-file same-block dwell progress and closed-v1 event projection review; earlier approved source retained",
+      "integrationCommit": "b87f289594735c5f1dc54f635a15078907f36619",
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
       "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
       "previousApproval": {
         "status": "approved",
         "reviewer": "foundation_prs",
-        "kind": "Independent full follow-up diff, real emitter comparisons and control regressions; original focused diff review retained",
-        "integrationCommit": "f142cb016818ade49a51bf8859086b8e007aaf18",
-        "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md",
+        "kind": "Independent two-file CI render-loop reproduction and idempotence repair; earlier approved source retained",
+        "integrationCommit": "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
         "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
         "previousApproval": {
           "status": "approved",
           "reviewer": "foundation_prs",
-          "kind": "independent bounded source and regression review",
-          "integrationCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
-          "report": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-peer-review.md",
+          "kind": "Independent full follow-up diff, real emitter comparisons and control regressions; original focused diff review retained",
+          "integrationCommit": "f142cb016818ade49a51bf8859086b8e007aaf18",
+          "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md",
           "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
-          "verifiedPublishedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+          "previousApproval": {
+            "status": "approved",
+            "reviewer": "foundation_prs",
+            "kind": "independent bounded source and regression review",
+            "integrationCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
+            "report": "docs/audits/2026-10-11-pr-history/batch-03/external-preview-peer-review.md",
+            "limitation": "Approval is limited to the described repair; hosted CI, native and hardware evidence are separate.",
+            "verifiedPublishedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+            "sourceAttestation": {
+              "reviewedCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
+              "publishedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+              "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
+              "checkedAt": "2026-10-11T05:18:56.756Z"
+            }
+          },
+          "fileManifest": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-files.json",
+          "verifiedPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
           "sourceAttestation": {
-            "reviewedCommit": "6676114a9594f8b79fc2eeb5acc13c9294235e27",
-            "publishedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
+            "reviewedCommit": "f142cb016818ade49a51bf8859086b8e007aaf18",
+            "publishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
             "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-            "checkedAt": "2026-10-11T05:18:56.756Z"
+            "checkedAt": "2026-10-11T06:39:57.226Z"
           }
         },
-        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-files.json",
-        "verifiedPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+        "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-files.json",
+        "pendingCiFinding": {
+          "run": 38115826326,
+          "job": 114401184688,
+          "head": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-failure.log",
+          "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-red.json",
+          "result": "Confirmed inactive state-update loop repaired in an independently approved two-file commit. The previously unfinished unchanged suite passed all three modes; replacement latest-head hosted CI is pending.",
+          "status": "repaired-published-awaiting-ci",
+          "repairPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e"
+        },
+        "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-commit-attestation.json",
+        "verifiedPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
         "sourceAttestation": {
-          "reviewedCommit": "f142cb016818ade49a51bf8859086b8e007aaf18",
-          "publishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+          "reviewedCommit": "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+          "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
           "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-          "checkedAt": "2026-10-11T06:39:57.226Z"
-        }
+          "checkedAt": "2026-10-11T07:12:21.750Z"
+        },
+        "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-published-review.md"
       },
-      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-files.json",
+      "fileManifest": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-files.json",
       "pendingCiFinding": {
         "run": 38115826326,
         "job": 114401184688,
         "head": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-failure.log",
         "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-red.json",
-        "result": "Confirmed inactive state-update loop repaired in an independently approved two-file commit. The previously unfinished unchanged suite passed all three modes; replacement latest-head hosted CI is pending.",
-        "status": "repaired-published-awaiting-ci",
+        "result": "Confirmed inactive-clear state loop was independently repaired and published; the unchanged previously unfinished suite passed all three modes. Latest replacement-head CI is tracked in ci.",
+        "status": "repaired-published",
         "repairPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e"
       },
-      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-commit-attestation.json",
-      "verifiedPublishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+      "commitAttestation": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-commit-attestation.json",
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-published-review.md",
+      "pendingComments": [],
+      "verifiedPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
       "sourceAttestation": {
-        "reviewedCommit": "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
-        "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+        "reviewedCommit": "b87f289594735c5f1dc54f635a15078907f36619",
+        "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:21.750Z"
-      },
-      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-published-review.md"
+        "checkedAt": "2026-10-11T07:54:28.991Z"
+      }
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
-      "head": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
-      "testsPassed": 242,
-      "testFiles": 31,
+      "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+      "testsPassed": 294,
+      "testFiles": 35,
       "typecheck": "passed",
       "scopedLint": "passed",
       "changedFormatting": "passed",
       "fileSizePolicy": "passed",
-      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/external-program-timing-followup-fc43c8ded360-2026-10-11T07-09-06-952Z-",
-      "checkedAt": "2026-10-11T07:11:29.309Z"
+      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/external-program-timing-followup-b87f28959473-2026-10-11T07-49-42-581Z-",
+      "checkedAt": "2026-10-11T07:53:39.570Z"
     },
     "cycleVerified": false,
     "completionBlockers": ["Hosted CI is pending"],
@@ -3216,22 +3369,42 @@
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
           "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+        },
+        {
+          "id": 4240671071,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671071",
+          "commentedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+          "status": "resolved-in-published-followup",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4"
+        },
+        {
+          "id": 4240671073,
+          "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240671073",
+          "commentedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+          "status": "resolved-in-published-followup",
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4"
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     },
     "followUpCommits": [
       "f142cb016818ade49a51bf8859086b8e007aaf18",
-      "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8"
+      "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+      "b87f289594735c5f1dc54f635a15078907f36619"
     ],
     "verificationTestFiles": [
+      "src/core/execution-plan/build-executable-plan.test.ts",
+      "src/core/execution-plan/executable-plan-schema.test.ts",
       "src/core/gcode-time/estimator-parity.test.ts",
       "src/core/gcode-time/gcode-fractional-feed-time.test.ts",
       "src/core/gcode-time/gcode-timing-calibration.test.ts",
+      "src/core/gcode-time/gcode-timing-dwell-progress.test.ts",
       "src/core/gcode-time/gcode-timing-plan.test.ts",
       "src/core/gcode-time/program-dwell-order.test.ts",
       "src/core/gcode-time/program-native-controller-timing.test.ts",
@@ -3252,6 +3425,7 @@
       "src/ui/import/gcode-preview-timing.test.ts",
       "src/ui/import/packed-gcode-result.test.ts",
       "src/ui/import/parse-gcode-blob.test.ts",
+      "src/ui/state/live-job-timing.test.ts",
       "src/ui/state/ui-store.test.ts",
       "src/ui/workspace/WorkspaceButtons.audit.test.tsx",
       "src/ui/workspace/imported-preview-controls.test.tsx",
@@ -3261,20 +3435,29 @@
       "src/ui/workspace/use-preview-toolpath.test.tsx",
       "src/ui/workspace/workspace-status-poll-renders.test.tsx"
     ],
-    "publicationDescription": "Imported G-code preview previously used the background project estimate. Capture timing with the imported source and its machine assumptions, then use that same timeline for the displayed ETA and playback. Feed changes and dwell intervals now affect the imported route consistently.\n\nThe reviewed follow-up preserves timing for supported exported dialect words and explicit incremental arc centers, places same-block G4 before movement, and reports non-finite estimates as unavailable while retaining geometry. Play resumes a paused final dwell; Restart resets an initial dwell even when the distance scrubber is already zero. Unsupported source syntax keeps an explicit geometry-only fallback.\n\nHosted CI exposed a render loop when inactive preview received a new scheduler callback each render. Clearing an already-empty route now preserves state identity for the same imported owner. The original three status-poll tests remain unchanged and pass; bounded regressions cover idle owner changes and exit/reentry without stale geometry.",
+    "publicationDescription": "Imported G-code preview previously used the background project estimate. Capture timing with the imported source and its machine assumptions, then use that same timeline for the displayed ETA and playback. Feed changes and dwell intervals now affect the imported route consistently.\n\nThe reviewed follow-up preserves timing for supported exported dialect words and explicit incremental arc centers, places same-block G4 before movement, and reports non-finite estimates as unavailable while retaining geometry. Play resumes a paused final dwell; Restart resets an initial dwell even when the distance scrubber is already zero. Unsupported source syntax keeps an explicit geometry-only fallback.\n\nHosted CI exposed a render loop when inactive preview received a new scheduler callback each render. Clearing an already-empty route now preserves state identity for the same imported owner. The original three status-poll tests remain unchanged and pass; bounded regressions cover idle owner changes and exit/reentry without stale geometry.\n\nLive route progress now counts same-block G4 dwell as complete when physical movement proves it has elapsed, without pre-crediting leading, future or trailing waits at stationary boundaries. ExecutablePlan v1 assembly projects dwell events to its existing kind/line/seconds contract; internal ordering metadata remains available to parser-based timing, and the exact G-code bytes and closed schema are unchanged.",
     "previousPublishedHeads": [
       "5bb3558b051251b575da6ccad93916ae8f4039e6",
-      "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4"
+      "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+      "522e79f03d4ccc25494c23d0eda8aad33f33981e"
     ],
     "publishedFollowUpCommits": [
       "f142cb016818ade49a51bf8859086b8e007aaf18",
-      "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8"
+      "fc43c8ded36066a8a4885b1c8fcb73e7c65c91e8",
+      "b87f289594735c5f1dc54f635a15078907f36619"
     ],
     "independentVerification": {
-      "testsPassed": 5,
-      "beforeFailed": 3,
-      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
-      "note": "Bounded copy of the exact unfinished CI suite plus real imported-owner and cancellation controls; default application scheduler is stable, so no universal application OOM claim."
+      "previousVerification": {
+        "testsPassed": 5,
+        "beforeFailed": 3,
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
+        "note": "Bounded copy of the exact unfinished CI suite plus real imported-owner and cancellation controls; default application scheduler is stable, so no universal application OOM claim."
+      },
+      "testsPassed": 25,
+      "beforeFailed": 20,
+      "beforePassed": 5,
+      "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
+      "note": "Identical independent baseline/candidate probes cover actual live ETA, line/route boundaries, after-motion stops, dwell schema validation and lexical round-trip; no hardware claim."
     },
     "isolatedVerificationHistory": [
       {
@@ -3286,6 +3469,17 @@
         "changedFormatting": "passed",
         "fileSizePolicy": "passed",
         "checkedAt": "2026-10-11T05:45:36.358Z"
+      },
+      {
+        "head": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
+        "testsPassed": 242,
+        "testFiles": 31,
+        "typecheck": "passed",
+        "scopedLint": "passed",
+        "changedFormatting": "passed",
+        "fileSizePolicy": "passed",
+        "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/external-program-timing-followup-fc43c8ded360-2026-10-11T07-09-06-952Z-",
+        "checkedAt": "2026-10-11T07:11:29.309Z"
       }
     ]
   },
@@ -3319,7 +3513,7 @@
       "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T07:12:26.979Z",
+      "checkedAt": "2026-10-11T07:54:36.563Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3515,7 +3709,7 @@
         "reviewedCommit": "bbd9e3b055327212866f842be19fe45e6d5f5d57",
         "publishedHead": "5db629ff40eb51254d39695cce9bee3fdb850109",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
-        "checkedAt": "2026-10-11T07:12:21.947Z"
+        "checkedAt": "2026-10-11T07:54:29.404Z"
       }
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
@@ -3536,9 +3730,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1150.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T07:10:09.225Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-postpublish-review-final-complete.json",
-        "result": "All inline/review/discussion IDs and edited bodies read without a timestamp cutoff; no new actionable feedback. Timing was still at its prior head during this read; replacement-head feedback remains subject to refresh."
+        "checkedAt": "2026-10-11T07:56:02.909Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-postpublish-review-complete.json",
+        "result": "All inline/review/discussion IDs and edited bodies read; known confirmed claims are published and independently attested. Hosted quota/skip notices and prior-head summaries are not current-head approval."
       }
     }
   }

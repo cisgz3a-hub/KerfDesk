@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 43 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 10 rejected candidate; 8 documented limitation.
+These 46 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -347,3 +347,27 @@ Disposition: **documented limitation**. Historical PRs: [#1139](https://github.c
 Comment r4240569210 reports calc(1fr / 1fr). Both Chrome154 and the published importer reject that exact expression and preserve the valid lower declaration. CSS Values4 draft type algebra includes flex cancellation while CSS Grid2 retains a flex-in-calc restriction note. The importer retains its observed browser-compatible unsupported-flex boundary; this is not a claim of universal CSS invalidity or a repaired ratio. Independent review separately confirmed sign(1fr) could evade that boundary; that defect is repaired and recorded under FND-001.
 
 Local audit evidence: publication/heartbeat-0651-svg-reproduction.md, publication/heartbeat-0651-svg-peer-review.md, publication/heartbeat-0651-svg-repair-report.md.
+
+## DISP-044: Relative-unit sign expressions retain the disclosed opaque approximation
+
+Disposition: **documented limitation**. Historical PRs: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139).
+
+Comment r4240648358 correctly observes sign(-1em) can clamp to zero while imported geometry is retained. This is covered by the existing explicit layout-dependent opacity-1 approximation and warning that hidden source artwork may be included. Independent normal/zero-font/signed controls preserve that documented behavior. The importer does not perform sign-domain or range analysis to prove every simplifiable contextual expression; this remains a precision limitation, not a repaired expression or browser-equality claim.
+
+Local audit evidence: publication/heartbeat-0718-svg-reproduction-report.md, publication/heartbeat-0718-svg-peer-before.json.
+
+## DISP-045: Stylesheet revert-layer is alleged to bypass SVG presentation attributes
+
+Disposition: **rejected candidate**. Historical PRs: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139).
+
+The reported literal stylesheet revert-layer plus zero presentation attribute remains hidden in actual Chrome154, matching the importer. All 36 independent rollback assertions pass, including importance and parent controls. Cascade5 distinguishes the author presentational-hint origin for cascading; the comment assumption that the two sources must form one removable layer is not supported by these observations. No rollback production change is justified by this report; arbitrary named layers remain outside the importer scope.
+
+Local audit evidence: publication/heartbeat-0718-svg-reproduction-report.md, publication/heartbeat-0718-svg-peer-before.json.
+
+## DISP-046: Typed attr XML reserialization fails only in the jsdom test environment
+
+Disposition: **documented limitation**. Historical PRs: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139).
+
+A raw probe using XML-escaped type(<number>) inside an inline attribute encountered an XML reparse error after jsdom serialization emitted a literal less-than character. Actual Chrome154 with the same installed DOMPurify and sanitizer options preserves the escape and reparses cleanly. This is recorded separately from the 39 substantive attr/importance probe failures; no production sanitizer repair or weakened sanitization is justified by the environment-only result.
+
+Local audit evidence: publication/heartbeat-0718-svg-reproduction-report.md, publication/heartbeat-0718-svg-reproduction-sanitize.json.
