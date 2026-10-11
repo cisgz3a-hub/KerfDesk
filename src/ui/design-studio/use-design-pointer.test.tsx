@@ -56,7 +56,7 @@ describe('Design point-tool pointer interactions', () => {
     document.body.appendChild(host);
     root = createRoot(host);
     useDesignStudioStore.setState({ session: null, stash: null });
-    useDesignStudioStore.getState().openStudio();
+    void useDesignStudioStore.getState().openStudio();
   });
 
   afterEach(() => {

@@ -32,7 +32,7 @@ beforeEach(() => {
   const project = createProject();
   useStore.setState({ project: { ...project, scene: { ...project.scene, objects: [photo] } } });
   studio.setState({ session: null, stash: null });
-  studio.getState().openStudio();
+  void studio.getState().openStudio();
   studio.getState().setView({ panXmm: 0, panYmm: 0, pxPerMm: 1 });
 });
 afterEach(() => vi.unstubAllGlobals());

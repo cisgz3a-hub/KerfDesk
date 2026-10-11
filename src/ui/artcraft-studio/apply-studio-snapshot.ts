@@ -17,7 +17,6 @@ export async function applyStudioSnapshot(
   ownerEpoch: number,
   isActive: () => boolean = () => true,
 ): Promise<void> {
-  const file = snapshotFile(snapshot);
   const current = () => {
     if (!isActive()) throw new Error('The editor panel closed. Nothing was applied.');
     const state = useStore.getState();
@@ -25,6 +24,8 @@ export async function applyStudioSnapshot(
       throw new Error('The project changed. Apply again to the project you want to edit.');
     return state;
   };
+  current();
+  const file = await snapshotFile(snapshot);
   current();
   let committed = false;
   const commit = (fragment: SvgArtworkFragment, raster: boolean): ImportOutcome => {

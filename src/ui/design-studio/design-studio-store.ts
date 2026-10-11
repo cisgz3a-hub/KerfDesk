@@ -53,7 +53,7 @@ import {
   updateSessionMove,
 } from './design-session-mutations';
 import { readPersistedSession } from './design-session-storage';
-import { designRecoveryOwner } from './design-recovery-owner';
+import { cancelPendingDesignRecoveryOwner, designRecoveryOwner } from './design-recovery-owner';
 import {
   markSessionApplied,
   redoSession,
@@ -86,7 +86,7 @@ type DesignStudioState = {
   readonly session: DesignSession | null;
   // Retained across a close so reopening resumes the drawing in progress.
   readonly stash: DesignSession | null;
-  readonly openStudio: () => void;
+  readonly openStudio: () => void | Promise<void>;
   readonly closeStudio: () => void;
   readonly setTool: (tool: DesignToolKind) => void;
   readonly setView: (view: DesignView) => void;
@@ -164,12 +164,11 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   session: null,
   stash: null,
 
-  openStudio: () => set(openedSession),
+  openStudio,
 
   // No confirmation, no "discard changes?" — the session survives in the stash
   // and the operator gets it back untouched on reopen.
-  closeStudio: () =>
-    set((state) => (state.session === null ? state : { session: null, stash: state.session })),
+  closeStudio,
 
   setTool: (tool) => set(mapSession((session) => setSessionTool(session, tool))),
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
@@ -339,44 +338,84 @@ function extendCursorActions(
 // Reopening prefers the stash (this page's drawing, untouched), then the
 // drawing the last page left behind (ADR-272 Amendment 3), and only then
 // starts blank.
-function openedSession(state: DesignStudioState): Partial<DesignStudioState> {
+let recoveryRequest = 0;
+let recoveryOpening = false;
+
+function closeStudio(): void {
+  recoveryRequest++;
+  recoveryOpening = false;
+  useDesignStudioStore.setState((state) =>
+    state.session === null ? state : { session: null, stash: state.session },
+  );
+}
+
+function openStudio(): void | Promise<void> {
+  const request = ++recoveryRequest;
+  recoveryOpening = false;
+  const state = useDesignStudioStore.getState();
   const { project, projectDocumentEpoch } = useStore.getState();
   if (state.documentEpoch === projectDocumentEpoch) {
-    if (state.session !== null) return state;
-    if (state.stash !== null)
-      return { session: reconcileProjectDesignSession(state.stash, project) };
+    if (state.session !== null) return;
+    if (state.stash !== null) {
+      useDesignStudioStore.setState({
+        session: reconcileProjectDesignSession(state.stash, project),
+      });
+      return;
+    }
   }
-  return {
-    documentEpoch: projectDocumentEpoch,
-    stash: null,
-    session: restoredOwnedSession(project, projectDocumentEpoch),
+  const publish = (session: DesignSession) => {
+    if (request !== recoveryRequest) return;
+    // A same-document workspace edit during hashing also requires a fresh key.
+    if (useStore.getState().project !== project) return openStudio();
+    recoveryOpening = false;
+    useDesignStudioStore.setState({ documentEpoch: projectDocumentEpoch, stash: null, session });
   };
+  const session = restoredOwnedSession(project, projectDocumentEpoch);
+  if (!(session instanceof Promise)) return publish(session);
+  recoveryOpening = true;
+  return session.then(publish, () => {
+    if (request !== recoveryRequest) return;
+    if (useStore.getState().project !== project) return openStudio();
+    return publish(restoreProjectDesignSession(project));
+  });
 }
 
 useStore.subscribe((next, previous) => {
   if (next.projectDocumentEpoch === previous.projectDocumentEpoch) return;
-  useDesignStudioStore.setState((state) => ({
+  cancelPendingDesignRecoveryOwner(previous.project);
+  const wasOpen = recoveryOpening || useDesignStudioStore.getState().session !== null;
+  recoveryRequest++;
+  recoveryOpening = false;
+  useDesignStudioStore.setState({
     documentEpoch: next.projectDocumentEpoch,
     stash: null,
-    session:
-      state.session === null ? null : restoredOwnedSession(next.project, next.projectDocumentEpoch),
-  }));
+    session: null,
+  });
+  if (wasOpen) void openStudio();
 });
 
 function restoredOwnedSession(
   project: ReturnType<typeof useStore.getState>['project'],
   epoch: number,
-): DesignSession {
+): DesignSession | Promise<DesignSession> {
   const saved = readPersistedSession();
+  if (saved === null) return restoreProjectDesignSession(project);
+  if (
+    saved.projectOwner === undefined &&
+    (epoch !== 0 || project.designStudioDocument !== undefined || project.scene.objects.length > 0)
+  )
+    return restoreProjectDesignSession(project);
   const owner = designRecoveryOwner(project);
-  const matches =
-    saved !== null &&
-    (owner === undefined
-      ? epoch === 0 && saved.projectOwner === undefined
-      : saved.projectOwner === owner);
-  return matches
-    ? reconcileProjectDesignSession(restoreDesignSession(saved), project)
-    : restoreProjectDesignSession(project);
+  const restore = (key: string | undefined) => {
+    const matches =
+      key === undefined
+        ? epoch === 0 && saved.projectOwner === undefined
+        : saved.projectOwner === key;
+    return matches
+      ? reconcileProjectDesignSession(restoreDesignSession(saved), project)
+      : restoreProjectDesignSession(project);
+  };
+  return owner instanceof Promise ? owner.then(restore) : restore(owner);
 }
 
 // Every session mutation goes through here so a closed Studio silently ignores

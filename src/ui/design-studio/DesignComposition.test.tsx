@@ -55,7 +55,7 @@ beforeEach(() => {
     loadState: { kind: 'idle' },
   });
   studio.setState({ session: null, stash: null });
-  studio.getState().openStudio();
+  void studio.getState().openStudio();
   studio.getState().setView({ panXmm: 12, panYmm: 34, pxPerMm: 3 });
   studio
     .getState()

@@ -48,7 +48,7 @@ const session = () => {
 beforeEach(() => {
   useDesignStudioStore.setState({ session: null, stash: null });
   fitCalls = 0;
-  store().openStudio();
+  void store().openStudio();
 });
 
 describe('tool shortcuts', () => {

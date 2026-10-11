@@ -59,7 +59,7 @@ beforeEach(() => {
 });
 
 describe('project-owned vector source', () => {
-  it('keeps the existing recovery allowance for large drawings with a bounded owner digest', () => {
+  it('keeps the existing recovery allowance for large drawings with a bounded owner digest', async () => {
     const sketch: Sketch = {
       entities: [
         {
@@ -74,7 +74,7 @@ describe('project-owned vector source', () => {
     const applied = applyDesignSketch({ project: createProject(), undoStack: [] }, sketch, [
       'unused',
     ])!;
-    const owner = designRecoveryOwner(applied.project)!;
+    const owner = (await designRecoveryOwner(applied.project))!;
     expect(owner).toMatch(/^sha256:[a-f0-9]{64}$/);
     writePersistedSession({
       projectOwner: owner,
@@ -87,7 +87,7 @@ describe('project-owned vector source', () => {
     expect(readPersistedSession()?.sketch).toEqual(sketch);
     expect(readPersistedSession()?.projectOwner).toBe(owner);
   });
-  it('recovers unapplied work only for the exact saved project authoring revision', () => {
+  it('recovers unapplied work only for the exact saved project authoring revision', async () => {
     const project = appliedProject();
     const draft = {
       ...sketch,
@@ -98,7 +98,7 @@ describe('project-owned vector source', () => {
     };
     const session = restoreProjectDesignSession(project);
     writePersistedSession({
-      projectOwner: designRecoveryOwner(project)!,
+      projectOwner: (await designRecoveryOwner(project))!,
       sketch: draft,
       activeLayerId: session.activeLayerId,
       surface3d: false,
@@ -107,9 +107,9 @@ describe('project-owned vector source', () => {
     });
     const reopened = deserializeProject(serializeProject(project));
     if (reopened.kind !== 'ok') throw new Error('roundtrip failed');
-    expect(designRecoveryOwner(reopened.project)).toBe(designRecoveryOwner(project));
+    expect(await designRecoveryOwner(reopened.project)).toBe(await designRecoveryOwner(project));
     useStore.setState({ project: reopened.project, projectDocumentEpoch: 1 });
-    useDesignStudioStore.getState().openStudio();
+    await useDesignStudioStore.getState().openStudio();
     expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(draft);
     expect(useDesignStudioStore.getState().session!.dirtySinceApply).toBe(true);
     expect(useDesignStudioStore.getState().session!.history.past).toHaveLength(0);
@@ -125,6 +125,7 @@ describe('project-owned vector source', () => {
       },
     };
     useStore.setState({ project: changed, projectDocumentEpoch: 2 });
+    await useDesignStudioStore.getState().openStudio();
     expect(
       sessionSketch(useDesignStudioStore.getState().session!).entities.some(
         (entity) => entity.id === 'draft-line',
@@ -134,7 +135,7 @@ describe('project-owned vector source', () => {
     expect(sessionSketch(useDesignStudioStore.getState().session!).entities).toHaveLength(0);
   });
 
-  it('does not match independently created same-shape artwork with different persisted IDs', () => {
+  it('does not match independently created same-shape artwork with different persisted IDs', async () => {
     const project = appliedProject();
     const other = {
       ...project,
@@ -143,14 +144,14 @@ describe('project-owned vector source', () => {
         objects: project.scene.objects.map((object) => ({ ...object, id: `${object.id}-other` })),
       },
     };
-    expect(designRecoveryOwner(other)).not.toBe(designRecoveryOwner(project));
+    expect(await designRecoveryOwner(other)).not.toBe(await designRecoveryOwner(project));
   });
   it('survives actual file serialization, fresh store/profile restoration, and replacement Apply', () => {
     const reopened = deserializeProject(serializeProject(appliedProject()));
     if (reopened.kind !== 'ok') throw new Error(JSON.stringify(reopened));
     localStorage.clear();
     useStore.setState({ project: reopened.project, projectDocumentEpoch: 1 });
-    useDesignStudioStore.getState().openStudio();
+    void useDesignStudioStore.getState().openStudio();
     const session = useDesignStudioStore.getState().session!;
     expect(sessionSketch(session)).toEqual(sketch);
     expect(session.activeLayerId).toBe(DEFAULT_DESIGN_LAYER.id);
@@ -185,11 +186,11 @@ describe('project-owned vector source', () => {
       surface3d: false,
       applied: null,
     });
-    useDesignStudioStore.getState().openStudio();
+    void useDesignStudioStore.getState().openStudio();
     expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(sketch);
     useDesignStudioStore.getState().closeStudio();
     useStore.setState({ project: createProject(), projectDocumentEpoch: 1 });
-    useDesignStudioStore.getState().openStudio();
+    void useDesignStudioStore.getState().openStudio();
     expect(sessionSketch(useDesignStudioStore.getState().session!).entities).toHaveLength(0);
     useStore.setState({ project: appliedProject(), projectDocumentEpoch: 2 });
     expect(sessionSketch(useDesignStudioStore.getState().session!)).toEqual(sketch);

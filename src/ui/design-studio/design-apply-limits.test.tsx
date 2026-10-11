@@ -59,7 +59,7 @@ function ApplyButtons() {
 
 // The Studio open on DRAWING, with its Apply and Apply & Close buttons.
 async function openStudioOnDrawing() {
-  useDesignStudioStore.getState().openStudio();
+  void useDesignStudioStore.getState().openStudio();
   useDesignStudioStore.getState().setSketch(DRAWING);
   const host = document.createElement('div');
   document.body.appendChild(host);

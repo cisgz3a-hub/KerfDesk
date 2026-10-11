@@ -104,7 +104,7 @@ it.each([false, true])(
 it.each(['deleted', 'construction'] as const)(
   'empty reapply clears owned output when its final entity is %s',
   async (mode) => {
-    useDesignStudioStore.getState().openStudio();
+    void useDesignStudioStore.getState().openStudio();
     useDesignStudioStore.getState().setSketch(drawing);
     const host = document.createElement('div');
     document.body.appendChild(host);
@@ -203,7 +203,7 @@ it('persists never-applied work as pending, including the real subscription flus
   const root = createRoot(host);
   await act(async () => root.render(<ApplyButtons />));
   await act(async () => {
-    useDesignStudioStore.getState().openStudio();
+    void useDesignStudioStore.getState().openStudio();
     useDesignStudioStore.getState().setSketch(drawing);
   });
   await act(async () => root.unmount());

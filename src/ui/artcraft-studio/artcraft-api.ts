@@ -1,4 +1,5 @@
 import type { StudioDocument } from '../../core/scene/studio-document';
+import { decodeSnapshotBytes } from './snapshot-bytes';
 export type StudioEditor = 'photo' | 'vector';
 export type StudioSession = {
   readonly id: string;
@@ -83,7 +84,7 @@ async function sourceFile(file: File, editor: StudioEditor) {
   return { name: file.name, mediaType, dataBase64 };
 }
 
-export function snapshotFile(snapshot: StudioSnapshot): File {
+export async function snapshotFile(snapshot: StudioSnapshot): Promise<File> {
   if (snapshot.nativeSaved !== true)
     throw new Error('Save the native editor document before Apply.');
   const extension = snapshot.editor === 'vector' ? 'svg' : 'png';
@@ -91,7 +92,7 @@ export function snapshotFile(snapshot: StudioSnapshot): File {
   const documentId = snapshot.documentId ?? snapshot.id;
   if (snapshot.mime !== mime || !/^[a-zA-Z0-9-]+$/.test(documentId))
     throw new Error('The editor returned an unsupported artwork snapshot.');
-  const bytes = Uint8Array.from(atob(snapshot.dataBase64), (character) => character.charCodeAt(0));
+  const bytes = await decodeSnapshotBytes(snapshot.dataBase64);
   const content = snapshot.editor === 'vector' ? vectorSnapshotSource(bytes, snapshot) : bytes;
   return new File([content], `kerfdesk-studio-${documentId}.${extension}`, { type: mime });
 }

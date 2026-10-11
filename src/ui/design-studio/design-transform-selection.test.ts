@@ -8,7 +8,7 @@ beforeEach(() => {
   resetStore();
   clearPersistedSession();
   studio.setState({ session: null, stash: null, documentEpoch: -1 });
-  state().openStudio();
+  void state().openStudio();
   state().setSketch({
     entities: [
       {
@@ -59,6 +59,6 @@ it('retains transformed geometry across close and reopen; ignores actions while 
   state().closeStudio();
   state().transformSelection('flip-horizontal');
   expect(state().session).toBeNull();
-  state().openStudio();
+  void state().openStudio();
   expect(state().session).toBe(after);
 });

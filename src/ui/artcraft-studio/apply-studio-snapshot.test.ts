@@ -60,7 +60,7 @@ afterEach(() => {
 describe('desktop editor artwork handoff', () => {
   it('refreshes retained relief when native SVG reapply restores a component placement', async () => {
     const native = studioDocument();
-    const source = snapshotFile(snapshot).name;
+    const source = (await snapshotFile(snapshot)).name;
     const svgImport = {
       id: 'composition',
       source,
@@ -279,12 +279,30 @@ describe('desktop editor artwork handoff', () => {
     ).toThrow('multiple copies');
   });
 
-  it('uses session identity rather than externally supplied filenames and checks snapshot type', () => {
-    expect(snapshotFile(snapshot).name).toBe('kerfdesk-studio-session-123.svg');
-    expect(() => snapshotFile({ ...snapshot, mime: 'text/html' })).toThrow('unsupported');
-    expect(() => snapshotFile({ ...snapshot, id: '../file' })).toThrow('unsupported');
-    expect(() =>
+  it('uses session identity rather than externally supplied filenames and checks snapshot type', async () => {
+    expect((await snapshotFile(snapshot)).name).toBe('kerfdesk-studio-session-123.svg');
+    await expect(snapshotFile({ ...snapshot, mime: 'text/html' })).rejects.toThrow('unsupported');
+    await expect(snapshotFile({ ...snapshot, id: '../file' })).rejects.toThrow('unsupported');
+    await expect(
       snapshotFile({ ...snapshot, nativeSaved: false } as unknown as StudioSnapshot),
-    ).toThrow('native');
+    ).rejects.toThrow('native');
   });
+
+  it.each(['project', 'panel'] as const)(
+    'refuses stale %s ownership during snapshot decoding',
+    async (change) => {
+      const before = useStore.getState();
+      let active = true;
+      const pending = applyStudioSnapshot(snapshot, before.projectDocumentEpoch, () => active);
+      if (change === 'project')
+        useStore.setState({ projectDocumentEpoch: before.projectDocumentEpoch + 1 });
+      else active = false;
+      await expect(pending).rejects.toThrow(
+        change === 'project' ? 'project changed' : 'panel closed',
+      );
+      expect(dispatchImportFilesInOrder).not.toHaveBeenCalled();
+      expect(useStore.getState().project).toBe(before.project);
+      expect(useStore.getState().undoStack).toBe(before.undoStack);
+    },
+  );
 });
