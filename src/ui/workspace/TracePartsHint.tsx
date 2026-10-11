@@ -27,12 +27,18 @@ export function TracePartsHint(): JSX.Element | null {
         <button
           type="button"
           className="lf-btn"
+          title="Finish editing trace parts and return to the Select tool."
           onClick={() => useUiStore.getState().resetToolMode()}
         >
           Done
         </button>
       ) : (
-        <button type="button" className="lf-btn" onClick={activateTracePartTool}>
+        <button
+          type="button"
+          className="lf-btn"
+          title="Pick and move individual traced lines or shapes while keeping their holes."
+          onClick={activateTracePartTool}
+        >
           Edit trace parts
         </button>
       )}
@@ -40,6 +46,7 @@ export function TracePartsHint(): JSX.Element | null {
         <button
           type="button"
           className="lf-btn"
+          title="Reshape the selected trace by moving its nodes and curve handles."
           onClick={() => useUiStore.getState().setToolMode({ kind: 'node' })}
         >
           {active ? 'Edit part nodes' : 'Edit nodes'}
