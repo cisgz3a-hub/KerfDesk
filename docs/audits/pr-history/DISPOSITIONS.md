@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 46 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation.
+These 48 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -371,3 +371,19 @@ Disposition: **documented limitation**. Historical PRs: [#1139](https://github.c
 A raw probe using XML-escaped type(<number>) inside an inline attribute encountered an XML reparse error after jsdom serialization emitted a literal less-than character. Actual Chrome154 with the same installed DOMPurify and sanitizer options preserves the escape and reparses cleanly. This is recorded separately from the 39 substantive attr/importance probe failures; no production sanitizer repair or weakened sanitization is justified by the environment-only result.
 
 Local audit evidence: publication/heartbeat-0718-svg-reproduction-report.md, publication/heartbeat-0718-svg-reproduction-sanitize.json.
+
+## DISP-047: Concurrently upgrade declares a Node version above historical tooling
+
+Disposition: **closed-unmerged proposal**. Historical PRs: [#1](https://github.com/cisgz3a-hub/KerfDesk/pull/1).
+
+package-lock concurrently.engines.node >=22; historical workflows select Node20; electron:dev invokes concurrently. Declared toolchain inconsistency. No install or runtime failure reproduced; ordinary CI does not invoke electron:dev. Current manifest and scripts no longer use concurrently; historical PR closed unmerged.
+
+Local audit evidence: batch-04/early-dependencies.md, batch-04/early-dependencies.json, batch-04/early-dependencies-checks.json.
+
+## DISP-048: Licence checker upgrade exceeds the Node version used by its workflow
+
+Disposition: **closed-unmerged proposal**. Historical PRs: [#4](https://github.com/cisgz3a-hub/KerfDesk/pull/4).
+
+package-lock checker.engines requires Node>=24/npm>=11; historical license-check workflow selects Node20 and runs scripts/license-check.mjs wrapper. Source-confirmed violation of declared package Node contract; no runtime crash or npm-install failure asserted. Current license-check runs pnpm-aware scripts/check-licenses.mjs and does not depend on license-checker-rseidelsohn; historical PR closed unmerged.
+
+Local audit evidence: batch-04/early-dependencies.md, batch-04/early-dependencies.json, batch-04/early-dependencies-checks.json.

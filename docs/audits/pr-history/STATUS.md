@@ -1,10 +1,10 @@
 # PR audit progress
 
-Updated: 2026-10-11T09:18:58.860Z. Repository: cisgz3a-hub/KerfDesk.
+Updated: 2026-10-11T10:29:02.941Z. Repository: cisgz3a-hub/KerfDesk.
 
-The loop is active. 1145 PRs are inventoried: 46 full-diff reviews, 57 partial reviews and 1042 unstarted. Partial reviews retain their explicit gaps in coverage.json. This is not a whole-history completion claim.
+The loop is active. 1146 PRs are inventoried: 54 full-diff reviews, 50 partial reviews and 1042 unstarted. Partial reviews retain their explicit gaps in coverage.json. This is not a whole-history completion claim.
 
-14 original findings, plus their recorded review follow-ups, are tracked in 12 coherent repair groups. 12 repair PRs are open or recorded; 12 have successful required CI recorded at their published heads.
+15 original findings, plus their recorded review follow-ups, are tracked in 13 coherent repair groups. 13 repair PRs are open or recorded; 12 have successful required CI recorded at their published heads.
 
 | Finding | Historical origin | Defect / repair | Current state | Repair PR |
 | --- | --- | --- | --- | --- |
@@ -22,9 +22,10 @@ The loop is active. 1145 PRs are inventoried: 46 full-diff reviews, 57 partial r
 | MTX-001 | [#110](https://github.com/cisgz3a-hub/KerfDesk/pull/110) | Bind Zero Z acknowledgement to the tool that initiated it | pr-open-ci-verified | [#1148](https://github.com/cisgz3a-hub/KerfDesk/pull/1148) |
 | WUX-001 | [#80](https://github.com/cisgz3a-hub/KerfDesk/pull/80) | Imported-program playback uses the background project timing | pr-open-ci-verified | [#1149](https://github.com/cisgz3a-hub/KerfDesk/pull/1149) |
 | B03-VAR-001 | [#58](https://github.com/cisgz3a-hub/KerfDesk/pull/58) | Keep the editable current serial inside the persistence integer domain | pr-open-ci-verified | [#1150](https://github.com/cisgz3a-hub/KerfDesk/pull/1150) |
+| B04-DIAGNOSTIC-001 | See attribution | Opt-in Edge diagnostics use copied settings that differ from the app defaults they claim | pr-open-ci-pending | [#1152](https://github.com/cisgz3a-hub/KerfDesk/pull/1152) |
 
 Repairs use focused commits and independent main-based PR branches. Commit IDs, local test evidence, current heads and CI check URLs are in repairs.json. A pending CI result is not a passing check; source evidence is separate from deployment, packaging and hardware qualification.
 
-The chronological unstarted cursor is #91; 57 earlier partial scopes also remain. Next action: Independently review the frozen tracking snapshot and generated next-action correction, then commit and publish it to PR #1151. Verify replacement-head required aggregate CI and complete review feedback before refreshing repair cycle gates and starting the prepared historical batch.
+The chronological unstarted cursor is #91; 50 earlier partial scopes also remain. Next action: Independently review this frozen nine-file tracking snapshot, bind approval to its focused commit and publish it to PR #1151. Then verify all repair heads, complete review-comment dispositions and both required CI aggregates for repair #1152 and the tracking PR. Keep batch-04 publication ownership until every cycle is verified; only then start the prepared next batch.
 
-12 of 12 repair groups have completed the entire review/publication/CI cycle. Review follow-ups, unpublished commits, stale review heads and closed-unmerged PRs remain blockers even if an older CI run is green.
+12 of 13 repair groups have completed the entire review/publication/CI cycle. Review follow-ups, unpublished commits, stale review heads and closed-unmerged PRs remain blockers even if an older CI run is green.

@@ -234,6 +234,20 @@ Historical origin: #58. The current-value Counter originated in PR #58 (e3fb1903
 
 Local evidence: docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-03/variable-counter-repair.md.
 
+## B04-DIAGNOSTIC-001: Opt-in Edge diagnostics use copied settings that differ from the app defaults they claim
+
+Repair: [#1152](https://github.com/cisgz3a-hub/KerfDesk/pull/1152). State: pr-open-ci-pending.
+
+Recorded CI: pending at commit b121d97e71c17f4eed04373d68f54de925c0386d.
+
+Trigger: Run the Edge smoothness or small-letter diagnostics with TRACE_AUDIT=1 and no operator override.
+
+Impact: The diagnostic helpers force a 3-pixel minimum instead of the fresh app default of 12, retaining short closed contours that the app drops and undermining their claimed default-path comparisons. This is a developer diagnostic fidelity defect, not a demonstrated application tracing regression.
+
+Historical origin: See attribution. The two discovery helpers originated at original-history 0f5668c6ff5795addf7bd41e2e27dee26d287d6e (rewritten history 871bb3acd5b9ca3106890603a1595dd1e206c51b), when the preset already used 12 and fresh UI overrides were empty. PR #18 changed only opt-in gating. Independent review identified the same false-current-default copy in _new-problems-audit.test.ts; the explicit historical region-enhancement scenario keeps its inputs.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diffs.md. Repair evidence: docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md.
+
 ## Tracking record corrections
 
 These concern the audit records and are separate from application defect counts.
@@ -244,4 +258,4 @@ These concern the audit records and are separate from application defect counts.
 - [tracking-coverage-ci](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity. Status: resolved-in-published-followup.
 - [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: resolved-in-published-followup.
 - [4240943303](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240943303): Confirmed three SVG result descriptions contradicted successful CI receipts in the same snapshot. Replace transient pending wording with neutral behavior prose and render recorded CI status together with its observed commit from the repair ledger. Underlying repair CI was already successful. Status: resolved-in-published-followup.
-- [4241008264](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264): The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed. Status: fixed-awaiting-independent-review.
+- [4241008264](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4241008264): The status page used a generic repair-publication instruction while the structured next action identified pending tracking review/publication/CI. Render state.nextAction directly so the visible continuation step follows the recorded phase. No machine-readable gate bypass or application defect is claimed. Status: resolved-in-published-followup.

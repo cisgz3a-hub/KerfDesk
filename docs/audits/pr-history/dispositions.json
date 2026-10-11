@@ -405,5 +405,29 @@
       "publication/heartbeat-0718-svg-reproduction-report.md",
       "publication/heartbeat-0718-svg-reproduction-sanitize.json"
     ]
+  },
+  {
+    "id": "DISP-047",
+    "title": "Concurrently upgrade declares a Node version above historical tooling",
+    "historicalPrs": [1],
+    "disposition": "closed-unmerged proposal",
+    "currentSourceReason": "package-lock concurrently.engines.node >=22; historical workflows select Node20; electron:dev invokes concurrently. Declared toolchain inconsistency. No install or runtime failure reproduced; ordinary CI does not invoke electron:dev. Current manifest and scripts no longer use concurrently; historical PR closed unmerged.",
+    "evidenceReports": [
+      "batch-04/early-dependencies.md",
+      "batch-04/early-dependencies.json",
+      "batch-04/early-dependencies-checks.json"
+    ]
+  },
+  {
+    "id": "DISP-048",
+    "title": "Licence checker upgrade exceeds the Node version used by its workflow",
+    "historicalPrs": [4],
+    "disposition": "closed-unmerged proposal",
+    "currentSourceReason": "package-lock checker.engines requires Node>=24/npm>=11; historical license-check workflow selects Node20 and runs scripts/license-check.mjs wrapper. Source-confirmed violation of declared package Node contract; no runtime crash or npm-install failure asserted. Current license-check runs pnpm-aware scripts/check-licenses.mjs and does not depend on license-checker-rseidelsohn; historical PR closed unmerged.",
+    "evidenceReports": [
+      "batch-04/early-dependencies.md",
+      "batch-04/early-dependencies.json",
+      "batch-04/early-dependencies-checks.json"
+    ]
   }
 ]

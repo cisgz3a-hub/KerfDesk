@@ -445,5 +445,18 @@
     "group": "variable-counter-bounds",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/root-coverage.json",
     "repairReport": "docs/audits/2026-10-11-pr-history/batch-03/variable-counter-repair.md"
+  },
+  {
+    "id": "B04-DIAGNOSTIC-001",
+    "priority": 3,
+    "title": "Opt-in Edge diagnostics use copied settings that differ from the app defaults they claim",
+    "originPr": null,
+    "discoveredDuringPr": 18,
+    "trigger": "Run the Edge smoothness or small-letter diagnostics with TRACE_AUDIT=1 and no operator override.",
+    "impact": "The diagnostic helpers force a 3-pixel minimum instead of the fresh app default of 12, retaining short closed contours that the app drops and undermining their claimed default-path comparisons. This is a developer diagnostic fidelity defect, not a demonstrated application tracing regression.",
+    "attribution": "The two discovery helpers originated at original-history 0f5668c6ff5795addf7bd41e2e27dee26d287d6e (rewritten history 871bb3acd5b9ca3106890603a1595dd1e206c51b), when the preset already used 12 and fresh UI overrides were empty. PR #18 changed only opt-in gating. Independent review identified the same false-current-default copy in _new-problems-audit.test.ts; the explicit historical region-enhancement scenario keeps its inputs.",
+    "group": "trace-diagnostic-defaults",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diffs.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md"
   }
 ]

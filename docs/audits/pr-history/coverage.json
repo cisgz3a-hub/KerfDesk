@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T08:39:04.516Z",
+  "inventoryRefreshedAt": "2026-10-11T10:23:05.101Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -8,8 +8,8 @@
     "not-started": "Inventory only; no code review claimed"
   },
   "counts": {
-    "partial": 57,
-    "full-diff": 46,
+    "full-diff": 54,
+    "partial": 50,
     "not-started": 1042
   },
   "prs": [
@@ -28,12 +28,24 @@
       "head": "82607a221ce0359c5ad3b544659319f240eefe7e",
       "base": "d66ce7fc7a00871bab871581b1ef5cf48c8d0053",
       "review": {
-        "coverage": "partial",
-        "report": "dependencies-tooling.json",
-        "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+        "coverage": "full-diff",
+        "report": "batch-04/early-dependencies.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "dependencies-tooling.json",
+          "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+          "reviewedFiles": ["package-lock.json", "package.json"],
+          "remaining": [],
+          "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
+        },
+        "reviewedHead": "82607a221ce0359c5ad3b544659319f240eefe7e",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/ledger_0900",
+        "scope": "Dev-tool upgrades and all esbuild/CLI graph changes; declared concurrently Node >=22 conflicts with historical Node 20 tooling.",
         "reviewedFiles": ["package-lock.json", "package.json"],
+        "changedFileCount": 2,
         "remaining": [],
-        "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
+        "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
       }
     },
     {
@@ -74,12 +86,24 @@
       "head": "4a0ef0d61f9a8283ccc85c8399f0a5910d4523b9",
       "base": "d66ce7fc7a00871bab871581b1ef5cf48c8d0053",
       "review": {
-        "coverage": "partial",
-        "report": "dependencies-tooling.json",
-        "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+        "coverage": "full-diff",
+        "report": "batch-04/early-dependencies.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "dependencies-tooling.json",
+          "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+          "reviewedFiles": ["package-lock.json", "package.json"],
+          "remaining": [],
+          "limitations": "Major dependency version and removed transitives examined; application call-site API compatibility at the rejected historical head not qualified."
+        },
+        "reviewedHead": "4a0ef0d61f9a8283ccc85c8399f0a5910d4523b9",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/ledger_0900",
+        "scope": "OpenType 2 direct/lock declarations and removed now-unused transitive entries; no manifest defect established.",
         "reviewedFiles": ["package-lock.json", "package.json"],
+        "changedFileCount": 2,
         "remaining": [],
-        "limitations": "Major dependency version and removed transitives examined; application call-site API compatibility at the rejected historical head not qualified."
+        "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
       }
     },
     {
@@ -97,12 +121,24 @@
       "head": "ea79c03f98946a722ea1821d83adf783deab78f7",
       "base": "d66ce7fc7a00871bab871581b1ef5cf48c8d0053",
       "review": {
-        "coverage": "partial",
-        "report": "dependencies-tooling.json",
-        "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+        "coverage": "full-diff",
+        "report": "batch-04/early-dependencies.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "dependencies-tooling.json",
+          "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+          "reviewedFiles": ["package-lock.json", "package.json"],
+          "remaining": [],
+          "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
+        },
+        "reviewedHead": "ea79c03f98946a722ea1821d83adf783deab78f7",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/ledger_0900",
+        "scope": "Licence checker upgrade, complete Arborist/npmcli/signature/cache graph and removed legacy reader entries; declared Node >=24 conflicts with actual historical Node 20 license workflow.",
         "reviewedFiles": ["package-lock.json", "package.json"],
+        "changedFileCount": 2,
         "remaining": [],
-        "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
+        "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
       }
     },
     {
@@ -143,12 +179,24 @@
       "head": "7fdf3b59508b7c9dae978d24bbd57e13dd23ec6f",
       "base": "d66ce7fc7a00871bab871581b1ef5cf48c8d0053",
       "review": {
-        "coverage": "partial",
-        "report": "dependencies-tooling.json",
-        "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+        "coverage": "full-diff",
+        "report": "batch-04/early-dependencies.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "dependencies-tooling.json",
+          "scope": "Dependency manifest and lockfile diff inspection; no historical package installation. Closed unmerged; no shipped attribution.",
+          "reviewedFiles": ["package-lock.json", "package.json"],
+          "remaining": [],
+          "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
+        },
+        "reviewedHead": "7fdf3b59508b7c9dae978d24bbd57e13dd23ec6f",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/ledger_0900",
+        "scope": "Vite/Rolldown platform and WASM graph; PostCSS resolved below Vite declared range by explicit unchanged root override, without a reproduced runtime defect.",
         "reviewedFiles": ["package-lock.json", "package.json"],
+        "changedFileCount": 2,
         "remaining": [],
-        "limitations": "Transitive lock churn only partially examined; engine changes and direct entries checked, dependency implementations and advisories not audited."
+        "limitations": "Upstream implementations/advisories and historical application/tool runtime compatibility not qualified; complete changed manifest/lock diff inspection is not whole-product clearance."
       }
     },
     {
@@ -272,8 +320,8 @@
           {
             "path": "src/io/project/project-shape-validator.ts",
             "prs": [10, 11],
-            "historical": "inventory and validator introduction",
-            "current": "partial scene, object, transform and shape validation"
+            "historical": "Complete introduction/change hunks for #10 and #11 read in batch-04; prior inventory-only scope superseded for these historical hunks.",
+            "current": "Partial: prior scene/object/transform review plus batch-04 numeric/device/workspace/layer/optimization/power persistence slice; modern optional-feature helper internals remain outside scope."
           },
           {
             "path": "src/io/project/normalize-scene-object.ts",
@@ -370,10 +418,38 @@
           "Exhaustive compile-job, fill and raster emission",
           "Complete geometry and trace conversion",
           "Machine/session transport and hardware UI",
-          "Every project validator and normalizer",
+          "Remaining project validator/normalizer scopes beyond the completed batch-04 numeric, optimization, layer-default and object-power persistence slice",
           "Electron boundary changes",
           "Deployment workflow changes",
           "All other changed files in these checkpoint PRs"
+        ],
+        "priorScopeEvidence": "foundation.json",
+        "additionalReviews": [
+          {
+            "report": "batch-04/checkpoint-validation.json",
+            "reviewer": "checkpoint_0948",
+            "reviewedAt": "2026-10-11T10:11:55.750Z",
+            "historicalHead": "22d8f2ab4f4150b74c711fad252fae4719ab4b41",
+            "sourceHead": "f87141e8e9eb4cf30685c65427764faa09574409",
+            "scope": "Complete historical changed hunks in the named validator/persistence slice; bounded current numeric, optimization, layer-default and object-power persistence controls.",
+            "reviewedFiles": [
+              "src/io/project/project-shape-validator.ts",
+              "src/io/project/project.test.ts"
+            ],
+            "hunks": 4,
+            "tests": {
+              "passed": 223,
+              "independentProbes": 172,
+              "existing": 51
+            },
+            "remaining": [
+              "PR #10 still has 287 changed files overall and PR #11 has 199; this closes only six named file-pair changed-hunk gaps. Both PRs must remain partial.",
+              "All earlier foundation remaining scopes persist except this explicitly completed validator/persistence slice. No exhaustive compiler, emission, modern optional feature validator, geometry, session/transport, or Electron/deployment review.",
+              "Modern optional feature helper internals and complete migration/output behavior remain outside this lane. Every historical line in the queued validator introduction was read, but that is not equivalent to qualification of every current descendant.",
+              "Finite extreme numeric acceptance is only a persistence-boundary observation. No claim that such values are physically meaningful or that downstream rendering/emission accepts them; no policy cap or Start guard proposed.",
+              "No native UI, installed package, hosted CI, provider, air-cut, material, or hardware execution. No new current bug and no repair commit claimed."
+            ]
+          }
         ]
       }
     },
@@ -429,8 +505,8 @@
           {
             "path": "src/io/project/project-shape-validator.ts",
             "prs": [10, 11],
-            "historical": "inventory and validator introduction",
-            "current": "partial scene, object, transform and shape validation"
+            "historical": "Complete introduction/change hunks for #10 and #11 read in batch-04; prior inventory-only scope superseded for these historical hunks.",
+            "current": "Partial: prior scene/object/transform review plus batch-04 numeric/device/workspace/layer/optimization/power persistence slice; modern optional-feature helper internals remain outside scope."
           },
           {
             "path": "src/io/project/normalize-scene-object.ts",
@@ -527,10 +603,40 @@
           "Exhaustive compile-job, fill and raster emission",
           "Complete geometry and trace conversion",
           "Machine/session transport and hardware UI",
-          "Every project validator and normalizer",
+          "Remaining project validator/normalizer scopes beyond the completed batch-04 numeric, optimization, layer-default and object-power persistence slice",
           "Electron boundary changes",
           "Deployment workflow changes",
           "All other changed files in these checkpoint PRs"
+        ],
+        "priorScopeEvidence": "foundation.json",
+        "additionalReviews": [
+          {
+            "report": "batch-04/checkpoint-validation.json",
+            "reviewer": "checkpoint_0948",
+            "reviewedAt": "2026-10-11T10:11:55.750Z",
+            "historicalHead": "4a1c58082290604e594a314fbd3ceefcd12088d3",
+            "sourceHead": "f87141e8e9eb4cf30685c65427764faa09574409",
+            "scope": "Complete historical changed hunks in the named validator/persistence slice; bounded current numeric, optimization, layer-default and object-power persistence controls.",
+            "reviewedFiles": [
+              "src/core/scene/project.ts",
+              "src/io/project/project-shape-validator.ts",
+              "src/io/project/project.test.ts",
+              "src/io/project/project-power-scale.test.ts"
+            ],
+            "hunks": 10,
+            "tests": {
+              "passed": 223,
+              "independentProbes": 172,
+              "existing": 51
+            },
+            "remaining": [
+              "PR #10 still has 287 changed files overall and PR #11 has 199; this closes only six named file-pair changed-hunk gaps. Both PRs must remain partial.",
+              "All earlier foundation remaining scopes persist except this explicitly completed validator/persistence slice. No exhaustive compiler, emission, modern optional feature validator, geometry, session/transport, or Electron/deployment review.",
+              "Modern optional feature helper internals and complete migration/output behavior remain outside this lane. Every historical line in the queued validator introduction was read, but that is not equivalent to qualification of every current descendant.",
+              "Finite extreme numeric acceptance is only a persistence-boundary observation. No claim that such values are physically meaningful or that downstream rendering/emission accepts them; no policy cap or Start guard proposed.",
+              "No native UI, installed package, hosted CI, provider, air-cut, material, or hardware execution. No new current bug and no repair commit claimed."
+            ]
+          }
         ]
       }
     },
@@ -749,9 +855,45 @@
       "head": "2e58df9d06092ad98320497362fe1204bed90e1b",
       "base": "398b49523976e4f8148a12bf7e438c54d8f42753",
       "review": {
-        "coverage": "partial",
-        "report": "dependencies-tooling.json",
-        "scope": "All executable source, UI, workflow and added tests; current updater, detection and workflow test descendants. Historical documentation and transitive lock changes only selectively read.",
+        "coverage": "full-diff",
+        "report": "batch-04/early-supporting-diffs.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "dependencies-tooling.json",
+          "scope": "All executable source, UI, workflow and added tests; current updater, detection and workflow test descendants. Historical documentation and transitive lock changes only selectively read.",
+          "reviewedFiles": [
+            ".github/workflows/release-desktop.yml",
+            "electron-builder.yml",
+            "electron/auto-update.test.ts",
+            "electron/auto-update.ts",
+            "electron/main.ts",
+            "package.json",
+            "public/download.html",
+            "scripts/check-licenses.mjs",
+            "src/platform/electron/index.ts",
+            "src/platform/electron/is-electron.test.ts",
+            "src/platform/electron/is-electron.ts",
+            "src/platform/electron/release-desktop-workflow-gate.test.ts",
+            "src/ui/app/main.tsx",
+            "src/ui/app/platform-context.tsx",
+            "src/ui/common/DownloadDesktopLink.test.tsx",
+            "src/ui/common/DownloadDesktopLink.tsx",
+            "src/ui/common/Toolbar.tsx"
+          ],
+          "remaining": [
+            "AUDIT.md",
+            "DECISIONS.md",
+            "PROJECT.md",
+            "RESEARCH_LOG.md",
+            "WORKFLOW.md",
+            "pnpm-lock.yaml"
+          ],
+          "limitations": "Focused tests use current main, not the original merged commit."
+        },
+        "reviewedHead": "2e58df9d06092ad98320497362fe1204bed90e1b",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/live_0900",
+        "scope": "All changed files covered by the prior explicitly recorded scope plus the completed batch-04 supporting diff remainder. Current descendant review remains bounded as recorded in both reports.",
         "reviewedFiles": [
           ".github/workflows/release-desktop.yml",
           "electron-builder.yml",
@@ -769,9 +911,7 @@
           "src/ui/app/platform-context.tsx",
           "src/ui/common/DownloadDesktopLink.test.tsx",
           "src/ui/common/DownloadDesktopLink.tsx",
-          "src/ui/common/Toolbar.tsx"
-        ],
-        "remaining": [
+          "src/ui/common/Toolbar.tsx",
           "AUDIT.md",
           "DECISIONS.md",
           "PROJECT.md",
@@ -779,7 +919,10 @@
           "WORKFLOW.md",
           "pnpm-lock.yaml"
         ],
-        "limitations": "Focused tests use current main, not the original merged commit."
+        "changedFileCount": 23,
+        "remaining": [],
+        "limitations": "Complete historical changed-diff inspection does not qualify the complete current subsystem, upstream packages, historical runtime, native UI, releases or hardware.",
+        "additionalEvidence": "dependencies-tooling.json and canonical prior coverage; coordinator must reconcile union."
       }
     },
     {
@@ -797,9 +940,67 @@
       "head": "2c6865e5368a33e1d76c3fbe3bd9764823ef7425",
       "base": "efe318bc31b395540799e3884d0bcbe758885dc8",
       "review": {
-        "coverage": "partial",
-        "report": "dependencies-tooling.json",
-        "scope": "All changed runtime logic and configuration; listed fixture/test edits. Remaining opt-in perceptual fixtures and historical audit narrative not read line by line.",
+        "coverage": "full-diff",
+        "report": "batch-04/early-supporting-diffs.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "dependencies-tooling.json",
+          "scope": "All changed runtime logic and configuration; listed fixture/test edits. Remaining opt-in perceptual fixtures and historical audit narrative not read line by line.",
+          "reviewedFiles": [
+            "src/__fixtures__/jsdom-canvas-setup.ts",
+            "src/__fixtures__/perceptual/_arch-a-scale.test.ts",
+            "src/__fixtures__/perceptual/_edge-zoom.test.ts",
+            "src/__fixtures__/perceptual/_letter-a-counter.test.ts",
+            "src/__fixtures__/perceptual/_reference-iou.test.ts",
+            "src/__fixtures__/perceptual/arch-house-baseline.test.ts",
+            "src/__fixtures__/perceptual/arch-house-edge-truth.ts",
+            "src/__fixtures__/perceptual/benchmark-rating.ts",
+            "src/__fixtures__/perceptual/edge-curve-truth.ts",
+            "src/__fixtures__/perceptual/trace-benchmark-loop.ts",
+            "src/__fixtures__/perceptual/trace-benchmark-regression-cases.ts",
+            "src/__fixtures__/vitest-workers.ts",
+            "src/__fixtures__/vitest-workers.test.ts",
+            "src/core/scene/machine-default-tools.test.ts",
+            "src/core/trace/auto-upscale.test.ts",
+            "src/core/trace/auto-upscale.ts",
+            "src/core/trace/canny-edges.test.ts",
+            "src/core/trace/canny-edges.ts",
+            "src/core/trace/trace-image-guards.test.ts",
+            "src/core/trace/trace-image.ts",
+            "src/core/util/finite.test.ts",
+            "src/core/util/finite.ts",
+            "src/core/util/index.ts",
+            "src/platform/web/build-info.test.ts",
+            "src/platform/web/build-info.ts",
+            "src/ui/app/PwaUpdatePrompt.test.tsx",
+            "src/ui/app/PwaUpdatePrompt.tsx",
+            "src/ui/camera/trace-from-camera.ts",
+            "vite.config.ts",
+            "vitest.config.ts"
+          ],
+          "remaining": [
+            ".gitignore",
+            "PROJECT.md",
+            "audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md",
+            "audit/REPOSITORY-SECTOR-PROGRESS-2026-07-03.md",
+            "src/__fixtures__/perceptual/_arch-house-edge-audit.test.ts",
+            "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+            "src/__fixtures__/perceptual/_letter-b-smoothness.test.ts",
+            "src/__fixtures__/perceptual/_reference-export.test.ts",
+            "src/__fixtures__/perceptual/_sharp-candidates.test.ts",
+            "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+            "src/__fixtures__/perceptual/_trace-audit-render.test.ts",
+            "src/__fixtures__/perceptual/_tracer-upgrade-audit.test.ts",
+            "src/__fixtures__/perceptual/arch-house-edge-benchmark.ts",
+            "src/__fixtures__/perceptual/edge-curve-quality.test.ts",
+            "src/__fixtures__/perceptual/trace-artifact-runner.ts"
+          ],
+          "limitations": "Focused tests use current main, not the original merged commit."
+        },
+        "reviewedHead": "2c6865e5368a33e1d76c3fbe3bd9764823ef7425",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/live_0900",
+        "scope": "All changed files covered by the prior explicitly recorded scope plus the completed batch-04 supporting diff remainder. Current descendant review remains bounded as recorded in both reports.",
         "reviewedFiles": [
           "src/__fixtures__/jsdom-canvas-setup.ts",
           "src/__fixtures__/perceptual/_arch-a-scale.test.ts",
@@ -830,9 +1031,7 @@
           "src/ui/app/PwaUpdatePrompt.tsx",
           "src/ui/camera/trace-from-camera.ts",
           "vite.config.ts",
-          "vitest.config.ts"
-        ],
-        "remaining": [
+          "vitest.config.ts",
           ".gitignore",
           "PROJECT.md",
           "audit/REPOSITORY-SECTOR-AUDIT-2026-07-03.md",
@@ -849,7 +1048,10 @@
           "src/__fixtures__/perceptual/edge-curve-quality.test.ts",
           "src/__fixtures__/perceptual/trace-artifact-runner.ts"
         ],
-        "limitations": "Focused tests use current main, not the original merged commit."
+        "changedFileCount": 45,
+        "remaining": [],
+        "limitations": "Complete historical changed-diff inspection does not qualify the complete current subsystem, upstream packages, historical runtime, native UI, releases or hardware.",
+        "additionalEvidence": "dependencies-tooling.json and canonical prior coverage; coordinator must reconcile union."
       }
     },
     {
@@ -1026,11 +1228,32 @@
       "head": "768312938da4b20f400168b239d013374d45db8f",
       "base": "8e7a0e9d1f36c84c98f0120917c8e0b7182ed0e8",
       "review": {
-        "coverage": "partial",
-        "report": "root-coverage.json",
-        "scope": "All production setup button/dialog/help changes and current consolidated entry",
+        "coverage": "full-diff",
+        "report": "batch-04/early-supporting-diffs.json",
+        "previousReview": {
+          "coverage": "partial",
+          "report": "root-coverage.json",
+          "scope": "All production setup button/dialog/help changes and current consolidated entry",
+          "changedFileCount": 7,
+          "remaining": ["Historical test changes not all read", "Native UI qualification"]
+        },
+        "reviewedHead": "768312938da4b20f400168b239d013374d45db8f",
+        "reviewedAt": "2026-10-11T10:11:55.750Z",
+        "reviewer": "/root/live_0900",
+        "scope": "All changed files covered by the prior explicitly recorded scope plus the completed batch-04 supporting diff remainder. Current descendant review remains bounded as recorded in both reports.",
+        "reviewedFiles": [
+          "src/ui/help/help-topics.ts",
+          "src/ui/laser/MachineSetupDialog.tsx",
+          "src/ui/laser/device-setup/DeviceSetupControls.tsx",
+          "src/ui/laser/device-setup/DeviceSetupWizard.tsx",
+          "src/ui/laser/LaserWindow.device-setup.test.tsx",
+          "src/ui/laser/MachineSetupDialog.test.tsx",
+          "WORKFLOW.md"
+        ],
         "changedFileCount": 7,
-        "remaining": ["Historical test changes not all read", "Native UI qualification"]
+        "remaining": [],
+        "limitations": "Complete historical changed-diff inspection does not qualify the complete current subsystem, upstream packages, historical runtime, native UI, releases or hardware.",
+        "additionalEvidence": "Canonical coverage record for #24 and earlier setup/help review; coordinator must reconcile union."
       }
     },
     {
@@ -24888,18 +25111,18 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T05:20:35Z",
-      "updated_at": "2026-10-11T08:24:21Z",
+      "updated_at": "2026-10-11T09:27:42Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "ecdfb6480e3338545b284996f0430bbe64672fa8",
-      "head": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+      "merge_commit_sha": "f10473da31b88791eb0272f6b09c38620402b9ff",
+      "head": "586a3c40451c48592af352fda554b84b662545b8",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
         "scope": "Complete nine-file tracking diff independently reviewed at reviewedHead. Source-review coverage and per-head CI are separate; see ciSnapshot and state.json:ledgerCi.",
-        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0853-ledger-peer-review.md",
+        "report": "docs/audits/2026-10-11-pr-history/publication/continuation-0916-ledger-peer-review.md",
         "reviewer": "ledger_0900",
-        "reviewedHead": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
+        "reviewedHead": "586a3c40451c48592af352fda554b84b662545b8",
         "reviewedFiles": [
           "docs/audits/pr-history/README.md",
           "docs/audits/pr-history/STATUS.md",
@@ -24915,17 +25138,45 @@
         "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
       },
       "ciSnapshot": {
-        "head": "8f82dc686515fa99e146a3c1cd3479fa64670e02",
-        "status": "pending",
-        "checkedAt": "2026-10-11T09:18:42.928Z",
+        "head": "586a3c40451c48592af352fda554b84b662545b8",
+        "status": "passed",
+        "checkedAt": "2026-10-11T10:24:10.764Z",
         "matchesInventoriedHead": true,
-        "absentRequired": ["Chrome UX smoke"],
-        "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+        "absentRequired": [],
+        "unmetRequired": [],
         "source": "state.json:ledgerCi"
-      },
-      "previousInventoriedHead": "a05bb69051de0e076fbcca96f7b42657628ea86e",
-      "headRefreshedAt": "2026-10-11T09:04:25.619Z",
-      "headEvidence": "Live publisher confirmed the pushed head and every file matched the independently reviewed Git tree"
+      }
+    },
+    {
+      "number": 1152,
+      "title": "fix(test): align Edge diagnostics with current app defaults",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1152",
+      "state": "open",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T10:21:32Z",
+      "updated_at": "2026-10-11T10:21:49Z",
+      "closed_at": null,
+      "merged_at": null,
+      "merge_commit_sha": "a21357acbd39fcccbbecb8b28603b4c8c426393a",
+      "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "review": {
+        "coverage": "full-diff",
+        "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
+        "report": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-peer-review.md",
+        "reviewer": "checkpoint_0948",
+        "reviewedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+        "reviewedFiles": [
+          "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+          "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+          "src/__fixtures__/perceptual/_new-problems-audit.test.ts",
+          "src/__fixtures__/perceptual/region-enhance-recovery.test.ts"
+        ],
+        "remaining": [],
+        "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
+        "repairGroup": "trace-diagnostic-defaults"
+      }
     }
   ]
 }

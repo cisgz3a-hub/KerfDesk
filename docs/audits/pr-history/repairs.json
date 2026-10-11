@@ -86,7 +86,7 @@
       "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.584Z",
+      "checkedAt": "2026-10-11T10:24:07.746Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -553,9 +553,9 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     },
     "verificationTestFiles": [
@@ -699,7 +699,7 @@
       "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.747Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -917,9 +917,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1140.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -952,7 +952,7 @@
       "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.747Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1169,9 +1169,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1141.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -1204,7 +1204,7 @@
       "head": "335b6e8438f2694b005c906bce761894cc479e98",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1421,9 +1421,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1142.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -1458,7 +1458,7 @@
       "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1675,9 +1675,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1143.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -1710,7 +1710,7 @@
       "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1927,9 +1927,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1144.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -1961,7 +1961,7 @@
       "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2178,9 +2178,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1145.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -2212,7 +2212,7 @@
       "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2458,9 +2458,9 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -2494,7 +2494,7 @@
       "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2711,9 +2711,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1147.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -2747,7 +2747,7 @@
       "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2964,9 +2964,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1148.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     }
   },
@@ -3056,7 +3056,7 @@
       "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3418,9 +3418,9 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
     },
     "followUpCommits": [
@@ -3543,7 +3543,7 @@
       "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T09:18:39.586Z",
+      "checkedAt": "2026-10-11T10:24:07.748Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3760,10 +3760,271 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1150.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T08:38:52.595Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/continuation-0838-review-complete.json",
-        "result": "All IDs and edited bodies read; no new repair claims. Existing explicit dispositions retained."
+        "checkedAt": "2026-10-11T10:23:44.858Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-publication-review-complete.json",
+        "result": "Complete paginated feedback and edited bodies compared. Existing inline dispositions retained; no new inline finding at this snapshot."
       }
+    }
+  },
+  {
+    "id": "trace-diagnostic-defaults",
+    "findings": ["B04-DIAGNOSTIC-001"],
+    "title": "fix(test): align Edge diagnostics with current app defaults",
+    "auditBatch": 4,
+    "branch": "codex/audit-trace-diagnostic-defaults-20261011",
+    "files": [
+      "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+      "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+      "src/__fixtures__/perceptual/_new-problems-audit.test.ts",
+      "src/__fixtures__/perceptual/region-enhance-recovery.test.ts"
+    ],
+    "status": "pr-open-ci-pending",
+    "ci": {
+      "status": "pending",
+      "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T10:24:07.748Z",
+      "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089200",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088961",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:23:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666876/job/114447089225",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089311",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088958",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:21:35Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666876/job/114447089979",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T10:21:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089395",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089425",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666932/job/114447089415",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447089005",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T10:21:35Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666876/job/114447090076",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T10:21:35Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088927",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447089034",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447089052",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38131666872/job/114447088833",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T10:21:37Z",
+          "status": "IN_PROGRESS",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T10:21:44Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ]
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "checkpoint_0948",
+      "kind": "independent complete repair diff and source-byte review",
+      "integrationCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+      "report": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-peer-review.md",
+      "fileManifest": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-peer-review.json",
+      "limitation": "Diagnostic source and option-fidelity evidence; independent callback inputs mocked, actual raster corpus execution independently inspected in author receipts.",
+      "verifiedPublishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "sourceAttestation": {
+        "reviewedCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+        "publishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+        "files": [
+          "src/__fixtures__/perceptual/_edge-rough-smoothness.test.ts",
+          "src/__fixtures__/perceptual/_new-problems-audit.test.ts",
+          "src/__fixtures__/perceptual/_small-letter-facet.test.ts",
+          "src/__fixtures__/perceptual/region-enhance-recovery.test.ts"
+        ],
+        "method": "Complete changed-file manifest and every file match the independently reviewed Git tree",
+        "checkedAt": "2026-10-11T10:21:33.805Z"
+      },
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-published-review.json"
+    },
+    "cycleVerified": false,
+    "completionBlockers": ["Hosted CI is pending"],
+    "publicationOwner": "root",
+    "publicationProbe": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author-controls.mjs",
+    "publicationDescription": "Three opt-in Edge diagnostics claim to reproduce a fresh Trace Image dialog but copy a 3-pixel minimum line length while the app retains the preset minimum of 12. A closed 8-pixel contour therefore appears in the diagnostics and is discarded by the app. Reuse the existing pure app settings merger in those diagnostics so their inputs follow current defaults.\n\nKeep the separate region-enhancement regression at its intentional historical 3-pixel setting and label it explicitly. This changes diagnostic fidelity only; application tracing code and defaults are unchanged.\n\nHistorical audit finding B04-DIAGNOSTIC-001 was discovered while reviewing PR #18, whose opt-in gating edit did not introduce the copied-setting mismatch. Independent author and reviewer controls reproduce the original mismatch and exercise the actual diagnostic entry points after the fix.",
+    "integrationCommit": "1e41e1a8fd8dfa0ba3e8fe61767cea50a599b8ab",
+    "localVerification": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-author.md",
+      "testsPassed": 27,
+      "testFiles": 5,
+      "result": "passed",
+      "scope": "Actual opt-in logo/font diagnostics, unchanged historical recovery scenario, app merge controls; independent14call/42contour oracle; scoped lint/format"
+    },
+    "publishedHead": "b121d97e71c17f4eed04373d68f54de925c0386d",
+    "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
+    "pullRequest": {
+      "number": 1152,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1152"
+    },
+    "isolatedVerification": {
+      "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "testsPassed": 4,
+      "testsSkipped": 0,
+      "testFiles": 4,
+      "parityControls": "passed",
+      "typecheck": "passed",
+      "scopedLint": "passed",
+      "changedFormatting": "passed",
+      "fileSizePolicy": "passed",
+      "evidencePrefix": "docs/audits/2026-10-11-pr-history/publication/diagnostic-1e41e1a8fd8d-1791713911385-",
+      "checkedAt": "2026-10-11T10:21:33.805Z"
+    },
+    "reviewComments": {
+      "items": [],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T10:28:06.008Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/batch-04/publication/pr1152-monitor-2026-10-11T10-28-01.296Z-00.json",
+        "result": "Complete paginated current repair feedback; both automated reviews completed and no actionable findings."
+      },
+      "checkedAt": "2026-10-11T10:23:44.858Z",
+      "discussionDispositions": [
+        {
+          "id": 6108025434,
+          "status": "informational-no-review-performed",
+          "result": "CodeRabbit reports automatic review skipped; no finding or review completion inferred."
+        },
+        {
+          "id": 6108025787,
+          "status": "informational-review-completed-no-findings",
+          "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+          "result": "Edited status body and all paginated feedback read: Code and Security reviews completed at the published head with no inline or submitted review findings at this snapshot.",
+          "evidence": "docs/audits/2026-10-11-pr-history/batch-04/publication/pr1152-monitor-2026-10-11T10-28-01.296Z-00.json"
+        }
+      ]
     }
   }
 ]
