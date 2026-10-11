@@ -26,6 +26,8 @@ import type { AppState } from './store';
 import { pushUndo } from './scene-mutations';
 import { removeObjectIdsFromGroups } from './scene-group-actions';
 import { repairDanglingObjectDependencies, reportDependencyRepairs } from './object-delete-actions';
+import { reliefAuthoringLinkIds } from '../../core/relief/relief-authoring-link-ids';
+import { useToastStore } from './toast-store';
 
 const REGISTRATION_JIG_ARTWORK_FIT_FRACTION = 0.9;
 
@@ -109,6 +111,7 @@ export function applyCenterArtworkInRegistrationJigSet(
     state.project.scene,
     new Set(selected.map((object) => object.id)),
   );
+  if (!canReplaceJigArtwork(state.project.scene, replacedIds, copies)) return state;
   const copiedGroupPrefixes = completeSelectedGroups(state.project.scene, selected).map((group) =>
     registrationJigGroupCopyPrefix(group.id),
   );
@@ -142,6 +145,31 @@ export function applyCenterArtworkInRegistrationJigSet(
     redoStack: [],
     dirty: true,
   };
+}
+
+function canReplaceJigArtwork(
+  scene: Scene,
+  replacedIds: ReadonlySet<string>,
+  copies: ReadonlyArray<SceneObject>,
+): boolean {
+  const recreatedIds = new Set(copies.map((object) => object.id));
+  const removedDescendants = new Set([...replacedIds].filter((id) => !recreatedIds.has(id)));
+  const removesReliefSource = scene.objects.some(
+    (object) =>
+      !removedDescendants.has(object.id) &&
+      object.kind === 'relief' &&
+      'reliefAuthoring' in object &&
+      object.reliefAuthoring !== undefined &&
+      reliefAuthoringLinkIds(object.reliefAuthoring).some((id) => removedDescendants.has(id)),
+  );
+  if (removesReliefSource)
+    useToastStore
+      .getState()
+      .pushToast(
+        'A jig part is used as a linked relief source. Remove its linked use in the relief editor before replacing the jig artwork, or duplicate the source artwork to create a new jig layout.',
+        'warning',
+      );
+  return !removesReliefSource;
 }
 
 export function applyRegistrationJigArtworkSize(

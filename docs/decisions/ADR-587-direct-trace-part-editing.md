@@ -51,7 +51,9 @@ direct selection, isolation, node editing, and hole-preserving splitting in esta
   link, with guidance to release the dependency first. Retaining its ID only on the remainder
   would silently narrow the mask or guide or rematerialize the relief. Keep the complete project
   and history unchanged in that case, including for hidden or locked dependents. Selecting an
-  already separate single part requires no split.
+  already separate single part requires no split. Reapplying jig artwork also preserves the entire
+  project when it would remove a detached descendant retained as a relief source; the linked use
+  must be released explicitly before replacing that layout.
 
 ## Consequences and verification
 
