@@ -189,18 +189,16 @@ class LicensingService {
     if (this.config.channel !== 'commercial') return this.readStatus();
     const { saved, device } = await this.load();
     const current = this.evaluate(saved, device);
+    if (current.state === 'unavailable') return current;
     // A pending deactivation no longer blocks an explicit activation or trial;
     // the new grant replaces it (ADR-523 Amendment 2).
-    const call =
-      current.state === 'unavailable'
-        ? null
-        : grantRequest(this.config, {
-            action,
-            saved,
-            device,
-            deviceName: this.options.deviceName,
-            licenseKey,
-          });
+    const call = grantRequest(this.config, {
+      action,
+      saved,
+      device,
+      deviceName: this.options.deviceName,
+      licenseKey,
+    });
     if (call === null) return current;
     let value: unknown;
     try {
@@ -211,7 +209,14 @@ class LicensingService {
         return this.dropRevokedRights(saved, device, error.code);
       return { ...this.evaluate(saved, device), message: requestFailureMessage(error) };
     }
-    return this.acceptGrant(action, value, { saved, device }, licenseKey, onAccepted);
+    try {
+      return await this.acceptGrant(action, value, { saved, device }, licenseKey, onAccepted);
+    } catch (error) {
+      if (action !== 'activate' || current.tier !== 'trial') throw error;
+      // A rejected or unsaved paid grant cannot replace an existing trial.
+      // Re-evaluate its signed deadline; never extend it while the request waits.
+      return { ...this.evaluate(saved, device), message: MESSAGES.unavailable };
+    }
   };
   private readonly acceptGrant = async (
     action: GrantAction,
@@ -278,12 +283,12 @@ class LicensingService {
   });
   readonly status = () => this.safe(this.readStatus);
   readonly activate = (licenseKey: string) =>
-    this.safe(() => {
+    this.safe(async () => {
       // Accept the key inside whatever was pasted; anything else keeps the plain rule
       // and the service decides. The form, not this, warns about a partial key.
       const key = findLicenceKey(licenseKey) ?? licenseKey.trim();
       if (!validLicenceKey(key))
-        return Promise.resolve(this.summary('activation-required', null, MESSAGES.invalidKey));
+        return { ...(await this.readStatus()), message: MESSAGES.invalidKey };
       return this.acquire('activate', key);
     }, true);
   readonly startTrial = () => this.safe(() => this.acquire('trial'), true);
