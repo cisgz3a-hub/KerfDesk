@@ -1,29 +1,79 @@
 type Point = { readonly x: number; readonly y: number };
 type Outlines = ReadonlyArray<ReadonlyArray<Point>>;
+type Bounds = { minX: number; minY: number; maxX: number; maxY: number };
+type Segment = { p: Point; q: Point; bounds: Bounds };
+type SegmentIndex = { bounds: Bounds } & (
+  | { segments: ReadonlyArray<Segment> }
+  | { left: SegmentIndex; right: SegmentIndex }
+);
 
 /** Check the actual contour segments; rounded offset polygons are only an approximation. */
 export function outlinesCloserThan(left: Outlines, right: Outlines, spacing: number): boolean {
   const threshold = spacing - 1e-7;
   if (threshold <= 0) return false;
-  return left.some((a) => right.some((b) => pathsCloserThan(a, b, threshold)));
+  const segments = right.flatMap(pathSegments);
+  if (segments.length === 0) return false;
+  const index = segmentIndex(segments);
+  return left.some((path) =>
+    pathSegments(path).some((segment) => indexCloserThan(segment, index, threshold)),
+  );
 }
-function pathsCloserThan(
-  a: ReadonlyArray<Point>,
-  b: ReadonlyArray<Point>,
-  threshold: number,
-): boolean {
-  const squared = threshold * threshold;
-  for (let i = 0; i < a.length; i += 1)
-    for (let j = 0; j < b.length; j += 1) {
-      const p = a[i],
-        q = a[(i + 1) % a.length];
-      const r = b[j],
-        s = b[(j + 1) % b.length];
-      if (p === undefined || q === undefined || r === undefined || s === undefined) continue;
-      if (separated(p, q, r, s, threshold)) continue;
-      if (segmentsCloserThan(p, q, r, s, squared)) return true;
-    }
-  return false;
+function pathSegments(path: ReadonlyArray<Point>): Segment[] {
+  return path.flatMap((p, i) => {
+    const q = path[(i + 1) % path.length];
+    if (q === undefined) return [];
+    return [
+      {
+        p,
+        q,
+        bounds: {
+          minX: Math.min(p.x, q.x),
+          minY: Math.min(p.y, q.y),
+          maxX: Math.max(p.x, q.x),
+          maxY: Math.max(p.y, q.y),
+        },
+      },
+    ];
+  });
+}
+// A balanced segment-box hierarchy prunes distant contour runs before the exact
+// distance check, including when the two complete artwork bounds overlap.
+function segmentIndex(segments: Segment[]): SegmentIndex {
+  const bounds = segments.reduce(
+    (box, segment) => ({
+      minX: Math.min(box.minX, segment.bounds.minX),
+      minY: Math.min(box.minY, segment.bounds.minY),
+      maxX: Math.max(box.maxX, segment.bounds.maxX),
+      maxY: Math.max(box.maxY, segment.bounds.maxY),
+    }),
+    { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity },
+  );
+  if (segments.length <= 8) return { bounds, segments };
+  const horizontal = bounds.maxX - bounds.minX >= bounds.maxY - bounds.minY;
+  const centre = (segment: Segment): number =>
+    horizontal
+      ? segment.bounds.minX + segment.bounds.maxX
+      : segment.bounds.minY + segment.bounds.maxY;
+  segments.sort((a, b) => centre(a) - centre(b));
+  const mid = Math.floor(segments.length / 2);
+  return {
+    bounds,
+    left: segmentIndex(segments.slice(0, mid)),
+    right: segmentIndex(segments.slice(mid)),
+  };
+}
+function indexCloserThan(segment: Segment, index: SegmentIndex, threshold: number): boolean {
+  if (separated(segment.bounds, index.bounds, threshold)) return false;
+  if ('segments' in index)
+    return index.segments.some(
+      (other) =>
+        !separated(segment.bounds, other.bounds, threshold) &&
+        segmentsCloserThan(segment.p, segment.q, other.p, other.q, threshold * threshold),
+    );
+  return (
+    indexCloserThan(segment, index.left, threshold) ||
+    indexCloserThan(segment, index.right, threshold)
+  );
 }
 function segmentsCloserThan(p: Point, q: Point, r: Point, s: Point, squared: number): boolean {
   return (
@@ -34,12 +84,12 @@ function segmentsCloserThan(p: Point, q: Point, r: Point, s: Point, squared: num
     distanceSquared(s, p, q) < squared
   );
 }
-function separated(p: Point, q: Point, r: Point, s: Point, threshold: number): boolean {
+function separated(a: Bounds, b: Bounds, threshold: number): boolean {
   return (
-    Math.max(p.x, q.x) + threshold < Math.min(r.x, s.x) ||
-    Math.max(r.x, s.x) + threshold < Math.min(p.x, q.x) ||
-    Math.max(p.y, q.y) + threshold < Math.min(r.y, s.y) ||
-    Math.max(r.y, s.y) + threshold < Math.min(p.y, q.y)
+    a.maxX + threshold < b.minX ||
+    b.maxX + threshold < a.minX ||
+    a.maxY + threshold < b.minY ||
+    b.maxY + threshold < a.minY
   );
 }
 function crosses(a: Point, b: Point, c: Point, d: Point): boolean {

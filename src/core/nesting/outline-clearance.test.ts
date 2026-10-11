@@ -18,6 +18,29 @@ const triangle: OutlineNestItem = {
 };
 const bin = { minX: 0, minY: 0, maxX: 100, maxY: 100 };
 describe('actual contour spacing', () => {
+  it('prunes dense separated contours without visiting every segment pair', () => {
+    let reads = 0;
+    const coordinate = (value: number): number => {
+      if (++reads > 1_000_000) throw new Error('Unbounded segment-pair clearance scan');
+      return value;
+    };
+    const ring = (radius: number) =>
+      Array.from({ length: 20_000 }, (_, index) => {
+        const angle = (index * Math.PI * 2) / 20_000;
+        return {
+          get x() {
+            return coordinate(radius * Math.cos(angle));
+          },
+          get y() {
+            return coordinate(radius * Math.sin(angle));
+          },
+        };
+      });
+    // Their overall bounds overlap, but their edges remain ten millimetres apart.
+    expect(outlinesCloserThan([ring(100)], [ring(110)], 2)).toBe(false);
+    expect(outlinesCloserThan([ring(100)], [ring(101)], 2)).toBe(true);
+    expect(reads).toBeLessThan(1_000_000);
+  });
   it('rejects the measured 1.999 mm triangle gap despite rounded offset polygons', () => {
     const items = [triangle, { ...triangle, id: 'b' }];
     const placements = [

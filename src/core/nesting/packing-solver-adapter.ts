@@ -222,10 +222,10 @@ export function advancedNestImproves(
 ): boolean {
   if (best === null || candidate.produced !== best.produced)
     return best === null || candidate.produced > best.produced;
-  if (candidate.stockAreaMm2 !== best.stockAreaMm2)
-    return candidate.stockAreaMm2 < best.stockAreaMm2;
   if (candidate.sheets.length !== best.sheets.length)
     return candidate.sheets.length < best.sheets.length;
+  if (candidate.stockAreaMm2 !== best.stockAreaMm2)
+    return candidate.stockAreaMm2 < best.stockAreaMm2;
   return (
     candidate.sheets.reduce((n, s) => n + s.footprintAreaMm2, 0) <
     best.sheets.reduce((n, s) => n + s.footprintAreaMm2, 0)

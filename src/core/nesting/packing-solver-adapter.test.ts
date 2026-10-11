@@ -149,4 +149,37 @@ describe('advanced nesting boundary', () => {
     expect(empty?.produced).toBe(0);
     expect(advancedNestImproves(empty!, baseline)).toBe(false);
   });
+  it('ranks complete valid certificates by sheet count before total stock area', () => {
+    const original = fixture(2);
+    const stock = original.definition.sheets[0]!;
+    const input = {
+      ...original,
+      definition: {
+        ...original.definition,
+        sheets: [
+          { ...stock, widthMm: 100, heightMm: 100 },
+          { ...stock, id: 'small-a', widthMm: 50, heightMm: 50 },
+          { ...stock, id: 'small-b', widthMm: 50, heightMm: 50 },
+        ],
+      },
+    };
+    const oneSheet = readAdvancedNest(input, certificate([item(), item(23, 1)]));
+    const twoRemnants = readAdvancedNest(
+      input,
+      JSON.stringify({
+        bins: [
+          { id: 1, copies: 1, items: [item()] },
+          { id: 2, copies: 1, items: [item()] },
+        ],
+      }),
+    );
+    const oneRemnant = readAdvancedNest(input, certificate([item(), item(23, 1)], 1));
+    expect(oneSheet?.produced).toBe(2);
+    expect(twoRemnants?.produced).toBe(2);
+    expect(oneRemnant?.produced).toBe(2);
+    expect(twoRemnants!.stockAreaMm2).toBeLessThan(oneSheet!.stockAreaMm2);
+    expect(advancedNestImproves(twoRemnants!, oneSheet)).toBe(false);
+    expect(advancedNestImproves(oneSheet!, twoRemnants)).toBe(true);
+    expect(advancedNestImproves(oneRemnant!, oneSheet)).toBe(true);
+  });
 });
