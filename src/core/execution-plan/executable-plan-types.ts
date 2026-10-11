@@ -72,6 +72,11 @@ export type ExecutablePlanTerminalState = {
   readonly programEnded: boolean;
 };
 
+/** The closed v1 dwell shape excludes the render model's timing-only marker. */
+type ExecutablePlanEvent =
+  | Exclude<ProgramEvent, { readonly kind: 'dwell' }>
+  | Pick<Extract<ProgramEvent, { readonly kind: 'dwell' }>, 'kind' | 'line' | 'seconds'>;
+
 /** Immutable semantic sidecar for one exact legacy G-code program. */
 export type ExecutablePlanV1 = {
   readonly schema: typeof EXECUTABLE_PLAN_SCHEMA;
@@ -94,7 +99,7 @@ export type ExecutablePlanV1 = {
     readonly lineEnding: 'none' | 'lf' | 'crlf' | 'cr' | 'mixed';
   };
   readonly motions: ReadonlyArray<ExecutablePlanMotion>;
-  readonly events: ReadonlyArray<ProgramEvent>;
+  readonly events: ReadonlyArray<ExecutablePlanEvent>;
   readonly bounds: {
     readonly allMotionMm: ExecutablePlanBounds | null;
     readonly processMm: ExecutablePlanBounds | null;

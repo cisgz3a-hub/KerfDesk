@@ -70,9 +70,18 @@ export function snapWorkspacePointer(args: {
     return { point: raw, ownsFeedback: context.kind !== 'none' };
   }
   const target = context.kind === 'node' ? nodeDragSnapTarget(context.drag, args.project) : null;
+  // Snap the grabbed node's destination, preserving the offset between the
+  // pointer and the node centre. The primary node can be elsewhere in the set.
+  const nodeOffset =
+    context.kind === 'node'
+      ? {
+          x: context.drag.startNodeScenePoint.x - context.drag.startScenePoint.x,
+          y: context.drag.startNodeScenePoint.y - context.drag.startScenePoint.y,
+        }
+      : { x: 0, y: 0 };
   const result = resolvePointerSnap({
     project: target?.project ?? args.project,
-    rawMm: raw,
+    rawMm: { x: raw.x + nodeOffset.x, y: raw.y + nodeOffset.y },
     pxToMm: pxToMmForCanvas(args.canvas, args.project, args.viewState),
     settings: ui.snapSettings,
     suppressed: args.e.altKey || (context.kind === 'free' && context.constrained),
@@ -80,7 +89,10 @@ export function snapWorkspacePointer(args: {
   });
   ui.setSnapMarker(result.marker);
   ui.setSnapGuides(result.guides);
-  return { point: result.pointMm, ownsFeedback: true };
+  return {
+    point: { x: result.pointMm.x - nodeOffset.x, y: result.pointMm.y - nodeOffset.y },
+    ownsFeedback: true,
+  };
 }
 
 // The pointer-up of a draw or measure drag re-reads its snapped end point, so

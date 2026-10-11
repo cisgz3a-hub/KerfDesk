@@ -59,7 +59,11 @@ export function plannedProgressAtRoute(
   const motionStart = plan.plannedMotionStartSeconds[index] ?? 0;
   const motionEnd = plan.plannedMotionEndSeconds[index] ?? motionStart;
   const line = plan.segmentRawLine[index] ?? 0;
-  const dwellSeconds = line === 0 ? 0 : (plan.rawLineDwellEndSeconds[line - 1] ?? 0);
+  // Strict timelines reject canned cycles, so every admitted dwell is G4 and
+  // precedes its block's motion. Entering this segment proves that wait ended.
+  // At a route boundary the search retains the previous segment; a stationary
+  // position therefore cannot consume the next block's dwell.
+  const dwellSeconds = plan.rawLineDwellEndSeconds[line] ?? 0;
   const transportSeconds = plan.rawLineTransportEndSeconds[line] ?? 0;
   const elapsedInSegment = segmentElapsedTime(plan, index, fraction);
   const motionSeconds =

@@ -326,6 +326,9 @@ function recordVectorPresentation(
   if (state.unsupportedEffects.includes('filter')) counts.filtered += 1;
   if (paint.stroke.color !== '' && paint.fill.color !== '') counts.fillAndStroke += 1;
   const imported = paint.stroke.color !== '' ? paint.stroke : paint.fill;
+  const unresolvedOpacity =
+    paint.stroke.color !== '' ? state.strokeOpacityUnresolved : state.fillOpacityUnresolved;
+  if (unresolvedOpacity) counts.unresolvedPaintOpacity += 1;
   if (imported.server === 'gradient') counts.gradient += 1;
   if (hasSvgMarkers(el, state.markers, context.resolveId)) counts.markers += 1;
 }

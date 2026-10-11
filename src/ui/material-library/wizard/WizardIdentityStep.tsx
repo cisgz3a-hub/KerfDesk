@@ -98,7 +98,7 @@ function ThicknessOrTitleField(props: IdentityStepProps): JSX.Element {
         className="lf-input"
         type="number"
         min={0}
-        step={0.1}
+        step="any"
         value={identity.thicknessMm}
         aria-label="Material thickness millimeters"
         title="Material thickness in millimeters."

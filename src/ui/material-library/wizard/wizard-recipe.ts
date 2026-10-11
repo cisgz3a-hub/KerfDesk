@@ -10,7 +10,8 @@ import {
   type MaterialRecipe,
   type MaterialRecipeOperation,
 } from '../../../core/material-library';
-import { createLayer, type Layer, type LayerMode } from '../../../core/scene';
+import { materialKey } from '../../../core/material-library/auto-recipe';
+import { assertNever, createLayer, type Layer, type LayerMode } from '../../../core/scene';
 import type { MaterialPreset } from '../../../io/material-library';
 import { readCutSettingsPatch } from '../../layers/cut-settings-draft';
 import type { IdentityDraft } from './wizard-state';
@@ -63,7 +64,7 @@ export function identityFromPreset(preset: MaterialPreset): IdentityDraft {
   return {
     materialName: preset.materialName,
     thicknessMode: mm !== undefined ? 'thickness' : 'surface',
-    thicknessMm: mm !== undefined ? formatThickness(mm) : '',
+    thicknessMm: mm !== undefined ? String(mm) : '',
     title: preset.title ?? '',
     description: preset.description,
   };
@@ -81,9 +82,9 @@ export function buildPreset(args: {
     ...preservedMetadata(args.existing),
     id: args.id,
     materialName: name,
-    material: name,
+    material: materialIdentity(args.existing, name),
     ...thicknessOrTitle(args.identity),
-    operation: args.existing?.operation ?? defaultOperation(args.recipe.mode),
+    operation: operationForMode(args.existing?.operation, args.recipe.mode),
     description: args.identity.description.trim(),
     recipe: materialRecipePatch(args.recipe),
     revision: args.revision,
@@ -113,8 +114,48 @@ function defaultOperation(mode: LayerMode): MaterialRecipeOperation {
   return mode === 'line' ? 'cut' : 'engrave';
 }
 
+function materialIdentity(existing: MaterialPreset | null, name: string): string {
+  if (existing?.material === undefined) return name;
+  // The Material name field renames an ordinary material whose key follows
+  // that name. Imported presets can instead carry a distinct canonical key;
+  // editing their display label must not move the recipe to another material.
+  return materialKey(existing.material) === materialKey(existing.materialName)
+    ? name
+    : existing.material;
+}
+
+function operationForMode(
+  operation: MaterialRecipeOperation | undefined,
+  mode: LayerMode,
+): MaterialRecipeOperation {
+  // Keep compatible specialised intent (score, image) while following the
+  // production modes used by bestRecipeForOperation (ADR-496).
+  switch (operation) {
+    case 'cut':
+    case 'score':
+      if (mode === 'line') return operation;
+      break;
+    case 'engrave':
+      if (mode !== 'line') return operation;
+      break;
+    case 'image':
+      if (mode === 'image') return operation;
+      break;
+    case 'material-test':
+    case 'interval-test':
+      // These describe diagnostic purpose, not production process. An edit
+      // must not silently make a test recipe eligible for automatic selection.
+      return operation;
+    case undefined:
+      break;
+    default:
+      return assertNever(operation, 'material recipe operation');
+  }
+  return defaultOperation(mode);
+}
+
 // Carries provenance forward when editing (calibration source, device, etc.);
-// material and operation are re-derived above, so they are excluded here.
+// material and operation are handled above, so they are excluded here.
 function preservedMetadata(existing: MaterialPreset | null): Partial<MaterialPreset> {
   if (existing === null) return {};
   return {
@@ -132,12 +173,6 @@ function preservedMetadata(existing: MaterialPreset | null): Partial<MaterialPre
       ? { calibrationProvenance: existing.calibrationProvenance }
       : {}),
   };
-}
-
-function formatThickness(value: number): string {
-  return Number.isInteger(value)
-    ? String(value)
-    : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function slug(value: string): string {
