@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { mkdtemp, readFile, writeFile, mkdir } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, mkdir, unlink } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import type { ChildProcess } from 'node:child_process';
@@ -7,12 +8,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createArtcraftRuntime } from './artcraft-runtime';
 import { initialiseEditor, inspectEditor, saveEditorRevision } from './artcraft-operations';
 import { launchArtcraftProcess } from './artcraft-process';
+import { checkEditorLease } from './artcraft-process-lease';
 
 vi.mock('./artcraft-installation.js', () => ({
   ARTCRAFT_VERSIONS: { photo: '0.7.0', vector: '0.9.0' },
   readArtcraftInstallation: vi.fn(async () => ({ executable: 'trusted.exe' })),
 }));
 vi.mock('./artcraft-process.js', () => ({ launchArtcraftProcess: vi.fn() }));
+vi.mock('./artcraft-process-lease.js', () => ({ checkEditorLease: vi.fn(async () => undefined) }));
 vi.mock('./artcraft-operations.js', async (original) => ({
   ...(await original<typeof import('./artcraft-operations')>()),
   initialiseEditor: vi.fn(),
@@ -194,6 +197,77 @@ it('keeps newer working bytes when restoring an older embedded revision', async 
   expect((await restarted.capture!(restored.id)).nativeSha256).toBe(document.nativeSha256);
   expect((await restarted.restore!(document)).id).toBe(restored.id);
   expect((await restarted.status()).sessions).toHaveLength(2);
+});
+it('skips a running candidate whose initialization failed and restores embedded bytes', async () => {
+  const original = createArtcraftRuntime(root, 'editors');
+  const source = await original.open({ editor: 'photo' });
+  const document = await original.capture!(source.id);
+  const profile = path.join(root, 'failed-profile');
+  const restored = createArtcraftRuntime(profile, 'editors');
+  vi.mocked(initialiseEditor).mockRejectedValueOnce(new Error('open failed'));
+  await expect(restored.restore!(document)).rejects.toThrow('open failed');
+  const failed = (await restored.status()).sessions[0]!;
+  const recovered = await restored.restore!(document);
+  expect(recovered.id).not.toBe(failed.id);
+  expect((await restored.capture!(recovered.id)).nativeSha256).toBe(document.nativeSha256);
+  expect((await restored.restore!(document)).id).toBe(recovered.id);
+  expect((await restored.status()).sessions).toHaveLength(2);
+  expect(
+    await readFile(path.join(profile, 'artcraft-studio', failed.id, 'working.pcraft'), 'utf8'),
+  ).toBe('layered original');
+});
+it('preserves a disconnected leased session without recovering files in its directory', async () => {
+  const original = createArtcraftRuntime(root, 'editors');
+  const source = await original.open({ editor: 'photo' });
+  const snapshot = await original.snapshot(source.id);
+  const directory = path.join(root, 'artcraft-studio', source.id);
+  const working = path.join(directory, 'working.pcraft');
+  await unlink(working);
+  vi.mocked(checkEditorLease).mockImplementation(async (candidate) => {
+    if (candidate === directory) throw new Error('The previous editor is still running');
+  });
+  const restarted = createArtcraftRuntime(root, 'editors');
+  const restored = await restarted.restore!(snapshot.nativeDocument);
+  expect(checkEditorLease).toHaveBeenCalledWith(directory);
+  expect(restored.id).not.toBe(source.id);
+  await expect(readFile(working)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(
+    await readFile(path.join(directory, 'revisions', snapshot.revision, 'source.pcraft'), 'utf8'),
+  ).toBe('layered original');
+  expect((await restarted.capture!(restored.id)).nativeSha256).toBe(
+    snapshot.nativeDocument?.nativeSha256,
+  );
+});
+it('hashes frozen candidate files without materializing a working file', async () => {
+  const original = createArtcraftRuntime(root, 'editors');
+  const source = await original.open({ editor: 'photo' });
+  const snapshot = await original.snapshot(source.id);
+  const working = path.join(root, 'artcraft-studio', source.id, 'working.pcraft');
+  await unlink(working);
+  const bytes = Buffer.from('different embedded revision');
+  const document = {
+    ...snapshot.nativeDocument!,
+    nativeBase64: bytes.toString('base64'),
+    nativeSha256: createHash('sha256').update(bytes).digest('hex'),
+  };
+  const restarted = createArtcraftRuntime(root, 'editors');
+  const restored = await restarted.restore!(document);
+  expect(restored.id).not.toBe(source.id);
+  await expect(readFile(working)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect((await restarted.capture!(restored.id)).nativeSha256).toBe(document.nativeSha256);
+});
+it('falls back after a candidate cannot resume but propagates a fresh launch failure', async () => {
+  const original = createArtcraftRuntime(root, 'editors');
+  const source = await original.open({ editor: 'photo' });
+  const document = await original.capture!(source.id);
+  const restarted = createArtcraftRuntime(root, 'editors');
+  vi.mocked(launchArtcraftProcess).mockRejectedValueOnce(new Error('Candidate lease changed'));
+  const restored = await restarted.restore!(document);
+  expect(restored.id).not.toBe(source.id);
+  expect((await restarted.capture!(restored.id)).nativeSha256).toBe(document.nativeSha256);
+  const fresh = createArtcraftRuntime(path.join(root, 'unavailable-profile'), 'editors');
+  vi.mocked(launchArtcraftProcess).mockRejectedValueOnce(new Error('Editor cannot launch'));
+  await expect(fresh.restore!(document)).rejects.toThrow('Editor cannot launch');
 });
 it('refuses to checkpoint a document changed while saving', async () => {
   const runtime = createArtcraftRuntime(root, 'editors');

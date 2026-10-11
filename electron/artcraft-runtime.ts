@@ -1,5 +1,6 @@
 import { readArtcraftDocument } from './artcraft-document.js';
 import { readEditorProcessIdentity } from './artcraft-process-identity.js';
+import { checkEditorLease } from './artcraft-process-lease.js';
 import type { ArtcraftWindowHost } from './artcraft-window-host.js';
 import { prepareRecoveredSession } from './artcraft-recovery.js';
 import { createHash, randomUUID } from 'node:crypto';
@@ -195,8 +196,8 @@ class DesktopStudio implements ArtcraftRuntime {
     document: ArtcraftDocument,
     bytes: Buffer,
   ): Promise<ArtcraftSession> {
-    const existing = await this.matchingSession(document);
-    if (existing !== undefined) return this.resume(existing.id);
+    const existing = await this.restoreMatchingSession(document);
+    if (existing !== undefined) return existing;
     const id = randomUUID();
     const directory = studioDirectory(this.root, id);
     const nativeFile = workingFile(document.editor);
@@ -213,23 +214,39 @@ class DesktopStudio implements ArtcraftRuntime {
     this.sessions.set(id, session);
     return this.resume(id);
   }
-  private async matchingSession(
+  private async restoreMatchingSession(
     document: ArtcraftDocument,
-  ): Promise<StoredArtcraftSession | undefined> {
+  ): Promise<ArtcraftSession | undefined> {
     for (const session of this.sessions.values()) {
       if ((session.documentId ?? session.id) !== document.id || session.editor !== document.editor)
         continue;
-      if (this.processes.get(session.id)?.running() === true) {
-        // Capture live edits first: a previously matching revision must not reuse changed work.
-        if ((await this.capture(session.id)).nativeSha256 === document.nativeSha256) return session;
-        continue;
+      try {
+        if (this.processes.get(session.id)?.running() === true) {
+          // Capture live edits first: a previously matching revision must not reuse changed work.
+          if ((await this.capture(session.id)).nativeSha256 === document.nativeSha256)
+            return await this.resume(session.id);
+          continue;
+        }
+        const directory = studioDirectory(this.root, session.id);
+        // A disconnected editor may still own this directory. Candidate inspection must not
+        // restore working files or bypass the launcher's independent lease check.
+        await checkEditorLease(directory);
+        const file = await studioFile(directory, workingFile(session.editor)).catch(
+          (error: unknown) => {
+            if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+            return session.nativeFile === undefined
+              ? undefined
+              : studioFile(directory, session.nativeFile);
+          },
+        );
+        if (file === undefined) continue;
+        const bytes = await boundedStudioRead(file);
+        if (createHash('sha256').update(bytes).digest('hex') === document.nativeSha256)
+          return await this.resume(session.id);
+      } catch {
+        // An unusable cached session cannot prevent restoring validated embedded bytes.
+        // Preserve it for recovery and try another candidate, then a fresh directory.
       }
-      const directory = studioDirectory(this.root, session.id);
-      const recovered = await prepareRecoveredSession(session, directory);
-      if (recovered.nativeFile === undefined) continue;
-      const bytes = await boundedStudioRead(await studioFile(directory, recovered.nativeFile));
-      if (createHash('sha256').update(bytes).digest('hex') === document.nativeSha256)
-        return session;
     }
     return undefined;
   }
