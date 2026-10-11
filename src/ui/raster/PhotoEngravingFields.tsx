@@ -25,6 +25,7 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
         <span>Photo processing</span>
         <select
           className="lf-select"
+          title="Choose the dot pattern used to reproduce photographic shading."
           value={draft.ditherAlgorithm}
           onChange={(event) => onChange({ ditherAlgorithm: photoDither(event.target.value) })}
         >
@@ -39,6 +40,7 @@ export function PhotoEngravingFields(props: PhotoEngravingFieldsProps): JSX.Elem
         <span>Material marking</span>
         <select
           className="lf-select"
+          title="Choose whether engraving makes dark or light marks on your material."
           value={draft.negativeImage ? 'light' : 'dark'}
           onChange={(event) => onChange({ negativeImage: event.target.value === 'light' })}
         >

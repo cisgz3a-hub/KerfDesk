@@ -101,7 +101,9 @@ function PhotoEngravingGuide(props: {
 }): JSX.Element {
   return (
     <details className="lf-photo-engraving__guide">
-      <summary>Prepare a clear portrait on your material</summary>
+      <summary title="Show how to prepare a portrait and test its material settings.">
+        Prepare a clear portrait on your material
+      </summary>
       <ol>
         <li>
           Use a sharp photo with visible detail in the eyes and hair. Set its engraving size on the
