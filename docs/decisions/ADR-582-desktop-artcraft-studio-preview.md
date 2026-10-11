@@ -80,5 +80,3 @@ redistribution package. The old studio is not retired by this decision.
 - [VectorCraft SVG export options](https://github.com/storytold/vectorcraft/blob/v0.9.0/crates/engine/src/cmd/fileio/svg.rs)
 - [PhotoCraft MIT licence](https://github.com/storytold/photocraft/blob/v0.7.0/LICENSE-MIT)
 - [VectorCraft MIT licence](https://github.com/storytold/vectorcraft/blob/v0.9.0/LICENSE-MIT)
-
-

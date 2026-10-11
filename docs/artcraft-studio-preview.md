@@ -114,4 +114,3 @@ a different tab's contents.
 
 Changed vector components may receive new default machining operations during
 reimport. Review the imported geometry and operation settings after Apply.
-
