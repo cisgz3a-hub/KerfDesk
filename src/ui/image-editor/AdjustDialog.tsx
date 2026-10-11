@@ -67,6 +67,7 @@ function PanelBody(props: {
       }}
     >
       <AdjustmentHeading label={spec.label} />
+      {dialog.id === 'remove-white-background' ? <PaperRemovalHelp /> : null}
       {spec.hasHistogram ? <Histogram session={session} /> : null}
       {dialog.id === 'curves' ? (
         <CurvesEditor points={dialog.curvePoints ?? DEFAULT_CURVE_POINTS} session={session} />
@@ -116,6 +117,16 @@ function PanelBody(props: {
         </button>
       </div>
     </div>
+  );
+}
+
+function PaperRemovalHelp(): JSX.Element {
+  return (
+    <p style={{ fontSize: 12, margin: '8px 0', maxWidth: 300 }}>
+      Removes white from the active layer to reveal artwork below. Soft ink edges stay smooth.
+      Increase Paper cleanup for off-white scans. With no artwork underneath, the canvas stays
+      white.
+    </p>
   );
 }
 

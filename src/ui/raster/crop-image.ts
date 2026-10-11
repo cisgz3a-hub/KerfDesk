@@ -58,7 +58,7 @@ export async function cropMaskedRasterImage(
     luma: croppedLuma,
   };
   const fields = await encode(croppedRaster);
-  const { imageMaskId: _imageMaskId, ...unmasked } = source;
+  const { imageMaskId: _imageMaskId, editorDocument: _editorDocument, ...unmasked } = source;
   return {
     ...unmasked,
     dataUrl: fields.dataUrl,

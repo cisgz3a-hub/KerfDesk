@@ -42,7 +42,11 @@ const DEFAULT_RIGHT_INSET_PX = 20;
 const DEFAULT_TOP_PX = 16;
 const PANEL_WIDTH_PX = 214;
 
-export function ShapeInspector(): JSX.Element | null {
+export function ShapeInspector({
+  docked = false,
+}: {
+  readonly docked?: boolean;
+}): JSX.Element | null {
   const session = useDesignStudioStore((state) => state.session);
   const selectedId = onlySelectedId(session?.selectedIds);
   const entity =
@@ -57,17 +61,24 @@ export function ShapeInspector(): JSX.Element | null {
   return (
     <aside
       ref={hostRef}
-      style={{ ...boxStyle, left: resolved.x, top: resolved.y }}
+      style={
+        docked
+          ? { ...boxStyle, position: 'static', width: '100%', boxShadow: 'none', border: 0 }
+          : { ...boxStyle, left: resolved.x, top: resolved.y }
+      }
       aria-label={`${KIND_LABEL[entity.kind]} properties`}
     >
-      <header style={headerStyle} onPointerDown={drag.onPointerDown}>
+      <header
+        style={{ ...headerStyle, cursor: docked ? 'default' : 'grab' }}
+        onPointerDown={docked ? undefined : drag.onPointerDown}
+      >
         <span style={titleStyle}>{KIND_LABEL[entity.kind]}</span>
         {entity.construction === true ? <span style={badgeStyle}>guide</span> : null}
       </header>
       <div style={bodyStyle}>
         {GROUPS.map((group) => (
           <FieldGroupRows
-            key={group.group}
+            key={`${entity.id}-${group.group}`}
             entity={entity}
             group={group.group}
             heading={group.heading}

@@ -1,5 +1,27 @@
 # Desktop studio preview
 
+> Current direction (ADR-584): improve KerfDesk's own Design Studio. The hosted
+> editor replacement was rejected after the quality review. Open Design Studio
+> directly for labelled tools, docked properties, shape selection and alignment.
+> The launcher below now opens that preview without requiring native editor
+> installation. Existing embedded sources remain under Legacy editor documents
+> in projects that already contain them. The rest of this document describes the
+> earlier native-editor experiment and its limitations.
+
+The current preview has **Vectors** and **Photos** workspaces inside Design Studio.
+Photos opens existing project images or imports PNG/JPEG/BMP/GIF. Common preparation
+tools, layers and history are visible; vector selections have quarter-turn and
+mirror actions. Apply each workspace's edits, then save the project from the main
+workspace. Finished raster pixels, editable photo layers, exact Studio sketches and vector artwork
+are saved together. Opening the project in a fresh app profile restores its sources.
+Apply your changes, then save the project; unapplied drafts remain session work. TIFF imports use
+the main workspace's page dialog before opening the result in Studio Photos.
+
+Crop, image/canvas resize and layer changes now support Undo/Redo, including
+add/delete/duplicate/merge/reorder and layer properties. The shared 2D canvas
+shows photos with vector artwork and opens a selected photo in its embedded editor. The full-editor setup below is historical and unnecessary
+for the current preview.
+
 This local Windows preview connects the **full PhotoCraft 0.7.0 and VectorCraft
 0.9.0 desktop applications** to KerfDesk. Each editor opens in its own window.
 The current Design Studio is retained. The preview is the first working connection

@@ -86,8 +86,10 @@ it.each([false, true])(
     const applied = applyDesignSketch({ project: createProject(), undoStack: [] }, next, [
       'output',
     ]);
-    if (construction) expect(applied).toBeNull();
-    else {
+    if (construction) {
+      expect(applied?.project.scene.objects).toHaveLength(0);
+      expect(applied?.project.designStudioDocument?.sketch).toEqual(next);
+    } else {
       if (!applied) throw new Error('expected output');
       const stamped = applyCarveSettingsToOperations(applied, applied.carveOperations);
       expect(stamped.project.scene.layers[0]?.cnc).toMatchObject({

@@ -4,7 +4,7 @@
 // selection commands, and Esc (cancel → close with the session kept, F-L1).
 
 import { invertMask, selectAllMask } from '../../core/image-select';
-import { isKeyboardActivationTarget } from '../common/keyboard-targets';
+import { isEditableShortcutTarget, isKeyboardActivationTarget } from '../common/keyboard-targets';
 import { useAdjustDialogStore } from './adjust-dialog-store';
 import type { EditorTool } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
@@ -12,7 +12,7 @@ import { useQuickMaskStore } from './quick-mask-store';
 import { useTextDialogStore } from './text-dialog-store';
 
 export function handleEditorKeyDown(e: React.KeyboardEvent): void {
-  if (e.defaultPrevented || isKeyboardActivationTarget(e.target)) return;
+  if (nativeControlOwnsKey(e)) return;
   const key = e.key.toLowerCase();
   if (key === ' ') {
     // Held Spacebar = temporary Hand pan (Photoshop convention).
@@ -28,6 +28,16 @@ export function handleEditorKeyDown(e: React.KeyboardEvent): void {
   if (handleArrowKey(key, e.shiftKey) || handlePlainKey(key) || handleToolKey(key)) {
     e.preventDefault();
   }
+}
+
+function nativeControlOwnsKey(e: React.KeyboardEvent): boolean {
+  // A button retains Enter/Space and plain tool letters, but Ctrl+Z still undoes
+  // the edit it just performed. Text fields retain their native editing keys.
+  return (
+    e.defaultPrevented ||
+    isEditableShortcutTarget(e.target) ||
+    (!(e.ctrlKey || e.metaKey) && isKeyboardActivationTarget(e.target))
+  );
 }
 
 // An open adjustment dialog owns the keys: Enter commits, Esc cancels,

@@ -45,7 +45,7 @@ describe('commitImageSize', () => {
     expect(grey(resized.doc, 14, 8)).toBe(255);
     // Same pixel-vs-base shape as before => uncropped => bounds unchanged.
     expect(appliedBounds(resized)).toBeNull();
-    expect(resized.history.undoStack.length).toBe(0);
+    expect(resized.history.undoStack.at(-1)?.label).toBe('Image size');
     expect(resized.selection).toBeNull();
     expect(resized.dirtySinceApply).toBe(true);
   });

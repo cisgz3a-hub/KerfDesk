@@ -3,6 +3,17 @@
 // boundaries enforced). Cross-module callers import only from this index.
 
 export type {
+  PhotoEditorDocument,
+  PhotoEditorLayer,
+  PhotoEditorBlend,
+} from './photo-editor-document';
+export {
+  PHOTO_EDITOR_BLENDS,
+  MAX_PHOTO_EDITOR_DOCUMENT_BYTES,
+  MAX_PHOTO_EDITOR_LAYERS,
+} from './photo-editor-document';
+
+export type {
   Layer,
   LayerFillStyle,
   LayerMode,

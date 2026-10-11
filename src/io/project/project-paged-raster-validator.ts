@@ -1,4 +1,5 @@
 import { validateRasterLumaBase64 } from './project-raster-luma-validator';
+import { validatePhotoEditorDocument } from './project-photo-document-validator';
 import {
   firstError,
   isObject,
@@ -20,6 +21,12 @@ export function validateRasterSourceContract(
     optionalString(obj, `${path}.dataUrl`),
     optionalString(obj, `${path}.lumaBase64`),
     validatePagedRasterImageAsset(imageAsset, `${path}.imageAsset`),
+    validatePhotoEditorDocument(
+      obj['editorDocument'],
+      `${path}.editorDocument`,
+      pixelWidth,
+      pixelHeight,
+    ),
   ]);
   if (fieldError !== null) return fieldError;
   const hasEmbeddedSource = typeof obj['dataUrl'] === 'string';

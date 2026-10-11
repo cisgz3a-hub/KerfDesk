@@ -162,6 +162,10 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     .join('\n\n');
   return [
     header,
+    '== Adapted source algorithms ==',
+    fs
+      .readFileSync(path.join(rootDir, 'docs/licensing/photocraft-color-to-alpha.txt'), 'utf8')
+      .trim(),
     '== Bundled fonts ==',
     ...outlineFontSections(rootDir),
     ...cncStrokeFontSections(),

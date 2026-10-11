@@ -17,13 +17,18 @@
 
 import { entityToPolylines, type Sketch } from '../../core/design';
 import { entityDesignLayer, sketchLayers } from '../../core/design/layers';
-import type { Polyline, Vec2 } from '../../core/scene';
+import type { Polyline, Scene, Vec2 } from '../../core/scene';
 import { canvasTheme } from '../theme/canvas-theme';
 import { canvasVectorDisplayColor } from '../theme/canvas-vector-color';
 import { mmToPx } from './design-view';
 import type { DesignView } from './design-session';
+import { paintDesignProjectArtwork } from './design-project-photos';
 
 export type DesignCanvasPaint = {
+  readonly scene?: Scene;
+  readonly selectedPhotoId?: string | null;
+  readonly draftObjectIds?: ReadonlySet<string>;
+  readonly onBitmapReady?: () => void;
   readonly view: DesignView;
   readonly sketch: Sketch;
   readonly selectedIds: ReadonlySet<string>;
@@ -35,6 +40,7 @@ export type DesignCanvasPaint = {
   readonly heightPx: number;
 };
 
+const NO_DRAFT_OBJECT_IDS: ReadonlySet<string> = new Set();
 const MIN_MINOR_GRID_PX = 6;
 const MAJOR_EVERY = 5;
 const SELECTED_LINE_WIDTH_PX = 2;
@@ -47,6 +53,16 @@ const ORIGIN_LINE_WIDTH_PX = 1.5;
 export function paintDesignCanvas(ctx: CanvasRenderingContext2D, paint: DesignCanvasPaint): void {
   paintBed(ctx, paint);
   if (paint.showGrid) paintGrid(ctx, paint);
+  if (paint.scene !== undefined) {
+    paintDesignProjectArtwork(
+      ctx,
+      paint.scene,
+      paint.view,
+      paint.selectedPhotoId ?? null,
+      paint.onBitmapReady,
+      paint.draftObjectIds ?? NO_DRAFT_OBJECT_IDS,
+    );
+  }
   paintOriginMarker(ctx, paint);
   paintEntities(ctx, paint);
 }

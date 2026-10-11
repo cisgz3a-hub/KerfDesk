@@ -20,6 +20,14 @@ macOS; JS license banners also remain in shipped assets.
 
 ## Selected bundled runtime libraries (shipped in the web/desktop bundle)
 
+The Image Studio white-background removal algorithm adapts PhotoCraft's
+`crates/algo/src/color_to_alpha.rs` at commit
+`79261615956ab21334e49ca1d384390272e647da` under its MIT option.
+The exact attribution, source functions, modifications and full permission notice
+are in `docs/licensing/photocraft-color-to-alpha.txt` and are included in the
+generated release notices. No upstream editor, artwork or fonts are bundled for
+this feature.
+
 | Library | License | Copyright / source |
 |---|---|---|
 | react, react-dom | MIT | © Meta Platforms, Inc. and affiliates — https://github.com/facebook/react |

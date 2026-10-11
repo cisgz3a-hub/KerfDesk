@@ -126,7 +126,7 @@ export function createDesignSession(sketch: Sketch = EMPTY_SKETCH): DesignSessio
     filletRadiusMm: DEFAULT_FILLET_RADIUS_MM,
     chamferDistanceMm: DEFAULT_CHAMFER_DISTANCE_MM,
     activeLayerId: DEFAULT_DESIGN_LAYER_ID,
-    surface3d: true,
+    surface3d: false,
     applied: null,
     dirtySinceApply: false,
   };

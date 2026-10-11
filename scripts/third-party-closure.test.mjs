@@ -100,6 +100,14 @@ test('renders deterministic notices for every production package and artwork ass
   );
   assert.equal(countMatches(first, /^--- Package:/gm), packages.length + 1);
   assert.equal(countMatches(first, /^--- Artwork:/gm), 8);
+  const photoCraftNotice = fs
+    .readFileSync(path.join(REPO_ROOT, 'docs/licensing/photocraft-color-to-alpha.txt'), 'utf8')
+    .trim()
+    .replace(/\r\n?/g, '\n');
+  assert.ok(
+    first.includes(photoCraftNotice),
+    'adapted PhotoCraft code must ship its complete notice',
+  );
   assert.match(first, /Electron package license is reproduced below/);
   assert.match(first, /artifact-level license files are explicitly bundled and required/);
   assert.match(first, /explicitly bundles the Electron and Chromium runtime license files/);

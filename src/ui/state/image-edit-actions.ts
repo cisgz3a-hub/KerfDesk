@@ -8,6 +8,7 @@
 import { replaceObject, type Bounds, type SceneObject } from '../../core/scene';
 import { pushUndo } from './scene-mutations';
 import type { AppState } from './store';
+import type { PhotoEditorDocument } from '../../core/scene/photo-editor-document';
 
 export type EditedImageFields = {
   readonly dataUrl: string;
@@ -17,6 +18,7 @@ export type EditedImageFields = {
   readonly pixelHeight?: number;
   /** Physical extent of this revision; Revert can restore the as-opened extent. */
   readonly bounds?: Bounds;
+  readonly editorDocument?: PhotoEditorDocument;
 };
 
 export type ImageEditActions = {
@@ -38,7 +40,7 @@ function applyEdit(
 ): AppState | Partial<AppState> {
   const image = sceneObjectById(state.project.scene.objects, imageId);
   if (image?.kind !== 'raster-image') return state;
-  const { imageAsset: _imageAsset, ...embedded } = image;
+  const { imageAsset: _imageAsset, editorDocument: _oldDocument, ...embedded } = image;
   const edited = {
     ...embedded,
     dataUrl: fields.dataUrl,
@@ -46,6 +48,7 @@ function applyEdit(
     ...(fields.pixelWidth === undefined ? {} : { pixelWidth: fields.pixelWidth }),
     ...(fields.pixelHeight === undefined ? {} : { pixelHeight: fields.pixelHeight }),
     ...(fields.bounds === undefined ? {} : { bounds: fields.bounds }),
+    ...(fields.editorDocument === undefined ? {} : { editorDocument: fields.editorDocument }),
   };
   return {
     project: {

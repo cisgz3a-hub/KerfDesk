@@ -15,7 +15,6 @@ import {
   type TextObject,
   machineKindOf,
 } from '../../core/scene';
-import type { Sketch } from '../../core/design';
 import {
   applyInsertBoxPanels,
   type InsertablePart,
@@ -222,13 +221,13 @@ function insertBoxPanelsAction(set: Setter): AppState['insertBoxPanels'] {
 }
 
 function applyDesignSketchAction(set: Setter): AppState['applyDesignSketch'] {
-  return (sketch: Sketch, ids: ReadonlyArray<string>, previous: DesignApplyRecord | null) => {
+  return (sketch, ids, previous, view) => {
     // The record has to reach the Studio, and a zustand setter returns nothing,
     // so it is captured here and returned once the transition has run.
     let record: DesignApplyRecord | 'refused' | null = null;
     set((state) => {
       const restoreUndoName = saveUndoStepName(state.project);
-      const next = applyDesignSketch(state, sketch, ids, previous);
+      const next = applyDesignSketch(state, sketch, ids, previous, view);
       // A sketch that contributes nothing leaves the project exactly as it was.
       if (next === null) return state;
       // A project past its limits saves but cannot be opened again (ADR-307

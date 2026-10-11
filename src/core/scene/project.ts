@@ -13,6 +13,7 @@ import type { RetainedArrayLayout } from './retained-array';
 import type { CncMachiningSetup } from './cnc-machining-setup';
 import type { ProcessRecipeApplication } from '../material-library/process-recipe-application';
 import type { StudioDocument } from './studio-document';
+import type { DesignStudioDocument } from '../design/design-studio-document';
 import type { ProductionNestDefinition } from '../nesting/production-nest';
 
 // v9 preserves owned image clips. Older readers would engrave the full source
@@ -162,6 +163,7 @@ export type Project = {
   readonly printAndCutTargets?: PrintAndCutDesignTargets;
   readonly embeddedFonts?: ReadonlyArray<EmbeddedFont>;
   readonly studioDocuments?: ReadonlyArray<StudioDocument>;
+  readonly designStudioDocument?: DesignStudioDocument;
   readonly notes: string;
   readonly sheetBook?: ProjectSheetBook;
   readonly fixtureTemplates?: ReadonlyArray<FixtureTemplate>;

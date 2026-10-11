@@ -1,9 +1,8 @@
 import type { RasterImage } from '../../core/scene';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
-import { appliedBounds, createSession } from './editor-session';
-import { compositeSession } from './editor-session-layers';
-import { bakeBufferToBitmapFields, decodeRasterToBuffer } from './image-editor-decode';
+import { appliedBounds } from './editor-session';
+import { bakeProjectPhoto, openProjectPhoto } from './editor-project-document';
 import type { ImageEditorState, Setter } from './image-editor-store';
 import {
   type ImageEditorApplyRequest,
@@ -103,15 +102,15 @@ export function openEditorAction(
     isApplying: false,
     applyRequest: null,
   }));
-  decodeRasterToBuffer(image)
-    .then((doc) => {
+  openProjectPhoto(image)
+    .then((session) => {
       if (!isCurrentOpenRequest(get(), image.id, requestToken)) return;
       if (!ownerIsCurrent(owner)) {
         set({ loadState: { kind: 'idle' } });
         return;
       }
       set({
-        session: createSession(image.id, image.source, doc, image.bounds),
+        session,
         sessionOwner: owner,
         loadState: { kind: 'idle' },
         pendingCrop: null,
@@ -176,7 +175,7 @@ function runApply(set: Setter, get: () => ImageEditorState): Promise<string | nu
   set({ isApplying: true, applyRequest: request });
   const objectId = session.objectId;
   // ADR-245: Apply bakes the layer composite, never the active layer alone.
-  return bakeBufferToBitmapFields(compositeSession(session))
+  return bakeProjectPhoto(session)
     .then((fields) => {
       if (!applyRequestIsCurrent(get(), request)) return null;
       if (sessionOwner !== null && !ownerIsCurrent(sessionOwner)) {

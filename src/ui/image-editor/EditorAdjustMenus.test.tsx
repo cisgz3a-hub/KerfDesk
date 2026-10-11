@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorAdjustMenus } from './EditorAdjustMenus';
+import { useAdjustDialogStore } from './adjust-dialog-store';
 import { createEditorTestBuffer } from './create-editor-test-buffer';
 import { createSession } from './editor-session';
 import { useImageEditorStore } from './image-editor-store';
@@ -24,6 +25,7 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
   useResizeDialogStore.setState({ dialog: null });
+  useAdjustDialogStore.setState({ dialog: null });
   useImageEditorStore.setState({ session: null, sessionOwner: null, transform: null });
 });
 
@@ -48,6 +50,27 @@ function menuItems(): HTMLButtonElement[] {
 }
 
 describe('Image Studio operation menus', () => {
+  it('opens the white-background adjustment from the visible Adjust menu', async () => {
+    useImageEditorStore.setState({
+      session: createSession('paper', 'scan.png', createEditorTestBuffer(2, 2), {
+        minX: 0,
+        minY: 0,
+        maxX: 2,
+        maxY: 2,
+      }),
+      transform: null,
+    });
+    await act(async () => root.render(<EditorAdjustMenus />));
+    await act(async () => trigger('Adjust').click());
+    const remove = menuItems().find((item) =>
+      item.textContent?.includes('Remove white background'),
+    );
+    expect(remove).toBeDefined();
+    await act(async () => remove?.click());
+    expect(useAdjustDialogStore.getState().dialog?.id).toBe('remove-white-background');
+    expect(useAdjustDialogStore.getState().dialog?.params).toEqual({ cleanup: 0 });
+  });
+
   it('opens at either end with arrow keys, moves focus, and dismisses with Escape', async () => {
     const onEditorKey = vi.fn();
     await act(async () =>

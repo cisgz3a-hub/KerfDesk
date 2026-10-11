@@ -7,6 +7,11 @@
 // write into the project, as a single undo entry.
 
 import { create } from 'zustand';
+import { useStore } from '../state';
+import {
+  reconcileProjectDesignSession,
+  restoreProjectDesignSession,
+} from './project-design-session';
 import {
   addEntity,
   removeEntities,
@@ -49,7 +54,6 @@ import {
 } from './design-session-mutations';
 import { readPersistedSession } from './design-session-storage';
 import {
-  createDesignSession,
   markSessionApplied,
   redoSession,
   restoreDesignSession,
@@ -62,8 +66,20 @@ import {
 } from './design-session';
 import type { DesignToolKind } from './design-tool';
 import type { DesignPointSequence } from './design-point-sequence';
+import {
+  alignEntities,
+  distributeEntities,
+  type DesignAlignKind,
+  type DesignDistributeKind,
+} from '../../core/design/ops/arrange-entities';
+import { duplicateSelectionSession, selectAllSession } from './design-selection-session';
+import {
+  transformSelection,
+  type DesignTransformKind,
+} from '../../core/design/ops/transform-selection';
 
 type DesignStudioState = {
+  readonly documentEpoch: number;
   readonly session: DesignSession | null;
   // Retained across a close so reopening resumes the drawing in progress.
   readonly stash: DesignSession | null;
@@ -74,6 +90,11 @@ type DesignStudioState = {
   readonly setCursorMm: (point: Vec2 | null) => void;
   readonly setActiveSnap: (target: SnapTarget | null) => void;
   readonly setSelection: (ids: ReadonlyArray<string>) => void;
+  readonly selectAll: () => void;
+  readonly duplicateSelection: () => void;
+  readonly alignSelection: (kind: DesignAlignKind) => void;
+  readonly distributeSelection: (kind: DesignDistributeKind) => void;
+  readonly transformSelection: (kind: DesignTransformKind) => void;
   readonly toggleSnap: () => void;
   readonly toggleOrtho: () => void;
   readonly toggleGrid: () => void;
@@ -126,6 +147,7 @@ type DesignStudioState = {
 };
 
 export const useDesignStudioStore = create<DesignStudioState>((set) => ({
+  documentEpoch: -1,
   session: null,
   stash: null,
 
@@ -140,10 +162,7 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
   setView: (view) => set(mapSession((session) => ({ ...session, view }))),
   setCursorMm: (cursorMm) => set(mapSession((session) => ({ ...session, cursorMm }))),
   setActiveSnap: (activeSnap) => set(mapSession((session) => ({ ...session, activeSnap }))),
-  // Selecting arms the selection's layer, so the layers panel shows the cut,
-  // depth, and bit of the shape just clicked.
-  setSelection: (ids) =>
-    set(mapSession((session) => armLayerOfSelection({ ...session, selectedIds: new Set(ids) }))),
+  ...selectionActions(set),
 
   toggleSnap: () =>
     set(mapSession((session) => ({ ...session, snapEnabled: !session.snapEnabled }))),
@@ -223,15 +242,89 @@ export const useDesignStudioStore = create<DesignStudioState>((set) => ({
     set(mapSession((session) => ({ ...session, surface3d: !session.surface3d }))),
 }));
 
+function selectionActions(
+  set: (change: (state: DesignStudioState) => Partial<DesignStudioState>) => void,
+): Pick<
+  DesignStudioState,
+  | 'setSelection'
+  | 'selectAll'
+  | 'duplicateSelection'
+  | 'alignSelection'
+  | 'distributeSelection'
+  | 'transformSelection'
+> {
+  return {
+    // Selecting arms the shape's layer so its carve settings follow the selection.
+    setSelection: (ids) =>
+      set(mapSession((session) => armLayerOfSelection({ ...session, selectedIds: new Set(ids) }))),
+    selectAll: () => set(mapSession(selectAllSession)),
+    duplicateSelection: () =>
+      set(
+        mapSession((session) =>
+          duplicateSelectionSession(
+            session,
+            new Map([...session.selectedIds].map((id) => [id, crypto.randomUUID()])),
+          ),
+        ),
+      ),
+    alignSelection: (kind) =>
+      set(
+        mapSession((session) =>
+          withSketch(session, alignEntities(sessionSketch(session), session.selectedIds, kind)),
+        ),
+      ),
+    distributeSelection: (kind) =>
+      set(
+        mapSession((session) =>
+          withSketch(
+            session,
+            distributeEntities(sessionSketch(session), session.selectedIds, kind),
+          ),
+        ),
+      ),
+    transformSelection: (kind) =>
+      set(
+        mapSession((session) =>
+          withSketch(
+            session,
+            transformSelection(sessionSketch(session), session.selectedIds, kind),
+          ),
+        ),
+      ),
+  };
+}
+
 // Reopening prefers the stash (this page's drawing, untouched), then the
 // drawing the last page left behind (ADR-272 Amendment 3), and only then
 // starts blank.
 function openedSession(state: DesignStudioState): Partial<DesignStudioState> {
-  if (state.session !== null) return state;
-  if (state.stash !== null) return { session: state.stash };
-  const saved = readPersistedSession();
-  return { session: saved === null ? createDesignSession() : restoreDesignSession(saved) };
+  const { project, projectDocumentEpoch } = useStore.getState();
+  if (state.documentEpoch === projectDocumentEpoch) {
+    if (state.session !== null) return state;
+    if (state.stash !== null)
+      return { session: reconcileProjectDesignSession(state.stash, project) };
+  }
+  const saved =
+    projectDocumentEpoch === 0 &&
+    project.scene.objects.length === 0 &&
+    project.designStudioDocument === undefined
+      ? readPersistedSession()
+      : null;
+  return {
+    documentEpoch: projectDocumentEpoch,
+    stash: null,
+    session: saved === null ? restoreProjectDesignSession(project) : restoreDesignSession(saved),
+  };
 }
+
+useStore.subscribe((next, previous) => {
+  if (next.projectDocumentEpoch === previous.projectDocumentEpoch) return;
+  useDesignStudioStore.setState((state) => ({
+    documentEpoch: next.projectDocumentEpoch,
+    stash: null,
+    session: state.session === null ? null : restoreProjectDesignSession(next.project),
+  }));
+});
 
 // Every session mutation goes through here so a closed Studio silently ignores
 // stray actions instead of resurrecting a session.

@@ -44,6 +44,12 @@ export function handleDesignStudioKey(
 function handleChord(event: React.KeyboardEvent<HTMLDivElement>): void {
   const store = useDesignStudioStore.getState();
   const key = event.key.toLowerCase();
+  if (!event.shiftKey && (key === 'a' || key === 'd')) {
+    if (key === 'a') store.selectAll();
+    else store.duplicateSelection();
+    event.preventDefault();
+    return;
+  }
   if (key === 'z' && !event.shiftKey) {
     store.undo();
     event.preventDefault();

@@ -5,7 +5,7 @@
 // and bump `revision` so React consumers redraw; the editor-local tile
 // history makes every committed op reversible. Sessions survive editor close
 // (resumable, no confirmation surfaces — CLAUDE.md #7) and live only in
-// memory (F-L4 edge).
+// memory until Apply snapshots their editable layers into the project.
 
 import {
   captureRect,
@@ -36,6 +36,7 @@ import {
   type SelectionMask,
 } from '../../core/image-select';
 import { BACKGROUND_LAYER_ID, clearEditorLayerInPlace } from './editor-layer-clear';
+import { captureDocumentHistory, stepDocumentHistory } from './editor-document-history';
 
 export { BACKGROUND_LAYER_ID } from './editor-layer-clear';
 
@@ -110,6 +111,9 @@ export type EditorSession = {
   readonly activeLayerId: string;
   /** As-opened pixels, for the explicit Revert action (F-L4). */
   readonly base: RgbaBuffer;
+  /** Layered source restored from the project, for lossless Revert. */
+  readonly baseLayers?: readonly EditorLayer[];
+  readonly baseActiveLayerId?: string;
   /** Where the doc sits inside the as-opened image (crop accumulates). */
   readonly cropOffset: { readonly x: number; readonly y: number };
   /** Continuous physical scale, independent of rounded Revert pixel dimensions. */
@@ -163,12 +167,18 @@ export function createSession(
 
 /** Explicit Revert: back to the as-opened pixels (un-crops, un-layers too). */
 export function revertSession(session: EditorSession): EditorSession {
-  const doc = cloneRgbaBuffer(session.base);
+  const layers = session.baseLayers?.map((layer) => ({
+    ...layer,
+    buffer: cloneRgbaBuffer(layer.buffer),
+  })) ?? [layerFromBuffer(BACKGROUND_LAYER_ID, 'Background', cloneRgbaBuffer(session.base))];
+  const active = layers.find((layer) => layer.id === session.baseActiveLayerId) ?? layers[0];
+  if (active === undefined) return session;
+  const doc = active.buffer;
   return {
     ...session,
     doc,
-    layers: [layerFromBuffer(BACKGROUND_LAYER_ID, 'Background', doc)],
-    activeLayerId: BACKGROUND_LAYER_ID,
+    layers,
+    activeLayerId: active.id,
     cropOffset: { x: 0, y: 0 },
     pixelSizeMm: {
       x: (session.sourceBounds.maxX - session.sourceBounds.minX) / doc.width,
@@ -207,10 +217,8 @@ export function appliedBounds(session: EditorSession): Bounds | null {
 }
 
 /**
- * Crop the working document to the rect. Tile history cannot span a resize,
- * so the editor history clears (surfaced in the status row); Revert still
- * restores the full as-opened image, and Apply maps the mm bounds through
- * the accumulated offset so physical scale stays honest.
+ * Crop every layer, recording the complete document so Undo crosses the
+ * dimension change. Apply maps the accumulated offset at the original scale.
  */
 export function commitCrop(session: EditorSession, rect: PixelRect): EditorSession {
   const x = Math.max(0, Math.floor(rect.x));
@@ -218,6 +226,8 @@ export function commitCrop(session: EditorSession, rect: PixelRect): EditorSessi
   const width = Math.min(session.doc.width, Math.ceil(rect.x + rect.width)) - x;
   const height = Math.min(session.doc.height, Math.ceil(rect.y + rect.height)) - y;
   if (!(width > 0 && height > 0)) return session;
+  if (x === 0 && y === 0 && width === session.doc.width && height === session.doc.height)
+    return session;
   // Every layer crops identically so dimensions stay uniform (ADR-245); the
   // active layer's cropped buffer becomes the new doc pointer.
   const layers = session.layers.map((layer) => ({
@@ -232,7 +242,7 @@ export function commitCrop(session: EditorSession, rect: PixelRect): EditorSessi
     layers,
     activeLayerId: active.id,
     cropOffset: { x: session.cropOffset.x + x, y: session.cropOffset.y + y },
-    history: createEditHistory(),
+    history: pushHistoryEntry(session.history, captureDocumentHistory(session, 'Crop')),
     selection: null,
     revision: session.revision + 1,
     dirtySinceApply: true,
@@ -378,6 +388,8 @@ export function commitMoveSelection(session: EditorSession, dx: number, dy: numb
 }
 
 export function undoSession(session: EditorSession): EditorSession {
+  const documentStep = stepDocumentHistory(session, 'undoStack');
+  if (documentStep !== null) return documentStep;
   const result = undoInPlace(session.history, session.doc);
   if (result.applied === null) return session;
   return {
@@ -390,6 +402,8 @@ export function undoSession(session: EditorSession): EditorSession {
 }
 
 export function redoSession(session: EditorSession): EditorSession {
+  const documentStep = stepDocumentHistory(session, 'redoStack');
+  if (documentStep !== null) return documentStep;
   const result = redoInPlace(session.history, session.doc);
   if (result.applied === null) return session;
   return {

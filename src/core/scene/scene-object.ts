@@ -16,6 +16,7 @@ import type { ReliefHeightfield } from './relief/relief-heightfield';
 import type { ReliefAuthoringDocument } from './relief/relief-authoring';
 import type { LayerPowerMode, TabLayoutMode } from './layer';
 import type { LaserTabAnchor } from './laser-tab-anchor';
+import type { PhotoEditorDocument } from './photo-editor-document';
 
 export type { LaserTabAnchor } from './laser-tab-anchor';
 
@@ -380,6 +381,9 @@ export type RasterImage = ObjectPowerScale & {
   readonly imageAsset?: PagedRasterImageAsset; // Qualified PNG source + luma page references.
   readonly pixelWidth: number;
   readonly pixelHeight: number;
+  // Optional and additive: old projects open as a single flattened photo layer.
+  // Applied display/output pixels remain dataUrl/lumaBase64; this is editable source.
+  readonly editorDocument?: PhotoEditorDocument;
   readonly bounds: Bounds;
   readonly transform: Transform;
   // The Layer this image binds to, by color key. Lets a single

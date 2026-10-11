@@ -1,6 +1,6 @@
 // Local opt-in source preview; a separate profile preserves installed application data.
 import { spawn } from 'node:child_process';
-import { mkdir, access, readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import {
@@ -9,7 +9,6 @@ import {
   ARTCRAFT_PREVIEW_ROOT as preview,
 } from './build-artcraft-preview.mjs';
 const editorRoot = path.join(root, '.artcraft');
-await access(path.join(editorRoot, 'manifest.json'));
 await mkdir(path.join(editorRoot, 'kerfdesk-preview'), { recursive: true });
 if (!process.argv.includes('--skip-build')) await buildArtcraftPreview();
 const marker = JSON.parse(await readFile(path.join(preview, 'preview-build.json'), 'utf8'));
@@ -35,5 +34,5 @@ child.once('error', (error) => {
 });
 child.unref();
 console.log(
-  'Opened the isolated KerfDesk source preview. Use Design Studio > Desktop editors. This is a development build, not a release.',
+  'Opened the isolated KerfDesk source preview. Open Design Studio for the updated KerfDesk tools. This is a development build, not a release.',
 );

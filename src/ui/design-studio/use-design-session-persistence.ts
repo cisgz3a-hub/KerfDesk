@@ -8,6 +8,7 @@
 // runs at unmount so nothing in flight is lost.
 
 import { useEffect } from 'react';
+import { useStore } from '../state';
 import { sessionSketch } from './design-session';
 import { useDesignStudioStore } from './design-studio-store';
 import { writePersistedSession } from './design-session-storage';
@@ -25,6 +26,7 @@ export function useDesignSessionPersistence(): void {
       // The stash holds the drawing while the Studio is closed, so a session
       // that just closed still has something worth saving.
       const state = useDesignStudioStore.getState();
+      if (state.documentEpoch !== useStore.getState().projectDocumentEpoch) return;
       const session = state.session ?? state.stash;
       if (session === null) return;
       writePersistedSession({

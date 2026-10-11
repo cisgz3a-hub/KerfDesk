@@ -12,7 +12,6 @@ import { createFrameScheduler, frameSchedulerHostFor } from '../design-frame-sch
 import type { DesignSurface } from '../design-surface';
 import { useDesignStudioStore } from '../design-studio-store';
 import { useDesignPointer } from '../use-design-pointer';
-import { ShapeInspector } from '../ShapeInspector';
 import { useDesignCarveContent } from '../preview3d/use-design-carve-content';
 import { useDesignSimulate } from '../preview3d/use-design-simulate';
 import { DesignViewportToolbar } from './DesignViewportToolbar';
@@ -56,7 +55,6 @@ export function DesignViewport3D(): JSX.Element {
             : '3D needs WebGL — switch to 2D in the top bar; drawing and Apply work the same there.'}
         </p>
       )}
-      <ShapeInspector />
     </div>
   );
 }

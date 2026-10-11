@@ -9,7 +9,6 @@
 // keeps drawing. "Apply & Close" is the variant that also stashes and closes.
 
 import { useCallback } from 'react';
-import { outputSketchBounds, type Sketch } from '../../core/design';
 import { useStore } from '../state';
 import { survivingObjectIds } from '../state/design-apply-record';
 import { sessionSketch } from './design-session';
@@ -37,8 +36,9 @@ export function useDesignApply(): DesignApplyHandlers {
     if (current === null) return 'nothing';
     const sketch = sessionSketch(current);
     if (
-      !hasOutputGeometry(sketch) &&
-      survivingObjectIds(useStore.getState().project.scene, current.applied).size === 0
+      sketch.entities.length === 0 &&
+      survivingObjectIds(useStore.getState().project.scene, current.applied).size === 0 &&
+      useStore.getState().project.designStudioDocument === undefined
     )
       return 'nothing';
     // Handing back what the last Apply created is what makes a second Apply an
@@ -47,6 +47,7 @@ export function useDesignApply(): DesignApplyHandlers {
       sketch,
       sketch.entities.map(() => crypto.randomUUID()),
       current.applied,
+      { activeLayerId: current.activeLayerId, surface3d: current.surface3d },
     );
     // Refused, with a notice: the drawing stays unapplied, and Apply stays on
     // for when there is room.
@@ -65,19 +66,12 @@ export function useDesignApply(): DesignApplyHandlers {
     canApply:
       session !== null &&
       session.dirtySinceApply &&
-      (hasOutputGeometry(sessionSketch(session)) ||
-        survivingObjectIds(scene, session.applied).size > 0),
+      (sessionSketch(session).entities.length > 0 ||
+        survivingObjectIds(scene, session.applied).size > 0 ||
+        session.applied !== null),
     apply: () => {
       apply();
     },
     applyAndClose,
   };
-}
-
-// Construction-only sketches contribute nothing to output, so Apply has nothing
-// to do. Measured from the output bounds rather than the entity count, so a
-// sketch of guides alone reads as empty.
-function hasOutputGeometry(sketch: Sketch): boolean {
-  const bounds = outputSketchBounds(sketch);
-  return bounds.maxX > bounds.minX || bounds.maxY > bounds.minY;
 }
