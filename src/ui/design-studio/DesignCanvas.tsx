@@ -20,7 +20,11 @@ import { subscribeCanvasColorScheme } from '../theme/canvas-color-scheme';
 import { entityFields, type EntityField } from './design-entity-fields';
 import type { DesignSession as DesignStudioSession } from './design-session';
 import { paintDesignCanvas } from './design-canvas-draw';
-import { createFrameScheduler, frameSchedulerHostFor } from './design-frame-scheduler';
+import {
+  createFrameScheduler,
+  frameSchedulerHostFor,
+  type FrameScheduler,
+} from './design-frame-scheduler';
 import { paintDesignOverlay } from './design-overlay-draw';
 import { useCanvas2dSurface } from './design-surface';
 import { useDesignStudioStore } from './design-studio-store';
@@ -203,31 +207,38 @@ function useLayerPaint(
       paint,
       frameSchedulerHostFor(host.ownerDocument.defaultView),
     );
-    const unsubscribe = useDesignStudioStore.subscribe(scheduler.request);
-    const unsubscribeProject = subscribeProjectScene(scheduler.request);
-    const unsubscribeTheme = subscribeCanvasColorScheme(scheduler.request);
-    const observer = new ResizeObserver(scheduler.request);
-    observer.observe(host);
-    // The FIRST paint runs immediately rather than on a frame: a hidden or
-    // throttled page does not run frame callbacks at all, and the canvas must not
-    // be blank while that is true.
-    scheduler.flush();
-    // Coming back into view is the other moment a frame is owed but may never have
-    // arrived, so repaint outright rather than trusting the pending request.
-    const onVisible = (): void => {
-      if (!host.ownerDocument.hidden) scheduler.flush();
-    };
-    host.ownerDocument.addEventListener('visibilitychange', onVisible);
+    const stopPainting = subscribeLayerPaint(host, scheduler);
     return () => {
       active = false;
-      unsubscribe();
-      unsubscribeProject();
-      unsubscribeTheme();
-      observer.disconnect();
-      host.ownerDocument.removeEventListener('visibilitychange', onVisible);
-      scheduler.cancel();
+      stopPainting();
     };
   }, [staticRef, overlayRef, hostRef, bedWidthMm, bedHeightMm, selectedPhotoId]);
+}
+
+function subscribeLayerPaint(host: HTMLDivElement, scheduler: FrameScheduler): () => void {
+  const unsubscribe = useDesignStudioStore.subscribe(scheduler.request);
+  const unsubscribeProject = subscribeProjectScene(scheduler.request);
+  const unsubscribeTheme = subscribeCanvasColorScheme(scheduler.request);
+  const observer = new ResizeObserver(scheduler.request);
+  observer.observe(host);
+  // The FIRST paint runs immediately rather than on a frame: a hidden or
+  // throttled page does not run frame callbacks at all, and the canvas must not
+  // be blank while that is true.
+  scheduler.flush();
+  // Coming back into view is the other moment a frame is owed but may never have
+  // arrived, so repaint outright rather than trusting the pending request.
+  const onVisible = (): void => {
+    if (!host.ownerDocument.hidden) scheduler.flush();
+  };
+  host.ownerDocument.addEventListener('visibilitychange', onVisible);
+  return () => {
+    unsubscribe();
+    unsubscribeProject();
+    unsubscribeTheme();
+    observer.disconnect();
+    host.ownerDocument.removeEventListener('visibilitychange', onVisible);
+    scheduler.cancel();
+  };
 }
 
 // Telemetry and unrelated selection changes do not alter the composition pixels.
