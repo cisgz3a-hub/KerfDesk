@@ -98,7 +98,9 @@ function timePreview(
   // The 2D parser ignores these non-geometric words; the timing model handles
   // them. Other ignored words could change the route, so do not claim that
   // their source timing maps onto the 2D geometry.
-  const ignored = notes.find((note) => !/unsupported (G4|G94|G91\.1|M0|M1|M400)$/.test(note));
+  const ignored = notes.find(
+    (note) => !/unsupported (G4|G54|G94|M0|M1|M106|M107|M221|M400)$/.test(note),
+  );
   if (ignored !== undefined) return unavailable(`2D preview omitted ${ignored}.`);
   const timing = context.timing;
   if (timing === undefined) return unavailable('No machine timing assumptions were supplied.');
@@ -108,6 +110,16 @@ function timePreview(
     ...(timing.travelTimeScale === undefined ? {} : { travelTimeScale: timing.travelTimeScale }),
     ...(timing.plannerBlocks === undefined ? {} : { plannerBlocks: timing.plannerBlocks }),
   });
+  if (
+    ![
+      time.totalSeconds,
+      time.motionSeconds,
+      time.dwellSeconds,
+      ...Object.values(time.breakdown),
+    ].every(finiteNonNegative) ||
+    !time.segSeconds.every(finiteNonNegative)
+  )
+    return unavailable('Source timing contains a non-finite or invalid duration.');
   const timeline = sourceLineTimeline(model, motions, time.segSeconds);
   if (timeline === null) return unavailable('Source motion does not match the 2D preview route.');
   const { cutSeconds, rapidTravelSeconds, feedTravelSeconds } = time.breakdown;
@@ -145,20 +157,8 @@ function sourceLineTimeline(
   let elapsed = 0;
   let motionIndex = 0;
   for (let line = 0; line < model.lineCount; line += 1) {
-    const seconds = motionSeconds[line] ?? 0;
-    const motion = motions[motionIndex];
-    if (motion?.line === line) {
-      if (!(seconds > 0)) return null;
-      segments.push({
-        startDistanceMm: distance,
-        endDistanceMm: distance + motion.length,
-        startSeconds: elapsed,
-        endSeconds: elapsed + seconds,
-      });
-      distance += motion.length;
-      elapsed += seconds;
-      motionIndex += 1;
-    } else if (seconds > 0) return null;
+    // The admitted model excludes canned cycles, so every represented dwell
+    // is G4: RS274/GRBL execute it before this block's motion, in either word order.
     const dwell = dwells.get(line) ?? 0;
     if (dwell > 0) {
       segments.push({
@@ -169,8 +169,23 @@ function sourceLineTimeline(
       });
       elapsed += dwell;
     }
+    const seconds = motionSeconds[line] ?? 0;
+    const motion = motions[motionIndex];
+    if (motion?.line === line) {
+      if (!validMotionTime(motion.length, seconds)) return null;
+      segments.push({
+        startDistanceMm: distance,
+        endDistanceMm: distance + motion.length,
+        startSeconds: elapsed,
+        endSeconds: elapsed + seconds,
+      });
+      distance += motion.length;
+      elapsed += seconds;
+      motionIndex += 1;
+    } else if (seconds > 0) return null;
   }
-  if (motionIndex !== motions.length) return null;
+  if (motionIndex !== motions.length || !finiteNonNegative(distance) || !finiteNonNegative(elapsed))
+    return null;
   return { totalDistanceMm: distance, totalSeconds: elapsed, segments };
 }
 
@@ -198,4 +213,12 @@ function unavailable(message: string): ImportedGcodeTiming {
     timeline: null,
     description: `Timing unavailable: ${message} Playback shows geometry only.`,
   };
+}
+
+function finiteNonNegative(value: number): boolean {
+  return Number.isFinite(value) && value >= 0;
+}
+
+function validMotionTime(length: number, seconds: number): boolean {
+  return seconds > 0 && finiteNonNegative(length);
 }

@@ -227,6 +227,7 @@ export function PreviewRouteControls(
 ): JSX.Element {
   const previewPlaying = useUiStore((s) => s.previewPlaying);
   const setPreviewPlaying = useUiStore((s) => s.setPreviewPlaying);
+  const restartPreviewPlayback = useUiStore((s) => s.restartPreviewPlayback);
   const scrubberT = useUiStore((s) => s.scrubberT);
   const setScrubberT = useUiStore((s) => s.setScrubberT);
   const previewPlaybackSpeed = useUiStore((s) => s.previewPlaybackSpeed);
@@ -245,7 +246,7 @@ export function PreviewRouteControls(
         data-help-id="control:preview.routePlayback"
         onClick={() => {
           if (disabled) return;
-          if (!previewPlaying && scrubberT >= 1) setScrubberT(0);
+          // The playback owner knows whether a final stationary dwell remains.
           setPreviewPlaying(!previewPlaying);
         }}
       >
@@ -272,8 +273,7 @@ export function PreviewRouteControls(
         data-help-id="control:preview.routeRestart"
         onClick={() => {
           if (disabled) return;
-          setScrubberT(0);
-          setPreviewPlaying(false);
+          restartPreviewPlayback();
         }}
       >
         Restart

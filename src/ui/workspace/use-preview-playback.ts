@@ -24,6 +24,7 @@ export function usePreviewPlayback(
   const playing = useUiStore((s) => s.previewPlaying);
   const playbackSpeed = useUiStore((s) => s.previewPlaybackSpeed);
   const scrubberT = useUiStore((s) => s.scrubberT);
+  const restartRevision = useUiStore((s) => s.previewRestartRevision);
   const setPreviewPlaying = useUiStore((s) => s.setPreviewPlaying);
   const setScrubberT = useUiStore((s) => s.setScrubberT);
   const external = useStore((s) => s.externalGcodePreview);
@@ -37,7 +38,7 @@ export function usePreviewPlayback(
           : null,
     [estimate, external, toolpath],
   );
-  const { scrubberRef, elapsedRef } = usePlaybackScrubber(timeline, scrubberT);
+  const { scrubberRef, elapsedRef } = usePlaybackScrubber(timeline, scrubberT, restartRevision);
 
   useEffect(() => {
     if ((!previewMode || !hasPlayableRoute) && playing) setPreviewPlaying(false);
@@ -50,10 +51,8 @@ export function usePreviewPlayback(
     let lastFrameAt: number | null = null;
     const playbackRate = PLAYBACK_RATE[playbackSpeed];
 
-    if (
-      scrubberRef.current >= 1 &&
-      (timeline === null || elapsedRef.current >= timeline.totalSeconds)
-    ) {
+    const completed = timeline === null || elapsedRef.current >= timeline.totalSeconds;
+    if (scrubberRef.current >= 1 && completed) {
       scrubberRef.current = 0;
       elapsedRef.current = 0;
       setScrubberT(0);
@@ -99,28 +98,34 @@ export function usePreviewPlayback(
     timeline,
     elapsedRef,
     scrubberRef,
+    restartRevision,
   ]);
 }
 
 function usePlaybackScrubber(
   timeline: ReturnType<typeof buildPreviewTimeline> | null,
   scrubberT: number,
+  restartRevision: number,
 ) {
   const scrubberRef = useRef(scrubberT);
   const elapsedRef = useRef(0);
   const timelineRef = useRef<typeof timeline>(null);
+  const restartRef = useRef(restartRevision);
   useEffect(() => {
     // Dwell time cannot be recovered from stationary distance. Only re-seek
     // for a user scrub or a new timeline, not our own animation frame writes.
-    if (
+    if (restartRef.current !== restartRevision) elapsedRef.current = 0;
+    else if (
       timeline !== null &&
       (timelineRef.current !== timeline || scrubberRef.current !== scrubberT)
     ) {
-      elapsedRef.current = elapsedSecondsAtScrubber(timeline, scrubberT);
+      elapsedRef.current =
+        scrubberT >= 1 ? timeline.totalSeconds : elapsedSecondsAtScrubber(timeline, scrubberT);
     }
     scrubberRef.current = scrubberT;
     timelineRef.current = timeline;
-  }, [scrubberT, timeline]);
+    restartRef.current = restartRevision;
+  }, [scrubberT, timeline, restartRevision]);
   return { scrubberRef, elapsedRef };
 }
 

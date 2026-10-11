@@ -321,6 +321,7 @@ function buildSegmentTiming(
   const plannedMotionEndSeconds = new Float64Array(model.segmentCount);
   const plannedStartSeconds = new Float64Array(model.segmentCount);
   const plannedEndSeconds = new Float64Array(model.segmentCount);
+  const sameBlockDwell = dwellBeforeMotionByLine(model);
   let motionElapsed = 0;
   let routeMm = 0;
   for (let index = 0; index < model.segmentCount; index += 1) {
@@ -328,7 +329,9 @@ function buildSegmentTiming(
     const motionStart = motionElapsed;
     motionElapsed += time.segSeconds[index] ?? 0;
     const motionEnd = motionElapsed;
-    const dwellBefore = line === 0 ? 0 : (lines.rawLineDwellEndSeconds[line - 1] ?? 0);
+    const dwellBefore =
+      (line === 0 ? 0 : (lines.rawLineDwellEndSeconds[line - 1] ?? 0)) +
+      (sameBlockDwell[line] ?? 0);
     const transportBefore = lines.rawLineTransportEndSeconds[line] ?? 0;
     routeStartMm[index] = routeMm;
     routeMm =
@@ -350,6 +353,15 @@ function buildSegmentTiming(
     plannedStartSeconds,
     plannedEndSeconds,
   };
+}
+
+function dwellBeforeMotionByLine(model: GcodeRenderModel): Float64Array {
+  const seconds = new Float64Array(model.lineCount);
+  for (const event of model.events) {
+    if (event.kind === 'dwell' && event.isBeforeMotion === true)
+      seconds[event.line] = (seconds[event.line] ?? 0) + event.seconds;
+  }
+  return seconds;
 }
 
 function last(values: Float64Array): number {
