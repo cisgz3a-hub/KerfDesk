@@ -10,7 +10,7 @@
 # Electron's renderer keeps its narrower connect-src; its updater runs in main.
 
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self'; worker-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:51731; font-src 'self' data:; connect-src 'self' http://127.0.0.1:51731 https://dl.kerfdesk.com; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:51731; font-src 'self' data:; connect-src 'self' http://127.0.0.1:51731 https://dl.kerfdesk.com; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
@@ -28,6 +28,8 @@
 # safe to cache aggressively.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+  # Vite's module workers must carry the workspace's isolation policy too.
+  Cross-Origin-Embedder-Policy: credentialless
 
 # The service worker must NOT be long-cached (ADR-060): the browser revalidates
 # sw.js to detect a new deploy's SW, and an HTTP-cached copy delays updates up to
@@ -35,6 +37,19 @@
 # one tiny conditional request per load.
 /sw.js
   Cache-Control: no-cache
+
+# Threaded offline nesting requires isolation on the workspace document.
+# Credentialless retains non-CORS camera images without cross-origin cookies.
+/
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+/index.html
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+/packing-solver-worker.js
+  Cross-Origin-Embedder-Policy: credentialless
+/vendor/packingsolver/*
+  Cross-Origin-Embedder-Policy: credentialless
 
 # This dedicated download page supplies its restrictive CSP in a meta element.
 # Detach only this page's app-wide policy to permit its one public manifest host.

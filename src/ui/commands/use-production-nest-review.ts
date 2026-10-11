@@ -33,7 +33,7 @@ export function useProductionNestReview(onClose: () => void) {
     setProgress(null);
     setRunning(false);
   };
-  const calculate = (definition: ProductionNestDefinition): void => {
+  const calculate = (definition: ProductionNestDefinition, advanced = false): void => {
     reset();
     const prepared = useStore.getState().prepareProductionNest(definition);
     if (prepared.kind === 'invalid') {
@@ -45,7 +45,15 @@ export function useProductionNestReview(onClose: () => void) {
     setDraft(prepared.value);
     setProgress({ attempted: 0, total: definition.optimise ? 24 : 1, best: null });
     setRunning(true);
-    launchProductionSearch(prepared.value, session, owner, setProgress, setRunning, pushToast);
+    launchProductionSearch(
+      prepared.value,
+      session,
+      owner,
+      setProgress,
+      setRunning,
+      pushToast,
+      advanced,
+    );
   };
   const accept = (partial: boolean): void => {
     if (draft === null || progress?.best === null || progress?.best === undefined) return;
@@ -81,11 +89,16 @@ function launchProductionSearch(
   setProgress: (progress: ProductionNestingProgress) => void,
   setRunning: (running: boolean) => void,
   pushToast: (message: string, variant: 'error') => void,
+  advanced: boolean,
 ): void {
   try {
-    session.search = startProductionNestingSearch(prepared.input, (progress) => {
-      if (owner.current === session) setProgress(progress);
-    });
+    session.search = startProductionNestingSearch(
+      prepared.input,
+      (progress) => {
+        if (owner.current === session) setProgress(progress);
+      },
+      advanced,
+    );
     void session.search.result.then(
       () => {
         if (owner.current === session) setRunning(false);

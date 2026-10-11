@@ -324,7 +324,7 @@ startup crash is shown at once. It introduces no startup interaction or modal.
 
 Identical to the format-specific import flows except:
 - Triggered by `File → Import...` (`Cmd/Ctrl+I`) for ordered SVG, DXF, PDF/compatible AI,
-  HPGL/PLT, PNG/JPG/BMP/GIF/TIFF, or STL input.
+  HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD, or STL input.
 - OS-native file picker (Electron) or browser file picker (web).
 - Multi-select supported in the picker.
 
@@ -338,6 +338,13 @@ Identical to the format-specific import flows except:
 - TIFF also uses the page picker, preserving the selected page's original pixels and orientation.
   Its embedded X/Y density sets size; missing density uses 254 DPI. Engraving pixels are 8-bit
   RGB over white. Unsupported encodings are reported so the file can be exported as PNG.
+- Photoshop PSD imports its saved merged image for engraving or tracing (ADR-591), preserving
+  transparency and independent X/Y density. Save an 8-bit RGB or grayscale PSD with a compatible
+  merged composite, or export PNG if compression, colour mode or depth is unsupported. Layers
+  remain flattened; PSB and editable Photoshop layers are outside this import route. Cancelling
+  or failing a decode leaves the current artwork unchanged. The PSD decoder/PNG encoder checks
+  its estimated working allocations before reading the full file; if its 512 MiB budget is
+  exceeded, resize the document or export PNG for the existing PNG import route.
 - BMP honours embedded density. GIF imports a still image of the first/default frame.
 - HPGL/PLT imports supported pen geometry at 40 plotter units/mm. Scaling needs explicit reference
   points. Unsupported drawing commands reject the file with their source location. Pen colours
@@ -1539,7 +1546,7 @@ Mac uses `Cmd`, Windows/Linux web uses `Ctrl`.
 - `Cmd/Ctrl+O` — Open project
 - `Cmd/Ctrl+S` — Save project
 - `Cmd/Ctrl+Shift+S` — Save Project As
-- `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF or STL through the unified picker
+- `Cmd/Ctrl+I` — Import SVG, DXF, PDF/compatible AI, HPGL/PLT, PNG/JPG/BMP/GIF/TIFF/PSD or STL through the unified picker
 - `Cmd/Ctrl+Shift+E` — Save G-code (Export)
 
 #### Edit
@@ -3310,6 +3317,11 @@ settings and Job Review keep their existing read-only setup references.
 
 ### Other text controls
 
+- Multilingual outline text uses local shaping and bidirectional layout (ADR-591). Hebrew,
+  Arabic, mixed-direction numbers and combining marks retain their glyph order and positioning
+  through wrapping and path text. Choose or import a font containing the required characters;
+  missing glyphs are still reported. No online font service is used. Existing basic Latin and
+  single-line engraving fonts keep their established geometry.
 - The outline font picker includes Great Vibes, Allura, Alex Brush, Parisienne, Pinyon Script,
   Italianno, and Corinthia for names and calligraphic signs. Cinzel Decorative provides ornamental
   serif companion lettering. These fonts are bundled with the app, remain editable on canvas,

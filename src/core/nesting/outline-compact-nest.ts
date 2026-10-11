@@ -100,10 +100,20 @@ export function isOutlineNestWithinWorkBudget(items: ReadonlyArray<OutlineNestIt
   if (items.length === 0 || items.length > OUTLINE_NEST_ITEM_LIMIT) return false;
   const itemPairCount = items.length * items.length;
   let outlinePoints = 0;
+  let segmentPairs = 0;
   for (const item of items) {
-    if (item.outline === undefined || item.outline.length === 0) outlinePoints += 4;
-    else for (const path of item.outline) outlinePoints += path.length;
-    if (itemPairCount * outlinePoints > OUTLINE_NEST_WORK_LIMIT) return false;
+    const points = item.outline?.length
+      ? item.outline.reduce((sum, path) => sum + path.length, 0)
+      : 4;
+    // The segment index accelerates validation, but repeated search candidates
+    // must also budget the worst-case cross-product of contour segments.
+    segmentPairs += outlinePoints * points;
+    outlinePoints += points;
+    if (
+      itemPairCount * outlinePoints > OUTLINE_NEST_WORK_LIMIT ||
+      segmentPairs > OUTLINE_NEST_WORK_LIMIT
+    )
+      return false;
   }
   return true;
 }

@@ -227,6 +227,24 @@ describe('compactOutlineNest', () => {
     expect(isOutlineNestWithinWorkBudget(detailed)).toBe(false);
   });
 
+  it('retains the rectangular draft when dense contour segment pairs exceed the search budget', () => {
+    const contour = Array.from({ length: 20_000 }, (_, i) => ({
+      x: 10 + 10 * Math.cos((i * Math.PI * 2) / 20_000),
+      y: 10 + 10 * Math.sin((i * Math.PI * 2) / 20_000),
+    }));
+    const dense = ['a', 'b'].map((id) => ({
+      id,
+      width: 20,
+      height: 20,
+      canRotate: false,
+      outline: [contour],
+    }));
+    expect(isOutlineNestWithinWorkBudget(dense)).toBe(false);
+    const result = outlineNest({ minX: 0, minY: 0, maxX: 100, maxY: 100 }, dense, { padding: 2 });
+    expect(result).toMatchObject({ ok: true, usedOutline: false });
+    if (result.ok) expect(result.placements).toHaveLength(2);
+  });
+
   it(
     'packs a deterministic forty-part production corpus within its budget',
     { timeout: ciBudgetMs(5_000, 15_000) },

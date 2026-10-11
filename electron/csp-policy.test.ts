@@ -7,6 +7,18 @@ function readRepoFile(path: string): string {
 }
 
 describe('trace worker CSP', () => {
+  it('keeps WebAssembly compilation separate from JavaScript eval and isolates emitted workers', () => {
+    for (const path of ['public/_headers', 'electron/main.ts']) {
+      const source = readRepoFile(path);
+      expect(source).toContain("'wasm-unsafe-eval'");
+      expect(source).not.toMatch(/script-src[^\n]*\s'unsafe-eval'/);
+    }
+    const headers = readRepoFile('public/_headers');
+    expect(headers).toMatch(/\/assets\/\*[\s\S]*?Cross-Origin-Embedder-Policy: credentialless/);
+    expect(headers).toMatch(
+      /\/packing-solver-worker\.js\s+Cross-Origin-Embedder-Policy: credentialless/,
+    );
+  });
   it('allows the Vite trace worker URL scheme in web and Electron CSP', () => {
     for (const path of ['public/_headers', 'electron/main.ts']) {
       expect(readRepoFile(path), path).toContain("worker-src 'self' data: blob:");

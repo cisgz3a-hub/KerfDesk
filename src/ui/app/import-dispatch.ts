@@ -12,6 +12,7 @@ import { importStlFiles } from './stl-import-action';
 import type { StlImportTarget } from './stl-import-size';
 import { useStore } from '../state/store';
 import { importSvgFiles } from './svg-import-action';
+import { importPsdFile } from './psd-import-action';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
 import { describeImportBedFit } from './import-bed-fit-notice';
 import { proFeaturesUnlocked, requestProFeature } from '../licensing/edition';
@@ -32,6 +33,7 @@ export const ARTWORK_IMPORT_EXTENSIONS = [
   '.tif',
   '.tiff',
   '.stl',
+  '.psd',
 ] as const;
 
 export type ImportDispatchActions = {
@@ -46,7 +48,7 @@ export type ImportDispatchActions = {
   readonly openGcodeInspector?: (name: string, source: GcodeInspectionSource) => void;
 };
 
-type ImportFileKind = 'svg' | 'dxf' | 'pdf' | 'tiff' | 'hpgl' | 'image' | 'stl' | 'gcode';
+type ImportFileKind = 'svg' | 'dxf' | 'pdf' | 'tiff' | 'hpgl' | 'image' | 'stl' | 'gcode' | 'psd';
 type RecognizedImportFile = { readonly file: File; readonly kind: ImportFileKind };
 
 /**
@@ -260,6 +262,14 @@ async function dispatchOneFile(
   nextSuccessIndex: () => number,
   owner: ImportDocumentOwner,
 ): Promise<void> {
+  if (kind === 'psd') {
+    await importPsdFile(file, {
+      isCurrent: owner.isCurrent,
+      importRasterImage: (object) => actions.importRasterImage(object, nextSuccessIndex()),
+      pushToast: actions.pushToast,
+    });
+    return;
+  }
   if (kind === 'pdf' || kind === 'tiff') {
     await requestPagedArtwork(file, kind, owner.isCurrent, (object) => {
       const outcome =
@@ -384,12 +394,15 @@ const IMPORT_KINDS_BY_EXTENSION: Readonly<Record<string, ImportFileKind>> = {
   bmp: 'image',
   gif: 'image',
   stl: 'stl',
+  psd: 'psd',
   nc: 'gcode',
   gcode: 'gcode',
   tap: 'gcode',
 };
 const IMPORT_KINDS_BY_MIME: Readonly<Record<string, ImportFileKind>> = {
   'application/pdf': 'pdf',
+  'image/vnd.adobe.photoshop': 'psd',
+  'image/x-photoshop': 'psd',
   'image/tiff': 'tiff',
   'image/png': 'image',
   'image/jpeg': 'image',

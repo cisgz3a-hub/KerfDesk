@@ -1,20 +1,14 @@
-import {
-  areaD,
-  EndType,
-  FillRule,
-  inflatePathsD,
-  intersectD,
-  JoinType,
-  type PathsD,
-} from 'clipper2-ts';
+import { areaD, FillRule, intersectD, type PathsD } from 'clipper2-ts';
 import { nestRotation, type NestPlacement, type NestRect } from './quick-nest';
+import { outlinesCloserThan } from './outline-clearance';
 import type { NestOutline, OutlineNestItem } from './outline-compact-nest';
 const AREA_EPSILON = 1e-7;
 
 export type PlacedState = {
   readonly item: OutlineNestItem;
   readonly placement: NestPlacement;
-  readonly paths: PathsD;
+  readonly sourcePaths: PathsD;
+  readonly spacing: number;
   readonly bounds: NestRect;
 };
 
@@ -41,12 +35,19 @@ export function placedState(
     }),
   ) as PathsD;
   const spacing = finiteNonNegative(padding) / 2;
-  const paths =
-    spacing === 0
-      ? oriented
-      : inflatePathsD(oriented, spacing, JoinType.Round, EndType.Polygon, 2, 3);
-  const bounds = pathsBounds(paths) ?? placementBounds(item, placement, spacing);
-  return { item, placement, paths, bounds };
+  // A polygonal approximation of a round offset can miss its true extrema.
+  // Derive the exact clearance box from the uninflated artwork instead.
+  const sourceBounds = pathsBounds(oriented);
+  const bounds =
+    sourceBounds === null
+      ? placementBounds(item, placement, spacing)
+      : {
+          minX: sourceBounds.minX - spacing,
+          minY: sourceBounds.minY - spacing,
+          maxX: sourceBounds.maxX + spacing,
+          maxY: sourceBounds.maxY + spacing,
+        };
+  return { item, placement, sourcePaths: oriented, spacing, bounds };
 }
 
 export function obstacleState(rect: NestRect, padding: number): PlacedState {
@@ -66,8 +67,15 @@ export function collides(
 ): boolean {
   return [...others, ...obstacles].some((other) => {
     if (!rectanglesOverlap(candidate.bounds, other.bounds)) return false;
-    const intersection = intersectD(candidate.paths, other.paths, FillRule.NonZero, 3);
-    return intersection.some((path) => Math.abs(areaD(path)) > AREA_EPSILON);
+    const intersection = intersectD(candidate.sourcePaths, other.sourcePaths, FillRule.NonZero, 6);
+    return (
+      intersection.some((path) => Math.abs(areaD(path)) > AREA_EPSILON) ||
+      outlinesCloserThan(
+        candidate.sourcePaths,
+        other.sourcePaths,
+        candidate.spacing + other.spacing,
+      )
+    );
   });
 }
 

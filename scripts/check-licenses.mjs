@@ -37,6 +37,8 @@ const ALLOWED_LICENSES = new Set([
   'BlueOak-1.0.0',
   '(MPL-2.0 OR Apache-2.0)',
   'Python-2.0',
+  // ag-psd -> pako: both permissive constituents reviewed in ADR-591.
+  '(MIT AND Zlib)',
 ]);
 
 const raw = execSync('pnpm licenses list --prod --json', {
