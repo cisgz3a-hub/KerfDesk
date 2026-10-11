@@ -75,6 +75,16 @@ describe('Extend artwork', () => {
     });
     expect(findExtendTarget(scene(loop, edge(-20)), p(0, 0), 0.1)).toBeNull();
   });
+  it('extends a short local straight segment enlarged into a visible open line', () => {
+    const line = art('scaled-line', [p(0, 0), p(0.00005, 0)], {
+      transform: { ...IDENTITY_TRANSFORM, scaleX: 100000, scaleY: 100000 },
+    });
+    expect(findExtendTarget(scene(line, edge(20)), p(5, 0), 0.1)).toMatchObject({
+      status: 'ready',
+      end: 'end',
+      to: p(20, 0),
+    });
+  });
   it.each([1, 1000])(
     'uses shared local closure tolerance for a near-closed cubic at scale %s',
     (scale) => {

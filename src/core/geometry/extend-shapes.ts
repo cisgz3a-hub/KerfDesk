@@ -91,6 +91,7 @@ function pickEndpoint(
   // Match the shared closure policy in local coordinates, including unflagged
   // single-cubic loops. Scaling must not turn a filled loop into an open source.
   if (
+    (contour.segments.segments.length > 1 || contour.segments.segments[0]?.kind !== 'line') &&
     Math.abs(localStart.x - localEnd.x) < CLOSURE_EPS_MM &&
     Math.abs(localStart.y - localEnd.y) < CLOSURE_EPS_MM
   )
