@@ -1,9 +1,16 @@
 import type { RemoteWriteCommand, RemoteReadCommand, RemoteWrite } from './types';
 import { validTextPatch } from './text-validation';
 import { RemoteFault } from './fault';
+import {
+  DESIGN_WRITE_COMMANDS,
+  validOperationPatch,
+  validateDesignWrite,
+  type DesignWrite,
+} from './design-validation';
 
 const READS = new Set([
   'get_workspace',
+  'get_workspace_scene',
   'get_workspace_preview',
   'list_fonts',
   'get_text',
@@ -33,7 +40,8 @@ export type ValidatedCommand =
       readonly args: Record<string, never>;
     }
   | { readonly command: 'get_text'; readonly args: { readonly artworkId: string } }
-  | RemoteWrite;
+  | RemoteWrite
+  | DesignWrite;
 
 export function record(value: unknown): value is RecordValue {
   return (
@@ -70,6 +78,7 @@ const admissionKeys = ['expectedRevision', 'requestId'];
 
 /** Strict, bounded JSON contract; never echo user keys or values in errors. */
 export function validateCommand(command: string, args: unknown): ValidatedCommand {
+  if (DESIGN_WRITE_COMMANDS.has(command)) return validateDesignWrite(command, args);
   if (!READS.has(command) && !WRITES.has(command)) throw new RemoteFault('unsupported_command');
   if (!record(args)) throw new RemoteFault('invalid_arguments');
   const valid = READS.has(command)
@@ -204,21 +213,7 @@ function validTransform(value: unknown): boolean {
   }
 }
 function validPatch(value: unknown): boolean {
-  if (!record(value) || Object.keys(value).length === 0) return false;
-  return Object.entries(value).every(([key, field]) => {
-    switch (key) {
-      case 'powerPercent':
-        return finite(field, 0, 100);
-      case 'speedMmPerMin':
-        return finite(field, Number.MIN_VALUE, 100_000);
-      case 'passes':
-        return finite(field, 1, 1000) && Number.isInteger(field);
-      case 'enabled':
-        return typeof field === 'boolean';
-      default:
-        return false;
-    }
-  });
+  return record(value) && Object.keys(value).length > 0 && validOperationPatch(value);
 }
 
 export function canonicalRequest(value: unknown): string {

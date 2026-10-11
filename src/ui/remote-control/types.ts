@@ -1,8 +1,11 @@
+import type { PlatformAdapter } from '../../platform/types';
 import type { AppState } from '../state/store';
 import type { MachineAuthority, RemoteCaller } from './machine-types';
+import type { RemoteOperationPatchFull } from './design-validation';
 
 export type RemoteReadCommand =
   | 'get_workspace'
+  | 'get_workspace_scene'
   | 'get_workspace_preview'
   | 'list_fonts'
   | 'get_text'
@@ -28,12 +31,7 @@ export type RemoteTransform =
   | { readonly type: 'move'; readonly dxMm: number; readonly dyMm: number }
   | { readonly type: 'resize'; readonly widthMm: number; readonly heightMm: number }
   | { readonly type: 'rotate'; readonly angleDeg: number };
-export type RemoteOperationPatch = {
-  readonly powerPercent?: number;
-  readonly speedMmPerMin?: number;
-  readonly passes?: number;
-  readonly enabled?: boolean;
-};
+export type RemoteOperationPatch = RemoteOperationPatchFull;
 export type RemoteTextPatch = {
   readonly text?: string;
   readonly fontId?: string;
@@ -215,6 +213,8 @@ export type RemoteControlOptions = {
     currentRevision: string,
     signal?: AbortSignal,
   ) => SafeRemoteJobReview | null | Promise<SafeRemoteJobReview | null>;
+  /** Desktop platform for Save and Connect; never exposes paths or port names remotely. */
+  readonly getPlatform?: () => PlatformAdapter | null;
   readonly store?: RemoteAppStore;
 };
 export type RemoteControlAdapter = {
@@ -229,6 +229,10 @@ export type RemoteControlAdapter = {
   ) => Promise<RemoteCommandResult>;
   readonly getRevision: () => string;
   readonly dispose: () => void;
+  /** Held-jog dead-man (ADR-585): heartbeats, releases and whether a hold needs fast polling. */
+  readonly holdBeat?: (clientId: string, operationId: string) => boolean;
+  readonly holdRelease?: (clientId: string | null) => void;
+  readonly holdActive?: () => boolean;
   /** Synchronous final disclosure projection before native serialization. */
   readonly machineDelivery?: (command: string, result: RemoteCommandResult) => RemoteCommandResult;
 };

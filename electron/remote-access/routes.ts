@@ -35,6 +35,30 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
     reader.releaseLock();
   }
 }
+const EVENTS = new Set(['job.finished', 'job.stopped', 'machine.alarm']);
+/** null: absent; false: malformed (the whole poll is refused). */
+function validObservation(value: unknown): { revision: string; machineSeq: number } | null | false {
+  if (value === undefined) return null;
+  if (
+    !object(value) ||
+    Object.keys(value).length !== 2 ||
+    typeof value.revision !== 'string' ||
+    value.revision.length < 1 ||
+    value.revision.length > 200 ||
+    !Number.isSafeInteger(value.machineSeq) ||
+    (value.machineSeq as number) < 0
+  )
+    return false;
+  return { revision: value.revision, machineSeq: value.machineSeq as number };
+}
+function validEvents(value: unknown): string[] | false {
+  if (value === undefined) return [];
+  return Array.isArray(value) &&
+    value.length <= 8 &&
+    value.every((item) => EVENTS.has(item as string))
+    ? (value as string[])
+    : false;
+}
 function fields(value: Record<string, unknown>, allowed: string[]): boolean {
   const names = Object.keys(value).filter((key) => key !== 'sessionId');
   return names.length === allowed.length && names.every((name) => allowed.includes(name));
@@ -120,9 +144,17 @@ class RemoteRoutes {
     return response({ detached: true });
   }
   private poll(value: Record<string, unknown>, session: string): Response {
-    return fields(value, [])
-      ? response({ ...this.queue.poll(session), status: this.runtime.status() })
-      : missing();
+    const names = Object.keys(value).filter((key) => key !== 'sessionId');
+    if (!names.every((name) => name === 'observed' || name === 'events')) return missing();
+    const observed = validObservation(value.observed);
+    const events = validEvents(value.events);
+    if (observed === false || events === false) return missing();
+    if (observed !== null) this.runtime.observe(observed, events);
+    return response({
+      ...this.queue.poll(session),
+      ...this.runtime.takeHoldSignals(),
+      status: this.runtime.status(),
+    });
   }
   private pair(value: Record<string, unknown>): Response {
     return fields(value, []) ? response(this.runtime.pair()) : missing();
@@ -140,14 +172,23 @@ class RemoteRoutes {
     return response(await this.runtime.configure(value.enabled));
   }
   private decide(value: Record<string, unknown>): Response {
+    const remember = value.remember;
     if (
-      !fields(value, ['pairingId', 'approved', 'scopes']) ||
+      !fields(value, [
+        'pairingId',
+        'approved',
+        'scopes',
+        ...(remember === undefined ? [] : ['remember']),
+      ]) ||
       typeof value.pairingId !== 'string' ||
       typeof value.approved !== 'boolean' ||
+      (remember !== undefined && typeof remember !== 'boolean') ||
       !validRemoteScopes(value.scopes)
     )
       return missing();
-    return response(this.runtime.decide(value.pairingId, value.approved, value.scopes));
+    return response(
+      this.runtime.decide(value.pairingId, value.approved, value.scopes, remember === true),
+    );
   }
   private complete(value: Record<string, unknown>, session: string): Response {
     if (!fields(value, ['id', 'result']) || typeof value.id !== 'string' || !object(value.result))

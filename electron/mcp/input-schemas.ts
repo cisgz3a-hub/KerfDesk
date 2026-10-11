@@ -2,6 +2,7 @@ import { type StandardSchemaWithJSON } from '@modelcontextprotocol/server';
 import { z } from 'zod';
 import { MCP_ARRANGE_ACTIONS, mcpTextPatchSchema } from './authoring-schemas.js';
 import { mcpMachineInputSchemas } from './machine-schemas.js';
+import { mcpDesignInputSchemas, mcpOperationPatchSchema } from './design-schemas.js';
 
 export const MCP_MAX_ITEMS = 200;
 export const MCP_MAX_RESULT_BYTES = 256 * 1024;
@@ -16,17 +17,7 @@ const pointsMm = z
   .array(z.strictObject({ xMm: coordinate, yMm: coordinate }))
   .min(2)
   .max(512);
-const operationPatch = z
-  .strictObject({
-    powerPercent: z.number().min(0).max(100).optional(),
-    speedMmPerMin: z.number().positive().max(100_000).optional(),
-    passes: z.number().int().min(1).max(1000).optional(),
-    enabled: z.boolean().optional(),
-  })
-  .refine(
-    (patch) => Object.values(patch).some((value) => value !== undefined),
-    'Provide at least one operation field.',
-  );
+const operationPatch = mcpOperationPatchSchema;
 
 export const mcpInputSchemas = {
   get_workspace: z.strictObject({}),
@@ -87,6 +78,7 @@ export const mcpInputSchemas = {
   }),
   undo: z.strictObject(writeAdmission),
   redo: z.strictObject(writeAdmission),
+  ...mcpDesignInputSchemas,
   ...mcpMachineInputSchemas,
 } as const;
 
@@ -106,6 +98,15 @@ export const MCP_WRITE_COMMANDS = new Set<KerfDeskMcpCommand>([
   'arrange_artwork',
   'undo',
   'redo',
+  'create_operation',
+  'assign_artwork_to_operation',
+  'reorder_operation',
+  'delete_operation',
+  'apply_material_recipe',
+  'add_svg',
+  'import_file',
+  'save_project',
+  'apply_edits',
 ]);
 
 /** Physical control is independent of document editing, including revision-bearing controls. */
@@ -115,10 +116,33 @@ export const MCP_CONTROL_COMMANDS = new Set<KerfDeskMcpCommand>([
   'review_machine_job',
   'start_job',
   'abort_job',
+  'connect_machine',
+  'disconnect_machine',
+  'home_machine',
+  'set_work_origin',
+  'pause_job',
+  'resume_job',
+  'jog_hold_start',
+  'jog_hold_stop',
 ]);
 
+/** Control-approved reads that are not ledgered actions (no requestId, no motion). */
+export const MCP_CONTROL_READ_COMMANDS = new Set<KerfDeskMcpCommand>(['get_camera_snapshot']);
+
+/** Stop/cancel commands share the reserved Abort lane: they must stay reachable under load. */
+export const MCP_PRIORITY_COMMANDS = new Set<KerfDeskMcpCommand>(['abort_job', 'jog_hold_stop']);
+
+/** Held motion needs a live phone socket for its dead-man heartbeat; never offered to AI tools. */
+export const MCP_PHONE_ONLY_COMMANDS = new Set<KerfDeskMcpCommand>([
+  'jog_hold_start',
+  'jog_hold_stop',
+]);
+
+/** Answered by the relay from desktop change counters; the desktop never receives it. */
+export const MCP_RELAY_COMMANDS = new Set<KerfDeskMcpCommand>(['wait_for_change']);
+
 export function mcpCommandScope(command: KerfDeskMcpCommand): 'read' | 'edit' | 'control' {
-  if (MCP_CONTROL_COMMANDS.has(command)) return 'control';
+  if (MCP_CONTROL_COMMANDS.has(command) || MCP_CONTROL_READ_COMMANDS.has(command)) return 'control';
   return MCP_WRITE_COMMANDS.has(command) ? 'edit' : 'read';
 }
 

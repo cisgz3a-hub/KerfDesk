@@ -1,6 +1,19 @@
 # KerfDesk phone control and remote MCP
 
-This separate Cloudflare Worker relays approved workspace reads and edits to an open KerfDesk desktop app. It serves a small phone page at `/control?deviceId=<public UUID>` and standard MCP Streamable HTTP at `/mcp`. The public origin is fixed to `https://kerfdesk-phone-control.cisgz3a.workers.dev`.
+This separate Cloudflare Worker relays approved workspace reads and edits to an open KerfDesk desktop app. It serves the **KerfDesk Remote** phone app at `/app/` (ADR-582), the previous phone page at `/control?deviceId=<public UUID>` for existing links, and standard MCP Streamable HTTP at `/mcp`. The public origin is fixed to `https://kerfdesk-phone-control.cisgz3a.workers.dev`.
+
+## KerfDesk Remote app
+
+The app source is `app/` (React 18, TypeScript): `src/core/` holds the store, transports, scene geometry and controller; `src/ui/` the screens and design system; `src/mcp/` the MCP Apps integration. `pnpm build:app` (`scripts/build-app.mjs`) writes two committed outputs, and `build`, `format:check` and `deploy` fail if either is stale:
+
+- `public/app/` — the installable phone app (`index.html`, `app.js`, `app.css`, `manifest.webmanifest`, `sw.js`, icons). Only those names are served under `/app/`. The document gets its own CSP (`manifest-src` and `worker-src 'self'`, same-origin `wss:`) and `camera=(self)` for QR pairing. The service worker caches the shell only, never API data, and shows job alerts.
+- `../../electron/mcp/workspace-app-ui.ts` — the same app as one self-contained HTML document, served by the MCP server as `ui://kerfdesk/workspace/v6.html`. It talks to the host through `@modelcontextprotocol/ext-apps`, has empty network allowlists, and registers view-only app tools.
+
+`pnpm build:app-icons` re-renders the PNG icons from `app/static/icon.svg`. Bundled React, ext-apps and the MCP client SDK are production dependencies so they appear in `/third-party-notices.txt`.
+
+Live updates (ADR-582): the desktop sends `{v:1,type:'changed',revision,machineSeq}` when its counters change and `{v:1,type:'event',kind}` for `job.finished`, `job.stopped` or `machine.alarm`. The Durable Object keeps the latest counters in the desktop socket attachment, fans them out to approved phone sockets at `GET /api/client/socket` (same cookie, exact Origin, session and scope rechecked on every frame), and answers the read command `wait_for_change` itself. Phone sockets also carry held-jog heartbeats (`hold.beat`), forwarded to the desktop only for control-approved clients; a closed socket or revocation sends `hold.release` (ADR-585). Held jogs are refused on `/mcp` and without a live phone socket.
+
+Job alerts (ADR-583) use Web Push with VAPID and `aes128gcm`, implemented on Web Crypto in `src/push.ts`. They stay off until the maintainer adds `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` and `VAPID_SUBJECT` as Worker secrets; `/api/push/key` returns 404 until then. Subscriptions are limited to known push-service hosts, one per approved client, and deleted on revocation or a 404/410 response.
 
 The first-party website provides the [Phone & MCP setup page](https://kerfdesk.com/phone.html), with a link into these controls. Controls stay in a top-level page so the existing Secure, HttpOnly, SameSite=Strict session and framing protections remain effective.
 
@@ -30,7 +43,9 @@ The desktop opens WSS `/api/desktop/connect?deviceId=<public UUID>` with `Author
 | Desktop sends | Relay responds or forwards |
 | --- | --- |
 | `{v:1,type:'pair.create',requestId}` | `pair.offer` with the same UUID request ID, code, original `expiresAt` and remaining `expiresInMs` |
-| `{v:1,type:'pair.decide',pairingId,approved,scopes}` | Updated `clients` snapshot; approval must be a subset of the requested scopes |
+| `{v:1,type:'pair.decide',pairingId,approved,scopes,remember?}` | Updated `clients` snapshot; approval must be a subset of the requested scopes. `remember: true` gives a phone a 30-day session |
+| `{v:1,type:'changed',revision,machineSeq}` | Nothing; stored and fanned out to phone sockets and `wait_for_change` |
+| `{v:1,type:'event',kind}` | Nothing; fanned out and, when configured, sent as a job alert |
 | `{v:1,type:'clients.list',requestId}` | `clients` snapshot with the same UUID request ID |
 | `{v:1,type:'client.revoke',clientId}` | Updated `clients` snapshot; pending work is cancelled |
 | `{v:1,type:'clients.revokeAll',requestId}` | Empty `clients` snapshot, then `clients.revoked` with the same UUID request ID |
@@ -43,22 +58,24 @@ Pairing offers, approval requests, phone claim responses and pending phone statu
 
 If a claim is rejected, check that the PC reports **Connected to the remote service**, that its computer ID matches, and that the latest code matches exactly, including capitals. Another Create request replaces the preceding code immediately. A successful claim consumes its code once. The phone form accepts either spelling of a public UUID by normalising input to lowercase; this does not migrate owner records or relax case-sensitive pairing codes. A generic rejection does not establish which private condition failed.
 
-The shared portable MCP server in `electron/mcp` defines the exact tools, argument schemas and projected output. Read tools are `get_workspace`, `get_machine`, `get_app_status`, `list_material_recipes`, `review_job`, `get_workspace_preview`, `list_fonts` and `get_text`. Edit tools are `set_selection`, `add_text`, `add_rectangle`, `add_ellipse`, `add_polyline`, `transform_artwork`, `update_operation`, `update_text`, `arrange_artwork`, `undo` and `redo`. Edits include a fresh `expectedRevision` and caller-generated UUID `requestId`; uncertain retries preserve that UUID. All layers use the shared mutation classification to enforce edit permission.
+The shared portable MCP server in `electron/mcp` defines the exact tools, argument schemas and projected output. Read tools are `get_workspace`, `get_machine`, `get_app_status`, `list_material_recipes`, `review_job`, `get_workspace_preview`, `get_workspace_scene`, `wait_for_change`, `list_fonts` and `get_text`. Edit tools are `set_selection`, `add_text`, `add_rectangle`, `add_ellipse`, `add_polyline`, `transform_artwork`, `update_operation`, `update_text`, `arrange_artwork`, `undo`, `redo`, and the ADR-584 tools `create_operation`, `assign_artwork_to_operation`, `reorder_operation`, `delete_operation`, `apply_material_recipe`, `add_svg`, `import_file`, `save_project` and `apply_edits`. Machine tools are listed in `electron/mcp/README.md`. Edits include a fresh `expectedRevision` and caller-generated UUID `requestId`; uncertain retries preserve that UUID. All layers use the shared mutation classification to enforce edit permission.
 
 The phone page includes previews, searchable bundled fonts, ordinary text editing, layout actions and shared Undo/Redo. Numeric inputs preserve blank and partial drafts until submission. Separate default-off desktop artwork sharing is required for previews and text reads; read approval alone does not grant it. The renderer redacts operation labels and artwork-derived warning wording while sharing is off. Complete project files, camera pictures and private paths have no output fields.
 
-MCP previews include a bounded PNG image and advertise the static authenticated `ui://kerfdesk/workspace/v4.html` MCP Apps resource. Its MIME type is `text/html;profile=mcp-app`, external connect/resource allowlists are empty, and tool calls pass through the host's existing authenticated MCP connection. The resource embeds no computer identity, session secret or project contents. It is not an iframe of `/control` and does not relax that page's framing or cookie policy. Revoked/expired approvals cannot read the resource.
+MCP previews include a bounded PNG image. The workspace, scene, preview and machine tools advertise the static authenticated `ui://kerfdesk/workspace/v6.html` MCP Apps resource (KerfDesk Remote; earlier releases used v4/v5). Its MIME type is `text/html;profile=mcp-app`, external connect/resource allowlists are empty, and tool calls pass through the host's existing authenticated MCP connection. The resource embeds no computer identity, session secret or project contents. It is not an iframe of `/control` and does not relax that page's framing or cookie policy. Revoked/expired approvals cannot read the resource.
 
 `review_job` prepares through the desktop's canonical read-only compiler or reuses an exact current owned review. Counts are workspace totals; timing, warnings and bounds describe the scoped prepared program. Review bounds are output coordinates; preview bounds are design coordinates. Readiness and independent spatial Frame completion do not authorize execution. Hosted service deployment and updated native clients must be qualified separately; an older client may report a new command unsupported.
 
-The updated `/control` document supports an explicit camera scanner and direct touch editing. QR frames are decoded locally using native detection or a self-hosted pinned fallback; scanning only fills the form. Only the successful top-level document permits `camera=(self)`, with microphone and framing still denied. Success, cancellation and hidden/navigation state stop the stream. Touch gestures use the renderer's exact ready-preview `viewport`, require actual editing and artwork-sharing approval, and remain local until Apply. Ordinary Laser ellipse/polyline creation and existing selection/transforms share PC history, revision checks and idempotent request IDs. The portable resource is now `ui://kerfdesk/workspace/v4.html`, without network dependencies; older desktop metadata disables direct tools rather than guessing coordinates.
+The updated `/control` document supports an explicit camera scanner and direct touch editing. QR frames are decoded locally using native detection or a self-hosted pinned fallback; scanning only fills the form. Only the successful top-level document permits `camera=(self)`, with microphone and framing still denied. Success, cancellation and hidden/navigation state stop the stream. Touch gestures use the renderer's exact ready-preview `viewport`, require actual editing and artwork-sharing approval, and remain local until Apply. Ordinary Laser ellipse/polyline creation and existing selection/transforms share PC history, revision checks and idempotent request IDs. Older desktop metadata disables direct tools rather than guessing coordinates.
 
 ## Stored data and expiry
 
 | Record | Behaviour |
 | --- | --- |
 | Pairing offer and pending claim | Five minutes; one successful claim, at most five incorrect well-formed code attempts per offer |
-| Phone cookie and phone-only approval | Fixed eight hours from explicit PC approval; repeated status requests do not renew it |
+| Phone cookie and phone-only approval | Fixed eight hours from explicit PC approval, or 30 days when the PC ticks **Keep this phone signed in** (ADR-583); repeated status requests do not renew it |
+| Push subscription | One per approved phone in Durable Object storage; deleted on revocation, expiry cleanup or a 404/410 from the push service |
+| Latest change counters | The desktop socket attachment only (workspace revision and machine sequence numbers, no artwork) |
 | OAuth access token | 30 minutes; requires the same live PC approval and audience |
 | OAuth refresh grant | Fixed 30 days only when `offline_access` is explicitly approved; refresh does not renew the PC approval lease |
 | Consent transaction and unexchanged authorization code | Ten minutes, managed by the official OAuth provider |
