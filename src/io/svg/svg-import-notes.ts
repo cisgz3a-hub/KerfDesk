@@ -97,7 +97,7 @@ function presentationNotes(counts: SvgImportCounts): string[] {
     ),
     [
       counts.unresolvedPaintOpacity,
-      'Imported $ SVG element(s) with unresolved fill or stroke opacity treated as fully opaque; opacity using CSS variables or layout-dependent values may hide artwork that is included. Resolve these expressions in your SVG editor before importing for exact visibility.',
+      'Imported $ SVG element(s) with unresolved fill or stroke opacity treated as fully opaque; opacity using CSS variables (custom or environment) or layout-dependent values may hide artwork that is included. Resolve these expressions in your SVG editor before importing for exact visibility.',
     ],
   ] as const;
   return notes

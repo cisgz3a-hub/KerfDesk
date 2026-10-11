@@ -15,6 +15,7 @@ import {
   isTokenComment,
   isTokenDelim,
   isTokenDimension,
+  isTokenIdent,
   isTokenNumber,
   isTokenOpenParen,
   isTokenPercentage,
@@ -202,10 +203,15 @@ function foldFunction(node: FunctionNode): Quantity | null {
     const token = node.value[at];
     if (at !== node.value.length && !(isTokenNode(token) && token.value[0] === TokenType.Comma))
       continue;
-    const arg = expression(node.value.slice(from, at));
+    const raw = node.value.slice(from, at);
+    const arg = expression(raw);
     // Strategy keywords (round) and none (clamp) remain the library's grammar.
-    if (arg === null) represented.push(node.value.slice(from, at));
-    else {
+    // Other failures include unsupported types: allowing those into a scalar
+    // function can conceal their type (e.g. sign(1fr) becomes a number).
+    if (arg === null) {
+      if (!isKeywordArgument(node.getName().toLowerCase(), represented.length, raw)) return null;
+      represented.push(raw);
+    } else {
       args.push(arg);
       const token = represent(arg);
       represented.push(token === null ? null : [token]);
@@ -225,6 +231,16 @@ function foldFunction(node: FunctionNode): Quantity | null {
   // percentage. Compound exponents may cancel inside calc, not across a
   // min/max/clamp (or other scalar function) boundary.
   return null;
+}
+
+function isKeywordArgument(name: string, index: number, values: ComponentValue[]): boolean {
+  const args = values.filter((node) => !isWhiteSpaceOrCommentNode(node));
+  const [node] = args;
+  if (args.length !== 1 || !isTokenNode(node) || !isTokenIdent(node.value)) return false;
+  const keyword = node.value[4].value.toLowerCase();
+  if (name === 'round' && index === 0)
+    return ['nearest', 'up', 'down', 'to-zero'].includes(keyword);
+  return name === 'clamp' && (index === 0 || index === 2) && keyword === 'none';
 }
 
 function scalar(node: TokenNode): Quantity | null {

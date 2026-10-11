@@ -37,6 +37,30 @@ const valid = [
   'var(--missing, (1;2))',
   'var(--missing, [!])',
   String.raw`var(--\6d issing, 1)`,
+  'env(missing, 1)',
+  'env(missing, 0)',
+  'env(missing)',
+  'env(missing,)',
+  'env(missing 0 1, .5)',
+  'env(missing +1 -0, 1)',
+  'env(missing, env(other, 1))',
+  'env(missing, var(--other, 1))',
+  'var(--missing, env(other, 1))',
+  'calc(1 + env(missing, 0) junk)',
+  'foo(env(missing, 1))',
+  'env(missing, 1',
+  'env(missing, [!])',
+  'env(missing, (1;2))',
+  String.raw`e\6e v(missing, 1)`,
+  String.raw`env(\6d issing, 1)`,
+  // Chrome accepts these names despite the env draft's custom-ident wording.
+  // Preserve them with a warning rather than silently exposing lower opacity.
+  'env(initial, 1)',
+  'env(inherit, 1)',
+  'env(unset, 1)',
+  'env(revert, 1)',
+  'env(revert-layer, 1)',
+  'env(default, 1)',
 ];
 const invalid = [
   'var()',
@@ -53,6 +77,19 @@ const invalid = [
   '"var(--missing)"',
   'var(--missing/**/tail, 1)',
   'var(--missing, 1!important)',
+  'env()',
+  'env(1, 1)',
+  'env("missing", 1)',
+  'env(missing extra, 1)',
+  'env(missing -1, 1)',
+  'env(missing 1.0, 1)',
+  'env(missing 1e0, 1)',
+  'env(missing, 1;2)',
+  'env(missing, !important)',
+  'env(missing, var(other, 1))',
+  'var(--missing, env(1, 1))',
+  'var(--missing, env(missing -1, 1))',
+  'env(missing, env(, 1))',
 ];
 
 describe('variable paint opacity declaration syntax', () => {
@@ -75,6 +112,12 @@ describe.each(parsers)('variable paint opacity through %s', (_name, parse) => {
       'var(--missing, 0)',
       'var(--missing)',
       'calc(var(--missing, 1) / 2)',
+      'env(missing, 1)',
+      'env(missing, 0)',
+      'env(missing)',
+      'env(missing 0 1, .5)',
+      'env(missing, var(--other, 1))',
+      'var(--missing, env(other, 1))',
     ])(
       'retains a valid winning %s and warns without guessing its computed value',
       async (value) => {
@@ -116,14 +159,33 @@ describe.each(parsers)('variable paint opacity through %s', (_name, parse) => {
       expect(notes(result)).toEqual([]);
     });
 
-    it.each(['var(missing, 1)', 'var(--, 1)', 'var(--missing 1)', 'var(--missing, var(other))'])(
-      'invalid %s leaves lower zero in effect without an approximation warning',
-      async (value) => {
-        const result = await parse(svg(shape(`style="${property}:0;${property}:${value}"`)));
-        expect(result.object).toBeNull();
-        expect(notes(result)).toEqual([]);
-      },
-    );
+    it('retains environment winners in stylesheets and attributes, with child overrides', async () => {
+      const result = await parse(
+        svg(
+          `<style>.x{${property}:0}.x{${property}:env(missing,1)!important;${property}:0}</style>${shape('class="x"')}<g ${property}="env(missing,0)">${shape('')}${shape(`${property}="initial"`)}${shape(`${property}="0"`)}</g>`,
+        ),
+      );
+      expect(result.object?.paths.flatMap((path) => path.polylines)).toHaveLength(3);
+      expect(notes(result)).toHaveLength(1);
+      expect(notes(result)[0]).toContain('Imported 2 SVG element(s)');
+      expect(notes(result)[0]).toContain('environment');
+    });
+
+    it.each([
+      'var(missing, 1)',
+      'var(--, 1)',
+      'var(--missing 1)',
+      'var(--missing, var(other))',
+      'env(missing -1, 1)',
+      'env(missing 1.0, 1)',
+      'env(missing 1px, 1)',
+      'var(--missing, env(1, 1))',
+      'env(missing, var(other))',
+    ])('invalid %s leaves lower zero in effect without an approximation warning', async (value) => {
+      const result = await parse(svg(shape(`style="${property}:0;${property}:${value}"`)));
+      expect(result.object).toBeNull();
+      expect(notes(result)).toEqual([]);
+    });
 
     it('preserves importance and lets explicit child values clear uncertainty', async () => {
       const result = await parse(

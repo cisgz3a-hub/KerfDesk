@@ -16,6 +16,11 @@ type Fixture = {
 };
 const cases: Fixture[] = [
   {
+    name: 'unsupported flex argument cannot hide behind a scalar function',
+    inline: 'P:0;P:calc(sign(1fr))',
+    expected: 0,
+  },
+  {
     name: 'stylesheet rollback removes the whole unlayered scope',
     sheet: '.x{P:0}.x{P:revert-layer}',
     expected: 1,
@@ -158,6 +163,14 @@ const cases: Fixture[] = [
     ['calc(clamp(0px * 1px, .5px * 1px, 1px * 1px) / (1px * 1px))', 0.75],
     ['calc(1foo / 1foo)', 0.75],
     ['calc(1fr / 1fr)', 0.75],
+    ['calc(sign(1fr))', 0.75],
+    ['sign(1fr)', 0.75],
+    ['sign(1foo)', 0.75],
+    ['round(up, .1, .5)', 0.5],
+    ['round(to-zero, -.9, .5)', 0],
+    ['round(bogus, .1, .5)', 0.75],
+    ['clamp(bogus, .1, .5)', 0.75],
+    ['round(down, calc(1fr / 1fr), .5)', 0.75],
     ['calc(0px / 1px)', 0],
     ['calc(0px / 0px)', 0],
     ['calc(1px / 0px)', 1],

@@ -31,7 +31,7 @@ export function parseSvgPaintOpacity(
   if (normalized === 'revert-layer') return 'revert-layer';
   const number = numericOpacity(normalized);
   if (number !== null) return number;
-  // Valid var() values win before substitution, even if substitution later
+  // Valid var()/env() values win before substitution, even if substitution later
   // fails. Do not expose an older declaration when context is unavailable.
   if (hasSvgOpacityVariables(value)) return 'unresolved';
   return svgOpacityMath(value);
