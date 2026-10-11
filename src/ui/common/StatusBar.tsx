@@ -18,7 +18,7 @@ import { UpdateReadyButton } from '../licensing/UpdateReadyButton';
 import { CANVAS_MOTION_SLOT_ID } from './status-bar-slots';
 import './status-bar.css';
 
-export function StatusBar(): JSX.Element {
+export function StatusBar({ children }: { readonly children?: React.ReactNode }): JSX.Element {
   const project = useStore((s) => s.project);
   const cursorMm = useStore((s) => s.cursorMm);
   const selectedObjectId = useStore((s) => s.selectedObjectId);
@@ -65,6 +65,7 @@ export function StatusBar(): JSX.Element {
         <span id={CANVAS_MOTION_SLOT_ID} style={slotStyle} />
       </div>
       <div className="lf-status-bar__actions" style={actionsStyle}>
+        {children}
         <SiteLinks />
         <EditionStatusButton />
         <UpdateReadyButton />

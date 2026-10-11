@@ -27,7 +27,7 @@ import { CncStockCanvasHud, RegistrationJigPanel, ToolStrip, Workspace } from '.
 import { WorkspaceViewport } from '../workspace/WorkspaceViewport';
 import { PwaUpdateWatcherGate } from './PwaUpdateWatcherGate';
 import { useAutosave } from './use-autosave';
-import { AutosaveRecoveryBanner } from './AutosaveRecoveryBanner';
+import { AutosaveRecoveryControl } from './AutosaveRecoveryControl';
 import { ProProjectDesktopDialog } from './ProProjectDesktopDialog';
 import { useActiveJobWakeLock } from './use-active-job-wake-lock';
 import { useJobWatch } from '../camera/job-watch/job-watch-runner';
@@ -65,7 +65,6 @@ export function App(): JSX.Element {
       <CommandShell />
       <DesktopCloseNotice />
       <DesktopSessionEndNotice />
-      <AutosaveRecoveryBanner />
       <ProProjectDesktopDialog />
       <ProjectBedReconciliationBanner />
       <ExternalGcodePreviewBanner />
@@ -84,7 +83,9 @@ export function App(): JSX.Element {
         */}
         <WorkspaceSidePanels />
       </main>
-      <StatusBar />
+      <StatusBar>
+        <AutosaveRecoveryControl />
+      </StatusBar>
       {/* Window-level popups (ADR-207 amendment). Both are `position: fixed`,
           so they take no layout space anywhere: mounting either one cannot
           resize the workspace or shift the rails. Neither may overlay the
