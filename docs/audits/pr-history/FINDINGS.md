@@ -250,9 +250,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-04/early-supporting-diff
 
 ## B05-CONSOLE-001: Combined tool and XY mutations retain stale XY origin evidence
 
-Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
 
-Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
 
 Trigger: G92 X0 T2 or G92.1 G49
 
@@ -264,9 +264,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair e
 
 ## B05-CONSOLE-002: Firmware-equivalent GRBL numeric spellings preserve stale work Z
 
-Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
 
-Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
 
 Trigger: G092 Z0 or G 92 Z0
 
@@ -278,9 +278,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-a.json. Repair e
 
 ## B05-C-REALTIME-COMMENTS: Saved G-code comments preserve GRBL realtime command bytes
 
-Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-pending.
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: merged-ci-verified.
 
-Recorded CI: pending at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
+Recorded CI: passed at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
 
 Trigger: Profile name Shop!~ exported with ordinary build metadata; a sender transmits comments verbatim.
 
@@ -292,9 +292,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/lane-c.json. Repair e
 
 ## B05-CONSOLE-003: Console WCS spellings and comments leave a stale G54 selection
 
-Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
 
-Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
 
 Trigger: Known activeWcs G54, then Console selects G55 using G055, G 55, G55X0, G55 (G54), or G55 ; G54.
 
@@ -306,9 +306,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-wcs-finding.j
 
 ## B05-CONSOLE-004: Fractional Console tool words preserve stale work-Z evidence
 
-Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: pr-open-ci-pending.
+Repair: [#1162](https://github.com/cisgz3a-hub/KerfDesk/pull/1162). State: merged-ci-verified.
 
-Recorded CI: pending at commit 4ffa9639eab02c95c90a853580ce8ebc2de365a3.
+Recorded CI: passed at commit 1114b8bf03ff08c1fff4617bf4cff56552ee3d00.
 
 Trigger: Send accepted GRBL T2.5, T+002.5 or T 2 . 5, alone or combined with G92 X0.
 
@@ -320,9 +320,9 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-05/console-fractional-to
 
 ## B05-CI-ESLINT-001: Repository lint exhausts its configured heap during full CI checks
 
-Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: pr-open-ci-pending.
+Repair: [#1161](https://github.com/cisgz3a-hub/KerfDesk/pull/1161). State: merged-ci-verified.
 
-Recorded CI: pending at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
+Recorded CI: passed at commit d843e2aebb838d41583e40f0b380f8a31c46b6a0.
 
 Trigger: Full ESLint process crosses its 5120 MiB V8 heap cap on current source; three hosted jobs exited 134 without code diagnostics, with an intervening unchanged-head retry passing.
 
@@ -331,3 +331,17 @@ Impact: Required CI cannot reliably verify repair and tracking PRs. The repair r
 Historical origin: See attribution. Operational audit follow-up observed while verifying batch05; no unsupported historical introduction or product-code fault is assigned.
 
 Local evidence: docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-ci-direct.log. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json.
+
+## B05-NOTICE-001: Generated pako notices omit the bundled Zlib attribution
+
+Repair: [#1167](https://github.com/cisgz3a-hub/KerfDesk/pull/1167). State: merged-ci-verified.
+
+Recorded CI: passed at commit 903149ab9a8ff337449c8ea81ad3e8b52c08a7d8.
+
+Trigger: Generate notices after the PSD dependency adds pako 2.1.0: the collector reads only its root MIT LICENSE and omits the Zlib attribution and conditions embedded in its source.
+
+Impact: The distributed notice text is incomplete and contradicts the documented MIT and Zlib coverage. This is a source/notice integrity defect; no deployed-artifact or legal-liability claim is made.
+
+Historical origin: #1155. Introduced by PR #1155, identified while reconciling current-main dependency changes after batch05 publication. Its wider feature scope remains unaudited.
+
+Local evidence: docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json. Repair evidence: docs/audits/2026-10-11-pr-history/batch-05/pako-notice-author.json.

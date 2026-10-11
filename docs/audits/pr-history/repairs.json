@@ -85,10 +85,10 @@
       "status": "passed",
       "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.897Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -270,7 +270,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -373,7 +375,9 @@
         "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:26.303Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+      "currentMainGateReview": "docs/audits/2026-10-11-pr-history/batch-06-plan/current-main-v3-peer-review.json"
     },
     "followUpCommits": [
       "2a3f70bd54647524852c7f297e87d7f4f94775d0",
@@ -444,28 +448,40 @@
           "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305758",
           "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
           "status": "resolved-in-published-followup",
-          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "3545ba22eaa1cb962d002c41538179fa54b7b6ab0fdba5444889822c2b48b00f",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240305762,
           "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305762",
           "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
           "status": "resolved-in-published-followup",
-          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "7397767023d4067180d874c669434956b9a2e0b401f460d7d71f2b71fb585e37",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240305766,
           "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305766",
           "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
           "status": "resolved-in-published-followup",
-          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "e48d5f9366be98b7a56e6b73bbf5f3267db382dd62d24dfd94eee6c04869d52d",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240305771,
           "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240305771",
           "commentedHead": "c3d0e07962846e4ca07d12632fbb2ff66489dc0c",
           "status": "resolved-in-published-followup",
-          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4"
+          "resolvedByPublishedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "abc365dca781ee0ef5da94360b7c299a1d70e1f6d21c1dcf195215aa745a8859",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240364150,
@@ -473,7 +489,10 @@
           "commentedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
-          "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "a7ad557114e4bfb497d37f3160527f51615884c8cb6208bf8836a999d34db222",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240364155,
@@ -481,7 +500,10 @@
           "commentedHead": "7f976434a2838f6e0d1bac0021af65ebb5655fe4",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
-          "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md"
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "b82b54f14fa0ccd9cba4c999dc32b56ca76f481fedb8df577a0d5a82ff93bfc3",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240505326,
@@ -490,7 +512,10 @@
           "status": "resolved-in-published-followup",
           "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
           "resolvedByPublishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
-          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md"
+          "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "6d8fdc394d9004c2feb5ea446d6f31f9ad4d12d13ac05393dacfb00a146eee30",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240505330,
@@ -498,8 +523,10 @@
           "commentedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
           "status": "rejected-not-reproduced",
           "dispositionId": "DISP-042",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
-          "result": "Published source preserves numeric Infinity/NaN through the pinned library; outer opacity maps NaN to zero. Independent actual Chrome/parser and direct-library controls pass."
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "result": "Published source preserves numeric Infinity/NaN through the pinned library; outer opacity maps NaN to zero. Independent actual Chrome/parser and direct-library controls pass.",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "792c2eef901e71098bba2f42b64217929edc138ef930200da3973ccd7cf9113c"
         },
         {
           "id": 4240569209,
@@ -508,7 +535,10 @@
           "status": "resolved-in-published-followup",
           "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-reproduction.md",
           "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
-          "resolvedByPublishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5"
+          "resolvedByPublishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "b0a686d2dc4aca297963c0222c4ec3bce7511e2c67166c3562bc71fe8d6cb066",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240569210,
@@ -516,8 +546,10 @@
           "commentedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
           "status": "documented-limitation",
           "dispositionId": "DISP-043",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
-          "result": "Exact ratio rendering claim not reproduced; conflicting specification/browser support retained explicitly. Separate sign(fr) defect independently repaired."
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "result": "Exact ratio rendering claim not reproduced; conflicting specification/browser support retained explicitly. Separate sign(fr) defect independently repaired.",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "8648df55308638a8d5c1a76d96997bf10017bf172c376a03f158ce3170ac3bcc"
         },
         {
           "id": 4240648358,
@@ -525,7 +557,9 @@
           "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
           "status": "documented-limitation",
           "dispositionId": "DISP-044",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "efccd7b9a3277fbd231b5f7dfa4f8ecfd963c50f69408f72fd51d8fa58f2d2fc"
         },
         {
           "id": 4240648361,
@@ -533,7 +567,9 @@
           "commentedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
           "status": "rejected-not-reproduced",
           "dispositionId": "DISP-045",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "10d7bffc9a491d09f5cd3d6ab9d34947fb71882366d5f2f7c6b12014029f34e7"
         },
         {
           "id": 4240648365,
@@ -542,7 +578,10 @@
           "status": "resolved-in-published-followup",
           "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
           "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
-          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8"
+          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "305a455256ac92d5bc7bc0d1e65652b26738dc22b15459ac30640a5e80134198",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240648371,
@@ -551,14 +590,16 @@
           "status": "resolved-in-published-followup",
           "reproduction": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-reproduction-report.md",
           "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0718-svg-peer-review.md",
-          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8"
+          "resolvedByPublishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "05c78d628c8f32e52015eafc62a9f4d3aee779fc1a2b4afa2eb10c2b52ff4cba",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -567,7 +608,7 @@
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
           "bodySha256": "1281bd2874f85f8521935650f052b24239b067d9fa66958373884eb2f3b54fa7",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105542899,
@@ -575,7 +616,7 @@
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
           "bodySha256": "ea828e80f26f7ea09438a2849f194a5b56519c8a6312b7ad0958ea208f715305",
           "result": "Completed hosted summary names historical head 447b4bc8a520a387a7d205ed073330955c6e86d5; retain as historical information only, not current-head source approval.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6106749619,
@@ -583,7 +624,52 @@
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
           "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5481946195,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "a26e6e15a5f0969102df3b8c8bf5028b47a335d2faf03b5026c80630ac39c16d",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5482003361,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "2db7f813eef1394ce23ae34ec841abcdefac9f54746a79d558dc7a49e4858019",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5482150853,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "ecfbd8219197eecf827cbf909378efac747883ce3192625f1f8938fd9c390c73",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5482215286,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "7226de0ba36d43cf3ed521c5002fc78afc4c6e94f07102e482d6b63390e13423",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5482303006,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+          "bodySha256": "73536bfcd8fc6b00f39aeb456943a7bcf123e3417f3598f36e5f48a6e5d0ea63",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -708,8 +794,38 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": false
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "follow-up-published-ci-pending",
+        "main": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json",
+        "followUpPr": 1167,
+        "followUpHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "followUpSourceReview": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-published-review.json"
+      },
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": false
+      }
+    ],
+    "publicationOwner": "root"
   },
   {
     "id": "raster-outline-boundaries",
@@ -739,10 +855,10 @@
       "status": "passed",
       "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.901Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -924,7 +1040,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -951,7 +1069,8 @@
         "publishedHead": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:26.555Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -960,10 +1079,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1140.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -972,7 +1090,7 @@
           "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
           "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105555935,
@@ -980,7 +1098,7 @@
           "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
           "bodySha256": "8c113df8a3e1b31ac7e2b6f0a9372c1d9b9f77fd52bd5cb77e4a10f8aee4da64",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -994,8 +1112,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "297d3f547217c338fec8d6c6b7d77847c32cf0fc",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "material-preset-roundtrip",
@@ -1025,10 +1165,10 @@
       "status": "passed",
       "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.901Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1210,7 +1350,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -1236,7 +1378,8 @@
         "publishedHead": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:26.849Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -1245,10 +1388,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1141.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -1257,7 +1399,7 @@
           "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
           "bodySha256": "dd12fe970575166b17fd701ef2be2c5e0f4012203e372206529a8a1afc171612",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105570119,
@@ -1265,7 +1407,7 @@
           "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
           "bodySha256": "1e48a64076de6297be8652018753c936dfa3d096df63755b47872fa0782111d5",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -1279,8 +1421,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "0e0a5f2f8f0381cb46daf097151af17499e21e27",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "camera-preview-url",
@@ -1310,10 +1474,10 @@
       "status": "passed",
       "head": "335b6e8438f2694b005c906bce761894cc479e98",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.901Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1495,7 +1659,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -1521,7 +1687,8 @@
         "publishedHead": "335b6e8438f2694b005c906bce761894cc479e98",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:27.086Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -1530,10 +1697,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1142.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -1542,7 +1708,7 @@
           "head": "335b6e8438f2694b005c906bce761894cc479e98",
           "bodySha256": "4bb61352c44a44794b4811b80209855445153731ac03732f1f246d135078cd13",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105581688,
@@ -1550,7 +1716,7 @@
           "head": "335b6e8438f2694b005c906bce761894cc479e98",
           "bodySha256": "f078254902f0f8fbb7664d218403cd52e3dfc4a28d32db8b1b55dac10b75c976",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -1564,8 +1730,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "335b6e8438f2694b005c906bce761894cc479e98",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "selected-node-drag",
@@ -1597,10 +1785,10 @@
       "status": "passed",
       "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.902Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -1782,7 +1970,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -1808,7 +1998,8 @@
         "publishedHead": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:27.329Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -1817,10 +2008,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1143.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -1829,7 +2019,7 @@
           "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
           "bodySha256": "f119968712f96d60c045e5126263383a9ed0bbe81e106633405a220552438a77",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105595233,
@@ -1837,7 +2027,7 @@
           "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
           "bodySha256": "c71430fe5cc4dfa199b7a73babc1796356a926d4be59aa5bdb3899b9ebbea37b",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -1851,8 +2041,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "b8389a0f7f9318e6750a0d7482ffa127aa4f293e",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "closed-contour-fairing",
@@ -1882,10 +2094,10 @@
       "status": "passed",
       "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.902Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2067,7 +2279,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -2093,7 +2307,8 @@
         "publishedHead": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:27.632Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -2102,10 +2317,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1144.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -2114,7 +2328,7 @@
           "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
           "bodySha256": "d433e28e1d3dea2db1090be32fae099c34f601ed7347b422866585aae5f5a557",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105614282,
@@ -2122,7 +2336,7 @@
           "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
           "bodySha256": "67e2df790ed2cde1fb9e844156d48819aa5d59c552e10737790d6642293d28eb",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -2136,8 +2350,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "b0a45672e8846e58910c06db3fbf286d60ebe96e",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "board-correction-ownership",
@@ -2166,10 +2402,10 @@
       "status": "passed",
       "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.902Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2351,7 +2587,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -2377,7 +2615,8 @@
         "publishedHead": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:27.884Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -2386,10 +2625,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1145.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -2398,7 +2636,7 @@
           "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
           "bodySha256": "16d76ea18f171232b4c898b9f591b6a0b6fc5a6a243b2ed01aa6417bde963d17",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105629848,
@@ -2406,7 +2644,7 @@
           "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
           "bodySha256": "7776955493c48679658456461e4b83e1e528c2bdb4f073f822b2b1ddf3113aae",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -2420,8 +2658,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "27f118da6cca51f64ec7e69b6cdd1ee1926e2084",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "concave-helical-pockets",
@@ -2450,10 +2710,10 @@
       "status": "passed",
       "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.902Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2635,7 +2895,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -2661,7 +2923,8 @@
         "publishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:28.155Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "previousReviews": [
       {
@@ -2695,14 +2958,16 @@
           "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1146#discussion_r4240337078",
           "commentedHead": "21c8971e9232fe04b39f2edfab8ef601c0bbaa3a",
           "status": "resolved-in-published-followup",
-          "resolvedByPublishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2"
+          "resolvedByPublishedHead": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+          "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+          "bodySha256": "fffc3a4b2564bbcd9137ba728014ec4634d7399d2c8695ae801a261973ef0e91",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -2711,7 +2976,7 @@
           "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
           "bodySha256": "1362ae65f8d5f8477b68169332840066e153d8a33a1b1c5f0e8f9a0a5d79fd4d",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105647325,
@@ -2719,7 +2984,16 @@
           "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
           "bodySha256": "b595db9a6525672295afc184ee0d8e656db1648a6ccc101130d144ec64c747c4",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5481976770,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+          "bodySha256": "7d0c2b80afa12cb56c633cee9f7d3cf350fc158032470d635c421e48c4db7a2c",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -2733,8 +3007,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "04545ed92f6bbf4366b99be9d22ec21a53dda4b2",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "manual-tabs-binding",
@@ -2765,10 +3061,10 @@
       "status": "passed",
       "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.902Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -2950,7 +3246,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -2976,7 +3274,8 @@
         "publishedHead": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:28.459Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -2985,10 +3284,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1147.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -2997,7 +3295,7 @@
           "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
           "bodySha256": "62c1b3d7e357f2ee6b2d3fab72caf99e78791ba68d190a7a9fe826aca7fd56c2",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105660328,
@@ -3005,7 +3303,7 @@
           "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
           "bodySha256": "e79f1b33897650769d378d59ca022fde792478ee9b84597a82076b7033a1e949",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -3019,8 +3317,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "be8d56612aeb6c20131ff2c1ca8eeb00a2770307",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "zero-z-owner",
@@ -3051,10 +3371,10 @@
       "status": "passed",
       "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.902Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3236,7 +3556,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "review": {
       "status": "approved",
@@ -3251,7 +3573,8 @@
         "publishedHead": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:28.722Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -3271,10 +3594,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1148.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -3283,7 +3605,7 @@
           "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
           "bodySha256": "c88bfd0c8fc156d02538e40d560d36b3705ee38b6d463f2f19bd405a7dca2fcd",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105676166,
@@ -3291,7 +3613,7 @@
           "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
           "bodySha256": "4cbe51eefd19781b63ef50dc2362d4a304829cfb658a174d4c54df0d4835aee3",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -3305,8 +3627,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "4cecefc2f99271f2ec3d6a88781d659bcad2122f",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "external-program-timing",
@@ -3393,10 +3737,10 @@
       "status": "passed",
       "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.903Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -3578,7 +3922,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "browserVerification": {
       "head": "c2dda26f4d60bd4b8c2850aacad56b0b51a4efc2",
@@ -3672,7 +4018,9 @@
         "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:28.991Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+      "currentMainGateReview": "docs/audits/2026-10-11-pr-history/batch-06-plan/current-main-v3-peer-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -3698,7 +4046,9 @@
           "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "17268f917d13134ff3f9e5a37ae2d1543abef60c4cc598a8aee56aac554a5efc"
         },
         {
           "id": 4240361100,
@@ -3706,7 +4056,9 @@
           "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "b2fadd483948fe908aada03dfcb8bbd95fb4edb1cf7aad4718202a1594722b6e"
         },
         {
           "id": 4240361105,
@@ -3714,7 +4066,9 @@
           "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "d47e5f009a72d34a9f35ca86f415d76bd058c7c14d3444cff4892ac4a51c699f"
         },
         {
           "id": 4240361108,
@@ -3722,7 +4076,9 @@
           "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "e9f630ba3297e44546fc273e5f9806c5e1d544ba391feb2ae5ed1cec9b29a88a"
         },
         {
           "id": 4240361112,
@@ -3730,7 +4086,9 @@
           "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "4371a26e6f0a0b23b5e90fba60a7ebfcf1e2cdc33bbf37ec07f99b87134d400b"
         },
         {
           "id": 4240361117,
@@ -3738,7 +4096,9 @@
           "commentedHead": "5bb3558b051251b575da6ccad93916ae8f4039e6",
           "status": "resolved-in-published-followup",
           "resolvedByPublishedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "9bed7ab039ac836eb5c0eb326c0aabdcc674256c4df617107c9d8ab6566c133a"
         },
         {
           "id": 4240671071,
@@ -3746,7 +4106,10 @@
           "commentedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
           "status": "resolved-in-published-followup",
           "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
-          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4"
+          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "725e9b9707d0ccd06b983688dcd9521712f10f196588bf60fac9036501cbd9eb",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 4240671073,
@@ -3754,14 +4117,16 @@
           "commentedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
           "status": "resolved-in-published-followup",
           "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0737-timing-peer-review.md",
-          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4"
+          "resolvedByPublishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "c064d5a11bdcc1a8c9ca681ca3383d5d7c4387afbc0fe205dc2ec6769c712447",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -3770,7 +4135,7 @@
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
           "bodySha256": "0e79947b250e5db0581c1f3ac764f0c15f82619e06299d33a2733ec28bcfca0a",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105692020,
@@ -3778,7 +4143,7 @@
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
           "bodySha256": "04484b94969921d7c78195d95b345db841a5d7d4e6404d8045419a385d256f00",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105950937,
@@ -3786,7 +4151,25 @@
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
           "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5482000358,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "222116612d3f5981c56df00a0a1bca80bce4c5f73d395c51263509ad3805169d",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 5482325496,
+          "kind": "reviews",
+          "status": "review-summary-covered-by-inline-dispositions",
+          "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+          "bodySha256": "5c6c97a9c2cab0ce2c3ad1aa423c17b2c3e4b0a08bb24307ef68091d47553cfc",
+          "result": "Full ID and body bytes equal the preceding independently reviewed receipt; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -3889,7 +4272,10 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
     },
     "currentMainReconciliation": {
       "main": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
@@ -3898,7 +4284,42 @@
       "reviewer": "/root/batch05_b",
       "tests": 69,
       "gateReview": "docs/audits/2026-10-11-pr-history/batch-06-plan/current-main-v2-peer-review.json"
-    }
+    },
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": false
+    },
+    "previousCurrentMainReviews": [
+      {
+        "status": "approved",
+        "main": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-import-reconciliation.json",
+        "successorProof": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main4a-console-merge-review.json",
+        "testsPassed": 89
+      }
+    ],
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "3994983d55dc40c9aaaaf62c531b12ff3b321f96",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1715-timing-reconciliation.json",
+        "testsPassed": 69,
+        "sourceProof": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1715-source-review.json"
+      },
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": false
+      }
+    ],
+    "publicationOwner": "root"
   },
   {
     "id": "variable-counter-bounds",
@@ -3929,10 +4350,10 @@
       "status": "passed",
       "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.903Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -4114,7 +4535,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "review": {
       "status": "approved",
@@ -4129,7 +4552,8 @@
         "publishedHead": "5db629ff40eb51254d39695cce9bee3fdb850109",
         "method": "Every repair source/test file is byte-identical in the reviewed and published Git trees",
         "checkedAt": "2026-10-11T07:54:29.404Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "publicationBase": "ef9f5435c93f5595370832d21950e4777af8ac7c",
     "isolatedVerification": {
@@ -4149,10 +4573,9 @@
       "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-pr-1150.json",
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "discussionDispositions": [
         {
@@ -4161,7 +4584,7 @@
           "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
           "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         },
         {
           "id": 6105705441,
@@ -4169,7 +4592,7 @@
           "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
           "bodySha256": "fcc724e4867e8c5a14d2bb83adbcbc4bf89f0c9b0debedc897200fb185f8f1ab",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json"
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
         }
       ]
     },
@@ -4183,8 +4606,30 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
-    }
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "5db629ff40eb51254d39695cce9bee3fdb850109",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "publicationOwner": "root"
   },
   {
     "id": "trace-diagnostic-defaults",
@@ -4203,10 +4648,10 @@
       "status": "passed",
       "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.903Z",
+      "checkedAt": "2026-10-11T17:54:03.972Z",
       "absentRequired": [],
       "unmetRequired": [],
       "missingRequired": [],
@@ -4388,7 +4833,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "review": {
       "status": "approved",
@@ -4411,7 +4858,8 @@
         "method": "Complete changed-file manifest and every file match the independently reviewed Git tree",
         "checkedAt": "2026-10-11T10:21:33.805Z"
       },
-      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-published-review.json"
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-04/trace-diagnostic-published-review.json",
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
     "cycleVerified": true,
     "completionBlockers": [],
@@ -4448,10 +4896,9 @@
     "reviewComments": {
       "items": [],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       },
       "checkedAt": "2026-10-11T10:23:44.858Z",
       "discussionDispositions": [
@@ -4461,7 +4908,7 @@
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
           "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
           "bodySha256": "f221a175fe9967d373dfebe052fddf2cb09e0522dbeb2b0daa93caa9c1ba6c44",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "previousDisposition": {
             "id": 6108025434,
             "status": "informational-no-review-performed",
@@ -4473,7 +4920,7 @@
           "status": "informational-hosted-review-completed",
           "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
           "result": "Exact complete body and ID unchanged from independently reviewed prior collection; retain the explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "bodySha256": "3f8978f5468db0867d05edc50b21e71b8cf05db4870dd07cfbf3a4f9ee8c5f8a",
           "previousDisposition": {
             "id": 6108025787,
@@ -4495,7 +4942,28 @@
       "checkedAt": "2026-10-11T10:59:30.851Z",
       "reviewer": "/root/batch04_gate",
       "evidence": "docs/audits/2026-10-11-pr-history/publication/batch04-external-merge-review.json",
-      "allRepairFilesMatchReviewedSource": true
+      "allRepairFilesMatchReviewedSource": true,
+      "head": "b121d97e71c17f4eed04373d68f54de925c0386d",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
     }
   },
   {
@@ -4505,66 +4973,205 @@
     "auditBatch": 5,
     "branch": "codex/audit-console-coordinate-effects-20261011",
     "files": [
-      "package.json",
-      "scripts/run-eslint.mjs",
-      "scripts/run-eslint.test.mjs",
       "src/core/controllers/console-state-effect.test.ts",
       "src/core/controllers/console-state-effect.ts",
       "src/ui/state/frame-wcs-selection.test.ts",
       "src/ui/state/frame-wcs-selection.ts",
       "src/ui/state/laser-store-console.test.ts"
     ],
-    "status": "pr-open-ci-pending",
+    "status": "merged-ci-verified",
     "ci": {
-      "status": "pending",
-      "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
-      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
-      "containsFetchedMain": true,
+      "status": "passed",
+      "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+      "base": "416091469561c6c8693a17d131dba75051afc73b",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:58.965Z",
-      "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-      "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-      "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "checkedAt": "2026-10-11T17:54:03.972Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
       "checks": [
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153815/job/114498733085",
+          "completedAt": "2026-10-11T16:13:12Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841058/job/114510523818",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T16:09:46Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:04:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858387",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T15:55:42Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:06:54Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841020/job/114509664547",
           "name": "Package, check and launch the desktop app",
-          "startedAt": "2026-10-11T14:55:49Z",
-          "status": "IN_PROGRESS",
+          "startedAt": "2026-10-11T16:04:35Z",
+          "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T14:55:31Z",
+          "completedAt": "2026-10-11T15:48:41Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153815/job/114498733986",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841020/job/114509665994",
           "name": "Package, install and launch the Windows desktop app",
-          "startedAt": "2026-10-11T14:55:31Z",
+          "startedAt": "2026-10-11T15:48:42Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "2026-10-11T14:55:31Z",
+          "completedAt": "2026-10-11T16:37:24Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841058/job/114510524056",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T16:16:59Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T15:58:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858232",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T15:54:18Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:35:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841058/job/114510524050",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T16:16:59Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:40:42Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841058/job/114510524007",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T16:16:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:29:09Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841058/job/114510524012",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T16:11:51Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T15:48:41Z",
           "conclusion": "SKIPPED",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153815/job/114498734159",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841020/job/114509665728",
           "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
-          "startedAt": "2026-10-11T14:55:31Z",
+          "startedAt": "2026-10-11T15:48:42Z",
           "status": "COMPLETED",
           "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:43:22Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841058/job/114520325769",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T16:42:59Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:48:00Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858482",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T16:34:27Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:34:26Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858462",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T16:25:38Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:09:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858448",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T15:55:31Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:47:25Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858404",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T16:33:07Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:39:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114509858456",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T16:34:35Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T16:55:57Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38152841069/job/114521792632",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T16:55:32Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
         },
         {
           "__typename": "StatusContext",
           "context": "CodeRabbit",
-          "startedAt": "2026-10-11T14:55:36Z",
+          "startedAt": "2026-10-11T15:48:48Z",
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "review": {
       "status": "approved",
@@ -4572,14 +5179,11 @@
       "kind": "Independent reproduction and complete repair-file review",
       "head": "50c2204fe8777f1b314b5eaba46a2e26337c52d4",
       "report": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-tool-independent-review.json",
-      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-console-published-review.json",
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1545-console-published-review.json",
       "sourceAttestation": {
         "reviewedCommit": "50c2204fe8777f1b314b5eaba46a2e26337c52d4",
-        "publishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+        "publishedHead": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
         "files": [
-          "package.json",
-          "scripts/run-eslint.mjs",
-          "scripts/run-eslint.test.mjs",
           "src/core/controllers/console-state-effect.test.ts",
           "src/core/controllers/console-state-effect.ts",
           "src/ui/state/frame-wcs-selection.test.ts",
@@ -4587,25 +5191,29 @@
           "src/ui/state/laser-store-console.test.ts"
         ],
         "completeChangedFileManifest": [
-          "package.json",
-          "scripts/run-eslint.mjs",
-          "scripts/run-eslint.test.mjs",
           "src/core/controllers/console-state-effect.test.ts",
           "src/core/controllers/console-state-effect.ts",
           "src/ui/state/frame-wcs-selection.test.ts",
           "src/ui/state/frame-wcs-selection.ts",
           "src/ui/state/laser-store-console.test.ts"
         ],
-        "method": "Complete live API/Git manifest and all product/CI blobs independently verified against reviewed Git tree",
-        "checkedAt": "2026-10-11T14:55:51.275Z"
+        "retainedSourceFiles": [
+          "package.json",
+          "scripts/run-eslint.mjs",
+          "scripts/run-eslint.test.mjs"
+        ],
+        "retainedSourceVerification": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1545-console-published-review.json",
+        "method": "All8 original files unchanged and verified;5 remain changed versusmain,3 sharedCI files equalmergedmain",
+        "checkedAt": "2026-10-11T15:49:05.451Z"
       },
-      "verifiedPublishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3"
+      "verifiedPublishedHead": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
-    "cycleVerified": false,
-    "completionBlockers": ["Hosted CI is pending"],
+    "cycleVerified": true,
+    "completionBlockers": [],
     "publicationOwner": "root",
     "integrationCommit": "1ab8b751df1690f81487986f3b34fc0b45d245df",
-    "publishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+    "publishedHead": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
     "pullRequest": {
       "number": 1162,
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1162"
@@ -4633,70 +5241,102 @@
         {
           "id": 6109068224,
           "status": "informational-no-review-performed",
-          "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
-          "bodySha256": "fd9e1874638fe5fd38dbe39ccf94892843ccc39143d7879aac187ba58292820a",
-          "result": "Read full edited notice; only automatic-review run ID changed. Review remains skipped and is not source approval.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
+          "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+          "bodySha256": "f34eccd93a82dc5efd31ed5bac586a75f40d749dcb6dfcc2f00ed958dd1a2fe4",
+          "result": "Complete ID/body bytes match the preceding independent review exactly; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "previousDisposition": {
             "id": 6109068224,
             "status": "informational-no-review-performed",
-            "head": "789f1655fdf2d1557c1b9a5a8cbb8b942f27e4e5",
-            "bodySha256": "ecb9d47e578d962ffb67ec2ba9dd3e530a95e0f465fccf55b474a7771f971dbf",
-            "result": "Read the full edited body. Only the run ID changed; automatic review was explicitly skipped. This is neither source approval nor a code finding.",
-            "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json",
+            "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+            "bodySha256": "fd9e1874638fe5fd38dbe39ccf94892843ccc39143d7879aac187ba58292820a",
+            "result": "Full ID and body bytes are identical to the prior independently read and approved collection; retain explicit disposition without timestamp cutoff.",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1515-format-review-complete.json",
             "previousDisposition": {
               "id": 6109068224,
               "status": "informational-no-review-performed",
-              "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
-              "bodySha256": "8938e807e86959e8b4fefb93ae7abf9087b5a69bfc9c31835d27af3461ed18b5",
-              "result": "Edited same-ID skipped automatic review notice has a new run ID. Full body contains no code finding or completed review.",
-              "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-tracking-review-complete.json",
+              "head": "789f1655fdf2d1557c1b9a5a8cbb8b942f27e4e5",
+              "bodySha256": "ecb9d47e578d962ffb67ec2ba9dd3e530a95e0f465fccf55b474a7771f971dbf",
+              "result": "Read the full edited body. Only the run ID changed; automatic review was explicitly skipped. This is neither source approval nor a code finding.",
+              "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json",
               "previousDisposition": {
                 "id": 6109068224,
-                "status": "informational-review-not-run",
-                "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
-                "bodySha256": "864d3ea3951956381d83c11303e939fd61b95114f9fcd0887f66a916dd89d03c",
-                "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
-                "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-tracking-review-complete.json"
+                "status": "informational-no-review-performed",
+                "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
+                "bodySha256": "8938e807e86959e8b4fefb93ae7abf9087b5a69bfc9c31835d27af3461ed18b5",
+                "result": "Edited same-ID skipped automatic review notice has a new run ID. Full body contains no code finding or completed review.",
+                "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-tracking-review-complete.json",
+                "previousDisposition": {
+                  "id": 6109068224,
+                  "status": "informational-review-not-run",
+                  "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+                  "bodySha256": "864d3ea3951956381d83c11303e939fd61b95114f9fcd0887f66a916dd89d03c",
+                  "result": "Service configuration/marketing notice; explicitly skipped automatic review; no code finding or approval.",
+                  "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-tracking-review-complete.json"
+                }
               }
             }
           }
         },
         {
           "id": 6109069941,
-          "status": "hosted-review-in-progress",
-          "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
-          "bodySha256": "8cbbe8a6ec469a6eaf546c79f622dadba161ee0f5fc1baf34c3d555a261e5010",
-          "result": "Full current-head body reports code/security review still running. Keep root publication ownership and refresh this exact ID/body before advancing.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
+          "status": "informational-hosted-review-completed",
+          "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+          "bodySha256": "d324a9e95902488712d83243667ca6a221646cc8b2199cd50698e3b15ade9181",
+          "result": "Read complete hosted summary: code and security reviews completed at the exact collected live head. Complete paginated inline/review collections contain no new findings. This is informational completion, separate from source and CI evidence.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "previousDisposition": {
             "id": 6109069941,
             "status": "hosted-review-in-progress",
-            "head": "789f1655fdf2d1557c1b9a5a8cbb8b942f27e4e5",
-            "bodySha256": "6cf7d084870928ba142e14da4086527a28fc96baedda52e89516a30c54dda930",
-            "result": "The current-head summary reports both code and security reviews running. Retain publication ownership and refresh this exact ID/body before advancing.",
-            "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json",
+            "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+            "bodySha256": "b15ed764711770c71c40cbc687f6984c0fb777afb8e28880fd2854a6b43cc13c",
+            "result": "Full current-head summary reports both code and security review running. Retain root publication ownership; refresh this exact ID/body before advancing.",
+            "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1545-published-review-complete.json",
             "previousDisposition": {
               "id": 6109069941,
-              "status": "informational-review-completed-no-new-findings",
-              "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
-              "bodySha256": "0e7be18636caaaf9d6bb0925752d4652e45fa2e818bf7eb5bd842e56892d9b56",
-              "result": "Unchanged completed hosted-review summary refers to historical head ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b. Retained as terminal historical information only; it is not current-head review approval.",
-              "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-tracking-review-complete.json",
+              "status": "informational-hosted-review-completed",
+              "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+              "bodySha256": "6652a53334d2102ac1ffc4a17f68cc61eae5f045e4ddc4c2994d85cc7b8db376",
+              "result": "Full ID and body bytes are identical to the prior independently read and approved collection; retain explicit disposition without timestamp cutoff.",
+              "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1515-format-review-complete.json",
               "previousDisposition": {
                 "id": 6109069941,
-                "status": "informational-review-completed-no-new-findings",
-                "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
-                "bodySha256": "0e7be18636caaaf9d6bb0925752d4652e45fa2e818bf7eb5bd842e56892d9b56",
-                "result": "Edited same-ID current-head summary now reports both code and security reviews completed. Complete collection contains no new inline finding or review for this PR.",
-                "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-tracking-review-complete.json",
+                "status": "hosted-review-in-progress",
+                "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+                "bodySha256": "8cbbe8a6ec469a6eaf546c79f622dadba161ee0f5fc1baf34c3d555a261e5010",
+                "result": "Full current-head body reports code/security review still running. Keep root publication ownership and refresh this exact ID/body before advancing.",
+                "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
                 "previousDisposition": {
                   "id": 6109069941,
                   "status": "hosted-review-in-progress",
-                  "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
-                  "bodySha256": "6f49d127db2866ac660363a5e0de16078787f0702af71eb34f0ab1215503ea6f",
-                  "result": "Current-head hosted review is still running in this exact collected body. Retain active review ownership and refresh by ID/body; do not mark terminal.",
-                  "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+                  "head": "789f1655fdf2d1557c1b9a5a8cbb8b942f27e4e5",
+                  "bodySha256": "6cf7d084870928ba142e14da4086527a28fc96baedda52e89516a30c54dda930",
+                  "result": "The current-head summary reports both code and security reviews running. Retain publication ownership and refresh this exact ID/body before advancing.",
+                  "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat1417-review-complete.json",
+                  "previousDisposition": {
+                    "id": 6109069941,
+                    "status": "informational-review-completed-no-new-findings",
+                    "head": "05573b3c311e0bb8b3ea5ff89a0d8c6f989e5d2a",
+                    "bodySha256": "0e7be18636caaaf9d6bb0925752d4652e45fa2e818bf7eb5bd842e56892d9b56",
+                    "result": "Unchanged completed hosted-review summary refers to historical head ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b. Retained as terminal historical information only; it is not current-head review approval.",
+                    "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-fractional-tracking-review-complete.json",
+                    "previousDisposition": {
+                      "id": 6109069941,
+                      "status": "informational-review-completed-no-new-findings",
+                      "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+                      "bodySha256": "0e7be18636caaaf9d6bb0925752d4652e45fa2e818bf7eb5bd842e56892d9b56",
+                      "result": "Edited same-ID current-head summary now reports both code and security reviews completed. Complete collection contains no new inline finding or review for this PR.",
+                      "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-tracking-review-complete.json",
+                      "previousDisposition": {
+                        "id": 6109069941,
+                        "status": "hosted-review-in-progress",
+                        "head": "ef3a8ba87c8ad200ea2c018eb9572bbbbae23c4b",
+                        "bodySha256": "6f49d127db2866ac660363a5e0de16078787f0702af71eb34f0ab1215503ea6f",
+                        "result": "Current-head hosted review is still running in this exact collected body. Retain active review ownership and refresh by ID/body; do not mark terminal.",
+                        "evidence": "docs/audits/2026-10-11-pr-history/publication/batch05-repairs-review-complete.json"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -4705,10 +5345,10 @@
         {
           "id": 6109264136,
           "status": "informational-review-unavailable",
-          "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+          "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
           "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
-          "result": "Exact complete ID/body bytes match the hash-bound prior independent review; retain explicit disposition.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
+          "result": "Complete ID/body bytes match the preceding independent review exactly; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "previousDisposition": {
             "id": 6109264136,
             "status": "informational-review-unavailable",
@@ -4720,13 +5360,12 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       }
     },
-    "publicationBase": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+    "publicationBase": "416091469561c6c8693a17d131dba75051afc73b",
     "independentFollowUps": [
       {
         "id": "B05-CONSOLE-004",
@@ -4735,11 +5374,11 @@
         "author": "/root/batch05_a",
         "reviewer": "/root/batch05_c",
         "publicationOwner": "root",
-        "publishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+        "publishedHead": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
         "commit": "f5129cd68486f2b7cd9896cea31ac1acc59ed1f0",
         "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/console-fractional-published-review.json",
-        "previousPublishedHead": "789f1655fdf2d1557c1b9a5a8cbb8b942f27e4e5",
-        "reconciliation": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-console-published-review.json"
+        "previousPublishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+        "reconciliation": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1545-console-published-review.json"
       },
       {
         "id": "B05-CI-ESLINT-001",
@@ -4749,10 +5388,11 @@
         "publicationOwner": "root",
         "evidence": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json",
         "scope": "Shared focused CI lint runner followup, alloriginalfiles/rules retained",
-        "publishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
-        "reconciliation": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-console-published-review.json",
+        "publishedHead": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+        "reconciliation": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1545-console-published-review.json",
         "commit": "50c2204fe8777f1b314b5eaba46a2e26337c52d4",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-peer-review.json"
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-peer-review.json",
+        "previousPublishedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3"
       }
     ],
     "followUpCommits": [
@@ -5136,8 +5776,226 @@
           ]
         },
         "reason": "Superseded by independently reviewed shared CI memory follow-up"
+      },
+      {
+        "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+        "review": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-console-published-review.json",
+        "ci": {
+          "status": "pending",
+          "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+          "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+          "fetchedMain": "416091469561c6c8693a17d131dba75051afc73b",
+          "containsFetchedMain": false,
+          "needsMainReconciliation": true,
+          "checkedAt": "2026-10-11T15:45:25.693Z",
+          "absentRequired": ["Chrome UX smoke"],
+          "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+          "missingRequired": ["Chrome UX smoke"],
+          "checks": [
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:12:05Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153851/job/114500951474",
+              "name": "Browser test checks and production-bundle smoke",
+              "startedAt": "2026-10-11T15:07:04Z",
+              "status": "COMPLETED",
+              "workflowName": "Browser smoke"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:23:45Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998157",
+              "name": "Typecheck, lint and format",
+              "startedAt": "2026-10-11T15:17:29Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T14:58:10Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153815/job/114498733085",
+              "name": "Package, check and launch the desktop app",
+              "startedAt": "2026-10-11T14:55:49Z",
+              "status": "COMPLETED",
+              "workflowName": "Desktop package check"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T14:55:31Z",
+              "conclusion": "SKIPPED",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153815/job/114498733986",
+              "name": "Package, install and launch the Windows desktop app",
+              "startedAt": "2026-10-11T14:55:31Z",
+              "status": "COMPLETED",
+              "workflowName": "Desktop package check"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:36:30Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153851/job/114500951579",
+              "name": "Chrome UX smoke (1/4)",
+              "startedAt": "2026-10-11T15:20:16Z",
+              "status": "COMPLETED",
+              "workflowName": "Browser smoke"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:38:45Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998232",
+              "name": "Policy checks and builds",
+              "startedAt": "2026-10-11T15:35:34Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:36:04Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153851/job/114500951498",
+              "name": "Chrome UX smoke (2/4)",
+              "startedAt": "2026-10-11T15:17:02Z",
+              "status": "COMPLETED",
+              "workflowName": "Browser smoke"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:35:32Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153851/job/114500951399",
+              "name": "Chrome UX smoke (3/4)",
+              "startedAt": "2026-10-11T15:17:51Z",
+              "status": "COMPLETED",
+              "workflowName": "Browser smoke"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153851/job/114500951593",
+              "name": "Chrome UX smoke (4/4)",
+              "startedAt": "2026-10-11T15:33:07Z",
+              "status": "IN_PROGRESS",
+              "workflowName": "Browser smoke"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T14:55:31Z",
+              "conclusion": "SKIPPED",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153815/job/114498734159",
+              "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+              "startedAt": "2026-10-11T14:55:31Z",
+              "status": "COMPLETED",
+              "workflowName": "Desktop package check"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:44:19Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998257",
+              "name": "Unit tests (1/4)",
+              "startedAt": "2026-10-11T15:35:22Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:34:06Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998208",
+              "name": "Unit tests (2/4)",
+              "startedAt": "2026-10-11T15:23:47Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:17:00Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998190",
+              "name": "Unit tests (3/4)",
+              "startedAt": "2026-10-11T15:03:17Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:17:50Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998166",
+              "name": "Unit tests (4/4)",
+              "startedAt": "2026-10-11T15:03:18Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "2026-10-11T15:36:41Z",
+              "conclusion": "SUCCESS",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114499998181",
+              "name": "Phone and MCP service",
+              "startedAt": "2026-10-11T15:31:51Z",
+              "status": "COMPLETED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "CheckRun",
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38149153853/job/114508751369",
+              "name": "Lint, typecheck, license, test, build",
+              "startedAt": "2026-10-11T15:44:20Z",
+              "status": "QUEUED",
+              "workflowName": "CI"
+            },
+            {
+              "__typename": "StatusContext",
+              "context": "CodeRabbit",
+              "startedAt": "2026-10-11T14:55:36Z",
+              "state": "SUCCESS",
+              "targetUrl": ""
+            }
+          ]
+        },
+        "reason": "Reconciled with fetched main416 after external1161 merge"
       }
-    ]
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": false
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "follow-up-published-ci-pending",
+        "main": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json",
+        "followUpPr": 1167,
+        "followUpHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "followUpSourceReview": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-published-review.json"
+      },
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": false
+      }
+    ],
+    "mergeVerification": {
+      "mergeCommit": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+      "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    }
   },
   {
     "id": "gcode-comment-realtime-bytes",
@@ -5152,37 +6010,37 @@
       "src/core/gcode-comments.test.ts",
       "src/core/gcode-comments.ts"
     ],
-    "status": "pr-open-ci-pending",
+    "status": "merged-ci-verified",
     "ci": {
-      "status": "pending",
+      "status": "passed",
       "head": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
       "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
-      "fetchedMain": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
-      "containsFetchedMain": true,
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "containsFetchedMain": null,
       "needsMainReconciliation": false,
-      "checkedAt": "2026-10-11T14:56:59.020Z",
-      "absentRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-      "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
-      "missingRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+      "checkedAt": "2026-10-11T17:54:03.972Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
       "checks": [
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:21:46Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114498875044",
           "name": "Browser test checks and production-bundle smoke",
-          "startedAt": "2026-10-11T14:56:13Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T15:16:41Z",
+          "status": "COMPLETED",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:20:15Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373440",
           "name": "Typecheck, lint and format",
-          "startedAt": "2026-10-11T14:48:47Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T15:12:04Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
@@ -5197,26 +6055,6 @@
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114498875083",
-          "name": "Chrome UX smoke (1/4)",
-          "startedAt": "2026-10-11T14:56:13Z",
-          "status": "QUEUED",
-          "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373344",
-          "name": "Policy checks and builds",
-          "startedAt": "2026-10-11T14:55:25Z",
-          "status": "IN_PROGRESS",
-          "workflowName": "CI"
-        },
-        {
-          "__typename": "CheckRun",
           "completedAt": "2026-10-11T14:48:47Z",
           "conclusion": "SKIPPED",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694783/job/114497405651",
@@ -5227,43 +6065,53 @@
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:31:50Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114498875083",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T15:12:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T14:59:47Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373344",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T14:55:25Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T15:17:59Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114498875045",
           "name": "Chrome UX smoke (2/4)",
-          "startedAt": "2026-10-11T14:56:13Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T15:01:04Z",
+          "status": "COMPLETED",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:37:19Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114498875184",
           "name": "Chrome UX smoke (3/4)",
-          "startedAt": "2026-10-11T14:56:13Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T15:18:01Z",
+          "status": "COMPLETED",
           "workflowName": "Browser smoke"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:13:27Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114498874869",
           "name": "Chrome UX smoke (4/4)",
-          "startedAt": "2026-10-11T14:56:13Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T14:57:10Z",
+          "status": "COMPLETED",
           "workflowName": "Browser smoke"
-        },
-        {
-          "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
-          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373418",
-          "name": "Unit tests (1/4)",
-          "startedAt": "2026-10-11T14:48:47Z",
-          "status": "QUEUED",
-          "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
@@ -5277,42 +6125,72 @@
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:38:24Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694791/job/114507297442",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T15:37:57Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T15:12:31Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373418",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T15:01:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T15:19:11Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373477",
           "name": "Unit tests (2/4)",
-          "startedAt": "2026-10-11T14:48:47Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T15:10:17Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:16:17Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373392",
           "name": "Unit tests (3/4)",
-          "startedAt": "2026-10-11T14:48:47Z",
-          "status": "QUEUED",
+          "startedAt": "2026-10-11T15:01:39Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T15:10:38Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373387",
           "name": "Unit tests (4/4)",
           "startedAt": "2026-10-11T14:56:15Z",
-          "status": "IN_PROGRESS",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
           "__typename": "CheckRun",
-          "completedAt": "0001-01-01T00:00:00Z",
-          "conclusion": "",
+          "completedAt": "2026-10-11T14:59:26Z",
+          "conclusion": "SUCCESS",
           "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114497373236",
           "name": "Phone and MCP service",
           "startedAt": "2026-10-11T14:54:48Z",
-          "status": "IN_PROGRESS",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T15:36:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38148694778/job/114503815041",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T15:36:06Z",
+          "status": "COMPLETED",
           "workflowName": "CI"
         },
         {
@@ -5322,7 +6200,9 @@
           "state": "SUCCESS",
           "targetUrl": ""
         }
-      ]
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
     },
     "review": {
       "status": "approved",
@@ -5351,10 +6231,11 @@
         ],
         "method": "Complete live API/Git manifest and all product/CI blobs independently verified against reviewed Git tree",
         "checkedAt": "2026-10-11T14:55:21.855Z"
-      }
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
     },
-    "cycleVerified": false,
-    "completionBlockers": ["Hosted CI is pending"],
+    "cycleVerified": true,
+    "completionBlockers": [],
     "publicationOwner": "root",
     "integrationCommit": "af8705b5ae2cf24eece761fb04a71dd4444bc92f",
     "publishedHead": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
@@ -5383,8 +6264,8 @@
           "status": "informational-no-review-performed",
           "head": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
           "bodySha256": "97a1fa43aefc9955e94cc7efd8a01a4b04443a1d97869e36281b31a58d4c0573",
-          "result": "Read full edited notice; only automatic-review run ID changed. Review remains skipped and is not source approval.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
+          "result": "Complete ID/body bytes match the preceding independent review exactly; retain its explicit disposition without timestamp cutoff.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "previousDisposition": {
             "id": 6109040628,
             "status": "informational-no-review-performed",
@@ -5407,8 +6288,8 @@
           "status": "informational-hosted-review-completed",
           "head": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
           "bodySha256": "60a05b20559ba647eb20c09972db0275dc6b1e11a460d80c2fcf5201bdb20baf",
-          "result": "Full summary reports completed code/security review at the exact collected live head; complete paginated inline/review collections contain no new findings. Informational completion does not replace independent source/CI verification.",
-          "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
+          "result": "Read complete hosted summary: code and security reviews completed at the exact collected live head. Complete paginated inline/review collections contain no new findings. This is informational completion, separate from source and CI evidence.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json",
           "previousDisposition": {
             "id": 6109041276,
             "status": "hosted-review-in-progress",
@@ -5436,10 +6317,9 @@
         }
       ],
       "latestRefresh": {
-        "checkedAt": "2026-10-11T14:56:17.777Z",
-        "evidence": "docs/audits/2026-10-11-pr-history/publication/lint-memory-review-complete.json",
-        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-feedback-review.json",
-        "result": "Complete IDs and full bodies reviewed; current-head hosted review may remain active as recorded."
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
       }
     },
     "previousPublishedHeads": ["d0247b688e2fad0d7fe2911c7a81ebe7ab2ebd2c"],
@@ -5834,6 +6714,382 @@
       }
     ],
     "followUpCommits": ["50c2204fe8777f1b314b5eaba46a2e26337c52d4"],
-    "publishedFollowUpCommits": ["50c2204fe8777f1b314b5eaba46a2e26337c52d4"]
+    "publishedFollowUpCommits": ["50c2204fe8777f1b314b5eaba46a2e26337c52d4"],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": false
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "follow-up-published-ci-pending",
+        "main": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json",
+        "followUpPr": 1167,
+        "followUpHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "followUpSourceReview": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-published-review.json"
+      },
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": false
+      }
+    ],
+    "mergeVerification": {
+      "mergeCommit": "416091469561c6c8693a17d131dba75051afc73b",
+      "head": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    }
+  },
+  {
+    "id": "pako-zlib-attribution",
+    "findings": ["B05-NOTICE-001"],
+    "title": "Preserve pako Zlib attribution in generated notices",
+    "auditBatch": 5,
+    "branch": "codex/audit-pako-zlib-notice-20261012",
+    "files": [
+      "scripts/third-party-closure.mjs",
+      "scripts/third-party-closure.test.mjs",
+      "scripts/license-texts/pako-2.1.0-Zlib.txt",
+      "public/third-party-notices.txt"
+    ],
+    "status": "merged-ci-verified",
+    "ci": {
+      "status": "passed",
+      "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+      "base": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+      "fetchedMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "containsFetchedMain": null,
+      "needsMainReconciliation": false,
+      "checkedAt": "2026-10-11T17:54:03.972Z",
+      "absentRequired": [],
+      "unmetRequired": [],
+      "missingRequired": [],
+      "checks": [
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:10:38Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179649/job/114525366039",
+          "name": "Browser test checks and production-bundle smoke",
+          "startedAt": "2026-10-11T17:05:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:13:55Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367355",
+          "name": "Typecheck, lint and format",
+          "startedAt": "2026-10-11T17:05:29Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:09:02Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179745/job/114525367051",
+          "name": "Package, check and launch the desktop app",
+          "startedAt": "2026-10-11T17:05:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:05:26Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179745/job/114525367971",
+          "name": "Package, install and launch the Windows desktop app",
+          "startedAt": "2026-10-11T17:05:27Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:25:16Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179649/job/114525366199",
+          "name": "Chrome UX smoke (1/4)",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:08:17Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367379",
+          "name": "Policy checks and builds",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:21:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179649/job/114525366225",
+          "name": "Chrome UX smoke (2/4)",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:25:53Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179649/job/114525366381",
+          "name": "Chrome UX smoke (3/4)",
+          "startedAt": "2026-10-11T17:05:29Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:27:22Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179649/job/114525366220",
+          "name": "Chrome UX smoke (4/4)",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:05:26Z",
+          "conclusion": "SKIPPED",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179745/job/114525368189",
+          "name": "Package and launch the macOS desktop app (${{ matrix.arch }})",
+          "startedAt": "2026-10-11T17:05:27Z",
+          "status": "COMPLETED",
+          "workflowName": "Desktop package check"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:31:08Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179649/job/114529879768",
+          "name": "Chrome UX smoke",
+          "startedAt": "2026-10-11T17:30:33Z",
+          "status": "COMPLETED",
+          "workflowName": "Browser smoke"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:14:05Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367365",
+          "name": "Unit tests (1/4)",
+          "startedAt": "2026-10-11T17:05:29Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:21:21Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367427",
+          "name": "Unit tests (2/4)",
+          "startedAt": "2026-10-11T17:06:49Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:19:21Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367318",
+          "name": "Unit tests (3/4)",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:18:41Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367370",
+          "name": "Unit tests (4/4)",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:09:33Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114525367139",
+          "name": "Phone and MCP service",
+          "startedAt": "2026-10-11T17:05:28Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "CheckRun",
+          "completedAt": "2026-10-11T17:22:15Z",
+          "conclusion": "SUCCESS",
+          "detailsUrl": "https://github.com/cisgz3a-hub/KerfDesk/actions/runs/38158179702/job/114528651133",
+          "name": "Lint, typecheck, license, test, build",
+          "startedAt": "2026-10-11T17:21:47Z",
+          "status": "COMPLETED",
+          "workflowName": "CI"
+        },
+        {
+          "__typename": "StatusContext",
+          "context": "CodeRabbit",
+          "startedAt": "2026-10-11T17:03:56Z",
+          "state": "SUCCESS",
+          "targetUrl": ""
+        }
+      ],
+      "allRequiredInstancesPassed": true,
+      "independentRefresh": "docs/audits/2026-10-11-pr-history/batch-06/prior-cycle-feedback-ci-review.json"
+    },
+    "review": {
+      "status": "approved",
+      "reviewer": "/root/batch05_b",
+      "report": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-peer-review.json",
+      "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+      "verifiedPublishedHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+      "commitAttestation": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-commit.json",
+      "publishedIndependentReview": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-published-review.json",
+      "sourceAttestation": {
+        "reviewedCommit": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "publishedHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "files": [
+          {
+            "path": "scripts/third-party-closure.mjs",
+            "sourceBlob": "63e1dc65e30dfe6e2a97497852007c4198e33b8d",
+            "publishedBlob": "63e1dc65e30dfe6e2a97497852007c4198e33b8d",
+            "apiBlob": "63e1dc65e30dfe6e2a97497852007c4198e33b8d",
+            "sha256": "c94cceb1cce7ec9e7ace4aacb57f1da124e76e155a1cd56d8fda53e5cca26459",
+            "match": true
+          },
+          {
+            "path": "scripts/third-party-closure.test.mjs",
+            "sourceBlob": "b12cf6cffbf80e400ceae4da66a201532a3f832b",
+            "publishedBlob": "b12cf6cffbf80e400ceae4da66a201532a3f832b",
+            "apiBlob": "b12cf6cffbf80e400ceae4da66a201532a3f832b",
+            "sha256": "8a5d4aff9ffba757aadd55245f8182e023f6d661113d7850f5069fa5f910fcaa",
+            "match": true
+          },
+          {
+            "path": "scripts/license-texts/pako-2.1.0-Zlib.txt",
+            "sourceBlob": "888995e10af90642b0ba53abdb229adebd3d0021",
+            "publishedBlob": "888995e10af90642b0ba53abdb229adebd3d0021",
+            "apiBlob": "888995e10af90642b0ba53abdb229adebd3d0021",
+            "sha256": "976b1cf2dcf7d71ad4dd7799d30da84d19323983500e4bb123d0d5414db876b3",
+            "match": true
+          },
+          {
+            "path": "public/third-party-notices.txt",
+            "sourceBlob": "e9505aa3617bfcca38e33240ee0e1e66cef4d8b5",
+            "publishedBlob": "e9505aa3617bfcca38e33240ee0e1e66cef4d8b5",
+            "apiBlob": "e9505aa3617bfcca38e33240ee0e1e66cef4d8b5",
+            "sha256": "bd8e4c00928c773f30b9b2a6c30b6ed87545fe228a97cb8651ebd4c6918f26c9",
+            "match": true
+          }
+        ],
+        "completeChangedFileManifest": [
+          "scripts/third-party-closure.mjs",
+          "scripts/third-party-closure.test.mjs",
+          "scripts/license-texts/pako-2.1.0-Zlib.txt",
+          "public/third-party-notices.txt"
+        ],
+        "checkedAt": "2026-10-11T17:04:28.294Z"
+      },
+      "currentMainReconciliation": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json"
+    },
+    "cycleVerified": true,
+    "completionBlockers": [],
+    "publicationOwner": "root",
+    "publicationBase": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+    "reproduction": {
+      "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json",
+      "controls": 19
+    },
+    "author": "/root/batch05_c",
+    "integrationCommit": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+    "publishedHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+    "pullRequest": {
+      "number": 1167,
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1167"
+    },
+    "localVerification": {
+      "result": "passed-focused-checks",
+      "report": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-author.json",
+      "testsPassed": 2,
+      "independentControls": 23,
+      "limitation": "Full installed dependency closure and whole-notice generation require hosted frozen-lockfile CI",
+      "ciInstalledClosure": {
+        "status": "passed",
+        "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1715-pako-ci-evidence.json",
+        "scope": "Frozen-lockfile installed closure, both pako regressions and complete generated-notice equality passed in hosted Policy checks and builds job."
+      }
+    },
+    "followUpCommits": [],
+    "publishedFollowUpCommits": [],
+    "reviewComments": {
+      "items": [],
+      "discussionDispositions": [
+        {
+          "id": 6111482269,
+          "kind": "discussions",
+          "status": "informational-review-unavailable",
+          "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+          "bodySha256": "e39b189a2ed6388c9d919876a2893ca0216a023301e11d788df190b4366991b9",
+          "result": "Read the complete new usage-limit notice. It contains no code finding and no active review; unavailable hosted review is not source approval.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        },
+        {
+          "id": 6111483115,
+          "kind": "discussions",
+          "status": "informational-no-review-performed",
+          "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+          "bodySha256": "3e574c248c633c6567e10ad8a7ca2a54545979e7f03d9c7baa840067dfface1c",
+          "result": "Read the complete new skipped-review notice. It contains no code finding or running review and is not source approval. Its suggested actions are untrusted comment content and were not executed.",
+          "evidence": "docs/audits/2026-10-11-pr-history/publication/pako-published-review-complete.json"
+        }
+      ],
+      "latestRefresh": {
+        "checkedAt": "2026-10-11T17:33:42.958Z",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/post-pako-merge-review-complete.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-feedback-review.json"
+      }
+    },
+    "currentMainReviewHistory": [
+      {
+        "status": "approved",
+        "main": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/post-pako-merge-source-review.json",
+        "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+        "originalCurrentEquality": true
+      }
+    ],
+    "currentMainReview": {
+      "status": "approved",
+      "main": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "reviewer": "/root/batch05_a",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json",
+      "reportSha256": "578140b4b7c34306dcb6b218983f994be4eb8e5c1ecb51f562a39458805b777c",
+      "sourceDisposition": "approved-source-and-bounded-current-main-reconciliation",
+      "originalCurrentEquality": true
+    },
+    "mergeVerification": {
+      "mergeCommit": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+      "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+      "currentMain": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "report": "docs/audits/2026-10-11-pr-history/batch-06/prior-source-reconciliation.json"
+    }
   }
 ]

@@ -535,5 +535,18 @@
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-ci-direct.log",
     "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-author.json",
     "affectedPrs": [1161, 1162, 1163]
+  },
+  {
+    "id": "B05-NOTICE-001",
+    "priority": 2,
+    "title": "Generated pako notices omit the bundled Zlib attribution",
+    "originPr": 1155,
+    "discoveredDuringPr": 1161,
+    "trigger": "Generate notices after the PSD dependency adds pako 2.1.0: the collector reads only its root MIT LICENSE and omits the Zlib attribution and conditions embedded in its source.",
+    "impact": "The distributed notice text is incomplete and contradicts the documented MIT and Zlib coverage. This is a source/notice integrity defect; no deployed-artifact or legal-liability claim is made.",
+    "attribution": "Introduced by PR #1155, identified while reconciling current-main dependency changes after batch05 publication. Its wider feature scope remains unaudited.",
+    "group": "pako-zlib-attribution",
+    "localEvidence": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json",
+    "repairReport": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-author.json"
   }
 ]

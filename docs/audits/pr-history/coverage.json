@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T14:30:52.413Z",
+  "inventoryRefreshedAt": "2026-10-11T17:53:42.928Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -8,9 +8,9 @@
     "not-started": "Inventory only; no code review claimed"
   },
   "counts": {
-    "full-diff": 62,
-    "partial": 50,
-    "not-started": 1047
+    "full-diff": 68,
+    "partial": 51,
+    "not-started": 1042
   },
   "prs": [
     {
@@ -470,6 +470,33 @@
             ],
             "hunks": 10,
             "limitations": "All original compiler, raster/dither implementation, geometry, transport and other checkpoint scopes outside these exact 13 pairs remain unfinished. Current descendants inspected only as needed for this bounded seam."
+          },
+          {
+            "report": "batch-06/lane-c.json",
+            "reports": ["batch-06/lane-c.json"],
+            "reviewers": ["/root/batch05_c"],
+            "reviewedAt": "2026-10-11T17:52:31.384Z",
+            "historicalHead": "22d8f2ab4f4150b74c711fad252fae4719ab4b41",
+            "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+            "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+            "reviewedFiles": [
+              "src/core/job/compile-job-fill-cache.test.ts",
+              "src/core/job/fill-hatching-cache.ts",
+              "src/core/job/fill-hatching.test.ts",
+              "src/core/job/fill-hatching.ts",
+              "src/core/job/fill-overscan.test.ts",
+              "src/core/job/fill-overscan.ts",
+              "src/core/job/fill-sweeps.test.ts",
+              "src/core/job/fill-sweeps.ts"
+            ],
+            "hunks": 14,
+            "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+            "remaining": [
+              "PR10 and PR11 remain partial after this completed fill/cache/sweep/overscan slice; no whole-compiler or whole-fill-system coverage is claimed.",
+              "Compile-job orchestration, compile-job-fill integration tests, raster/dither/rasterization, remaining geometry, trace conversion, machine/session transport, Electron boundary and deployment changes remain unreviewed.",
+              "Previously completed validator/persistence and pre-emission/output-handoff scopes retain their recorded current-descendant limitations.",
+              "All other existing partial scopes remain unfinished. This report records bounded review evidence only; the coordinator owns canonical coverage and cursor integration."
+            ]
           }
         ]
       }
@@ -673,6 +700,27 @@
             ],
             "hunks": 8,
             "limitations": "All original compiler, raster/dither implementation, geometry, transport and other checkpoint scopes outside these exact 13 pairs remain unfinished. Current descendants inspected only as needed for this bounded seam."
+          },
+          {
+            "report": "batch-06/lane-c.json",
+            "reports": ["batch-06/lane-c.json"],
+            "reviewers": ["/root/batch05_c"],
+            "reviewedAt": "2026-10-11T17:52:31.384Z",
+            "historicalHead": "4a1c58082290604e594a314fbd3ceefcd12088d3",
+            "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+            "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+            "reviewedFiles": [
+              "src/core/job/compile-job-fill-cache.test.ts",
+              "src/core/job/fill-hatching-cache.ts"
+            ],
+            "hunks": 3,
+            "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+            "remaining": [
+              "PR10 and PR11 remain partial after this completed fill/cache/sweep/overscan slice; no whole-compiler or whole-fill-system coverage is claimed.",
+              "Compile-job orchestration, compile-job-fill integration tests, raster/dither/rasterization, remaining geometry, trace conversion, machine/session transport, Electron boundary and deployment changes remain unreviewed.",
+              "Previously completed validator/persistence and pre-emission/output-handoff scopes retain their recorded current-descendant limitations.",
+              "All other existing partial scopes remain unfinished. This report records bounded review evidence only; the coordinator owns canonical coverage and cursor integration."
+            ]
           }
         ]
       }
@@ -5192,8 +5240,52 @@
       "head": "81a8f0f406245412c8203a0005670fa04c947ae2",
       "base": "7b361eb209ae80bbe3a2ae3b641652251390d6c4",
       "review": {
-        "coverage": "not-started",
-        "report": null
+        "coverage": "full-diff",
+        "report": "batch-06/lane-a.json",
+        "reports": ["batch-06/lane-a.json"],
+        "reviewers": ["/root/batch05_a"],
+        "reviewedAt": "2026-10-11T17:52:31.384Z",
+        "historicalHead": "81a8f0f406245412c8203a0005670fa04c947ae2",
+        "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+        "reviewedFiles": [
+          "WORKFLOW.md",
+          "src/ui/laser/JobRunControls.tool-change.test.tsx",
+          "src/ui/laser/cnc-start-advisories.test.ts",
+          "src/ui/laser/cnc-start-advisories.ts",
+          "src/ui/laser/start-job-flow.ts",
+          "src/ui/laser/start-job-readiness.ts",
+          "src/ui/state/laser-connection-actions.ts",
+          "src/ui/state/laser-console-actions.ts",
+          "src/ui/state/laser-error-line.test.ts",
+          "src/ui/state/laser-home-action.ts",
+          "src/ui/state/laser-job-actions.ts",
+          "src/ui/state/laser-line-handler-frame.test.ts",
+          "src/ui/state/laser-line-handler-ov.test.ts",
+          "src/ui/state/laser-line-handler.test.ts",
+          "src/ui/state/laser-origin-actions.ts",
+          "src/ui/state/laser-origin-transaction.ts",
+          "src/ui/state/laser-probe-actions.ts",
+          "src/ui/state/laser-probe-lifecycle.test.ts",
+          "src/ui/state/laser-status-line.ts",
+          "src/ui/state/laser-store-console.test.ts",
+          "src/ui/state/laser-store-helpers.ts",
+          "src/ui/state/laser-store-origin.test.ts",
+          "src/ui/state/laser-store-tool-change.test.ts",
+          "src/ui/state/laser-store.ts",
+          "src/ui/state/laser-stream-ack.ts",
+          "src/ui/state/setup-blocking-gate.test.ts",
+          "src/ui/state/work-z-zero-evidence.ts"
+        ],
+        "hunks": 87,
+        "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+        "reviewedHead": "81a8f0f406245412c8203a0005670fa04c947ae2",
+        "changedFileCount": 27,
+        "remaining": [],
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        }
       }
     },
     {
@@ -5211,8 +5303,37 @@
       "head": "9bfef705c7e452331dcc9fe0ffe6998611f18302",
       "base": "ca449d541f92766093beac2adfc7c4f9452a72c8",
       "review": {
-        "coverage": "not-started",
-        "report": null
+        "coverage": "full-diff",
+        "report": "batch-06/lane-a.json; batch-06/lane-b.json",
+        "reports": ["batch-06/lane-a.json", "batch-06/lane-b.json"],
+        "reviewers": ["/root/batch05_a", "/root/batch05_b"],
+        "reviewedAt": "2026-10-11T17:52:31.384Z",
+        "historicalHead": "9bfef705c7e452331dcc9fe0ffe6998611f18302",
+        "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+        "reviewedFiles": [
+          "DECISIONS.md",
+          "e2e/shape-properties.spec.ts",
+          "scripts/index-export-baseline.json",
+          "src/core/shapes/index.ts",
+          "src/core/shapes/rematerialize-shape.test.ts",
+          "src/core/shapes/rematerialize-shape.ts",
+          "src/ui/layers/SelectedObjectProperties.test.tsx",
+          "src/ui/layers/SelectedObjectProperties.tsx",
+          "src/ui/layers/SelectedShapeGeometryFields.test.tsx",
+          "src/ui/layers/SelectedShapeGeometryFields.tsx",
+          "src/ui/state/object-properties-actions.ts",
+          "src/ui/state/shape-property-actions.test.ts"
+        ],
+        "hunks": 20,
+        "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+        "reviewedHead": "9bfef705c7e452331dcc9fe0ffe6998611f18302",
+        "changedFileCount": 12,
+        "remaining": [],
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        }
       }
     },
     {
@@ -5230,8 +5351,27 @@
       "head": "2b734f594a58e385c0c72f2cd5fc6ad8d37fe23a",
       "base": "ae97b5ccc9883b2404f6caed8b2a74bda0f00093",
       "review": {
-        "coverage": "not-started",
-        "report": null
+        "coverage": "full-diff",
+        "report": "batch-06/lane-b.json",
+        "reports": ["batch-06/lane-b.json"],
+        "reviewers": ["/root/batch05_b"],
+        "reviewedAt": "2026-10-11T17:52:31.384Z",
+        "historicalHead": "2b734f594a58e385c0c72f2cd5fc6ad8d37fe23a",
+        "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+        "reviewedFiles": [
+          "src/io/project/project-scene-curve-budget.test.ts",
+          "src/io/project/project-scene-integrity-validator.ts"
+        ],
+        "hunks": 6,
+        "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+        "reviewedHead": "2b734f594a58e385c0c72f2cd5fc6ad8d37fe23a",
+        "changedFileCount": 2,
+        "remaining": [],
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        }
       }
     },
     {
@@ -5249,8 +5389,28 @@
       "head": "59327da354845579b622babd65f87f78b5736535",
       "base": "ae97b5ccc9883b2404f6caed8b2a74bda0f00093",
       "review": {
-        "coverage": "not-started",
-        "report": null
+        "coverage": "full-diff",
+        "report": "batch-06/lane-b.json",
+        "reports": ["batch-06/lane-b.json"],
+        "reviewers": ["/root/batch05_b"],
+        "reviewedAt": "2026-10-11T17:52:31.384Z",
+        "historicalHead": "59327da354845579b622babd65f87f78b5736535",
+        "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+        "reviewedFiles": [
+          "src/core/variables/template-source.test.ts",
+          "src/core/variables/template-source.ts",
+          "src/ui/text/VariableTextControls.tsx"
+        ],
+        "hunks": 7,
+        "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+        "reviewedHead": "59327da354845579b622babd65f87f78b5736535",
+        "changedFileCount": 3,
+        "remaining": [],
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        }
       }
     },
     {
@@ -5268,8 +5428,24 @@
       "head": "8fd68a53cd171735bd3ef89236da3a4151a3dd75",
       "base": "ae97b5ccc9883b2404f6caed8b2a74bda0f00093",
       "review": {
-        "coverage": "not-started",
-        "report": null
+        "coverage": "full-diff",
+        "report": "batch-06/lane-a.json",
+        "reports": ["batch-06/lane-a.json"],
+        "reviewers": ["/root/batch05_a"],
+        "reviewedAt": "2026-10-11T17:52:31.384Z",
+        "historicalHead": "8fd68a53cd171735bd3ef89236da3a4151a3dd75",
+        "sourceHead": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+        "scope": "Every queued historical changed hunk read; current descendants and independent controls bounded by the linked reports.",
+        "reviewedFiles": ["DECISIONS.md", "PROJECT.md", "WORKFLOW.md"],
+        "hunks": 7,
+        "limitations": "Source and mock/UI test evidence only; no native, browser E2E, output, hardware or provider qualification. Current descendant scope is bounded by the reports.",
+        "reviewedHead": "8fd68a53cd171735bd3ef89236da3a4151a3dd75",
+        "changedFileCount": 3,
+        "remaining": [],
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        }
       }
     },
     {
@@ -25482,24 +25658,40 @@
       "number": 1155,
       "title": "Add offline multilingual text, PSD import and advanced nesting",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1155",
-      "state": "open",
-      "draft": true,
+      "state": "closed",
+      "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:06:24Z",
-      "updated_at": "2026-10-11T12:13:13Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "a78adfbed42b40383cfa5d579549411be59c70b4",
-      "head": "dc35f0a78cd07b60c3d861320bab5e5425c46819",
-      "base": "50f86d378894f9efb97fb0fc9ddc93438246e523",
+      "updated_at": "2026-10-11T16:27:36Z",
+      "closed_at": "2026-10-11T16:27:35Z",
+      "merged_at": "2026-10-11T16:27:35Z",
+      "merge_commit_sha": "a807d0703fc5900c591299077bc5d4c233ff919a",
+      "head": "77a4d4daa0d4832d66c785bb30a5bcafedf63857",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
-        "coverage": "not-started",
-        "report": null,
+        "coverage": "partial",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1645-main1893-dependency-reconciliation.json",
         "previousReview": {
           "coverage": "not-started",
-          "report": null
+          "report": null,
+          "previousReview": {
+            "coverage": "not-started",
+            "report": null,
+            "previousReview": {
+              "coverage": "not-started",
+              "report": null
+            },
+            "reason": "Open PR head changed since the recorded review"
+          },
+          "reason": "Open PR head changed since the recorded review"
         },
-        "reason": "Open PR head changed since the recorded review"
+        "reason": "Open PR head changed since the recorded review",
+        "reviewedHead": "77a4d4daa0d4832d66c785bb30a5bcafedf63857",
+        "scope": "Bounded current-main dependency/notice and import-worker interaction reconciliation only",
+        "gaps": [
+          "Remaining multilingual text, PSD import, nesting and other PR feature changes have not received a full historical audit."
+        ],
+        "findings": ["B05-NOTICE-001"]
       }
     },
     {
@@ -25529,36 +25721,12 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:25:49Z",
-      "updated_at": "2026-10-11T13:15:39Z",
+      "updated_at": "2026-10-11T17:48:36Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": null,
-      "head": "b9e7f9182f06e9bef3a4c2867b01374dd54871eb",
-      "base": "50f86d378894f9efb97fb0fc9ddc93438246e523",
-      "review": {
-        "coverage": "not-started",
-        "report": null,
-        "previousReview": {
-          "coverage": "not-started",
-          "report": null
-        },
-        "reason": "Open PR head changed since the recorded review"
-      }
-    },
-    {
-      "number": 1158,
-      "title": "Edit individual traced lines and shapes directly",
-      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1158",
-      "state": "open",
-      "draft": false,
-      "author": "cisgz3a-hub",
-      "created_at": "2026-10-11T11:38:41Z",
-      "updated_at": "2026-10-11T14:29:05Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "31a18723fd7511b775d19fd90bf09ed734155363",
-      "head": "6c376775925695e8ec6d01fcec62bf0327e7dcf9",
-      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "merge_commit_sha": "8a01637b5f7a1474f23ae7ed0eab17031ce30ffb",
+      "head": "92c783dbb73e6e21cdd82fda097ac23f56a57e6e",
+      "base": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
       "review": {
         "coverage": "not-started",
         "report": null,
@@ -25573,7 +25741,61 @@
               "report": null,
               "previousReview": {
                 "coverage": "not-started",
-                "report": null
+                "report": null,
+                "previousReview": {
+                  "coverage": "not-started",
+                  "report": null
+                },
+                "reason": "Open PR head changed since the recorded review"
+              },
+              "reason": "Open PR head changed since the recorded review"
+            },
+            "reason": "Open PR head changed since the recorded review"
+          },
+          "reason": "Open PR head changed since the recorded review"
+        },
+        "reason": "Open PR head changed since the recorded review"
+      }
+    },
+    {
+      "number": 1158,
+      "title": "Edit individual traced lines and shapes directly",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1158",
+      "state": "closed",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T11:38:41Z",
+      "updated_at": "2026-10-11T17:10:33Z",
+      "closed_at": "2026-10-11T17:10:33Z",
+      "merged_at": "2026-10-11T17:10:33Z",
+      "merge_commit_sha": "3994983d55dc40c9aaaaf62c531b12ff3b321f96",
+      "head": "5d1451bc2ae75a2d064c0c21e88b872917498ad0",
+      "base": "a807d0703fc5900c591299077bc5d4c233ff919a",
+      "review": {
+        "coverage": "not-started",
+        "report": null,
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null,
+          "previousReview": {
+            "coverage": "not-started",
+            "report": null,
+            "previousReview": {
+              "coverage": "not-started",
+              "report": null,
+              "previousReview": {
+                "coverage": "not-started",
+                "report": null,
+                "previousReview": {
+                  "coverage": "not-started",
+                  "report": null,
+                  "previousReview": {
+                    "coverage": "not-started",
+                    "report": null
+                  },
+                  "reason": "Open PR head changed since the recorded review"
+                },
+                "reason": "Open PR head changed since the recorded review"
               },
               "reason": "Open PR head changed since the recorded review"
             },
@@ -25588,35 +25810,16 @@
       "number": 1159,
       "title": "Fix trial purchases, saved Paddle orders, and covered installer history",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1159",
-      "state": "open",
+      "state": "closed",
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T11:47:47Z",
-      "updated_at": "2026-10-11T12:16:51Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "180a136782e708b1ab1e5e5d48392903d94443ee",
-      "head": "f2039aa9b3d20defcdd46fdfc9c08685a339b0b8",
-      "base": "50f86d378894f9efb97fb0fc9ddc93438246e523",
-      "review": {
-        "coverage": "not-started",
-        "report": null
-      }
-    },
-    {
-      "number": 1160,
-      "title": "Fix Trim at tangent line and curve contacts",
-      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1160",
-      "state": "open",
-      "draft": true,
-      "author": "cisgz3a-hub",
-      "created_at": "2026-10-11T11:55:00Z",
-      "updated_at": "2026-10-11T14:04:12Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "95d72fbd90e9df11c040cd745bcb3fc9df420138",
-      "head": "10409d66069b8cee76fe4c676496e48fb8956288",
-      "base": "39cea0af4cee305ffbd89fc4019954cd08efc7f8",
+      "updated_at": "2026-10-11T16:43:33Z",
+      "closed_at": "2026-10-11T16:43:33Z",
+      "merged_at": "2026-10-11T16:43:33Z",
+      "merge_commit_sha": "68148186bc71566f1b5adfbca84ff3fbdb1b3f28",
+      "head": "3001f329a4869b89d0decbf4bb4791b7780d142b",
+      "base": "416091469561c6c8693a17d131dba75051afc73b",
       "review": {
         "coverage": "not-started",
         "report": null,
@@ -25628,17 +25831,46 @@
       }
     },
     {
+      "number": 1160,
+      "title": "Fix Trim at tangent line and curve contacts",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1160",
+      "state": "closed",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T11:55:00Z",
+      "updated_at": "2026-10-11T16:36:41Z",
+      "closed_at": "2026-10-11T16:36:41Z",
+      "merged_at": "2026-10-11T16:36:41Z",
+      "merge_commit_sha": "864caa3624d7034c466f321163cfbd968355ccd7",
+      "head": "6251d3d456e4f32ecdf8c6ab17fdab3a3124ad4a",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "review": {
+        "coverage": "not-started",
+        "report": null,
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null,
+          "previousReview": {
+            "coverage": "not-started",
+            "report": null
+          },
+          "reason": "Open PR head changed since the recorded review"
+        },
+        "reason": "Open PR head changed since the recorded review"
+      }
+    },
+    {
       "number": 1161,
       "title": "Fix realtime control bytes in exported G-code comments",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1161",
-      "state": "open",
+      "state": "closed",
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:30:38Z",
-      "updated_at": "2026-10-11T14:27:15Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "ee502f7e54ba22af24e60f0fcc8ca37b73138705",
+      "updated_at": "2026-10-11T15:39:04Z",
+      "closed_at": "2026-10-11T15:39:04Z",
+      "merged_at": "2026-10-11T15:39:04Z",
+      "merge_commit_sha": "416091469561c6c8693a17d131dba75051afc73b",
       "head": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
       "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
@@ -25658,46 +25890,29 @@
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
         "repairGroup": "gcode-comment-realtime-bytes",
         "changedFileCount": 5
-      },
-      "reviewHistory": [
-        {
-          "coverage": "full-diff",
-          "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-          "report": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-comment-published-review.json",
-          "reviewer": "/root/batch05_a",
-          "reviewedHead": "d843e2aebb838d41583e40f0b380f8a31c46b6a0",
-          "reviewedFiles": ["src/core/gcode-comments.ts", "src/core/gcode-comments.test.ts"],
-          "remaining": [],
-          "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
-          "repairGroup": "gcode-comment-realtime-bytes",
-          "note": "Superseded product-only review receipt; current full manifest includes shared CI repair"
-        }
-      ]
+      }
     },
     {
       "number": 1162,
       "title": "Fix stale coordinate and WCS evidence after Console commands",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1162",
-      "state": "open",
+      "state": "closed",
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:33:59Z",
-      "updated_at": "2026-10-11T14:29:52Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "c08634d94f67f6673d3d032026e0379a985d47e8",
-      "head": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
-      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "updated_at": "2026-10-11T16:56:36Z",
+      "closed_at": "2026-10-11T16:56:36Z",
+      "merged_at": "2026-10-11T16:56:36Z",
+      "merge_commit_sha": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+      "head": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
+      "base": "416091469561c6c8693a17d131dba75051afc73b",
       "review": {
         "coverage": "full-diff",
-        "scope": "Complete product and shared CI repair manifest independently reviewed; all published blobs match reviewed source50c. CI remains separate.",
-        "report": "docs/audits/2026-10-11-pr-history/batch-05/lint-memory-console-published-review.json",
+        "scope": "All5 changed product files and3 retained sharedCI files independently match approved source; full current diff verified.",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1545-console-published-review.json",
         "reviewer": "/root/batch05_a",
-        "reviewedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
+        "reviewedHead": "1114b8bf03ff08c1fff4617bf4cff56552ee3d00",
         "reviewedFiles": [
-          "package.json",
-          "scripts/run-eslint.mjs",
-          "scripts/run-eslint.test.mjs",
           "src/core/controllers/console-state-effect.test.ts",
           "src/core/controllers/console-state-effect.ts",
           "src/ui/state/frame-wcs-selection.test.ts",
@@ -25707,48 +25922,33 @@
         "remaining": [],
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
         "repairGroup": "console-coordinate-effects",
-        "changedFileCount": 8
-      },
-      "reviewHistory": [
-        {
-          "coverage": "full-diff",
-          "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-          "report": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-console-published-review.json",
-          "reviewer": "/root/batch05_c",
-          "reviewedHead": "4ffa9639eab02c95c90a853580ce8ebc2de365a3",
-          "reviewedFiles": [
-            "src/core/controllers/console-state-effect.ts",
-            "src/core/controllers/console-state-effect.test.ts",
-            "src/ui/state/frame-wcs-selection.ts",
-            "src/ui/state/frame-wcs-selection.test.ts",
-            "src/ui/state/laser-store-console.test.ts"
-          ],
-          "remaining": [],
-          "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
-          "repairGroup": "console-coordinate-effects",
-          "note": "Superseded product-only review receipt; current full manifest includes shared CI repair"
-        }
-      ]
+        "changedFileCount": 5,
+        "retainedReviewedFiles": [
+          "package.json",
+          "scripts/run-eslint.mjs",
+          "scripts/run-eslint.test.mjs"
+        ]
+      }
     },
     {
       "number": 1163,
       "title": "Track audit batch five and coordinate/output repairs",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1163",
-      "state": "open",
+      "state": "closed",
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T12:42:53Z",
-      "updated_at": "2026-10-11T14:25:16Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "6abae0120264b0f1dc0dd431158ac0425b898f85",
-      "head": "9302b995626e9a98bdc74e5b08aa9e3679ab0794",
-      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
+      "updated_at": "2026-10-11T16:47:41Z",
+      "closed_at": "2026-10-11T16:47:41Z",
+      "merged_at": "2026-10-11T16:47:41Z",
+      "merge_commit_sha": "1893f754f4582bff1b9582b6e4c24bd40d5aabf4",
+      "head": "457b65f35ded9f79a6e2dfa0f1ad5c1686b51677",
+      "base": "416091469561c6c8693a17d131dba75051afc73b",
       "review": {
         "coverage": "full-diff",
-        "report": "docs/audits/2026-10-11-pr-history/batch-05/main-eaae-ledger-published-review.json",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/heartbeat1545-ledger-published-review.json",
         "reviewer": "/root/batch05_a",
-        "reviewedHead": "9302b995626e9a98bdc74e5b08aa9e3679ab0794",
+        "reviewedHead": "457b65f35ded9f79a6e2dfa0f1ad5c1686b51677",
         "reviewedFiles": [
           "docs/audits/pr-history/DISPOSITIONS.md",
           "docs/audits/pr-history/FINDINGS.md",
@@ -25769,19 +25969,22 @@
           "docs/audits/pr-history/dispositions.json",
           "docs/audits/pr-history/findings.json",
           "docs/audits/pr-history/repairs.json",
-          "docs/audits/pr-history/state.json"
+          "docs/audits/pr-history/state.json",
+          "package.json",
+          "scripts/run-eslint.mjs",
+          "scripts/run-eslint.test.mjs"
         ],
         "remaining": [],
         "scope": "Complete tracking diff and frozen snapshot independently reviewed at reviewedHead. Source-review coverage and per-head CI are separate; see ciSnapshot and state.json:ledgerCi.",
         "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
       },
       "ciSnapshot": {
-        "head": "9302b995626e9a98bdc74e5b08aa9e3679ab0794",
-        "status": "failed",
-        "checkedAt": "2026-10-11T14:57:00.927Z",
+        "head": "457b65f35ded9f79a6e2dfa0f1ad5c1686b51677",
+        "status": "passed",
+        "checkedAt": "2026-10-11T17:54:03.972Z",
         "matchesInventoriedHead": true,
-        "absentRequired": ["Chrome UX smoke"],
-        "unmetRequired": ["Lint, typecheck, license, test, build", "Chrome UX smoke"],
+        "absentRequired": [],
+        "unmetRequired": [],
         "source": "state.json:ledgerCi"
       }
     },
@@ -25808,19 +26011,70 @@
       "number": 1165,
       "title": "Preserve curve geometry when closing paths",
       "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1165",
-      "state": "open",
+      "state": "closed",
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T13:43:12Z",
-      "updated_at": "2026-10-11T13:47:38Z",
-      "closed_at": null,
-      "merged_at": null,
-      "merge_commit_sha": "86c0bdad42e214607fef668de5d78e534d97d8ea",
-      "head": "3c05e63b1f55a7b7e73fc2017cb6fc1da7ae053c",
-      "base": "22868ee92b4fd6eb53e4bb3d5a8f45ceb7d4662f",
+      "updated_at": "2026-10-11T16:18:15Z",
+      "closed_at": "2026-10-11T16:18:15Z",
+      "merged_at": "2026-10-11T16:18:15Z",
+      "merge_commit_sha": "1525aed98c1135ec3079146e720c265d9a861fd0",
+      "head": "38a9857c4448cdb4ca9854f1f6aebdb9d45cea6e",
+      "base": "eaae471da93cbdee761e9f4da06ac750667b3bbc",
       "review": {
         "coverage": "not-started",
-        "report": null
+        "report": null,
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        },
+        "reason": "Open PR head changed since the recorded review"
+      }
+    },
+    {
+      "number": 1166,
+      "title": "Put Phone & MCP in the main toolbar with a live status quick panel",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1166",
+      "state": "closed",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T16:12:29Z",
+      "updated_at": "2026-10-11T17:48:01Z",
+      "closed_at": "2026-10-11T17:48:01Z",
+      "merged_at": "2026-10-11T17:48:01Z",
+      "merge_commit_sha": "a55c74162f117c9c5b233423a00dad01e1bd5d92",
+      "head": "f909bd389ac80161333adb3b2501b4a08f8db7c0",
+      "base": "416091469561c6c8693a17d131dba75051afc73b",
+      "review": {
+        "coverage": "not-started",
+        "report": null,
+        "previousReview": {
+          "coverage": "not-started",
+          "report": null
+        },
+        "reason": "Open PR head changed since the recorded review"
+      }
+    },
+    {
+      "number": 1167,
+      "title": "Fix missing pako Zlib attribution in generated notices",
+      "url": "https://github.com/cisgz3a-hub/KerfDesk/pull/1167",
+      "state": "closed",
+      "draft": false,
+      "author": "cisgz3a-hub",
+      "created_at": "2026-10-11T17:03:45Z",
+      "updated_at": "2026-10-11T17:31:52Z",
+      "closed_at": "2026-10-11T17:31:52Z",
+      "merged_at": "2026-10-11T17:31:52Z",
+      "merge_commit_sha": "aa60290419bf04f395d4da7d3ee68d49577f6453",
+      "head": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+      "base": "4a508e2cb621c1f796d4c6a132dff5e11d18c283",
+      "review": {
+        "coverage": "full-diff",
+        "reviewedHead": "903149ab9a8ff337449c8ea81ad3e8b52c08a7d8",
+        "report": "docs/audits/2026-10-11-pr-history/batch-05/pako-notice-published-review.json",
+        "scope": "All four files independently reviewed as the current audit repair; hosted CI remains a separate gate.",
+        "findings": ["B05-NOTICE-001"]
       }
     }
   ]
