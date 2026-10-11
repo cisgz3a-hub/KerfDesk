@@ -85,4 +85,7 @@ export type ProductionNestingProgress = {
   readonly attempted: number;
   readonly total: number;
   readonly best: ProductionNestResult | null;
+  /** A search limitation never invalidates the last independently validated draft. */
+  readonly notice?: string;
+  readonly advanced?: boolean;
 };

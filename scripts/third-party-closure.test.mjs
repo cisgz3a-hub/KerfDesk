@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,9 +23,27 @@ import {
   verifyOpenClipartAssets,
 } from './third-party-closure.mjs';
 import { verifyPackagedPreviewMetadata } from './verify-packaged-preview-metadata.mjs';
+import { OFFLINE_ENGINE_ASSETS, verifyOfflineEngineAssets } from './offline-engine-assets.mjs';
 
 const packages = collectProductionPackages();
 const electronPackage = collectElectronPackage();
+
+test('pins native engines and includes licences that npm wrapper packages omit', () => {
+  verifyOfflineEngineAssets(REPO_ROOT);
+  const notice = buildThirdPartyNotice();
+  for (const { sha256 } of OFFLINE_ENGINE_ASSETS) assert.ok(notice.includes(sha256));
+  assert.match(notice, /Old MIT/);
+  assert.match(notice, /UNICODE LICENSE V3/);
+  assert.match(notice, /packingsolver-highs/);
+  assert.match(notice, /emscripten-system-lib-libc-musl/);
+  assert.match(
+    execFileSync(process.execPath, ['scripts/prepare-packing-solver.mjs', '--check'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+    }),
+    /no-eval loader verified/,
+  );
+});
 
 function countMatches(text, pattern) {
   return [...text.matchAll(pattern)].length;

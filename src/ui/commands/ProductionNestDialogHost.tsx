@@ -1,4 +1,5 @@
 import { Button, Dialog, DialogActions, NumberInput } from '../kit';
+import { useState } from 'react';
 import type { ProductionNestDefinition } from '../../core/nesting/production-nest';
 import { ProductionNestPartFields } from './ProductionNestPartFields';
 import { ProductionNestStockFields } from './ProductionNestStockFields';
@@ -12,6 +13,7 @@ export function ProductionNestDialogHost(props: {
 }): JSX.Element {
   const form = useProductionNestForm();
   const review = useProductionNestReview(props.onClose);
+  const [advanced, setAdvanced] = useState(false);
   const close = (): void => {
     review.reset();
     props.onClose();
@@ -62,6 +64,7 @@ export function ProductionNestDialogHost(props: {
         ))}
         <Button onClick={form.addSheet}>Add stock sheet or remnant</Button>
         <ProductionNestOptions definition={form.definition} change={form.change} />
+        <AdvancedNestOption checked={advanced} onChange={setAdvanced} />
         <Button onClick={form.save}>Save production definition</Button>
       </fieldset>
       {review.draft !== null && review.progress !== null && (
@@ -79,7 +82,7 @@ export function ProductionNestDialogHost(props: {
           review.reset();
           props.onBack();
         }}
-        onCalculate={() => review.calculate(form.definition)}
+        onCalculate={() => review.calculate(form.definition, advanced)}
       />
     </Dialog>
   );
@@ -176,5 +179,31 @@ function ProductionReviewActions(props: {
         </Button>
       )}
     </DialogActions>
+  );
+}
+
+function AdvancedNestOption(props: {
+  readonly checked: boolean;
+  readonly onChange: (checked: boolean) => void;
+}): JSX.Element {
+  return (
+    <>
+      <label>
+        <input
+          type="checkbox"
+          checked={props.checked}
+          title="Try a local advanced search for fewer sheets while retaining the best standard layout"
+          onChange={(event) => props.onChange(event.currentTarget.checked)}
+        />{' '}
+        Advanced optimise (experimental)
+      </label>
+      {props.checked && (
+        <p>
+          Try to use fewer sheets with a five-second local search. Requires Compact and Closed
+          outlines, with matching material, thickness and stock grain. The standard layout remains
+          available if the search stops or cannot improve it.
+        </p>
+      )}
+    </>
   );
 }

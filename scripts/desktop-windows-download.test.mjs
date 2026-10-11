@@ -121,6 +121,27 @@ test('falls back only from absent or empty signed stable to a stable-key-authent
   );
 });
 
+test('an Authenticode handoff accurately describes the signed installer and its automatic updates', async () => {
+  const payload = manualDownloadPayload(
+    stable.fixture().identity,
+    Buffer.from('signed handoff'),
+    stable.keySet,
+  );
+  const envelope = await signManualDownload(
+    { ...payload, codeSigning: 'authenticode' },
+    stable.privateKeyPem,
+    stable.keyId,
+    stable.keySet,
+  );
+  const result = await resolveWindowsDesktopDownload(
+    server(new Response('', { status: 404 }), stable.keySet, JSON.stringify(envelope)),
+  );
+  assert.equal(result.status, 'ready');
+  assert.equal(result.codeSigning, 'signed');
+  assert.equal(result.updates, 'automatic');
+  assert.equal(result.sha256, payload.artifacts[0].sha256);
+});
+
 test('missing or empty commercial catalogue is unreleased and never falls back to Preview', async () => {
   for (const catalog of [
     new Response('missing', { status: 404 }),

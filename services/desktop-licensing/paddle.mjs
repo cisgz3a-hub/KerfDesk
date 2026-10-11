@@ -92,25 +92,45 @@ export async function verifyPaddleSignature(header, raw, secret, now) {
   return false;
 }
 
-export function validatePaddleTransaction(data, config, operation) {
-  const amount = CATALOG[operation];
+function paymentCatalog(config, operation, order) {
+  return {
+    // Operator-recorded orders predate a price snapshot and retain the configured
+    // price check. Server-created orders keep the catalogue they offered the buyer.
+    priceId: order?.priceId ?? config.prices[operation],
+    amount: order?.amount ?? CATALOG[operation],
+    currency: order?.currency ?? 'USD',
+  };
+}
+
+export function validatePaddleTransaction(data, config, operation, order) {
+  const { amount, currency, priceId } = paymentCatalog(config, operation, order);
   const item = data.items?.[0];
   const totals = data.details?.totals;
   requireValue(
-    data.currency_code === 'USD' &&
+    Object.hasOwn(CATALOG, operation) &&
+      (!order || (order.provider === 'paddle' && order.operation === operation)) &&
+      Number.isSafeInteger(amount) &&
+      amount > 0 &&
+      currency === 'USD' &&
+      /^pri_[a-z0-9]{26}$/u.test(priceId ?? ''),
+    409,
+    'payment_mismatch',
+  );
+  requireValue(
+    data.currency_code === currency &&
       data.collection_mode === 'automatic' &&
       data.subscription_id === null,
     409,
     'payment_mismatch',
   );
   requireValue(
-    data.items?.length === 1 && item.quantity === 1 && item.price?.id === config.prices[operation],
+    data.items?.length === 1 && item.quantity === 1 && item.price?.id === priceId,
     409,
     'payment_mismatch',
   );
   requireValue(
     item.price?.unit_price?.amount === String(amount) &&
-      item.price.unit_price.currency_code === 'USD' &&
+      item.price.unit_price.currency_code === currency &&
       item.price.billing_cycle === null &&
       item.price.trial_period === null &&
       item.price.tax_mode === 'external',
@@ -121,7 +141,7 @@ export function validatePaddleTransaction(data, config, operation) {
     data.discount_id === null &&
       totals?.discount === '0' &&
       totals?.subtotal === String(amount) &&
-      totals?.currency_code === 'USD',
+      totals?.currency_code === currency,
     409,
     'payment_mismatch',
   );
@@ -159,18 +179,18 @@ function paymentFacts(data) {
 }
 
 /** The reason a completed KerfDesk transaction cannot fulfil its order, or null. */
-function paymentProblem(data, config, operation) {
+function paymentProblem(data, config, operation, order) {
   if (data.status !== 'completed') return 'payment_not_completed';
   if (!Object.hasOwn(CATALOG, operation)) return 'payment_mismatch';
   try {
-    validatePaddleTransaction(data, config, operation);
+    validatePaddleTransaction(data, config, operation, order);
     return null;
   } catch {
     return 'payment_mismatch';
   }
 }
 
-export function paddleVerifier(env) {
+export function paddleVerifier(env, findOrder = () => undefined) {
   const config = configuredPaddleProvider(env);
   return async (headers, raw, now) => {
     requireValue(
@@ -193,6 +213,10 @@ export function paddleVerifier(env) {
       return { ignored: true };
     const operation = data.custom_data.kerfdesk_operation;
     const known = Object.hasOwn(CATALOG, operation);
+    // Read the immutable offer only after authenticating Paddle's raw payload.
+    // Fulfilment still checks the order proof, ownership and current stored fields.
+    const order = findOrder(orderId);
+    const catalog = known ? paymentCatalog(config, operation, order) : null;
     // From here on the payment belongs to a KerfDesk order. A problem is reported as
     // `rejection` and recorded for support, never bounced back for Paddle to retry.
     return {
@@ -205,12 +229,12 @@ export function paddleVerifier(env) {
       // Only used to look up where to email the key (licence-email.mjs); never stored.
       customerId: typeof data.customer_id === 'string' ? data.customer_id : null,
       operation: known ? operation : null,
-      priceId: known ? config.prices[operation] : null,
-      amount: known ? CATALOG[operation] : null,
-      currency: 'USD',
+      priceId: catalog?.priceId ?? null,
+      amount: catalog?.amount ?? null,
+      currency: catalog?.currency ?? 'USD',
       status: 'paid',
       facts: paymentFacts(data),
-      rejection: paymentProblem(data, config, operation),
+      rejection: paymentProblem(data, config, operation, order),
     };
   };
 }

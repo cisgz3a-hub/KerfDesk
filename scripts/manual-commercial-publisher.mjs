@@ -6,6 +6,8 @@ import {
 } from '../public/desktop-manual-download.mjs';
 import { CommercialReleaseError, digest } from './commercial-release-manifest.mjs';
 import { manualDownloadPayload, signManualDownload } from './manual-commercial-manifest.mjs';
+import { MANUAL_CATALOG_KEY } from '../public/desktop-manual-catalog.mjs';
+import { prepareManualHistory } from './manual-commercial-history.mjs';
 import {
   requireNotesBaseline,
   signUpdateNotes,
@@ -18,7 +20,7 @@ const refuse = (message) => {
   throw new CommercialReleaseError(message);
 };
 
-/** Separate manual-only lane. Requires serialized operators; never writes an update feed/catalogue. */
+/** Separate manual-only lane. Serialized operators; never writes the automatic update feed. */
 export async function publishManualCommercialRelease({
   identity,
   installer,
@@ -29,6 +31,7 @@ export async function publishManualCommercialRelease({
   verifyInstaller,
   expectedLatestSha256,
   reviewedNotes,
+  reviewedHistory,
 }) {
   if (typeof verifyInstaller !== 'function')
     refuse('Unsigned commercial package verification is mandatory.');
@@ -53,6 +56,7 @@ export async function publishManualCommercialRelease({
       refuse('The published manual version conflicts with this build.');
     if (!same(initial, manifest)) requireNotesBaseline(reviewedNotes, previous);
   } else requireNotesBaseline(reviewedNotes, null);
+  const history = await prepareManualHistory(store, initial, envelope, keySet, reviewedHistory);
   const plan = [
     { key: manualDownloadKey(payload.version, payload.artifacts[0].name), bytes: installer },
     { key: manualDownloadKey(payload.version, 'download-manifest.json'), bytes: manifest },
@@ -77,6 +81,20 @@ export async function publishManualCommercialRelease({
   }
   if (!same(initial, await store.get(MANUAL_DOWNLOAD_LATEST_KEY)))
     refuse('Manual download latest changed during publication.');
+  if (!same(history.initial, await store.get(MANUAL_CATALOG_KEY)))
+    refuse('Manual download history changed during publication.');
+  if (!same(history.initial, history.next)) {
+    await store.put(MANUAL_CATALOG_KEY, history.next, {
+      contentType: 'application/json',
+      cacheControl: 'no-store',
+    });
+    if (!same(history.next, await store.get(MANUAL_CATALOG_KEY)))
+      refuse('Manual download history readback failed.');
+  }
+  // History goes first, so an interruption can never promote a release while
+  // losing its predecessors. Readers cap history at the authenticated latest.
+  if (!same(initial, await store.get(MANUAL_DOWNLOAD_LATEST_KEY)))
+    refuse('Manual download latest changed during history publication.');
   if (same(initial, manifest))
     return {
       status: 'already-published',

@@ -36,6 +36,11 @@ this feature.
 | dompurify | MPL-2.0 OR Apache-2.0 | © Cure53 and other contributors — https://github.com/cure53/DOMPurify |
 | @csstools/css-calc 2.1.4, @csstools/css-parser-algorithms 3.0.5, @csstools/css-tokenizer 3.0.4 | MIT | © 2022 Romain Menke, Antonio Laguna — https://github.com/csstools/postcss-plugins |
 | opentype.js | MIT | © 2020 Frederik De Bleser — https://github.com/opentypejs/opentype.js |
+| harfbuzzjs 1.6.3 / HarfBuzz | MIT / Old MIT | HarfBuzz contributors — https://github.com/harfbuzz/harfbuzzjs; native notices included separately |
+| bidi-js 1.1.0 | MIT | Loov Communications — https://github.com/lojjic/bidi-js |
+| Unicode 17 script data | Unicode-3.0 | © Unicode, Inc. — https://www.unicode.org/Public/17.0.0/ucd/ |
+| ag-psd 31.0.3 | MIT | Agamnentzar — https://github.com/Agamnentzar/ag-psd |
+| PackingSolver 49bf6c7 and its solver dependencies | MIT, with permissive runtime notices | Florian Fontan and contributors — https://github.com/fontanf/packingsolver |
 | imagetracerjs | Unlicense (public domain) | András Jankovics — https://github.com/jankovicsandras/imagetracerjs |
 | clipper2-ts | BSL-1.0 (Boost Software License 1.0) | Port of Angus Johnson's Clipper2 — https://github.com/ErikSom/Clipper2-ts |
 | lucide-static | ISC | © Lucide Contributors — https://github.com/lucide-icons/lucide |
@@ -50,6 +55,13 @@ files include the Apache-2.0 transition notice, full Apache-2.0 terms and retain
 historical MIT terms. The generated release notices reproduce those complete
 files; the metadata label does not replace them. The MCP client and WebSocket
 TypeScript declarations are development-only dependencies.
+
+The offline native engine closure is separately pinned and verified by
+`scripts/offline-engine-assets.mjs`. Its complete notices (including HarfBuzz,
+Unicode data, HiGHS, nlohmann/json, Emscripten, musl, libc++, compiler-rt and
+mimalloc) are included in the generated release notices. The Photoshop decoder's
+pako transitive dependency uses both MIT and Zlib terms, reproduced in the npm
+closure. No Photoshop example artwork from upstream is bundled.
 
 The separately deployed phone and MCP service ships its complete production
 dependency notices in `services/remote-control/public/third-party-notices.txt`.
@@ -130,3 +142,16 @@ preserved without alteration.
 > strings are no longer a manual check — `generate-third-party-notices.mjs`
 > reads them out of each `.ttf`'s `name` table and fails the build if a
 > copyright record is missing.
+
+## Test-only font fixture
+
+`src/core/text/__fixtures__/NotoSansArabic-Regular.ttf` is an unmodified test
+fixture, excluded from runtime imports and the bundled product font catalogue.
+Copyright 2018 The Noto Project Authors (github.com/googlei18n/noto-fonts).
+It is distributed under the SIL Open Font License 1.1 (OFL-1.1); its original
+copyright and full licence accompany it in
+[`src/core/text/__fixtures__/OFL-Noto.txt`](src/core/text/__fixtures__/OFL-Noto.txt).
+The pinned source is
+[notofonts/noto-fonts at ffebf8c1ee449e544955a7e813c54f9b73848eac](https://github.com/notofonts/noto-fonts/blob/ffebf8c1ee449e544955a7e813c54f9b73848eac/hinted/ttf/NotoSansArabic/NotoSansArabic-Regular.ttf).
+The unmodified font SHA-256 is
+`ceea25b464a656dc3b26849bab9356740401af62aedf1bfa8b7f0d9b75925b1b`.

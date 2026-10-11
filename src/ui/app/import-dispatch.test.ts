@@ -249,6 +249,7 @@ describe('dispatchImportFilesInOrder', () => {
         '.tif',
         '.tiff',
         '.stl',
+        '.psd',
       ],
       multiple: true,
     });

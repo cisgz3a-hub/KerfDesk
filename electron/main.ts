@@ -83,6 +83,7 @@ import { installDesktopContextMenu } from './desktop-context-menu.js';
 import { loadWindowPlacement, rememberWindowPlacement } from './desktop-window-placement.js';
 import { installRendererCrashRecovery } from './renderer-crash-recovery.js';
 import { rendererContentSecurityPolicy } from './renderer-content-security-policy.js';
+import { withRendererIsolation, rendererResponsePolicyHeaders } from './renderer-isolation.js';
 import { createDesktopWindowReopener } from './desktop-window-reopen.js';
 import { createDesktopLicensing } from './desktop-licensing.js';
 import { readLicensingConfig } from './licensing-config.js';
@@ -195,7 +196,7 @@ const checkForPreviewUpdate = createPreviewUpdateCheck({
 });
 const CSP_POLICY = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
   "worker-src 'self' data: blob:",
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${CAMERA_BRIDGE_ORIGIN}`,
@@ -258,7 +259,7 @@ function makeAppProtocolHandler(distRoot: string) {
     if (rel.startsWith('..') || path.isAbsolute(rel)) {
       return new Response('Not Found', { status: 404 });
     }
-    return net.fetch(pathToFileURL(filePath).toString());
+    return withRendererIsolation(await net.fetch(pathToFileURL(filePath).toString()));
   };
 }
 
@@ -274,14 +275,10 @@ function createMainWindow(bounds: ReturnType<typeof loadWindowPlacement>['bounds
 }
 
 function installContentSecurityPolicy(ses: Session): void {
+  const csp = rendererContentSecurityPolicy(CSP_POLICY, IS_DEV_SERVER_RENDERER);
   ses.webRequest.onHeadersReceived((details, callback) => {
     callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          rendererContentSecurityPolicy(CSP_POLICY, IS_DEV_SERVER_RENDERER),
-        ],
-      },
+      responseHeaders: rendererResponsePolicyHeaders(csp, details.responseHeaders),
     });
   });
 }

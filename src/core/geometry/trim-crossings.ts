@@ -1,12 +1,12 @@
 // Where a contour meets other outlines, for Trim Shapes (LightBurn gap
-// LBG-T04). Crossings are found on world chords: the contour's chords sit in a
-// uniform grid, and every chord of every other outline whose bounds reach the
-// contour is tested only against the cells it overlaps. A touch counts as a
+// LBG-T04). Mixed line/curve pairs use canonical analytic contacts. Other pairs
+// use world chords: a uniform grid limits tests to overlapping cells. A touch counts as a
 // crossing, so a line ending on a shape splits that shape there. The contour
 // also crosses itself where its non-adjacent chords meet.
 
 import type { Bounds, Vec2 } from '../scene';
 import { boundsOverlap, type TrimContour } from './trim-contours';
+import { analyticChordPair, collectAnalyticCrossings } from './trim-analytic-crossings';
 
 export type TrimCrossing = {
   /** Position on the contour (segment + t). */
@@ -14,6 +14,8 @@ export type TrimCrossing = {
   /** The contour chord it lies on. */
   readonly chord: number;
   readonly point: Vec2;
+  /** Canonical parameter already solved analytically; no chord refinement needed. */
+  readonly exact?: true;
   /** The chord of the other outline, so the exact curve can be refined onto it. */
   readonly edgeStart: Vec2;
   readonly edgeEnd: Vec2;
@@ -57,11 +59,13 @@ function collectCrossings(
   outline: TrimContour,
   found: TrimCrossing[],
 ): void {
+  collectAnalyticCrossings(contour, outline, found);
   const seen = new Int32Array(contour.points.length);
   for (let edge = 0; edge < outline.points.length - 1; edge += 1) {
     const a = outline.points[edge] as Vec2;
     const b = outline.points[edge + 1] as Vec2;
     forEachChordNear(grid, segmentBounds(a, b), seen, edge + 1, (chord) => {
+      if (analyticChordPair(contour, chord, outline, edge)) return;
       const crossing = crossingOn(contour, chord, a, b);
       if (crossing !== null) found.push(crossing);
     });
@@ -93,8 +97,7 @@ function crossingOn(contour: TrimContour, chord: number, a: Vec2, b: Vec2): Trim
   const q = contour.points[chord + 1] as Vec2;
   const hit = segmentHit(p, q, a, b);
   if (hit === null) return null;
-  const p0 = contour.params[chord] as number;
-  const p1 = contour.params[chord + 1] as number;
+  const [p0, p1] = contour.chordParams[chord] as readonly [number, number];
   return {
     p: p0 + (p1 - p0) * hit,
     chord,

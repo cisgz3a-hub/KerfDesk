@@ -8,7 +8,11 @@ import {
   populatePreviewDownloads,
 } from '../public/desktop-downloads.mjs';
 import { verifyCommercialCatalog } from '../public/desktop-commercial-catalog.mjs';
-import { MANUAL_DOWNLOAD_LATEST_URL } from '../public/desktop-manual-download.mjs';
+import {
+  MANUAL_DOWNLOAD_LATEST_URL,
+  manualDownloadUrl,
+} from '../public/desktop-manual-download.mjs';
+import { MANUAL_CATALOG_URL } from '../public/desktop-manual-catalog.mjs';
 import { manualDownloadPayload, signManualDownload } from './manual-commercial-manifest.mjs';
 import { verifyPreviewManifest } from '../public/desktop-release-manifest.mjs';
 import {
@@ -55,7 +59,7 @@ function publishedCatalog(versions, source = {}) {
   });
   return { entries, text: catalogBytes(entries).toString('utf8') };
 }
-function commercialServer(catalog, manual = null) {
+function commercialServer(catalog, manual = null, history = undefined, versions = {}) {
   const requests = [];
   return {
     requests,
@@ -64,8 +68,45 @@ function commercialServer(catalog, manual = null) {
       if (url === '/desktop-release-keys.json') return new Response(JSON.stringify(anchors));
       if (url === MANUAL_DOWNLOAD_LATEST_URL)
         return manual === null ? new Response('Not found', { status: 404 }) : new Response(manual);
+      if (url === MANUAL_CATALOG_URL) {
+        const value =
+          history === undefined && manual !== null
+            ? JSON.stringify({
+                schemaVersion: 1,
+                kind: 'manual-download-catalog',
+                releases: [JSON.parse(manual)],
+              })
+            : history;
+        return value == null ? new Response('Not found', { status: 404 }) : new Response(value);
+      }
+      if (url.includes('/commercial-manual/releases/'))
+        return versions[url] === undefined
+          ? new Response('Not found', { status: 404 })
+          : new Response(versions[url]);
       return catalog === null ? new Response('Not found', { status: 404 }) : new Response(catalog);
     },
+  };
+}
+
+async function manualCatalog(versions) {
+  const releases = await Promise.all(
+    versions.map(async (version) =>
+      signManualDownload(
+        manualDownloadPayload(
+          stable.fixture(version).identity,
+          Buffer.from(`package-${version}`),
+          stable.keySet,
+        ),
+        stable.privateKeyPem,
+        stable.keyId,
+        stable.keySet,
+      ),
+    ),
+  );
+  return {
+    releases,
+    latest: JSON.stringify(releases[0]),
+    text: JSON.stringify({ schemaVersion: 1, kind: 'manual-download-catalog', releases }),
   };
 }
 
@@ -240,6 +281,231 @@ test('a publisher-built catalogue offers the newest signed installer and keeps o
   // The Preview links stay untouched: the two editions never share a download.
   for (const link of document.querySelectorAll('[data-preview-suffix]'))
     assert.equal(link.hasAttribute('href'), false);
+});
+
+test('manual release history lists verified older installers numerically with release dates and hashes', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.2.3', '1.9.0']);
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(
+    document,
+    commercialServer(null, manual.latest, manual.text).fetchRequest,
+  );
+  const history = [...document.querySelectorAll('#commercial-history-list a')];
+  assert.deepEqual(
+    history.map((link) => link.textContent),
+    ['KerfDesk 1.9.0', 'KerfDesk 1.2.3'],
+  );
+  for (const link of history) {
+    assert.match(
+      link.href,
+      /^https:\/\/dl[.]kerfdesk[.]com\/desktop\/commercial-manual\/releases\//u,
+    );
+    assert.match(
+      link.nextSibling.textContent,
+      /Released 2026-01-01 · Unsigned installer · SHA-256: [a-f0-9]{64}$/u,
+    );
+  }
+  assert.equal(document.querySelector('#commercial-history-status').textContent, '');
+  assert.match(commercialLinks(document)[0].href, /\/1[.]10[.]0\//u);
+});
+
+test('manual versions remain reachable after the signed installer lane starts', async () => {
+  const manual = await manualCatalog(['1.9.0', '1.2.3']);
+  const signed = publishedCatalog(['1.10.0', '1.9.0']);
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(
+    document,
+    commercialServer(signed.text, manual.latest, manual.text).fetchRequest,
+  );
+  assert.match(commercialLinks(document)[0].href, /\/commercial\/releases\/1[.]10[.]0\//u);
+  const history = [...document.querySelectorAll('#commercial-history-list a')];
+  assert.deepEqual(
+    history.map((link) => link.textContent),
+    ['KerfDesk 1.9.0', 'KerfDesk 1.2.3'],
+  );
+  assert.match(history[0].href, /\/commercial\/releases\//u);
+  assert.match(history[1].href, /\/commercial-manual\/releases\//u);
+});
+
+test('stable exact-version selection works before and after manual history publication', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.2.3']);
+  const immutable = manualDownloadUrl('1.2.3', 'download-manifest.json');
+  const emptyHistory = JSON.stringify({
+    schemaVersion: 1,
+    kind: 'manual-download-catalog',
+    releases: [],
+  });
+  for (const history of [manual.text, null, '{}', emptyHistory]) {
+    const document = new JSDOM(html).window.document;
+    const server = commercialServer(null, manual.latest, history, {
+      [immutable]: JSON.stringify(manual.releases[1]),
+    });
+    await populateCommercialDownload(document, server.fetchRequest, '?version=1.2.3');
+    assert.match(commercialLinks(document)[0].href, /\/1[.]2[.]3\//u);
+    assert.match(
+      document.querySelector('#commercial-status').textContent,
+      /^KerfDesk 1[.]2[.]3 ·/u,
+    );
+    assert.equal(
+      server.requests.some(({ url }) => url === immutable),
+      history !== manual.text,
+    );
+  }
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(
+    document,
+    commercialServer(publishedCatalog(['2.0.0', '1.9.0']).text).fetchRequest,
+    '?version=1.9.0',
+  );
+  assert.match(commercialLinks(document)[0].href, /\/commercial\/releases\/1[.]9[.]0\//u);
+  const preview = responses();
+  await populatePreviewDownloads(document, '?version=1.9.0', preview.fetchRequest);
+  assert.equal(preview.requests[0].url, 'https://dl.kerfdesk.com/desktop/previews/latest.json');
+  assert.match(
+    document.querySelector('#release-status').textContent,
+    /Publisher signature verified/u,
+  );
+});
+
+test('missing, tampered or mismatched exact stable versions never substitute latest', async () => {
+  const manual = await manualCatalog(['1.10.0']);
+  for (const [search, immutableBody] of [
+    ['?version=1.2.3', undefined],
+    ['?version=1.2.3', manual.latest],
+    ['?version=1.2.3', '{}'],
+    ['?version=1.11.0', manual.latest],
+    ['?version=../../evil', undefined],
+    ['?version=1.2.3&version=1.10.0', undefined],
+  ]) {
+    const document = new JSDOM(html).window.document;
+    const server = commercialServer(null, manual.latest, null, {
+      [manualDownloadUrl('1.2.3', 'download-manifest.json')]: immutableBody,
+    });
+    await populateCommercialDownload(document, server.fetchRequest, search);
+    assert.match(
+      document.querySelector('#commercial-status').textContent,
+      /That desktop version could not be verified/u,
+    );
+    for (const link of commercialLinks(document)) assert.equal(link.hasAttribute('href'), false);
+    assert.equal(document.querySelector('#commercial-hash').textContent, '');
+    assert.equal(
+      server.requests.some(({ url }) => url.includes('/releases/1.11.0/')),
+      false,
+    );
+  }
+});
+
+test('bad or unavailable history preserves verified latest and shows recovery guidance', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.9.0']);
+  const tampered = JSON.parse(manual.text);
+  tampered.releases[1].signature = Buffer.alloc(64).toString('base64');
+  for (const history of [null, '{}', JSON.stringify(tampered)]) {
+    const document = new JSDOM(html).window.document;
+    await populateCommercialDownload(
+      document,
+      commercialServer(null, manual.latest, history).fetchRequest,
+    );
+    assert.match(commercialLinks(document)[0].href, /\/1[.]10[.]0\//u);
+    assert.equal(document.querySelector('#commercial-history-list').children.length, 0);
+    assert.equal(document.querySelector('#commercial-history').hidden, false);
+    assert.match(
+      document.querySelector('#commercial-history-status').textContent,
+      /Contact KerfDesk support/u,
+    );
+  }
+});
+
+test('empty or stale manual history keeps verified entries and warns that the archive is incomplete', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.9.0', '1.2.3']);
+  for (const releases of [[], manual.releases.slice(1)]) {
+    const history = JSON.stringify({ schemaVersion: 1, kind: 'manual-download-catalog', releases });
+    const document = new JSDOM(html).window.document;
+    await populateCommercialDownload(
+      document,
+      commercialServer(null, manual.latest, history).fetchRequest,
+    );
+    assert.match(commercialLinks(document)[0].href, /\/1[.]10[.]0\//u);
+    assert.equal(document.querySelector('#commercial-history').hidden, false);
+    assert.match(
+      document.querySelector('#commercial-history-status').textContent,
+      /Contact KerfDesk support/u,
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll('#commercial-history-list a')].map((link) => link.textContent),
+      releases.length === 0 ? [] : ['KerfDesk 1.9.0', 'KerfDesk 1.2.3'],
+    );
+  }
+});
+
+test('a commercial outage on an exact Preview URL reports the commercial outage without blaming that version', async () => {
+  const document = new JSDOM(html).window.document;
+  const search = '?version=0.2.0-preview.14';
+  await populatePreviewDownloads(document, search, responses().fetchRequest);
+  await populateCommercialDownload(
+    document,
+    async () => {
+      throw new Error('commercial host offline');
+    },
+    search,
+  );
+  assert.match(
+    document.querySelector('#commercial-status').textContent,
+    /^No verified download of the licensed Windows edition/u,
+  );
+  assert.doesNotMatch(
+    document.querySelector('#commercial-status').textContent,
+    /That desktop version/u,
+  );
+  assert.match(
+    document.querySelector('#release-status').textContent,
+    /Publisher signature verified/u,
+  );
+  assert.equal(document.querySelector('#preview-links').hidden, false);
+  for (const link of commercialLinks(document)) assert.equal(link.hasAttribute('href'), false);
+});
+
+test('a healthy manual catalogue excludes unlisted immutable candidates from exact-version downloads', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.9.0', '1.2.3']);
+  const immutable = manualDownloadUrl('1.2.3', 'download-manifest.json');
+  const history = JSON.stringify({
+    schemaVersion: 1,
+    kind: 'manual-download-catalog',
+    releases: manual.releases.slice(0, 2),
+  });
+  const server = commercialServer(null, manual.latest, history, {
+    [immutable]: JSON.stringify(manual.releases[2]),
+  });
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(document, server.fetchRequest, '?version=1.2.3');
+  assert.equal(
+    server.requests.some(({ url }) => url === immutable),
+    false,
+  );
+  assert.match(
+    document.querySelector('#commercial-status').textContent,
+    /That desktop version could not be verified/u,
+  );
+  for (const link of commercialLinks(document)) assert.equal(link.hasAttribute('href'), false);
+});
+
+test('an interrupted future history entry is hidden until its authenticated latest is promoted', async () => {
+  const manual = await manualCatalog(['1.11.0', '1.10.0', '1.9.0']);
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(
+    document,
+    commercialServer(null, JSON.stringify(manual.releases[1]), manual.text).fetchRequest,
+  );
+  assert.match(commercialLinks(document)[0].href, /\/1[.]10[.]0\//u);
+  assert.deepEqual(
+    [...document.querySelectorAll('#commercial-history-list a')].map((link) => link.textContent),
+    ['KerfDesk 1.9.0'],
+  );
+  await populateCommercialDownload(
+    document,
+    commercialServer(null, JSON.stringify(manual.releases[1]), manual.text).fetchRequest,
+    '?version=1.11.0',
+  );
+  assert.equal(commercialLinks(document)[0].hasAttribute('href'), false);
 });
 
 test('unverifiable entries are skipped, and nothing unverified is ever offered', async () => {

@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 48 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation.
+These 57 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 3 closed-unmerged proposal; 24 resolved before audit; 11 rejected candidate; 10 documented limitation; 1 no-current-defect-confirmed; 1 historical-limitations-already-fixed; 1 superseded-contract; 1 not-reproduced; 1 evidence-limit; 1 superseded; 1 retained-under-canonical-setting; 1 already-fixed; 1 retained-validation-limitation.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -387,3 +387,75 @@ Disposition: **closed-unmerged proposal**. Historical PRs: [#4](https://github.c
 package-lock checker.engines requires Node>=24/npm>=11; historical license-check workflow selects Node20 and runs scripts/license-check.mjs wrapper. Source-confirmed violation of declared package Node contract; no runtime crash or npm-install failure asserted. Current license-check runs pnpm-aware scripts/check-licenses.mjs and does not depend on license-checker-rseidelsohn; historical PR closed unmerged.
 
 Local audit evidence: batch-04/early-dependencies.md, batch-04/early-dependencies.json, batch-04/early-dependencies-checks.json.
+
+## DISP-049: Original checkpoint test weak baseline superseded by baseline-relative current test and expanded recovery checks; software score remains historical.
+
+Disposition: **no-current-defect-confirmed**. Historical PRs: [#91](https://github.com/cisgz3a-hub/KerfDesk/pull/91).
+
+Original checkpoint test weak baseline superseded by baseline-relative current test and expanded recovery checks; software score remains historical.
+
+Local audit evidence: batch-05/lane-a.json, batch-05/lane-a.md.
+
+## DISP-050: Atomic commit arithmetic correct under declared geometry; current geometry/ownership/G92 fixes in 06e8678f3, bb6c54fe5 and 53e6568d1. No duplicate repair.
+
+Disposition: **historical-limitations-already-fixed**. Historical PRs: [#92](https://github.com/cisgz3a-hub/KerfDesk/pull/92).
+
+Atomic commit arithmetic correct under declared geometry; current geometry/ownership/G92 fixes in 06e8678f3, bb6c54fe5 and 53e6568d1. No duplicate repair.
+
+Local audit evidence: batch-05/lane-a.json, batch-05/lane-a.md.
+
+## DISP-051: Removed 700/1100px collapse defaults and active-job rail lock intentionally replaced by tabbed layout and separate Live Motion controls; do not restore obsolete restrictions.
+
+Disposition: **superseded-contract**. Historical PRs: [#93](https://github.com/cisgz3a-hub/KerfDesk/pull/93).
+
+Removed 700/1100px collapse defaults and active-job rail lock intentionally replaced by tabbed layout and separate Live Motion controls; do not restore obsolete restrictions.
+
+Local audit evidence: batch-05/lane-b.json, batch-05/lane-b.md.
+
+## DISP-052: Indexed backing-array semantics remain coherent in current consumers; no lost/duplicated/reordered line or queue-based stall regression found.
+
+Disposition: **not-reproduced**. Historical PRs: [#95](https://github.com/cisgz3a-hub/KerfDesk/pull/95).
+
+Indexed backing-array semantics remain coherent in current consumers; no lost/duplicated/reordered line or queue-based stall regression found.
+
+Local audit evidence: batch-05/lane-b.json, batch-05/lane-b.md.
+
+## DISP-053: Historical acceptance scores and tests are dated bounded evidence, not current browser/hardware or universal performance qualification. No browser run performed in this lane.
+
+Disposition: **evidence-limit**. Historical PRs: [#93](https://github.com/cisgz3a-hub/KerfDesk/pull/93), [#95](https://github.com/cisgz3a-hub/KerfDesk/pull/95).
+
+Historical acceptance scores and tests are dated bounded evidence, not current browser/hardware or universal performance qualification. No browser run performed in this lane.
+
+Local audit evidence: batch-05/lane-b.json, batch-05/lane-b.md.
+
+## DISP-054: Historical raster budget/pass-through mismatch
+
+Disposition: **superseded**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+PR11 corrected source-grid sizing; 2be958797 removed budget refusal and current tests pass.
+
+Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-055: Historical optional optimization toggle
+
+Disposition: **retained-under-canonical-setting**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+bfef38a93 added toggle; 9721cc783 introduced richer settings. Current action/deserializer synchronize reduceTravelMoves/travelPolicy; independent exact emission controls pass.
+
+Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-056: Historical metadata newline injection
+
+Disposition: **already-fixed**. Historical PRs: [#10](https://github.com/cisgz3a-hub/KerfDesk/pull/10), [#11](https://github.com/cisgz3a-hub/KerfDesk/pull/11).
+
+b813865131 shared sanitizer; existing newline controls and independent body/preflight parity pass. Distinct ASCII realtime defect remains.
+
+Local audit evidence: batch-05/lane-c.json, batch-05/lane-c.md.
+
+## DISP-057: Existing TypeScript cycle-detection validation limitation
+
+Disposition: **retained-validation-limitation**. Historical PRs: .
+
+A TypeScript import/no-cycle fixture was missed by the unchanged default extension mapping both before and after the lint memory repair. Type-aware diagnostics and exact eligible-file union remain equivalent. A fixture-only resolver mapping detects cross-partition cycles. This does not establish a product runtime defect or a historical introduction; investigate separately without claiming default TypeScript cycle qualification.
+
+Local audit evidence: batch-05/lint-memory-author.json, batch-05/lint-memory-peer-review.json.
