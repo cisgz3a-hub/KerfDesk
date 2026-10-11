@@ -15,6 +15,7 @@
 
 import type { ActiveWorkCoordinateSystem } from '../../core/controllers/grbl/work-offset-readback';
 import type { ControllerDriver } from '../../core/controllers';
+import { scanConsoleWords } from '../../core/controllers/console-state-effect';
 import type { ControllerLifecycleRefs } from './laser-interactive-command';
 import type { LaserSafetyAction } from './laser-safety-notice';
 import type { LaserState } from './laser-store';
@@ -69,7 +70,7 @@ export async function trackConsoleWcs(
   write: WriteFn,
 ): Promise<void> {
   const selection = consoleWcsSelection(command.normalized);
-  if (selection !== null) set({ activeWcs: selection });
+  if (selection !== undefined) set({ activeWcs: selection });
   if (command.stateEffect !== 'reference') return;
   set({ activeWcs: null });
   await readUnknownActiveWcs(get, refs, write);
@@ -78,10 +79,16 @@ export async function trackConsoleWcs(
 // The last G54-G59 word in a console command is the WCS it leaves active. GRBL
 // status never reports which WCS is active, so this console echo is how the app
 // learns the operator selected a non-G54 frame.
-function consoleWcsSelection(normalized: string): ActiveWorkCoordinateSystem | null {
-  const matches = normalized.toUpperCase().match(/\bG5[4-9]\b/g);
-  const last = matches?.at(-1);
-  return last === undefined ? null : (last as ActiveWorkCoordinateSystem);
+function consoleWcsSelection(normalized: string): ActiveWorkCoordinateSystem | null | undefined {
+  const selections = scanConsoleWords(normalized).filter(
+    ({ letter, value }) => letter === 'G' && value >= 54 && value < 60,
+  );
+  const last = selections.at(-1);
+  if (last === undefined) return undefined;
+  // Extended/fractional spellings have dialect-specific meaning. Do not use
+  // the conservative effect classifier's rounding as proof of the active WCS;
+  // make the existing Frame readback resolve it instead.
+  return Number.isInteger(last.value) ? (`G${last.value}` as ActiveWorkCoordinateSystem) : null;
 }
 
 /** The state after the Frame's G54 was acknowledged. */
