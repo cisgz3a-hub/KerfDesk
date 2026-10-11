@@ -173,6 +173,30 @@ test('interruption after history publication retries without losing history or a
   assert.equal(f.writes.filter(({ key }) => key === MANUAL_CATALOG_KEY).length, 2);
 });
 
+for (const hasLatest of [false, true]) {
+  test(`a later publication excludes an abandoned history entry (previous latest: ${hasLatest})`, async () => {
+    const f = fixture('1.2.3');
+    if (hasLatest) await publishManualCommercialRelease(f);
+    const initialLatest = f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY) ?? null;
+    const abandoned = hasLatest ? nextRelease(f, '1.2.4') : { ...fixture('1.2.4'), store: f.store };
+    const put = f.store.put;
+    f.store.put = async (key, bytes, metadata) => {
+      await put(key, bytes, metadata);
+      if (key === MANUAL_CATALOG_KEY) throw new Error('Interrupted after history upload');
+    };
+    await assert.rejects(publishManualCommercialRelease(abandoned), /Interrupted/u);
+    assert.deepEqual(f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY) ?? null, initialLatest);
+    assert.deepEqual(await historyVersions(f), hasLatest ? ['1.2.4', '1.2.3'] : ['1.2.4']);
+    f.store.put = put;
+    const next = hasLatest ? nextRelease(f, '1.2.5') : { ...fixture('1.2.5'), store: f.store };
+    assert.equal((await publishManualCommercialRelease(next)).status, 'published');
+    assert.deepEqual(await historyVersions(f), hasLatest ? ['1.2.5', '1.2.3'] : ['1.2.5']);
+    // Unpromoted immutable evidence remains intact, but is not advertised as history.
+    assert.ok(f.objects.has(manualDownloadKey('1.2.4', 'download-manifest.json')));
+    assert.equal((await publishManualCommercialRelease(next)).status, 'already-published');
+  });
+}
+
 test('corrupt history and missing historical installers refuse publication before any writes', async () => {
   for (const corrupt of [
     (f) => f.objects.set(MANUAL_CATALOG_KEY, Buffer.from('{}')),

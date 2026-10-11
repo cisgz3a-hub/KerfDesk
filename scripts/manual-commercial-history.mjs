@@ -45,7 +45,7 @@ async function historicalEntries(store, latest, keys) {
   return entries;
 }
 
-/** Backfill existing immutable releases once, then preserve every verified entry. */
+/** Backfill once, then retain published history and an identical candidate retry. */
 export async function prepareManualHistory(store, latest, envelope, keys) {
   const initial = await store.get(MANUAL_CATALOG_KEY);
   const entries =
@@ -53,9 +53,10 @@ export async function prepareManualHistory(store, latest, envelope, keys) {
       ? await historicalEntries(store, latest, keys)
       : await verifyManualCatalog(initial.toString('utf8'), keys);
   const candidate = await verifyManualDownload(JSON.stringify(envelope), keys);
+  const previous =
+    latest === null ? null : await verifyManualDownload(latest.toString('utf8'), keys);
   const byVersion = new Map(entries.map((entry) => [entry.release.version, entry]));
-  if (latest !== null) {
-    const previous = await verifyManualDownload(latest.toString('utf8'), keys);
+  if (previous !== null) {
     const previousEnvelope = JSON.parse(latest.toString('utf8'));
     const archived = byVersion.get(previous.version);
     if (archived && !isDeepStrictEqual(archived.envelope, previousEnvelope))
@@ -67,6 +68,13 @@ export async function prepareManualHistory(store, latest, envelope, keys) {
       refuse('Manual history is ahead of this publication.');
     if (entry.release.version === candidate.version && !isDeepStrictEqual(entry.envelope, envelope))
       refuse('Manual history conflicts with this release.');
+    // A history-first upload alone did not publish this version. Do not let a
+    // later candidate turn an abandoned upload into advertised release history.
+    if (
+      entry.release.version !== candidate.version &&
+      (previous === null || compareCommercialVersions(entry.release.version, previous.version) > 0)
+    )
+      byVersion.delete(entry.release.version);
   }
   byVersion.set(candidate.version, { envelope, release: candidate });
   const releases = [...byVersion.values()]
