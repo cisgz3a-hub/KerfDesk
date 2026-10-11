@@ -1,4 +1,4 @@
-## ADR-582 — Pick and edit individual trace parts
+## ADR-586 — Pick and edit individual trace parts
 
 **Status:** Accepted. **Date:** 2026-10-11
 
