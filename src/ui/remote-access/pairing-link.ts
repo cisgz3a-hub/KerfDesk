@@ -1,7 +1,8 @@
 import { encodeQr, type QrSymbol } from '../../core/barcode/qr-encode';
 import type { RemoteAccessStatus } from './remote-access-store';
 
-export const PHONE_CONTROL_URL = 'https://kerfdesk-phone-control.cisgz3a.workers.dev/control';
+/** KerfDesk Remote (ADR-582). The relay keeps serving the legacy /control page for old links. */
+export const PHONE_CONTROL_URL = 'https://kerfdesk-phone-control.cisgz3a.workers.dev/app/';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const CODE = /^[A-Za-z0-9-]{12,24}$/;
 const QUIET_ZONE = 4;

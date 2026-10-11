@@ -6,4 +6,7 @@ worker-configuration.d.ts
 test-results
 public/third-party-notices.txt
 public/control-scanner-decoder.js
+public/app/app.js
+public/app/app.css
+public/app/sw.js
 *.md

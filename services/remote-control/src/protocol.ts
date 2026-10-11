@@ -13,6 +13,8 @@ export const MAX_BYTES = 256 * 1024;
 export const MAX_METADATA_BYTES = 4096;
 export const PAIR_TTL_MS = 5 * 60 * 1000;
 export const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+/** ADR-583: only when the PC approval explicitly keeps the phone signed in. */
+export const REMEMBERED_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const ACCESS_TTL_SECONDS = 30 * 60;
 export const GRANT_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const COMMAND_TIMEOUT_MS = 20_000;

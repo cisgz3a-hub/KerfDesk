@@ -9,7 +9,13 @@ const COMPLEXITY_LIMIT = 12;
 
 export default tseslint.config(
   {
-    ignores: ['dist-electron/**', 'electron/**/*.test.ts', 'electron/**/*.test-support.ts'],
+    ignores: [
+      'dist-electron/**',
+      'electron/**/*.test.ts',
+      'electron/**/*.test-support.ts',
+      // Generated single-file MCP App (services/remote-control/scripts/build-app.mjs --check).
+      'electron/mcp/workspace-app-ui.ts',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,
