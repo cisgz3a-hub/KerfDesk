@@ -147,6 +147,7 @@ export function clearOwnedPointerDrag(args: {
 }
 
 function initializeDragSurface(drag: DragState, deps: WorkspaceDragDeps): void {
+  if (drag.kind === 'move' && drag.interactionStarted === true) return;
   if (drag.kind === 'marquee') {
     deps.setSelectionMarquee({ start: drag.startScenePoint, end: drag.startScenePoint });
   } else if (drag.kind === 'measure') {

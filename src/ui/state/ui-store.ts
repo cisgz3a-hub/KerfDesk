@@ -70,6 +70,7 @@ export type TraceImageDialogState = {
 // canvas drag. Ephemeral like zoom — never persisted; Esc returns to select.
 export type ToolMode =
   | { readonly kind: 'select' }
+  | { readonly kind: 'trace-parts' }
   | { readonly kind: 'text' }
   | { readonly kind: 'node' }
   | { readonly kind: 'measure' }

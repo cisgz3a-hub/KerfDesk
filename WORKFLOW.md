@@ -422,6 +422,22 @@ destination and cannot overwrite the template source.
 
 ---
 
+### Edit individual trace parts (ADR-582)
+
+1. After tracing, click **Edit trace parts** in the canvas hint or the left tool strip.
+   Double-clicking a trace with Select also opens this tool.
+2. Click or drag the line or filled shape you want to change. Only that part separates from the
+   rest of the trace. A filled shape keeps its holes; a Centerline stroke moves independently.
+3. Shift-click to select several parts. Drag them together, use the transform handles to resize
+   or rotate, arrow keys to nudge, or Delete to remove them. Existing duplication and numeric
+   position controls work on the picked parts.
+4. Use **Edit part nodes** to reshape a connected contour. This allows changes to points within
+   one connected mark, rather than moving the whole mark.
+5. One Undo restores a separation and its drag. Escape during a drag restores the original trace;
+   Done or Escape outside a drag returns to Select. The retained source image can start a fresh trace.
+6. Large traces stay together except for the parts you pick. **Arrange → Break Apart** remains
+   available when you deliberately want every shape separated.
+
 ### F-A5a. Join curve endpoints
 
 #### Success — join two open subpaths

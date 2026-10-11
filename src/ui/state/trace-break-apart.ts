@@ -68,7 +68,7 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
       ? Array.from({ length: subpathCount(path) }, (_, index) => [index])
       : groupSubpathsByOuterShape(path);
     return groups.map((subpathIndices) => ({
-      path: pathSubset(path, subpathIndices),
+      path: tracePathSubset(path, subpathIndices),
       pathIndex,
       subpathIndices,
     }));
@@ -76,7 +76,7 @@ function pieceGeometries(object: TracedImage): ReadonlyArray<PieceGeometry> {
 }
 
 // Each piece keeps the part of a traced forest (ADR-531) that its subpaths span.
-function pathSubset(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
+export function tracePathSubset(path: ColoredPath, indices: ReadonlyArray<number>): ColoredPath {
   return subsetSubpathNesting(path, indices, subsetGeometry(path, indices));
 }
 

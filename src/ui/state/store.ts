@@ -10,6 +10,7 @@ import { reliefAuthoringActions, type ReliefAuthoringActions } from './relief-au
 import { reliefLinkMutationSetter } from './relief-link-mutation';
 import { observeDesignHierarchyDocument } from './design-hierarchy-store';
 import { proOperationMutationSetter } from '../licensing/pro-operation-mutation';
+import { newlyIntroducedProOperationFeature } from '../licensing/pro-operation-policy';
 import type { SvgFragmentActions } from './svg-fragment-mutation';
 // Zustand store: project/UI state, undo/redo, and dirty/save tracking.
 // Slice factories keep the create call within ADR-015's size rule.
@@ -44,6 +45,7 @@ import { machineActions, type MachineActions } from './machine-actions';
 import { projectActions, type ProjectActions } from './project-actions';
 import type { ProjectBedReconciliationNotice } from './project-bed-reconciliation';
 import { breakApartActions, type BreakApartActions } from './break-apart-actions';
+import { tracePartActions, type TracePartActions } from './trace-part-actions';
 import {
   rasterAdjustmentActions,
   type RasterImageAdjustmentPatch,
@@ -174,6 +176,7 @@ export type AppState = PartGeneratorActions &
   PathNodeEditActions &
   PathNodeCurveCommandActions &
   BreakApartActions &
+  TracePartActions &
   FillSelectionActions &
   VectorPathActions &
   EditingToolsActions &
@@ -412,6 +415,7 @@ export const useStore = create<AppState>((rawSet, get) => {
     ...objectInsertActions(set, get),
     ...imageImportActions(set, get),
     ...breakApartActions(proOperationMutationSetter(set, get)),
+    ...tracePartActions(proOperationMutationSetter(set, get, newlyIntroducedProOperationFeature)),
     ...rasterAdjustmentActions(set),
     ...reliefParamActions(set),
     ...reliefTwoSidedActions(set),

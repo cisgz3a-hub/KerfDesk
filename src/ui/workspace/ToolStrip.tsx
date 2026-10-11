@@ -19,6 +19,7 @@ import { curveCommandNode } from '../state/path-node-command-geometry';
 import { openArtworkCreation } from '../layers/artwork-creation-store';
 import { BooleanCompoundControls } from './BooleanCompoundControls';
 import { NodeCoordinateControls } from './NodeCoordinateControls';
+import { activateTracePartTool } from './trace-part-tool';
 import './tool-strip.css';
 
 type Tool = {
@@ -29,6 +30,7 @@ type Tool = {
 
 const TOOLS: ReadonlyArray<Tool> = [
   { mode: { kind: 'select' }, helpKey: 'select', icon: 'cursor' },
+  { mode: { kind: 'trace-parts' }, helpKey: 'trace-parts', icon: 'trace-parts' },
   { mode: { kind: 'node' }, helpKey: 'node', icon: 'nodes' },
   { mode: { kind: 'measure' }, helpKey: 'measure', icon: 'ruler' },
   { mode: { kind: 'text' }, helpKey: 'text', icon: 'text' },
@@ -76,7 +78,8 @@ export function ToolStrip(): JSX.Element {
             helpId={toolHelpId(tool.helpKey)}
             {...(tool.helpKey === 'node' ? { buttonRef: nodeToolButtonRef } : {})}
             onClick={() => {
-              if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
+              if (tool.mode.kind === 'trace-parts') activateTracePartTool();
+              else if (tool.mode.kind === 'draw' && isActive(toolMode, tool.mode)) resetToolMode();
               else setToolMode(tool.mode);
             }}
             pressed={isActive(toolMode, tool.mode)}
@@ -199,6 +202,7 @@ function NodeAction(props: {
 
 function isActive(current: ToolMode, tool: ToolMode): boolean {
   if (current.kind === 'select') return tool.kind === 'select';
+  if (current.kind === 'trace-parts') return tool.kind === 'trace-parts';
   if (current.kind === 'text') return tool.kind === 'text';
   if (current.kind === 'node') return tool.kind === 'node';
   if (current.kind === 'measure') return tool.kind === 'measure';

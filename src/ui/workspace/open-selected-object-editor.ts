@@ -2,7 +2,7 @@
 // image opens in the Image Studio (Photoshop's double-click-to-edit — the
 // toolbar "Image Studio…" button is the other entry point), a text object
 // opens the canvas text editor with its current values, and a barcode opens
-// the barcode dialog. Every other kind is a no-op.
+// the barcode dialog. A trace enters the part selection tool.
 
 import { isBarcodeObject } from '../../core/barcode';
 import { useBarcodeDialogStore } from '../barcode/barcode-dialog-store';
@@ -10,6 +10,7 @@ import { useStore } from '../state';
 import { isModalOpen, useUiStore } from '../state/ui-store';
 import { useImageEditorStore } from '../image-editor/image-editor-store';
 import { useCanvasTextStore } from '../text/canvas-text-store';
+import { activateTracePartTool } from './trace-part-tool';
 
 export function openEditorForSelectedObject(): void {
   const s = useStore.getState();
@@ -18,6 +19,10 @@ export function openEditorForSelectedObject(): void {
   if (id === null) return;
   const obj = s.project.scene.objects.find((object) => object.id === id);
   if (obj === undefined || obj.locked === true) return;
+  if (obj.kind === 'traced-image' && useUiStore.getState().toolMode.kind === 'select') {
+    activateTracePartTool();
+    return;
+  }
   if (obj.kind === 'raster-image') {
     useImageEditorStore.getState().openEditor(obj);
     return;
