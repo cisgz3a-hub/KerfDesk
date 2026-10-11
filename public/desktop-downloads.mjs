@@ -118,8 +118,16 @@ export async function populateCommercialDownload(document, fetchRequest = fetch,
   showEarlierReleases(document, []);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8_000);
+  let requested = null;
   try {
-    const requested = requestedStableVersion(search);
+    const params = new URLSearchParams(search);
+    const value = params.get('version');
+    requested = value === null || isPreviewVersion(value) ? null : value;
+    if (
+      requested !== null &&
+      (params.getAll('version').length !== 1 || !isStableVersion(requested))
+    )
+      throw new Error('Invalid requested desktop version');
     const options = requestOptions(controller.signal);
     const [catalog, keys] = await Promise.all([
       fetchRequest(COMMERCIAL_CATALOG_URL, options),
@@ -152,11 +160,12 @@ export async function populateCommercialDownload(document, fetchRequest = fetch,
       requested === null
         ? (releases[0] ?? manual.latest)
         : all.find((item) => item.version === requested);
-    // Before the first history publication, an exact version can still be
-    // recovered from its immutable signed manifest. Never substitute latest.
+    // An unavailable archive can recover an exact version from its immutable
+    // signed manifest. A healthy catalogue controls which versions are offered.
     if (
       !release &&
       requested !== null &&
+      manual.historyUnavailable &&
       manual.latest &&
       compareCommercialVersions(requested, manual.latest.version) <= 0
     ) {
@@ -181,7 +190,7 @@ export async function populateCommercialDownload(document, fetchRequest = fetch,
     document.getElementById('commercial-hash').textContent = '';
     showEarlierReleases(document, []);
     status.textContent =
-      search && new URLSearchParams(search).has('version')
+      requested !== null
         ? 'That desktop version could not be verified. Check the version number or contact support for an installer your licence covers.'
         : COMMERCIAL_UNVERIFIED;
   } finally {
@@ -196,15 +205,6 @@ function isStableVersion(value) {
   } catch {
     return false;
   }
-}
-
-function requestedStableVersion(search) {
-  const params = new URLSearchParams(search);
-  const value = params.get('version');
-  if (value === null || isPreviewVersion(value)) return null;
-  if (params.getAll('version').length !== 1 || !isStableVersion(value))
-    throw new Error('Invalid requested desktop version');
-  return value;
 }
 
 async function manualVersion(fetchRequest, options, keys, version) {
@@ -241,7 +241,7 @@ async function manualDownloads(fetchRequest, options, keys) {
     if (listed && JSON.stringify(listed) !== JSON.stringify(latest))
       throw new Error('Manual download history conflicts with latest');
     if (!listed) releases.unshift(latest);
-    return { latest, releases, historyUnavailable: false };
+    return { latest, releases, historyUnavailable: !listed };
   } catch {
     // An archive outage must not hide an independently verified latest installer.
     return { latest, releases: [latest], historyUnavailable: true };

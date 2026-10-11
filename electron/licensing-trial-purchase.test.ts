@@ -110,6 +110,75 @@ describe('a paid purchase replaces an active trial only after verified, durable 
     });
   });
 
+  it('retains the bounded trial when both paid activation and its clock checkpoint cannot be saved', async () => {
+    const h = trial();
+    expect(await h.runtime.status()).toMatchObject({ tier: 'trial', edition: 'pro' });
+    const before = h.saved();
+    h.clock(NOW + 1_000);
+    h.store.write.mockRejectedValue(new Error('disk remains full'));
+    const result = await h.runtime.activate(TEST_KEY);
+    expect(result).toMatchObject({
+      tier: 'trial',
+      state: 'ready',
+      edition: 'pro',
+      licenseKey: null,
+      accessExpiresAt: trialClaims().accessExpiresAt,
+    });
+    expect(result.trialExpiresInMs).toBeLessThanOrEqual(20 * 86_400_000 - 1_000);
+    expect(h.store.write).toHaveBeenCalledTimes(2);
+    expect(h.saved()).toEqual(before);
+    expect(h.runtime.proUnlocked()).toBe(true);
+    expect(h.runtime.isReleaseEligibleCached(release('update-manifest'), '1.0.0')).toBe(false);
+    // Recovery is specific to activation. Ordinary checkpoints still fail closed.
+    expect(await h.runtime.status()).toMatchObject({ state: 'unavailable', edition: 'free' });
+    expect(h.runtime.proUnlocked()).toBe(false);
+    expect(await createLicensingRuntime(h.options).status()).toMatchObject({
+      state: 'unavailable',
+      edition: 'free',
+    });
+  });
+
+  it.each([false, true])(
+    'does not revive an expired trial after persistent writes fail and clock rollback (active session: %s)',
+    async (activeSession) => {
+      const h = trial();
+      if (activeSession)
+        expect(await h.runtime.status()).toMatchObject({ tier: 'trial', edition: 'pro' });
+      const expiry = trialClaims().accessExpiresAt!;
+      h.clock(expiry * 1000);
+      h.fetch.mockResolvedValue(grant(claims({ issuedAt: expiry })));
+      h.store.write.mockRejectedValue(new Error('disk remains full'));
+      expect(await h.runtime.activate(TEST_KEY)).toMatchObject({
+        tier: 'trial',
+        state: 'trial-expired',
+        edition: 'free',
+        trialExpiresInMs: 0,
+      });
+      h.clock(NOW + 1_000);
+      h.fetch.mockResolvedValue(Response.json({ entitlement: { payload: 'forged' } }));
+      expect(await h.runtime.activate(TEST_KEY)).toMatchObject({
+        tier: 'trial',
+        state: 'trial-expired',
+        edition: 'free',
+        trialExpiresInMs: 0,
+      });
+      expect(h.runtime.proUnlocked()).toBe(false);
+      expect(h.saved()?.lastSeenAt).toBe(NOW / 1000);
+      expect(h.saved()?.licenseKey).toBeUndefined();
+    },
+  );
+
+  it('does not soften a grant clock error when its trial checkpoint cannot be saved', async () => {
+    const h = trial();
+    expect(await h.runtime.status()).toMatchObject({ tier: 'trial', edition: 'pro' });
+    h.clock(NOW + 1_000);
+    h.fetch.mockResolvedValue(grant(claims({ issuedAt: NOW / 1000 + 600 })));
+    h.store.write.mockRejectedValue(new Error('disk remains full'));
+    expect(await h.runtime.activate(TEST_KEY)).toMatchObject({ edition: 'free' });
+    expect(h.runtime.proUnlocked()).toBe(false);
+    expect(h.saved()?.licenseKey).toBeUndefined();
+  });
+
   it('reports paid rights only after saving, then retains them through an offline restart', async () => {
     const h = trial();
     expect(await h.runtime.status()).toMatchObject({ tier: 'trial', edition: 'pro' });

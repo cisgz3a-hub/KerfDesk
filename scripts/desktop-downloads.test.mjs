@@ -330,7 +330,12 @@ test('manual versions remain reachable after the signed installer lane starts', 
 test('stable exact-version selection works before and after manual history publication', async () => {
   const manual = await manualCatalog(['1.10.0', '1.2.3']);
   const immutable = manualDownloadUrl('1.2.3', 'download-manifest.json');
-  for (const history of [manual.text, null]) {
+  const emptyHistory = JSON.stringify({
+    schemaVersion: 1,
+    kind: 'manual-download-catalog',
+    releases: [],
+  });
+  for (const history of [manual.text, null, '{}', emptyHistory]) {
     const document = new JSDOM(html).window.document;
     const server = commercialServer(null, manual.latest, history, {
       [immutable]: JSON.stringify(manual.releases[1]),
@@ -343,7 +348,7 @@ test('stable exact-version selection works before and after manual history publi
     );
     assert.equal(
       server.requests.some(({ url }) => url === immutable),
-      history === null,
+      history !== manual.text,
     );
   }
   const document = new JSDOM(html).window.document;
@@ -408,6 +413,79 @@ test('bad or unavailable history preserves verified latest and shows recovery gu
       /Contact KerfDesk support/u,
     );
   }
+});
+
+test('empty or stale manual history keeps verified entries and warns that the archive is incomplete', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.9.0', '1.2.3']);
+  for (const releases of [[], manual.releases.slice(1)]) {
+    const history = JSON.stringify({ schemaVersion: 1, kind: 'manual-download-catalog', releases });
+    const document = new JSDOM(html).window.document;
+    await populateCommercialDownload(
+      document,
+      commercialServer(null, manual.latest, history).fetchRequest,
+    );
+    assert.match(commercialLinks(document)[0].href, /\/1[.]10[.]0\//u);
+    assert.equal(document.querySelector('#commercial-history').hidden, false);
+    assert.match(
+      document.querySelector('#commercial-history-status').textContent,
+      /Contact KerfDesk support/u,
+    );
+    assert.deepEqual(
+      [...document.querySelectorAll('#commercial-history-list a')].map((link) => link.textContent),
+      releases.length === 0 ? [] : ['KerfDesk 1.9.0', 'KerfDesk 1.2.3'],
+    );
+  }
+});
+
+test('a commercial outage on an exact Preview URL reports the commercial outage without blaming that version', async () => {
+  const document = new JSDOM(html).window.document;
+  const search = '?version=0.2.0-preview.14';
+  await populatePreviewDownloads(document, search, responses().fetchRequest);
+  await populateCommercialDownload(
+    document,
+    async () => {
+      throw new Error('commercial host offline');
+    },
+    search,
+  );
+  assert.match(
+    document.querySelector('#commercial-status').textContent,
+    /^No verified download of the licensed Windows edition/u,
+  );
+  assert.doesNotMatch(
+    document.querySelector('#commercial-status').textContent,
+    /That desktop version/u,
+  );
+  assert.match(
+    document.querySelector('#release-status').textContent,
+    /Publisher signature verified/u,
+  );
+  assert.equal(document.querySelector('#preview-links').hidden, false);
+  for (const link of commercialLinks(document)) assert.equal(link.hasAttribute('href'), false);
+});
+
+test('a healthy manual catalogue excludes unlisted immutable candidates from exact-version downloads', async () => {
+  const manual = await manualCatalog(['1.10.0', '1.9.0', '1.2.3']);
+  const immutable = manualDownloadUrl('1.2.3', 'download-manifest.json');
+  const history = JSON.stringify({
+    schemaVersion: 1,
+    kind: 'manual-download-catalog',
+    releases: manual.releases.slice(0, 2),
+  });
+  const server = commercialServer(null, manual.latest, history, {
+    [immutable]: JSON.stringify(manual.releases[2]),
+  });
+  const document = new JSDOM(html).window.document;
+  await populateCommercialDownload(document, server.fetchRequest, '?version=1.2.3');
+  assert.equal(
+    server.requests.some(({ url }) => url === immutable),
+    false,
+  );
+  assert.match(
+    document.querySelector('#commercial-status').textContent,
+    /That desktop version could not be verified/u,
+  );
+  for (const link of commercialLinks(document)) assert.equal(link.hasAttribute('href'), false);
 });
 
 test('an interrupted future history entry is hidden until its authenticated latest is promoted', async () => {
