@@ -1,10 +1,13 @@
-import type { Project, Vec2 } from '../../core/scene';
+import { applyTransform, type Project, type Vec2 } from '../../core/scene';
 import { pathNodeRefsEqual, type PathNodeRef } from '../state/path-node-edit-actions';
+import { pathNodePoint } from '../state/path-node-edit-geometry';
 import { hitPathNode } from './path-node-hit-test';
 
 export type PathNodeDragState = {
   readonly kind: 'path-node';
   readonly startScenePoint: Vec2;
+  readonly startNodeScenePoint: Vec2;
+  readonly startPrimaryScenePoint: Vec2;
 };
 
 export function beginPathNodeDrag(args: {
@@ -32,7 +35,21 @@ export function beginPathNodeDrag(args: {
   if (args.additive === true || !alreadySelected) {
     args.selectPathNode(ref, { additive: args.additive === true });
   }
-  return { kind: 'path-node', startScenePoint: args.scenePoint };
+  // Toggling a node off is selection-only; dragging from it must not move the
+  // remaining selected nodes.
+  if (args.additive === true && alreadySelected) return null;
+  // The selection reducer keeps the last selected ref as the primary. Keep
+  // that primary when grabbing any selected node, without reordering the set.
+  const primary = alreadySelected ? (args.selectedPathNodes.at(-1) ?? ref) : ref;
+  const startNodeScenePoint = nodeScenePoint(args.project, ref);
+  const startPrimaryScenePoint = nodeScenePoint(args.project, primary);
+  if (startNodeScenePoint === null || startPrimaryScenePoint === null) return null;
+  return {
+    kind: 'path-node',
+    startScenePoint: args.scenePoint,
+    startNodeScenePoint,
+    startPrimaryScenePoint,
+  };
 }
 
 export function updatePathNodeDrag(args: {
@@ -41,5 +58,16 @@ export function updatePathNodeDrag(args: {
   readonly setSelectedPathNodePositionDuringInteraction: (scenePoint: Vec2) => void;
 }): void {
   if (args.point === null) return;
-  args.setSelectedPathNodePositionDuringInteraction(args.point);
+  const { startScenePoint, startPrimaryScenePoint } = args.drag;
+  args.setSelectedPathNodePositionDuringInteraction({
+    x: startPrimaryScenePoint.x + args.point.x - startScenePoint.x,
+    y: startPrimaryScenePoint.y + args.point.y - startScenePoint.y,
+  });
+}
+
+function nodeScenePoint(project: Project, ref: PathNodeRef): Vec2 | null {
+  const object = project.scene.objects.find((candidate) => candidate.id === ref.objectId);
+  if (object === undefined || !('paths' in object)) return null;
+  const point = pathNodePoint(object.paths, ref);
+  return point === null ? null : applyTransform(point, object.transform);
 }
