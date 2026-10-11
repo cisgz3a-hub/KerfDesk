@@ -57,6 +57,8 @@ Mixed line/cubic and line/elliptical-arc pairs on different contours now use the
 
 The original fixture now leaves `(3,0)`–`(10,0)` when clicked at `(1,0)`, preserving the boundary curve. Tests cover both sides of the line, a cubic source sliced at the tangent, ellipse contacts in both sweep directions, reversed lines, reflections/rotation/unequal scaling, conservative bounds, finite boundary clipping, a true near miss, three distinct cubic roots, and existing overlap/open-end behaviour. The independent store regression failed before the correction and passes afterward, including one-step Undo and Redo with exact project restoration.
 
+Review also exposed a zero-length segment between two ordinary segments changing the retained chord's canonical range. That could suppress a valid crossing or slice at the wrong position. Each retained chord now carries its own canonical parameter range, while the existing point topology preserves self-intersection adjacency. Regressions cover skipped lines and cubics, crossings on either side of the skipped segment, both click sides, exact retained endpoints and matching previews.
+
 The implementation remains deliberately bounded: curve/curve and self-intersections use the existing chord grid; collinear overlap and no-contact deletion semantics are unchanged. Autojoin and Shift-preserve are not added. Tests establish software geometry and history behaviour, not native LightBurn runtime parity or machine qualification.
 
 ## Evidence ledger

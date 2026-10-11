@@ -262,4 +262,43 @@ describe('analytic mixed Trim crossings', () => {
     expect(crossings(s, 'line')).toHaveLength(0);
     expect(crossings(s, 'curve')).toHaveLength(1);
   });
+
+  it.each(['line', 'cubic'] as const)(
+    'keeps chord parameters across a skipped segment after a %s',
+    (kind) => {
+      const canonical: CurveSubpath = {
+        start: p(0, 0),
+        closed: false,
+        segments: [
+          kind === 'line'
+            ? { kind, to: p(10, 0) }
+            : { kind, control1: p(10 / 3, 0), control2: p(20 / 3, 0), to: p(10, 0) },
+          kind === 'line'
+            ? { kind: 'cubic', control1: p(10, 0), control2: p(10, 0), to: p(10, 0) }
+            : { kind: 'line', to: p(10, 0) },
+          { kind: 'line', to: p(20, 0) },
+        ],
+      };
+      const source = curve(canonical);
+      expect(crossings(scene(source), 'curve')).toHaveLength(0);
+      for (const x of [5, 15]) verifySkippedSegment(source, x);
+    },
+  );
 });
+
+function verifySkippedSegment(source: ImportedSvg, x: number): void {
+  const s = scene(source, line('boundary', p(x, -5), p(x, 5)));
+  const hits = crossings(s, source.id);
+  expect(hits).toHaveLength(1);
+  expect(hits[0]?.p).toBeCloseTo(x === 5 ? 0.5 : 2.5, 8);
+  closePoint(hits[0]?.point, p(x, 0));
+  for (const left of [true, false]) {
+    const hit = target(s, p(x + (left ? -2 : 2), 0));
+    expect(hit.whole).toBe(false);
+    const kept = trimEdit(source, hit)!.paths[0]!.curves![0]!;
+    closePoint(kept.start, p(left ? x : 0, 0));
+    closePoint(kept.segments.at(-1)!.to, p(left ? 20 : x, 0));
+    closePoint(hit.highlight[0], p(left ? 0 : x, 0));
+    closePoint(hit.highlight.at(-1), p(left ? x : 20, 0));
+  }
+}

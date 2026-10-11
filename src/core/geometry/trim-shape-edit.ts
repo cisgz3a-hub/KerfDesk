@@ -93,8 +93,7 @@ function refine(segments: ContourSegments, target: TrimTarget, crossing: TrimCro
   const contour = target.contour;
   const segment = segments.segments[contourParam(segments, crossing.p).index];
   if (segment === undefined || segment.kind === 'line') return crossing.p;
-  let low = contour.params[crossing.chord] as number;
-  let high = contour.params[crossing.chord + 1] as number;
+  let [low, high] = contour.chordParams[crossing.chord] as readonly [number, number];
   const side = (p: number): number => {
     const point = applyTransform(contourPoint(segments, p), contour.transform);
     const { edgeStart: a, edgeEnd: b } = crossing;

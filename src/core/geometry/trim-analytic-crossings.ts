@@ -87,8 +87,7 @@ export function analyticChordPair(
 }
 
 function chordSegment(contour: TrimContour, chord: number): PathSegment | undefined {
-  const low = contour.params[chord] ?? 0;
-  const high = contour.params[chord + 1] ?? low;
+  const [low, high] = contour.chordParams[chord] ?? [0, 0];
   return contour.segments.segments[Math.floor((low + high) / 2)];
 }
 
@@ -117,10 +116,10 @@ function segmentsOf(contour: TrimContour): ReadonlyArray<SegmentEntry> {
 
 function chordAt(contour: TrimContour, p: number): number {
   let low = 0;
-  let high = contour.params.length - 1;
+  let high = contour.chordParams.length;
   while (high - low > 1) {
     const middle = (low + high) >> 1;
-    if ((contour.params[middle] as number) <= p) low = middle;
+    if ((contour.chordParams[middle] as readonly [number, number])[0] <= p) low = middle;
     else high = middle;
   }
   return low;

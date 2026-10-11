@@ -93,8 +93,7 @@ function nearestOnContour(
     const u = Math.min(1, Math.max(0, raw));
     const distance = Math.hypot(a.x + dx * u - point.x, a.y + dy * u - point.y);
     if (distance < best.distance) {
-      const p0 = contour.params[chord] as number;
-      const p1 = contour.params[chord + 1] as number;
+      const [p0, p1] = contour.chordParams[chord] as readonly [number, number];
       best = { p: p0 + (p1 - p0) * u, distance };
     }
   }
@@ -164,18 +163,17 @@ export function stretchPoints(contour: TrimContour, from: number, to: number): R
 }
 
 function pointAt(contour: TrimContour, p: number): Vec2 {
-  const params = contour.params;
+  const ranges = contour.chordParams;
   let low = 0;
-  let high = params.length - 1;
+  let high = ranges.length;
   while (high - low > 1) {
     const middle = (low + high) >> 1;
-    if ((params[middle] as number) <= p) low = middle;
+    if ((ranges[middle] as readonly [number, number])[0] <= p) low = middle;
     else high = middle;
   }
   const a = contour.points[low] as Vec2;
-  const b = contour.points[high] as Vec2;
-  const p0 = params[low] as number;
-  const p1 = params[high] as number;
+  const b = contour.points[low + 1] as Vec2;
+  const [p0, p1] = ranges[low] as readonly [number, number];
   const u = p1 > p0 ? Math.min(1, Math.max(0, (p - p0) / (p1 - p0))) : 0;
   return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
 }

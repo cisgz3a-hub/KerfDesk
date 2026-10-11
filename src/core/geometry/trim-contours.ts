@@ -38,6 +38,8 @@ export type TrimContour = {
   /** World points of the chords, and each point's position on the exact contour. */
   readonly points: ReadonlyArray<Vec2>;
   readonly params: ReadonlyArray<number>;
+  /** Canonical range for each retained chord, unaffected by skipped zero-length segments. */
+  readonly chordParams: ReadonlyArray<readonly [number, number]>;
   readonly bounds: Bounds;
 };
 
@@ -167,29 +169,34 @@ function curveEndsMeet(curve: CurveSubpath): boolean {
 export function flattenContour(
   contour: ContourSegments,
   transform: Transform,
-): Pick<TrimContour, 'points' | 'params' | 'bounds'> {
+): Pick<TrimContour, 'points' | 'params' | 'chordParams' | 'bounds'> {
   const scale = Math.max(Math.abs(transform.scaleX), Math.abs(transform.scaleY));
   const tolerance = scale > 0 && Number.isFinite(scale) ? TRIM_CHORD_TOLERANCE_MM / scale : 1;
   const points: Vec2[] = [applyTransform(contour.start, transform)];
   const params: number[] = [0];
+  const chordParams: Array<readonly [number, number]> = [];
   let from = contour.start;
   contour.segments.forEach((segment, index) => {
+    let previousT = 0;
     for (const t of segmentSamples(from, segment, tolerance)) {
       const point = applyTransform(segmentPoint(from, segment, t), transform);
       const last = points[points.length - 1] as Vec2;
       if (Math.hypot(point.x - last.x, point.y - last.y) <= DUPLICATE_POINT_MM) {
         params[params.length - 1] = index + t;
+        previousT = t;
         continue;
       }
       points.push(point);
       params.push(index + t);
+      chordParams.push([index + previousT, index + t]);
+      previousT = t;
     }
     from = segment.to;
   });
   // Chords can lie strictly inside a tangent curve. Broad-phase bounds must
   // contain the canonical curve, including when sampling hits its segment cap.
   const canonical = transformedBounds(curveSubpathBounds(contour), transform);
-  return { points, params, bounds: unionBounds(boundsOf(points), canonical) };
+  return { points, params, chordParams, bounds: unionBounds(boundsOf(points), canonical) };
 }
 
 /** Parameters of the chord ends on one segment, ending at 1. */

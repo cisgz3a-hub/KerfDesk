@@ -97,8 +97,7 @@ function crossingOn(contour: TrimContour, chord: number, a: Vec2, b: Vec2): Trim
   const q = contour.points[chord + 1] as Vec2;
   const hit = segmentHit(p, q, a, b);
   if (hit === null) return null;
-  const p0 = contour.params[chord] as number;
-  const p1 = contour.params[chord + 1] as number;
+  const [p0, p1] = contour.chordParams[chord] as readonly [number, number];
   return {
     p: p0 + (p1 - p0) * hit,
     chord,
