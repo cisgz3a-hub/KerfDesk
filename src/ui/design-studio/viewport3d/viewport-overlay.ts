@@ -14,6 +14,7 @@ import { canvasTheme } from '../../theme/canvas-theme';
 import { draftToEntity, type DesignDraft } from '../design-draft';
 import { resizeHandles, selectionBounds } from '../design-handles';
 import { pointSequencePreviewPolylines, type DesignPointSequence } from '../design-point-sequence';
+import type { SketchExtension } from '../../../core/design/ops/extend-sketch';
 
 // Floats the sketch just above the stock top so lines never z-fight the
 // carved surface. Small enough to read as "on" the material.
@@ -49,6 +50,7 @@ export type ViewportOverlay = {
 };
 
 export type ViewportOverlayInput = {
+  readonly extendPreview?: SketchExtension | null;
   readonly sketch: Sketch;
   readonly selectedIds: ReadonlySet<string>;
   readonly draft: DesignDraft | null;
@@ -81,6 +83,7 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
   if (input.pointSequence != null) {
     push(canvasTheme.selection, false, pointSequencePreviewPolylines(input.pointSequence));
   }
+  push(`${canvasTheme.selection}|dash`, true, extensionPolylines(input.extendPreview));
 
   const buckets = [...segments.entries()]
     .filter(([, bucket]) => bucket.points.length > 0)
@@ -90,14 +93,7 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
       positions: new Float32Array(bucket.points),
     }));
 
-  const snapLocal =
-    input.snapMm === null
-      ? null
-      : localFromScene(
-          { x: input.snapMm.x, y: input.snapMm.y, z: OVERLAY_LIFT_MM },
-          input.frame.originMm,
-          input.frame,
-        );
+  const snapLocal = overlayMarker(input);
   const handlesLocal = resizeHandles(selectionBounds(input.sketch, input.selectedIds)).map(
     (handle) =>
       localFromScene(
@@ -107,6 +103,23 @@ export function buildViewportOverlay(input: ViewportOverlayInput): ViewportOverl
       ),
   );
   return { buckets, snapLocal, handlesLocal };
+}
+
+function extensionPolylines(
+  extension: SketchExtension | null | undefined,
+): ReadonlyArray<Polyline> {
+  return extension?.to == null ? [] : [{ points: [extension.from, extension.to], closed: false }];
+}
+
+function overlayMarker(input: ViewportOverlayInput): ViewportOverlay['snapLocal'] {
+  const marker = input.extendPreview?.to ?? input.extendPreview?.from ?? input.snapMm;
+  return marker === null
+    ? null
+    : localFromScene(
+        { x: marker.x, y: marker.y, z: OVERLAY_LIFT_MM },
+        input.frame.originMm,
+        input.frame,
+      );
 }
 
 function draftEntityPolylines(entity: SketchEntity): ReadonlyArray<Polyline> {

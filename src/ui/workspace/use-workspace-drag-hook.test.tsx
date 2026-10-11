@@ -50,6 +50,19 @@ afterEach(async () => {
 });
 
 describe('useDragMove hook event pipeline', () => {
+  it.each(['select', 'extend-shapes'] as const)(
+    'clears idle %s hover on leaving so menu activation cannot reuse it',
+    async (kind) => {
+      useUiStore.getState().setToolMode({ kind });
+      const { canvas } = await renderHarness();
+      await dispatchPointer(canvas, 'pointermove', { clientX: 90, clientY: 100 });
+      expect(useStore.getState().cursorMm).not.toBeNull();
+      await dispatchPointer(canvas, 'pointerleave', { clientX: 9999, clientY: 9999 });
+      expect(useStore.getState().cursorMm).toBeNull();
+      await act(async () => useUiStore.getState().setToolMode({ kind: 'extend-shapes' }));
+      expect(useStore.getState().cursorMm).toBeNull();
+    },
+  );
   it.each([
     ['Space + left drag', 0, true],
     ['middle-button drag', 1, false],
@@ -158,11 +171,16 @@ describe('useDragMove hook event pipeline', () => {
     await dispatchPointer(canvas, 'pointerdown', start);
     expect(canvas.dataset.dragKind).toBe('move');
 
+    await dispatchPointer(canvas, 'pointermove', end);
+    const cursorWhileOwned = useStore.getState().cursorMm;
+    expect(cursorWhileOwned).not.toBeNull();
+
     // Pointer leaves the canvas — with capture the drag must NOT finalize
     // (the old onMouseLeave=onMouseUp wiring committed it here — audit C1).
     await dispatchPointer(canvas, 'pointerleave', { clientX: 9999, clientY: 9999 });
     expect(canvas.dataset.dragKind).toBe('move');
     expect(useStore.getState().pendingUndo).not.toBeNull();
+    expect(useStore.getState().cursorMm).toEqual(cursorWhileOwned);
 
     // Motion still tracked while captured; release finalizes with one undo.
     await dispatchPointer(canvas, 'pointermove', end);
@@ -317,6 +335,7 @@ function DragHarness(props: { readonly previewMode?: boolean }): JSX.Element {
       onPointerUp={handlers.onPointerUp}
       onPointerCancel={handlers.onPointerCancel}
       onLostPointerCapture={handlers.onLostPointerCapture}
+      onPointerLeave={handlers.onPointerLeave}
       aria-label="drag hook test canvas"
     />
   );
@@ -357,7 +376,8 @@ async function dispatchPointer(
 ): Promise<void> {
   // jsdom has no PointerEvent constructor, so build a MouseEvent of the
   // pointer type (React maps it to onPointerX) and attach a pointerId.
-  const event = new MouseEvent(type, {
+  // React derives onPointerLeave from the native pointerout event.
+  const event = new MouseEvent(type === 'pointerleave' ? 'pointerout' : type, {
     bubbles: true,
     button: init.button ?? 0,
     clientX: init.clientX,
