@@ -48,6 +48,8 @@ export type PresentationState = {
   readonly opacity: number;
   readonly strokeOpacity: number;
   readonly fillOpacity: number;
+  readonly strokeOpacityUnresolved: boolean;
+  readonly fillOpacityUnresolved: boolean;
   /** The computed visibility keyword; null until something sets it (visible). */
   readonly visibility: string | null;
   /** A zero stroke-width paints no stroke (SVG 2 painting.html#StrokeWidth). */
@@ -73,6 +75,8 @@ export const INITIAL_PRESENTATION_STATE: PresentationState = {
   opacity: 1,
   strokeOpacity: 1,
   fillOpacity: 1,
+  strokeOpacityUnresolved: false,
+  fillOpacityUnresolved: false,
   visibility: null,
   strokeWidthZero: false,
   markers: NO_MARKERS,
@@ -97,10 +101,12 @@ export function presentationStateFor(
   const strokeOpacity = inheritedPaintOpacity(
     specifiedValues(el, styles, 'stroke-opacity'),
     parent.strokeOpacity,
+    parent.strokeOpacityUnresolved,
   );
   const fillOpacity = inheritedPaintOpacity(
     specifiedValues(el, styles, 'fill-opacity'),
     parent.fillOpacity,
+    parent.fillOpacityUnresolved,
   );
   const transform = multiplySvgMatrix(
     parent.transform,
@@ -130,8 +136,10 @@ export function presentationStateFor(
     ),
     ...visibilityState(property, parent, opacity),
     opacity,
-    strokeOpacity,
-    fillOpacity,
+    strokeOpacity: strokeOpacity.value,
+    fillOpacity: fillOpacity.value,
+    strokeOpacityUnresolved: strokeOpacity.unresolved,
+    fillOpacityUnresolved: fillOpacity.unresolved,
     strokeWidthZero: strokeWidthZero(property('stroke-width'), parent.strokeWidthZero),
     markers: svgMarkerReferences(property, parent.markers),
     viewport: parent.viewport,
@@ -216,14 +224,20 @@ function specifiedPaint(
 // Fill/stroke opacity belongs to each element's paint and inherits as a value
 // (SVG 2 painting). A child can replace its parent's zero; only overall group
 // opacity compounds. Invalid declarations fall through to the next candidate.
-function inheritedPaintOpacity(values: readonly (string | null)[], inherited: number): number {
+function inheritedPaintOpacity(
+  values: readonly (string | null)[],
+  inherited: number,
+  unresolved: boolean,
+): { value: number; unresolved: boolean } {
+  const parent = { value: inherited, unresolved };
   for (const value of values) {
     const parsed = parseSvgPaintOpacity(value);
-    if (parsed === 'inherit') return inherited;
-    if (parsed === 'initial') return 1;
-    if (parsed !== null) return parsed;
+    if (parsed === 'inherit' || parsed === 'revert-layer') return parent;
+    if (parsed === 'unresolved') return { value: 1, unresolved: true };
+    if (parsed === 'initial') return { value: 1, unresolved: false };
+    if (parsed !== null) return { value: parsed, unresolved: false };
   }
-  return inherited;
+  return parent;
 }
 
 function presentationValue(

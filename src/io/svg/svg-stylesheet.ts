@@ -94,7 +94,12 @@ function cascadeDeclarations(
   rules: StyleRule[],
   inline: ReadonlyMap<string, string>,
 ): ReadonlyMap<string, string> {
-  if (rules.length === 0 && ![...inline.values()].some((value) => IMPORTANT.test(value))) {
+  if (
+    rules.length === 0 &&
+    ![...inline.values()].some(
+      (value) => IMPORTANT.test(value) || svgPaintOpacityText(value) === 'revert-layer',
+    )
+  ) {
     return inline;
   }
   rules.sort((a, b) => a.selector.specificity - b.selector.specificity || a.order - b.order);
@@ -104,7 +109,8 @@ function cascadeDeclarations(
       : splitImportance(raw);
     return value === null ? [] : [{ name, ...value }];
   });
-  const ordered = [...rules.flatMap((rule) => rule.declarations), ...attached];
+  const sheet = rules.flatMap((rule) => rule.declarations);
+  const ordered = [...sheet, ...attached];
   const styles = new Map<string, string>();
   // Normal declarations first, then !important ones. Within each pass the
   // style attribute follows every rule and rules run by specificity, then
@@ -114,7 +120,40 @@ function cascadeDeclarations(
       if (declaration.important === important) styles.set(declaration.name, declaration.value);
     }
   }
+  for (const name of ['fill-opacity', 'stroke-opacity']) {
+    const value = cascadedPaintOpacity(name, sheet, attached);
+    if (value === undefined) styles.delete(name);
+    else styles.set(name, value);
+  }
   return styles;
+}
+
+// The supported cascade has unlayered author rules and element-attached styles;
+// named @layers remain outside this importer's selector/at-rule scope. Rollback
+// removes the whole winning scope, not just its last declaration. A sheet's
+// important rollback also removes intervening normal inline styles. An inline
+// important rollback only removes inline styles (CSS Cascade 5 §7.3.5).
+function cascadedPaintOpacity(
+  name: string,
+  sheet: readonly Declaration[],
+  attached: readonly Declaration[],
+): string | undefined {
+  const winner = (declarations: readonly Declaration[], important: boolean) =>
+    declarations.findLast(
+      (declaration) => declaration.name === name && declaration.important === important,
+    )?.value;
+  const inlineImportant = winner(attached, true);
+  const rolledBack = (value: string | undefined) =>
+    value !== undefined && svgPaintOpacityText(value) === 'revert-layer';
+  if (inlineImportant !== undefined && !rolledBack(inlineImportant)) return inlineImportant;
+  const sheetImportant = winner(sheet, true);
+  if (sheetImportant !== undefined) return rolledBack(sheetImportant) ? undefined : sheetImportant;
+  if (inlineImportant === undefined) {
+    const inlineNormal = winner(attached, false);
+    if (inlineNormal !== undefined && !rolledBack(inlineNormal)) return inlineNormal;
+  }
+  const sheetNormal = winner(sheet, false);
+  return rolledBack(sheetNormal) ? undefined : sheetNormal;
 }
 
 function splitImportance(raw: string): { readonly value: string; readonly important: boolean } {

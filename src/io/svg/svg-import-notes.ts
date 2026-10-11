@@ -17,6 +17,7 @@ export type SvgImportCounts = {
   pattern: number;
   circularUse: number;
   markers: number;
+  unresolvedPaintOpacity: number;
   readonly skippedImages: Record<Exclude<SvgImageSkipReason, 'no-data'>, number>;
 };
 
@@ -31,6 +32,7 @@ export function createSvgImportCounts(): SvgImportCounts {
     pattern: 0,
     circularUse: 0,
     markers: 0,
+    unresolvedPaintOpacity: 0,
     skippedImages: { format: 0, effects: 0, size: 0, fit: 0, shear: 0 },
   };
 }
@@ -93,6 +95,10 @@ function presentationNotes(counts: SvgImportCounts): string[] {
           `Skipped $ embedded image(s) because ${why}; the rest of the file imported.`,
         ] as const,
     ),
+    [
+      counts.unresolvedPaintOpacity,
+      'Imported $ SVG element(s) with unresolved fill or stroke opacity treated as fully opaque; layout-dependent opacity may hide artwork that is included. Resolve these expressions in your SVG editor before importing for exact visibility.',
+    ],
   ] as const;
   return notes
     .filter(([count]) => count > 0)
