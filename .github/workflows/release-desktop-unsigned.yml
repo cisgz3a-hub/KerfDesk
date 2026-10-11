@@ -205,7 +205,7 @@ jobs:
             artifacts/historical-installers/*/archive-*.txt
           retention-days: 7
           if-no-files-found: warn
-      - name: Publish immutable installer and authenticated notification manifest
+      - name: Publish immutable installer, verified history and notification manifest
         if: steps.plan.outputs.publish == 'true'
         env:
           DESKTOP_STABLE_MANIFEST_PRIVATE_KEY: ${{ secrets.DESKTOP_STABLE_MANIFEST_PRIVATE_KEY }}
@@ -223,7 +223,7 @@ jobs:
           node scripts/publish-manual-commercial-release.mjs `
             --expected-latest-sha256 $env:EXPECTED_LATEST_SHA256 $release $identity "$release/win-unpacked/resources"
           if ($LASTEXITCODE -ne 0) { throw 'Unsigned publication was not confirmed.' }
-          "Published Windows $env:RELEASE_VERSION. Installed apps check at startup and every 30 minutes; download and installation require user choices." >> $env:GITHUB_STEP_SUMMARY
+          "Published Windows $env:RELEASE_VERSION with verified download history. Installed apps check at startup and every 30 minutes; download and installation require user choices." >> $env:GITHUB_STEP_SUMMARY
       - name: Preserve a failed release for inspection
         if: failure() && steps.plan.outputs.publish == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

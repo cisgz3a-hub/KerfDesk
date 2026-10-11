@@ -55,6 +55,8 @@
   Cache-Control: no-cache
 /desktop-manual-download.mjs
   Cache-Control: no-cache
+/desktop-manual-catalog.mjs
+  Cache-Control: no-cache
 /desktop-windows-download.mjs
   Cache-Control: no-cache
 

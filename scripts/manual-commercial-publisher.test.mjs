@@ -6,7 +6,8 @@ import {
   verifyManualDownload,
 } from '../public/desktop-manual-download.mjs';
 import { verifyCommercialCatalog } from '../public/desktop-commercial-catalog.mjs';
-import { verifyCommercialEnvelope } from './commercial-release-manifest.mjs';
+import { digest, verifyCommercialEnvelope } from './commercial-release-manifest.mjs';
+import { MANUAL_CATALOG_KEY, verifyManualCatalog } from '../public/desktop-manual-catalog.mjs';
 import { manualDownloadPayload, signManualDownload } from './manual-commercial-manifest.mjs';
 import { publishManualCommercialRelease } from './manual-commercial-publisher.mjs';
 import { updateNotesStorageKey } from './manual-commercial-notes.mjs';
@@ -21,6 +22,7 @@ function fixture(version = '1.2.3') {
   const writes = [];
   const verified = [];
   const store = {
+    list: async (prefix) => [...objects.keys()].filter((key) => key.startsWith(prefix)),
     get: async (key) => objects.get(key) ?? null,
     put: async (key, bytes, metadata) => {
       writes.push({ key, metadata });
@@ -50,12 +52,12 @@ function fixture(version = '1.2.3') {
   };
 }
 
-test('manual release authenticates one installer, reads it back, and never touches update catalogues', async () => {
+test('manual release authenticates an installer and history without touching the automatic update feed', async () => {
   const f = fixture();
   const result = await publishManualCommercialRelease(f);
   assert.equal(result.status, 'published');
   assert.deepEqual(f.verified, ['local', 'remote']);
-  assert.equal(f.writes.length, 4);
+  assert.equal(f.writes.length, 5);
   assert.ok(f.writes.every(({ key }) => key.startsWith('desktop/commercial-manual/')));
   assert.equal(f.writes.at(-1).key, MANUAL_DOWNLOAD_LATEST_KEY);
   assert.equal(f.writes.at(-1).metadata.cacheControl, 'no-store');
@@ -70,8 +72,10 @@ test('manual release authenticates one installer, reads it back, and never touch
     release,
   );
   assert.deepEqual(notes.highlights, f.reviewedNotes.highlights);
-  assert.equal(f.writes.at(-2).key, updateNotesStorageKey(release.version));
-  assert.equal(f.writes.at(-2).metadata.cacheControl, 'public, max-age=31536000, immutable');
+  assert.equal(f.writes.at(-3).key, updateNotesStorageKey(release.version));
+  assert.equal(f.writes.at(-3).metadata.cacheControl, 'public, max-age=31536000, immutable');
+  assert.equal(f.writes.at(-2).key, MANUAL_CATALOG_KEY);
+  assert.equal(f.writes.at(-2).metadata.cacheControl, 'no-store');
   assert.equal(
     f.objects.get(manualDownloadKey(release.version, 'download-manifest.json')).toString(),
     latest,
@@ -85,7 +89,130 @@ test('manual release authenticates one installer, reads it back, and never touch
     ),
   );
   assert.equal((await publishManualCommercialRelease(f)).status, 'already-published');
-  assert.equal(f.writes.length, 4);
+  assert.equal(f.writes.length, 5);
+});
+
+async function historyVersions(f) {
+  return (
+    await verifyManualCatalog(f.objects.get(MANUAL_CATALOG_KEY).toString(), stable.keySet)
+  ).map((entry) => entry.release.version);
+}
+
+function nextRelease(f, version) {
+  const next = fixture(version);
+  return {
+    ...next,
+    store: f.store,
+    expectedLatestSha256: digest(f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY)),
+    reviewedNotes: { ...next.reviewedNotes, sinceSourceSha: 'a'.repeat(40) },
+  };
+}
+
+test('the first history publication backfills immutable releases and retains every covered installer', async () => {
+  const f = fixture('1.2.3');
+  await publishManualCommercialRelease(f);
+  await publishManualCommercialRelease(nextRelease(f, '1.9.0'));
+  // Model an existing deployment whose old publisher never wrote this index.
+  f.objects.delete(MANUAL_CATALOG_KEY);
+  await publishManualCommercialRelease(nextRelease(f, '1.10.0'));
+  assert.deepEqual(await historyVersions(f), ['1.10.0', '1.9.0', '1.2.3']);
+  const archived = await verifyManualCatalog(
+    f.objects.get(MANUAL_CATALOG_KEY).toString(),
+    stable.keySet,
+  );
+  for (const { envelope, release } of archived) {
+    assert.deepEqual(
+      envelope,
+      JSON.parse(f.objects.get(manualDownloadKey(release.version, 'download-manifest.json'))),
+    );
+    assert.equal(
+      f.objects.has(manualDownloadKey(release.version, release.artifacts[0].name)),
+      true,
+    );
+  }
+  // Subsequent publication uses the verified index, not another bucket-wide scan.
+  f.store.list = async () => {
+    throw new Error('should not list again');
+  };
+  await publishManualCommercialRelease(nextRelease(f, '1.11.0'));
+  assert.deepEqual(await historyVersions(f), ['1.11.0', '1.10.0', '1.9.0', '1.2.3']);
+});
+
+test('a legacy latest can gain history on an identical retry without rewriting installer objects', async () => {
+  const f = fixture();
+  await publishManualCommercialRelease(f);
+  f.objects.delete(MANUAL_CATALOG_KEY);
+  const count = f.writes.length;
+  assert.equal((await publishManualCommercialRelease(f)).status, 'already-published');
+  assert.deepEqual(
+    f.writes.slice(count).map(({ key }) => key),
+    [MANUAL_CATALOG_KEY],
+  );
+  assert.deepEqual(await historyVersions(f), ['1.2.3']);
+});
+
+test('interruption after history publication retries without losing history or advancing latest early', async () => {
+  const f = fixture();
+  await publishManualCommercialRelease(f);
+  const oldLatest = f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY);
+  const next = nextRelease(f, '1.2.4');
+  const put = f.store.put;
+  let interrupted = false;
+  f.store.put = async (key, bytes, metadata) => {
+    await put(key, bytes, metadata);
+    if (key === MANUAL_CATALOG_KEY && !interrupted) {
+      interrupted = true;
+      throw new Error('Interrupted after history upload');
+    }
+  };
+  await assert.rejects(publishManualCommercialRelease(next), /Interrupted/u);
+  assert.deepEqual(f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY), oldLatest);
+  assert.deepEqual(await historyVersions(f), ['1.2.4', '1.2.3']);
+  assert.equal((await publishManualCommercialRelease(next)).status, 'published');
+  assert.deepEqual(await historyVersions(f), ['1.2.4', '1.2.3']);
+  assert.equal(f.writes.filter(({ key }) => key === MANUAL_CATALOG_KEY).length, 2);
+});
+
+test('corrupt history and missing historical installers refuse publication before any writes', async () => {
+  for (const corrupt of [
+    (f) => f.objects.set(MANUAL_CATALOG_KEY, Buffer.from('{}')),
+    (f) => {
+      f.objects.delete(MANUAL_CATALOG_KEY);
+      f.objects.delete(manualDownloadKey('1.2.3', 'KerfDesk-1.2.3-windows-x64-setup.exe'));
+    },
+    (f) => {
+      f.objects.delete(MANUAL_CATALOG_KEY);
+      f.objects.set(
+        manualDownloadKey('1.1.0', 'download-manifest.json'),
+        f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY),
+      );
+    },
+  ]) {
+    const f = fixture();
+    await publishManualCommercialRelease(f);
+    const next = nextRelease(f, '1.2.4');
+    corrupt(f);
+    const count = f.writes.length;
+    await assert.rejects(publishManualCommercialRelease(next));
+    assert.equal(f.writes.length, count);
+  }
+});
+
+test('concurrent history mutation and corrupt history readback never advance latest', async () => {
+  for (const stage of ['immutable', 'history']) {
+    const f = fixture();
+    await publishManualCommercialRelease(f);
+    const next = nextRelease(f, '1.2.4');
+    const oldLatest = f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY);
+    const put = f.store.put;
+    f.store.put = async (key, bytes, metadata) => {
+      await put(key, bytes, metadata);
+      if (key === (stage === 'immutable' ? updateNotesStorageKey('1.2.4') : MANUAL_CATALOG_KEY))
+        f.objects.set(MANUAL_CATALOG_KEY, Buffer.from('concurrent/corrupt'));
+    };
+    await assert.rejects(publishManualCommercialRelease(next), /history (?:changed|readback)/u);
+    assert.deepEqual(f.objects.get(MANUAL_DOWNLOAD_LATEST_KEY), oldLatest);
+  }
 });
 
 test('invalid package, missing verifier, wrong key and stale reviewed state stop before writes', async () => {
@@ -141,7 +268,7 @@ test('manual history cannot roll back or replace the bytes of an already-publish
         expectedLatestSha256: first.latestSha256,
       }),
     );
-    assert.equal(f.writes.length, 4);
+    assert.equal(f.writes.length, 5);
   }
 });
 
@@ -198,9 +325,9 @@ test('interrupted sidecar publication retries identical bytes before latest adva
   await assert.rejects(publishManualCommercialRelease(f), /Interrupted/u);
   assert.equal(f.objects.has(MANUAL_DOWNLOAD_LATEST_KEY), false);
   assert.equal((await publishManualCommercialRelease(f)).status, 'published');
-  assert.equal(f.writes.length, 4);
+  assert.equal(f.writes.length, 5);
   assert.equal((await publishManualCommercialRelease(f)).status, 'already-published');
-  assert.equal(f.writes.length, 4);
+  assert.equal(f.writes.length, 5);
   await assert.rejects(
     publishManualCommercialRelease({
       ...f,
@@ -216,7 +343,7 @@ test('fresh notes must use authenticated previous source and concurrent latest c
   const next = fixture('1.2.4');
   const input = { ...next, store: f.store, expectedLatestSha256: previous.latestSha256 };
   await assert.rejects(publishManualCommercialRelease(input), /previous release source/u);
-  assert.equal(f.writes.length, 4);
+  assert.equal(f.writes.length, 5);
   input.reviewedNotes = { ...next.reviewedNotes, sinceSourceSha: 'a'.repeat(40) };
   const put = f.store.put;
   f.store.put = async (key, bytes, metadata) => {
