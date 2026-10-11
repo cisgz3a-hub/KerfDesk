@@ -57,6 +57,10 @@ for (const width of [320, 390]) {
       await page.getByText('Approve on your PC').waitFor();
       assert.deepEqual(state.claim.requestedScopes, ['read', 'edit', 'control']);
       assert.equal(state.claim.code, 'PairCode12-A');
+      // Nothing opens until the PC approves; the waiting screen keeps polling.
+      await page.waitForTimeout(1800);
+      assert.equal(await page.getByText('Approve on your PC').isVisible(), true);
+      state.approve();
       await page.getByRole('navigation', { name: 'Sections' }).waitFor({ timeout: 6000 });
       await page.getByText('Your workspace').waitFor();
       assert.equal(await noHorizontalOverflow(page), true);

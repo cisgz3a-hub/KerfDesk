@@ -192,6 +192,11 @@ export async function phonePage(browser, state, { width = 390, paired = true } =
   });
   const page = await context.newPage();
   let approved = paired;
+  let claimed = false;
+  // Like the relay: a claimed phone stays pending until the PC approves it.
+  state.approve = () => {
+    approved = true;
+  };
   page.on('pageerror', (error) => state.errors?.push(String(error)));
   await page.route(`${ORIGIN}/**`, async (route) => {
     const url = new URL(route.request().url());
@@ -226,11 +231,13 @@ export async function phonePage(browser, state, { width = 390, paired = true } =
               client: { id: 'c1', label: 'Test phone', scopes: state.scopes },
               csrf: 'csrf-token',
             }
-          : { status: 'unavailable' },
+          : claimed
+            ? { status: 'pending', expiresInMs: 300000 }
+            : { status: 'unavailable' },
       );
     if (url.pathname === '/api/pair/claim') {
       state.claim = JSON.parse(route.request().postData() ?? '{}');
-      approved = true;
+      claimed = true;
       return json({ status: 'pending', expiresInMs: 300000 }, 202);
     }
     if (url.pathname === '/api/push/key') return json({ error: 'not_found' }, 404);
