@@ -46,7 +46,6 @@ const MM_PER_INCH = 25.4;
 // adjacent spans don't double-count (matches fill-hatching's SCANLINE_EPS).
 const SCANLINE_EPS = 1e-9;
 const OUTLINE_RADIUS_PX = 0.5;
-const OUTLINE_RADIUS_SQ = OUTLINE_RADIUS_PX * OUTLINE_RADIUS_PX;
 const MIN_STROKE_POINTS = 2;
 const MIN_PIXEL_DIM = 1;
 
@@ -218,6 +217,14 @@ function strokePolylines(grid: LumaGrid, strokes: ReadonlyArray<PixelStroke>): v
 }
 
 function strokeSegment(grid: LumaGrid, a: Vec2, b: Vec2): void {
+  // Normalization and closest-point projection can place an exact half-pixel
+  // tangency a few binary64 rounding steps outside the stroke. Account for
+  // those operations at the segment's pixel-coordinate scale, rather than
+  // widening every outline by a fixed geometric tolerance.
+  const coordinateScale = Math.max(1, Math.abs(a.x), Math.abs(a.y), Math.abs(b.x), Math.abs(b.y));
+  const roundoffPx = 16 * Number.EPSILON * coordinateScale;
+  const radiusWithRoundoff = OUTLINE_RADIUS_PX + roundoffPx;
+  const radiusSq = radiusWithRoundoff * radiusWithRoundoff;
   const minX = Math.max(0, Math.floor(Math.min(a.x, b.x) - OUTLINE_RADIUS_PX));
   const maxX = Math.min(grid.width - 1, Math.ceil(Math.max(a.x, b.x) + OUTLINE_RADIUS_PX));
   const minY = Math.max(0, Math.floor(Math.min(a.y, b.y) - OUTLINE_RADIUS_PX));
@@ -225,7 +232,8 @@ function strokeSegment(grid: LumaGrid, a: Vec2, b: Vec2): void {
   for (let y = minY; y <= maxY; y += 1) {
     const rowBase = y * grid.width;
     for (let x = minX; x <= maxX; x += 1) {
-      if (pointSegmentDistanceSq(x + 0.5, y + 0.5, a, b) <= OUTLINE_RADIUS_SQ) {
+      const distanceSq = pointSegmentDistanceSq(x + 0.5, y + 0.5, a, b);
+      if (Number.isFinite(distanceSq) && distanceSq <= radiusSq) {
         grid.luma[rowBase + x] = grid.ink;
       }
     }

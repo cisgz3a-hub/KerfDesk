@@ -114,6 +114,8 @@ it.each(commands)(
     expect(workspace.ok && workspace.data.capabilities).toEqual({
       touchEditing: true,
       groupTransformBounds: true,
+      scene: true,
+      designControl: true,
     });
     expect(workspace.ok && workspace.data.permissions).toMatchObject({ canEdit: false });
     expect(resultCode(await adapter.execute(command, writeArgs(adapter, values)))).toBe(
@@ -124,20 +126,15 @@ it.each(commands)(
 );
 
 it.each(commands)(
-  'refuses CNC creation for %s without changing the scene or history',
+  'creates %s in a CNC workspace as one undoable ordinary drawing (ADR-584)',
   async (command, values) => {
     const state = useStore.getState();
     useStore.setState({ project: { ...state.project, machine: DEFAULT_CNC_MACHINE_CONFIG } });
     const workspace = await adapter.execute('get_workspace', {});
-    expect(workspace.ok && workspace.data.capabilities).toEqual({
-      touchEditing: false,
-      groupTransformBounds: true,
-    });
-    expect(resultCode(await adapter.execute(command, writeArgs(adapter, values)))).toBe(
-      'unsupported_operation',
-    );
-    expect(useStore.getState().project.scene.objects).toHaveLength(0);
-    expect(useStore.getState().undoStack).toHaveLength(0);
+    expect(workspace.ok && workspace.data.capabilities).toMatchObject({ touchEditing: true });
+    expect(resultCode(await adapter.execute(command, writeArgs(adapter, values)))).toBe('ok');
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+    expect(useStore.getState().undoStack).toHaveLength(1);
   },
 );
 

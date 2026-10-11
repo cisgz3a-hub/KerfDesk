@@ -1,6 +1,12 @@
 import { pointInPolygon } from '../geometry';
+import { segmentContainedInPolygon } from '../geometry/segment-contained-in-polygon';
 import type { CncHelicalContourPass, CncPass } from '../job';
 import type { CncHelixEntrySettings, Polyline, Vec2 } from '../scene';
+import {
+  buildVCarveBoundarySegmentIndex,
+  someVCarveBoundarySegmentInBox,
+  type VCarveBoundarySegmentIndex,
+} from './vcarve-boundary-segment-index';
 
 export type HelicalEntryPlan =
   | { readonly ok: true; readonly passes: ReadonlyArray<CncPass> }
@@ -22,11 +28,17 @@ export function planHelicalPocketPasses(
     return { ok: false, reason: 'Helical entry could not identify a pocket boundary.' };
   }
   const boundarySign = Math.sign(signedArea(entryBoundary.points));
+  const boundaryIndex = buildVCarveBoundarySegmentIndex(
+    entryBoundary.points.flatMap((point, index) => {
+      const next = entryBoundary.points[(index + 1) % entryBoundary.points.length];
+      return next === undefined ? [] : [{ ax: point.x, ay: point.y, bx: next.x, by: next.y }];
+    }),
+  );
   if (
     toolpaths.some(
       (toolpath) =>
         Math.sign(signedArea(toolpath.points)) !== boundarySign ||
-        !toolpathInsideBoundary(toolpath, entryBoundary),
+        !toolpathInsideBoundary(toolpath, entryBoundary, boundaryIndex),
     )
   ) {
     return {
@@ -79,10 +91,52 @@ function largestRing(toolpaths: ReadonlyArray<Polyline>): Polyline | null {
   return largest;
 }
 
-function toolpathInsideBoundary(toolpath: Polyline, boundary: Polyline): boolean {
+function toolpathInsideBoundary(
+  toolpath: Polyline,
+  boundary: Polyline,
+  index: VCarveBoundarySegmentIndex,
+): boolean {
   if (toolpath === boundary) return true;
-  const probe = polygonCentroid(toolpath.points) ?? toolpath.points[0];
-  return probe !== undefined && pointInPolygon(probe, boundary.points);
+  const first = toolpath.points[0];
+  if (first === undefined || !segmentContainedInPolygon(first, first, boundary.points))
+    return false;
+  // From a contained point a connected segment cannot leave without meeting
+  // the boundary. Skip only boxes with no possible contact; all other edges,
+  // including the closing edge and tangencies, retain the full interval test.
+  return toolpath.points.every((point, pointIndex) => {
+    const next = toolpath.points[(pointIndex + 1) % toolpath.points.length];
+    return (
+      next !== undefined &&
+      (!segmentMayContactBoundary(point, next, index) ||
+        segmentContainedInPolygon(point, next, boundary.points))
+    );
+  });
+}
+
+function segmentMayContactBoundary(
+  from: Vec2,
+  to: Vec2,
+  index: VCarveBoundarySegmentIndex,
+): boolean {
+  if (index.root === null || ![from.x, from.y, to.x, to.y].every(Number.isFinite)) return true;
+  // The interval predicate's on-boundary tolerance is 1e-9 mm. This wider
+  // query padding plus coordinate roundoff can add work, never skip contact.
+  const padding = Math.max(
+    EPSILON,
+    Number.EPSILON *
+      64 *
+      Math.max(1, Math.abs(from.x), Math.abs(from.y), Math.abs(to.x), Math.abs(to.y)),
+  );
+  return someVCarveBoundarySegmentInBox(
+    index,
+    {
+      minX: Math.min(from.x, to.x) - padding,
+      minY: Math.min(from.y, to.y) - padding,
+      maxX: Math.max(from.x, to.x) + padding,
+      maxY: Math.max(from.y, to.y) + padding,
+    },
+    () => true,
+  );
 }
 
 type EntryCircle = {
@@ -207,23 +261,6 @@ function reorderClosedRing(
   start: Vec2,
 ): ReadonlyArray<Vec2> {
   return [start, ...points.slice(edgeIndex + 1), ...points.slice(0, edgeIndex + 1), start];
-}
-
-function polygonCentroid(points: ReadonlyArray<Vec2>): Vec2 | null {
-  let twiceArea = 0;
-  let x = 0;
-  let y = 0;
-  for (let index = 0; index < points.length; index += 1) {
-    const current = points[index];
-    const next = points[(index + 1) % points.length];
-    if (current === undefined || next === undefined) continue;
-    const cross = current.x * next.y - next.x * current.y;
-    twiceArea += cross;
-    x += (current.x + next.x) * cross;
-    y += (current.y + next.y) * cross;
-  }
-  if (!Number.isFinite(twiceArea) || Math.abs(twiceArea) <= EPSILON) return null;
-  return { x: x / (3 * twiceArea), y: y / (3 * twiceArea) };
 }
 
 function signedArea(points: ReadonlyArray<Vec2>): number {

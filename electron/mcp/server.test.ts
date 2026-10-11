@@ -10,8 +10,9 @@ import {
   MCP_CONTROL_COMMANDS,
 } from './input-schemas.js';
 import { createKerfDeskMcpServer } from './server.js';
-import { KERFDESK_WORKSPACE_UI_URI } from './workspace-ui.js';
+import { KERFDESK_WORKSPACE_APP_URI as KERFDESK_WORKSPACE_UI_URI } from './workspace-app-ui.js';
 import { mcpOutputSchemas } from './output-schemas.js';
+import { mcpMachineToolInfo } from './machine-tool-info.js';
 const writeAdmission = {
   expectedRevision: 'revision-1',
   requestId: '12345678-1234-4234-8234-123456789abc',
@@ -48,6 +49,28 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   arrange_artwork: { ...writeAdmission, artworkIds: ['art-1'], action: 'mirror_horizontal' },
   undo: { ...writeAdmission },
   redo: { ...writeAdmission },
+  get_workspace_scene: {},
+  wait_for_change: { sinceRevision: 'revision-1', timeoutMs: 0 },
+  create_operation: { ...writeAdmission, color: '#ff0000', mode: 'fill', name: 'Fill' },
+  assign_artwork_to_operation: { ...writeAdmission, artworkIds: ['art-1'], operationId: 'op-1' },
+  reorder_operation: { ...writeAdmission, operationId: 'op-1', direction: 'up' },
+  delete_operation: { ...writeAdmission, operationId: 'op-1' },
+  apply_material_recipe: { ...writeAdmission, operationId: 'op-1', recipeId: 'recipe-1' },
+  add_svg: { ...writeAdmission, svg: '<svg xmlns="http://www.w3.org/2000/svg"/>', xMm: 1 },
+  import_file: {
+    ...writeAdmission,
+    fileName: 'logo.svg',
+    mimeType: 'image/svg+xml',
+    dataBase64: 'PHN2Zy8+',
+  },
+  save_project: { ...writeAdmission },
+  apply_edits: {
+    ...writeAdmission,
+    edits: [
+      { command: 'add_rectangle', args: { xMm: 1, yMm: 2, widthMm: 3, heightMm: 4 } },
+      { command: 'arrange_artwork', args: { artworkIds: ['$0', 'art-1'], action: 'align_left' } },
+    ],
+  },
   get_machine_status: {},
   get_control_operation: { operationId: writeAdmission.requestId },
   jog_machine: { ...writeAdmission, axis: 'x', direction: 1, distanceMm: 1 },
@@ -55,7 +78,19 @@ const toolExamples: Record<KerfDeskMcpCommand, Record<string, unknown>> = {
   review_machine_job: { ...writeAdmission },
   start_job: { ...writeAdmission, reviewId: writeAdmission.requestId },
   abort_job: { requestId: writeAdmission.requestId },
+  connect_machine: { ...writeAdmission },
+  disconnect_machine: { ...writeAdmission },
+  home_machine: { ...writeAdmission },
+  set_work_origin: { ...writeAdmission, axes: 'xy' },
+  pause_job: { requestId: writeAdmission.requestId },
+  resume_job: { requestId: writeAdmission.requestId },
+  // Phone-only held jogs are never registered as MCP tools (ADR-585).
+  jog_hold_start: { ...writeAdmission, axis: 'x', direction: 1 },
+  jog_hold_stop: { requestId: writeAdmission.requestId, operationId: writeAdmission.requestId },
+  get_camera_snapshot: {},
 };
+const PHONE_ONLY = new Set(['jog_hold_start', 'jog_hold_stop']);
+const listedTools = Object.keys(toolExamples).filter((name) => !PHONE_ONLY.has(name));
 
 const bounds = { xMm: 10, yMm: 20, widthMm: 30, heightMm: 40 };
 const machineOperation = {
@@ -162,6 +197,9 @@ const readResults: Partial<Record<KerfDeskMcpCommand, Record<string, unknown>>> 
     },
   },
   get_control_operation: machineOperation,
+  get_workspace_scene: { revision: 'revision-1', status: 'disabled' },
+  wait_for_change: { revision: 'revision-1', machineSeq: 3, changed: false, reason: 'timeout' },
+  get_camera_snapshot: { revision: 'revision-1', status: 'disabled' },
 };
 
 function successfulBackend(): KerfDeskMcpBackend {
@@ -248,25 +286,17 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
     const backend = successfulBackend();
     const request = vi.spyOn(backend, 'request');
     const client = await connectedClient(backend, modern);
-    expect(client.getServerVersion()).toMatchObject({ name: 'kerfdesk-desktop', version: '1.2.0' });
+    expect(client.getServerVersion()).toMatchObject({ name: 'kerfdesk-desktop', version: '1.3.0' });
     const listing = await client.listTools();
-    expect(listing.tools.map((tool) => tool.name)).toEqual(Object.keys(toolExamples));
+    expect(listing.tools.map((tool) => tool.name)).toEqual(listedTools);
     for (const tool of listing.tools) {
       expect(tool.inputSchema.additionalProperties).toBe(false);
       expect(tool.outputSchema).toBeDefined();
       expect(tool.annotations?.openWorldHint).toBe(false);
       expect(tool.annotations?.readOnlyHint).toBe(tool.name in readResults);
       if (
-        [
-          'get_workspace_preview',
-          'get_machine_status',
-          'get_control_operation',
-          'jog_machine',
-          'frame_job',
-          'review_machine_job',
-          'start_job',
-          'abort_job',
-        ].includes(tool.name)
+        ['get_workspace', 'get_workspace_scene', 'get_workspace_preview'].includes(tool.name) ||
+        Object.hasOwn(mcpMachineToolInfo, tool.name)
       ) {
         expect(tool._meta).toEqual({
           ui: { resourceUri: KERFDESK_WORKSPACE_UI_URI, visibility: ['model', 'app'] },
@@ -282,7 +312,7 @@ describe.each([false, true])('official client protocol (modern=%s)', (modern) =>
       });
       expect(JSON.parse(responseText(result))).toEqual(result.structuredContent);
     }
-    expect(request).toHaveBeenCalledTimes(Object.keys(toolExamples).length);
+    expect(request).toHaveBeenCalledTimes(listedTools.length);
     expect(request.mock.calls.every((call) => call[2] instanceof AbortSignal)).toBe(true);
   });
 

@@ -51,7 +51,13 @@ export type ProgramEvent =
   | { readonly kind: 'spindle-off'; readonly line: number }
   | { readonly kind: 'coolant-on'; readonly line: number; readonly channel: 'mist' | 'flood' }
   | { readonly kind: 'coolant-off'; readonly line: number }
-  | { readonly kind: 'dwell'; readonly line: number; readonly seconds: number }
+  | {
+      readonly kind: 'dwell';
+      readonly line: number;
+      readonly seconds: number;
+      /** G4 executes before block motion. Omitted for existing cycle dwells. */
+      readonly isBeforeMotion?: boolean;
+    }
   | { readonly kind: 'pause'; readonly line: number; readonly optional: boolean }
   | {
       readonly kind: 'synchronization';

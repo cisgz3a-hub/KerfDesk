@@ -25,9 +25,24 @@ Frame, Start, output, or existing-work entitlement gates.
   without editing. Read the workspace before sending another write. Old
   serialized writes cannot match the new namespace. Unresolved receipts are
   never evicted, and stale or unauthorized traffic cannot trigger renewal.
-- Creation and operation settings currently support Laser workspaces only.
-  Existing CNC artwork can be selected and transformed. No CNC creation or
-  deferred Pro prompt is started. This does not change the normal desktop tools.
+- Creation works in Laser and CNC workspaces (ADR-584). Laser-only operation
+  fields are refused on CNC operations and CNC fields on Laser operations. Pro
+  CNC strategies return `needs_pro` without a deferred prompt. This does not
+  change the normal desktop tools.
+- Design control (ADR-584) lives in `design-*.ts`: `design-validation.ts`
+  (strict zod schemas mirroring the wire), `design-operations.ts` (operations
+  and recipes through the store's layer actions), `design-imports.ts` (SVG, DXF
+  and image imports through the ordinary parsers), `design-save.ts` (existing
+  save target only) and `design-batch.ts` (`apply_edits`: async inputs are
+  prepared first, then every item runs inside one `beginInteraction`, so a
+  failure calls `cancelInteraction` and leaves no Undo entry).
+  `scene-projection.ts` builds the opt-in vector scene.
+- Machine control (ADR-569, ADR-585) adds `machine-actions.ts` (connect,
+  disconnect, home, origin, pause/resume through the laser store),
+  `machine-hold.ts` (held jog plus the `HoldDeadman` timer that cancels only
+  the owned motion when heartbeats are 600 ms late) and `machine-camera.ts`.
+  `../remote-access/remote-change-observer.ts` produces the change counters and
+  kind-only job events that the relay fans out.
 - Text uses a chosen bundled font, or the bundled default when `fontId` is omitted, and the actual text geometry renderer.
   `widthMm` is a maximum: overflowing text shrinks uniformly, smaller text is not
   enlarged. Coordinates place the top-left of its visible bounds; no bed fit is

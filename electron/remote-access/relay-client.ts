@@ -5,6 +5,7 @@ import {
   mcpInputSchemas,
   mcpCommandScope,
   MCP_MAX_RESULT_BYTES,
+  MCP_PRIORITY_COMMANDS,
   type KerfDeskMcpCommand,
 } from '../mcp/input-schemas.js';
 import { mcpOutputSchemas } from '../mcp/output-schemas.js';
@@ -141,7 +142,7 @@ class RemoteRelayClient {
   private acceptsCommand(command: Command): boolean {
     return (
       !this.commands.has(command.requestId) &&
-      this.commands.size < (command.name === 'abort_job' ? 36 : 32) &&
+      this.commands.size < (MCP_PRIORITY_COMMANDS.has(command.name) ? 36 : 32) &&
       this.options.canRequest(
         command.clientId,
         command.scopes,

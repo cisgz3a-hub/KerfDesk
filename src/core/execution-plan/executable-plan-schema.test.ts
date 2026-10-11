@@ -3,9 +3,10 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { EXECUTABLE_PLAN_CORPUS } from '../../__fixtures__/executable-plan-corpus';
 import { validateAgainstSchema } from '../../__fixtures__/json-schema-subset';
-import type { ProgramEvent } from '../gcode-view';
+import { buildGcodeRenderModel, type ProgramEvent } from '../gcode-view';
 import { buildExecutablePlan } from './build-executable-plan';
 import type { ExecutablePlanController } from './executable-plan-types';
+import { serializeExecutablePlan } from './serialize-executable-plan';
 
 const SCHEMA_PATH = 'docs/schemas/executable-plan-v1.schema.json';
 
@@ -62,6 +63,41 @@ function schemaEventKinds(schema: Readonly<Record<string, unknown>>): ReadonlyAr
 
 describe('executable-plan-v1.schema.json', () => {
   const schema = readSchema();
+
+  it.each(['G4 P4', 'G4 P4 G1 X10 F600', 'G4 P0'])(
+    'projects %s into the unchanged v1 event contract without losing parser ordering',
+    (block) => {
+      const gcode = `G21 G90\r\nM3 S12000\r\nM8\r\n${block}\r\nG1 X20 F600\r\nM5\r\nM9\r\nM2`;
+      const rendered = buildGcodeRenderModel(gcode);
+      const built = buildExecutablePlan(gcode, { machineKind: 'cnc', controller: 'grbl-cnc' });
+      if (rendered.kind !== 'ok' || built.kind !== 'ok') throw new Error('Expected a plan.');
+      const parserDwell = rendered.model.events.find((event) => event.kind === 'dwell');
+      expect(parserDwell?.isBeforeMotion).toBe(true);
+      expect(built.plan.events.filter((event) => event.kind === 'dwell')).toEqual([
+        { kind: 'dwell', line: 3, seconds: block === 'G4 P0' ? 0 : 4 },
+      ]);
+      expect(built.plan.events.filter((event) => event.kind !== 'dwell')).toEqual(
+        rendered.model.events.filter((event) => event.kind !== 'dwell'),
+      );
+      expect(validateAgainstSchema(JSON.parse(JSON.stringify(built.plan)), schema)).toEqual([]);
+      expect(serializeExecutablePlan(built.plan)).toBe(gcode);
+    },
+  );
+
+  it('rejects timing-only metadata in serialized v1 dwell events', () => {
+    const built = buildExecutablePlan('G4 P4\nG1 X10 F600', {
+      machineKind: 'cnc',
+      controller: 'grbl-cnc',
+    });
+    if (built.kind !== 'ok') throw new Error('Expected a plan.');
+    const invalid = {
+      ...built.plan,
+      events: [{ kind: 'dwell', line: 0, seconds: 4, isBeforeMotion: true }],
+    };
+    expect(validateAgainstSchema(invalid, schema)).toEqual([
+      { path: '$.events[0]', message: 'matched 0 oneOf branches, expected exactly 1' },
+    ]);
+  });
 
   for (const fixture of EXECUTABLE_PLAN_CORPUS) {
     it(`accepts the plan built from ${fixture.name}`, () => {

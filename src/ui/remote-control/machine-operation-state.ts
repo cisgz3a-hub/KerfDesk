@@ -20,6 +20,8 @@ export type OwnedMachineOperation = {
   streamerEpoch?: number;
   motionSettled?: Promise<void>;
   jobSettled?: Promise<void>;
+  /** A held jog the phone released (or whose heartbeat stopped); settling Idle completes it. */
+  holdReleased?: true;
   review?: {
     readonly id: string;
     readonly revision: string;
