@@ -1,0 +1,112 @@
+.lf-toolbar-shell .lf-remote-toolbar-button {
+  padding: 5px 9px;
+}
+.lf-toolbar-shell .lf-remote-toolbar-button[aria-expanded='true'] {
+  background: var(--lf-tint-accent);
+  border-color: var(--lf-border);
+}
+.lf-remote-toolbar-icon {
+  position: relative;
+  display: inline-flex;
+}
+.lf-remote-dot {
+  box-sizing: border-box;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--lf-text-faint);
+}
+.lf-remote-toolbar-icon > .lf-remote-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -2px;
+  outline: 2px solid var(--lf-bg-0);
+}
+[data-remote-state='connecting'] .lf-remote-dot {
+  background: var(--lf-warning);
+}
+[data-remote-state='ready'] .lf-remote-dot {
+  border-color: var(--lf-success);
+  background: var(--lf-bg-0);
+}
+[data-remote-state='live'] .lf-remote-dot {
+  background: var(--lf-success);
+}
+[data-remote-state='attention'] .lf-remote-dot {
+  background: var(--lf-accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-remote-state='attention'] .lf-remote-dot {
+    animation: lf-remote-pulse 1.4s ease-in-out infinite;
+  }
+}
+@keyframes lf-remote-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (max-width: 1180px) {
+  .lf-toolbar-shell .lf-remote-toolbar-button {
+    width: 36px;
+    padding: 4px;
+  }
+  .lf-toolbar-shell .lf-remote-toolbar-button .lf-remote-toolbar-label {
+    display: none;
+  }
+}
+
+.lf-remote-panel {
+  width: 360px;
+  padding: 0;
+}
+.lf-remote-panel__body {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+.lf-remote-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.lf-remote-panel__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.lf-remote-panel__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0 0;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+}
+.lf-remote-panel__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.lf-remote-panel__note {
+  margin: 0;
+  color: var(--lf-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.lf-remote-panel__alert {
+  margin: 0;
+  color: var(--lf-danger-fg);
+  font-size: 12px;
+}
+.lf-remote-panel__rule {
+  width: 100%;
+  height: 1px;
+  margin: 0;
+  border: 0;
+  background: var(--lf-border);
+}

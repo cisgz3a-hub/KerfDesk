@@ -180,6 +180,10 @@ describe('renderer connection owns queued work and cancellation', () => {
     expect(captured.execute.mock.calls[0]![2]!.signal!.aborted).toBe(true);
     expect(useRemoteAccessStore.getState().status).toMatchObject({ connected: false, clients: [] });
     expect(useRemoteAccessStore.getState().message).toContain('Reopen the app');
+    expect(useRemoteAccessStore.getState().connectionLost).toBe(true);
+    const pollCount = calls.filter((call) => call.action === 'poll').length;
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(calls.filter((call) => call.action === 'poll')).toHaveLength(pollCount);
     held.resolve(result);
     await vi.advanceTimersByTimeAsync(0);
   });
@@ -204,6 +208,7 @@ describe('renderer connection owns queued work and cancellation', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(useRemoteAccessStore.getState().status?.connected).toBe(true);
     expect(useRemoteAccessStore.getState().message).toBeNull();
+    expect(useRemoteAccessStore.getState().connectionLost).toBe(false);
   });
 
   it('a delayed pre-Create poll cannot restore a superseded pairing code', async () => {
