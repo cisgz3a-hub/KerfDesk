@@ -13,6 +13,8 @@ export default tseslint.config(
       'test-results/**',
       // Reproducible, reviewed third-party output; checked against the pinned npm source.
       'public/control-scanner-decoder.js',
+      // Generated KerfDesk Remote bundles; their sources live in app/ (scripts/build-app.mjs --check).
+      'public/app/**',
     ],
   },
   js.configs.recommended,
@@ -48,11 +50,28 @@ export default tseslint.config(
     },
   },
   {
+    files: ['app/src/**/*.ts', 'app/src/**/*.tsx'],
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: { project: './app/tsconfig.json', tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/consistent-type-imports': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: false }],
+      'max-lines': ['error', { max: 450, skipBlankLines: true, skipComments: true }],
+    },
+  },
+  {
+    files: ['app/static/sw.js'],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
     files: ['test/**/*.mjs', 'scripts/**/*.mjs', 'eslint.config.mjs'],
     languageOptions: { globals: globals.node },
   },
   {
-    files: ['test/mobile.test.mjs'],
+    files: ['test/mobile.test.mjs', 'test/remote-app-ui.test.mjs', 'test/remote-app-support.mjs'],
     languageOptions: {
       globals: {
         document: 'readonly',
