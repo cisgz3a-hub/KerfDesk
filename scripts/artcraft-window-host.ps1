@@ -25,6 +25,7 @@ public static class KerfDeskWindowHost {
     }
     private delegate bool EnumProc(IntPtr window, IntPtr data);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumProc callback, IntPtr data);
+    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr parent, EnumProc callback, IntPtr data);
     [DllImport("user32.dll")] private static extern bool IsWindow(IntPtr window);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern IntPtr GetParent(IntPtr window);
@@ -188,6 +189,22 @@ public static class KerfDeskWindowHost {
         foreach(var id in new List<string>(entries.Keys)) { try { Detach(id); } catch(Exception error) { failure=error; } }
         if(failure!=null) throw new Exception("Could not safely detach every editor: "+failure.Message);
     }
+    public static void VerifyDetached() {
+        CheckHost();
+        bool foreignChild=false;
+        // Enumerates descendants too, including hidden windows. The return value
+        // is unspecified; the callback records whether ownership is confirmed.
+        EnumChildWindows(host, delegate(IntPtr window, IntPtr data) {
+            uint owner;
+            if(GetWindowThreadProcessId(window,out owner)==0 || owner!=hostPid) {
+                foreignChild=true;
+                return false;
+            }
+            return true;
+        }, IntPtr.Zero);
+        CheckHost();
+        if(foreignChild) throw new Exception("An editor window remains attached. Close that editor, then retry closing KerfDesk.");
+    }
 }
 "@
 [KerfDeskWindowHost]::Init([int]$env:KERFDESK_WINDOW_HOST_PID,$env:KERFDESK_WINDOW_HOST_HWND)
@@ -207,6 +224,7 @@ try {
                 'focus' { [KerfDeskWindowHost]::Focus($id) }
                 'detach' { [KerfDeskWindowHost]::Detach($id) }
                 'dispose' { [KerfDeskWindowHost]::DetachAll() }
+                'verifyDetached' { [KerfDeskWindowHost]::VerifyDetached() }
                 default { throw 'Unknown host request' }
             }
             @{id=$request.id;ok=$true;result=$result} | ConvertTo-Json -Compress -Depth 5 | Write-Output

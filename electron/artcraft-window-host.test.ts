@@ -19,6 +19,8 @@ function fakeChild() {
     stdin: new PassThrough(),
     stdout: new PassThrough(),
     stderr: new PassThrough(),
+    kill: vi.fn(() => true),
+    unref: vi.fn(),
   });
 }
 let child: ReturnType<typeof fakeChild>;
@@ -33,12 +35,78 @@ beforeEach(() => {
   mocks.spawn.mockReturnValue(child);
 });
 afterEach(() => {
+  vi.useRealTimers();
   Object.defineProperty(process, 'platform', { value: originalPlatform });
 });
 function reply(index: number, result: unknown = null): void {
   child.stdout.write(JSON.stringify({ id: requests[index]?.['id'], ok: true, result }) + '\n');
 }
 describe('native editor host boundary', () => {
+  it('verifies detachment through a fresh helper after the original helper exits', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const host = createArtcraftWindowHost(Buffer.from([1, 0, 0, 0]), 'helper.ps1');
+    child.emit('exit', 1);
+    const replacement = fakeChild();
+    const methods: string[] = [];
+    replacement.stdin.on('data', (chunk: Buffer) => {
+      const request = JSON.parse(chunk.toString()) as { id: string; method: string };
+      methods.push(request.method);
+      replacement.stdout.write(JSON.stringify({ id: request.id, ok: true }) + '\n');
+    });
+    mocks.spawn.mockReturnValue(replacement);
+    await expect(host.dispose()).resolves.toBeUndefined();
+    expect(methods).toEqual(['verifyDetached']);
+    expect(replacement.stdin.writableEnded).toBe(true);
+    expect(replacement.kill).toHaveBeenCalledOnce();
+  });
+  it('keeps disposal retryable while an orphan editor remains attached', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const host = createArtcraftWindowHost(Buffer.from([1, 0, 0, 0]), 'helper.ps1');
+    child.emit('exit', 1);
+    let orphanRemains = true;
+    const probes: ReturnType<typeof fakeChild>[] = [];
+    mocks.spawn.mockImplementation(() => {
+      const probe = fakeChild();
+      probes.push(probe);
+      probe.stdin.on('data', (chunk: Buffer) => {
+        const request = JSON.parse(chunk.toString()) as { id: string; method: string };
+        const blocked = request.method === 'verifyDetached' && orphanRemains;
+        probe.stdout.write(
+          JSON.stringify({ id: request.id, ok: !blocked, error: 'Editor remains attached' }) + '\n',
+        );
+      });
+      return probe;
+    });
+    await expect(host.dispose()).rejects.toThrow('Editor remains attached');
+    expect(probes[0]?.stdin.writableEnded).toBe(true);
+    orphanRemains = false;
+    await expect(host.dispose()).resolves.toBeUndefined();
+    expect(probes).toHaveLength(2);
+    expect(probes[1]?.stdin.writableEnded).toBe(true);
+  });
+  it('does not bypass a broken channel while its original helper could still attach a window', async () => {
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const host = createArtcraftWindowHost(Buffer.from([1, 0, 0, 0]), 'helper.ps1');
+    child.stdin.emit('error', new Error('pipe lost'));
+    await expect(host.dispose()).rejects.toThrow('unconfirmed');
+    expect(mocks.spawn).toHaveBeenCalledTimes(1);
+  });
+  it('terminates a timed-out read-only probe without retaining its streams or process', async () => {
+    vi.useFakeTimers();
+    Object.defineProperty(process, 'platform', { value: 'win32' });
+    const host = createArtcraftWindowHost(Buffer.from([1, 0, 0, 0]), 'helper.ps1');
+    child.emit('exit', 1);
+    const probe = fakeChild();
+    mocks.spawn.mockReturnValue(probe);
+    const check = expect(host.dispose()).rejects.toThrow('timed out');
+    await vi.advanceTimersByTimeAsync(15_000);
+    await check;
+    expect(probe.stdin.writableEnded).toBe(true);
+    expect(probe.stdout.destroyed).toBe(true);
+    expect(probe.stderr.destroyed).toBe(true);
+    expect(probe.kill).toHaveBeenCalledOnce();
+    expect(probe.unref).toHaveBeenCalledOnce();
+  });
   it('retains the full unsigned native handle and rejects unsupported sizes', () => {
     const handle = Buffer.alloc(8);
     handle.writeBigUInt64LE(0x123456789abcdef0n);
@@ -71,6 +139,14 @@ describe('native editor host boundary', () => {
   });
 });
 describe('persistent native host channel', () => {
+  it('does not use read-only probe cleanup on a channel that could own editor windows', async () => {
+    const channel = new ArtcraftWindowChannel('helper.ps1', '1', 42);
+    const attach = channel.request('attach', 'session');
+    reply(0);
+    await attach;
+    expect(() => channel.stopReadOnlyProbe()).toThrow('without detaching');
+    expect(child.kill).not.toHaveBeenCalled();
+  });
   it('uses hidden noninteractive PowerShell and main-owned host identity', () => {
     new ArtcraftWindowChannel('helper.ps1', '123456', 42);
     expect(mocks.spawn).toHaveBeenLastCalledWith(

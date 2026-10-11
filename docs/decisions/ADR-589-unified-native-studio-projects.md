@@ -21,6 +21,14 @@ parent. It does not terminate native editors. Abrupt parent crashes cannot
 guarantee child-window preservation. The native apps retain their own custom
 titlebar controls and native Ctrl+S behavior.
 
+If the helper exits unexpectedly, a fresh read-only helper may verify that the
+same parent still belongs to KerfDesk and has no foreign-process descendants,
+including hidden windows. Only confirmed original-helper exit allows this
+recovery, so an outstanding attach cannot race it. A surviving foreign child
+keeps detachment unconfirmed; closing that editor allows a later close attempt.
+Every verification probe is stopped after completion or failure, without using
+that shortcut on a helper which may own attached editors.
+
 Project schema 16 adds optional studioDocuments containing native bytes, editor
 identity/version, a durable document UUID, SHA-256 and revision. Validate canonical
 base64, metadata, duplicates and budgets (32 MiB per document; 64 MiB total including
@@ -67,5 +75,6 @@ redistribution/licence limitations still apply.
 ### Primary references
 
 - [Microsoft SetParent](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setparent)
+- [Microsoft EnumChildWindows](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-enumchildwindows)
 - [Electron BrowserWindow native handle](https://www.electronjs.org/docs/latest/api/browser-window)
 - [ADR-588](ADR-588-desktop-artcraft-studio-preview.md)

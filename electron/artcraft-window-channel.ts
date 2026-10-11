@@ -11,6 +11,11 @@ export class ArtcraftWindowChannel {
   private errors = '';
   private closed = false;
   private disposed = false;
+  private exited = false;
+  private verificationOnly = true;
+  get hasExited(): boolean {
+    return this.exited;
+  }
   constructor(helperPath: string, parentHandle: string, parentPid: number) {
     const powershell = path.join(
       process.env['SystemRoot'] ?? 'C:\\Windows',
@@ -38,11 +43,15 @@ export class ArtcraftWindowChannel {
     this.child.stderr.on('data', (chunk: string) => {
       this.errors = (this.errors + chunk).slice(-4096);
     });
-    this.child.on('error', () => this.fail(new Error('Native window helper could not start')));
+    this.child.on('error', () => {
+      this.exited = true;
+      this.fail(new Error('Native window helper could not start'));
+    });
     this.child.stdin.on('error', () => this.fail(new Error('Native window helper channel closed')));
-    this.child.on('exit', () =>
-      this.fail(new Error(`Native window helper exited. ${this.errors}`.trim())),
-    );
+    this.child.on('exit', () => {
+      this.exited = true;
+      this.fail(new Error(`Native window helper exited. ${this.errors}`.trim()));
+    });
   }
   request(
     method: string,
@@ -50,6 +59,7 @@ export class ArtcraftWindowChannel {
     params: Record<string, unknown> = {},
   ): Promise<unknown> {
     if (this.closed) return Promise.reject(new Error('Native window helper is closed'));
+    if (method !== 'verifyDetached') this.verificationOnly = false;
     const id = randomUUID();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -67,6 +77,18 @@ export class ArtcraftWindowChannel {
     await this.request('dispose', 'host');
     this.disposed = true;
     this.child.stdin.end();
+  }
+  /** A fresh verifier never owns editor windows and may be stopped even after timeout. */
+  stopReadOnlyProbe(): void {
+    if (!this.verificationOnly)
+      throw new Error('Cannot stop a window-owning host without detaching');
+    this.fail(new Error('Native window verification finished'));
+    this.child.stdin.end();
+    this.child.stdin.destroy();
+    this.child.stdout.destroy();
+    this.child.stderr.destroy();
+    if (!this.exited) this.child.kill();
+    this.child.unref();
   }
   private receive(chunk: string): void {
     this.buffer += chunk;

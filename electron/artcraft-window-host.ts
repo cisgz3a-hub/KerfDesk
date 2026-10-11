@@ -65,15 +65,16 @@ export function createArtcraftWindowHost(
   helperPath = fileURLToPath(new URL('../scripts/artcraft-window-host.ps1', import.meta.url)),
 ): ArtcraftWindowHost {
   if (process.platform !== 'win32') throw new Error('Embedded desktop editors require Windows');
-  const channel = new ArtcraftWindowChannel(
-    helperPath,
-    nativeHandleString(parentHandle),
-    process.pid,
-  );
-  return new NativeEditorHost(channel);
+  const parent = nativeHandleString(parentHandle);
+  const createChannel = (): ArtcraftWindowChannel =>
+    new ArtcraftWindowChannel(helperPath, parent, process.pid);
+  return new NativeEditorHost(createChannel(), createChannel);
 }
 class NativeEditorHost implements ArtcraftWindowHost {
-  constructor(private readonly channel: ArtcraftWindowChannel) {}
+  constructor(
+    private readonly channel: ArtcraftWindowChannel,
+    private readonly createChannel: () => ArtcraftWindowChannel,
+  ) {}
   async attach(
     id: string,
     identity: EditorProcessIdentity,
@@ -103,6 +104,18 @@ class NativeEditorHost implements ArtcraftWindowHost {
     await this.channel.request('detach', id);
   }
   async dispose(): Promise<void> {
-    await this.channel.dispose();
+    try {
+      await this.channel.dispose();
+    } catch (error) {
+      // A lost pipe is insufficient: the original helper must have stopped so
+      // an in-flight attach cannot race the fresh ownership verification.
+      if (!this.channel.hasExited) throw error;
+      const verifier = this.createChannel();
+      try {
+        await verifier.request('verifyDetached', 'host');
+      } finally {
+        verifier.stopReadOnlyProbe();
+      }
+    }
   }
 }
