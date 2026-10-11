@@ -66,7 +66,7 @@ describe('close path', () => {
     expect(result.paths[0]?.curves?.[0]).toEqual({ ...curve, closed: true });
   });
 
-  it('moves an end that stops just short of the start onto it', () => {
+  it('adds a short closing line without moving an endpoint near the start', () => {
     const nearStart = p(0.00005, -0.00003);
     const curve: CurveSubpath = {
       start: p(0, 0),
@@ -79,12 +79,16 @@ describe('close path', () => {
 
     const result = closeOpenPaths([path([open([...U, nearStart])], [curve])], IDENTITY_TRANSFORM);
 
-    expect(result.paths[0]?.polylines[0]).toEqual({ closed: true, points: [...U, p(0, 0)] });
+    expect(result.paths[0]?.polylines[0]).toEqual({
+      closed: true,
+      points: [...U, nearStart, p(0, 0)],
+    });
     expect(result.paths[0]?.curves?.[0]).toEqual({
       start: p(0, 0),
       segments: [
         ...lines(U.slice(1)),
-        { kind: 'cubic', control1: p(7, -1), control2: p(3, -1), to: p(0, 0) },
+        { kind: 'cubic', control1: p(7, -1), control2: p(3, -1), to: nearStart },
+        { kind: 'line', to: p(0, 0) },
       ],
       closed: true,
     });

@@ -114,9 +114,13 @@ test('loads the hashed production bundle and edits script through its outline wo
   const pageErrors: string[] = [];
   const failedAssets: string[] = [];
   const workerUrls: string[] = [];
+  const shapingWasmResponses: number[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('worker', (worker) => workerUrls.push(worker.url()));
   page.on('response', (response) => {
+    if (/\/assets\/harfbuzz-[^/]+\.wasm(?:\?|$)/u.test(response.url())) {
+      shapingWasmResponses.push(response.status());
+    }
     if (response.url().startsWith('http://127.0.0.1:') && response.status() >= 400) {
       failedAssets.push(`${response.status()} ${response.url()}`);
     }
@@ -174,6 +178,18 @@ test('loads the hashed production bundle and edits script through its outline wo
   await page.getByRole('button', { name: 'Done', exact: true }).click();
   await expect(input).toHaveCount(0);
   expect(workerUrls.some((url) => /\/assets\/text-weld-worker-[^/]+\.js$/u.test(url))).toBe(true);
+  await page.getByRole('button', { name: 'Text', exact: true }).click();
+  await page.getByLabel('KerfDesk workspace', { exact: true }).click({
+    position: { x: 300, y: 350 },
+  });
+  await input.fill('ABC שלום 123');
+  await page.getByTitle('Open the font picker and choose the text typeface.').click();
+  await page.getByRole('button', { name: /^Tinos(?! Bold)/ }).click();
+  await expect(formatting).toContainText('Live preview');
+  await expect(formatting.getByRole('alert')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(input).toHaveCount(0);
+  expect(shapingWasmResponses).toContain(200);
   expect(failedAssets).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

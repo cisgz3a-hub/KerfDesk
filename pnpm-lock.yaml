@@ -49,6 +49,12 @@ importers:
       '@tabler/icons':
         specifier: 3.43.0
         version: 3.43.0
+      ag-psd:
+        specifier: 31.0.3
+        version: 31.0.3
+      bidi-js:
+        specifier: 1.1.0
+        version: 1.1.0
       clipper2-ts:
         specifier: 2.0.1-17
         version: 2.0.1-17
@@ -61,6 +67,9 @@ importers:
       electron-updater:
         specifier: ^6.8.9
         version: 6.8.9
+      harfbuzzjs:
+        specifier: 1.6.3
+        version: 1.6.3
       imagetracerjs:
         specifier: ^1.2.6
         version: 1.2.6
@@ -1896,6 +1905,9 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  ag-psd@31.0.3:
+    resolution: {integrity: sha512-THDYK+WK1F5GOH4G0l4wkQRc0Cyq5tnxIwBezACKwa6idKygphnGgMISr4lmW6n0Q89ceoqpdPZQF3Y7TL1pgg==}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
@@ -2021,6 +2033,9 @@ packages:
     resolution: {integrity: sha512-oCu2wfipvX3AePSgmOuKkIywOu+8n9psz7hXYmk56ghpu3+7KzNIBopaOs4c9BrtdnTtW30unG9GTfHo7EwERQ==}
     engines: {node: '>=6.0.0'}
     hasBin: true
+
+  bidi-js@1.1.0:
+    resolution: {integrity: sha512-fX1Onk0tdVPC7obPWB5EbJ1z7NVhLq4m2xZLq2YXBkxzMXIGRpNMU88n0EPgWseKl12J7zXs7qrDxPK4sRs2fg==}
 
   blake3-wasm@2.1.5:
     resolution: {integrity: sha512-F1+K8EbfOZE49dtoPtmxUQrpXaBIl3ICvasLh+nJta0xkz+9kF/7uet9fLnwKqhDrmj6g+6K3Tw9yQPUg2ka5g==}
@@ -2789,6 +2804,9 @@ packages:
     engines: {node: '>=0.4.7'}
     hasBin: true
 
+  harfbuzzjs@1.6.3:
+    resolution: {integrity: sha512-R5Mfo1UUvQmZJmtScP7fBLKYKnYu82ZdtFT7WbQYeGb3Ut5PR3xfFCJ5/FjbcW5SAfb9cqCSny/KNjp+NJBx0w==}
+
   has-bigints@1.1.0:
     resolution: {integrity: sha512-R3pbpkcIqv2Pm3dUwgjclDRVmWpTJW2DcMzcIhEXEx1oh/CEMObMm3KLmRJOdvhM7o4uQBnwr8pzRK2sJWIqfg==}
     engines: {node: '>= 0.4'}
@@ -3419,6 +3437,9 @@ packages:
 
   package-json-from-dist@1.0.1:
     resolution: {integrity: sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==}
+
+  pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -6174,6 +6195,11 @@ snapshots:
 
   acorn@8.16.0: {}
 
+  ag-psd@31.0.3:
+    dependencies:
+      base64-js: 1.5.1
+      pako: 2.1.0
+
   agent-base@7.1.4: {}
 
   ajv@6.15.0:
@@ -6374,6 +6400,10 @@ snapshots:
   base64-js@1.5.1: {}
 
   baseline-browser-mapping@2.11.0: {}
+
+  bidi-js@1.1.0:
+    dependencies:
+      require-from-string: 2.0.2
 
   blake3-wasm@2.1.5: {}
 
@@ -7378,6 +7408,8 @@ snapshots:
     optionalDependencies:
       uglify-js: 3.19.3
 
+  harfbuzzjs@1.6.3: {}
+
   has-bigints@1.1.0: {}
 
   has-flag@4.0.0: {}
@@ -8000,6 +8032,8 @@ snapshots:
       p-limit: 3.1.0
 
   package-json-from-dist@1.0.1: {}
+
+  pako@2.1.0: {}
 
   parent-module@1.0.1:
     dependencies:

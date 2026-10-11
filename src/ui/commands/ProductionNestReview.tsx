@@ -18,9 +18,12 @@ export function ProductionNestReview(props: {
   return (
     <section aria-label="Production quantity review" style={{ display: 'grid', gap: 12 }}>
       <p role="status">
-        {props.running ? 'Searching' : 'Search stopped or complete'} · {props.progress.attempted} /{' '}
-        {props.progress.total} arrangements tried.
+        {props.running ? 'Searching' : 'Search stopped or complete'} ·{' '}
+        {props.progress.advanced
+          ? `${props.progress.attempted} drafts checked for advanced optimisation.`
+          : `${props.progress.attempted} / ${props.progress.total} arrangements tried.`}
       </p>
+      {props.progress.notice !== undefined && <p role="status">{props.progress.notice}</p>}
       {props.stale && (
         <p role="alert">
           Artwork or setup changed. Calculate a fresh quantity draft before accepting.

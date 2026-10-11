@@ -7,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
+import { offlineEngineNotices } from './offline-engine-assets.mjs';
 
 import {
   CNC_STROKE_FONTS,
@@ -171,6 +172,7 @@ export function buildThirdPartyNotice(rootDir = REPO_ROOT) {
     ...openClipartSections(rootDir),
     '== pnpm production dependency closure ==',
     ...dependencySections(rootDir),
+    ...offlineEngineNotices(rootDir),
     '== Electron desktop runtime package ==',
     electronSection(rootDir),
     standardTexts,
