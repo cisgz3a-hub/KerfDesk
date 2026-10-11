@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "sinceSourceSha": "e34ad795e1e6d8dad256d106e41e9b3a8f335331",
+  "sinceSourceSha": "67d109ffd84c833ea80f6fd4e49cd00214837f36",
   "highlights": [
-    "Repeated Save and Save As requests to the same file through different paths preserve the newest captured document.",
-    "CNC relief masks respect whole cell footprints, varying-width rail profiles stay aligned and tapered inlays preserve overlapping text joins. Sketches retain diagonals and withhold results that cannot reopen.",
-    "Selected CNC output ignores unused projection dependencies and retains valid Frame evidence after unrelated edits.",
-    "Artwork exports preserve thin and flattened curves under scaling, rotation and mirroring, within the requested precision of supported vector formats.",
-    "Licence checkout rejects malformed requests before saving payment intent. Desktop Phone connections bound complete reply frames and report oversize responses cleanly.",
-    "First Connect opens Machine Setup for an unconfigured machine. Desktop upgrade checks verify saved CNC setups and optimisation settings against the installed writer. Build tools include available security patches."
+    "Desktop updates now appear above the canvas, with separate choices to download and install. Licence keys are easier to paste, and the purchase page can open licence settings in KerfDesk.",
+    "The Laser/CNC switch is in the machine toolbar. Positioning actions stay beside the jog controls, and Machine Setup has clearer review, focus and discard choices.",
+    "Create artwork now provides clearer sketch and part workflows, accessible project sheets and editable relief tools. Older relief projects retain their composition settings.",
+    "STL reliefs keep model proportions, finish against the mesh and support two-sided setups with carved-stock previews. V-carving uses modelled conical cutters and catches empty geometry before output.",
+    "Checkout recovery and licence device ownership are more reliable. Saved-document recovery is preserved, unsendable output is caught before Start, and Abort can be retried after an unconfirmed reset.",
+    "Updated safety guidance explains direct supervision, machine safety features and fire response. Refund Policy 1.2 considers new requests case by case while preserving existing promises and mandatory rights."
   ]
 }

@@ -291,3 +291,28 @@ it('Buy Pro opens the purchase page itself, while Renew updates still starts in 
   expect(adapter.checkout).toHaveBeenCalledExactlyOnceWith('renewal');
   expect(openPurchasePage).toHaveBeenCalledOnce();
 });
+
+it('shows the key as typed, pastes it from the clipboard in one click, and spots a partial key', async () => {
+  const key = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
+  const adapter = client(offered(false));
+  const clipboardKey = vi.fn(async (): Promise<string | null> => key);
+  await show({ ...adapter, clipboardKey });
+  expect(activationInput().type).toBe('text');
+  await act(async () => button('Paste key').click());
+  expect(clipboardKey).toHaveBeenCalledOnce();
+  expect(activationInput().value).toBe(key);
+  await act(async () => button('Activate licence').click());
+  expect(adapter.activate).toHaveBeenCalledExactlyOnceWith(key);
+  clipboardKey.mockResolvedValueOnce(null);
+  await act(async () => button('Paste key').click());
+  expect(host.textContent).toContain('No KerfDesk licence key is on the clipboard');
+  await enterKey(key.slice(0, 50));
+  expect(host.textContent).toContain('Part of the key seems to be missing');
+  await enterKey(`Licence key: ${key}`);
+  expect(host.textContent).toContain('Found your licence key in the pasted text');
+});
+
+it('offers no Paste key where the app cannot read a key from the clipboard', async () => {
+  await show(client(offered(false)));
+  expect(button('Paste key')).toBeUndefined();
+});

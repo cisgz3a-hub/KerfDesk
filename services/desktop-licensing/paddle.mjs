@@ -202,6 +202,8 @@ export function paddleVerifier(env) {
       orderProof: data.custom_data.kerfdesk_order_proof,
       provider: 'paddle',
       providerOrderId: data.id,
+      // Only used to look up where to email the key (licence-email.mjs); never stored.
+      customerId: typeof data.customer_id === 'string' ? data.customer_id : null,
       operation: known ? operation : null,
       priceId: known ? config.prices[operation] : null,
       amount: known ? CATALOG[operation] : null,

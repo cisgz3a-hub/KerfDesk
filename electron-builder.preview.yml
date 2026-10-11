@@ -21,6 +21,7 @@ files:
   - public/desktop-commercial-catalog.mjs
   - public/desktop-release-keys.json
   - public/desktop-sandbox-contract.mjs
+  - public/licence-key-text.mjs
   # The renderer is bundled into dist/web. Ship only the main process's
   # reachable packages and mandatory dependency closure (ADR-483), including
   # nested imports. electron/packaged-runtime-closure.test.ts checks this list

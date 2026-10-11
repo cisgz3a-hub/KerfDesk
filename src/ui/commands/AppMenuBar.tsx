@@ -278,6 +278,7 @@ const MENU_GROUPS: Partial<Record<CommandFamily, ReadonlyArray<MenuGroupLayout>>
       ids: [
         'tools.edit-image',
         'tools.adjust-image',
+        'tools.photo-engraving',
         'tools.apply-image-mask',
         'tools.crop-image',
         'tools.flatten-image-mask',

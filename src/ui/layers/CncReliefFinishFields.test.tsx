@@ -65,7 +65,8 @@ describe('ReliefLayerRows', () => {
       // Unset, relief roughing leaves 0.5 mm.
       expect(allowance.value).toBe('0.5');
       const strategy = select(host, 'Relief finish strategy for #ff0000');
-      expect(strategy.value).toBe('raster');
+      // Unset is Automatic (ADR-580): waterline for an STL, raster for a height map.
+      expect(strategy.value).toBe('automatic');
       const axis = select(host, 'Relief raster direction for #ff0000');
       expect(axis.value).toBe('x');
 
@@ -77,6 +78,30 @@ describe('ReliefLayerRows', () => {
       });
       expect(onCommit).toHaveBeenCalledWith({ reliefFinishStrategy: 'raster-waterline' });
       expect(onCommit).toHaveBeenCalledWith({ reliefRasterAxis: 'y' });
+    } finally {
+      await act(async () => root.unmount());
+      host.remove();
+    }
+  });
+
+  it('returns an explicit finish strategy to Automatic by removing it (ADR-580)', async () => {
+    const onCommitSettings = vi.fn();
+    const settings: CncLayerSettings = {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'engrave',
+      reliefFinishStrategy: 'raster',
+    };
+    const { host, root } = await renderRows(settings, vi.fn(), onCommitSettings);
+    try {
+      const strategy = select(host, 'Relief finish strategy for #ff0000');
+      expect(strategy.value).toBe('raster');
+      await act(async () => {
+        strategy.value = 'automatic';
+        strategy.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      const committed = onCommitSettings.mock.calls[0]?.[0] as CncLayerSettings | undefined;
+      expect(committed).toBeDefined();
+      expect(committed && 'reliefFinishStrategy' in committed).toBe(false);
     } finally {
       await act(async () => root.unmount());
       host.remove();

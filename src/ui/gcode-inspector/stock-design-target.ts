@@ -80,8 +80,15 @@ function sampleRelief(
   return landed;
 }
 
+// Steeper than this between two neighbouring samples, the design holds a wall
+// (ADR-580): an STL's vertical side, say. The depth at a point between them
+// could be either side's, so the cell is not compared rather than given a
+// depth part-way up the wall; interpolated, a carving that follows the wall's
+// foot exactly read as cut metres too deep.
+const WALL_SLOPE = Math.tan((85 * Math.PI) / 180);
+
 // The heightmap's depth at a point, between the four nearest cell centres;
-// null off the heightmap or where its mask leaves the cell out.
+// null off the heightmap, where its mask leaves the cell out, or on a wall.
 function depthAt(map: Heightmap, at: { x: number; y: number }): number | null {
   if (at.x < 0 || at.y < 0 || at.x > map.widthMm || at.y > map.heightMm) return null;
   const last = { x: map.widthCells - 1, y: map.heightCells - 1 };
@@ -93,12 +100,13 @@ function depthAt(map: Heightmap, at: { x: number; y: number }): number | null {
   if (map.inclusion?.[nearest] === 0) return null;
   const x1 = Math.min(x0 + 1, last.x);
   const y1 = Math.min(y0 + 1, last.y);
-  const tx = fx - x0;
-  const ty = fy - y0;
   const cell = (x: number, y: number): number => map.depth[y * map.widthCells + x] ?? 0;
-  const front = cell(x0, y0) + (cell(x1, y0) - cell(x0, y0)) * tx;
-  const back = cell(x0, y1) + (cell(x1, y1) - cell(x0, y1)) * tx;
-  return front + (back - front) * ty;
+  const corners = [cell(x0, y0), cell(x1, y0), cell(x0, y1), cell(x1, y1)];
+  if (Math.max(...corners) - Math.min(...corners) > WALL_SLOPE * map.mmPerCell) return null;
+  const [a = 0, b = 0, c = 0, d = 0] = corners;
+  const front = a + (b - a) * (fx - x0);
+  const back = c + (d - c) * (fx - x0);
+  return front + (back - front) * (fy - y0);
 }
 
 // The stock cells the heightmap's four corners reach, clamped to the stock.

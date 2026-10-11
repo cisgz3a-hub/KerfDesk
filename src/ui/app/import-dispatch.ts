@@ -9,6 +9,8 @@ import { importDxfFiles } from './dxf-import-action';
 import { importHpglFile } from './hpgl-import-action';
 import { openGcodeFileInInspector } from './gcode-open-action';
 import { importStlFiles } from './stl-import-action';
+import type { StlImportTarget } from './stl-import-size';
+import { useStore } from '../state/store';
 import { importSvgFiles } from './svg-import-action';
 import { requestPagedArtwork } from '../import/request-paged-artwork';
 import { describeImportBedFit } from './import-bed-fit-notice';
@@ -311,6 +313,7 @@ async function dispatchOneFile(
         importObject: actions.importSvgObject,
         pushToast: actions.pushToast,
         nextSuccessIndex,
+        target: currentStlImportTarget,
       }),
     );
     return;
@@ -321,6 +324,18 @@ async function dispatchOneFile(
       openGcodeFileInInspector(file, openInspector, actions.pushToast),
     );
   }
+}
+
+// The bed an STL is fitted to and the stock its height is compared with
+// (ADR-580), read when the file arrives.
+function currentStlImportTarget(): StlImportTarget {
+  const { project } = useStore.getState();
+  const machine = project.machine;
+  return {
+    bedWidthMm: project.device.bedWidth,
+    bedHeightMm: project.device.bedHeight,
+    ...(machine?.kind === 'cnc' ? { stockThicknessMm: machine.stock.thicknessMm } : {}),
+  };
 }
 
 async function whenPro(feature: ProFeature, work: () => Promise<unknown>): Promise<void> {

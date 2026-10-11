@@ -224,6 +224,29 @@ describe('licensing custom protocol capability boundary', () => {
       expect(checkout).not.toHaveBeenCalled();
     },
   );
+  it('Paste key returns only a KerfDesk key from the clipboard, never other clipboard text', async () => {
+    const h = routes();
+    const key = `KD1.0f8fad5b-d9cb-469f-a165-70867728950e.${'a'.repeat(43)}`;
+    let clipboard = `Your licence key:\n${key}\n`;
+    const handle = withLicensingRoutes(
+      async () => new Response('asset'),
+      h.runtime,
+      undefined,
+      undefined,
+      undefined,
+      { readClipboard: () => clipboard },
+    );
+    expect(await (await handle(request('clipboard-key', {}, {}))).json()).toEqual({
+      licenseKey: key,
+    });
+    clipboard = 'my bank password 1234';
+    expect(await (await handle(request('clipboard-key', {}, {}))).json()).toEqual({
+      licenseKey: null,
+    });
+    expect((await handle(request('clipboard-key', {}, { text: 'x' }))).status).toBe(400);
+    // Free and Preview builds have no clipboard route at all.
+    expect((await h.handle(request('clipboard-key', {}, {}))).status).toBe(404);
+  });
   it('routes the recovery actions and no longer offers a launch gate', async () => {
     const h = routes();
     const reset = vi.spyOn(h.runtime, 'resetStore');

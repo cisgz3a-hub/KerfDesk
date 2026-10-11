@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
 import { purchaseLabel, purchaseTitle, startPurchase } from './purchase-action';
 
@@ -9,45 +9,7 @@ type ActionProps = {
   readonly run: (work: () => Promise<LicenceStatus>) => Promise<void>;
 };
 
-export function LicenceActivationForm({
-  value,
-  setValue,
-  busy,
-  submit,
-}: {
-  readonly value: string;
-  readonly setValue: (value: string) => void;
-  readonly busy: boolean;
-  readonly submit: (event: FormEvent) => void;
-}): JSX.Element {
-  return (
-    <form onSubmit={submit} style={{ display: 'grid', gap: 10, marginTop: 12 }}>
-      <label htmlFor="kerfdesk-licence-key">Licence key</label>
-      <input
-        id="kerfdesk-licence-key"
-        title="Paste the licence key from your purchase, or the key you were given"
-        className="lf-input"
-        value={value}
-        onChange={(event) => setValue(event.currentTarget.value)}
-        type="password"
-        autoComplete="off"
-        spellCheck={false}
-        maxLength={256}
-        disabled={busy}
-        placeholder="Enter your licence key"
-        style={{ width: '100%', boxSizing: 'border-box' }}
-      />
-      <button
-        type="submit"
-        className="lf-btn lf-btn--primary"
-        title="Unlock Pro on this device with the licence key"
-        disabled={busy || value.trim().length < 8}
-      >
-        Activate licence
-      </button>
-    </form>
-  );
-}
+export { LicenceActivationForm } from './LicenceKeyForm';
 
 /**
  * Shows the saved key so a buyer can activate their other devices and keep a

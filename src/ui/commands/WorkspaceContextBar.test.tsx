@@ -113,6 +113,18 @@ describe('WorkspaceContextBar', () => {
     expect(Number.parseFloat(menu.style.top)).toBeLessThan(999);
   });
 
+  it('opens Photo engraving through the selected-image More actions', async () => {
+    const photoEngraving = vi.fn();
+    useUiStore.getState().openWorkspaceContextBar({ x: 80, y: 90, context: 'workspace-selection' });
+    const h = await renderBar(commands({ 'tools.photo-engraving': photoEngraving }));
+
+    await clickButton(h, 'More');
+    await clickButton(h, 'Photo engraving...');
+
+    expect(photoEngraving).toHaveBeenCalledOnce();
+    expect(useUiStore.getState().workspaceContextBar).toBeNull();
+  });
+
   it('consumes Escape so dismissing the menu does not also run the workspace Escape shortcut', async () => {
     const workspaceEscape = vi.fn();
     window.addEventListener('keydown', workspaceEscape);
@@ -224,6 +236,7 @@ const COMMAND_IDS: ReadonlyArray<CommandId> = [
   'file.import-image',
   'tools.add-text',
   'tools.adjust-image',
+  'tools.photo-engraving',
   'tools.trace-image',
   'tools.convert-to-bitmap',
   'tools.fill-selection',
@@ -253,6 +266,7 @@ const COMMAND_LABELS: Partial<Record<CommandId, string>> = {
   'file.import-image': 'Import Image...',
   'tools.add-text': 'Text...',
   'tools.adjust-image': 'Adjust Image...',
+  'tools.photo-engraving': 'Photo engraving...',
   'tools.trace-image': 'Trace Image...',
   'tools.convert-to-bitmap': 'Convert to Bitmap...',
   'tools.fill-selection': 'Fill Selection',

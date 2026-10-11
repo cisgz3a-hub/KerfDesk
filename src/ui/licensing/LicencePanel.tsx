@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import type { LicenceAdapter, LicenceStatus } from '../../platform/types';
+import { findLicenceKey } from '../../../public/licence-key-text.mjs';
 import { EarlyUpdatesOption } from './EarlyUpdatesOption';
 import { LicenceDevicesPanel } from './LicenceDevicesPanel';
 import {
@@ -18,6 +19,8 @@ type Props = {
   readonly onStatus: (status: LicenceStatus) => Promise<void>;
   readonly onRetry: () => Promise<void>;
   readonly onClose: () => void;
+  /** A key to start with: the one a kerfdesk://licence link found on the clipboard. */
+  readonly initialKey?: string;
 };
 
 /** Help > Licence: the edition, the saved key and every licence action (ADR-540). */
@@ -28,8 +31,9 @@ export function LicencePanel({
   onStatus,
   onRetry,
   onClose,
+  initialKey = '',
 }: Props): JSX.Element {
-  const [key, setKey] = useState('');
+  const [key, setKey] = useState(initialKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const run = async (work: () => Promise<LicenceStatus>, activatedKey?: string): Promise<void> => {
@@ -57,7 +61,8 @@ export function LicencePanel({
   const activate = (event: FormEvent): void => {
     event.preventDefault();
     const submitted = key.trim();
-    void run(() => client.activate(submitted), submitted);
+    // The app activates the key found in pasted text; that is the key it saves.
+    void run(() => client.activate(submitted), findLicenceKey(submitted) ?? submitted);
   };
   if (status?.channel === 'free') return <EveryFeaturePanel onClose={onClose} />;
   return (
@@ -73,7 +78,13 @@ export function LicencePanel({
       />
       <SavedLicence client={client} status={status} busy={busy} run={run} />
       {offersActivation(status) ? (
-        <LicenceActivationForm value={key} setValue={setKey} busy={busy} submit={activate} />
+        <LicenceActivationForm
+          value={key}
+          setValue={setKey}
+          busy={busy}
+          submit={activate}
+          client={client}
+        />
       ) : null}
       <LicenceDeviceActions client={client} status={status} busy={busy} run={run} />
       <LicenceDevicesPanel client={client} status={status} typedKey={key} busy={busy} />

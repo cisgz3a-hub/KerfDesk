@@ -66,7 +66,7 @@ export function compileReliefProjectionGroups(
     targetScaleX: space.targetScaleX,
     targetScaleY: space.targetScaleY,
     mmPerCell: Math.min(projection.sampleSpacingMm, tool.diameterMm / 10),
-    sampling: 'footprint-max',
+    sampling: 'exact-mesh',
   });
   if (result.kind === 'error') return reliefMaterializationFailure(target.source, result.reason);
   const local = polylines.map((line) => ({

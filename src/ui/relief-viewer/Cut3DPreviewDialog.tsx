@@ -41,7 +41,7 @@ export function Cut3DPreviewDialog(props: {
     <Viewer3DDialogShell
       ariaLabel="Cut 3D preview"
       canvasAriaLabel="Cut 3D preview surface"
-      title={`Cut preview — ${formatDisplayMillimetres(widthMm)} × ${formatDisplayMillimetres(heightMm)} mm stock`}
+      title={`Cut preview — ${formatDisplayMillimetres(widthMm)} × ${formatDisplayMillimetres(heightMm)} mm of stock round the cut`}
       onClose={props.onClose}
       {...(notices.length === 0 ? {} : { notice: notices.join(' ') })}
       buildScene={buildScene}

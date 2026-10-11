@@ -4,7 +4,11 @@ import type { CncReliefPlanningEvidence } from '../job/job';
 import { DEFAULT_RELIEF_SCALLOP_MM } from '../relief';
 import { reliefScallopBallRadiusMm } from '../relief/relief-finishing';
 import { finishedFlatDepthAt, type ReliefFinishedFlats } from '../relief/relief-flat-finish';
-import { reliefFinishingPlan, reliefFinishRowSpacingMm } from '../relief/relief-finishing-strategy';
+import {
+  reliefFinishingPlan,
+  reliefFinishRowSpacingMm,
+  reliefFinishStrategyFor,
+} from '../relief/relief-finishing-strategy';
 import type { Heightmap } from '../relief/heightmap';
 import { reliefObjectToHeightmap } from '../relief/relief-object-to-heightmap';
 import {
@@ -104,7 +108,7 @@ function finishRelief(
   | ReliefMaterializationFailure {
   const space = reliefMachineSpaceGeometry(relief);
   const scallopMm = settings.reliefScallopMm ?? DEFAULT_RELIEF_SCALLOP_MM;
-  const strategy = settings.reliefFinishStrategy ?? 'raster';
+  const strategy = reliefFinishStrategyFor(settings.reliefFinishStrategy, relief.reliefSource.kind);
   const rowSpacingMm = reliefFinishRowSpacingMm(tool, scallopMm, strategy);
   const result = reliefObjectToHeightmap(relief, {
     targetWidthMm: relief.targetWidthMm,
@@ -112,7 +116,7 @@ function finishRelief(
     targetScaleX: space.targetScaleX,
     targetScaleY: space.targetScaleY,
     mmPerCell: finishingCellSizeMm(rowSpacingMm, tool),
-    sampling: 'footprint-max',
+    sampling: 'exact-mesh',
   });
   if (result.kind === 'error') return reliefMaterializationFailure(relief.source, result.reason);
   const map = result.heightmap;

@@ -7,7 +7,7 @@ export interface ManualDownload {
   sourceSha: string;
   sourceRef: string;
   publishedAt: string;
-  codeSigning: 'unsigned';
+  codeSigning: 'unsigned' | 'authenticode';
   updates: 'manual';
   artifacts: [{ name: string; bytes: number; sha256: string }];
 }

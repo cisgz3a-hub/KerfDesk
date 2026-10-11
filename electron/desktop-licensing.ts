@@ -1,4 +1,5 @@
-import { app, net, Notification, safeStorage, shell } from 'electron';
+import { app, BrowserWindow, clipboard, net, Notification, safeStorage, shell } from 'electron';
+import { installLicenceLink } from './licence-link.js';
 import { readLicensingConfig, type LicensingConfig } from './licensing-config.js';
 import { isLicenceCheckoutUrl, purchasePageUrl } from './licensing-commerce.js';
 import { licensingDeviceId, rememberDeviceId } from './licensing-device.js';
@@ -83,6 +84,7 @@ export function createDesktopLicensing(options: Options) {
     fetch: (url, init) => net.fetch(url, init),
     ...browserOpeners(config.channel === 'commercial' && config.sandbox === true),
   });
+  const licenceLink = desktopLicenceLink(config, options.packaged);
   const rings = createUpdateRingStore(options.userDataPath);
   const manual = desktopManualUpdates(config, {
     ...options,
@@ -118,6 +120,9 @@ export function createDesktopLicensing(options: Options) {
         earlyUpdates,
         updates,
         manual === null ? undefined : options.requestManualUpdateClose,
+        config.channel === 'commercial'
+          ? { readClipboard: () => clipboard.readText(), licenceLink }
+          : {},
       ),
     /**
      * Runs once the window is open: a quiet weekly licence confirmation, then
@@ -145,6 +150,29 @@ export function createDesktopLicensing(options: Options) {
         runtime.isReleaseEligibleCached(pendingUpdate.envelope, pendingUpdate.version);
     },
   };
+}
+
+/** kerfdesk://licence for a packaged, non-sandbox commercial Windows build only (ADR-579). */
+function desktopLicenceLink(config: LicensingConfig, packaged: boolean) {
+  return installLicenceLink(app, {
+    enabled:
+      config.channel === 'commercial' &&
+      config.sandbox !== true &&
+      packaged &&
+      process.platform === 'win32',
+    argv: process.argv,
+    readClipboard: () => clipboard.readText(),
+    primaryWindow: () => BrowserWindow.getAllWindows()[0],
+    // A packaged build only ever shows its own app://app renderer.
+    isTrustedRenderer: (url) => {
+      try {
+        const parsed = new URL(url);
+        return parsed.protocol === 'app:' && parsed.host === 'app';
+      } catch {
+        return false;
+      }
+    },
+  });
 }
 
 function announceManualUpdate(version: string): void {

@@ -18,6 +18,7 @@ import { ProInDesktopDialog } from './ProInDesktopDialog';
 import type { ProFeature } from './pro-features';
 import { createTrialExpiryClock, expireTrialStatus } from './trial-expiry';
 import { useTrialExpiry } from './use-trial-expiry';
+import { useLicenceLink } from './use-licence-link';
 
 export { LICENCE_SETTINGS_EVENT };
 
@@ -71,6 +72,7 @@ function LicensedEdition({
 }): JSX.Element {
   const session = useLicenceSession(client, unlicensedRunsFree);
   const desktop = useProInDesktop();
+  const link = useLicenceLink(client);
   // A desktop build without commercial metadata cannot take a licence.
   const freeBuild = unlicensedRunsFree && session.status?.channel === 'free';
   const { load, isPro } = session;
@@ -100,6 +102,8 @@ function LicensedEdition({
       {managing ? (
         <div role="dialog" aria-modal="false" aria-label="KerfDesk licence" style={panelOverlay}>
           <LicencePanel
+            key={link.serial}
+            initialKey={link.linkedKey ?? ''}
             client={client}
             status={session.status}
             failure={session.failure}

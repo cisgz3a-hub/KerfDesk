@@ -28,6 +28,9 @@ const moduleBoundaries = {
     { type: 'platform-web', pattern: 'src/platform/web', mode: 'folder' },
     { type: 'platform-electron', pattern: 'src/platform/electron', mode: 'folder' },
     { type: 'core', pattern: 'src/core', mode: 'folder' },
+    // Dependency-free licence-key parsing shared with the Electron main process,
+    // whose rootDir cannot reach src/ (ADR-578). It imports nothing, like core.
+    { type: 'core', pattern: 'public/licence-key-text.{mjs,d.mts}', mode: 'file' },
     { type: 'io', pattern: 'src/io', mode: 'folder' },
     { type: 'ui', pattern: 'src/ui', mode: 'folder' },
   ],

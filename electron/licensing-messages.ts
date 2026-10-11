@@ -103,6 +103,8 @@ export const REVOKED = new Set(['license_revoked']);
 const FREE_HERE =
   'Enter your licence key to use Pro here again, or contact KerfDesk support to free the seat.';
 export const MESSAGES = {
+  invalidKey:
+    'That is not a whole KerfDesk licence key. A key starts with KD1. and is 84 characters long. Copy it again from the purchase page or your email, then paste it here.',
   unreadable:
     'The licence saved on this computer can’t be read, for example after a Windows account or password reset, so Pro tools are locked. Everything else works. Reset it, then enter your licence key again; this computer keeps its licence seat.',
   unavailable:

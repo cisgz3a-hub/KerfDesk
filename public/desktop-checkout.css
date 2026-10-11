@@ -358,6 +358,15 @@ button.text-button:hover:not(:disabled) {
 .licence-result p {
   font-size: 12px;
 }
+.licence-result button + button {
+  margin-left: 8px;
+}
+.licence-steps {
+  margin: 12px 0 8px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.5;
+}
 .features {
   padding-top: 12px;
 }

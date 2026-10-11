@@ -120,3 +120,47 @@ describe('the carving against the design (ADR-487)', () => {
     });
   });
 });
+
+describe('walls in the design (ADR-580)', () => {
+  // A 10 mm plate 4 mm below a ridge at the stock top: the ridge spans
+  // x 4 to 6 with vertical sides, as an STL models it.
+  function ridge(): ReliefObject {
+    const p = [0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 0, 0, 10, 10, 0, 0, 10, 0];
+    p.push(4, 0, 4, 6, 0, 4, 6, 10, 4, 4, 0, 4, 6, 10, 4, 4, 10, 4);
+    p.push(4, 0, 0, 4, 10, 0, 4, 10, 4, 6, 0, 0, 6, 10, 4, 6, 10, 0);
+    return {
+      kind: 'relief',
+      id: 'ridge',
+      source: 'ridge.stl',
+      reliefSource: { kind: 'legacy-mesh', meshPositions: p, emptyCells: 'floor' },
+      targetWidthMm: 10,
+      reliefDepthMm: 4,
+      color: DEFAULT_RELIEF_LAYER_COLOR,
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+    };
+  }
+  const fine: StockCells = {
+    originX: 0,
+    originY: 0,
+    mmPerCell: 0.1,
+    widthCells: 100,
+    heightCells: 100,
+  };
+  const at01 = (target: Float32Array, column: number) => target[50 * fine.widthCells + column];
+
+  it('compares neither side of a wall part-way up it, and both sides away from it', () => {
+    const target = designTarget(fine, [at(ridge(), 0, 0)]);
+    if (target === null) throw new Error('no design');
+    expect(at01(target, 30)).toBeCloseTo(-4, 5);
+    expect(at01(target, 50)).toBeCloseTo(0, 5);
+    // The cell whose interpolation spans the ridge's side holds no design.
+    expect(at01(target, 39)).toBe(NO_DESIGN);
+    // A carving that follows the wall's foot is never read as cut too deep.
+    const depth = new Float32Array(target.length).fill(-4);
+    for (let column = 40; column < 60; column += 1) {
+      for (let row = 0; row < fine.heightCells; row += 1) depth[row * fine.widthCells + column] = 0;
+    }
+    expect(compareWithDesign(depth, target, 0.05).gouged).toBe(0);
+  });
+});

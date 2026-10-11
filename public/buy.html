@@ -131,17 +131,35 @@
                   aria-describedby="licence-key-help"
                 ></textarea>
                 <button
+                  id="licence-open-app"
+                  type="button"
+                  hidden
+                  title="Copy your licence key and open KerfDesk on its Licence page, with the key filled in"
+                >
+                  Copy key &amp; open KerfDesk
+                </button>
+                <button
                   id="licence-copy"
+                  class="secondary"
                   type="button"
                   title="Copy your confirmed licence key to your clipboard"
                 >
                   Copy licence key
                 </button>
                 <p id="licence-copy-status" role="status" aria-live="polite"></p>
-                <p id="licence-key-help">
-                  Keep this key somewhere private. On Windows, open
-                  <strong>Help → Licence</strong> in KerfDesk and enter it. This phone uses no
-                  licence seat.
+                <ol id="licence-key-help" class="licence-steps">
+                  <li>Copy your key, and keep a copy somewhere private.</li>
+                  <li>
+                    In KerfDesk for Windows, open <strong>Help → Licence</strong>, or click
+                    <strong>Free · Try Pro</strong> in the status bar.
+                  </li>
+                  <li>
+                    Choose <strong>Paste key</strong>, then <strong>Activate licence</strong>.
+                  </li>
+                </ol>
+                <p class="licence-note">
+                  Buying on a phone or tablet uses no licence seat; activate on up to three Windows
+                  computers.
                 </p>
               </div>
               <p class="storage-note">

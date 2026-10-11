@@ -85,6 +85,26 @@ requirement; public unsigned distribution would need a separately reviewed lane.
 macOS commercial signing/notarization and signed update qualification remain a
 separate launch prerequisite; no macOS auto-update claim is made here.
 
+### Moving customers from unsigned to signed Windows releases (ADR-579)
+
+Installed unsigned copies only ever read `desktop/commercial-manual/latest.json`;
+the signed release train never writes it. Switching to signed releases without a
+hand-off would leave every current customer on their last unsigned version.
+
+1. Buy the certificate (the train expects SSL.com eSigner) and complete
+   "Switching it on" under the weekly release train below.
+2. Before the last unsigned release, make sure installed copies accept
+   `codeSigning: "authenticode"` in the manual manifest: every release from the
+   ADR-579 change on does. Publish at least one unsigned release containing it.
+3. Publish the first signed installer to the manual lane as well, with
+   `codeSigning: "authenticode"` (`scripts/manual-commercial-manifest.mjs` still
+   writes only `"unsigned"`; extend it then). Unsigned copies offer it through
+   Download update and Install when I close KerfDesk; both builds share one app ID,
+   so it installs in place and keeps projects, settings and the saved licence.
+4. Verify on a disposable Windows profile: unsigned N takes signed N+1, the
+   installed app then reports signed automatic updates, and its licence still
+   reads Pro. Only then stop the unsigned lane.
+
 The commercial feed is separate from `/desktop` and `/desktop/previews`. Keep old
 eligible commercial versions available for customers whose update period ended.
 The catalog is bounded; reaching its capacity requires a reviewed archival/index

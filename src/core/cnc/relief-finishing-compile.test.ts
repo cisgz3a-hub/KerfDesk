@@ -103,7 +103,14 @@ function shallowDepthMapRelief(): ReliefObject {
 function reliefLayer(cnc: Partial<CncLayerSettings>): Layer {
   return {
     ...createLayer({ id: RELIEF_COLOR, color: RELIEF_COLOR }),
-    cnc: { ...DEFAULT_CNC_LAYER_SETTINGS, cutType: 'engrave', ...cnc },
+    // Raster row spacing is the subject; Automatic (ADR-580) adds waterline
+    // passes to an STL relief, so the strategy is pinned unless a case sets it.
+    cnc: {
+      ...DEFAULT_CNC_LAYER_SETTINGS,
+      cutType: 'engrave',
+      reliefFinishStrategy: 'raster',
+      ...cnc,
+    },
   };
 }
 

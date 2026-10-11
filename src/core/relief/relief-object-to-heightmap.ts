@@ -10,9 +10,10 @@ import { meshToHeightmap, type MeshSampling } from './mesh-to-heightmap';
 /** Materialization options shared by mesh-backed and heightfield-backed reliefs. */
 export type ReliefObjectHeightmapOptions = HeightfieldHeightmapOptions & {
   /**
-   * How a mesh source is read (ADR-412 Amendment 1): relief CAM passes
-   * 'footprint-max', previews keep the 'center' default. A heightfield source
-   * always takes the highest of the pixels under each cell.
+   * How a mesh source is read: relief CAM passes 'exact-mesh' (ADR-580), so
+   * the cutter is solved against the mesh's triangles; previews keep the
+   * 'center' default. A heightfield source always takes the highest of the
+   * pixels under each cell.
    */
   readonly sampling?: MeshSampling;
 };

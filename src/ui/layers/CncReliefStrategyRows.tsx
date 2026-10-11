@@ -96,23 +96,29 @@ function ReliefRoughingRows(props: ReliefRowsProps): JSX.Element {
 }
 
 // Whether steep walls get waterline passes, and which way the raster runs.
+// Unset is Automatic (ADR-580): raster + waterline for an STL model, raster
+// for a height map.
 function ReliefFinishRows(props: ReliefRowsProps): JSX.Element {
   const { layer, settings, onCommit } = props;
   return (
     <>
       <Row label="Finish strategy">
         <select
-          value={settings.reliefFinishStrategy ?? 'raster'}
-          onChange={(event) =>
-            onCommit({
-              reliefFinishStrategy:
-                event.target.value === 'raster-waterline' ? 'raster-waterline' : 'raster',
-            })
-          }
+          value={settings.reliefFinishStrategy ?? 'automatic'}
+          onChange={(event) => {
+            const value = event.target.value;
+            if (value === 'raster' || value === 'raster-waterline') {
+              onCommit({ reliefFinishStrategy: value });
+              return;
+            }
+            const { reliefFinishStrategy: _removed, ...rest } = settings;
+            props.onCommitSettings(rest);
+          }}
           aria-label={`Relief finish strategy for ${layer.color}`}
-          title="Raster rows the whole surface along one axis. Raster + waterline also circles every wall steeper than 45° level by level, the edge of a mask outline included, and packs the rows closer, so steep walls are finished as finely as flats; it takes longer."
+          title="Raster rows the whole surface along one axis. Raster + waterline also circles every wall steeper than 45° level by level, the edge of a mask outline included, and packs the rows closer, so steep walls are finished as finely as flats; it takes longer. Automatic uses Raster + waterline for an STL model and Raster for a height map."
           style={selectStyle}
         >
+          <option value="automatic">Automatic (STL: + waterline)</option>
           <option value="raster">Raster</option>
           <option value="raster-waterline">Raster + waterline</option>
         </select>

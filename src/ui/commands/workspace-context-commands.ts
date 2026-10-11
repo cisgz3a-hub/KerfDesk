@@ -66,6 +66,7 @@ const SELECTION_MORE_COMMANDS: ReadonlyArray<CommandId> = [
   'arrange.flip-horizontal',
   'arrange.flip-vertical',
   'tools.adjust-image',
+  'tools.photo-engraving',
   'tools.apply-image-mask',
   'tools.crop-image',
   'tools.remove-image-mask',

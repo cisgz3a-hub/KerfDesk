@@ -74,8 +74,8 @@ describe('Cut3DPreviewDialog', () => {
         );
       });
 
-      expect(host.textContent).toContain('1.4 × 0.6 mm stock');
-      expect(host.textContent).not.toContain('2 × 1 mm stock');
+      expect(host.textContent).toContain('1.4 × 0.6 mm of stock round the cut');
+      expect(host.textContent).not.toContain('2 × 1 mm of stock');
     } finally {
       if (root !== null) await act(async () => root?.unmount());
       host.remove();
@@ -129,7 +129,7 @@ describe('Cut3DPreviewDialog', () => {
       });
 
       expect(host.querySelector('[role="dialog"]')).not.toBeNull();
-      expect(host.textContent).toContain('40 × 30 mm stock');
+      expect(host.textContent).toContain('40 × 30 mm of stock round the cut');
       await vi.waitFor(
         async () => {
           await act(async () => Promise.resolve());

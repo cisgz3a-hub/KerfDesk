@@ -53,6 +53,13 @@ export type LicenceDevices = {
 export type LicenceAdapter = {
   readonly status: () => Promise<LicenceStatus>;
   readonly activate: (licenseKey: string) => Promise<LicenceStatus>;
+  /** The KerfDesk key on the clipboard, read by the main process on an explicit click; null if none. */
+  readonly clipboardKey?: () => Promise<string | null>;
+  /** Whether a kerfdesk://licence link asked to open Help > Licence; answers once per link. */
+  readonly licenceLink?: () => Promise<{
+    readonly open: boolean;
+    readonly licenseKey: string | null;
+  }>;
   /** The computers the saved key, or the key given, is active on. */
   readonly devices?: (licenseKey?: string) => Promise<LicenceDevices>;
   /** Frees another computer's seat with the key; never touches this device's saved licence. */

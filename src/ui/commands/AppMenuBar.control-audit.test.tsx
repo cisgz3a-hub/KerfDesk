@@ -81,6 +81,7 @@ const OUTCOMES: Record<CommandId, Outcome> = {
   'tools.print-and-cut': { callback: 'printAndCut' },
   'tools.labs': { callback: 'labsSettings' },
   'tools.adjust-image': { callback: 'adjustImage' },
+  'tools.photo-engraving': { callback: 'photoEngraving' },
   'tools.edit-image': { callback: 'editImage' },
   'tools.apply-image-mask': { callback: 'applyImageMask' },
   'tools.crop-image': { callback: 'cropImage' },
@@ -231,6 +232,7 @@ function availableContext(id: CommandId): AppCommandContext {
     quickNest: vi.fn(),
     exitApp: vi.fn(),
     openDataFolder: vi.fn(),
+    photoEngraving: vi.fn(),
   });
 }
 

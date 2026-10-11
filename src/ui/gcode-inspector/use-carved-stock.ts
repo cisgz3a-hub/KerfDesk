@@ -68,13 +68,15 @@ type CarvedStockOptions = {
   readonly design: GcodeInspectionDesign | undefined;
   /** Where playback has got; the whole program when it is not playing. */
   readonly target: StockTarget;
+  /** Start with the stock shown (the canvas view of a relief job, ADR-580). */
+  readonly initiallyShown?: boolean;
 };
 
 export const DEFAULT_COMPARE_TOLERANCE_MM = 0.1;
 
 export function useCarvedStock(options: CarvedStockOptions): CarvedStock {
   const { handleRef, state, model, sections, machineKind, design, target } = options;
-  const [shown, setShown] = useState(false);
+  const [shown, setShown] = useState(options.initiallyShown === true);
   const [toolpathShown, setToolpathShown] = useState(false);
   const [shaded, setShaded] = useState(true);
   const [material, setMaterial] = useStockMaterial(stockMaterialFor(design?.stockMaterialKey));
