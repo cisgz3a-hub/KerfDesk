@@ -13,6 +13,7 @@ import { useDesignStudioStore } from './design-studio-store';
 const surface: DesignSurface = {
   toMm: (event) => ({ x: event.clientX, y: event.clientY }),
   pxPerMm: () => 1,
+  toClient: (point) => point,
 };
 
 function PointerHarness(): JSX.Element {

@@ -42,6 +42,7 @@ export type AppState = {
   scopes: Scope[];
   pcOnline: boolean;
   socket: boolean;
+  liveUpdates: boolean;
   workspace: Workspace | null;
   scene: Scene | null;
   sceneRevision: string | null;
@@ -72,6 +73,7 @@ const initial: AppState = {
   scopes: ['read'],
   pcOnline: true,
   socket: false,
+  liveUpdates: false,
   workspace: null,
   scene: null,
   sceneRevision: null,

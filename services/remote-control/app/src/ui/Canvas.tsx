@@ -1,6 +1,5 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -20,7 +19,14 @@ import {
 } from '../core/scene';
 import { canEdit, store, type View } from '../core/store';
 import { CanvasLayers } from './canvas-layers';
-import { RAIL_INSET, clampScale, fitView, normalize, useContentBox } from './canvas-view';
+import {
+  RAIL_INSET,
+  fitView,
+  clampScale,
+  normalize,
+  useContentBox,
+  useAutomaticFit,
+} from './canvas-view';
 import { useApp, useElementSize } from './hooks';
 
 export { fitView, useContentBox } from './canvas-view';
@@ -56,17 +62,7 @@ export function Canvas({ interactive = true }: { interactive?: boolean }) {
   const [marquee, setMarquee] = useState<Box | null>(null);
   const lastTap = useRef(0);
 
-  // Fit once, and once more when the bed size first arrives with the scene.
-  const fittedBed = useRef(false);
-  const bedKnown = scene?.bed !== undefined;
-  useEffect(() => {
-    if (size.width === 0) return;
-    if (view !== null && interactive && (fittedBed.current || !bedKnown)) return;
-    fittedBed.current = bedKnown;
-    store.set({
-      view: fitView(content, size.width, size.height, 28, interactive ? RAIL_INSET : 0),
-    });
-  }, [size.width, size.height, view === null, interactive, content, bedKnown]);
+  useAutomaticFit(size, view, interactive, content, scene?.bed !== undefined);
 
   const current = view ?? { x: 0, y: 0, scale: 1 };
   const toScene = useCallback(

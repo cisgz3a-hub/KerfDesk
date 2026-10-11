@@ -16,6 +16,12 @@ export function vectorCutCommandContext(
       if (ui.toolMode.kind === 'trim-shapes') ui.resetToolMode();
       else ui.setToolMode({ kind: 'trim-shapes' });
     },
+    extendShapesActive: useUiStore.getState().toolMode.kind === 'extend-shapes',
+    extendShapes: () => {
+      const ui = useUiStore.getState();
+      if (ui.toolMode.kind === 'extend-shapes') ui.resetToolMode();
+      else ui.setToolMode({ kind: 'extend-shapes' });
+    },
     cutShapes: () => {
       app.cutSelectedShapes();
     },

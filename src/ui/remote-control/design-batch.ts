@@ -1,4 +1,7 @@
 import { withUndoStepName } from '../state/undo-step-names';
+import type { AppState } from '../state/store';
+import { prepareArrange } from './arrange';
+import type { RemoteArrangeAction } from './types';
 import { historyProjection } from './authoring-projections';
 import {
   applyMaterialRecipe,
@@ -70,13 +73,17 @@ function runBatch(
   const results: ItemResult[] = [];
   withUndoStepName('Remote edits', () =>
     inOneUndoStep(store, () => {
+      const owner = store.getState();
+      const ownedUndo = owner.pendingUndo;
       edits.forEach((edit, index) => {
         signal.throwIfAborted();
+        assertBatchOwner(store, owner);
         const args = resolveReferences(edit.args, results);
         results.push({
           command: edit.command,
-          ...runItem(store, edit.command, args, prepared[index], signal),
+          ...runItem(store, edit.command, args, prepared[index], signal, ownedUndo),
         });
+        assertBatchOwner(store, owner);
       });
     }),
   );
@@ -97,11 +104,22 @@ function runBatch(
   };
 }
 
+function assertBatchOwner(store: RemoteAppStore, owner: AppState): void {
+  const current = store.getState();
+  if (
+    current.pendingUndo !== owner.pendingUndo ||
+    current.projectDocumentEpoch !== owner.projectDocumentEpoch ||
+    current.projectOpenRequestEpoch !== owner.projectOpenRequestEpoch
+  )
+    throw new RemoteFault('stale_revision');
+}
+
 type ItemContext = {
   readonly store: RemoteAppStore;
   readonly args: Record<string, unknown>;
   readonly prepared: Prepared | undefined;
   readonly signal: AbortSignal;
+  readonly ownedUndo: AppState['pendingUndo'];
 };
 type ItemRunner = (
   context: ItemContext,
@@ -133,7 +151,16 @@ const ITEM_RUNNERS: Record<BatchItem['command'], ItemRunner> = {
       updateOperationFull(store, String(args.operationId), args.patch as RemoteOperationPatchFull),
     ),
   set_selection: ordinary,
-  arrange_artwork: ordinary,
+  arrange_artwork: ({ store, args, ownedUndo }) =>
+    pick(
+      prepareArrange(
+        store.getState(),
+        store,
+        args.artworkIds as string[],
+        args.action as RemoteArrangeAction,
+        ownedUndo,
+      )(),
+    ),
   add_rectangle: ordinary,
   add_ellipse: ordinary,
   add_polyline: ordinary,
@@ -146,8 +173,9 @@ function runItem(
   args: Record<string, unknown>,
   prepared: Prepared | undefined,
   signal: AbortSignal,
+  ownedUndo: AppState['pendingUndo'],
 ): Omit<ItemResult, 'command'> {
-  return ITEM_RUNNERS[command]({ store, args, prepared, signal }, command);
+  return ITEM_RUNNERS[command]({ store, args, prepared, signal, ownedUndo }, command);
 }
 
 /** Existing single-edit writes commit before their first await, so they run synchronously here. */

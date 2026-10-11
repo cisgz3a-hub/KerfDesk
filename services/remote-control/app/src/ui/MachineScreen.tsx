@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { controller } from '../core/controller';
 import { formatMm } from '../core/numbers';
 import { canControl } from '../core/store';
@@ -251,8 +251,29 @@ export function AbortDock() {
     controller.holdActive() ||
     /run|jog|home|hold/i.test(machine.controllerState ?? '');
   if (!moving) return null;
+  return <ActiveAbortDock />;
+}
+
+function ActiveAbortDock() {
+  const dock = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = dock.current;
+    if (element === null) return;
+    const update = () =>
+      document.documentElement.style.setProperty(
+        '--abort-dock-height',
+        `${element.getBoundingClientRect().height}px`,
+      );
+    const observer = new ResizeObserver(update);
+    observer.observe(element, { box: 'border-box' });
+    update();
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty('--abort-dock-height');
+    };
+  }, []);
   return (
-    <div className="abort-dock">
+    <div className="abort-dock" ref={dock}>
       <button type="button" className="abort-btn" onClick={() => void controller.abort()}>
         <Icon name="stop" size={24} /> Abort
       </button>

@@ -30,8 +30,11 @@ import { formatFieldValue, type EntityField } from './design-field-format';
 import { pointSequencePreviewPolylines, type DesignPointSequence } from './design-point-sequence';
 import type { DesignMarquee, DesignView } from './design-session';
 import { mmToPx } from './design-view';
+import type { SketchExtension } from '../../core/design/ops/extend-sketch';
+import { paintExtension } from './design-extend-draw';
 
 export type DesignOverlayPaint = {
+  readonly extendPreview?: SketchExtension | null;
   readonly view: DesignView;
   readonly draft: DesignDraft | null;
   readonly pointSequence: DesignPointSequence | null;
@@ -60,6 +63,7 @@ export function paintDesignOverlay(ctx: CanvasRenderingContext2D, paint: DesignO
   if (paint.draft !== null) paintDraft(ctx, paint.view, paint.draft);
   if (paint.pointSequence !== null) paintPointSequence(ctx, paint.view, paint.pointSequence);
   paintMeasurement(ctx, paint);
+  if (paint.extendPreview != null) paintExtension(ctx, paint.view, paint.extendPreview);
   // Drawn last so the snap glyph is never hidden behind a draft or a dimension.
   if (paint.snap !== null) paintSnapMarker(ctx, paint.view, paint.snap);
 }

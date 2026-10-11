@@ -27,14 +27,7 @@ export function Sheet({
   return (
     <>
       <div className="backdrop" onClick={onClose} />
-      <div
-        className="sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={id}
-        ref={panel}
-        tabIndex={-1}
-      >
+      <div className="sheet" role="dialog" aria-labelledby={id} ref={panel} tabIndex={-1}>
         <div className="sheet-grip" />
         <div className="sheet-head">
           <h2 id={id}>{title}</h2>

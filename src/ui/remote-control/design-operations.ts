@@ -205,10 +205,29 @@ export function inOneUndoStep(store: RemoteAppStore, run: () => void): void {
     return;
   }
   state.beginInteraction();
+  const ownedUndo = store.getState().pendingUndo;
+  const ownsInteraction = () => {
+    const current = store.getState();
+    return (
+      ownedUndo !== null &&
+      ownedUndo.project === state.project &&
+      current.pendingUndo === ownedUndo &&
+      current.projectDocumentEpoch === state.projectDocumentEpoch
+    );
+  };
+  const assertCurrent = () => {
+    if (
+      !ownsInteraction() ||
+      store.getState().projectOpenRequestEpoch !== state.projectOpenRequestEpoch
+    )
+      throw new RemoteFault('stale_revision');
+  };
   try {
+    assertCurrent();
     run();
+    assertCurrent();
   } catch (error) {
-    store.getState().cancelInteraction();
+    if (ownsInteraction()) store.getState().cancelInteraction();
     throw error;
   }
   store.getState().endInteraction();
