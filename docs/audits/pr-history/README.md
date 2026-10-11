@@ -5,7 +5,7 @@ The maintainer authorised continuing the audit through the complete PR history o
 ## Working record
 
 - [Current status](STATUS.md) shows publication and CI progress. [Confirmed defects and repairs](FINDINGS.md) provides each trigger, impact and attribution.
-- `findings.json` contains every confirmed current defect, its trigger, impact and historical attribution.
+- `findings.json` contains every confirmed current defect, its trigger, impact and historical attribution. Its `priority` is a JSON integer from 0 to 3, corresponding to P0 through P3; display strings such as `"P2"` are not stored in that field.
 - [Historical findings and dispositions](DISPOSITIONS.md) records defects already fixed before this audit, unmerged proposals, documented limitations and investigated candidates without sufficient evidence. `dispositions.json` preserves their reasons and local evidence references; these are not counted as new repairs.
 - `repairs.json` maps findings to focused changes, local verification, commit, branch, PR and CI evidence. Three related material-preset defects share one coherent repair.
 - `coverage.json` retains the full PR inventory, review scopes and explicit gaps. Historical evidence paths refer to the local audit archive, which includes intentionally failing probes and is not shipped with repair PRs.

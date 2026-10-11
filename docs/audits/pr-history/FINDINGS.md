@@ -4,7 +4,7 @@ This list grows as the audit continues. Status is taken from the live repair led
 
 ## FND-001: SVG import drops visible children overriding inherited fill or stroke opacity
 
-Repair: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139). State: pr-open-ci-pending.
+Repair: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139). State: pr-open-ci-verified.
 
 Trigger: Import a group with fill-opacity=0 and child rectangle fill-opacity=1, or stroke-opacity equivalents.
 
@@ -170,7 +170,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-03/machine-transactions.
 
 ## WUX-001: Imported-program playback uses the background project timing
 
-Repair: [#1149](https://github.com/cisgz3a-hub/KerfDesk/pull/1149). State: pr-open-ci-pending.
+Repair: [#1149](https://github.com/cisgz3a-hub/KerfDesk/pull/1149). State: pr-open-ci-verified.
 
 Trigger: Open a CNC project containing ordinary artwork, inspect a different external program and choose Open in 2D simulator. Same-geometry F60/F6000 programs both inherit the existing project estimate.
 
@@ -212,5 +212,6 @@ These concern the audit records and are separate from application defect counts.
 
 - [4240384675](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384675): Four null repair evidence references now use the canonical repair reports. Renderer has explicit fallback. Status: resolved-in-published-followup.
 - [4240384677](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240384677): Queued aggregates already kept cycleVerified false. absentRequired and unmetRequired now distinguish absence from all unsuccessful required checks. Status: resolved-in-published-followup.
-- [pending-ledger-review](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed queue inconsistency: the frozen snapshot awaited independent review but omitted its pending task. The next snapshot retains an explicit review token and sequences review before publication; only commit-bound approval and verified committed blobs clear the local token. Independent evidence shows the previous snapshot was reviewed; a publication bypass was not reproduced. Status: confirmed-corrected-awaiting-snapshot-review.
-- [tracking-coverage-ci](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity. Status: confirmed-corrected-awaiting-snapshot-review.
+- [pending-ledger-review](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed queue inconsistency: the frozen snapshot awaited independent review but omitted its pending task. The next snapshot retains an explicit review token and sequences review before publication; only commit-bound approval and verified committed blobs clear the local token. Independent evidence shows the previous snapshot was reviewed; a publication bypass was not reproduced. Status: resolved-in-published-followup.
+- [tracking-coverage-ci](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#issuecomment-6106651312): Confirmed same-head contradiction: coverage still called passed tracking CI pending. Coverage now has neutral source-review prose and a structured CI receipt synchronized to state, including its observed head and whether that head matches the inventory. A green result cannot silently advance source review or inventory identity. Status: resolved-in-published-followup.
+- [4240863024](https://github.com/cisgz3a-hub/KerfDesk/pull/1151#discussion_r4240863024): Confirmed mixed JSON priority types: four P2 display strings differed from ten numeric values. Normalize the four records to numeric 2 and document the numeric 0-3 convention. A strict numeric selection omitted those four records; no existing production consumer failure is claimed. Status: fixed-awaiting-independent-review.

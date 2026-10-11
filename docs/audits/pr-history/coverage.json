@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T07:53:29.385Z",
+  "inventoryRefreshedAt": "2026-10-11T08:39:04.516Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -24794,10 +24794,10 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T05:06:52Z",
-      "updated_at": "2026-10-11T07:20:10Z",
+      "updated_at": "2026-10-11T07:59:45Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "2dbf18c0730d038312b604e9dcd23b45131ffcd4",
+      "merge_commit_sha": "a586414ce97189b4a7471280ce79db17fbdc37b8",
       "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
@@ -24849,10 +24849,7 @@
         "remaining": [],
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
         "repairGroup": "external-program-timing"
-      },
-      "previousInventoriedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
-      "headRefreshedAt": "2026-10-11T07:54:28.991Z",
-      "headEvidence": "Publication verified the live GitHub PR head; source attestation checked the complete diff manifest and reviewed files"
+      }
     },
     {
       "number": 1150,
@@ -24891,18 +24888,18 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T05:20:35Z",
-      "updated_at": "2026-10-11T07:24:47Z",
+      "updated_at": "2026-10-11T08:24:21Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "f1b0f6ac216f2f96a217d8ad178ad3a9c5e837dc",
-      "head": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
+      "merge_commit_sha": "ecdfb6480e3338545b284996f0430bbe64672fa8",
+      "head": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
         "scope": "Complete nine-file tracking diff independently reviewed at reviewedHead. Source-review coverage and per-head CI are separate; see ciSnapshot and state.json:ledgerCi.",
-        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-ledger-peer-review.md",
-        "reviewer": "foundation_prs",
-        "reviewedHead": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0812-ledger-peer-review.md",
+        "reviewer": "ledger_0812",
+        "reviewedHead": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
         "reviewedFiles": [
           "docs/audits/pr-history/README.md",
           "docs/audits/pr-history/STATUS.md",
@@ -24918,9 +24915,9 @@
         "limitations": "Documentation and workflow record. CI applies only to its recorded head and does not complete the historical audit or qualify product deployment/hardware."
       },
       "ciSnapshot": {
-        "head": "69e97b7b6af333d20851af56c3a5e2ecf3d684e1",
+        "head": "f7833a464df7307499c5aa3de4a28a4244dc8de2",
         "status": "passed",
-        "checkedAt": "2026-10-11T07:54:39.245Z",
+        "checkedAt": "2026-10-11T08:39:10.629Z",
         "matchesInventoriedHead": true,
         "absentRequired": [],
         "unmetRequired": [],

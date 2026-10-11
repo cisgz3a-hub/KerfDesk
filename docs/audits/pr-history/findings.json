@@ -40,8 +40,9 @@
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       },
       {
@@ -60,8 +61,9 @@
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       },
       {
@@ -74,8 +76,9 @@
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       },
       {
@@ -88,8 +91,9 @@
         "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       },
       {
@@ -102,8 +106,9 @@
         "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       },
       {
@@ -121,8 +126,9 @@
         "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       },
       {
@@ -135,8 +141,9 @@
         "publishedHead": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
         "latestRepairVerification": {
           "head": "2f212738870ccdbea45e739acd05a5c0bfe389e8",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.873Z"
         }
       }
     ],
@@ -199,7 +206,7 @@
   },
   {
     "id": "CCA-001",
-    "priority": "P2",
+    "priority": 2,
     "title": "Append camera preview cache busting outside the proxied camera URL",
     "originPr": 33,
     "trigger": "Detect a machine snapshot camera whose successful frame response takes longer than the 1500 ms preview poll (2.2 s in reproduction, below the bridge 10 s timeout).",
@@ -211,7 +218,7 @@
   },
   {
     "id": "CCA-002",
-    "priority": "P2",
+    "priority": 2,
     "title": "Use the grabbed selected node as the drag reference",
     "originPr": 32,
     "trigger": "Select node A, Shift-add B so B is primary, then plain-drag already-selected A.",
@@ -223,7 +230,7 @@
   },
   {
     "id": "BRP-01",
-    "priority": "P2",
+    "priority": 2,
     "title": "Reject a stale board correction after Undo replaces the captured outline",
     "originPr": 304,
     "trigger": "Capture a 120 x 80 rectangle over an existing 40 x 40 captured board. Begin bottom-left physical-point correction, then invoke ordinary Undo while setOriginHere is pending. Resolve the origin operation.",
@@ -235,7 +242,7 @@
   },
   {
     "id": "B02-TRACE-001",
-    "priority": "P2",
+    "priority": 2,
     "title": "Close the final fairing span at its actual corner",
     "originPr": 51,
     "trigger": "A closed measured organic contour with one or more pinned corners reaches fairChainSegments; cyclically shift the equivalent ring to a different first corner or reverse traversal.",
@@ -308,8 +315,9 @@
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361096",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -319,8 +327,9 @@
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361100",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -330,8 +339,9 @@
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361105",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -341,8 +351,9 @@
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -352,8 +363,9 @@
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -363,8 +375,9 @@
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -377,8 +390,9 @@
         "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -392,8 +406,9 @@
         "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       },
       {
@@ -407,8 +422,9 @@
         "publishedHead": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
         "latestRepairVerification": {
           "head": "4dc690605f80ef27dac35b95e0d0371856ad19f4",
-          "ci": "pending",
-          "cycleVerified": false
+          "ci": "passed",
+          "cycleVerified": true,
+          "checkedAt": "2026-10-11T08:17:57.876Z"
         }
       }
     ],
