@@ -13,6 +13,7 @@ import {
   getStudioBinding,
 } from './studio-project-bridge';
 import { IDENTITY_TRANSFORM, type Project, type RasterImage } from '../../core/scene';
+import type { HeightfieldReliefObject } from '../../core/scene/scene-object';
 import { useStore } from '../state';
 import { resetStore, svgObj } from '../state/test-helpers';
 import { dispatchImportFilesInOrder, type ImportDispatchActions } from '../app/import-dispatch';
@@ -36,7 +37,7 @@ function retainedRelief(project: Project, id: string) {
   const object = project.scene.objects.find((candidate) => candidate.id === id);
   if (object?.kind !== 'relief' || object.reliefSource.kind !== 'heightfield-v1')
     throw new Error('Missing retained relief');
-  return { ...object, reliefSource: object.reliefSource };
+  return object as HeightfieldReliefObject;
 }
 
 beforeEach(() => {
