@@ -58,10 +58,17 @@ export function segmentRayContacts(
   const local = (p: Vec2): Vec2 => ({ x: cross(p, v) / determinant, y: cross(u, p) / determinant });
   const p = local(minus(origin, center));
   const d = local(direction);
+  const endpoints = [world(from), world(segment.to)];
+  const start = local(minus(endpoints[0] as Vec2, center));
+  const end = local(minus(endpoints[1] as Vec2, center));
   return quadraticRoots(dot(d, d), 2 * dot(p, d), dot(p, p) - 1).flatMap((distance) => {
-    const angle = Math.atan2(p.y + distance * d.y, p.x + distance * d.x);
-    const travel = positiveAngle(Math.sign(arc.delta) * (angle - arc.theta1));
-    const onArc = travel <= Math.abs(arc.delta) + 1e-10 || Math.PI * 2 - travel <= 1e-10;
+    const unitPoint = { x: p.x + distance * d.x, y: p.y + distance * d.y };
+    // Angular slack grows with radius and object scale. Outside the strict arc
+    // span, accept only float noise within the physical endpoint tolerance.
+    const point = { x: origin.x + distance * direction.x, y: origin.y + distance * direction.y };
+    const onArc =
+      withinArcSpan(unitPoint, start, end, arc.delta) ||
+      endpoints.some((end) => Math.hypot(point.x - end.x, point.y - end.y) <= EXTEND_EPS_MM);
     return onArc ? contact(distance) : [];
   });
 }
@@ -97,8 +104,12 @@ function overlapContact(min: number, max: number): RayContact[] {
   const distance = Math.max(0, min);
   return [{ distance, overlap: max - distance > EXTEND_EPS_MM }];
 }
-function positiveAngle(angle: number): number {
-  return ((angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+function withinArcSpan(point: Vec2, start: Vec2, end: Vec2, delta: number): boolean {
+  // Avoid atan2/subtraction/modulo rounding a tiny off-end angle onto a seam.
+  // The minor span is the intersection of two half-planes; the major is their union.
+  const fromStart = Math.sign(delta) * cross(start, point);
+  const toEnd = Math.sign(delta) * cross(point, end);
+  return Math.abs(delta) <= Math.PI ? fromStart >= 0 && toEnd >= 0 : fromStart >= 0 || toEnd >= 0;
 }
 
 type CubicCoefficients = readonly [number, number, number, number];

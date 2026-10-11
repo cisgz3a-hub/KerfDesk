@@ -1,5 +1,6 @@
 import {
   applyTransform,
+  curveSubpathBounds,
   type ColoredPath,
   type CurveSubpath,
   type PathSegment,
@@ -8,6 +9,7 @@ import {
   type Vec2,
 } from '../scene';
 import { ellipticalArcEndDirection } from '../scene/curve-path';
+import { transformedBounds } from '../scene/hit-test';
 import { isBooleanCompoundObject } from '../scene/boolean-compound';
 import { CLOSURE_EPS_MM } from '../scene/polyline-closure';
 import {
@@ -16,6 +18,7 @@ import {
   createTrimModel,
   type TrimContour,
   type TrimModel,
+  type TrimObjectEntry,
 } from './trim-contours';
 import { segmentStart } from './trim-curve-split';
 import { EXTEND_EPS_MM, segmentRayContacts, type RayContact } from './extend-ray';
@@ -43,7 +46,11 @@ export type ExtendModel = {
 
 /** Cache boundary queries by endpoint while the immutable scene stays unchanged. */
 export function createExtendModel(scene: Scene): ExtendModel {
-  const model = createTrimModel(scene);
+  const trimModel = createTrimModel(scene);
+  const model: TrimModel = {
+    ...trimModel,
+    entries: trimModel.entries.map(withCanonicalBounds),
+  };
   const cache = new Map<string, ExtendTarget>();
   return {
     model,
@@ -56,6 +63,24 @@ export function createExtendModel(scene: Scene): ExtendModel {
       return target;
     },
   };
+}
+
+/** Compatibility caches must not hide an endpoint in authoritative curve geometry. */
+function withCanonicalBounds(entry: TrimObjectEntry): TrimObjectEntry {
+  let bounds = entry.bounds;
+  for (const path of entry.object.paths) {
+    if (path.curves === undefined || path.curves.length !== path.polylines.length) continue;
+    for (const curve of path.curves) {
+      const canonical = transformedBounds(curveSubpathBounds(curve), entry.object.transform);
+      bounds = {
+        minX: Math.min(bounds.minX, canonical.minX),
+        minY: Math.min(bounds.minY, canonical.minY),
+        maxX: Math.max(bounds.maxX, canonical.maxX),
+        maxY: Math.max(bounds.maxY, canonical.maxY),
+      };
+    }
+  }
+  return bounds === entry.bounds ? entry : { ...entry, bounds };
 }
 
 /** Pick only an open endpoint; nearest wins, then top-most artwork. */
