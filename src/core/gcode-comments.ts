@@ -11,7 +11,8 @@ const TRUNCATION_SUFFIX = '...';
 // characters are extended ACSII only"). KerfDesk's streamer never sends
 // comment lines, but a saved file can be streamed by a sender that does, and
 // UTF-8 '×' carries 0x97 (rapid override 25%) while 'Ä' carries 0x84 (safety
-// door). Written comment values are therefore folded to printable ASCII.
+// door). ASCII !, ~ and ? also dispatch immediately (hold, resume, status).
+// Comment values therefore exclude realtime bytes even after Unicode folding.
 const ASCII_FOLDS: Readonly<Record<string, string>> = {
   '×': 'x',
   '°': 'deg',
@@ -42,7 +43,7 @@ const PRINTABLE_ASCII = /^[\x20-\x7e]*$/;
 const COMBINING_MARKS = /[\u0300-\u036f]/g;
 
 /**
- * Flatten an untrusted label into one printable-ASCII G-code comment line and
+ * Flatten an untrusted label into one realtime-free ASCII G-code comment line and
  * cap its size. Controllers and third-party senders do not all agree on
  * comment-buffer limits, so emitted diagnostic labels stay deliberately short.
  */
@@ -71,9 +72,12 @@ export function sanitizeGcodeCommentValue(
 }
 
 function asciiFold(char: string): string {
-  if (PRINTABLE_ASCII.test(char)) return char;
-  const folded = ASCII_FOLDS[char] ?? char.normalize('NFKD').replace(COMBINING_MARKS, '');
-  return folded.length > 0 && PRINTABLE_ASCII.test(folded) ? folded : '?';
+  const folded = PRINTABLE_ASCII.test(char)
+    ? char
+    : (ASCII_FOLDS[char] ?? char.normalize('NFKD').replace(COMBINING_MARKS, ''));
+  // NFKD can itself produce realtime punctuation (for example fullwidth !).
+  // The unknown-character replacement must also be inert: '?' is not safe.
+  return folded.length > 0 && PRINTABLE_ASCII.test(folded) ? folded.replace(/[!~?]/g, '_') : '_';
 }
 
 function normalizedByteLimit(value: number): number {
