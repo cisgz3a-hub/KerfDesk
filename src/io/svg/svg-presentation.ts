@@ -93,10 +93,14 @@ export function presentationStateFor(
   const stroke = specifiedPaint(specifiedValues(el, styles, 'stroke'), parent.stroke);
   const fill = specifiedPaint(specifiedValues(el, styles, 'fill'), parent.fill);
   const opacity = parent.opacity * parseOpacity(presentationValue(el, styles, 'opacity'));
-  const strokeOpacity =
-    parent.strokeOpacity * parseOpacity(presentationValue(el, styles, 'stroke-opacity'));
-  const fillOpacity =
-    parent.fillOpacity * parseOpacity(presentationValue(el, styles, 'fill-opacity'));
+  const strokeOpacity = inheritedPaintOpacity(
+    specifiedValues(el, styles, 'stroke-opacity'),
+    parent.strokeOpacity,
+  );
+  const fillOpacity = inheritedPaintOpacity(
+    specifiedValues(el, styles, 'fill-opacity'),
+    parent.fillOpacity,
+  );
   const transform = multiplySvgMatrix(
     parent.transform,
     parseSvgTransform(presentationValue(el, styles, 'transform')),
@@ -204,6 +208,23 @@ function specifiedPaint(
     const paint = parseSvgPaint(value);
     if (paint === 'inherit') return inherited;
     if (paint !== null) return paint;
+  }
+  return inherited;
+}
+
+// Fill/stroke opacity belongs to each element's paint and inherits as a value
+// (SVG 2 painting). A child can replace its parent's zero; only overall group
+// opacity compounds. Invalid declarations fall through to the next candidate.
+function inheritedPaintOpacity(values: readonly (string | null)[], inherited: number): number {
+  for (const value of values) {
+    const normalized = keyword(value);
+    if (normalized === 'inherit' || normalized === 'unset') return inherited;
+    if (normalized === 'initial') return 1;
+    const match = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)(%)?$/.exec(normalized ?? '');
+    if (match === null) continue;
+    const amount = Number(match[1]);
+    const fraction = match[2] === '%' ? amount / 100 : amount;
+    return Math.min(1, Math.max(0, fraction));
   }
   return inherited;
 }
