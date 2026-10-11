@@ -59,6 +59,8 @@ The original fixture now leaves `(3,0)`–`(10,0)` when clicked at `(1,0)`, pres
 
 Review also exposed a zero-length segment between two ordinary segments changing the retained chord's canonical range. That could suppress a valid crossing or slice at the wrong position. Each retained chord now carries its own canonical parameter range, while the existing point topology preserves self-intersection adjacency. Regressions cover skipped lines and cubics, crossings on either side of the skipped segment, both click sides, exact retained endpoints and matching previews.
 
+Integration with the reviewed Extend solver retains its oriented finite-arc span checks and world-millimetre endpoint tolerance. A contact admitted by endpoint tolerance maps to that nearest canonical endpoint; other arc parameters use the oriented angle from the start direction without rounding small positive angles through a full-turn normalization. The rebased integration passes 96 existing geometry/history tests plus 14 dedicated parameter tests covering endpoints, minor/major arcs in both sweep directions, transformed interior parameters, large-scale off-span rejection, line overlap and cubic tangency.
+
 The implementation remains deliberately bounded: curve/curve and self-intersections use the existing chord grid; collinear overlap and no-contact deletion semantics are unchanged. Autojoin and Shift-preserve are not added. Tests establish software geometry and history behaviour, not native LightBurn runtime parity or machine qualification.
 
 ## Evidence ledger
