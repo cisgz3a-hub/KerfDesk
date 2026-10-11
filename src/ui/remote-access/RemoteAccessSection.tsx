@@ -26,7 +26,7 @@ export function RemoteAccessSection(): JSX.Element {
     </>
   );
 }
-function ArtworkSharingConsent(): JSX.Element {
+export function ArtworkSharingConsent(): JSX.Element {
   const sharing = useArtworkSharing();
   const available = useRemoteAccessStore((state) => state.status?.available === true);
   const [failed, setFailed] = useState(false);
@@ -100,7 +100,7 @@ function RemoteConsent(): JSX.Element {
     </section>
   );
 }
-function ApprovedClients(): JSX.Element {
+export function ApprovedClients(): JSX.Element {
   const { status, busy, act } = useRemoteAccessStore();
   return (
     <section style={settingsGroupStyle}>

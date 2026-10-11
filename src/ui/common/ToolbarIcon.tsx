@@ -15,11 +15,12 @@ import qrCode from 'lucide-static/icons/qr-code.svg?raw';
 import save from 'lucide-static/icons/save.svg?raw';
 import saveAll from 'lucide-static/icons/save-all.svg?raw';
 import scanLine from 'lucide-static/icons/scan-line.svg?raw';
+import smartphone from 'lucide-static/icons/smartphone.svg?raw';
 import squareDashedPointer from 'lucide-static/icons/square-dashed-mouse-pointer.svg?raw';
 import typeIcon from 'lucide-static/icons/type.svg?raw';
 import type { CommandId } from '../commands/command-registry';
 
-export type ToolbarIconKey = CommandId | 'shortcuts' | 'more';
+export type ToolbarIconKey = CommandId | 'shortcuts' | 'more' | 'remote';
 
 const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'file.new': filePlus,
@@ -44,6 +45,7 @@ const TOOLBAR_ICONS: Partial<Readonly<Record<ToolbarIconKey, string>>> = {
   'window.toggle-preview': eye,
   shortcuts: keyboard,
   more: ellipsis,
+  remote: smartphone,
 };
 
 export function ToolbarIcon(props: { readonly icon: ToolbarIconKey }): JSX.Element | null {
