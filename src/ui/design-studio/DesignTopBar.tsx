@@ -10,6 +10,7 @@
 // while there is output geometry that has changed since the last Apply — an
 // inert control, not a policy gate (rule 7).
 
+import { DesktopEditorsButton } from '../artcraft-studio/DesktopEditorsButton';
 import { canRedo, canUndo } from './design-history';
 import { useDesignApply } from './use-design-apply';
 import { useDesignStudioStore } from './design-studio-store';
@@ -30,6 +31,7 @@ export function DesignTopBar(props: { readonly onFit: () => void }): JSX.Element
     <header style={barStyle}>
       <h2 style={titleStyle}>Design Studio</h2>
       <TutorialButton tutorialId="design-studio" />
+      <DesktopEditorsButton />
 
       <BarButton
         label="Undo"
