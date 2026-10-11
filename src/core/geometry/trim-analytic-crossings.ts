@@ -1,0 +1,127 @@
+// Mixed line/curve pairs are solved on canonical geometry. Curve/curve and
+// self-intersections deliberately retain Trim's existing chord-grid behaviour.
+import { applyTransform, type Bounds, type PathSegment, type Vec2 } from '../scene';
+import { curveSubpathBounds } from '../scene/curve-path';
+import { transformedBounds } from '../scene/hit-test';
+import { segmentRayParametricContacts } from './extend-ray';
+import { boundsOverlap, type TrimContour } from './trim-contours';
+import type { TrimCrossing } from './trim-crossings';
+import { segmentPoint } from './trim-curve-split';
+
+const TOUCH_MM = 1e-6;
+type SegmentEntry = {
+  readonly index: number;
+  readonly from: Vec2;
+  readonly segment: PathSegment;
+  readonly bounds: Bounds;
+};
+const segments = new WeakMap<TrimContour, ReadonlyArray<SegmentEntry>>();
+
+export function collectAnalyticCrossings(
+  contour: TrimContour,
+  outline: TrimContour,
+  found: TrimCrossing[],
+): void {
+  const boundaries = segmentsOf(outline);
+  const lines = boundaries.filter((entry) => entry.segment.kind === 'line');
+  const curves = boundaries.filter((entry) => entry.segment.kind !== 'line');
+  for (const source of segmentsOf(contour)) {
+    for (const boundary of source.segment.kind === 'line' ? curves : lines) {
+      if (!boundsOverlap(source.bounds, boundary.bounds, TOUCH_MM)) continue;
+      collectPair(contour, source, outline, boundary, found);
+    }
+  }
+}
+
+function collectPair(
+  contour: TrimContour,
+  source: SegmentEntry,
+  outline: TrimContour,
+  boundary: SegmentEntry,
+  found: TrimCrossing[],
+): void {
+  const sourceIsLine = source.segment.kind === 'line';
+  const line = sourceIsLine ? source : boundary;
+  const lineContour = sourceIsLine ? contour : outline;
+  const curve = sourceIsLine ? boundary : source;
+  const curveContour = sourceIsLine ? outline : contour;
+  const a = applyTransform(line.from, lineContour.transform);
+  const b = applyTransform(line.segment.to, lineContour.transform);
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  if (length <= TOUCH_MM) return;
+  const direction = { x: (b.x - a.x) / length, y: (b.y - a.y) / length };
+  for (const hit of segmentRayParametricContacts(
+    a,
+    direction,
+    curve.from,
+    curve.segment,
+    curveContour.transform,
+  )) {
+    if (hit.overlap || hit.parameter === null || hit.distance > length + TOUCH_MM) continue;
+    const lineT = Math.min(1, hit.distance / length);
+    const p = source.index + (sourceIsLine ? lineT : hit.parameter);
+    found.push({
+      p,
+      chord: chordAt(contour, p),
+      exact: true,
+      point: sourceIsLine
+        ? { x: a.x + direction.x * lineT * length, y: a.y + direction.y * lineT * length }
+        : applyTransform(
+            segmentPoint(curve.from, curve.segment, hit.parameter),
+            curveContour.transform,
+          ),
+      edgeStart: applyTransform(boundary.from, outline.transform),
+      edgeEnd: applyTransform(boundary.segment.to, outline.transform),
+    });
+  }
+}
+
+/** Suppress approximate duplicate hits for pairs already handled analytically. */
+export function analyticChordPair(
+  contour: TrimContour,
+  chord: number,
+  outline: TrimContour,
+  edge: number,
+): boolean {
+  return mixedKinds(chordSegment(contour, chord), chordSegment(outline, edge));
+}
+
+function chordSegment(contour: TrimContour, chord: number): PathSegment | undefined {
+  const low = contour.params[chord] ?? 0;
+  const high = contour.params[chord + 1] ?? low;
+  return contour.segments.segments[Math.floor((low + high) / 2)];
+}
+
+function mixedKinds(a: PathSegment | undefined, b: PathSegment | undefined): boolean {
+  return a !== undefined && b !== undefined && (a.kind === 'line') !== (b.kind === 'line');
+}
+
+function segmentsOf(contour: TrimContour): ReadonlyArray<SegmentEntry> {
+  const cached = segments.get(contour);
+  if (cached !== undefined) return cached;
+  let from = contour.segments.start;
+  const entries = contour.segments.segments.map((segment, index) => {
+    const localBounds = curveSubpathBounds({ start: from, segments: [segment], closed: false });
+    const entry = {
+      from,
+      segment,
+      index,
+      bounds: transformedBounds(localBounds, contour.transform),
+    };
+    from = segment.to;
+    return entry;
+  });
+  segments.set(contour, entries);
+  return entries;
+}
+
+function chordAt(contour: TrimContour, p: number): number {
+  let low = 0;
+  let high = contour.params.length - 1;
+  while (high - low > 1) {
+    const middle = (low + high) >> 1;
+    if ((contour.params[middle] as number) <= p) low = middle;
+    else high = middle;
+  }
+  return low;
+}

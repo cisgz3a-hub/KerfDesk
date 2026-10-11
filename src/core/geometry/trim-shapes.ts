@@ -141,8 +141,15 @@ function stretchHighlight(
   const last = contour.params[contour.params.length - 1] as number;
   const from = start?.p ?? first;
   const to = end?.p ?? last;
-  if (to > from) return stretchPoints(contour, from, to);
-  return [...stretchPoints(contour, from, last), ...stretchPoints(contour, first, to).slice(1)];
+  const points =
+    to > from
+      ? [...stretchPoints(contour, from, to)]
+      : [...stretchPoints(contour, from, last), ...stretchPoints(contour, first, to).slice(1)];
+  // Analytic contacts can lie off the sampled chord; preview the same exact
+  // endpoint that curve slicing will retain when the user clicks.
+  if (start !== null) points[0] = start.point;
+  if (end !== null) points[points.length - 1] = end.point;
+  return points;
 }
 
 /** World points of the chords between two positions, ends interpolated. */

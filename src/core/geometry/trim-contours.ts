@@ -5,7 +5,7 @@
 // Objects are flattened lazily, only when the pointer or a crossing search
 // comes near them.
 
-import { endpointArc } from '../scene/curve-path';
+import { curveSubpathBounds, endpointArc } from '../scene/curve-path';
 import { CLOSURE_EPS_MM } from '../scene/polyline-closure';
 import { transformedBounds } from '../scene/hit-test';
 import {
@@ -186,7 +186,10 @@ export function flattenContour(
     }
     from = segment.to;
   });
-  return { points, params, bounds: boundsOf(points) };
+  // Chords can lie strictly inside a tangent curve. Broad-phase bounds must
+  // contain the canonical curve, including when sampling hits its segment cap.
+  const canonical = transformedBounds(curveSubpathBounds(contour), transform);
+  return { points, params, bounds: unionBounds(boundsOf(points), canonical) };
 }
 
 /** Parameters of the chord ends on one segment, ending at 1. */
@@ -219,7 +222,19 @@ function chordCount(from: Vec2, segment: PathSegment, tolerance: number): number
 
 function localPolylineBounds(paths: ReadonlyArray<ColoredPath>): Bounds | null {
   const points = paths.flatMap((path) => path.polylines.flatMap((polyline) => polyline.points));
-  return points.length === 0 ? null : boundsOf(points);
+  if (points.length === 0) return null;
+  return paths
+    .flatMap((path) => path.curves ?? [])
+    .reduce((bounds, curve) => unionBounds(bounds, curveSubpathBounds(curve)), boundsOf(points));
+}
+
+function unionBounds(a: Bounds, b: Bounds): Bounds {
+  return {
+    minX: Math.min(a.minX, b.minX),
+    minY: Math.min(a.minY, b.minY),
+    maxX: Math.max(a.maxX, b.maxX),
+    maxY: Math.max(a.maxY, b.maxY),
+  };
 }
 
 export function boundsOf(points: ReadonlyArray<Vec2>): Bounds {

@@ -5,7 +5,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   createLayer,
   createProject,
+  flattenCurveSubpath,
   IDENTITY_TRANSFORM,
+  type CurveSubpath,
   type ImportedSvg,
   type Layer,
   type Polyline,
@@ -133,6 +135,56 @@ beforeEach(() => {
 });
 
 describe('Trim Shapes', () => {
+  it('trims to an exact cubic tangency and restores both project snapshots with Undo and Redo', () => {
+    // B(t) = (10t, (t - 0.3)^2): its only contact with y = 0 is (3, 0).
+    const curve: CurveSubpath = {
+      closed: false,
+      start: { x: 0, y: 0.09 },
+      segments: [
+        {
+          kind: 'cubic',
+          control1: { x: 10 / 3, y: -0.11 },
+          control2: { x: 20 / 3, y: 0.09 - 0.4 + 1 / 3 },
+          to: { x: 10, y: 0.49 },
+        },
+      ],
+    };
+    const flat = flattenCurveSubpath(curve, { toleranceMm: 0.02 });
+    if (flat.kind !== 'ok') throw new Error('Cubic boundary fixture exceeds its segment budget');
+    const boundary = art('tangent-boundary', [flat.polyline], {
+      paths: [{ color: '#000000', polylines: [flat.polyline], curves: [curve] }],
+    });
+    load(
+      [
+        art('source', [
+          poly([
+            [0, 0],
+            [10, 0],
+          ]),
+        ]),
+        boundary,
+      ],
+      ['source'],
+    );
+    const before = project();
+
+    expect(useStore.getState().trimShapeAt({ x: 1, y: 0 }, 0.01)).toBe(true);
+    const edited = project();
+    const kept = pointsOf('source');
+    expect(kept).toHaveLength(1);
+    expect(kept[0]).toHaveLength(2);
+    expect(kept[0]?.[0]?.[0]).toBeCloseTo(3, 6);
+    expect(kept[0]?.[0]?.[1]).toBeCloseTo(0, 6);
+    expect(kept[0]?.[1]).toEqual([10, 0]);
+    expect(objectById('tangent-boundary')).toBe(boundary);
+    expect(useStore.getState().undoStack).toEqual([before]);
+
+    useStore.getState().undo();
+    expect(project()).toBe(before);
+    useStore.getState().redo();
+    expect(project()).toBe(edited);
+    expect(objectById('tangent-boundary')).toBe(boundary);
+  });
   it('deletes the clicked stretch in one undo step and keeps the object', () => {
     load([RAIL, ...POSTS]);
     const before = project();
