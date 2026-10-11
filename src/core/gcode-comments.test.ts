@@ -18,11 +18,28 @@ describe('sanitizeGcodeCommentValue', () => {
     ['Default 400×400', 'Default 400x400'],
     ['60° V-bit — 1/4" shank', '60deg V-bit - 1/4" shank'],
     ['Äpfel Öl café', 'Apfel Ol cafe'],
-    ['bit 🙂 深', 'bit ? ?'],
+    ['bit 🙂 深', 'bit _ _'],
   ])('folds %s to printable ASCII', (input, expected) => {
     const sanitized = sanitizeGcodeCommentValue(input);
 
     expect(sanitized).toBe(expected);
     expect([...new TextEncoder().encode(sanitized)].every((byte) => byte < 0x80)).toBe(true);
+  });
+
+  it.each(['Cut! Resume~ Status?', 'Fullwidth！～？', 'Small﹗﹖', 'Unknown 🙂 深'])(
+    'removes realtime bytes after folding %s',
+    (input) => {
+      const sanitized = sanitizeGcodeCommentValue(input);
+      expect(sanitized).not.toMatch(/[!~?]/);
+      expect(sanitized).toMatch(/^[\x20-\x7e]*$/);
+    },
+  );
+
+  it('preserves ordinary ASCII labels and applies the cap after safe replacement', () => {
+    expect(sanitizeGcodeCommentValue('1/4 in. bit (roughing) - A+B')).toBe(
+      '1/4 in. bit (roughing) - A+B',
+    );
+    expect(sanitizeGcodeCommentValue('!~?！～？🙂'.repeat(20), 12)).toBe('_________...');
+    expect(sanitizeGcodeCommentValue('!~?！～？🙂', 0)).toBe('');
   });
 });
