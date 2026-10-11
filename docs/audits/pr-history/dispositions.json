@@ -353,5 +353,19 @@
       "publication/heartbeat-0621-svg-ieee-library.json"
     ],
     "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505330"
+  },
+  {
+    "id": "DISP-043",
+    "title": "Flex-unit cancellation in opacity has conflicting specification and browser support",
+    "historicalPrs": [1139],
+    "scope": "repair review follow-up",
+    "disposition": "documented limitation",
+    "currentSourceReason": "Comment r4240569210 reports calc(1fr / 1fr). Both Chrome154 and the published importer reject that exact expression and preserve the valid lower declaration. CSS Values4 draft type algebra includes flex cancellation while CSS Grid2 retains a flex-in-calc restriction note. The importer retains its observed browser-compatible unsupported-flex boundary; this is not a claim of universal CSS invalidity or a repaired ratio. Independent review separately confirmed sign(1fr) could evade that boundary; that defect is repaired and recorded under FND-001.",
+    "evidenceReports": [
+      "publication/heartbeat-0651-svg-reproduction.md",
+      "publication/heartbeat-0651-svg-peer-review.md",
+      "publication/heartbeat-0651-svg-repair-report.md"
+    ],
+    "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569210"
   }
 ]

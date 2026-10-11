@@ -9,7 +9,7 @@
     "attribution": null,
     "group": "svg-paint-opacity",
     "localEvidence": "docs/audits/2026-10-11-pr-history/foundation.md",
-    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md",
     "followUps": [
       {
         "title": "Invalid winning CSS and duplicate inline declarations discard a valid lower opacity",
@@ -62,13 +62,32 @@
         "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-reproduction.md",
         "publishedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
         "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md"
+      },
+      {
+        "title": "Valid environment opacity winner is discarded and malformed nested environment syntax survives",
+        "result": "Independently reproduced against published a4c1968. Retain syntactically valid env() winners as qualified unresolved opacity, validate nested var/env fallback syntax, and explicitly warn that custom or environment values can hide artwork imported fully opaque. Full substitution remains outside scope. Independently reviewed and published; latest-head required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569209",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-reproduction.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5"
+      },
+      {
+        "key": "unsupported-scalar-argument",
+        "title": "Unsupported dimension escapes validation through a scalar opacity function",
+        "result": "Independent lower-zero sign(1fr) tests exposed geometry that Chrome hides. Reject failed typed arguments except legitimate round/clamp keyword slots; preserve supported typed cancellation and scalar functions. This separately reproduced defect is distinct from the original flex-ratio interoperability claim. Independently reviewed and published; latest-head required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-fr-scalar-before.json",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
+        "publishedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5"
       }
     ],
-    "followUpAttribution": "Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect.",
+    "followUpAttribution": "Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect. Environment substitution and unsupported scalar arguments were reproduced against the current repair, not attributed to PR #10. Flex-ratio compatibility is DISP-043.",
     "followUpEvidence": "docs/audits/2026-10-11-pr-history/publication/svg-layer-math-peer-review.md",
     "previousRepairReports": [
       "docs/audits/2026-10-11-pr-history/publication/svg-opacity-follow-up.md",
-      "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md"
+      "docs/audits/2026-10-11-pr-history/publication/svg-math-followup.md",
+      "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md"
     ]
   },
   {
@@ -221,7 +240,7 @@
     "attribution": "PR80 introduced estimate-dependent playback; the displayed project estimate mismatch predates PR80 (Workspace estimate call blame 8f24e8d2d5).",
     "group": "external-program-timing",
     "localEvidence": "docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json",
-    "repairReport": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md",
+    "repairReport": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md",
     "followUps": [
       {
         "title": "Incremental arc-center declarations unnecessarily disable imported timing",
@@ -258,9 +277,21 @@
         "result": "Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending.",
         "status": "published-awaiting-ci",
         "comment": "https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117"
+      },
+      {
+        "key": "inactive-preview-render-loop",
+        "title": "Clearing inactive preview repeatedly updates state with an unstable scheduler",
+        "result": "Hosted CI exhausted a test worker. The exact unfinished test injects a fresh scheduler; independent capped probes reproduce all three modes. The repair returns the existing already-empty state for the same owner, preserving real owner changes, route clearing and cancellation. The default application scheduler is stable; this is not a claim that every ordinary mount exhausts memory. Independently reviewed and published; latest-head required CI remains pending.",
+        "status": "published-awaiting-ci",
+        "evidence": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md",
+        "independentReview": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
+        "publishedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e"
       }
     ],
-    "followUpAttribution": "These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware."
+    "followUpAttribution": "These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware. The inactive-clear object update was introduced by this audit repair, and is tracked as a CI follow-up rather than a new historical PR #80 defect.",
+    "previousRepairReports": [
+      "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md"
+    ]
   },
   {
     "id": "B03-VAR-001",

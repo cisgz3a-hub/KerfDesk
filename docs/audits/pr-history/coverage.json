@@ -1,6 +1,6 @@
 {
   "repository": "cisgz3a-hub/KerfDesk",
-  "inventoryRefreshedAt": "2026-10-11T06:19:22.457Z",
+  "inventoryRefreshedAt": "2026-10-11T07:12:57.619Z",
   "snapshot": "Live GitHub paginated pull-request inventory, all authors and states",
   "definitions": {
     "full-diff": "Changed diff inspected within stated scope; not whole-feature, upstream-dependency, hosted or hardware qualification",
@@ -24479,18 +24479,18 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T04:44:30Z",
-      "updated_at": "2026-10-11T06:17:44Z",
+      "updated_at": "2026-10-11T07:08:31Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "1d77af2810ac958607f10b82a53896006ad92be8",
-      "head": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+      "merge_commit_sha": "38d8b39e8ad29427489837b3f533ec58a7bdb1e7",
+      "head": "447b4bc8a520a387a7d205ed073330955c6e86d5",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
         "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-peer-review.md",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-peer-review.md",
         "reviewer": "foundation_prs",
-        "reviewedHead": "a4c1968b50ab735953b064ec65f8055aa74ced28",
+        "reviewedHead": "447b4bc8a520a387a7d205ed073330955c6e86d5",
         "reviewedFiles": [
           "THIRD_PARTY_NOTICES.md",
           "package.json",
@@ -24514,10 +24514,7 @@
         "remaining": [],
         "limitations": "Bounded repair review, not a complete audit of every affected feature, all upstream code, packaged rendering or hardware",
         "repairGroup": "svg-paint-opacity"
-      },
-      "previousInventoriedHead": "282b60d3c71320ad7884299d7d40924ab59c73f8",
-      "headRefreshedAt": "2026-10-11T06:39:54.734Z",
-      "headEvidence": "Publication verified the live GitHub PR head; source attestation checked the complete diff manifest and reviewed files"
+      }
     },
     {
       "number": 1140,
@@ -24795,18 +24792,18 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T05:06:52Z",
-      "updated_at": "2026-10-11T05:45:41Z",
+      "updated_at": "2026-10-11T07:11:38Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "839ed35e788eda166de950c5e324d6e2128041af",
-      "head": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+      "merge_commit_sha": "2dbf18c0730d038312b604e9dcd23b45131ffcd4",
+      "head": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
         "scope": "Complete focused repair diff and permanent tests independently reviewed; publication and CI completion are tracked separately in repairs.json",
-        "report": "docs/audits/2026-10-11-pr-history/publication/imported-timing-followup-peer-review.md",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-peer-review.md",
         "reviewer": "foundation_prs",
-        "reviewedHead": "286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4",
+        "reviewedHead": "522e79f03d4ccc25494c23d0eda8aad33f33981e",
         "reviewedFiles": [
           "src/core/gcode-time/program-dwell-order.test.ts",
           "src/core/gcode-time/program-time.ts",
@@ -24838,6 +24835,7 @@
           "src/ui/workspace/preview-overlays.tsx",
           "src/ui/workspace/use-preview-estimate.ts",
           "src/ui/workspace/use-preview-playback.ts",
+          "src/ui/workspace/use-preview-toolpath.test.tsx",
           "src/ui/workspace/use-preview-toolpath.ts"
         ],
         "remaining": [],
@@ -24882,18 +24880,18 @@
       "draft": false,
       "author": "cisgz3a-hub",
       "created_at": "2026-10-11T05:20:35Z",
-      "updated_at": "2026-10-11T06:18:33Z",
+      "updated_at": "2026-10-11T06:44:14Z",
       "closed_at": null,
       "merged_at": null,
-      "merge_commit_sha": "2edf4b2bb2acf771f68712de780ab0d3dc78b2ff",
-      "head": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+      "merge_commit_sha": "9baecbde05a758f78d22c6711941c11fe5a9af04",
+      "head": "23455fc2987e0bf7673dda780a8bb68f34629daa",
       "base": "ef9f5435c93f5595370832d21950e4777af8ac7c",
       "review": {
         "coverage": "full-diff",
-        "scope": "Complete nine-file tracking snapshot independently reviewed and committed source matched at publication; required hosted CI remains separate in state.json",
-        "report": "docs/audits/2026-10-11-pr-history/publication/ledger-followup-peer-review.md",
+        "scope": "Complete nine-file tracking snapshot independently reviewed; reviewed Git tree matched publication. Required hosted CI remains separately pending in state.json.",
+        "report": "docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-ledger-peer-review.md",
         "reviewer": "foundation_prs",
-        "reviewedHead": "073af6f4cb4618d5db95f9fbbfac4c213dbae04e",
+        "reviewedHead": "23455fc2987e0bf7673dda780a8bb68f34629daa",
         "reviewedFiles": [
           "docs/audits/pr-history/README.md",
           "docs/audits/pr-history/STATUS.md",
@@ -24906,7 +24904,7 @@
           "docs/audits/pr-history/dispositions.json"
         ],
         "remaining": [],
-        "limitations": "Audit tracking consistency and publication controls only; no additional historical product scope or successful CI is implied",
+        "limitations": "Tracking consistency and publication controls only; no additional historical product scope or successful CI is implied",
         "trackingPr": true
       }
     }

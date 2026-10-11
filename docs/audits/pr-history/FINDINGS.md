@@ -21,10 +21,12 @@ Review follow-ups:
 - Valid revert-layer incorrectly exposes lower opacity from the same cascade layer: Confirmed in the earlier audit repair. Inline revert-layer now reveals stylesheet opacity, and stylesheet rollback reveals the presentation attribute with importance order preserved. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364150).
 - Valid CSS math opacity is rejected before cascade resolution: Context-free CSS math now retains valid winning opacity, including typed absolute-unit cancellation and scalar functions; invalid numeric types preserve valid lower declarations. Layout-dependent winners retain an explicitly warned opaque approximation because exact visibility requires layout. Fresh imports and replacements both display the warning. Independently reviewed and published; latest-head hosted CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240364155).
 - Valid variable-containing opacity declaration is discarded before the cascade winner is resolved: Confirmed valid variable winner was discarded before cascade resolution. The published repair preserves syntactically valid variable-containing winners as unresolved, imports them with opacity 1 and explicitly warns that CSS variables or layout-dependent values may hide source artwork that is included. Invalid syntax retains valid lower candidates. Full custom-property substitution remains outside scope. Source review, 1259 isolated tests and 12 real production-worker cases passed; latest-head hosted CI is pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240505326).
+- Valid environment opacity winner is discarded and malformed nested environment syntax survives: Independently reproduced against published a4c1968. Retain syntactically valid env() winners as qualified unresolved opacity, validate nested var/env fallback syntax, and explicitly warn that custom or environment values can hide artwork imported fully opaque. Full substitution remains outside scope. Independently reviewed and published; latest-head required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1139#discussion_r4240569209).
+- Unsupported dimension escapes validation through a scalar opacity function: Independent lower-zero sign(1fr) tests exposed geometry that Chrome hides. Reject failed typed arguments except legitimate round/clamp keyword slots; preserve supported typed cancellation and scalar functions. This separately reproduced defect is distinct from the original flex-ratio interoperability claim. Independently reviewed and published; latest-head required CI remains pending.
 
-Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect.
+Cascade, rollback, typed-math, replacement-warning and variable-winner follow-ups are published at the recorded review heads. The variable defect was found while reviewing the audit repair; its historical introduction was not established and is not assigned to PR #10. The separate intermediate Infinity/NaN claim did not reproduce and is rejected candidate DISP-042, not a repaired defect. Environment substitution and unsupported scalar arguments were reproduced against the current repair, not attributed to PR #10. Flex-ratio compatibility is DISP-043.
 
-Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence: docs/audits/2026-10-11-pr-history/publication/heartbeat-0621-svg-repair-report.md.
+Local evidence: docs/audits/2026-10-11-pr-history/foundation.md. Repair evidence: docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-svg-repair-report.md.
 
 ## BITMAP-01: Retain boundary outlines after pixel-coordinate rounding
 
@@ -100,7 +102,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/camera-canvas-arcs.js
 
 ## BRP-01: Reject a stale board correction after Undo replaces the captured outline
 
-Repair: [#1145](https://github.com/cisgz3a-hub/KerfDesk/pull/1145). State: pr-open-ci-pending.
+Repair: [#1145](https://github.com/cisgz3a-hub/KerfDesk/pull/1145). State: pr-open-ci-verified.
 
 Trigger: Capture a 120 x 80 rectangle over an existing 40 x 40 captured board. Begin bottom-left physical-point correction, then invoke ordinary Undo while setOriginHere is pending. Resolve the origin operation.
 
@@ -124,7 +126,7 @@ Local evidence: docs/audits/2026-10-11-pr-history/batch-02/trace.json. Repair ev
 
 ## B03-CNC-001: Use a valid containment witness for concave helical pockets
 
-Repair: [#1146](https://github.com/cisgz3a-hub/KerfDesk/pull/1146). State: pr-open-ci-pending.
+Repair: [#1146](https://github.com/cisgz3a-hub/KerfDesk/pull/1146). State: pr-open-ci-verified.
 
 Trigger: One C-shaped island-free polygon [(0,0),(30,0),(30,6),(6,6),(6,24),(30,24),(30,30),(0,30)]; 2 mm cutter, 40% stepover, helix diameters 1 to 2 mm at 5 degrees, depth -1 mm.
 
@@ -182,14 +184,15 @@ Review follow-ups:
 - Restart during a leading dwell retains elapsed wait time: An explicit restart revision clears elapsed time even when the scrubber distance is already zero. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361108).
 - Same-block dwell is scheduled after motion: Ordinary G4 executes before same-block motion in both planning boundaries and preview timestamps; existing cycle dwell representation is preserved. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361112).
 - Non-finite dwell publishes an infinite estimate and unfinishable playback: Non-finite totals or segments retain geometry and report timing unavailable instead of publishing an unfinishable timeline. Independently reviewed and published in 286e7a54eccbfa4cdb4f2ee9988f80ccf6a35ff4; required CI remains pending. [Review finding](https://github.com/cisgz3a-hub/KerfDesk/pull/1149#discussion_r4240361117).
+- Clearing inactive preview repeatedly updates state with an unstable scheduler: Hosted CI exhausted a test worker. The exact unfinished test injects a fresh scheduler; independent capped probes reproduce all three modes. The repair returns the existing already-empty state for the same owner, preserving real owner changes, route clearing and cancellation. The default application scheduler is stable; this is not a claim that every ordinary mount exhausts memory. Independently reviewed and published; latest-head required CI remains pending.
 
-These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware.
+These six cases were reproduced against the first published imported-program timing repair. Their repair remains in the same focused PR; they are not attributed wholesale to historical PR #80. Source and mock playback evidence do not qualify controller hardware. The inactive-clear object update was introduced by this audit repair, and is tracked as a CI follow-up rather than a new historical PR #80 defect.
 
-Local evidence: docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json. Repair evidence: docs/audits/2026-10-11-pr-history/publication/imported-timing-followup.md.
+Local evidence: docs/audits/2026-10-11-pr-history/batch-03/workspace-ux.json. Repair evidence: docs/audits/2026-10-11-pr-history/publication/heartbeat-0651-timing-ci-repair.md.
 
 ## B03-VAR-001: Keep the editable current serial inside the persistence integer domain
 
-Repair: [#1150](https://github.com/cisgz3a-hub/KerfDesk/pull/1150). State: pr-open-ci-pending.
+Repair: [#1150](https://github.com/cisgz3a-hub/KerfDesk/pull/1150). State: pr-open-ci-verified.
 
 Trigger: Enter 10000000000000000 in the current Variable serial input. HTML input validity succeeds and the ordinary React/store edit commits that value.
 

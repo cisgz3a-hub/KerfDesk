@@ -1,6 +1,6 @@
 # Historical findings and dispositions
 
-These 42 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 10 rejected candidate; 7 documented limitation.
+These 43 records were reconciled from historical audit batches and repair follow-up reviews. They are separate from newly confirmed current defects. Counts: 1 closed-unmerged proposal; 24 resolved before audit; 10 rejected candidate; 8 documented limitation.
 
 A rejected candidate means the stated investigation did not establish an actionable current defect. It is not a proof of general correctness. Evidence paths are relative to the local archive docs/audits/2026-10-11-pr-history/.
 
@@ -339,3 +339,11 @@ Disposition: **rejected candidate**. Historical PRs: [#1139](https://github.com/
 Review comment r4240505330 did not reproduce at published head 282b60d3c71320ad7884299d7d40924ab59c73f8. All 25 independent Chrome/math controls passed through both parser routes and exact state, including infinity / infinity becoming NaN and outer opacity zero. Six direct @csstools/css-calc 2.1.4 controls using the exact current options preserve numeric Infinity, -Infinity, NaN and signed zero. No math production change is justified by this claim. This is bounded evidence for the reported expressions, not general CSS conformance.
 
 Local audit evidence: publication/heartbeat-0621-svg-reproduction.md, publication/heartbeat-0621-svg-ieee-library.json.
+
+## DISP-043: Flex-unit cancellation in opacity has conflicting specification and browser support
+
+Disposition: **documented limitation**. Historical PRs: [#1139](https://github.com/cisgz3a-hub/KerfDesk/pull/1139).
+
+Comment r4240569210 reports calc(1fr / 1fr). Both Chrome154 and the published importer reject that exact expression and preserve the valid lower declaration. CSS Values4 draft type algebra includes flex cancellation while CSS Grid2 retains a flex-in-calc restriction note. The importer retains its observed browser-compatible unsupported-flex boundary; this is not a claim of universal CSS invalidity or a repaired ratio. Independent review separately confirmed sign(1fr) could evade that boundary; that defect is repaired and recorded under FND-001.
+
+Local audit evidence: publication/heartbeat-0651-svg-reproduction.md, publication/heartbeat-0651-svg-peer-review.md, publication/heartbeat-0651-svg-repair-report.md.
